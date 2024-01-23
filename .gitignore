@@ -2,7 +2,6 @@
 
 # compiled output
 dist
-tmp
 /out-tsc
 artifacts
 
@@ -37,10 +36,6 @@ testem.log
 /typings
 .env
 
-# System Files
-.DS_Store
-Thumbs.db
-
 # Yarn
 .yarn/*
 
@@ -53,9 +48,6 @@ Thumbs.db
 /examples/*/build/
 /docs
 /report
-/node_modules
-website/node_modules
-
 **/build/
 **/*.log
 /packages/*/build/
@@ -64,7 +56,7 @@ website/node_modules
 /packages/*/api/*.api.md
 /packages/*/coverage/
 /packages/*/node_modules/
-coverage
+
 
 .npmrc
 
@@ -72,23 +64,8 @@ npm-debug.log
 npm-debug.log*
 lerna-debug.log
 
-*.tsbuildinfo
-identity-store.json
-key-store.json
-*.sqlite
-
-.vscode/
-node_modules
 temp/
 tmp/
-
-agent.yml
-data
-.vscode-upload.json
-
-local-database*.json
-
-/scratch
 
 # logs
 /logs

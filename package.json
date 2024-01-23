@@ -6,8 +6,9 @@
         "packages/*"
     ],
     "scripts": {
+        "start": "cd packages/core && pnpm start",
         "build": "pnpm -r --stream build",
-        "test": "pnpm test:packages",
+        "test": "jest",
         "upgrade:packages": "pnpm -r --stream upgrade --latest",
         "version": "lerna version",
         "prepare": "husky install",
