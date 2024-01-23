@@ -1,3 +1,94 @@
-node_modules/
-lib
+# See http://help.github.com/ignore-files/ for more about ignoring files.
+
+# compiled output
+dist
+tmp
+/out-tsc
+artifacts
+
+# dependencies
+node_modules
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+junit.xml
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+.env
+
+# System Files
 .DS_Store
+Thumbs.db
+
+# Yarn
+.yarn/*
+
+.idea
+.DS_STORE
+.eslintcache
+*.swp
+*~
+/examples/*/node_modules/
+/examples/*/build/
+/docs
+/report
+/node_modules
+website/node_modules
+
+**/build/
+**/*.log
+/packages/*/build/
+/packages/*/lib/
+/packages/*/api/*.api.json
+/packages/*/api/*.api.md
+/packages/*/coverage/
+/packages/*/node_modules/
+coverage
+
+.npmrc
+
+npm-debug.log
+npm-debug.log*
+lerna-debug.log
+
+*.tsbuildinfo
+identity-store.json
+key-store.json
+*.sqlite
+
+.vscode/
+node_modules
+temp/
+tmp/
+
+agent.yml
+data
+.vscode-upload.json
+
+local-database*.json
+
+/scratch
+
+# logs
+/logs
