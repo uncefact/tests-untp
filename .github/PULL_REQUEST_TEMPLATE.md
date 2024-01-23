@@ -6,8 +6,6 @@
   commits if your PR already received reviews or comments.
   
   Before submitting a Pull Request, please ensure you've done the following:
-  - 📖 Read the [Contributing Guide](https://github.com/uncefact/project-vckit/blob/main/CONTRIBUTING.md).
-  - 📖 Read the [Code of Conduct](https://github.com/uncefact/project-vckit/blob/main/CODE_OF_CONDUCT.md).
   - 👷‍♀️ Create small PRs. In most cases, this will be possible.
   - ✅ Provide tests for your changes.
   - 📝 Use descriptive commit messages following [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/).
@@ -55,7 +53,6 @@ https://docs.github.com/en/free-pro-team@latest/github/managing-your-work-on-git
 ## Added to documentation?
 
 - [ ] 📜 README.md
-- [ ] 📓 [vc-kit doc site](https://uncefact.github.io/vckit/)
 - [ ] 📕 storybook
 - [ ] 🙅 no documentation needed
 
