@@ -7,7 +7,6 @@
   "scripts": {
     "build": "pnpm -r --stream build",
     "test": "pnpm test:packages",
-    "prettier": "prettier --write \"{packages,docs,__tests__,!build}/**/*.{ts,js,json,md,yml}\"",
     "upgrade:packages": "pnpm -r --stream upgrade --latest",
     "version": "lerna version"
   },
