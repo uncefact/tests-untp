@@ -17,7 +17,7 @@ export default {
   extensionsToTreatAsEsm: ['.ts'],
   testMatch: ['**/__tests__/**/*.test.*'],
   testPathIgnorePatterns: ['<rootDir>/node_modules/'],
-  testEnvironment: 'jsdom',
+  testEnvironment: 'node',
   automock: false,
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
