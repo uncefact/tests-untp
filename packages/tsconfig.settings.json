@@ -15,15 +15,13 @@
     "useUnknownInCatchVariables": false,
     "experimentalDecorators": true,
     "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "jsx": "react-jsx"
   },
   "ts-node": {
     "compilerOptions": {
       "module": "CommonJS"
     }
   },
-  "exclude": [
-    "**/__tests__/**/*",
-    "**/build/**/*"
-  ]
+  "exclude": ["**/__tests__/**/*", "**/build/**/*"]
 }
