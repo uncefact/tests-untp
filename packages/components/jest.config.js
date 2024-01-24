@@ -2,7 +2,7 @@ const jestConfig = {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
   extensionsToTreatAsEsm: ['.ts'],
-  testMatch: ['**/__tests__/**/*.test.*'],
+  testMatch: ['**/__tests__/**/*.test.tsx'],
   testPathIgnorePatterns: ['<rootDir>/node_modules/'],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   moduleNameMapper: {
