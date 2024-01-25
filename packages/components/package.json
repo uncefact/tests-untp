@@ -10,7 +10,8 @@
     "build:watch": "tsc -b --watch",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test": "jest --ci --env=jest-environment-jsdom"
+    "test": "jest --ci --env=jest-environment-jsdom",
+    "coverage": "jest --coverage"
   },
   "eslintConfig": {
     "extends": [
@@ -46,7 +47,9 @@
     "@mui/x-date-pickers": "^6.19.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-scripts": "5.0.1"
+    "react-router-dom": "^6.21.3",
+    "react-scripts": "5.0.1",
+    "react-toastify": "^10.0.4"
   },
   "devDependencies": {
     "@babel/preset-react": "^7.7.0",
