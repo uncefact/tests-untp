@@ -8,8 +8,10 @@
   "scripts": {
     "start": "cd packages/core && pnpm start",
     "build": "pnpm -r --stream build",
-    "test:components": "cd packages/components && pnpm run test",
     "test": "pnpm run test:components",
+    "test:components": "cd packages/components && pnpm run test",
+    "storybook":"pnpm run storybook:components",
+    "storybook:components":"cd packages/components && pnpm run storybook",
     "upgrade:packages": "pnpm -r --stream upgrade --latest",
     "version": "lerna version",
     "prepare": "husky install",
