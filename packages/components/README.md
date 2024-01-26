@@ -21,7 +21,7 @@ Explore and interact with the components using Storybook.
 ### Run Storybook
 
 ```bash
-npm run storybook
+pnpm run storybook
 ```
 
 Visit http://localhost:6006/ in your browser to view Storybook.
@@ -31,5 +31,5 @@ Visit http://localhost:6006/ in your browser to view Storybook.
 Run unit tests using Jest.
 
 ```bash
-npm test
+pnpm test
 ```
