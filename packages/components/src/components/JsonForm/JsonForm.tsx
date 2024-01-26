@@ -7,46 +7,40 @@ import { JsonSchema, UISchemaElement } from '@jsonforms/core';
  * The props for the JsonForm component.
  * @typedef IRenderJsonSchemaProps
  * @property {Object} schema - The json schema.
+ * @property {Function} onChange - The callback to be called when the form changes.
  * @property {Object} [uiSchema] - The ui schema.
  * @property {Object} [initialData] - The initial data.
- * @property {Function} onChangeJsonSchemaForm - The callback to be called when the form changes.
+ * @property {string} [className] - The class name.
  */
-interface IRenderJsonSchemaProps {
+export interface IJsonFormProps {
   schema: JsonSchema;
+  onChange: ({ errors, data }: { errors: any[]; data: any }) => void;
   uiSchema?: UISchemaElement;
   initialData?: any;
-
-  onChangeJsonSchemaForm: ({ errors, data }: { errors: any[]; data: any }) => void;
-}
-
-interface IJsonForm extends React.HTMLAttributes<HTMLDivElement> {
-  jsonData: IRenderJsonSchemaProps;
+  className?: string;
 }
 
 /**
  * Receive a json schema and render a form.
- * @param {Object} props - The component props.
- * @param {Object} props.jsonData - The json data to render the form.
- * @param {string} props.className - The component class name.
  * @returns {React.ReactElement} The rendered component.
  */
-export const JsonForm = ({ jsonData, className, ...props }: IJsonForm) => {
-  const [data, setData] = useState(jsonData.initialData);
+export const JsonForm = ({ schema, uiSchema, initialData, onChange, className, ...props }: IJsonFormProps) => {
+  const [data, setData] = useState(initialData);
 
-  const onChange = ({ errors, data }: { errors: any[]; data: any }) => {
+  const handleChange = ({ errors, data }: { errors: any[]; data: any }) => {
     setData(data);
-    jsonData.onChangeJsonSchemaForm({ data, errors });
+    onChange({ data, errors });
   };
 
   return (
     <div className={className} {...props}>
       <JsonForms
-        schema={jsonData.schema}
-        uischema={jsonData.uiSchema}
+        schema={schema}
+        uischema={uiSchema}
         data={data}
         renderers={materialRenderers}
         cells={materialCells}
-        onChange={onChange}
+        onChange={handleChange}
       />
     </div>
   );

@@ -1,12 +1,11 @@
 export const schema = {
   type: 'object',
   properties: {
-    string: {
+    name: {
       type: 'string',
     },
-    boolean: {
+    vegetarian: {
       type: 'boolean',
-      description: 'Boolean description as a tooltip',
     },
   },
 };
@@ -16,16 +15,16 @@ export const uischema = {
   elements: [
     {
       type: 'Control',
-      scope: '#/properties/string',
+      scope: '#/properties/name',
     },
     {
       type: 'Control',
-      scope: '#/properties/boolean',
+      scope: '#/properties/vegetarian',
     },
   ],
 };
 
 export const initialData = {
-  string: 'This is a string',
-  boolean: true,
+  name: 'James A. Fernandes',
+  vegetarian: true,
 };

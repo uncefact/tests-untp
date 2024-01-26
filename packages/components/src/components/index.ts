@@ -1,1 +1,1 @@
-export * from './json-form/index.js';
+export * from './JsonForm/index.js';

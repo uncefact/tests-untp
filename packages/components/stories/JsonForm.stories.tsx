@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import { JsonForm } from '../src/components/json-form/JsonForm';
+import { JsonForm } from '../src/components/JsonForm/JsonForm';
 
 const meta: any = {
   title: 'Json Form',
@@ -16,12 +16,12 @@ type Story = StoryObj<typeof meta>;
 const schema = {
   type: 'object',
   properties: {
-    string: {
+    name: {
       type: 'string',
+      description: 'Please enter your name',
     },
-    boolean: {
+    vegetarian: {
       type: 'boolean',
-      description: 'Boolean description as a tooltip',
     },
   },
 };
@@ -31,28 +31,21 @@ const uiSchema = {
   elements: [
     {
       type: 'Control',
-      scope: '#/properties/string',
+      scope: '#/properties/name',
     },
     {
       type: 'Control',
-      scope: '#/properties/boolean',
+      scope: '#/properties/vegetarian',
     },
   ],
 };
 
 const initialData = {
-  string: 'Hello',
-  boolean: false,
-};
-
-const jsonData = {
-  schema,
-  uiSchema,
-  initialData,
-  onChangeJsonSchemaForm: () => {},
+  name: 'John Doe',
+  vegetarian: false,
 };
 
 export const Default: Story = {
-  args: { jsonData },
+  args: { schema, uiSchema, initialData, onChange: () => {} },
   decorators: [(Story) => <Story />],
 };
