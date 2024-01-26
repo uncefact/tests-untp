@@ -10,7 +10,7 @@ export const schema = {
   },
 };
 
-export const uischema = {
+export const uiSchema = {
   type: 'VerticalLayout',
   elements: [
     {

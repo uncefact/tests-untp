@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { JsonForms } from '@jsonforms/react';
 
-import { schema, initialData, uischema } from './mocks/json-form.mock';
+import { schema, initialData, uiSchema } from './mocks/JsonForm.mock';
 import { JsonForm } from '../components/JsonForm/JsonForm';
 
 describe('render json schema component', () => {
@@ -43,7 +43,7 @@ describe('render json schema component', () => {
   });
 
   it('should render component with schema and ui schema props', async () => {
-    render(<JsonForm schema={schema} uiSchema={uischema} onChange={onChangeJsonSchemaForm} className='json-form' />);
+    render(<JsonForm schema={schema} uiSchema={uiSchema} onChange={onChangeJsonSchemaForm} className='json-form' />);
     const getStringField = screen.getByLabelText('Name');
     expect(getStringField).not.toBeNull();
     const getBooleanField = screen.getByLabelText('Vegetarian');
@@ -54,7 +54,7 @@ describe('render json schema component', () => {
     render(
       <JsonForm
         schema={schema}
-        uiSchema={uischema}
+        uiSchema={uiSchema}
         initialData={initialData}
         onChange={onChangeJsonSchemaForm}
         className='json-form'
