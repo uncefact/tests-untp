@@ -1,6 +1,5 @@
 import React from 'react';
-import { ToastMessage } from '../src/components/ToastMessage'
-import { toastMessage } from '../src/utils/toastMessage';
+import { ToastMessage, toastMessage, Status } from '../src/components/ToastMessage/ToastMessage';
 
 export default {
   title: 'ToastMessage',
@@ -11,7 +10,7 @@ export default {
 };
 
 const args =  {
-  status: 'success',
+  status: Status.success,
   message: 'Toast message!',
 };
 
