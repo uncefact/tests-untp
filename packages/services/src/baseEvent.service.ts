@@ -6,10 +6,6 @@ import { IssueEvent } from './types/types';
 export class BaseEvent {
   private template?: any;
   private schema?: any;
-  objectEvent: any;
-  transformationEvent: any;
-  aggregationEvent: any;
-  transactionEvent: any;
 
   constructor(template?: any, schema?: any) {
     this.template = template;
@@ -38,15 +34,15 @@ export class BaseEvent {
 
   public async issueEvent(arg: IssueEvent) {
     try {
-      const { credentialPayload, credentialSubject, restOfVC, context } = arg;
-      const result: VerifiableCredential = await integrateVckitIssueVC({
+      const { credentialPayload, credentialSubject, restOfVC, context, vcKitAPIUrl } = arg;
+      const credentialValue: VerifiableCredential = await integrateVckitIssueVC({
         context,
         credentialSubject,
         ...credentialPayload,
         restOfVC,
+        vcKitAPIUrl,
       });
 
-      const credentialValue = result;
       return credentialValue;
     } catch (error) {
       throw error;
