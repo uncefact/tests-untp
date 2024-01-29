@@ -1,4 +1,3 @@
-/* eslint-disable no-useless-catch */
 import { VerifiableCredential } from '@vckit/core-types';
 import { IVcKitIssueVC, integrateVckitIssueVC } from './vckit.service';
 
@@ -13,21 +12,17 @@ export class BaseEvent {
 
   public createEvent(arg) {
     const { eventType } = arg;
-    try {
-      switch (eventType) {
-        case 'object_event':
-          break;
-        case 'transformation_event':
-          break;
-        case 'aggregation_event':
-          break;
-        case 'transaction_event':
-          break;
-        default:
-          break;
-      }
-    } catch (error) {
-      throw error;
+    switch (eventType) {
+      case 'object_event':
+        break;
+      case 'transformation_event':
+        break;
+      case 'aggregation_event':
+        break;
+      case 'transaction_event':
+        break;
+      default:
+        break;
     }
   }
 
