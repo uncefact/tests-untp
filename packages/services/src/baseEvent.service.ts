@@ -1,7 +1,6 @@
 /* eslint-disable no-useless-catch */
 import { VerifiableCredential } from '@vckit/core-types';
-import { integrateVckitIssueVC } from './vckit.service';
-import { IssueEvent } from './types/types';
+import { IVcKitIssueVC, integrateVckitIssueVC } from './vckit.service';
 
 export class BaseEvent {
   private template?: any;
@@ -32,7 +31,7 @@ export class BaseEvent {
     }
   }
 
-  public async issueEvent(arg: IssueEvent) {
+  public async issueEvent(arg: IVcKitIssueVC) {
     try {
       const { credentialPayload, credentialSubject, restOfVC, context, vcKitAPIUrl } = arg;
       const credentialValue: VerifiableCredential = await integrateVckitIssueVC({
