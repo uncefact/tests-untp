@@ -1,7 +1,7 @@
 import { VerifiableCredential } from '@vckit/core-types';
-import { IVcKitIssueVC, integrateVckitIssueVC } from './vckit.service';
+import { IVcKitIssueVC, integrateVckitIssueVC } from '../vckit.service';
 
-export class BaseEvent {
+export abstract class BaseEvent {
   private template?: any;
   private schema?: any;
 
@@ -26,7 +26,7 @@ export class BaseEvent {
     }
   }
 
-  public async issueEvent(arg: IVcKitIssueVC) {
+  async issueVC(arg: IVcKitIssueVC): Promise<VerifiableCredential> {
     try {
       const { credentialPayload, credentialSubject, restOfVC, context, vcKitAPIUrl } = arg;
       const credentialValue: VerifiableCredential = await integrateVckitIssueVC({
