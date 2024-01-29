@@ -66,7 +66,6 @@ class BaseAPI {
       const response = await this.axiosInstance.get<T>(url, config);
       return this.handleResponse(response);
     } catch (error) {
-      console.log(error);
       throw new Error('Request failed with get method');
     }
   }
@@ -83,7 +82,6 @@ class BaseAPI {
       const response = await this.axiosInstance.post<T>(url, data, config);
       return this.handleResponse(response);
     } catch (error) {
-      console.log(error);
       throw new Error('Request failed with get method');
     }
   }
@@ -100,7 +98,6 @@ class BaseAPI {
       const response = await this.axiosInstance.put<T>(url, data, config);
       return this.handleResponse(response);
     } catch (error) {
-      console.log(error);
       throw new Error('Request failed with get method');
     }
   }

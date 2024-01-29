@@ -2,6 +2,10 @@ import { CredentialPayload, VerifiableCredential } from '@vckit/core-types';
 import { contextDefault, typeDefault } from './models/vckit';
 import { publicAPI } from './utils/httpService';
 
+export interface IVcKitIssueVC extends CredentialPayload {
+  vcKitAPIUrl: string;
+}
+
 /**
  * integrate with vckit to issue vc with default context and type
  */
@@ -11,16 +15,11 @@ export const integrateVckitIssueVC = async ({
   issuer,
   credentialSubject,
   restOfVC,
-}: CredentialPayload): Promise<VerifiableCredential> => {
+  vcKitAPIUrl,
+}: IVcKitIssueVC): Promise<VerifiableCredential> => {
   const body = constructCredentialObject({ context, type, issuer, credentialSubject, restOfVC });
-
-  try {
-    const response = await publicAPI.post(`${process.env.REACT_APP_VCKIT_API_URL ?? ''}/credentials/issue`, body);
-    return response;
-  } catch (error) {
-    console.error(error);
-    throw error;
-  }
+  const response = await publicAPI.post(`${vcKitAPIUrl}/credentials/issue`, body);
+  return response;
 };
 
 const constructCredentialObject = ({ context, type, issuer, credentialSubject, restOfVC }: CredentialPayload) => {
