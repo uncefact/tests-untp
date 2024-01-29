@@ -38,9 +38,9 @@ export class BaseEvent {
 
   public async issueEvent(arg: IssueEvent) {
     try {
-      const { credentialPayload, credentialSubject, restOfVC } = arg;
+      const { credentialPayload, credentialSubject, restOfVC, context } = arg;
       const result: VerifiableCredential = await integrateVckitIssueVC({
-        context: ['https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json'],
+        context,
         credentialSubject,
         ...credentialPayload,
         restOfVC,
