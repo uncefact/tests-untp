@@ -8,7 +8,5 @@
     "resolveJsonModule": true
   },
   "references": [],
-  "include": [
-    "src/**/*.ts",
-  ]
+  "include": ["src/**/*.ts"]
 }

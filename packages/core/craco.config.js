@@ -1,13 +1,6 @@
 const webpack = require('webpack');
 
 module.exports = {
-  babel: {
-    presets: ['@babel/preset-react', '@babel/preset-env', '@babel/preset-typescript'],
-    plugins: ['@babel/plugin-syntax-import-assertions'],
-    loaderOptions: (babelLoaderOptions) => {
-      return babelLoaderOptions;
-    },
-  },
   webpack: {
     configure: (webpackConfig, { env, paths }) => {
       webpackConfig.resolve.fallback = {
@@ -16,6 +9,13 @@ module.exports = {
       };
       /* ... */
       return webpackConfig;
+    },
+    babel: {
+      presets: ['@babel/preset-react', '@babel/preset-env', '@babel/preset-typescript'],
+      plugins: ['@babel/plugin-syntax-import-assertions'],
+      loaderOptions: (babelLoaderOptions) => {
+        return babelLoaderOptions;
+      },
     },
     plugins: [
       new webpack.ProvidePlugin({
