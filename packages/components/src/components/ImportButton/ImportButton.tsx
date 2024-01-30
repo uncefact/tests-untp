@@ -15,24 +15,29 @@ export const ImportButton = ({ label = 'Import', onChange }: IProps) => {
   const [loading, setLoading] = useState<boolean>(false);
 
   const loadJsonFile = (file: File): Promise<object> => {
-    return new Promise((resolve, reject) => {
+    const maxFileSizeMB = 5;
+
+    return new Promise((resolve) => {
+      if (file.size > maxFileSizeMB * 1024 * 1024) { // 5 MB
+        throw new Error(`File size exceeds the maximum allowed size of ${maxFileSizeMB} MB.`);
+      }
       const fileReader = new FileReader();
   
       fileReader.onload = (event) => {
         const fileContent = event?.target?.result;
         try {
           if (!fileContent) {
-            return reject('File content is empty! Please select a valid file.');
+            throw new Error('File content is empty! Please select a valid file.');
           }
   
           const fileContentObject = JSON.parse(fileContent as string);
           resolve(fileContentObject);
         } catch (error: any) {
-          reject(`Invalid JSON file! ${error.message}`);
+          throw new Error(`Invalid JSON file! ${error.message}`);
         }
       };
       fileReader.onerror = () => {
-        reject('Error reading the file! Please try again.');
+        throw new Error('Error reading the file! Please try again.');
       };
   
       fileReader.readAsText(file);

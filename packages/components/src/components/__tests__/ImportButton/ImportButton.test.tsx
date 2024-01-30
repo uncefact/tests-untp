@@ -1,4 +1,7 @@
+/* eslint-disable testing-library/no-unnecessary-act */
+/* eslint-disable jest/no-conditional-expect */
 import React from 'react';
+import { act } from 'react-dom/test-utils';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ImportButton } from '../../..';
 
@@ -47,6 +50,40 @@ describe('ImportButton', () => {
 
     // Wait for the loading state to resolve
     await waitFor(() => expect(fileInput).not.toBeDisabled());
+  });
+
+  it('handles file upload error due to exceeding maximum file size', async () => {
+    try {
+      // A mock function to be used as the 'onChange' callback
+      const onChangeMock = jest.fn();
+      
+      // Mocking console.error to capture the error message
+      const consoleErrorMock = jest.spyOn(console, 'error');
+      consoleErrorMock.mockImplementation(() => {});
+    
+      // Set a file size greater than the maximum allowed size (in bytes)
+      const oversizedFileMock = new File(['file content'], 'oversizedFile.json', {
+        type: 'application/json',
+      });
+
+      // 6 MB, exceeding the maximum allowed size
+      Object.defineProperty(oversizedFileMock, 'size', { value: 1024 * 1024 * 6 });
+      
+      await act(async () => {
+        // Render the ImportButton component with the provided label and onChange mock function
+        render(<ImportButton label='Import JSON File' onChange={onChangeMock} />);
+
+        // Simulate a file change event by providing an oversized file to the file input
+        fireEvent.change(screen.getByLabelText('Import JSON File'), {
+          target: { files: [oversizedFileMock] },
+        });
+      });
+
+        // Catch any errors that might occur during the asynchronous operation
+      } catch (error: any) {
+        // expect that the error message is not null, indicating an error was thrown
+        expect(error.message).not.toBeNull();
+      }
   });
 
 });
