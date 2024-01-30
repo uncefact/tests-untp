@@ -5,19 +5,23 @@ This directory contains the source code for the services that are used by the ap
 ## Example use case
 
 ```JS
-class ObjectEvent extends BaseEvent {
-  constructor(template, schema) {
-    super(template, schema);
+class DummyEvent extends BaseEvent {
+  constructor({ renderTemplate, context, issuer, vcKitAPIUrl, eventType }) {
+    super({ renderTemplate, context, issuer, vcKitAPIUrl, eventType });
   }
 }
 
-const objectEvent = new ObjectEvent('object_template', 'object_schema');
-await objectEvent.issueVC({
-  credentialPayload: {},
-  credentialSubject: {},
-  issuer: '',
-  restOfVC: {},
-  context: {},
-  vcKitAPIUrl: '',
+const dummyEvent = new DummyEvent({
+  renderTemplate: { template: 'template', '@type': 'type' },
+  context: ['context'],
+  issuer: 'issuer',
+  vcKitAPIUrl: 'vcKitAPIUrl',
+  eventType: 'eventType',
 });
+
+await dummyEvent.issueVC({
+  credentialPayload: { batchId: '1234' },
+  credentialSubject: { id: 'did:web:localhost', name: 'John Doe', age: 30 },
+});
+
 ```
