@@ -21,7 +21,8 @@ export interface IBaseEvent {
   eventType: string;
 }
 
-export interface IArgIssueVC {
-  credentialPayload: any;
+export interface IArgIssueEvent {
+  credentialPayload: unknown;
   credentialSubject: CredentialSubject;
+  type?: string;
 }

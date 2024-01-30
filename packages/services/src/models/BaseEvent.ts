@@ -1,6 +1,6 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import { integrateVckitIssueVC } from '../vckit.service';
-import { IArgIssueVC, IBaseEvent, IRender } from '../types';
+import { IArgIssueEvent, IBaseEvent, IRender } from '../types/BaseEvent.types';
 
 /**
  * @description BaseEvent class is the base class for the events extending the class
@@ -26,39 +26,21 @@ export abstract class BaseEvent {
   }
 
   /**
-   * @description createEvent method is used to create the event
-   */
-  // TODO: put to case correct eventType
-  public createEvent() {
-    switch (this.eventType) {
-      case 'object_event':
-        break;
-      case 'transformation_event':
-        break;
-      case 'aggregation_event':
-        break;
-      case 'transaction_event':
-        break;
-      default:
-        break;
-    }
-  }
-
-  /**
-   * @description issueVC method is used to issue the VC
+   * @description issueEvent method is used to issue the VC
    * @param arg - arguments for the VC
    */
-  async issueVC(arg: IArgIssueVC): Promise<VerifiableCredential> {
+  async issueEvent(arg: IArgIssueEvent): Promise<VerifiableCredential> {
     try {
-      const restOfVC = { render: this.renderTemplate, type: this.eventType };
-      const { credentialPayload, credentialSubject } = arg;
+      const restOfVC = { render: this.renderTemplate };
+      const { credentialPayload, credentialSubject, type } = arg;
       const credentialValue: VerifiableCredential = await integrateVckitIssueVC({
         context: this.context,
         credentialSubject,
-        ...credentialPayload,
         issuer: this.issuer,
-        restOfVC,
+        type: [...this.eventType, ...(type ?? [])],
         vcKitAPIUrl: this.vcKitAPIUrl,
+        credentialPayload,
+        ...restOfVC,
       });
 
       return credentialValue;

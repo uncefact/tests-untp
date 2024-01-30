@@ -19,9 +19,10 @@ const dummyEvent = new DummyEvent({
   eventType: 'eventType',
 });
 
-await dummyEvent.issueVC({
+await dummyEvent.issueEvent({
   credentialPayload: { batchId: '1234' },
   credentialSubject: { id: 'did:web:localhost', name: 'John Doe', age: 30 },
+  type: 'typeEvent'
 });
 
 ```
