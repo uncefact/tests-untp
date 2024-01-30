@@ -1,3 +1,79 @@
+/**
+* @example 
+* import { ComponentType, IDynamicComponentRendererProps } from './components/GenericFeature/DynamicComponentRenderer';
+*
+* export const logService = (data: unknown) => {
+*   console.log(data);
+*   return data;
+* };
+*
+* export const logServiceTwo = (data: unknown) => {
+*   console.log(data);
+* };
+
+* function Example() {
+*   const [jsonFormData, setJsonFormData] = React.useState();
+*   const componentsData: IDynamicComponentRendererProps[] = [
+*     {
+*       name: 'JsonForm', // import from @mock-app/components
+*       type: 'EntryData' as ComponentType,
+*       props: {
+*         schema: {
+*           type: 'object',
+*           properties: {
+*             name: {
+*               type: 'string',
+*             },
+*             vegetarian: {
+*               type: 'boolean',
+*             },
+*           },
+*         },
+*         onChange: (value: any) => {
+*           setJsonFormData(value.data);
+*         },
+*         uiSchema: {
+*           type: 'VerticalLayout',
+*           elements: [
+*             {
+*               type: 'Control',
+*               scope: '#/properties/name',
+*            },
+*             {
+*               type: 'Control',
+*               scope: '#/properties/vegetarian',
+*             },
+*          ],
+*         },
+*         initialData: {},
+*         className: '',
+*       },
+*     },
+*     {
+*       name: 'Button',
+*       type: 'Submit' as ComponentType,
+*       props: {},
+*     },
+*  ];
+*
+*    const services = [
+*    {
+*      name: 'logService',
+*      parameters: [jsonFormData],
+*    },
+*    {
+*      name: 'logServiceTwo',
+*      parameters: [],
+*    },
+*  ];
+* return (
+*    <div className='example'>
+*      <GenericFeature components={componentsData} services={services} />
+*    </div>
+*    );
+*  }
+*/
+
 import React from 'react';
 import * as services from '@mock-app/services';
 // import * as events from '@mock-app/events';
