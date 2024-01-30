@@ -64,7 +64,7 @@ class BaseAPI {
   public async get<T = any>(url: string, config?: AxiosRequestConfig) {
     try {
       const response = await this.axiosInstance.get<T>(url, config);
-      return this.handleResponse(response);
+      return this.handleResponse(response) as T;
     } catch (error) {
       throw new Error('Request failed with get method');
     }
@@ -77,10 +77,10 @@ class BaseAPI {
    * @param config change default config of axios instance
    * @returns response data or error
    */
-  public async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig) {
+  public async post<T>(url: string, data?: any, config?: AxiosRequestConfig) {
     try {
       const response = await this.axiosInstance.post<T>(url, data, config);
-      return this.handleResponse(response);
+      return this.handleResponse(response) as T;
     } catch (error) {
       throw new Error('Request failed with get method');
     }
@@ -93,10 +93,10 @@ class BaseAPI {
    * @param config change default config of axios instance
    * @returns response data or error
    */
-  public async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig) {
+  public async put<T>(url: string, data?: any, config?: AxiosRequestConfig) {
     try {
       const response = await this.axiosInstance.put<T>(url, data, config);
-      return this.handleResponse(response);
+      return this.handleResponse(response) as T;
     } catch (error) {
       throw new Error('Request failed with get method');
     }

@@ -64,13 +64,14 @@ describe('BaseEvent', () => {
     it('should return successful value from integrateVckitIssueVC when calling issueVC with valid params', async () => {
       const mockResult = { data: 'successful' };
       (integrateVckitIssueVC as jest.Mock).mockResolvedValueOnce(mockResult);
-      const result = await instance.issueVC({
+      const result = await instance.issueEvent({
         credentialPayload: { batchId: '1234' },
         credentialSubject: {
           id: 'did:web:localhost',
           name: 'John Doe',
           age: 30,
         },
+        type: 'dummy_event',
       });
       expect(result).toEqual(mockResult);
     });
@@ -78,7 +79,7 @@ describe('BaseEvent', () => {
     it('should throw error from integrateVckitIssueVC when call issueVC with invalid params', async () => {
       try {
         (integrateVckitIssueVC as jest.Mock).mockRejectedValueOnce(new Error('error'));
-        await instance.issueVC({
+        await instance.issueEvent({
           credentialPayload: {},
           credentialSubject: {},
         });
