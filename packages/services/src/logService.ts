@@ -1,3 +1,3 @@
-export const logService = (data: any) => {
+export const logService = (data: unknown) => {
   console.log(data);
 };

@@ -7,8 +7,12 @@
     "plugin:@typescript-eslint/recommended",
     "plugin:@typescript-eslint/recommended-requiring-type-checking"
   ],
+  "parserOptions": {
+    "project": ["./packages/tsconfig.settings.json"]
+  },
   "rules": {
     "no-console": "warn",
+    // Off for now, but we should enable this in the future
     "@typescript-eslint/no-unsafe-call": "off",
     "@typescript-eslint/no-unsafe-member-access": "off",
     "@typescript-eslint/no-unsafe-assignment": "off"

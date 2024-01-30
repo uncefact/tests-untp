@@ -32,7 +32,7 @@ export const DynamicComponentRenderer: React.FC<IDynamicComponentRendererProps> 
     // Dynamically load the component from the components package
     const componentName = name as keyof typeof components;
     if (typeof components[componentName] !== 'undefined') {
-      setComponent(() => components[componentName]);
+      setComponent(() => components[componentName] as React.ComponentType<any>);
     }
   }, [name]);
 

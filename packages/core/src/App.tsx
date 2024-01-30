@@ -1,13 +1,44 @@
-import React, { Component } from 'react';
+import React from 'react';
 import { GenericFeature } from './components/GenericFeature';
 import { ComponentType, IDynamicComponentRendererProps } from './components/GenericFeature/DynamicComponentRenderer';
 
 function App() {
+  const [jsonFormData, setJsonFormData] = React.useState();
   const componentsData: IDynamicComponentRendererProps[] = [
     {
       name: 'JsonForm',
       type: 'EntryData' as ComponentType,
-      props: {},
+      props: {
+        schema: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+            },
+            vegetarian: {
+              type: 'boolean',
+            },
+          },
+        },
+        onChange: (value: any) => {
+          setJsonFormData(value.data);
+        },
+        uiSchema: {
+          type: 'VerticalLayout',
+          elements: [
+            {
+              type: 'Control',
+              scope: '#/properties/name',
+            },
+            {
+              type: 'Control',
+              scope: '#/properties/vegetarian',
+            },
+          ],
+        },
+        initialData: {},
+        className: '',
+      },
     },
     {
       name: 'Button',
@@ -19,7 +50,7 @@ function App() {
   const services = [
     {
       name: 'logService',
-      parameters: [],
+      parameters: [jsonFormData],
     },
   ];
 

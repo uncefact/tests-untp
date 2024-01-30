@@ -7,8 +7,9 @@
   ],
   "scripts": {
     "start": "cd packages/core && pnpm start",
-    "build": "pnpm build:components",
+    "build": "pnpm build:components && pnpm build:services",
     "build:components": "cd packages/components && pnpm run build",
+    "build:services": "cd packages/services && pnpm run build",
     "test": "pnpm run test:components",
     "test:components": "cd packages/components && pnpm run test",
     "storybook": "pnpm run storybook:components",
