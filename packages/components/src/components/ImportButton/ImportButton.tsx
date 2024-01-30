@@ -4,40 +4,40 @@ import { LoadingButton } from '@mui/lab';
 import { UploadFile as UploadFileIcon } from '@mui/icons-material';
 
 interface IProps {
-  buttonText?: string;
+  label?: string;
   onChange: (data: object[]) => void;
-}
-
-export function loadJsonFile(file: File): Promise<object> {
-  return new Promise((resolve, reject) => {
-    const fileReader = new FileReader();
-
-    fileReader.onload = (event) => {
-      const fileContent = event?.target?.result;
-      try {
-        if (!fileContent) {
-          return reject('File content is empty! Please select a valid file.');
-        }
-
-        const fileContentObject = JSON.parse(fileContent as string);
-        resolve(fileContentObject);
-      } catch (error: any) {
-        reject(`Invalid JSON file! ${error.message}`);
-      }
-    };
-    fileReader.onerror = () => {
-      reject('Error reading the file! Please try again.');
-    };
-
-    fileReader.readAsText(file);
-  });
 }
 
 /**
  * ImportButton component is used to display the footer
  */
-export const ImportButton = ({ buttonText = 'Import', onChange }: IProps) => {
+export const ImportButton = ({ label = 'Import', onChange }: IProps) => {
   const [loading, setLoading] = useState<boolean>(false);
+
+  const loadJsonFile = (file: File): Promise<object> => {
+    return new Promise((resolve, reject) => {
+      const fileReader = new FileReader();
+  
+      fileReader.onload = (event) => {
+        const fileContent = event?.target?.result;
+        try {
+          if (!fileContent) {
+            return reject('File content is empty! Please select a valid file.');
+          }
+  
+          const fileContentObject = JSON.parse(fileContent as string);
+          resolve(fileContentObject);
+        } catch (error: any) {
+          reject(`Invalid JSON file! ${error.message}`);
+        }
+      };
+      fileReader.onerror = () => {
+        reject('Error reading the file! Please try again.');
+      };
+  
+      fileReader.readAsText(file);
+    });
+  }
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     setLoading(true);
@@ -82,7 +82,7 @@ export const ImportButton = ({ buttonText = 'Import', onChange }: IProps) => {
           startIcon={<UploadFileIcon />}
           sx={{ margin: '0 5px' }}
         >
-          {buttonText}
+          {label}
           <input type='file' accept='.json' hidden onChange={handleFileUpload} multiple />
         </LoadingButton>
       </Box>

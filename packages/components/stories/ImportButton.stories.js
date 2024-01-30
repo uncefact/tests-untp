@@ -12,7 +12,7 @@ export default {
 
 export const Default = {
   args: {
-    buttonText: 'Import',
+    label: 'Import',
     onChange: (data) => console.log(data)
   },
   decorators: [
