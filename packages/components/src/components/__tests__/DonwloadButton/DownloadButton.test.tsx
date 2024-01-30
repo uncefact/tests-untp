@@ -26,10 +26,10 @@ describe('DownloadButton', () => {
   });
 
   it('renders DownloadButton component with custom button text', () => {
-    const customButtonText = 'Export';
+    const customLabel = 'Export';
     render(
       <DownloadButton
-        buttonText={customButtonText}
+        label={customLabel}
         fileData={jsonData}
         fileName={fileName}
         fileExtension={fileExtensionJson}
@@ -38,7 +38,7 @@ describe('DownloadButton', () => {
     );
 
     // Check if the rendered button with custom text is in the document
-    const renderedButton = screen.getByText(customButtonText);
+    const renderedButton = screen.getByText(customLabel);
     expect(renderedButton).toBeInTheDocument();
   });
 

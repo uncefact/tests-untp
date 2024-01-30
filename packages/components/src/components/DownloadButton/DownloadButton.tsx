@@ -7,14 +7,29 @@ export enum DownloadFileType {
 }
 
 interface IProps {
-  buttonText?: string,
+  label?: string,
   fileData: object | string;
   fileName: string;
   fileExtension: string;
   fileType: DownloadFileType;
 }
 
-export const DownloadButton = ({ buttonText = 'Download', fileData, fileName, fileExtension, fileType }: IProps) => {
+export const DownloadButton = ({ label = 'Download', fileData, fileName, fileExtension, fileType }: IProps) => {
+
+  const handleDownloadFile = ({ fileData, fileName, fileExtension, fileType }: IProps) => {
+    const element = document.createElement('a');
+    const file = new Blob([fileData as string], {
+      type: fileType,
+    });
+
+    element.href = URL.createObjectURL(file);
+    element.download = `${fileName}.${fileExtension}`;
+    document.body.appendChild(element); // Required for this to work in FireFox
+    element.click();
+
+    return element;
+  }
+
   const handleClickDownload = () => {
     let data = fileData;
     if (fileType === DownloadFileType.json) {
@@ -27,26 +42,9 @@ export const DownloadButton = ({ buttonText = 'Download', fileData, fileName, fi
   return (
     <>
       <Button onClick={handleClickDownload} variant='contained'>
-        {buttonText}
+        {label}
       </Button>
     </>
   );
 };
 
-/**
- * handle download file
- */
-
-export function handleDownloadFile({ fileData, fileName, fileExtension, fileType }: IProps) {
-  const element = document.createElement('a');
-  const file = new Blob([fileData as string], {
-    type: fileType,
-  });
-
-  element.href = URL.createObjectURL(file);
-  element.download = `${fileName}.${fileExtension}`;
-  document.body.appendChild(element); // Required for this to work in FireFox
-  element.click();
-
-  return element;
-}
