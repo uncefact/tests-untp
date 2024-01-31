@@ -3,7 +3,7 @@ import { Box } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 import { UploadFile as UploadFileIcon } from '@mui/icons-material';
 
-interface IProps {
+export interface IImportButtonProps {
   label?: string;
   onChange: (data: object[]) => void;
 }
@@ -11,7 +11,7 @@ interface IProps {
 /**
  * ImportButton component is used to display the footer
  */
-export const ImportButton = ({ label = 'Import', onChange }: IProps) => {
+export const ImportButton = ({ label = 'Import', onChange }: IImportButtonProps) => {
   const [loading, setLoading] = useState<boolean>(false);
 
   const loadJsonFile = (file: File): Promise<object> => {
@@ -36,6 +36,7 @@ export const ImportButton = ({ label = 'Import', onChange }: IProps) => {
           throw new Error(`Invalid JSON file! ${error.message}`);
         }
       };
+
       fileReader.onerror = () => {
         throw new Error('Error reading the file! Please try again.');
       };
@@ -88,7 +89,7 @@ export const ImportButton = ({ label = 'Import', onChange }: IProps) => {
           sx={{ margin: '0 5px' }}
         >
           {label}
-          <input type='file' accept='.json' hidden onChange={handleFileUpload} multiple />
+          <input data-testid="file-input" type='file' accept='.json' hidden onChange={handleFileUpload} multiple />
         </LoadingButton>
       </Box>
     </Box>
