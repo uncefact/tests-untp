@@ -1,13 +1,17 @@
 import React from 'react';
+import type { Meta, StoryObj } from '@storybook/react';
 import { DownloadButton, DownloadFileType } from '../src/components/DownloadButton/DownloadButton';
 
-export default {
+const meta: any = {
   title: 'DownloadButton',
   component: DownloadButton,
   parameters: { layout: 'centered' },
   tags: ['autodocs'],
   argTypes: {},
-};
+} satisfies Meta<typeof DownloadButton>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 const args =  {
   fileData: { content: 'Down data!' },
@@ -16,7 +20,7 @@ const args =  {
   fileType: DownloadFileType.json
 };
 
-export const Default = {
+export const Default: Story = {
   args,
   decorators: [
     (Story) => (

@@ -6,7 +6,7 @@ export enum DownloadFileType {
   plainText = 'text/plain',
 }
 
-interface IProps {
+export interface IDownloadButtonProps {
   label?: string,
   fileData: object | string;
   fileName: string;
@@ -14,9 +14,9 @@ interface IProps {
   fileType: DownloadFileType;
 }
 
-export const DownloadButton = ({ label = 'Download', fileData, fileName, fileExtension, fileType }: IProps) => {
+export const DownloadButton = ({ label = 'Download', fileData, fileName, fileExtension, fileType }: IDownloadButtonProps) => {
 
-  const handleDownloadFile = ({ fileData, fileName, fileExtension, fileType }: IProps) => {
+  const handleDownloadFile = ({ fileData, fileName, fileExtension, fileType }: IDownloadButtonProps) => {
     const element = document.createElement('a');
     const file = new Blob([fileData as string], {
       type: fileType,

@@ -1,7 +1,7 @@
 /* eslint-disable testing-library/no-node-access */
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { DownloadButton, DownloadFileType } from '../../../';
+import { DownloadButton, DownloadFileType } from '..';
 
 describe('DownloadButton', () => {
   const jsonData = { key: 'value' };
