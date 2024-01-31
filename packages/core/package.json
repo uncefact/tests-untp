@@ -12,8 +12,7 @@
   "scripts": {
     "start": "craco start",
     "build": "craco build",
-    "test": "craco test",
-    "eject": "react-scripts eject"
+    "test": "jest --ci --env=jest-environment-jsdom --coverage"
   },
   "eslintConfig": {
     "extends": [
@@ -46,7 +45,6 @@
     "@types/node": "^16.18.72",
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
-    "react-scripts": "^5.0.1",
     "typescript": "5.1.6",
     "webpack": "5.88.2"
   }
