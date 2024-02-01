@@ -2,6 +2,7 @@ import { VerifiableCredential } from '@vckit/core-types';
 import { integrateVckitIssueVC } from '../vckit.service';
 import { IArgIssueEvent, IBaseEvent, IRender, IStorageEvent } from '../types/BaseEvent.types';
 import { uploadJson } from '../storage.service';
+import { ICreateLinkResolver, createLinkResolver } from '../createLinkResolver.service';
 
 /**
  * @description BaseEvent class is the base class for the events extending the class
@@ -63,5 +64,13 @@ export abstract class BaseEvent {
       default:
         throw new Error('typeStorage is not defined');
     }
+  }
+
+  /**
+   * @description async createLinkResolverEvent method is used to create a link resolver
+   * @param arg - arguments for the event
+   */
+  async createLinkResolverEvent(arg: ICreateLinkResolver) {
+    await createLinkResolver(arg);
   }
 }

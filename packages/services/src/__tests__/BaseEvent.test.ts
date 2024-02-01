@@ -1,6 +1,8 @@
 import { BaseEvent } from '../models/BaseEvent';
 import { BucketName, uploadJson } from '../storage.service';
+import { privateAPI } from '../utils/httpService';
 import { integrateVckitIssueVC } from '../vckit.service';
+import { ICreateLinkResolver, IdentificationKeyType, createLinkResolver } from '../createLinkResolver.service';
 
 jest.mock('../vckit.service', () => ({
   integrateVckitIssueVC: jest.fn(),
@@ -12,6 +14,15 @@ jest.mock('../storage.service', () => ({
     PublicVC: 'PublicVCBucket',
     PrivateVC: 'PrivateVCBucket',
     EPCISEvent: 'EPCISEventBucket',
+  },
+}));
+
+jest.mock('../createLinkResolver.service', () => ({
+  createLinkResolver: jest.fn(),
+  IdentificationKeyType: {
+    gtin: 'gtin',
+    nlisid: 'nlisid',
+    consignment_id: 'consignment_id',
   },
 }));
 
@@ -143,5 +154,35 @@ describe('BaseEvent', () => {
         }
       });
     }); // end of storageEvent
+
+    describe('createLinkResolverEvent', () => {
+      it('should call createLinkResolver with valid params', async () => {
+        const arg: ICreateLinkResolver = {
+          linkResolver: {
+            identificationKeyType: IdentificationKeyType.nlisid,
+            identificationKey: '1234',
+            itemDescription: 'item',
+          },
+          linkResponses: [
+            {
+              linkType: 'all',
+              linkTitle: 'title',
+              targetUrl: 'https://target.com',
+              mimeType: 'application/json',
+            },
+          ],
+          qualifierPath: 'qualifier',
+          dlrAPIUrl: 'https://dlr.com',
+        };
+        jest.spyOn(privateAPI, 'post').mockResolvedValue({});
+        jest.spyOn(privateAPI, 'setBearerTokenAuthorizationHeaders' as any).mockResolvedValue({});
+
+        const createLinkResolverMock = jest.fn();
+
+        (createLinkResolver as jest.Mock).mockImplementation(createLinkResolverMock);
+        await instance.createLinkResolverEvent(arg);
+        expect(createLinkResolverMock).toHaveBeenCalledWith(arg);
+      });
+    }); // end of createLinkResolverEvent
   }); // end of create instance with all params in constructor and call method
 });
