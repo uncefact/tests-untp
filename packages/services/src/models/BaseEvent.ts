@@ -1,6 +1,7 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import { integrateVckitIssueVC } from '../vckit.service';
-import { IArgIssueEvent, IBaseEvent, IRender } from '../types/BaseEvent.types';
+import { IArgIssueEvent, IBaseEvent, IRender, IStorageEvent } from '../types/BaseEvent.types';
+import { uploadJson } from '../storage.service';
 
 /**
  * @description BaseEvent class is the base class for the events extending the class
@@ -46,6 +47,21 @@ export abstract class BaseEvent {
       return credentialValue;
     } catch (error) {
       throw error;
+    }
+  }
+
+  /**
+   * @description async storageEvent method is used to store the event to server such as S3
+   * @param arg - arguments for the event
+   */
+  async storageEvent(arg: IStorageEvent) {
+    const { typeStorage, ...rest } = arg;
+
+    switch (typeStorage) {
+      case 'S3':
+        return await uploadJson(rest);
+      default:
+        throw new Error('typeStorage is not defined');
     }
   }
 }

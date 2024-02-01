@@ -5,7 +5,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "jest --ci --env=jest-environment-node"
+    "test": "jest --ci --env=jest-environment-node",
+    "test:coverage": "pnpm run test --coverage"
   },
   "keywords": [],
   "author": "",

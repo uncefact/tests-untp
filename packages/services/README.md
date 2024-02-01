@@ -25,4 +25,13 @@ await dummyEvent.issueEvent({
   type: 'typeEvent'
 });
 
+await dummyEvent.storageEvent({
+  filename: 'filename',
+  bucket: BucketName.PublicVC, // enum BucketName {  PublicVC = 'PublicVCBucket' }
+  json: { name: 'John', age: 30 },
+  typeBucket: { PublicVC: 'bucket-verifiable-credentials' },
+  storageAPIUrl: 'https://storage.com',
+  typeStorage: 'S3',
+});
+
 ```
