@@ -1,14 +1,19 @@
 /**
 * @example 
 * import { ComponentType, IDynamicComponentRendererProps } from './components/GenericFeature/DynamicComponentRenderer';
-*
-* export const logService = (data: unknown) => {
-*   console.log(data);
-*   return data;
+* 
+* interface IService {
+*  (arg1: any, ...args: any[]): any;
+* }
+* export const logService: IService = (arg1: any, ...args: any[]): any => {
+*  console.log(arg1);
+*  console.log(args);
+*  return arg1;
 * };
 *
-* export const logServiceTwo = (data: unknown) => {
-*   console.log(data);
+* export const logServiceTwo: IService = (arg1: any, ...args: any[]): any  => {
+*  console.log(arg1);
+*  return args;
 * };
 
 * function Example() {
