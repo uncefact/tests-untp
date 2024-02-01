@@ -34,4 +34,23 @@ await dummyEvent.storageEvent({
   typeStorage: 'S3',
 });
 
+await dummyEvent.createLinkResolverEvent({
+  linkResolver: {
+    identificationKeyType: IdentificationKeyType.nlisid, // enum IdentificationKeyType { nlisid = 'nlisid' }
+    identificationKey: '1234',
+    itemDescription: 'description',
+  },
+  linkResponses: [
+    {
+      linkType: 'linkType',
+      linkTitle: 'linkTitle',
+      targetUrl: 'targetUrl',
+      mimeType: 'mimeType',
+    },
+  ],
+  qualifierPath: 'qualifierPath',
+  dlrAPIUrl: 'dlrAPIUrl',
+  responseLinkType: 'responseLinkType',
+  queryString: 'queryString',
+});
 ```
