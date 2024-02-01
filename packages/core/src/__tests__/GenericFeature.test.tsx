@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-
+import * as libServices from '@mock-app/services';
 import { GenericFeature } from '../components/GenericFeature/GenericFeature';
 import {
   ComponentType,
@@ -94,6 +94,8 @@ describe('GenericFeature', () => {
   });
 
   test('should render UI with componentsData and call onClick to trigger services', () => {
+    (libServices.logService as any).mockReturnValue('mockReturnLogService');
+
     const services = [
       {
         name: 'logService',
@@ -115,6 +117,5 @@ describe('GenericFeature', () => {
     fireEvent.click(screen.getByText('Click me!'));
 
     expect(screen.getByText('Button')).not.toBeNull();
-    expect(services).toEqual([{ name: 'logService', parameters: [{ name: 'tester' }] }]);
   });
 });

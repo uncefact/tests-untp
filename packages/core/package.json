@@ -12,7 +12,8 @@
   "scripts": {
     "start": "craco start",
     "build": "craco build",
-    "test": "jest --ci --env=jest-environment-jsdom --coverage"
+    "test": "jest --ci --env=jest-environment-jsdom",
+    "test:coverage": "pnpm run test --coverage"
   },
   "eslintConfig": {
     "extends": [
