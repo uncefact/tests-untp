@@ -1,73 +1,79 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { Router as RouterDom } from 'react-router-dom';
+import { createMemoryHistory } from 'history';
+import { Header } from '../components/Header';
 import { Router } from '../components/Router';
-import '@testing-library/jest-dom';
 
 // Mock the appConfig to provide test data
-// jest.mock('../../constants/app-config.json', () => ({
-//   apps: [
-//     // Mock your app data here
-//   ],
-// }));
+jest.mock(
+  '../../src/constants/app-config.json',
+  () => ({
+    apps: [
+      {
+        name: 'Farm',
+        features: [{ name: 'Issue DLP' }],
+      },
+      {
+        name: 'Feedlot',
+        features: [{ name: 'Import DLP' }, { name: 'Feed Cattle' }, { name: 'Sell Cattle' }],
+      },
+      {
+        name: 'Processor',
+        features: [{ name: 'Import DLP' }, { name: 'Process Cattle' }],
+      },
+    ],
+  }),
+  { virtual: true },
+);
 
-// Write the test suite
 describe('Router Component', () => {
-  it('renders without crashing', () => {
+  // Test case to check if the Router redirects to the 404 page for an invalid route
+  it('renders route incorrectly', () => {
+    // Create a memory history object with an initial entry of an invalid route
+    const history = createMemoryHistory({ initialEntries: ['/invalid-route'] });
+    // Render the Router component with the provided history
     render(
-      <MemoryRouter>
+      <RouterDom location={history.location} navigator={history}>
         <Router />
-      </MemoryRouter>
+      </RouterDom>,
     );
+
+    // Expect the Router to navigate to the '/404' route
+    expect(history.location.pathname).toBe('/404');
   });
 
-  it('renders home route correctly', () => {
+  // Test case to check if clicking on a link in the Header navigates to the correct route
+  it('renders route correctly', () => {
+    // Create a memory history object with an initial entry of the home route ('/')
+    const history = createMemoryHistory({ initialEntries: ['/'] });
+    // Render the Header component with the provided history
     render(
-      <MemoryRouter initialEntries={['/']}>
-        <Router />
-      </MemoryRouter>
+      <RouterDom location={history.location} navigator={history}>
+        <Header />
+      </RouterDom>,
     );
-
-    expect(screen.getByText('Features')).toBeInTheDocument();
-  });
-
-  it('renders app route and features correctly', () => {
-    render(
-      <MemoryRouter initialEntries={['/farm']}>
-        <Router />
-      </MemoryRouter>
-    );
-
-    // Expect app-specific elements to be present on the page
-    expect(screen.getByText('Wagu Wonder')).toBeInTheDocument();
-    expect(screen.getByText('Issue DLP')).toBeInTheDocument();
-  });
-
-  it('navigates to a specific feature route correctly', () => {
-    render(
-      <MemoryRouter initialEntries={['/farm/issue-dlp']}>
-        <Router />
-      </MemoryRouter>
-    );
-
-    // Expect the specific feature component to be rendered
-    expect(screen.getByText('NLISID')).toBeInTheDocument();
-  });
-
-  it('navigates between routes correctly', () => {
-    const { history } = render(
-      <MemoryRouter initialEntries={['/']}>
-        <Router />
-      </MemoryRouter>
-    );
-
-    // Navigate to the 'Farm' app
-    fireEvent.click(screen.getByText('Farm'));
+    
+    // Simulate a click on a link in the Header (Farm)
+    fireEvent.click(screen.getByRole('link', { name: /Farm/i }));
+    // Expect the Router to navigate to the '/farm' route
     expect(history.location.pathname).toBe('/farm');
-
-    // Navigate back to the home route
-    fireEvent.click(screen.getByText('Features'));
-    expect(history.location.pathname).toBe('/');
   });
 
+  // Test case to check if clicking on a feature in the Router navigates to the correct subpath
+  it('renders route subpath correctly', () => {
+    // Create a memory history object with an initial entry of the '/farm' route
+    const history = createMemoryHistory({ initialEntries: ['/farm'] });
+    // Render the Router component with the provided history
+    render(
+      <RouterDom location={history.location} navigator={history}>
+        <Router />
+      </RouterDom>,
+    );
+
+    // Simulate a click on a feature in the Router (Issue DLP)
+    fireEvent.click(screen.getByText('Issue DLP'));
+    // Expect the Router to navigate to the '/farm/issue-dlp' subpath
+    expect(history.location.pathname).toBe('/farm/issue-dlp');
+  });
 });
