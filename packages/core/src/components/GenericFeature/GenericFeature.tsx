@@ -131,7 +131,8 @@ export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, ser
         const type = component.type;
         switch (type) {
           case ComponentType.EntryData:
-            props.onChange = (value: string) => {
+            // unknown is used to flexibilize the type of the value, since it can be any type
+            props.onChange = (value: unknown) => {
               setState((s) => {
                 s[index] = value;
                 return s;

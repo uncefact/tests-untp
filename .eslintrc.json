@@ -8,7 +8,7 @@
     "plugin:@typescript-eslint/recommended-requiring-type-checking"
   ],
   "parserOptions": {
-    "project": ["./packages/tsconfig.settings.json"]
+    "project": ["./packages/tsconfig.settings.json", "./packages/*/tsconfig.json"]
   },
   "rules": {
     "no-console": "warn",
