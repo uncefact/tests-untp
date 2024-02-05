@@ -1,16 +1,19 @@
 import React from 'react';
-
+import type { Meta, StoryObj } from '@storybook/react';
 import { Header } from '../src/components/Header';
 
-export default {
+const meta = {
   title: 'Header',
   component: Header,
   parameters: { layout: 'centered' },
   tags: ['autodocs'],
   argTypes: {},
-};
+} satisfies Meta<typeof Header>;;
 
-export const Default = {
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {
   args: {
     logoTitle: 'Logo',
     logoTitleColor: '#000',
