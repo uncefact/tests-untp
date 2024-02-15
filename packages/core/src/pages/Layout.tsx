@@ -1,6 +1,7 @@
 import React from 'react';
 import { Container } from '@mui/material';
 import { Header } from '../components/Header';
+import { Footer } from '@mock-app/components';
 import { Router } from '../components/Router';
 
 function Layout() {
@@ -13,6 +14,7 @@ function Layout() {
     >
       <Header />
       <Router />
+      <Footer />
     </Container>
   );
 }

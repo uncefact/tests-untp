@@ -1,12 +1,22 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AppBar, Toolbar, Typography, Container, Stack, Box, IconButton, Menu, MenuItem, Button } from '@mui/material';
+import { AppBar, Toolbar, Typography, Container, Box, IconButton, Menu, MenuItem, Button, Stack } from '@mui/material';
 import { Menu as MenuIcon } from '@mui/icons-material';
 import appConfig from '../../constants/app-config.json';
 import { convertStringToPath } from '../../utils';
+import { IApp, IStyles } from '../../types/common.types';
 
 function Header() {
   const [anchorElNav, setAnchorElNav] = useState<null | HTMLElement>(null);
+  const [styles, setStyles] = useState<IStyles>({
+    primaryColor: appConfig.styles.primaryColor,
+    secondaryColor: appConfig.styles.secondaryColor,
+    tertiaryColor: appConfig.styles.tertiaryColor,
+  });
+
+  const handleChangeStyles = (styles: IStyles): void => {
+    setStyles(styles);
+  };
 
   /**
    * open nav menu on mobile.
@@ -23,17 +33,23 @@ function Header() {
   };
 
   const renderMenuByScreenType = (screenType: string) => {
-    return appConfig.apps.map((app) => {
+    return appConfig.apps.map((app: IApp) => {
       const route = `/${convertStringToPath(app.name)}`;
 
       if (screenType === 'mobile') {
         return (
-          <MenuItem key={route} onClick={handleCloseMobileNavMenu}>
+          <MenuItem
+            key={route}
+            onClick={() => {
+              handleCloseMobileNavMenu();
+              handleChangeStyles(app.styles);
+            }}
+          >
             <Typography
               textAlign='center'
               component={Link}
               to={route}
-              sx={{ textDecoration: 'none', color: 'inherit' }}
+              sx={{ textDecoration: 'none', color: app.styles.tertiaryColor }}
             >
               {app.name}
             </Typography>
@@ -42,7 +58,13 @@ function Header() {
       }
 
       return (
-        <Button key={route} component={Link} to={route} sx={{ color: '#000000', display: 'block' }}>
+        <Button
+          onClick={() => handleChangeStyles(app.styles)}
+          key={route}
+          component={Link}
+          to={route}
+          sx={{ color: app.styles.secondaryColor, display: 'block' }}
+        >
           {app.name}
         </Button>
       );
@@ -50,11 +72,11 @@ function Header() {
   };
 
   return (
-    <AppBar sx={{ background: '#ffffff' }}>
+    <AppBar sx={{ background: styles.primaryColor }}>
       <Container maxWidth='xl'>
         <Toolbar disableGutters>
           {/* Logo on desktop or tablet */}
-          {/* <Stack
+          <Stack
             component={Link}
             to='/'
             sx={{
@@ -62,26 +84,18 @@ function Header() {
               display: { xs: 'none', md: 'flex' },
               alignItems: 'center',
               flexDirection: 'row',
-              mr: 2,
+              mr: 5,
             }}
           >
             <Typography
-              variant='h6'
+              variant='h5'
               sx={{
-                color: '#000000',
+                color: appConfig.styles.secondaryColor,
               }}
             >
-              Ag
+              {appConfig.name}
             </Typography>
-            <Typography
-              variant='h6'
-              sx={{
-                color: '#15728d',
-              }}
-            >
-              Trace
-            </Typography>
-          </Stack> */}
+          </Stack>
           {/* Menu on mobile */}
           <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }} data-testid='menu'>
             <IconButton
@@ -90,9 +104,8 @@ function Header() {
               aria-controls='menu-appbar'
               aria-haspopup='true'
               onClick={handleOpenMobileNavMenu}
-              color='inherit'
             >
-              <MenuIcon sx={{ color: '#000000' }} />
+              <MenuIcon sx={{ color: styles.secondaryColor }} />
             </IconButton>
             <Menu
               data-testid='menu-appbar'
@@ -117,7 +130,7 @@ function Header() {
             </Menu>
           </Box>
           {/* Logo on mobile */}
-          {/* <Stack
+          <Stack
             component={Link}
             to='/'
             sx={{
@@ -129,22 +142,14 @@ function Header() {
             }}
           >
             <Typography
-              variant='h6'
+              variant='h5'
               sx={{
-                color: '#000000',
+                color: appConfig.styles.secondaryColor,
               }}
             >
-              Ag
+              {appConfig.name}
             </Typography>
-            <Typography
-              variant='h6'
-              sx={{
-                color: '#15728d',
-              }}
-            >
-              Trace
-            </Typography>
-          </Stack> */}
+          </Stack>
           {/* Menu item on  desktop or tablet */}
           <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }} data-testid='menu-desktop'>
             {renderMenuByScreenType('desktop')}

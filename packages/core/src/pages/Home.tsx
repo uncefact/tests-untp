@@ -2,33 +2,15 @@ import React from 'react';
 import { Box, Button } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { convertStringToPath } from '../utils';
+import appConfig from '../constants/app-config.json';
 
-export interface IHome {
-  app?: IApp;
-}
-
-export interface IApp {
-  name: string;
-  type: string;
-  features: IFeature[];
-}
-
-export interface IFeature {
-  name: string;
-  id: string;
-  services: string[];
-}
-
-function Home({ app }: IHome) {
-  const renderFeatures = (app: IApp) => {
-    const parentPath = `/${convertStringToPath(app.name)}`;
-
-    return app.features.map((feature: IFeature) => {
-      const childPath = `${parentPath}/${convertStringToPath(feature.name)}`;
-
+const Home = () => {
+  const renderApps = () => {
+    return appConfig.apps.map((configApp) => {
+      const path = `/${convertStringToPath(configApp.name)}`;
       return (
-        <Button key={childPath} variant='contained' component={Link} to={childPath}>
-          {feature.name}
+        <Button sx={{ background: appConfig.styles.primaryColor }} key={path} variant='contained' component={Link} to={path}>
+          {configApp.name}
         </Button>
       );
     });
@@ -47,9 +29,9 @@ function Home({ app }: IHome) {
         gap: '24px',
       }}
     >
-      {app ? renderFeatures(app) : 'Features'}
+      {renderApps()}
     </Box>
   );
-}
+};
 
 export default Home;
