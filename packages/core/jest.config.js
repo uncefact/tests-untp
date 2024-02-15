@@ -6,8 +6,7 @@ const jestConfig = {
   testPathIgnorePatterns: ['<rootDir>/node_modules/'],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   moduleNameMapper: {
-    '(.+)\\.js': '$1',
-    '\\.(css|less)$': '<rootDir>/__mocks__/styleMock.js',
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   transform: {
     '^.+\\.m?tsx?$': [
