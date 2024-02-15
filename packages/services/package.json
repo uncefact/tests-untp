@@ -2,10 +2,17 @@
   "name": "@mock-app/services",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "./build/index.js",
+  "types": "./build/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "watch": "tsc -b --watch"
   },
+  "type": "module",
+  "moduleDirectories": [
+    "node_modules",
+    "src"
+  ],
   "keywords": [],
   "author": "",
   "license": "ISC"
