@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export interface IServices {
-  getFormInfo(data: unknown): unknown;
+  (arg1: any, ...args: any[]): any;
 }
