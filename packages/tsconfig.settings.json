@@ -23,5 +23,6 @@
       "module": "CommonJS"
     }
   },
-  "exclude": ["**/__tests__/**/*", "**/build/**/*"]
+  "exclude": ["**/__tests__/**/*", "**/build/**/*"],
+  "include": ["src", "src/__tests__"]
 }

@@ -30,7 +30,7 @@ describe('render json schema component', () => {
     jest.clearAllMocks();
   });
 
-  const onChangeJsonSchemaForm = ({ errors, data }: { errors: any[]; data: any }) => {
+  const onChangeJsonSchemaForm = ({ data, errors }: { data: any; errors?: any[] }) => {
     console.log('onChangeJsonSchemaForm', errors, data);
   };
 
