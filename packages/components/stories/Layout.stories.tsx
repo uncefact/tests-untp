@@ -1,17 +1,21 @@
 import React from 'react';
 import { Typography } from '@mui/material';
-
+import type { Meta, StoryObj } from '@storybook/react';
 import { Layout } from '../src/components/Layout';
 
-export default {
+const meta = {
   title: 'Layout',
   component: Layout,
   parameters: { layout: 'centered' },
   tags: ['autodocs'],
   argTypes: {},
-};
+} satisfies Meta<typeof Layout>;
 
-export const Default = {
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {
   args: {
     children: <Typography>Main layout here</Typography>,
   },

@@ -1,24 +1,13 @@
-import { publicAPI } from './utils/httpService';
+import { publicAPI } from './utils/httpService.js';
 
 export type Json = {
-  [key: string]: unknown;
+  [key: string]: any;
 };
-
-export enum BucketName {
-  PublicVC = 'PublicVCBucket',
-  PrivateVC = 'PrivateVCBucket',
-  EPCISEvent = 'EPCISEventBucket',
-}
-
-export interface ITypeBucket {
-  [key: string]: string;
-}
 
 export interface IUploadedJson {
   filename: string;
-  bucket: BucketName;
+  bucket: string;
   json: Json;
-  typeBucket: ITypeBucket;
   storageAPIUrl: string;
 }
 /**
@@ -39,30 +28,18 @@ export interface IUploadedJson {
  * const url = await uploadJson('test', json, BucketName.PublicVC, 'https://storage.com', 'bucket-verifiable-credentials');
  * // Returns: https://storage.com/test.json
  */
-export const uploadJson = async ({
-  filename,
-  bucket,
-  json,
-  storageAPIUrl,
-  typeBucket,
-}: IUploadedJson): Promise<string> => {
+export const uploadJson = async ({ filename, bucket, json, storageAPIUrl }: IUploadedJson): Promise<string> => {
   try {
-    if (!storageAPIUrl) throw new Error('REACT_APP_STORAGE_API_URL is not defined');
+    if (!storageAPIUrl) throw new Error('storageAPIUrl is not defined');
 
-    const bucketNameMapping = {
-      PublicVCBucket: typeBucket.PublicVCBucket,
-      PrivateVCBucket: typeBucket.PrivateVCBucket,
-      EPCISEventBucket: typeBucket.EPCISEventBucket,
-    };
-
-    if (!bucketNameMapping[bucket]) throw new Error('Invalid bucket name');
+    if (!bucket) throw new Error('bucket is not defined');
 
     const file = new File([JSON.stringify(json)], `${filename}`, {
       type: 'application/json',
     });
 
     const presignedUrlParams = {
-      bucket: bucketNameMapping[bucket],
+      bucket: bucket,
       key: file.name,
       fileType: file.type,
     };
@@ -74,7 +51,7 @@ export const uploadJson = async ({
     publicAPI.setContentTypeHeader(file.type);
     await publicAPI.put(presignedUrl.toString(), file);
 
-    return `https://${bucketNameMapping[bucket]}.s3.ap-southeast-2.amazonaws.com/${file.name}`;
+    return `https://${bucket}.s3.ap-southeast-2.amazonaws.com/${file.name}`;
   } catch (error) {
     throw new Error('Error uploading json');
   }

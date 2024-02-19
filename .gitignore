@@ -69,3 +69,4 @@ tmp/
 
 # logs
 /logs
+packages/services/tsconfig.tsbuildinfo

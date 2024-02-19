@@ -3,8 +3,13 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "build",
-    "declarationDir": "build"
+    "declarationDir": "build",
+    "skipLibCheck": true,
+    "resolveJsonModule": true
   },
-
-  "include": ["src", "**/__tests__/**/*.test.ts"]
+  "references": [],
+  "include": [
+    "src/**/*.ts",
+  ]
+  
 }
