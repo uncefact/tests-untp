@@ -29,6 +29,5 @@
   ],
   "include": [
     "src",
-    "src/__tests__"
   ]
 }

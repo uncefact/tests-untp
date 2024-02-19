@@ -1,4 +1,4 @@
-import { privateAPI } from './utils/httpService';
+import { privateAPI } from './utils/httpService.js';
 
 /**
  * Generates a link resolver URL based on the provided AgtraceLinkResolver and AgtraceLinkResponse objects.
@@ -30,6 +30,18 @@ import { privateAPI } from './utils/httpService';
  * // Returns: http://localhost/nlisid/3ABCD123XBDC0447?linkType=all
  */
 
+export enum LinkType {
+  verificationLinkType = 'gs1:verificationService',
+  certificationLinkType = 'gs1:certificationInfo',
+  epcisLinkType = 'gs1:epcis',
+}
+
+export enum MimeType {
+  textPlain = 'text/plain',
+  textHtml = 'text/html',
+  applicationJson = 'application/json',
+}
+
 export enum IdentificationKeyType {
   gtin = 'gtin',
   nlisid = 'nlisid',
@@ -48,6 +60,7 @@ export interface ILinkResponse {
   targetUrl: string;
   mimeType: string;
 
+  defaultIanaLanguage?: boolean;
   defaultMimeType?: boolean;
   defaultLinkType?: boolean;
 }
@@ -57,6 +70,7 @@ export interface ICreateLinkResolver {
   linkResponses: ILinkResponse[];
   qualifierPath: string;
   dlrAPIUrl: string;
+  dlrAPIKey: string;
 
   responseLinkType?: string;
   queryString?: string | null;
@@ -72,7 +86,7 @@ export interface GS1LinkResponse extends ILinkResponse {
   ianaLanguage: string;
   context: string;
   active: boolean;
-  
+
   defaultIanaLanguage?: boolean;
   defaultContext?: boolean;
   fwqs?: boolean;
@@ -83,7 +97,7 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
   const registerQualifierPath = arg.queryString ? qualifierPath + '?' + arg.queryString : qualifierPath;
   const params: GS1LinkResolver[] = [constructLinkResolver(linkResolver, linkResponses, registerQualifierPath)];
   try {
-    privateAPI.setBearerTokenAuthorizationHeaders(process.env.REACT_APP_DLR_API_KEY || '');
+    privateAPI.setBearerTokenAuthorizationHeaders(arg.dlrAPIKey || '');
     await privateAPI.post<string>(`${dlrAPIUrl}/resolver`, params);
     const path = responseLinkType === 'all' ? '?linkType=all' : `${qualifierPath}?linkType=${responseLinkType}`;
     return `${dlrAPIUrl}/${linkResolver.identificationKeyType}/${linkResolver.identificationKey}${path}`;

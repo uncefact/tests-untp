@@ -4,7 +4,7 @@ import { AppBar, Toolbar, Typography, Container, Box, IconButton, Menu, MenuItem
 import { Menu as MenuIcon } from '@mui/icons-material';
 import appConfig from '../../constants/app-config.json';
 import { convertStringToPath } from '../../utils';
-import { IApp, IStyles } from '../../types/common.types';
+import { IStyles } from '../../types/common.types';
 
 function Header() {
   const [anchorElNav, setAnchorElNav] = useState<null | HTMLElement>(null);
@@ -33,7 +33,7 @@ function Header() {
   };
 
   const renderMenuByScreenType = (screenType: string) => {
-    return appConfig.apps.map((app: IApp) => {
+    return appConfig.apps.map((app: any) => {
       const route = `/${convertStringToPath(app.name)}`;
 
       if (screenType === 'mobile') {
