@@ -220,7 +220,7 @@
                     "type": ["VerifiableCredential"],
                     "context": ["https://www.w3.org/2018/credentials/v1"],
                     "renderTemplate": [],
-                    "issuer": "did:web:f570-2402-800-6315-4aad-954b-86be-9f85-bca9.ngrok-free.app"
+                    "issuer": "did:web:agtrace-passports.s3.ap-southeast-2.amazonaws.com"
                   },
                   "dlr": {
                     "identificationKeyType": "nlis",

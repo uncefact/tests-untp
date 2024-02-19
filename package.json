@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "start": "cd packages/core && yarn start",
-    "build": "yarn run build-clean && yarn run build:components && yarn build:services",
+    "build": "yarn run build-clean && yarn build:components && yarn build:services",
     "build:components": "cd packages/components && yarn run build",
     "build:services": "cd packages/services && yarn run build",
     "build-clean": "rimraf --glob ./packages/*/tsconfig.tsbuildinfo",

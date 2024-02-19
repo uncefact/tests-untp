@@ -6,4 +6,3 @@ export interface IssueEvent {
   credentialSubject: any;
   restOfVC: any;
 }
-
