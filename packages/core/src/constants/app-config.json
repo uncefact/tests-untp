@@ -212,21 +212,28 @@
           ],
           "services": [
             {
-              "name": "objectEvent",
+              "name": "processObjectEvent",
               "parameters": [
                 {
-                  "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dlpld2.json"],
-                  "issuer": "did:web:d091-103-69-79-17.ngrok-free.app",
-                  "eventType": "objectEvent",
-                  "vcType": ["LivestockPassportCredential"],
-                  "vcKitAPIUrl": "http://localhost:3332",
-                  "dlrAPIUrl": "http://localhost:8080",
-                  "storageAPIUrl": "https://storage.agtrace.showthething.com",
-                  "typeBucket": { "PublicVCBucket": "agtrace-test-verifiable-credentials" },
-                  "bucket": "PublicVCBucket",
-                  "verificationPage": "https://verify.agtrace.showthething.com/credentials/verify",
-                  "DLR_API_KEY": "5555555555555",
-                  "renderTemplate": []
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "type": ["VerifiableCredential"],
+                    "context": ["https://www.w3.org/2018/credentials/v1"],
+                    "renderTemplate": [],
+                    "issuer": "did:web:agtrace-passports.s3.ap-southeast-2.amazonaws.com"
+                  },
+                  "dlr": {
+                    "identificationKeyType": "nlis",
+                    "linkTitle": "Livestock Passport",
+                    "verificationPage":"https://web.agtrace.showthething.com/verify",
+                    "dlrAPIUrl": "http://localhost",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "identifierKeyPaths": ["herd", "NLIS"]
                 }
               ]
             }

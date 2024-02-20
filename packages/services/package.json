@@ -6,7 +6,9 @@
   "types": "./build/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "watch": "tsc -b --watch"
+    "watch": "tsc -b --watch",
+    "test": "jest --ci --env=jest-environment-node",
+    "coverage": "jest --coverage"
   },
   "type": "module",
   "moduleDirectories": [
@@ -15,5 +17,20 @@
   ],
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@vckit/core-types": "1.0.0-beta.7",
+    "axios": "^1.6.7",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^4",
+    "axios-mock-adapter": "^1.19.0"
+  },
+  "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/build/"
+    ]
+  }
 }
