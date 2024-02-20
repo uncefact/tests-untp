@@ -24,3 +24,9 @@ export interface IStyles {
   secondaryColor: string;
   tertiaryColor: string;
 }
+
+export enum MimeTypeEnum {
+  textPlain = 'text/plain',
+  textHtml = 'text/html',
+  applicationJson = 'application/json',
+}
