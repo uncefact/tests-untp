@@ -6,7 +6,7 @@ import appConfig from '../constants/app-config.json';
 
 const Home = () => {
   const renderApps = () => {
-    return appConfig.apps.map((configApp) => {
+    const apps = appConfig.apps.map((configApp) => {
       const path = `/${convertStringToPath(configApp.name)}`;
       return (
         <Button sx={{ background: appConfig.styles.primaryColor }} key={path} variant='contained' component={Link} to={path}>
@@ -14,6 +14,14 @@ const Home = () => {
         </Button>
       );
     });
+
+    apps.push(
+    <Button sx={{ background: appConfig.styles.primaryColor }} key={appConfig.scanningApp.config.path} variant='contained' component={Link} to={appConfig.scanningApp.config.path}>
+      Scanning
+    </Button>
+    );
+
+    return apps;
   };
 
   return (
