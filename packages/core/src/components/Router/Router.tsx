@@ -1,19 +1,29 @@
 import React from 'react';
 import { Route, Routes, Navigate } from 'react-router-dom';
 import appConfig from '../../constants/app-config.json';
-import { Form, Home } from '../../pages';
+import { Form, Home, Scanning, Verify } from '../../pages';
 import { convertStringToPath } from '../../utils';
 import Application from '../../pages/Application';
 import { IApp, IFeature } from '../../types/common.types';
 
 function Router() {
+  const scanningRoute = appConfig.scanningApp.config.path;
+
   return (
     // Define the root routing container using React Router's Routes component
     <Routes>
       {/* Default route for the home page, rendering the Home component */}
       <Route path='/' element={<Home />} />,
+
+      {/* Route for the Scanning page */}
+      <Route path={scanningRoute} element={<Scanning />} />,
+
+      {/* Route for the Verify page */}
+      <Route path='/verify' element={<Verify />} />
+
       {/* Catch-all route for any unknown paths, redirecting to the 404 page */}
       <Route path='*' element={<Navigate to='/404' />} />,
+
       {/* Iterate through the appConfig to dynamically generate routes */}
       {appConfig.apps.map((app: IApp) => {
         const mainPath = `/${convertStringToPath(app.name)}`;
