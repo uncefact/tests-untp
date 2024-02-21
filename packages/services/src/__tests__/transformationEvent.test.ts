@@ -3,27 +3,28 @@ import {
   issueEpcisTransformationEvent,
   processTransformationEvent,
   uploadVC,
-} from '../../build/epcisEvents/transformationEvent.js';
-import { issueVC, contextDefault } from '../../build/vckit.service.js';
-import { epcisTransformationCrendentialSubject } from '../../build/epcis.service.js';
-import { uploadJson } from '../../build/storage.service.js';
-import { registerLinkResolver, IdentificationKeyType } from '../../build/linkResolver.service.js';
-import { fillArray } from '../../build/utils/helpers.js';
+} from '../../build/epcisEvents/transformationEvent';
+import { issueVC, contextDefault } from '../../build/vckit.service';
+import { epcisTransformationCrendentialSubject } from '../../build/epcis.service';
+import { uploadJson } from '../../build/storage.service';
+import { registerLinkResolver, IdentificationKeyType } from '../../build/linkResolver.service';
+import { fillArray } from '../../build/utils/helpers';
+import { IInputItems } from '../epcisEvents/types';
 
-jest.mock('../../build/vckit.service.js', () => ({
+jest.mock('../../build/vckit.service', () => ({
   issueVC: jest.fn(),
   contextDefault: ['https://www.w3.org/2018/credentials/v1', 'https://w3id.org/vc-revocation-list-2020/v1'],
 }));
 
-jest.mock('../../build/epcis.service.js', () => ({
+jest.mock('../../build/epcis.service', () => ({
   epcisTransformationCrendentialSubject: jest.fn(),
 }));
 
-jest.mock('../../build/storage.service.js', () => ({
+jest.mock('../../build/storage.service', () => ({
   uploadJson: jest.fn(),
 }));
 
-jest.mock('../../build/linkResolver.service.js', () => ({
+jest.mock('../../build/linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
   IdentificationKeyType: {
     gtin: 'gtin',
@@ -130,7 +131,7 @@ describe('Transformation event', () => {
         readPointId: '48585',
         locationId: 'https://plus.codes/4RRG6MJF+C6X',
         inputItemList: inputItems,
-        inputQuantityList: countInputItems.map((item) => ({
+        inputQuantityList: countInputItems.map((item: IInputItems) => ({
           productClass: item.productClass,
           quantity: item.quantity,
           uom: item.uom,

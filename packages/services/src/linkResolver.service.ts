@@ -1,5 +1,4 @@
 import { privateAPI } from './utils/httpService.js';
-
 /**
  * Generates a link resolver URL based on the provided linkResolver and linkResponse objects.
  *
@@ -96,7 +95,7 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
   const { dlrAPIUrl, linkResolver, linkResponses, qualifierPath, responseLinkType = 'all' } = arg;
   const registerQualifierPath = arg.queryString ? qualifierPath + '?' + arg.queryString : qualifierPath;
   const params: GS1LinkResolver[] = [constructLinkResolver(linkResolver, linkResponses, registerQualifierPath)];
-  try {
+  try {    
     privateAPI.setBearerTokenAuthorizationHeaders(arg.dlrAPIKey || '');
     await privateAPI.post<string>(`${dlrAPIUrl}/resolver`, params);
     const path = responseLinkType === 'all' ? '?linkType=all' : `${qualifierPath}?linkType=${responseLinkType}`;
@@ -158,7 +157,7 @@ export const registerLinkResolver = async (
   verificationPage: string,
   dlrAPIUrl: string,
   dlrAPIKey: string,
-  qualifierPath: string,
+  qualifierPath?: string,
 ) => {
   const linkResolver: ILinkResolver = {
     identificationKeyType,
@@ -190,7 +189,7 @@ export const registerLinkResolver = async (
       defaultIanaLanguage: true,
       defaultMimeType: true,
     },
-  ];
+  ];  
 
   return await createLinkResolver({
     dlrAPIUrl,

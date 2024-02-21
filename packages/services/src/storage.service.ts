@@ -53,6 +53,6 @@ export const uploadJson = async ({ filename, bucket, json, storageAPIUrl }: IUpl
 
     return `https://${bucket}.s3.ap-southeast-2.amazonaws.com/${file.name}`;
   } catch (error) {
-    throw new Error('Error uploading json');
+    throw new Error(error.message ?? 'Error uploading json');
   }
 };

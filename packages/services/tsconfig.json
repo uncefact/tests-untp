@@ -5,10 +5,8 @@
     "outDir": "build",
     "declarationDir": "build",
     "skipLibCheck": true,
-    "resolveJsonModule": true,
+    "resolveJsonModule": true
   },
   "references": [],
-  "include": [
-    "src/**/*.ts",
-  ]
+  "include": ["src/**/*.ts"]
 }

@@ -32,7 +32,7 @@ export function fillArray(value1: any[], value2: any[]) {
   return value2;
 }
 
-export function incrementQuality(obj: any, numberOfItems = 1) {
+export function incrementQuality(obj: any, numberOfItems: number) {
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj[key], 'quantity')) {
       obj[key].quantity *= numberOfItems;
