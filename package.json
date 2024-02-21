@@ -10,7 +10,7 @@
     "build": "yarn run build-clean && yarn build:components && yarn build:services",
     "build:components": "cd packages/components && yarn run build",
     "build:services": "cd packages/services && yarn run build",
-    "build-clean": "rimraf --glob ./packages/*/tsconfig.tsbuildinfo",
+    "build-clean": "rimraf --glob ./packages/*/tsconfig.tsbuildinfo ./packages/*/build",
     "test": "yarn run test:components && yarn run test:services",
     "test:components": "cd packages/components && yarn run test",
     "test:services": "cd packages/services && yarn run test",

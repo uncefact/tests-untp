@@ -1,9 +1,9 @@
 export interface IVCKitContext {
-  vckitAPIUrl: string;
   type: string[];
   context: string[];
-  renderTemplate: string[];
+  renderTemplate: IRenderer[];
   issuer: string;
+  vckitAPIUrl: string;
 }
 export interface ILinkResolverContext {
   identificationKeyType: string;
@@ -11,6 +11,8 @@ export interface ILinkResolverContext {
   verificationPage: string;
   dlrAPIUrl: string;
   dlrAPIKey: string;
+
+  [key: string]: string;
 }
 export interface IStorageContext {
   storageAPIUrl: string;
@@ -21,4 +23,27 @@ export interface IContext {
   dlr: ILinkResolverContext;
   storage: IStorageContext;
   identifierKeyPaths: string[];
+}
+
+export interface IInputItems {
+  quantity: number;
+  uom: string;
+  productClass: string;
+}
+
+export interface IProductTransformation {
+  inputItems: IInputItems[];
+  outputItems: any;
+}
+
+export interface ITransFormaionEvent extends IContext {
+  gtins: string[];
+  epcisVckit: IVCKitContext;
+  dppVckit: IVCKitContext;
+  productTranformation: IProductTransformation;
+}
+
+export interface IRenderer {
+  template: string;
+  '@type': string;
 }

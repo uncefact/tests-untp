@@ -1,7 +1,7 @@
 import { privateAPI } from './utils/httpService.js';
 
 /**
- * Generates a link resolver URL based on the provided AgtraceLinkResolver and AgtraceLinkResponse objects.
+ * Generates a link resolver URL based on the provided linkResolver and linkResponse objects.
  *
  * @param arg - The arguments for the link resolver.
  *
@@ -120,7 +120,7 @@ export const constructLinkResolver = (
     responses: [],
   };
 
-  linkResponses.forEach((agtraceLinkResponse: ILinkResponse) => {
+  linkResponses.forEach((linkResponse: ILinkResponse) => {
     const gs1LinkResponseForUS: GS1LinkResponse = {
       ianaLanguage: 'en',
       context: 'us',
@@ -130,7 +130,7 @@ export const constructLinkResolver = (
       defaultMimeType: false,
       fwqs: false,
       active: true,
-      ...agtraceLinkResponse,
+      ...linkResponse,
     };
 
     const gs1LinkResponseForAU: GS1LinkResponse = {
@@ -142,10 +142,62 @@ export const constructLinkResolver = (
       defaultMimeType: false,
       fwqs: false,
       active: true,
-      ...agtraceLinkResponse,
+      ...linkResponse,
     };
 
     gs1LinkResolver.responses.push(gs1LinkResponseForUS, gs1LinkResponseForAU);
   });
   return gs1LinkResolver;
+};
+
+export const registerLinkResolver = async (
+  url: string,
+  identificationKeyType: IdentificationKeyType,
+  identificationKey: string,
+  linkTitle: string,
+  verificationPage: string,
+  dlrAPIUrl: string,
+  dlrAPIKey: string,
+  qualifierPath: string,
+) => {
+  const linkResolver: ILinkResolver = {
+    identificationKeyType,
+    identificationKey: identificationKey,
+    itemDescription: linkTitle,
+  };
+  const query = encodeURIComponent(JSON.stringify({ payload: { uri: url } }));
+  const queryString = `q=${query}`;
+  const verificationPassportPage = `${verificationPage}/?${queryString}`;
+  const linkResponses: ILinkResponse[] = [
+    {
+      linkType: LinkType.verificationLinkType,
+      linkTitle: 'VCKit verify service',
+      targetUrl: verificationPage,
+      mimeType: MimeType.textPlain,
+    },
+    {
+      linkType: LinkType.certificationLinkType,
+      linkTitle: linkTitle,
+      targetUrl: url,
+      mimeType: MimeType.applicationJson,
+    },
+    {
+      linkType: LinkType.certificationLinkType,
+      linkTitle: linkTitle,
+      targetUrl: verificationPassportPage,
+      mimeType: MimeType.textHtml,
+      defaultLinkType: true,
+      defaultIanaLanguage: true,
+      defaultMimeType: true,
+    },
+  ];
+
+  return await createLinkResolver({
+    dlrAPIUrl,
+    linkResolver,
+    linkResponses,
+    queryString,
+    dlrAPIKey,
+    qualifierPath: qualifierPath ?? '/',
+  });
 };
