@@ -1,6 +1,6 @@
+import React, { useEffect } from 'react';
 import { Box, Tab, Tabs } from '@mui/material';
 import { VerifiableCredential } from '@vckit/core-types';
-import React, { useEffect } from 'react';
 import CredentialRender from '../CredentialRender/CredentialRender';
 import { JsonBlock } from '../JsonBlock';
 

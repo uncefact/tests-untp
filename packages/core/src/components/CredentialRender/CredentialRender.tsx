@@ -45,6 +45,7 @@ const CredentialRender = ({ credential }: { credential: VerifiableCredential }) 
     <>
       {isLoading && <CircularProgress sx={{ margin: 'auto' }} />}
       <Box
+        data-testid='loading-indicator'
         sx={{
           overflowY: 'scroll',
           margin: '0 auto',

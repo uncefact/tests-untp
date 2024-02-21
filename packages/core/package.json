@@ -27,6 +27,7 @@
     "build": "craco build",
     "storybook": "storybook dev -p 6006",
     "test": "jest --ci --env=jest-environment-jsdom",
+    "test:watch": "jest --ci --watch --env=jest-environment-jsdom",
     "coverage": "jest --coverage"
   },
   "eslintConfig": {

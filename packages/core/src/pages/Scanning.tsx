@@ -23,7 +23,7 @@ const Scanning = () => {
 
       const productList = await fetchProductList(gtinCode);
       if (!productList) {
-        return toastMessage({ status: Status.error, message: 'There no product info' });
+        return toastMessage({ status: Status.error, message: 'There are no products' });
       }
 
       const { services } = appConfig.scanningApp;

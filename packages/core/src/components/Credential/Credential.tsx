@@ -17,8 +17,7 @@ const Credential = ({ credential }: { credential: VerifiableCredential }) => {
         width: '100%',
       }}
     >
-      <MessageText status={Status.success} text='Document has not been tampered' />
-      <MessageText status={Status.success} text='Document has not been revoked' />
+
       <CredentialInfo credential={credential} />
       <CredentialTabs credential={credential} />
     </Box>

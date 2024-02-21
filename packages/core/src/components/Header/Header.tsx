@@ -32,8 +32,8 @@ function Header() {
     setAnchorElNav(null);
   };
 
-  const renderMobileMenuItems = (apps: IApp[], scanningRoute: string, scanningStyles: IStyles) => {
-    const menuItems = apps.map((app: IApp) => {
+  const renderMobileMenuItems = (apps: any[], scanningRoute: string, scanningStyles: IStyles) => {
+    const menuItems = apps.map((app: any) => {
       const route = `/${convertStringToPath(app.name)}`;
 
       return (
@@ -79,8 +79,8 @@ function Header() {
     return menuItems;
   };
 
-  const renderDesktopMenuItems = (apps: IApp[], scanningRoute: string, scanningStyles: IStyles) => {
-    const menuItems = apps.map((app: IApp) => {
+  const renderDesktopMenuItems = (apps: any[], scanningRoute: string, scanningStyles: IStyles) => {
+    const menuItems = apps.map((app: any) => {
       const route = `/${convertStringToPath(app.name)}`;
 
       return (
