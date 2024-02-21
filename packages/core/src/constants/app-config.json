@@ -212,6 +212,32 @@
           ],
           "services": [
             {
+              "name": "processObjectEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "type": ["VerifiableCredential"],
+                    "context": ["https://www.w3.org/2018/credentials/v1"],
+                    "renderTemplate": [],
+                    "issuer": "did:web:agtrace-passports.s3.ap-southeast-2.amazonaws.com"
+                  },
+                  "dlr": {
+                    "identificationKeyType": "nlis",
+                    "linkTitle": "Livestock Passport",
+                    "verificationPage": "https://web.agtrace.showthething.com/verify",
+                    "dlrAPIUrl": "http://localhost",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "identifierKeyPaths": ["herd", "NLIS"]
+                }
+              ]
+            },
+            {
               "name": "processTransformationEvent",
               "parameters": [
                 {
