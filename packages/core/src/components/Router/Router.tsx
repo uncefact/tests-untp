@@ -4,7 +4,8 @@ import appConfig from '../../constants/app-config.json';
 import { Form, Home, Scanning, Verify } from '../../pages';
 import { convertStringToPath } from '../../utils';
 import Application from '../../pages/Application';
-import { IApp, IFeature } from '../../types/common.types';
+import { IFeature } from '../../types/common.types';
+import GenericPage from '../../pages/GenericPage';
 
 function Router() {
   const scanningRoute = appConfig.scanningApp.config.path;
@@ -25,14 +26,14 @@ function Router() {
       <Route path='*' element={<Navigate to='/404' />} />,
 
       {/* Iterate through the appConfig to dynamically generate routes */}
-      {appConfig.apps.map((app: IApp) => {
+      {appConfig.apps.map((app: any) => {
         const mainPath = `/${convertStringToPath(app.name)}`;
         const mainElement = <Application app={app} />;
 
         // Generate child routes for each feature of the app
         const childRoutes = app.features.map((feature: IFeature) => {
           const childPath = `/${convertStringToPath(feature.name)}`;
-          const childElement = <Form feature={feature} />;
+          const childElement = <GenericPage componentsData={feature.components} services={feature.services} />;
 
           // Create a React Router Route for the combined path, rendering the child element
           const combinePath = `${mainPath}${childPath}`;
@@ -41,9 +42,10 @@ function Router() {
 
         // Create a React Router Route for the main path, rendering the main element and its child routes
         return (
-          <Route key={mainPath} path={mainPath} element={mainElement}>
+          <>
+            <Route key={mainPath} path={mainPath} element={mainElement} />
             {childRoutes}
-          </Route>
+          </>
         );
       })}
     </Routes>
