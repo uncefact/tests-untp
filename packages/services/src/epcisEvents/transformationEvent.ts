@@ -3,6 +3,7 @@ import { VerifiableCredential } from '@vckit/core-types';
 import { issueVC } from '../vckit.service.js';
 import { uploadJson } from '../storage.service.js';
 import { IdentificationKeyType, registerLinkResolver } from '../linkResolver.service.js';
+import { epcisTransformationCrendentialSubject } from '../epcis.service.js';
 
 import { IService } from '../types/IService.js';
 import {
@@ -13,7 +14,6 @@ import {
   IVCKitContext,
 } from './types';
 import { generateUUID, incrementQuality } from '../utils/helpers.js';
-import { epcisTransformationCrendentialSubject } from '../epcis.service.js';
 
 /**
  * Process transformation event, issue epcis transformation event and dpp for each gtin, then upload to storage and register link resolver for each dpp
@@ -99,7 +99,7 @@ export const issueEpcisTransformationEvent = async (
   data: any,
   productTranformation: IProductTransformation,
 ) => {
-  const restOfVC = { render: vckitContext.renderTemplate };  
+  const restOfVC = { render: vckitContext.renderTemplate };
   const { nlisids } = data; // TODO: check the name of the field
 
   const epcisVc: VerifiableCredential = await issueVC({

@@ -32,6 +32,12 @@ export function fillArray(value1: any[], value2: any[]) {
   return value2;
 }
 
+/**
+ * Increment the quantity of the object
+ * @param obj - object with quantity
+ * @param numberOfItems - number of items
+ * @returns object with the quantity incremented, if the object has a quantity
+ */
 export function incrementQuality(obj: any, numberOfItems: number) {
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj[key], 'quantity')) {

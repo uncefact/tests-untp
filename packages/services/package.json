@@ -8,7 +8,7 @@
     "build": "tsc --build --clean && tsc",
     "watch": "tsc -b --watch",
     "test": "jest --ci --env=jest-environment-node",
-    "coverage": "jest --coverage"
+    "test:coverage": "jest --coverage"
   },
   "type": "module",
   "moduleDirectories": [
