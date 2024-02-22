@@ -332,7 +332,7 @@
                     ],
                     "type": ["TransformationEventCredential"],
                     "dlrIdentificationKeyType": "gtin",
-                    "dlrlinkTitle": "EPCIS transformation event VC",
+                    "dlrLinkTitle": "EPCIS transformation event VC",
                     "dlrVerificationPage": "https://web.agtrace.showthething.com/verify",
                     "dlrQualifierPath": ""
                   },
@@ -343,7 +343,7 @@
                     ],
                     "type": ["DigitalProductPassport"],
                     "dlrIdentificationKeyType": "gtin",
-                    "dlrlinkTitle": "Digital Product Passport",
+                    "dlrLinkTitle": "Digital Product Passport",
                     "dlrVerificationPage": "https://web.agtrace.showthething.com/verify",
                     "dlrQualifierPath": ""
                   },
