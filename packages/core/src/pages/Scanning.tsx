@@ -3,12 +3,12 @@ import { Box, CircularProgress, Stack } from '@mui/material';
 import { Html5QrcodeResult } from 'html5-qrcode';
 import { useNavigate } from 'react-router-dom';
 import { toastMessage, Status } from '@mock-app/components';
+import { getDlrUrl, getDlrPassport, getGtinCode } from '@mock-app/services';
 import { Scanner } from '../components/Scanner';
 import { IScannerRef } from '../types/scanner.types';
 import { CustomDialog } from '../components/CustomDialog';
-import { publicAPI } from '../utils';
 import appConfig from '../constants/app-config.json';
-import { MimeTypeEnum } from '../types/common.types';
+import { IdentifyProviderTypeEnum } from '../types/common.types';
 
 const Scanning = () => {
   const scannerRef = useRef<IScannerRef | null>(null);
@@ -21,83 +21,24 @@ const Scanning = () => {
     try {
       setIsLoading(true);
 
-      const productList = await fetchProductList(gtinCode);
-      if (!productList) {
-        return toastMessage({ status: Status.error, message: 'There are no products' });
+      const { url: identifyProviderUrl } = appConfig.identifyProvider;
+      const dlrUrl: string | null = await getDlrUrl(gtinCode, identifyProviderUrl);
+      if (!dlrUrl) {
+        return toastMessage({ status: Status.error, message: 'There no DLR url' });
       }
 
-      const { services } = appConfig.scanningApp;
-      const [firstProduct] = productList;
-      const serviceInfoUrl = firstProduct?.linkset?.[services.serviceInfo]?.[0]?.href;
-      if (!serviceInfoUrl) {
-        return toastMessage({ status: Status.error, message: 'There no service info url' });
-      }
-
-      const dlrUrl = `${serviceInfoUrl}/gtin/${gtinCode}?linkType=all`;
-      const dlrData = await fetchDlrData(dlrUrl);
-      if (!dlrData) {
-        return toastMessage({ status: Status.error, message: 'There no DLR data' });
-      }
-
-      const dlrPassport = getDlrPassport(dlrData);
+      const dlrPassport = await getDlrPassport(dlrUrl);
       if (!dlrPassport) {
         return toastMessage({ status: Status.error, message: 'There no DLR passport' });
       }
 
-      const verifyDlrPassportUri = dlrPassport.href;
-      redirectToVerifyPage(verifyDlrPassportUri);
+      redirectToVerifyPage(dlrPassport.href);
     } catch (error) {
       console.log(error);
       toastMessage({ status: Status.error, message: 'Failed to verify code' });
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const fetchProductList = async (code: string): Promise<any[] | null> => {
-    const { providerVerifyUrl } = appConfig.scanningApp;
-    const params = { keys: [code] };
-
-    const products: any[] = await publicAPI.post(providerVerifyUrl, params);
-    if (!products || !products.length) {
-      return null;
-    }
-
-    return products;
-  };
-
-  /**
-   * Fetching DRL data function
-   * @param dlrUrl this url api to get DRL data
-   */
-  const fetchDlrData = async (dlrUrl: string): Promise<any | null> => {
-    const dlrData = await publicAPI.get(dlrUrl);
-    if (!dlrData) {
-      return null;
-    }
-
-    return dlrData;
-  };
-
-  const getDlrPassport = (dlr: any): any | null => {
-    const { services } = appConfig.scanningApp;
-
-    const certificatePassports = dlr?.linkset?.find((linkSetItem: any) => linkSetItem[services.certificationInfo]);
-    if (!certificatePassports) {
-      return null;
-    }
-
-    const passportInfos = certificatePassports[services.certificationInfo];
-    if (!passportInfos) {
-      return null;
-    }
-
-    const dlrPassport = passportInfos.find((passportInfo: any) => passportInfo?.type === MimeTypeEnum.applicationJson);
-    if (!dlrPassport) {
-      return null;
-    }
-
-    return dlrPassport;
   };
 
   const redirectToVerifyPage = (verifyDlrPassportUri: string) => {
@@ -121,22 +62,25 @@ const Scanning = () => {
   };
 
   const onScanResult = (decodedText: string, result: Html5QrcodeResult) => {
-    const scannedCodeResult = getScannedCode(decodedText, result);
-    setScannedCode(scannedCodeResult);
-  };
+    let scannedCodeResult = '';
 
-  // This function is used for gs1 code
-  const getScannedCode = (decodedText: string, result: Html5QrcodeResult) => {
     const formatName = result?.result?.format?.formatName;
-    if (formatName === 'DATA_MATRIX') {
-      return decodedText.slice(2, 16);
+    if (!formatName) {
+      return toastMessage({ status: Status.error, message: 'Failed to scanning code' });
     }
 
-    if (decodedText.length < 14) {
-      return `0${decodedText}`;
+    const { type: providerTypeConfig } = appConfig.identifyProvider;
+
+    const providerSupports: string[] = [...new Set(Object.values(IdentifyProviderTypeEnum))];
+    if (!providerSupports.includes(providerTypeConfig)) {
+      return toastMessage({ status: Status.error, message: 'The configuration identity provider doesn\'t support' });
     }
 
-    return decodedText;
+    if (providerTypeConfig === IdentifyProviderTypeEnum.gs1) {
+      scannedCodeResult = getGtinCode(decodedText, formatName);
+    }
+
+    setScannedCode(scannedCodeResult);
   };
 
   // Handle close dialog when code not found

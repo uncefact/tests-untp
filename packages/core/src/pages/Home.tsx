@@ -16,7 +16,7 @@ const Home = () => {
     });
 
     apps.push(
-    <Button sx={{ background: appConfig.styles.primaryColor }} key={appConfig.scanningApp.config.path} variant='contained' component={Link} to={appConfig.scanningApp.config.path}>
+    <Button sx={{ background: appConfig.styles.primaryColor }} key={'/scanning'} variant='contained' component={Link} to={'/scanning'}>
       Scanning
     </Button>
     );

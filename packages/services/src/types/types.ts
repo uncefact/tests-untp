@@ -6,3 +6,9 @@ export interface IssueEvent {
   credentialSubject: any;
   restOfVC: any;
 }
+
+export enum MimeTypeEnum {
+  textPlain = 'text/plain',
+  textHtml = 'text/html',
+  applicationJson = 'application/json',
+}

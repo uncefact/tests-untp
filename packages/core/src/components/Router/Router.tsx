@@ -6,15 +6,13 @@ import { convertStringToPath } from '../../utils';
 import { IFeature } from '../../types/common.types';
 
 function Router() {
-  const scanningRoute = appConfig.scanningApp.config.path;
-
   return (
     // Define the root routing container using React Router's Routes component
     <Routes>
       {/* Default route for the home page, rendering the Home component */}
       <Route path='/' element={<Home />} />,
       {/* Route for the Scanning page */}
-      <Route path={scanningRoute} element={<Scanning />} />,
+      <Route path='/scanning' element={<Scanning />} />,
       {/* Route for the Verify page */}
       <Route path='/verify' element={<Verify />} />
       {/* Catch-all route for any unknown paths, redirecting to the 404 page */}

@@ -113,11 +113,18 @@ function Header() {
   };
 
   const renderMenuByScreenType = (screenType: string) => {
+    const scanningRoute = '/scanning';
+    const scanningStyles: IStyles = {
+      primaryColor: 'rgb(41, 171, 48)',
+      secondaryColor: 'white',
+      tertiaryColor: 'black'
+    };
+
     if (screenType === 'mobile') {
-      return renderMobileMenuItems(appConfig.apps, appConfig.scanningApp.config.path, appConfig.scanningApp.config.styles);
+      return renderMobileMenuItems(appConfig.apps, scanningRoute, scanningStyles);
     }
 
-    return renderDesktopMenuItems(appConfig.apps, appConfig.scanningApp.config.path, appConfig.scanningApp.config.styles);
+    return renderDesktopMenuItems(appConfig.apps, scanningRoute, scanningStyles);
   };
 
   return (
