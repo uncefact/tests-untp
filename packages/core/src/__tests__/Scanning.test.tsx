@@ -27,7 +27,8 @@ jest.mock('@mock-app/services', () => ({
 
 jest.mock('@mock-app/components', () => ({
   Status: 'success',
-  toastMessage: jest.fn()
+  toastMessage: jest.fn(),
+  ToastMessage: jest.fn()
 }));
 
 jest.mock('@veramo/utils', () => ({

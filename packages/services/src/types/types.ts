@@ -12,3 +12,7 @@ export enum MimeTypeEnum {
   textHtml = 'text/html',
   applicationJson = 'application/json',
 }
+
+export enum SupportedProviderTypesEnum {
+  gs1 = 'gs1',
+}

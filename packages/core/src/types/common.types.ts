@@ -26,7 +26,3 @@ export interface IStyles {
   secondaryColor: string;
   tertiaryColor: string;
 }
-
-export enum IdentifyProviderTypeEnum {
-  gs1 = 'gs1',
-}

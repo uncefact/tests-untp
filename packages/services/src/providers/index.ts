@@ -1,1 +1,2 @@
-export * from './gs1.js';
+export * from './gs1';
+export * from './ProviderStrategy';

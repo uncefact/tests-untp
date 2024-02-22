@@ -1,8 +1,6 @@
 import React from 'react';
 import { Box } from '@mui/material';
 import { VerifiableCredential } from '@vckit/core-types';
-import { MessageText } from '../../components/MessageText';
-import { Status } from '@mock-app/components';
 import { CredentialInfo } from '../CredentialInfo';
 import { CredentialTabs } from '../CredentialTabs';
 

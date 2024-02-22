@@ -1,37 +1,38 @@
 import React, { useState, useRef } from 'react';
 import { Box, CircularProgress, Stack } from '@mui/material';
+import { VerifiableCredential } from '@vckit/core-types';
 import { Html5QrcodeResult } from 'html5-qrcode';
 import { useNavigate } from 'react-router-dom';
-import { toastMessage, Status } from '@mock-app/components';
-import { getDlrUrl, getDlrPassport, getGtinCode } from '@mock-app/services';
+import { toastMessage, Status, ToastMessage } from '@mock-app/components';
+import { ProviderStrategy, getDlrPassport } from '@mock-app/services';
 import { Scanner } from '../components/Scanner';
 import { IScannerRef } from '../types/scanner.types';
-import { CustomDialog } from '../components/CustomDialog';
 import appConfig from '../constants/app-config.json';
-import { IdentifyProviderTypeEnum } from '../types/common.types';
+import { CustomDialog } from '../components/CustomDialog';
+import { getProviderInstance } from '../utils';
 
 const Scanning = () => {
   const scannerRef = useRef<IScannerRef | null>(null);
-  const [scannedCode, setScannedCode] = useState<string>('');
+  const [identityProvider, setIdentityProvider] = useState<ProviderStrategy | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [openDialogErrorCode, setOpenDialogErrorCode] = useState<boolean>(false);
   const navigate = useNavigate();
 
-  const goVerifyPage = async (gtinCode: string) => {
+  const goVerifyPage = async (identityProvider: ProviderStrategy) => {
     try {
       setIsLoading(true);
 
-      const { url: identifyProviderUrl } = appConfig.identifyProvider;
-      const dlrUrl: string | null = await getDlrUrl(gtinCode, identifyProviderUrl);
+      const dlrUrl = await identityProvider.getDlrUrl();
       if (!dlrUrl) {
         return toastMessage({ status: Status.error, message: 'There no DLR url' });
       }
 
-      const dlrPassport = await getDlrPassport(dlrUrl);
+      const dlrPassport = await getDlrPassport<VerifiableCredential>(dlrUrl);
       if (!dlrPassport) {
         return toastMessage({ status: Status.error, message: 'There no DLR passport' });
       }
 
+      scannerRef.current?.closeQrCodeScanner();
       redirectToVerifyPage(dlrPassport.href);
     } catch (error) {
       console.log(error);
@@ -46,41 +47,35 @@ const Scanning = () => {
     const queryString = `q=${encodeURIComponent(queryPayload)}`;
 
     navigate(`/verify?${queryString}`);
-    scannerRef.current?.closeQrCodeScanner();
   };
 
   React.useEffect(() => {
-    if (!scannedCode) {
+    if (!identityProvider) {
       return;
     }
 
-    goVerifyPage(scannedCode);
-  }, [scannedCode]);
+    goVerifyPage(identityProvider);
+  }, [identityProvider]);
 
   const onScanError = (error: unknown) => {
-    toastMessage({ status: Status.error, message: 'Failed to scanning code' });
+    setIdentityProvider(null);
   };
 
   const onScanResult = (decodedText: string, result: Html5QrcodeResult) => {
-    let scannedCodeResult = '';
-
     const formatName = result?.result?.format?.formatName;
     if (!formatName) {
       return toastMessage({ status: Status.error, message: 'Failed to scanning code' });
     }
 
-    const { type: providerTypeConfig } = appConfig.identifyProvider;
-
-    const providerSupports: string[] = [...new Set(Object.values(IdentifyProviderTypeEnum))];
-    if (!providerSupports.includes(providerTypeConfig)) {
+    const { type: providerType, url: providerUrl } = appConfig.identifyProvider;
+    const providerInstance = getProviderInstance(providerType, providerUrl);
+    if (!providerInstance.isProviderSupported()) {
       return toastMessage({ status: Status.error, message: 'The configuration identity provider doesn\'t support' });
     }
 
-    if (providerTypeConfig === IdentifyProviderTypeEnum.gs1) {
-      scannedCodeResult = getGtinCode(decodedText, formatName);
-    }
-
-    setScannedCode(scannedCodeResult);
+    const scannedCodeResult = providerInstance.getCode(decodedText, formatName);
+    providerInstance.setCode(scannedCodeResult);
+    setIdentityProvider(providerInstance);
   };
 
   // Handle close dialog when code not found
@@ -105,7 +100,7 @@ const Scanning = () => {
         qrCodeSuccessCallback={onScanResult}
         qrCodeErrorCallback={onScanError}
       />
-      {scannedCode && (
+      {identityProvider && (
         <>
           {isLoading && (
             <Stack>
@@ -122,6 +117,7 @@ const Scanning = () => {
           onClose={handleCloseDialogErrorFetchProductData}
         />
       )}
+      <ToastMessage />
     </Box>
   );
 };
