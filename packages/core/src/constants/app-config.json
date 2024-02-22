@@ -217,10 +217,14 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332",
-                    "type": ["VerifiableCredential"],
-                    "context": ["https://www.w3.org/2018/credentials/v1"],
-                    "renderTemplate": [],
                     "issuer": "did:web:agtrace-passports.s3.ap-southeast-2.amazonaws.com"
+                  },
+                  "dpp": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["DigitalProductPassport"]
                   },
                   "dlr": {
                     "identificationKeyType": "nlis",
