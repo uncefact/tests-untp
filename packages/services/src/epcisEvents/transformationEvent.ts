@@ -2,36 +2,43 @@ import { VerifiableCredential } from '@vckit/core-types';
 
 import { issueVC } from '../vckit.service.js';
 import { uploadJson } from '../storage.service.js';
-import { IdentificationKeyType, registerLinkResolver } from '../linkResolver.service.js';
+import { registerLinkResolver } from '../linkResolver.service.js';
 import { epcisTransformationCrendentialSubject } from '../epcis.service.js';
 
 import { IService } from '../types/IService.js';
 import {
-  ILinkResolverContext,
+  IConfigDLR,
+  ICredential,
   IProductTransformation,
   IStorageContext,
-  ITransFormaionEvent,
+  ITransformationEvent,
   IVCKitContext,
 } from './types';
 import { generateUUID, incrementQuality } from '../utils/helpers.js';
+import { getIdentifierByObjectKeyPaths } from './helpers.js';
+import { EPCISEventType } from '../types/epcis.js';
 
 /**
- * Process transformation event, issue epcis transformation event and dpp for each gtin, then upload to storage and register link resolver for each dpp
+ * Process transformation event, issue epcis transformation event and dpp for each identifiers, then upload to storage and register link resolver for each dpp
  * @param data - data for the transformation event, which nlsids are selected
- * @param context - context for the transformation event, which includes the epcisVckit, gtins, dlr, dppVckit, storage, etc.
+ * @param context - context for the transformation event, which includes the epcisTransformationEvent, identifiers, dlr, dpp, storage, etc.
  */
-export const processTransformationEvent: IService = async (data: any, context: ITransFormaionEvent): Promise<any> => {
+export const processTransformationEvent: IService = async (data: any, context: ITransformationEvent): Promise<any> => {
   try {
-    const epcisVckitContext = context.epcisVckit;
-    const gtinContext = context.gtins;
+    const epcisTransformationEventContext = context.epcisTransformationEvent;
+    const identifiersContext = context.identifiers;
     const dlrContext = context.dlr;
-    const productTranformation = context.productTranformation;
+    const vcKitContext = context.vckit;
+    const productTransformation = context.productTransformation;
+
     const epcisVc = await issueEpcisTransformationEvent(
-      epcisVckitContext,
-      gtinContext,
+      vcKitContext,
+      epcisTransformationEventContext,
+      identifiersContext,
       dlrContext,
       data,
-      productTranformation,
+      productTransformation,
+      context.identifierKeyPaths,
     );
 
     const storageContext = context.storage;
@@ -41,41 +48,44 @@ export const processTransformationEvent: IService = async (data: any, context: I
       storageContext,
     );
 
-    const dppVckitContext = context.dppVckit;
+    const dppContext = context.dpp;
     await Promise.all(
-      gtinContext.map(async (gtin: string) => {
-        const qualifierPath = context.dlr.epicsQualifierPath;
+      identifiersContext.map(async (identifier: string) => {
+        const epcisTransformationEventQualifierPath = epcisTransformationEventContext?.dlrQualifierPath;
         const linkResolverContext = context.dlr;
 
         const transformationEventLinkResolver = await registerLinkResolver(
           transformantionEventLink,
-          IdentificationKeyType[linkResolverContext.identificationKeyType as keyof typeof IdentificationKeyType],
-          gtin,
-          'EPCIS transformation event VC',
-          linkResolverContext.verificationPage,
+          epcisTransformationEventContext.dlrIdentificationKeyType,
+          identifier,
+          epcisTransformationEventContext.dlrLinkTitle,
+          epcisTransformationEventContext.dlrVerificationPage,
           linkResolverContext.dlrAPIUrl,
           linkResolverContext.dlrAPIKey,
-          qualifierPath,
+          epcisTransformationEventQualifierPath,
         );
 
         const dpp = await issueDPP(
-          dppVckitContext,
-          gtin,
+          vcKitContext,
+          dppContext,
+          identifier,
           data?.length,
           transformationEventLinkResolver,
-          productTranformation,
+          productTransformation,
           data,
         );
-        const DPPLink = await uploadVC(`${gtin}/${generateUUID()}`, dpp, storageContext);
+        const DPPLink = await uploadVC(`${identifier}/${generateUUID()}`, dpp, storageContext);
+
+        const dppQualifierPath = dppContext?.dlrQualifierPath;
         await registerLinkResolver(
           DPPLink,
-          IdentificationKeyType.gtin,
-          gtin,
-          linkResolverContext.linkTitle,
-          linkResolverContext.verificationPage,
+          dppContext.dlrIdentificationKeyType,
+          identifier,
+          dppContext.dlrLinkTitle,
+          dppContext.dlrVerificationPage,
           linkResolverContext.dlrAPIUrl,
           linkResolverContext.dlrAPIKey,
-          'Digital Product Passport',
+          dppQualifierPath,
         );
       }),
     );
@@ -87,32 +97,35 @@ export const processTransformationEvent: IService = async (data: any, context: I
 /**
  * Issue epcis transformation event and return the verifiable credential
  * @param vckitContext - context for the vckit to issue vc for epcis transformation event
- * @param gtinContext - list of gtin of products
+ * @param identifiersContext - list of identifiers of products
  * @param dlrContext - context for the link resolver to register link resolver for the epcis transformation event
  * @param data - data for the transformation event, which nlsids are selected
  * @returns VerifiableCredential
  */
 export const issueEpcisTransformationEvent = async (
-  vckitContext: IVCKitContext,
-  gtinContext: string[],
-  dlrContext: ILinkResolverContext,
+  vcKitContext: IVCKitContext,
+  epcisTransformationEvent: ICredential,
+  identifiersContext: string[],
+  dlrContext: IConfigDLR,
   data: any,
-  productTranformation: IProductTransformation,
+  productTransformation: IProductTransformation,
+  identifierKeyPaths: string[],
 ) => {
-  const restOfVC = { render: vckitContext.renderTemplate };
-  const { nlisids } = data; // TODO: check the name of the field
+  const restOfVC = { render: epcisTransformationEvent.renderTemplate };
+  const nlisids = getIdentifierByObjectKeyPaths(data.data, identifierKeyPaths) as string[];
+  if (!nlisids) throw new Error('nlisids not found');
 
   const epcisVc: VerifiableCredential = await issueVC({
-    context: vckitContext.context,
+    context: epcisTransformationEvent.context,
     credentialSubject: epcisTransformationCrendentialSubject(
-      nlisids.map((item: any) => item.value),
-      gtinContext,
+      nlisids.map((item: any) => item),
+      identifiersContext,
       dlrContext.dlrAPIUrl,
-      productTranformation,
+      productTransformation,
     ),
-    issuer: vckitContext.issuer,
-    type: [...vckitContext.type],
-    vcKitAPIUrl: vckitContext.vckitAPIUrl,
+    issuer: vcKitContext.issuer,
+    type: [...epcisTransformationEvent.type],
+    vcKitAPIUrl: vcKitContext.vckitAPIUrl,
     ...restOfVC,
   });
 
@@ -137,37 +150,49 @@ export const uploadVC = async (filename: string, vc: VerifiableCredential, stora
 };
 
 /**
- *  Issue DPP for the given gtin and return the verifiable credential
- * @param dppVckitContext - context for the vckit to issue vc for dpp
- * @param gtin - gtin of the product
+ *  Issue DPP for the given identifiers and return the verifiable credential
+ * @param dppContext - context for the vckit to issue vc for dpp
+ * @param identifiers - identifiers of the product
  * @param numberOfItems - number of cows
  * @param linkEpcis - link to the epcis event
  * @returns
  */
 export const issueDPP = async (
-  dppVckitContext: IVCKitContext,
-  gtin: string,
+  vcKitContext: IVCKitContext,
+  dppContext: ICredential,
+  identifiers: string,
   numberOfItems: number,
   linkEpcis: string,
-  productTranformation: IProductTransformation,
+  productTransformation: IProductTransformation,
   data: any,
 ) => {
-  const getOutPutItemsProductTranformation = productTranformation.outputItems;
+  const getOutPutItemsproductTransformation = productTransformation.outputItems;
 
-  const value = incrementQuality(getOutPutItemsProductTranformation, numberOfItems);
-  const gtinData: { [k: string]: any } = value;
+  const value = incrementQuality(getOutPutItemsproductTransformation, numberOfItems);
+  const product = value.find((item) => item.itemID === identifiers);
 
-  const product = gtinData[gtin];
+  if (!product) throw new Error('identifiers not found');
 
-  if (!product) throw new Error('GTIN not found');
+  const restOfVC = { render: dppContext.renderTemplate };
 
-  const restOfVC = { render: dppVckitContext.renderTemplate };
+  // add the epcis event link to the traceabilityInfo of the batch
+
   const result: VerifiableCredential = await issueVC({
-    context: dppVckitContext.context,
-    issuer: dppVckitContext.issuer,
-    type: dppVckitContext.type,
-    vcKitAPIUrl: dppVckitContext.vckitAPIUrl,
-    credentialSubject: data.data,
+    context: dppContext.context,
+    issuer: vcKitContext.issuer,
+    type: dppContext.type,
+    vcKitAPIUrl: vcKitContext.vckitAPIUrl,
+    credentialSubject: {
+      ...data.data,
+      batch: {
+        traceabilityInfo: [
+          {
+            EventReference: linkEpcis,
+            EventType: EPCISEventType.Transformation,
+          },
+        ],
+      },
+    },
     ...restOfVC,
   });
 

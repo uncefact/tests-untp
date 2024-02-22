@@ -17,17 +17,18 @@ import {
 export const processObjectEvent: IService = async (data: any, context: IContext): Promise<any> => {
   try {
     const vckitContext = context.vckit;
-    const restOfVC = { render: vckitContext.renderTemplate };
+    const dppContext = context.dpp;
+    const restOfVC = { render: dppContext.renderTemplate };
     const vc: VerifiableCredential = await issueVC({
-      context: vckitContext.context,
+      context: dppContext.context,
       credentialSubject: data.data,
       issuer: vckitContext.issuer,
-      type: [...vckitContext.type],
+      type: [...dppContext.type],
       vcKitAPIUrl: vckitContext.vckitAPIUrl,
       ...restOfVC,
     });
 
-    const identifier = getIdentifierByObjectKeyPaths(data.data, context.identifierKeyPaths);
+    const identifier = getIdentifierByObjectKeyPaths(data.data, context.identifierKeyPaths) as string;
     if (!identifier) throw new Error('Identifier not found');
 
     const storageContext = context.storage;
@@ -42,10 +43,10 @@ export const processObjectEvent: IService = async (data: any, context: IContext)
     const linkResolverContext = context.dlr;
     await registerLinkResolver(
       vcUrl,
-      IdentificationKeyType[linkResolverContext.identificationKeyType as keyof typeof IdentificationKeyType],
+      dppContext.dlrIdentificationKeyType,
       identifier,
-      linkResolverContext.linkTitle,
-      linkResolverContext.verificationPage,
+      dppContext.linkTitle,
+      dppContext.verificationPage,
       linkResolverContext.dlrAPIUrl,
       linkResolverContext.dlrAPIKey,
     );

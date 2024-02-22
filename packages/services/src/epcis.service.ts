@@ -1,8 +1,8 @@
 import moment from 'moment';
-import { EPCISEventType } from './types/epcis';
-import { IdentificationKeyType, LinkType } from './linkResolver.service';
-import { fillArray, generateUUID } from './utils/helpers';
-import { IProductTransformation } from './epcisEvents/types';
+import { EPCISEventType } from './types/epcis.js';
+import { IdentificationKeyType, LinkType } from './linkResolver.service.js';
+import { fillArray, generateUUID } from './utils/helpers.js';
+import { IProductTransformation } from './epcisEvents/types.js';
 
 /**
  * Generates a credential payload for an EPCIS transformation service.
@@ -12,20 +12,24 @@ import { IProductTransformation } from './epcisEvents/types';
  */
 export const epcisTransformationCrendentialSubject = (
   inputItemList: any[],
-  gtins: string[],
+  identifiers: string[],
   dlrUrl: string,
-  productTranformation: IProductTransformation,
+  productTransformation: IProductTransformation,
 ) => {
-  const detailOfProducts: any = productTranformation.outputItems;
-  const outputItemList = gtins.map((gtin) => {
+  const detailOfProducts: any = productTransformation.outputItems;
+  const convertProductToObj = detailOfProducts.reduce((accumulator: any, item: any) => {
+    accumulator[item.itemID] = item;
+    return accumulator;
+  }, {});
+  const outputItemList = identifiers.map((identifier) => {
     return {
-      itemID: gtin,
-      link: `${dlrUrl}/${IdentificationKeyType.gtin}/${gtin}?linkType=${LinkType.certificationLinkType}`,
-      name: detailOfProducts[gtin].productClass,
+      itemID: identifier,
+      link: `${dlrUrl}/${IdentificationKeyType.gtin}/${identifier}?linkType=${LinkType.certificationLinkType}`,
+      name: convertProductToObj[identifier]?.productClass,
     };
   });
 
-  const countInputItems = fillArray(inputItemList, productTranformation.inputItems);
+  const countInputItems = fillArray(inputItemList, productTransformation.inputItems);
 
   const inputItems = inputItemList.map((item: string) => {
     return {

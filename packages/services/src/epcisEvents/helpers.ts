@@ -1,4 +1,4 @@
-export const getIdentifierByObjectKeyPaths = (data: any, keyPaths: string[]): string | undefined => {
+export const getIdentifierByObjectKeyPaths = (data: any, keyPaths: string[]): any => {
   let value = data;
   for (const keyPath of keyPaths) {
     if (value[keyPath] === undefined) {

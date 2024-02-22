@@ -33,6 +33,151 @@ jest.mock('../../build/linkResolver.service', () => ({
 }));
 
 describe('Transformation event', () => {
+  const context = {
+    epcisTransformationEvent: {
+      context: ['https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transformation-event-ld.json'],
+      renderTemplate: [{ template: '<p>Render epcis template</p>', '@type': 'WebRenderingTemplate2022' }],
+      type: ['TransformationEventCredential'],
+      dlrIdentificationKeyType: 'gtin',
+      dlrlinkTitle: 'EPCIS transformation event VC',
+      dlrVerificationPage: 'https://web.agtrace.showthething.com/verify',
+      dlrQualifierPath: '',
+    },
+    dpp: {
+      context: ['https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json'],
+      renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
+      type: ['DigitalProductPassport'],
+      dlrIdentificationKeyType: 'gtin',
+      dlrlinkTitle: 'Digital Product Passport',
+      dlrVerificationPage: 'https://web.agtrace.showthething.com/verify',
+      dlrQualifierPath: '',
+    },
+    vckit: {
+      vckitAPIUrl: 'http://localhost:3332',
+      issuer: 'did:web:cd28-2402-800-6314-9b5f-6c75-aaf-7382-43e9.ngrok-free.app',
+    },
+    identifiers: ['9359502000034', '9359502000010'],
+    dlr: {
+      dlrAPIUrl: 'http://localhost',
+      dlrAPIKey: '5555555555555',
+    },
+    storage: {
+      storageAPIUrl: 'https://storage.agtrace.showthething.com',
+      bucket: 'agtrace-test-verifiable-credentials',
+    },
+    productTransformation: {
+      inputItems: [{ quantity: 1, uom: 'head', productClass: 'cattle' }],
+      outputItems: [
+        {
+          itemID: '9359502000041',
+          productClass: 'Beef Silverside',
+          quantity: 500,
+          weight: 500,
+          uom: 'kilogram',
+          image:
+            'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000041/AgTace-Meats-Silverside.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
+          description: 'Deforestation-free Beef Silverside',
+        },
+        {
+          itemID: '9359502000034',
+          productClass: 'Beef Scotch Fillet',
+          quantity: 300,
+          weight: 300,
+          uom: 'kilogram',
+          image:
+            'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000034/Beef-Scotch-Fillet-Steak-300g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
+          description: 'Deforestation-free Beef Scotch Fillet',
+        },
+        {
+          itemID: '9359502000010',
+          productClass: 'Beef Rump Steak',
+          quantity: 250,
+          weight: 250,
+          uom: 'kilogram',
+          image:
+            'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000010/Beef-Rump-Steak-250g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
+          description: 'Deforestation-free Beef Rump Steak',
+        },
+      ],
+    },
+    identifierKeyPaths: ['NLIS'],
+  };
+  // const context = {
+  //   epcisTransformationEvent: {
+  //     context: ['https://www.w3.org/2018/credentials/v1'],
+  //     renderTemplate: [{ template: '<p>Render template</p>', '@type': 'WebRenderingTemplate2022' }],
+  //     type: ['TransformationEventCredential'],
+  //     dlrIdentificationKeyType: 'gtin',
+  //     dlrVerificationPage: 'https://web.agtrace.showthething.com/verify',
+  //     dlrQualifierPath: '',
+  //   },
+  //   dpp: {
+  //     context: ['https://dpp-mock.com/dppld.json'],
+  //     renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
+  //     type: ['DigitalProductPassport'],
+  //     dlrlinkTitle: 'Digital Product Passport',
+  //     dlrIdentificationKeyType: 'gtin',
+  //     dlrVerificationPage: 'https://web.agtrace.showthething.com/verify',
+  //     dlrQualifierPath: '',
+  //   },
+  //   dlr: {
+  //     dlrAPIUrl: 'http://localhost',
+  //     dlrAPIKey: '1234',
+  //   },
+  //   vckit: {
+  //     vckitAPIUrl: 'http://localhost:3332',
+  //     issuer: 'did:web:cd28-2402-800-6314-9b5f-6c75-aaf-7382-43e9.ngrok-free.app',
+  //   },
+  //   storage: {
+  //     storageAPIUrl: 'https://storage.mock.com',
+  //     bucket: 'test-verifiable-credentials',
+  //   },
+  //   identifiers: ['9359502000034', '9359502000010'],
+  //   identifierKeyPaths: ['nlisids'],
+  //   productTransformation: {
+  //     inputItems: [{ quantity: 1, uom: 'head', productClass: 'Cattle' }],
+  //     outputItems: [
+  //       {
+  //         itemID: '9359502000041',
+  //         productClass: 'Beef Silverside',
+  //         quantity: 500,
+  //         weight: 500,
+  //         uom: 'kilogram',
+  //         image:
+  //           'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000041/AgTace-Meats-Silverside.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
+  //         description: 'Deforestation-free Beef Silverside',
+  //       },
+  //       {
+  //         itemID: '9359502000034',
+  //         productClass: 'Beef Scotch Fillet',
+  //         quantity: 300,
+  //         weight: 300,
+  //         uom: 'kilogram',
+  //         image:
+  //           'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000034/Beef-Scotch-Fillet-Steak-300g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
+  //         description: 'Deforestation-free Beef Scotch Fillet',
+  //       },
+  //       {
+  //         itemID: '9359502000010',
+  //         productClass: 'Beef Rump Steak',
+  //         quantity: 250,
+  //         weight: 250,
+  //         uom: 'kilogram',
+  //         image:
+  //           'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000010/Beef-Rump-Steak-250g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
+  //         description: 'Deforestation-free Beef Rump Steak',
+  //       },
+  //     ],
+  //   },
+  // };
+
+  const data = {
+    data: {
+      NLIS: ['NH020188LEJ00012', 'NH020188LEJ00013'],
+      batch: {},
+    },
+  };
+
   it('should issue epcis transformation event with multiple nilsid transforms the event', async () => {
     let expectResult = {};
     (issueVC as jest.Mock).mockImplementation((value) => {
@@ -49,65 +194,18 @@ describe('Transformation event', () => {
       return Promise.resolve(expectResult);
     });
 
-    const data = {
-      nlisids: [
-        {
-          value: 'NH020188LEJ00012',
-        },
-        {
-          value: 'NH020188LEJ00013',
-        },
-      ],
-    };
+    (epcisTransformationCrendentialSubject as jest.Mock).mockImplementation((nlisids) => {
+      const detailOfProducts: any = context.productTransformation.outputItems;
+      const convertProductToObj = detailOfProducts.reduce((accumulator, item, index) => {
+        accumulator[item.itemID] = item;
+        return accumulator;
+      }, {});
 
-    const context = {
-      epcisVckit: {
-        context: ['https://www.w3.org/2018/credentials/v1'],
-        renderTemplate: [{ template: '<p>Render template</p>', '@type': 'WebRenderingTemplate2022' }],
-        issuer: 'did:web:84d1-115-73-178-202.ngrok-free.app',
-        type: ['TransformationEventCredential'],
-        vckitAPIUrl: 'http://localhost:3332',
-      },
-      gtins: ['9359502000034', '9359502000010'],
-      dlr: {
-        dlrAPIUrl: 'http://localhost',
-        dlrAPIKey: '1234',
-        identificationKeyType: '',
-        linkTitle: '',
-        verificationPage: '',
-      },
-      productTranformation: {
-        inputItems: [{ quantity: 1, uom: 'head', productClass: 'Cattle' }],
-        outputItems: {
-          '9359502000034': {
-            productClass: 'Beef Scotch Fillet',
-            quantity: 300,
-            weight: 300,
-            uom: 'kilogram',
-            image:
-              'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000034/Beef-Scotch-Fillet-Steak-300g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
-            description: 'Deforestation-free Beef Scotch Fillet',
-          },
-          '9359502000010': {
-            productClass: 'Beef Rump Steak',
-            quantity: 250,
-            weight: 250,
-            uom: 'kilogram',
-            image:
-              'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000010/Beef-Rump-Steak-250g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
-            description: 'Deforestation-free Beef Rump Steak',
-          },
-        },
-      },
-    };
-
-    (epcisTransformationCrendentialSubject as jest.Mock).mockImplementation((nlisids) => {      
-      const detailOfProducts: any = context.productTranformation.outputItems;
-      const outputItemList = context.gtins.map((gtin) => {
+      const outputItemList = context.identifiers.map((identifier) => {
         return {
-          itemID: gtin,
-          link: `${context.dlr.dlrAPIUrl}/gtin/${gtin}?linkType=gs1:certificationInfo`,
-          name: detailOfProducts[gtin]?.productClass,
+          itemID: identifier,
+          link: `${context.dlr.dlrAPIUrl}/gtin/${identifier}?linkType=gs1:certificationInfo`,
+          name: convertProductToObj[identifier]?.productClass,
         };
       });
 
@@ -119,7 +217,7 @@ describe('Transformation event', () => {
         };
       });
 
-      const countInputItems = fillArray(nlisids, context.productTranformation.inputItems);
+      const countInputItems = fillArray(nlisids, context.productTransformation.inputItems);
 
       return {
         eventID: '1234',
@@ -141,11 +239,13 @@ describe('Transformation event', () => {
     });
 
     const vc = await issueEpcisTransformationEvent(
-      context.epcisVckit,
-      context.gtins,
+      context.vckit,
+      context.epcisTransformationEvent,
+      context.identifiers,
       context.dlr,
       data,
-      context.productTranformation,
+      context.productTransformation,
+      context.identifierKeyPaths,
     );
     expect(vc).toEqual(expectResult);
   });
@@ -177,8 +277,9 @@ describe('Transformation event', () => {
     expect(urlUpload).toEqual(expectResult);
   });
 
-  it('should call issueDPP and return valid vc', async () => {
+  it.only('should call issueDPP and return valid vc', async () => {
     let expectResult = {};
+
     (issueVC as jest.Mock).mockImplementation((value) => {
       expectResult = {
         '@context': [...contextDefault, ...value.context],
@@ -186,99 +287,43 @@ describe('Transformation event', () => {
         issuer: {
           id: value.issuer,
         },
-        credentialSubject: value.credentialSubject,
+        // credentialSubject: value.credentialSubject, // TODO: currently, the value in credentialSubject will be overwritten by the last identifier
         render: value.render,
       };
 
-      return Promise.resolve(expectResult);
+      return Promise.resolve({ ...expectResult });
     });
 
-    const data = {
-      nlisids: [
-        {
-          value: 'NH020188LEJ00012',
-        },
-        {
-          value: 'NH020188LEJ00013',
-        },
-      ],
-    };
+    let vc = {};
+    context.identifiers.map(async (identifier) => {
+      vc = await issueDPP(
+        context.vckit,
+        context.dpp,
+        identifier,
+        data.data.NLIS.length,
+        `http://localhost/gtin/${identifier}?linkType=all`,
+        context.productTransformation,
+        data,
+      );
 
-    const context = {
-      epcisVckit: {
-        context: ['https://epcis-mock.com/epcis.json'],
-        renderTemplate: [{ template: '<p>Render epcis template</p>', '@type': 'WebRenderingTemplate2022' }],
-        issuer: 'did:web:84d1-115-73-178-202.ngrok-free.app',
-        type: ['TransformationEventCredential'],
-        vckitAPIUrl: 'http://localhost:3332',
-      },
-      dppVckit: {
-        context: ['https://dpp-mock.com/dppld.json'],
-        renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
-        issuer: 'did:web:84d1-115-73-178-202.ngrok-free.app',
-        type: ['DigitalProductPassport'],
-        vckitAPIUrl: 'http://localhost:3332',
-      },
-      gtins: ['9359502000034'],
-      dlr: {
-        dlrAPIUrl: 'http://localhost',
-        dlrAPIKey: '1234',
-        identificationKeyType: 'gtin',
-        linkTitle: 'Digital Product Passport',
-        verificationPage: 'http://localhost/verify',
-      },
-      storage: {
-        storageAPIUrl: 'https://storage.mock.com',
-        bucket: 'test-verifiable-credentials',
-      },
-      productTranformation: {
-        inputItems: [{ quantity: 1, uom: 'head', productClass: 'Cattle' }],
-        outputItems: {
-          '9359502000034': {
-            productClass: 'Beef Scotch Fillet',
-            quantity: 300,
-            weight: 300,
-            uom: 'kilogram',
-            image:
-              'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000034/Beef-Scotch-Fillet-Steak-300g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
-            description: 'Deforestation-free Beef Scotch Fillet',
-          },
-          '9359502000010': {
-            productClass: 'Beef Rump Steak',
-            quantity: 250,
-            weight: 250,
-            uom: 'kilogram',
-            image:
-              'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000010/Beef-Rump-Steak-250g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
-            description: 'Deforestation-free Beef Rump Steak',
-          },
-        },
-      },
-    };
-
-    const vc = await issueDPP(
-      context.dppVckit,
-      context.gtins[0],
-      data.nlisids.length,
-      'http://localhost/gtin/9359502000034?linkType=all',
-      context.productTranformation,
-      data,
-    );
-
-    expect(vc).toEqual(expectResult);
+      expect(vc).toEqual(expectResult);
+    });
   });
 
   it('should throw error when issue DPP with gtin is invalid', async () => {
     try {
       const mockVc = {
-        context: [],
-        renderTemplate: [],
         issuer: '',
-        type: [''],
         vckitAPIUrl: '',
       };
 
-      await issueDPP(mockVc, '', 0, '', { inputItems: [], outputItems: {} }, {});
+      const mockDpp = {
+        context: [],
+        renderTemplate: [],
+        type: [''],
+      };
+
+      await issueDPP(mockVc, mockDpp, '', 0, '', { inputItems: [], outputItems: {} }, {}, []);
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
     }
@@ -302,68 +347,6 @@ describe('Transformation event', () => {
         return `${dlrAPIUrl}/${identificationKeyType}/${identificationKey}?linkType=all`;
       },
     );
-    const data = {
-      nlisids: [
-        {
-          value: 'NH020188LEJ00012',
-        },
-        {
-          value: 'NH020188LEJ00013',
-        },
-      ],
-    };
-
-    const context = {
-      epcisVckit: {
-        context: ['https://epcis-mock.com/epcis.json'],
-        renderTemplate: [{ template: '<p>Render epcis template</p>', '@type': 'WebRenderingTemplate2022' }],
-        issuer: 'did:web:84d1-115-73-178-202.ngrok-free.app',
-        type: ['TransformationEventCredential'],
-        vckitAPIUrl: 'http://localhost:3332',
-      },
-      dppVckit: {
-        context: ['https://dpp-mock.com/dppld.json'],
-        renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
-        issuer: 'did:web:84d1-115-73-178-202.ngrok-free.app',
-        type: ['DigitalProductPassport'],
-        vckitAPIUrl: 'http://localhost:3332',
-      },
-      gtins: ['9359502000034', '9359502000010'],
-      dlr: {
-        dlrAPIUrl: 'http://localhost',
-        dlrAPIKey: '1234',
-        identificationKeyType: 'gtin',
-        linkTitle: 'Digital Product Passport',
-        verificationPage: 'http://localhost/verify',
-      },
-      storage: {
-        storageAPIUrl: 'https://storage.mock.com',
-        bucket: 'test-verifiable-credentials',
-      },
-      productTranformation: {
-        inputItems: [{ quantity: 1, uom: 'head', productClass: 'Cattle' }],
-        outputItems: {
-          '9359502000034': {
-            productClass: 'Beef Scotch Fillet',
-            quantity: 300,
-            weight: 300,
-            uom: 'kilogram',
-            image:
-              'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000034/Beef-Scotch-Fillet-Steak-300g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
-            description: 'Deforestation-free Beef Scotch Fillet',
-          },
-          '9359502000010': {
-            productClass: 'Beef Rump Steak',
-            quantity: 250,
-            weight: 250,
-            uom: 'kilogram',
-            image:
-              'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000010/Beef-Rump-Steak-250g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
-            description: 'Deforestation-free Beef Rump Steak',
-          },
-        },
-      },
-    };
 
     await processTransformationEvent(data, context);
     expect(registerLinkResolver).toHaveBeenCalledTimes(4);

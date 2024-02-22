@@ -9,7 +9,7 @@ export const contextDefault = [
   'https://w3id.org/security/suites/jws-2020/v1',
 ];
 
-export const typeDefault = ['VerifiableCredential'];
+export const typeDefault = [''];
 
 export interface IArgIssueVC {
   credentialSubject: CredentialSubject;
