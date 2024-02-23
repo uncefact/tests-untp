@@ -255,7 +255,7 @@ describe('Transformation event', () => {
         type: [''],
       };
 
-      await issueDPP(mockVc, mockDpp, '', 0, '', { inputItems: [], outputItems: {} }, {}, []);
+      await issueDPP(mockVc, mockDpp, '', 0, '', { inputItems: [], outputItems: [] }, []);
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
     }
