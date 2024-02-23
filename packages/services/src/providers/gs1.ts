@@ -19,9 +19,7 @@ export class Gs1Provider implements ProviderStrategy {
   }
 
   /**
-   * Function to retrieve the DLR URL based on the provided GTIN code and identification provider URL.
-   * @param gtinCode The GTIN (Global Trade Item Number) code to fetch the DLR URL.
-   * @param identifyProviderUrl The identification provider URL to fetch product data.
+   * Function to retrieve the DLR URL based on the GTIN code and identification provider URL.
    * @returns The DLR (Digital Link Resolver) URL corresponding to the provided GTIN code, or null if not found.
    */
   async getDlrUrl(): Promise<string | null> {
@@ -48,6 +46,10 @@ export class Gs1Provider implements ProviderStrategy {
     }
   }
 
+  /**
+   * Sets the GTIN code for the provider instance.
+   * @param code The GTIN code to set.
+   */
   setCode(code: string) {
     this.code = code;
   }
@@ -70,8 +72,16 @@ export class Gs1Provider implements ProviderStrategy {
     return decodedText;
   }
 
+  /**
+   * Checks if the current provider type is supported.
+   * @returns A boolean value indicating whether the provider type is supported or not.
+   */
   isProviderSupported(): boolean {
+    // Get the list of supported provider types
     const supportedProviderTypes: string[] = [...new Set(Object.values(SupportedProviderTypesEnum))];
+    
+    // Check if the current provider type is included in the list of supported types
     return supportedProviderTypes.includes(this.providerType);
   }
+
 }
