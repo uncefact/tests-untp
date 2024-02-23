@@ -1,4 +1,4 @@
-import { Gs1Provider, gs1ServiceEnum } from '../identityProviders/Gs1Provider';
+import { GS1Provider, GS1ServiceEnum } from '../identityProviders/GS1Provider';
 import { publicAPI } from '../utils/httpService';
 
 jest.mock('../types/types', () => ({
@@ -11,11 +11,11 @@ describe('Gs1Provider', () => {
   const mockCode = '12345678901234';
   const providerUrl = 'https://example.com/gs1';
 
-  let gs1Provider: Gs1Provider;
+  let gs1Provider: GS1Provider;
 
   beforeEach(() => {
-    // Set up a new instance of Gs1Provider with the specified provider type and URL
-    gs1Provider = new Gs1Provider();
+    // Set up a new instance of GS1Provider with the specified provider type and URL
+    gs1Provider = new GS1Provider();
   });
 
   describe('getDlrUrl', () => {
@@ -40,7 +40,7 @@ describe('Gs1Provider', () => {
     it('should return null if gs1ServiceHost is not found', async () => {
       const mockProducts = [{
         linkset: {
-          [gs1ServiceEnum.serviceInfo]: []
+          [GS1ServiceEnum.serviceInfo]: []
         },
       }];
       jest.spyOn(publicAPI, 'post').mockResolvedValueOnce(mockProducts);
@@ -67,7 +67,7 @@ describe('Gs1Provider', () => {
       const mockGs1Host = 'https://gs1ServiceHost.com';
       const mockProducts = [{
         linkset: {
-            [gs1ServiceEnum.serviceInfo]: [{ href: mockGs1Host }]
+            [GS1ServiceEnum.serviceInfo]: [{ href: mockGs1Host }]
         },
       }];
 

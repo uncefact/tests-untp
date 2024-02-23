@@ -1,13 +1,13 @@
 import { publicAPI } from '../utils/httpService.js';
 import { IdentityProviderStrategy } from './IdentityProvider.js';
 
-export enum gs1ServiceEnum {
+export enum GS1ServiceEnum {
   certificationInfo = 'https://gs1.org/voc/certificationInfo',
   verificationService = 'https://gs1.org/voc/verificationService',
   serviceInfo = 'https://gs1.org/voc/serviceInfo',
 }
 
-export class Gs1Provider implements IdentityProviderStrategy {
+export class GS1Provider implements IdentityProviderStrategy {
   /**
    * Function to retrieve the DLR URL based on the GTIN code and identification provider URL.
    * @returns The DLR (Digital Link Resolver) URL corresponding to the provided GTIN code, or null if not found.
@@ -20,7 +20,7 @@ export class Gs1Provider implements IdentityProviderStrategy {
         return null;
       }
       // Extract the GS1 service host from the fetched products data
-      const gs1ServiceHost: string = products[0]?.linkset?.[gs1ServiceEnum.serviceInfo]?.[0]?.href;
+      const gs1ServiceHost: string = products[0]?.linkset?.[GS1ServiceEnum.serviceInfo]?.[0]?.href;
       if (!gs1ServiceHost) {
         return null;
       }
