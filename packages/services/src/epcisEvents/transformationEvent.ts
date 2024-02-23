@@ -31,10 +31,7 @@ export const processTransformationEvent: IService = async (data: any, context: I
     const vcKitContext = context.vckit;
     const productTransformation = context.productTransformation;
     const identifierKeyPathsContext = context.identifierKeyPaths;
-    const inputIdentifiers = getIdentifierByObjectKeyPaths(
-      data.data,
-      identifierKeyPathsContext.filter((item) => item === 'NLIS'),
-    ) as string[];
+    const inputIdentifiers = getIdentifierByObjectKeyPaths(data.data, identifierKeyPathsContext) as string[];
     if (!inputIdentifiers) throw new Error('Input Identifiers not found');
 
     const epcisVc = await issueEpcisTransformationEvent(
@@ -79,7 +76,6 @@ export const processTransformationEvent: IService = async (data: any, context: I
           transformationEventLinkResolver,
           data,
           outputItem,
-          identifierKeyPathsContext,
         );
         const DPPLink = await uploadVC(`${outputItem.productID as string}/${generateUUID()}`, dpp, storageContext);
 
@@ -168,20 +164,11 @@ export const issueDPP = async (
   linkEpcis: string,
   data: any,
   outputItem: any,
-  inputIdentifierKeyPaths: string[],
 ) => {
   const restOfVC = { render: dppContext.renderTemplate };
 
   const mappingProductQuality = incrementQuality(outputItem, numberOfItems);
-  const isManufacturer = inputIdentifierKeyPaths.includes('product');
-  const manufacturer = isManufacturer
-    ? getIdentifierByObjectKeyPaths(
-        data.data,
-        inputIdentifierKeyPaths.filter((item) => item === 'product'),
-      )
-    : {};
-
-  const mergeProductItem = _.merge({}, mappingProductQuality, manufacturer);
+  const mergeProductItem = _.merge({}, mappingProductQuality, data.data);
 
   const credentialSubject = buildDPPCredentialSubject({ productItem: mergeProductItem, linkEpcis });
   const result: VerifiableCredential = await issueVC({

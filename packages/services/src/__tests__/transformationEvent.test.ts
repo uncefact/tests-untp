@@ -100,7 +100,7 @@ describe('Transformation event', () => {
         },
       ],
     },
-    identifierKeyPaths: ['NLIS', 'product'],
+    identifierKeyPaths: ['NLIS'],
   };
 
   const data = {
@@ -225,8 +225,7 @@ describe('Transformation event', () => {
       },
     };
     (issueVC as jest.Mock).mockImplementation((value) => {
-      console.log('issueDPP', { value });
-      console.log('issueDPP value credentialSubject', value.credentialSubject);
+      console.log('issueDPP', JSON.stringify(value));
 
       expectResult = {
         '@context': [...contextDefault, ...value.context],
@@ -251,7 +250,6 @@ describe('Transformation event', () => {
         `http://localhost/gtin/${outputItem.productID}?linkType=all`,
         newData,
         outputItem,
-        context.identifierKeyPaths,
       );
 
       expect(vc).toEqual(expectResult);
@@ -271,7 +269,7 @@ describe('Transformation event', () => {
         type: [''],
       };
 
-      await issueDPP(mockVc, mockDpp, 0, '', { inputItems: [], outputItems: [] }, {}, []);
+      await issueDPP(mockVc, mockDpp, 0, '', { inputItems: [], outputItems: [] }, {});
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
     }
