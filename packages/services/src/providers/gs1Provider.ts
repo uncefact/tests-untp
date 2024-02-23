@@ -1,6 +1,6 @@
-import { SupportedProviderTypesEnum } from '../types/types';
-import { publicAPI } from '../utils/httpService';
-import { ProviderStrategy } from './ProviderStrategy';
+import { SupportedProviderTypesEnum } from '../types/types.js';
+import { publicAPI } from '../utils/httpService.js';
+import { ProviderStrategy } from './ProviderStrategy.js';
 
 export enum gs1ServiceEnum {
   certificationInfo = 'https://gs1.org/voc/certificationInfo',

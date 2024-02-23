@@ -1,6 +1,6 @@
-import { gs1ServiceEnum } from './providers/gs1';
-import { MimeTypeEnum } from './types/types';
-import { privateAPI } from './utils/httpService';
+import { gs1ServiceEnum } from './providers/gs1Provider.js';
+import { MimeTypeEnum } from './types/types.js';
+import { privateAPI } from './utils/httpService.js';
 
 /**
  * Generates a link resolver URL based on the provided AgtraceLinkResolver and AgtraceLinkResponse objects.

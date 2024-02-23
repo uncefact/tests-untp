@@ -4,21 +4,20 @@ import { VerifiableCredential } from '@vckit/core-types';
 import { Html5QrcodeResult } from 'html5-qrcode';
 import { useNavigate } from 'react-router-dom';
 import { toastMessage, Status, ToastMessage } from '@mock-app/components';
-import { ProviderStrategy, getDlrPassport } from '@mock-app/services';
+import { getDlrPassport, Provider, getProviderByType } from '@mock-app/services';
 import { Scanner } from '../components/Scanner';
 import { IScannerRef } from '../types/scanner.types';
 import appConfig from '../constants/app-config.json';
 import { CustomDialog } from '../components/CustomDialog';
-import { getProviderInstance } from '../utils';
 
 const Scanning = () => {
   const scannerRef = useRef<IScannerRef | null>(null);
-  const [identityProvider, setIdentityProvider] = useState<ProviderStrategy | null>(null);
+  const [identityProvider, setIdentityProvider] = useState<Provider | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [openDialogErrorCode, setOpenDialogErrorCode] = useState<boolean>(false);
   const navigate = useNavigate();
 
-  const goVerifyPage = async (identityProvider: ProviderStrategy) => {
+  const goVerifyPage = async (identityProvider: Provider) => {
     try {
       setIsLoading(true);
 
@@ -68,14 +67,15 @@ const Scanning = () => {
     }
 
     const { type: providerType, url: providerUrl } = appConfig.identifyProvider;
-    const providerInstance = getProviderInstance(providerType, providerUrl);
-    if (!providerInstance.isProviderSupported()) {
+    const providerInstance = getProviderByType(providerType, providerUrl);
+    const provider = new Provider(providerInstance);
+    if (!provider.isProviderSupported()) {
       return toastMessage({ status: Status.error, message: 'The configuration identity provider doesn\'t support' });
     }
 
     const scannedCodeResult = providerInstance.getCode(decodedText, formatName);
     providerInstance.setCode(scannedCodeResult);
-    setIdentityProvider(providerInstance);
+    setIdentityProvider(provider);
   };
 
   // Handle close dialog when code not found

@@ -1,2 +1,2 @@
-export * from './IService';
-export * from './types';
+export * from './IService.js';
+export * from './types.js';

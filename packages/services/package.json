@@ -24,13 +24,25 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "typescript": "^4",
-    "axios-mock-adapter": "^1.19.0"
+    "axios-mock-adapter": "^1.19.0",
+    "typescript": "^5.3.3"
   },
   "jest": {
     "testPathIgnorePatterns": [
       "/node_modules/",
       "/build/"
-    ]
+    ],
+    "transform": {
+      "\\.[jt]sx?$": "ts-jest"
+    },
+    "globals": {
+      "ts-jest": {
+        "useESM": true
+      }
+    },
+    "moduleNameMapper": {
+      "(.+)\\.js": "$1"
+    },
+    "extensionsToTreatAsEsm": [".ts"]
   }
 }
