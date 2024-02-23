@@ -1,5 +1,5 @@
-import { IdentityProviderStrategy } from './identityProviderStrategy.js';
-import { Gs1Provider } from './gs1Provider.js';
+import { IdentityProviderStrategy } from './IdentityProvider.js';
+import { Gs1Provider } from './Gs1Provider.js';
 
 /**
  * Factory function to get a provider instance based on the provider type.

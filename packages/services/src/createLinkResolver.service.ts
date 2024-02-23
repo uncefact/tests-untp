@@ -1,4 +1,4 @@
-import { gs1ServiceEnum } from './identityProviders/gs1Provider.js';
+import { gs1ServiceEnum } from './identityProviders/Gs1Provider.js';
 import { MimeTypeEnum } from './types/types.js';
 import { privateAPI } from './utils/httpService.js';
 

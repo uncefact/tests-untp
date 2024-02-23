@@ -4,7 +4,7 @@ import { VerifiableCredential } from '@vckit/core-types';
 import { Html5QrcodeResult } from 'html5-qrcode';
 import { useNavigate } from 'react-router-dom';
 import { toastMessage, Status, ToastMessage } from '@mock-app/components';
-import { getDlrPassport, IdentityProvder, getProviderByType } from '@mock-app/services';
+import { getDlrPassport, IdentityProvider, getProviderByType } from '@mock-app/services';
 import { Scanner } from '../components/Scanner';
 import { IScannerRef } from '../types/scanner.types';
 import appConfig from '../constants/app-config.json';
@@ -13,12 +13,12 @@ import { CustomDialog } from '../components/CustomDialog';
 const Scanning = () => {
   const scannerRef = useRef<IScannerRef | null>(null);
   const [scannedCode, setScannedCode] = useState<string>('');
-  const [identityProvider, setIdentityProvider] = useState<IdentityProvder | null>(null);
+  const [identityProvider, setIdentityProvider] = useState<IdentityProvider | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [openDialogErrorCode, setOpenDialogErrorCode] = useState<boolean>(false);
   const navigate = useNavigate();
 
-  const goVerifyPage = async (identityProvider: IdentityProvder) => {
+  const goVerifyPage = async (identityProvider: IdentityProvider) => {
     try {
       setIsLoading(true);
 
@@ -69,7 +69,7 @@ const Scanning = () => {
 
     const { type: providerType, url: providerUrl } = appConfig.identifyProvider;
     const providerInstance = getProviderByType(providerType);
-    const identityProvider = new IdentityProvder(providerInstance, providerUrl);
+    const identityProvider = new IdentityProvider(providerInstance, providerUrl);
 
     const scannedCodeResult = providerInstance.getCode(decodedText, formatName);
     setScannedCode(scannedCodeResult);

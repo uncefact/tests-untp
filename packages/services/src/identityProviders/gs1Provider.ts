@@ -1,5 +1,5 @@
 import { publicAPI } from '../utils/httpService.js';
-import { IdentityProviderStrategy } from './identityProviderStrategy.js';
+import { IdentityProviderStrategy } from './IdentityProvider.js';
 
 export enum gs1ServiceEnum {
   certificationInfo = 'https://gs1.org/voc/certificationInfo',

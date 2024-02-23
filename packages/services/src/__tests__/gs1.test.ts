@@ -1,4 +1,4 @@
-import { Gs1Provider, gs1ServiceEnum } from '../identityProviders/gs1Provider';
+import { Gs1Provider, gs1ServiceEnum } from '../identityProviders/Gs1Provider';
 import { publicAPI } from '../utils/httpService';
 
 jest.mock('../types/types', () => ({
