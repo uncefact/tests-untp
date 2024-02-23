@@ -4,7 +4,7 @@ import { VerifiableCredential } from '@vckit/core-types';
 import { Html5QrcodeResult } from 'html5-qrcode';
 import { useNavigate } from 'react-router-dom';
 import { toastMessage, Status, ToastMessage } from '@mock-app/components';
-import { getDlrPassport, Provider, getProviderByType } from '@mock-app/services';
+import { getDlrPassport, IdentityProvder, getProviderByType } from '@mock-app/services';
 import { Scanner } from '../components/Scanner';
 import { IScannerRef } from '../types/scanner.types';
 import appConfig from '../constants/app-config.json';
@@ -12,16 +12,17 @@ import { CustomDialog } from '../components/CustomDialog';
 
 const Scanning = () => {
   const scannerRef = useRef<IScannerRef | null>(null);
-  const [identityProvider, setIdentityProvider] = useState<Provider | null>(null);
+  const [scannedCode, setScannedCode] = useState<string>('');
+  const [identityProvider, setIdentityProvider] = useState<IdentityProvder | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [openDialogErrorCode, setOpenDialogErrorCode] = useState<boolean>(false);
   const navigate = useNavigate();
 
-  const goVerifyPage = async (identityProvider: Provider) => {
+  const goVerifyPage = async (identityProvider: IdentityProvder) => {
     try {
       setIsLoading(true);
 
-      const dlrUrl = await identityProvider.getDlrUrl();
+      const dlrUrl = await identityProvider.getDlrUrl(scannedCode);
       if (!dlrUrl) {
         return toastMessage({ status: Status.error, message: 'There no DLR url' });
       }
@@ -49,12 +50,12 @@ const Scanning = () => {
   };
 
   React.useEffect(() => {
-    if (!identityProvider) {
+    if (!scannedCode || !identityProvider) {
       return;
     }
 
     goVerifyPage(identityProvider);
-  }, [identityProvider]);
+  }, [scannedCode, identityProvider]);
 
   const onScanError = (error: unknown) => {
     setIdentityProvider(null);
@@ -67,15 +68,12 @@ const Scanning = () => {
     }
 
     const { type: providerType, url: providerUrl } = appConfig.identifyProvider;
-    const providerInstance = getProviderByType(providerType, providerUrl);
-    const provider = new Provider(providerInstance);
-    if (!provider.isProviderSupported()) {
-      return toastMessage({ status: Status.error, message: 'The configuration identity provider doesn\'t support' });
-    }
+    const providerInstance = getProviderByType(providerType);
+    const identityProvider = new IdentityProvder(providerInstance, providerUrl);
 
     const scannedCodeResult = providerInstance.getCode(decodedText, formatName);
-    providerInstance.setCode(scannedCodeResult);
-    setIdentityProvider(provider);
+    setScannedCode(scannedCodeResult);
+    setIdentityProvider(identityProvider);
   };
 
   // Handle close dialog when code not found

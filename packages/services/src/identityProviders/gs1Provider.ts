@@ -1,6 +1,5 @@
-import { SupportedProviderTypesEnum } from '../types/types.js';
 import { publicAPI } from '../utils/httpService.js';
-import { ProviderStrategy } from './ProviderStrategy.js';
+import { IdentityProviderStrategy } from './identityProviderStrategy.js';
 
 export enum gs1ServiceEnum {
   certificationInfo = 'https://gs1.org/voc/certificationInfo',
@@ -8,28 +7,15 @@ export enum gs1ServiceEnum {
   serviceInfo = 'https://gs1.org/voc/serviceInfo',
 }
 
-export class Gs1Provider implements ProviderStrategy {
-  private providerType: string;
-  private providerUrl: string;
-  private code: string | undefined;
-
-  constructor(providerType: string, providerUrl: string) {
-    this.providerType = providerType;
-    this.providerUrl = providerUrl;
-  }
-
+export class Gs1Provider implements IdentityProviderStrategy {
   /**
    * Function to retrieve the DLR URL based on the GTIN code and identification provider URL.
    * @returns The DLR (Digital Link Resolver) URL corresponding to the provided GTIN code, or null if not found.
    */
-  async getDlrUrl(): Promise<string | null> {
+  async getDlrUrl(code: string, providerUrl: string): Promise<string | null> {
     try {
-      if (!this.code) {
-        return null;
-      }
-
-      const fetchProductPayload = { keys: [this.code] };
-      const products: any[] = await publicAPI.post(this.providerUrl, fetchProductPayload);
+      const fetchProductPayload = { keys: [code] };
+      const products: any[] = await publicAPI.post(providerUrl, fetchProductPayload);
       if (!products || !products.length) {
         return null;
       }
@@ -39,19 +25,11 @@ export class Gs1Provider implements ProviderStrategy {
         return null;
       }
       // Construct and return the DLR URL using the GS1 service host and GTIN code
-      const dlrUrl = `${gs1ServiceHost}/gtin/${this.code}?linkType=all`;
+      const dlrUrl = `${gs1ServiceHost}/gtin/${code}?linkType=all`;
       return dlrUrl;
     } catch (error) {
       return null;
     }
-  }
-
-  /**
-   * Sets the GTIN code for the provider instance.
-   * @param code The GTIN code to set.
-   */
-  setCode(code: string) {
-    this.code = code;
   }
 
   /**
@@ -70,18 +48,6 @@ export class Gs1Provider implements ProviderStrategy {
     }
 
     return decodedText;
-  }
-
-  /**
-   * Checks if the current provider type is supported.
-   * @returns A boolean value indicating whether the provider type is supported or not.
-   */
-  isProviderSupported(): boolean {
-    // Get the list of supported provider types
-    const supportedProviderTypes: string[] = [...new Set(Object.values(SupportedProviderTypesEnum))];
-    
-    // Check if the current provider type is included in the list of supported types
-    return supportedProviderTypes.includes(this.providerType);
   }
 
 }
