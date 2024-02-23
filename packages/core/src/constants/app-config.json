@@ -281,24 +281,16 @@
                         "enum": ["NH020188LEJ00005", "NH020188LEJ00008", "NH020188LEJ00012"]
                       }
                     },
-                    "batch": {
+                    "product": {
                       "type": "object",
-                      "title": "Batch Information",
+                      "title": "Product Information",
                       "properties": {
-                        "traceabilityInfo": {
-                          "type": "array",
-                          "title": "Traceability Information",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "EventReference": {
-                                "type": "string",
-                                "title": "Event Reference"
-                              },
-                              "EventType": {
-                                "type": "string",
-                                "title": "Event Type"
-                              }
+                        "manufacturer": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "title": "Name"
                             }
                           }
                         }
@@ -349,9 +341,8 @@
                   },
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332",
-                    "issuer": "did:web:e139-2402-800-6314-9b5f-25eb-5c86-3ad9-71d.ngrok-free.app"
+                    "issuer": "did:web:9e2b-103-69-79-17.ngrok-free.app"
                   },
-                  "identifiers": ["9359502000034", "9359502000010"],
                   "dlr": {
                     "dlrAPIUrl": "http://localhost",
                     "dlrAPIKey": "5555555555555"
@@ -364,7 +355,7 @@
                     "inputItems": [{ "quantity": 1, "uom": "head", "productClass": "cattle" }],
                     "outputItems": [
                       {
-                        "itemID": "9359502000041",
+                        "productID": "9359502000041",
                         "productClass": "Beef Silverside",
                         "quantity": 500,
                         "weight": 500,
@@ -373,7 +364,7 @@
                         "description": "Deforestation-free Beef Silverside"
                       },
                       {
-                        "itemID": "9359502000034",
+                        "productID": "9359502000034",
                         "productClass": "Beef Scotch Fillet",
                         "quantity": 300,
                         "weight": 300,
@@ -382,7 +373,7 @@
                         "description": "Deforestation-free Beef Scotch Fillet"
                       },
                       {
-                        "itemID": "9359502000010",
+                        "productID": "9359502000010",
                         "productClass": "Beef Rump Steak",
                         "quantity": 250,
                         "weight": 250,
@@ -392,7 +383,7 @@
                       }
                     ]
                   },
-                  "identifierKeyPaths": ["NLIS"]
+                  "identifierKeyPaths": ["NLIS", "product", "manufacturer"]
                 }
               ]
             }

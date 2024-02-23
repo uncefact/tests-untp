@@ -39,7 +39,7 @@ describe('Transformation event', () => {
       renderTemplate: [{ template: '<p>Render epcis template</p>', '@type': 'WebRenderingTemplate2022' }],
       type: ['TransformationEventCredential'],
       dlrIdentificationKeyType: 'gtin',
-      dlrlinkTitle: 'EPCIS transformation event VC',
+      dlrLinkTitle: 'EPCIS transformation event VC',
       dlrVerificationPage: 'https://web.agtrace.showthething.com/verify',
       dlrQualifierPath: '',
     },
@@ -48,7 +48,7 @@ describe('Transformation event', () => {
       renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
       type: ['DigitalProductPassport'],
       dlrIdentificationKeyType: 'gtin',
-      dlrlinkTitle: 'Digital Product Passport',
+      dlrLinkTitle: 'Digital Product Passport',
       dlrVerificationPage: 'https://web.agtrace.showthething.com/verify',
       dlrQualifierPath: '',
     },
@@ -69,7 +69,7 @@ describe('Transformation event', () => {
       inputItems: [{ quantity: 1, uom: 'head', productClass: 'cattle' }],
       outputItems: [
         {
-          itemID: '9359502000041',
+          productID: '9359502000041',
           productClass: 'Beef Silverside',
           quantity: 500,
           weight: 500,
@@ -79,7 +79,7 @@ describe('Transformation event', () => {
           description: 'Deforestation-free Beef Silverside',
         },
         {
-          itemID: '9359502000034',
+          productID: '9359502000034',
           productClass: 'Beef Scotch Fillet',
           quantity: 300,
           weight: 300,
@@ -89,7 +89,7 @@ describe('Transformation event', () => {
           description: 'Deforestation-free Beef Scotch Fillet',
         },
         {
-          itemID: '9359502000010',
+          productID: '9359502000010',
           productClass: 'Beef Rump Steak',
           quantity: 250,
           weight: 250,
@@ -100,13 +100,17 @@ describe('Transformation event', () => {
         },
       ],
     },
-    identifierKeyPaths: ['NLIS'],
+    identifierKeyPaths: ['NLIS', 'product'],
   };
 
   const data = {
     data: {
       NLIS: ['NH020188LEJ00012', 'NH020188LEJ00013'],
-      batch: {},
+      product: {
+        manufacturer: {
+          name: "Pete's Meats",
+        },
+      },
     },
   };
 
@@ -129,21 +133,21 @@ describe('Transformation event', () => {
     (epcisTransformationCrendentialSubject as jest.Mock).mockImplementation((inputItems) => {
       const detailOfProducts: any = context.productTransformation.outputItems;
       const convertProductToObj = detailOfProducts.reduce((accumulator, item, index) => {
-        accumulator[item.itemID] = item;
+        accumulator[item.productID] = item;
         return accumulator;
       }, {});
 
-      const outputItemList = context.identifiers.map((identifier) => {
+      const outputItemList = detailOfProducts.map((itemOutput: any) => {
         return {
-          itemID: identifier,
-          link: `${context.dlr.dlrAPIUrl}/gtin/${identifier}?linkType=gs1:certificationInfo`,
-          name: convertProductToObj[identifier]?.productClass,
+          productID: itemOutput,
+          link: `${context.dlr.dlrAPIUrl}/gtin/${itemOutput}?linkType=gs1:certificationInfo`,
+          name: convertProductToObj[itemOutput]?.productClass,
         };
       });
 
       const inputItemObj = inputItems?.map((item: string) => {
         return {
-          itemID: item,
+          productID: item,
           link: `${context.dlr.dlrAPIUrl}/nlisid/${item}?linkType=gs1:certificationInfo`,
           name: 'Cattle',
         };
@@ -173,7 +177,6 @@ describe('Transformation event', () => {
     const vc = await issueEpcisTransformationEvent(
       context.vckit,
       context.epcisTransformationEvent,
-      context.identifiers,
       context.dlr,
       data,
       context.productTransformation,
@@ -209,10 +212,22 @@ describe('Transformation event', () => {
     expect(urlUpload).toEqual(expectResult);
   });
 
-  it.only('should call issueDPP and return valid vc', async () => {
+  it('should call issueDPP and return valid vc', async () => {
     let expectResult = {};
-
+    const newData = {
+      data: {
+        ...data,
+        product: {
+          manufacturer: {
+            name: "Pete's Meats",
+          },
+        },
+      },
+    };
     (issueVC as jest.Mock).mockImplementation((value) => {
+      console.log('issueDPP', { value });
+      console.log('issueDPP value credentialSubject', value.credentialSubject);
+
       expectResult = {
         '@context': [...contextDefault, ...value.context],
         type: ['VerifiableCredential', ...value.type],
@@ -227,15 +242,16 @@ describe('Transformation event', () => {
     });
 
     let vc = {};
-    context.identifiers.map(async (identifier) => {
+    const detailOfOutputProducts = context.productTransformation.outputItems;
+    detailOfOutputProducts.map(async (outputItem) => {
       vc = await issueDPP(
         context.vckit,
         context.dpp,
-        identifier,
         data.data.NLIS.length,
-        `http://localhost/gtin/${identifier}?linkType=all`,
-        context.productTransformation,
-        data,
+        `http://localhost/gtin/${outputItem.productID}?linkType=all`,
+        newData,
+        outputItem,
+        context.identifierKeyPaths,
       );
 
       expect(vc).toEqual(expectResult);
@@ -255,7 +271,7 @@ describe('Transformation event', () => {
         type: [''],
       };
 
-      await issueDPP(mockVc, mockDpp, '', 0, '', { inputItems: [], outputItems: [] }, []);
+      await issueDPP(mockVc, mockDpp, 0, '', { inputItems: [], outputItems: [] }, {}, []);
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
     }
@@ -282,13 +298,14 @@ describe('Transformation event', () => {
           verificationPage,
           dlrAPIKey,
           qualifierPath,
+          identificationKey,
         });
         return `${dlrAPIUrl}/${identificationKeyType}/${identificationKey}?linkType=all`;
       },
     );
 
     await processTransformationEvent(data, context);
-    expect(registerLinkResolver).toHaveBeenCalledTimes(4);
+    expect(registerLinkResolver).toHaveBeenCalledTimes(6);
   });
 
   it('should throw error when issueVC throws error', async () => {

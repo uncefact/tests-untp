@@ -12,28 +12,16 @@ import { IProductTransformation } from './epcisEvents/types.js';
  */
 export const epcisTransformationCrendentialSubject = (
   inputItemList: any[],
-  identifiers: string[],
   dlrUrl: string,
   productTransformation: IProductTransformation,
 ) => {
-  const detailOfProducts: any = productTransformation.outputItems;
-  const convertProductToObj = detailOfProducts.reduce((accumulator: any, item: any) => {
-    accumulator[item.itemID] = item;
-    return accumulator;
-  }, {});
-  const outputItemList = identifiers.map((identifier) => {
-    return {
-      itemID: identifier,
-      link: `${dlrUrl}/${IdentificationKeyType.gtin}/${identifier}?linkType=${LinkType.certificationLinkType}`,
-      name: convertProductToObj[identifier]?.productClass,
-    };
-  });
+  const { outputItems } = productTransformation;
 
   const countInputItems = fillArray(inputItemList, productTransformation.inputItems);
 
   const inputItems = inputItemList.map((item: string) => {
     return {
-      itemID: item,
+      productID: item,
       link: `${dlrUrl}/${IdentificationKeyType.nlisid}/${item}?linkType=${LinkType.certificationLinkType}`,
     };
   });
@@ -53,6 +41,6 @@ export const epcisTransformationCrendentialSubject = (
       quantity: item.quantity,
       uom: item.uom,
     })),
-    outputItemList,
+    outputItems,
   };
 };

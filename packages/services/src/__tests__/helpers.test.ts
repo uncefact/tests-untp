@@ -25,17 +25,21 @@ describe('first', () => {
     expect(result).toBeDefined();
   });
 
-  it('should increment the quantity of items', () => {
-    const obj = [{ quantity: 1 }, { quantity: 2 }];
-    const result = incrementQuality(obj, 2);
-    expect(result[0].quantity).toBe(2);
-    expect(result[1].quantity).toBe(4);
+  it('should multiply the quantity property by the given number', () => {
+    const obj = { quantity: 2 };
+    const result = incrementQuality(obj, 3);
+    expect(result.quantity).toBe(6);
   });
 
-  it('should return an object that does not change when it does not have a quantity', () => {
-    const obj = [{ uom: 'kg' }];
-    const result = incrementQuality(obj, 2);
-    expect(result[0].uom).toBe('kg');
-    expect(result[0].quantity).toBeUndefined();
+  it('should not modify the object if there is no quantity property', () => {
+    const obj = { otherProp: 2 };
+    const result = incrementQuality(obj, 3);
+    expect(result).toEqual({ otherProp: 2 });
+  });
+
+  it('should not modify the object if the number of items is 1', () => {
+    const obj = { quantity: 2 };
+    const result = incrementQuality(obj, 1);
+    expect(result.quantity).toBe(2);
   });
 });
