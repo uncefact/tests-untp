@@ -11,7 +11,7 @@ Make sure your machine has Node.js version 18 or later installed.
 To install the project dependencies, run the following command:
 
 ```bash
-pnpm install
+yarn install
 ```
 
 ## Storybook
@@ -21,7 +21,7 @@ Explore and interact with the components using Storybook.
 ### Run Storybook
 
 ```bash
-pnpm run storybook
+yarn run storybook
 ```
 
 Visit http://localhost:6006/ in your browser to view Storybook.
@@ -31,5 +31,5 @@ Visit http://localhost:6006/ in your browser to view Storybook.
 Run unit tests using Jest.
 
 ```bash
-pnpm test
+yarn test
 ```

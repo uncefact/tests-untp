@@ -5,11 +5,11 @@ React components for the core of the application, rendering the page by wrap up 
 ## Install package before start
 
 ```sh
-pnpm install
+yarn install
 ```
 
 ## Start the project
 
 ```sh
-pnpm start
+yarn start
 ```
