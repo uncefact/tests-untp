@@ -112,13 +112,13 @@ export const issueEpcisTransformationEvent = async (
   identifierKeyPaths: string[],
 ) => {
   const restOfVC = { render: epcisTransformationEvent.renderTemplate };
-  const nlisids = getIdentifierByObjectKeyPaths(data.data, identifierKeyPaths) as string[];
-  if (!nlisids) throw new Error('nlisids not found');
+  const inputIdentifiers = getIdentifierByObjectKeyPaths(data.data, identifierKeyPaths) as string[];
+  if (!inputIdentifiers) throw new Error('Input Identifiers not found');
 
   const epcisVc: VerifiableCredential = await issueVC({
     context: epcisTransformationEvent.context,
     credentialSubject: epcisTransformationCrendentialSubject(
-      nlisids.map((item: any) => item),
+      inputIdentifiers.map((item: any) => item),
       identifiersContext,
       dlrContext.dlrAPIUrl,
       productTransformation,
