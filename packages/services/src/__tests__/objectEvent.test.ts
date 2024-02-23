@@ -1,8 +1,8 @@
 import { processObjectEvent } from '../../build/epcisEvents/objectEvent';
 import { issueVC, contextDefault } from '../../build/vckit.service';
 import { uploadJson } from '../../build/storage.service';
-import { registerLinkResolver } from '../../build/linkResolver.service.js';
-import { IdentificationKeyType } from '../linkResolver.service.js';
+import { registerLinkResolver } from '../../build/linkResolver.service';
+import { IdentificationKeyType } from '../linkResolver.service';
 
 jest.mock('../../build/vckit.service', () => ({
   issueVC: jest.fn(),
@@ -70,22 +70,16 @@ describe('processObjectEvent', () => {
     });
   });
 
-  it('should process object event', async () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should call process object event and issue vc', async () => {
     const vc = await processObjectEvent(data, context);
     expect(vc).toEqual(expectVCResult);
   });
 
-  it('should process object event and upload json', async () => {
-    const vc = {
-      '@context': contextDefault,
-      type: ['VerifiableCredential'],
-      issuer: {
-        id: 'did:web:example.com',
-      },
-      credentialSubject: data.data,
-      render: context.dpp.renderTemplate,
-    };
-
+  it('should call process object event and upload json', async () => {
     (uploadJson as jest.Mock).mockImplementation(({ filename, bucket }: { filename: string; bucket: string }) => {
       return `https://${bucket}.s3.ap-southeast-2.amazonaws.com/${filename}`;
     });
@@ -123,5 +117,17 @@ describe('processObjectEvent', () => {
 
     await processObjectEvent(data, context);
     expect(registerLinkResolver).toHaveBeenCalled();
+
+    const dppContext = context.dpp;
+    const dlrContext = context.dlr;
+    expect(registerLinkResolver).toHaveBeenCalledWith(
+      expect.any(String),
+      dppContext.dlrIdentificationKeyType,
+      data.data.herd.NLIS,
+      dppContext.dlrLinkTitle,
+      dppContext.dlrVerificationPage,
+      dlrContext.dlrAPIUrl,
+      dlrContext.dlrAPIKey,
+    );
   });
 });
