@@ -126,7 +126,7 @@ describe('Transformation event', () => {
       return Promise.resolve(expectResult);
     });
 
-    (epcisTransformationCrendentialSubject as jest.Mock).mockImplementation((nlisids) => {
+    (epcisTransformationCrendentialSubject as jest.Mock).mockImplementation((inputItems) => {
       const detailOfProducts: any = context.productTransformation.outputItems;
       const convertProductToObj = detailOfProducts.reduce((accumulator, item, index) => {
         accumulator[item.itemID] = item;
@@ -141,7 +141,7 @@ describe('Transformation event', () => {
         };
       });
 
-      const inputItems = nlisids?.map((item: string) => {
+      const inputItemObj = inputItems?.map((item: string) => {
         return {
           itemID: item,
           link: `${context.dlr.dlrAPIUrl}/nlisid/${item}?linkType=gs1:certificationInfo`,
@@ -149,7 +149,7 @@ describe('Transformation event', () => {
         };
       });
 
-      const countInputItems = fillArray(nlisids, context.productTransformation.inputItems);
+      const countInputItems = fillArray(inputItems, context.productTransformation.inputItems);
 
       return {
         eventID: '1234',
@@ -160,7 +160,7 @@ describe('Transformation event', () => {
         businessStepCode: 'packing',
         readPointId: '48585',
         locationId: 'https://plus.codes/4RRG6MJF+C6X',
-        inputItemList: inputItems,
+        inputItemList: inputItemObj,
         inputQuantityList: countInputItems.map((item: IInputItems) => ({
           productClass: item.productClass,
           quantity: item.quantity,
@@ -276,6 +276,13 @@ describe('Transformation event', () => {
         dlrAPIKey,
         qualifierPath,
       ) => {
+        console.log({
+          url,
+          linkTitle,
+          verificationPage,
+          dlrAPIKey,
+          qualifierPath,
+        });
         return `${dlrAPIUrl}/${identificationKeyType}/${identificationKey}?linkType=all`;
       },
     );
