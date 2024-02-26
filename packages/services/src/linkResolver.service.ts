@@ -1,3 +1,5 @@
+import { GS1ServiceEnum } from './identityProviders/GS1Provider.js';
+import { MimeTypeEnum } from './types/types.js';
 import { privateAPI } from './utils/httpService.js';
 
 /**
@@ -148,4 +150,40 @@ export const constructLinkResolver = (
     gs1LinkResolver.responses.push(gs1LinkResponseForUS, gs1LinkResponseForAU);
   });
   return gs1LinkResolver;
+};
+
+/**
+ * Function to fetch the DLR passport data from the provided DLR URL.
+ * @param dlrUrl The DLR URL from which to fetch the passport data.
+ * @returns The DLR passport data if found, otherwise returns null.
+ */
+export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
+  // Fetch DLR data from the provided DLR URL
+  const dlrData = await privateAPI.get(dlrUrl);
+  if (!dlrData) {
+    return null;
+  }
+
+  // Find certificate passports in the DLR data
+  const certificatePassports = dlrData?.linkset?.find(
+    (linkSetItem: any) => linkSetItem[GS1ServiceEnum.certificationInfo],
+  );
+  if (!certificatePassports) {
+    return null;
+  }
+
+  // Extract passport infos from certificate passports
+  const dlrPassports = certificatePassports[GS1ServiceEnum.certificationInfo];
+  if (!dlrPassports) {
+    return null;
+  }
+
+  // Find DLR passport with MIME type application/json
+  const dlrPassport = dlrPassports.find((passportItem: any) => passportItem?.type === MimeTypeEnum.applicationJson);
+  if (!dlrPassport) {
+    return null;
+  }
+
+  // Return the found DLR passport
+  return dlrPassport;
 };
