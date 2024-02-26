@@ -56,7 +56,6 @@ export const processTransformationEvent: IService = async (data: any, context: I
     await Promise.all(
       detailOfOutputProducts.map(async (outputItem: any) => {
         const epcisTransformationEventQualifierPath = epcisTransformationEventContext?.dlrQualifierPath;
-        const linkResolverContext = context.dlr;
 
         const transformationEventLinkResolver = await registerLinkResolver(
           transformantionEventLink,
@@ -64,8 +63,8 @@ export const processTransformationEvent: IService = async (data: any, context: I
           outputItem.productID,
           epcisTransformationEventContext.dlrLinkTitle,
           epcisTransformationEventContext.dlrVerificationPage,
-          linkResolverContext.dlrAPIUrl,
-          linkResolverContext.dlrAPIKey,
+          dlrContext.dlrAPIUrl,
+          dlrContext.dlrAPIKey,
           epcisTransformationEventQualifierPath,
         );
 
@@ -86,8 +85,8 @@ export const processTransformationEvent: IService = async (data: any, context: I
           outputItem.productID,
           dppContext.dlrLinkTitle,
           dppContext.dlrVerificationPage,
-          linkResolverContext.dlrAPIUrl,
-          linkResolverContext.dlrAPIKey,
+          dlrContext.dlrAPIUrl,
+          dlrContext.dlrAPIKey,
           dppQualifierPath,
         );
       }),
