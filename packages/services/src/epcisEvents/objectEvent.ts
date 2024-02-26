@@ -7,6 +7,7 @@ import { generateUUID } from '../utils/helpers.js';
 import { uploadJson } from '../storage.service.js';
 import { issueVC } from '../vckit.service.js';
 import { registerLinkResolver } from '../linkResolver.service.js';
+import { validateContextObjectEvent } from './validateContext.js';
 
 /**
  * Process object event, issue VC, upload to storage and register link resolver
@@ -16,6 +17,9 @@ import { registerLinkResolver } from '../linkResolver.service.js';
  */
 export const processObjectEvent: IService = async (data: any, context: IContext): Promise<any> => {
   try {
+    const validationResult = validateContextObjectEvent(context);
+    if (!validationResult.ok) throw new Error(validationResult.value);
+
     const vckitContext = context.vckit;
     const dppContext = context.dpp;
     const restOfVC = { render: dppContext?.renderTemplate ?? [] };

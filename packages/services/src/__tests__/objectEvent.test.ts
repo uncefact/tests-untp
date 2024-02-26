@@ -139,15 +139,11 @@ describe('processObjectEvent', () => {
       try {
         await processObjectEvent(dataObjectEvent, newContext);
       } catch (error) {
-        expect(error.message).toEqual('Identifier not found');
+        expect(error.message).toEqual('identifierKeyPaths not found');
       }
     });
 
     it('should throw error when context is empty vckit field', async () => {
-      (issueVC as jest.Mock).mockImplementation((value) => {
-        return Promise.reject(new Error('Invalid vckit context'));
-      });
-
       const newContext = {
         ...contextObjectEvent,
         vckit: {},
@@ -161,10 +157,6 @@ describe('processObjectEvent', () => {
     });
 
     it('should throw error when context is empty dpp field', async () => {
-      (issueVC as jest.Mock).mockImplementation((value) => {
-        return Promise.reject(new Error('Invalid dpp context'));
-      });
-
       const newContext = {
         ...contextObjectEvent,
         dpp: {},
@@ -178,10 +170,6 @@ describe('processObjectEvent', () => {
     });
 
     it('should throw error when context is empty storage field', async () => {
-      (issueVC as jest.Mock).mockResolvedValue({});
-
-      (uploadJson as jest.Mock).mockRejectedValue(new Error('Invalid storage context'));
-
       const newContext = {
         ...contextObjectEvent,
         storage: {},
@@ -195,13 +183,6 @@ describe('processObjectEvent', () => {
     });
 
     it('should throw error when context is empty dlr field', async () => {
-      (issueVC as jest.Mock).mockResolvedValue({});
-      (uploadJson as jest.Mock).mockResolvedValue(
-        'https://test-verifiable-credentials.s3.ap-southeast-2.amazonaws.com/1234',
-      );
-
-      (registerLinkResolver as jest.Mock).mockRejectedValue(new Error('Invalid dlr context'));
-
       const newContext = {
         ...contextObjectEvent,
         dlr: {},
