@@ -241,6 +241,32 @@
                   "identifierKeyPaths": ["herd", "NLIS"]
                 }
               ]
+            },
+            {
+              "name": "processTransactionEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "type": ["TransactionEventCredential"],
+                    "context": ["https://www.w3.org/2018/credentials/v1", "https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
+                    "renderTemplate": [],
+                    "issuer": "did:web:agtrace-passports.s3.ap-southeast-2.amazonaws.com"
+                  },
+                  "dlr": {
+                    "identificationKeyType": "nlisid",
+                    "linkTitle": "Livestock Passport",
+                    "verificationPage":"https://web.agtrace.showthething.com/verify",
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "identifierKeyPaths": ["herd", "NLIS"]
+                }
+              ]
             }
           ]
         }
