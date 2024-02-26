@@ -22,7 +22,7 @@ import { getIdentifierByObjectKeyPaths } from './helpers.js';
 /**
  * Process transformation event, issue epcis transformation event and dpp for each identifiers, then upload to storage and register link resolver for each dpp
  * @param data - data for the transformation event, which nlsids are selected
- * @param context - context for the transformation event, which includes the epcisTransformationEvent, identifiers, dlr, dpp, storage, etc.
+ * @param context - context for the transformation event
  */
 export const processTransformationEvent: IService = async (data: any, context: ITransformationEvent): Promise<any> => {
   try {

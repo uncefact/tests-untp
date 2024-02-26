@@ -262,7 +262,7 @@ describe('Transformation event', () => {
       }
     });
 
-    it('should throw error when context is lack of vckit field', async () => {
+    it('should throw error when context is empty vckit field', async () => {
       const newContext = {
         ...contextTransformationEvent,
         vckit: {},
@@ -274,7 +274,7 @@ describe('Transformation event', () => {
         expect(error.message).not.toBeNull();
       }
     });
-    it('should throw error when context is lack of dpp field', async () => {
+    it('should throw error when context is empty dpp field', async () => {
       (issueVC as jest.Mock).mockImplementation(async (value) => {
         if (value.context) {
           return Promise.resolve({});
@@ -297,7 +297,7 @@ describe('Transformation event', () => {
       }
     });
 
-    it('should throw error when context is lack of dlr field', async () => {
+    it('should throw error when context is empty dlr field', async () => {
       (issueVC as jest.Mock).mockImplementation(async (value) => {
         return Promise.resolve({});
       });
@@ -319,7 +319,7 @@ describe('Transformation event', () => {
       }
     });
 
-    it('should throw error when context is lack of epcisTransformationEvent field', async () => {
+    it('should throw error when context is empty epcisTransformationEvent field', async () => {
       const newContext = {
         ...contextTransformationEvent,
         epcisTransformationEvent: {},
@@ -332,7 +332,7 @@ describe('Transformation event', () => {
       }
     });
 
-    it('should throw error when context is lack of productTransformation field', async () => {
+    it('should throw error when context is empty productTransformation field', async () => {
       (issueVC as jest.Mock).mockImplementation(async (value) => {
         return Promise.resolve({});
       });
@@ -348,7 +348,7 @@ describe('Transformation event', () => {
       }
     });
 
-    it('should throw error when context is lack of productTransformation field', async () => {
+    it('should throw error when context is empty productTransformation field', async () => {
       (issueVC as jest.Mock).mockImplementation(async () => {
         return Promise.resolve({});
       });
