@@ -38,7 +38,6 @@ export const processTransformationEvent: IService = async (data: any, context: I
       vcKitContext,
       epcisTransformationEventContext,
       dlrContext,
-      data,
       productTransformation,
       inputIdentifiers,
     );
@@ -52,6 +51,7 @@ export const processTransformationEvent: IService = async (data: any, context: I
 
     const dppContext = context.dpp;
     const detailOfOutputProducts = productTransformation.outputItems;
+    if (!detailOfOutputProducts) throw new Error('Output Items not found');
 
     await Promise.all(
       detailOfOutputProducts.map(async (outputItem: any) => {
@@ -99,16 +99,16 @@ export const processTransformationEvent: IService = async (data: any, context: I
 /**
  * Issue epcis transformation event and return the verifiable credential
  * @param vckitContext - context for the vckit to issue vc for epcis transformation event
- * @param identifiersContext - list of identifiers of products
- * @param dlrContext - context for the link resolver to register link resolver for the epcis transformation event
- * @param data - data for the transformation event, which nlsids are selected
+ * @param epcisTransformationEvent - context for the vckit to issue vc for epcis transformation event
+ * @param dlrContext - context for the vckit to issue vc for epcis transformation event
+ * @param productTransformation - context for the vckit to issue vc for epcis transformation event
+ * @param inputIdentifiers - input identifiers for the transformation event
  * @returns VerifiableCredential
  */
 export const issueEpcisTransformationEvent = async (
   vcKitContext: IVCKitContext,
   epcisTransformationEvent: ICredential,
   dlrContext: IConfigDLR,
-  data: any,
   productTransformation: IProductTransformation,
   inputIdentifiers: string[],
 ) => {
@@ -150,10 +150,12 @@ export const uploadVC = async (filename: string, vc: VerifiableCredential, stora
 
 /**
  *  Issue DPP for the given identifiers and return the verifiable credential
+ * @param vcKitContext - context for the vckit to issue vc for dpp
  * @param dppContext - context for the vckit to issue vc for dpp
- * @param identifiers - identifiers of the product
  * @param numberOfItems - number of cows
  * @param linkEpcis - link to the epcis event
+ * @param data - data for the transformation event, which nlsids are selected
+ * @param outputItem - output item of the transformation event
  * @returns
  */
 export const issueDPP = async (

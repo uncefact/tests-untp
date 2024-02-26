@@ -21,7 +21,6 @@ export const contextTransformationEvent = {
     vckitAPIUrl: 'http://localhost:3332',
     issuer: 'did:web:cd28-2402-800-6314-9b5f-6c75-aaf-7382-43e9.ngrok-free.app',
   },
-  identifiers: ['9359502000034', '9359502000010'],
   dlr: {
     dlrAPIUrl: 'http://localhost',
     dlrAPIKey: '5555555555555',

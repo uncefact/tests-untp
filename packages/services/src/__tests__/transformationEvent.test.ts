@@ -103,7 +103,6 @@ describe('Transformation event', () => {
         contextTransformationEvent.vckit,
         contextTransformationEvent.epcisTransformationEvent,
         contextTransformationEvent.dlr,
-        dataTransformationEvent,
         contextTransformationEvent.productTransformation,
         contextTransformationEvent.identifierKeyPaths,
       );
@@ -312,6 +311,53 @@ describe('Transformation event', () => {
       const newContext = {
         ...contextTransformationEvent,
         dlr: {},
+      };
+      try {
+        await processTransformationEvent(dataTransformationEvent, newContext);
+      } catch (error) {
+        expect(error.message).toEqual('Error: Invalid context');
+      }
+    });
+
+    it('should throw error when context is lack of epcisTransformationEvent field', async () => {
+      const newContext = {
+        ...contextTransformationEvent,
+        epcisTransformationEvent: {},
+      };
+      try {
+        await processTransformationEvent(dataTransformationEvent, newContext);
+      } catch (error) {
+        console.log(error.message);
+        expect(error.message).not.toBeNull();
+      }
+    });
+
+    it('should throw error when context is lack of productTransformation field', async () => {
+      (issueVC as jest.Mock).mockImplementation(async (value) => {
+        return Promise.resolve({});
+      });
+
+      const newContext = {
+        ...contextTransformationEvent,
+        productTransformation: [],
+      };
+      try {
+        await processTransformationEvent(dataTransformationEvent, newContext);
+      } catch (error) {
+        expect(error.message).toEqual('Error: Output Items not found');
+      }
+    });
+
+    it('should throw error when context is lack of productTransformation field', async () => {
+      (issueVC as jest.Mock).mockImplementation(async () => {
+        return Promise.resolve({});
+      });
+
+      (uploadJson as jest.Mock).mockRejectedValue(new Error('Invalid context'));
+
+      const newContext = {
+        ...contextTransformationEvent,
+        storage: [],
       };
       try {
         await processTransformationEvent(dataTransformationEvent, newContext);
