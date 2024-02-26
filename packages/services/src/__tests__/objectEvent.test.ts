@@ -129,7 +129,7 @@ describe('processObjectEvent', () => {
       }
     });
 
-    it('should throw error when context is lack of identifierKeyPaths field', async () => {
+    it('should throw error when context is empty identifierKeyPaths field', async () => {
       (issueVC as jest.Mock).mockResolvedValue({});
 
       const newContext = {
@@ -143,7 +143,7 @@ describe('processObjectEvent', () => {
       }
     });
 
-    it('should throw error when context is lack of vckit field', async () => {
+    it('should throw error when context is empty vckit field', async () => {
       (issueVC as jest.Mock).mockImplementation((value) => {
         return Promise.reject(new Error('Invalid vckit context'));
       });
@@ -160,7 +160,7 @@ describe('processObjectEvent', () => {
       }
     });
 
-    it('should throw error when context is lack of dpp field', async () => {
+    it('should throw error when context is empty dpp field', async () => {
       (issueVC as jest.Mock).mockImplementation((value) => {
         return Promise.reject(new Error('Invalid dpp context'));
       });
@@ -177,7 +177,7 @@ describe('processObjectEvent', () => {
       }
     });
 
-    it('should throw error when context is lack of storage field', async () => {
+    it('should throw error when context is empty storage field', async () => {
       (issueVC as jest.Mock).mockResolvedValue({});
 
       (uploadJson as jest.Mock).mockRejectedValue(new Error('Invalid storage context'));
@@ -194,7 +194,7 @@ describe('processObjectEvent', () => {
       }
     });
 
-    it('should throw error when context is lack of dlr field', async () => {
+    it('should throw error when context is empty dlr field', async () => {
       (issueVC as jest.Mock).mockResolvedValue({});
       (uploadJson as jest.Mock).mockResolvedValue(
         'https://test-verifiable-credentials.s3.ap-southeast-2.amazonaws.com/1234',
