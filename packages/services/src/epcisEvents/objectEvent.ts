@@ -8,11 +8,17 @@ import { uploadJson } from '../storage.service.js';
 import { issueVC } from '../vckit.service.js';
 import { registerLinkResolver } from '../linkResolver.service.js';
 
+/**
+ * Process object event, issue VC, upload to storage and register link resolver
+ * @param data - object event data, e.g. { data: { herd: { NLIS: 'NH020188LEJ00012' } } }
+ * @param context - object event context
+ * @returns
+ */
 export const processObjectEvent: IService = async (data: any, context: IContext): Promise<any> => {
   try {
     const vckitContext = context.vckit;
     const dppContext = context.dpp;
-    const restOfVC = { render: dppContext.renderTemplate };
+    const restOfVC = { render: dppContext?.renderTemplate ?? [] };
     const vc: VerifiableCredential = await issueVC({
       context: dppContext.context,
       credentialSubject: data.data,
@@ -47,6 +53,6 @@ export const processObjectEvent: IService = async (data: any, context: IContext)
 
     return vc;
   } catch (error: any) {
-    throw new Error(error);
+    throw new Error(error.message ?? 'Error processing object event');
   }
 };

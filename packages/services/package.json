@@ -30,7 +30,8 @@
   "jest": {
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "/build/"
+      "/build/",
+      "/__tests__/mocks/"
     ]
   }
 }

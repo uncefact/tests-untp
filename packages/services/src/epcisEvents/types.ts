@@ -8,7 +8,7 @@ export interface IVCKitContext {
 export interface ICredential {
   context: string[];
   type: string[];
-  renderTemplate: IRenderer[];
+  renderTemplate?: IRenderer[];
 }
 
 export interface ILinkResolverContext {
