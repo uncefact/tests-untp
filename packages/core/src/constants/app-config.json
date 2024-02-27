@@ -217,15 +217,19 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332",
-                    "type": ["VerifiableCredential"],
-                    "context": ["https://www.w3.org/2018/credentials/v1"],
-                    "renderTemplate": [],
-                    "issuer": "did:web:agtrace-passports.s3.ap-southeast-2.amazonaws.com"
+                    "issuer": "did:web:9e2b-103-69-79-17.ngrok-free.app"
+                  },
+                  "dpp": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["DigitalProductPassport"],
+                    "dlrLinkTitle": "Livestock Passport",
+                    "dlrIdentificationKeyType": "nlisid",
+                    "dlrVerificationPage": "https://web.agtrace.showthething.com/verify"
                   },
                   "dlr": {
-                    "identificationKeyType": "nlis",
-                    "linkTitle": "Livestock Passport",
-                    "verificationPage":"https://web.agtrace.showthething.com/verify",
                     "dlrAPIUrl": "http://localhost",
                     "dlrAPIKey": "5555555555555"
                   },

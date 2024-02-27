@@ -152,6 +152,57 @@ export const constructLinkResolver = (
   return gs1LinkResolver;
 };
 
+export const registerLinkResolver = async (
+  url: string,
+  identificationKeyType: IdentificationKeyType,
+  identificationKey: string,
+  linkTitle: string,
+  verificationPage: string,
+  dlrAPIUrl: string,
+  dlrAPIKey: string,
+  qualifierPath?: string,
+) => {
+  const linkResolver: ILinkResolver = {
+    identificationKeyType,
+    identificationKey: identificationKey,
+    itemDescription: linkTitle,
+  };
+  const query = encodeURIComponent(JSON.stringify({ payload: { uri: url } }));
+  const queryString = `q=${query}`;
+  const verificationPassportPage = `${verificationPage}/?${queryString}`;
+  const linkResponses: ILinkResponse[] = [
+    {
+      linkType: LinkType.verificationLinkType,
+      linkTitle: 'VCKit verify service',
+      targetUrl: verificationPage,
+      mimeType: MimeType.textPlain,
+    },
+    {
+      linkType: LinkType.certificationLinkType,
+      linkTitle: linkTitle,
+      targetUrl: url,
+      mimeType: MimeType.applicationJson,
+    },
+    {
+      linkType: LinkType.certificationLinkType,
+      linkTitle: linkTitle,
+      targetUrl: verificationPassportPage,
+      mimeType: MimeType.textHtml,
+      defaultLinkType: true,
+      defaultIanaLanguage: true,
+      defaultMimeType: true,
+    },
+  ];
+
+  return await createLinkResolver({
+    dlrAPIUrl,
+    linkResolver,
+    linkResponses,
+    queryString,
+    dlrAPIKey,
+    qualifierPath: qualifierPath ?? '/',
+  });
+};
 /**
  * Function to fetch the DLR passport data from the provided DLR URL.
  * @param dlrUrl The DLR URL from which to fetch the passport data.

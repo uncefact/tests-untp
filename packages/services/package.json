@@ -5,7 +5,7 @@
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --build --clean && tsc",
     "watch": "tsc -b --watch",
     "test": "jest --ci --env=jest-environment-node",
     "coverage": "jest --coverage"
@@ -30,7 +30,8 @@
   "jest": {
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "/build/"
+      "/build/",
+      "/__tests__/mocks/"
     ],
     "transform": {
       "\\.[jt]sx?$": "ts-jest"
@@ -43,6 +44,8 @@
     "moduleNameMapper": {
       "(.+)\\.js": "$1"
     },
-    "extensionsToTreatAsEsm": [".ts"]
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ]
   }
 }
