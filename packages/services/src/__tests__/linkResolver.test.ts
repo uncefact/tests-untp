@@ -1,7 +1,7 @@
-import { IdentificationKeyType, createLinkResolver, registerLinkResolver } from '../../build/linkResolver.service';
-import { privateAPI } from '../../build/utils/httpService';
+import { IdentificationKeyType, createLinkResolver, registerLinkResolver } from '../linkResolver.service';
+import { privateAPI } from '../utils/httpService';
 
-jest.mock('../../build/utils/httpService', () => ({
+jest.mock('../utils/httpService', () => ({
   privateAPI: {
     post: jest.fn(),
     setBearerTokenAuthorizationHeaders: jest.fn(),

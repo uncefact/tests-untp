@@ -18,6 +18,7 @@ import {
 } from './types';
 import { generateUUID, incrementQuality } from '../utils/helpers.js';
 import { getIdentifierByObjectKeyPaths } from './helpers.js';
+import {  validateContextTransformationEvent } from './validateContext.js';
 
 /**
  * Process transformation event, issue epcis transformation event and dpp for each identifiers, then upload to storage and register link resolver for each dpp
@@ -26,6 +27,9 @@ import { getIdentifierByObjectKeyPaths } from './helpers.js';
  */
 export const processTransformationEvent: IService = async (data: any, context: ITransformationEvent): Promise<any> => {
   try {
+    const validationResult = validateContextTransformationEvent(context);
+    if (!validationResult.ok) throw new Error(validationResult.value);
+
     const epcisTransformationEventContext = context.epcisTransformationEvent;
     const dlrContext = context.dlr;
     const vcKitContext = context.vckit;
@@ -91,7 +95,7 @@ export const processTransformationEvent: IService = async (data: any, context: I
         );
       }),
     );
-  } catch (error) {
+  } catch (error: any) {
     throw new Error(error);
   }
 };
@@ -125,7 +129,7 @@ export const issueEpcisTransformationEvent = async (
     issuer: vcKitContext.issuer,
     type: [...epcisTransformationEvent.type],
     vcKitAPIUrl: vcKitContext.vckitAPIUrl,
-    ...restOfVC,
+    restOfVC,
   });
 
   return epcisVc;
@@ -178,7 +182,7 @@ export const issueDPP = async (
     type: dppContext.type,
     vcKitAPIUrl: vcKitContext.vckitAPIUrl,
     credentialSubject,
-    ...restOfVC,
+    restOfVC,
   });
 
   return result;

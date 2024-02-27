@@ -217,19 +217,20 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332",
-                    "issuer": "did:web:agtrace-passports.s3.ap-southeast-2.amazonaws.com"
+                    "issuer": "did:web:0af6-103-69-79-17.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
                     "renderTemplate": [
                       { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
                     ],
-                    "type": ["DigitalProductPassport"]
+                    "type": ["DigitalProductPassport"],
+                    "dlrLinkTitle": "Livestock Passport",
+                    "dlrIdentificationKeyType": "nlisid",
+                    "dlrVerificationPage": "http://localhost:3001/verify"
                   },
+
                   "dlr": {
-                    "identificationKeyType": "nlis",
-                    "linkTitle": "Livestock Passport",
-                    "verificationPage": "https://web.agtrace.showthething.com/verify",
                     "dlrAPIUrl": "http://localhost",
                     "dlrAPIKey": "5555555555555"
                   },
@@ -341,7 +342,7 @@
                   },
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332",
-                    "issuer": "did:web:9e2b-103-69-79-17.ngrok-free.app"
+                    "issuer": "did:web:0af6-103-69-79-17.ngrok-free.app"
                   },
                   "dlr": {
                     "dlrAPIUrl": "http://localhost",
@@ -391,5 +392,16 @@
         }
       ]
     }
-  ]
+  ],
+  "identifyProvider": {
+    "type": "gs1",
+    "url": "https://verified-by-gs1.agtrace.showthething.com"
+  },
+  "defaultVerificationServiceLink": {
+    "title": "Default Verification Service",
+    "context": "Default Verification Service",
+    "type": "application/json",
+    "href": "https://verify.agtrace.showthething.com/credentials/verify",
+    "hreflang": ["en"]
+  }
 }

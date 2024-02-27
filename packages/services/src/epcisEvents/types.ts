@@ -8,7 +8,7 @@ export interface IVCKitContext {
 export interface ICredential {
   context: string[];
   type: string[];
-  renderTemplate: IRenderer[];
+  renderTemplate?: IRenderer[];
 }
 
 export interface ILinkResolverContext {
@@ -39,6 +39,11 @@ export interface IContext {
   dpp: IEntityIssue;
 }
 
+export interface IRenderer {
+  template: string;
+  '@type': string;
+}
+
 export interface IInputItems {
   quantity: number;
   uom: string;
@@ -54,9 +59,4 @@ export interface ITransformationEvent extends IContext {
   identifiers: string[];
   epcisTransformationEvent: IEntityIssue;
   productTransformation: IProductTransformation;
-}
-
-export interface IRenderer {
-  template: string;
-  '@type': string;
 }

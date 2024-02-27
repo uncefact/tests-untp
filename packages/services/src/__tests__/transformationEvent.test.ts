@@ -3,29 +3,29 @@ import {
   issueEpcisTransformationEvent,
   processTransformationEvent,
   uploadVC,
-} from '../../build/epcisEvents/transformationEvent';
-import { issueVC, contextDefault } from '../../build/vckit.service';
-import { epcisTransformationCrendentialSubject } from '../../build/epcis.service';
-import { uploadJson } from '../../build/storage.service';
-import { registerLinkResolver, IdentificationKeyType } from '../../build/linkResolver.service';
-import { fillArray } from '../../build/utils/helpers';
+} from '../epcisEvents/transformationEvent';
+import { issueVC, contextDefault } from '../vckit.service';
+import { epcisTransformationCrendentialSubject } from '../epcis.service';
+import { uploadJson } from '../storage.service';
+import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
+import { fillArray } from '../utils/helpers';
 import { IInputItems } from '../epcisEvents/types';
 import { contextTransformationEvent, dataTransformationEvent } from './mocks/constants';
 
-jest.mock('../../build/vckit.service', () => ({
+jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
   contextDefault: ['https://www.w3.org/2018/credentials/v1', 'https://w3id.org/vc-revocation-list-2020/v1'],
 }));
 
-jest.mock('../../build/epcis.service', () => ({
+jest.mock('../epcis.service', () => ({
   epcisTransformationCrendentialSubject: jest.fn(),
 }));
 
-jest.mock('../../build/storage.service', () => ({
+jest.mock('../storage.service', () => ({
   uploadJson: jest.fn(),
 }));
 
-jest.mock('../../build/linkResolver.service', () => ({
+jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
   IdentificationKeyType: {
     gtin: 'gtin',
@@ -57,7 +57,7 @@ describe('Transformation event', () => {
 
       (epcisTransformationCrendentialSubject as jest.Mock).mockImplementation((inputItems) => {
         const detailOfProducts: any = contextTransformationEvent.productTransformation.outputItems;
-        const convertProductToObj = detailOfProducts.reduce((accumulator, item, index) => {
+        const convertProductToObj = detailOfProducts.reduce((accumulator: any, item: any) => {
           accumulator[item.productID] = item;
           return accumulator;
         }, {});
@@ -239,7 +239,7 @@ describe('Transformation event', () => {
     it('should throw error when issueVC throws error', async () => {
       try {
         await processTransformationEvent(null, null);
-      } catch (error) {
+      } catch (error: any) {
         expect(error).toBeInstanceOf(Error);
       }
     });
@@ -256,7 +256,7 @@ describe('Transformation event', () => {
       };
       try {
         await processTransformationEvent(dataTransformationEvent, emptyContext);
-      } catch (error) {
+      } catch (error: any) {
         console.log(error.message);
         expect(error.message).not.toBeNull();
       }
@@ -269,53 +269,32 @@ describe('Transformation event', () => {
       };
       try {
         await processTransformationEvent(dataTransformationEvent, newContext);
-      } catch (error) {
+      } catch (error: any) {
         console.log(error.message);
         expect(error.message).not.toBeNull();
       }
     });
     it('should throw error when context is empty dpp field', async () => {
-      (issueVC as jest.Mock).mockImplementation(async (value) => {
-        if (value.context) {
-          return Promise.resolve({});
-        }
-
-        return Promise.reject(new Error('Invalid context'));
-      });
-      (uploadJson as jest.Mock).mockReturnValue(
-        Promise.resolve('https://bucket.s3.ap-southeast-2.amazonaws.com/epcis-transformation-event/1234'),
-      );
-
       const newContext = {
         ...contextTransformationEvent,
         dpp: {},
       };
       try {
         await processTransformationEvent(dataTransformationEvent, newContext);
-      } catch (error) {
-        expect(error.message).toEqual('Error: Invalid context');
+      } catch (error: any) {
+        expect(error.message).toEqual('Error: Invalid dpp context');
       }
     });
 
     it('should throw error when context is empty dlr field', async () => {
-      (issueVC as jest.Mock).mockImplementation(async (value) => {
-        return Promise.resolve({});
-      });
-
-      (uploadJson as jest.Mock).mockReturnValue(
-        Promise.resolve('https://bucket.s3.ap-southeast-2.amazonaws.com/epcis-transformation-event/1234'),
-      );
-
-      (registerLinkResolver as jest.Mock).mockRejectedValue(new Error('Invalid context'));
-
       const newContext = {
         ...contextTransformationEvent,
         dlr: {},
       };
       try {
         await processTransformationEvent(dataTransformationEvent, newContext);
-      } catch (error) {
-        expect(error.message).toEqual('Error: Invalid context');
+      } catch (error: any) {
+        expect(error.message).toEqual('Error: Invalid dlr context');
       }
     });
 
@@ -326,43 +305,48 @@ describe('Transformation event', () => {
       };
       try {
         await processTransformationEvent(dataTransformationEvent, newContext);
-      } catch (error) {
+      } catch (error: any) {
         console.log(error.message);
         expect(error.message).not.toBeNull();
       }
     });
 
-    it('should throw error when context is empty productTransformation field', async () => {
-      (issueVC as jest.Mock).mockImplementation(async (value) => {
-        return Promise.resolve({});
-      });
+    it('should throw error when context is empty epcisTransformationEvent type field', async () => {
+      const newContext = {
+        ...contextTransformationEvent,
+        epcisTransformationEvent: {
+          ...contextTransformationEvent.epcisTransformationEvent,
+          type: '',
+        },
+      };
+      try {
+        await processTransformationEvent(dataTransformationEvent, newContext);
+      } catch (error: any) {
+        expect(error.message).toEqual('Error: Invalid epcisTransformationEvent type');
+      }
+    });
 
+    it('should throw error when context is empty productTransformation field', async () => {
       const newContext = {
         ...contextTransformationEvent,
         productTransformation: [],
       };
       try {
         await processTransformationEvent(dataTransformationEvent, newContext);
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).toEqual('Error: Output Items not found');
       }
     });
 
     it('should throw error when context is empty productTransformation field', async () => {
-      (issueVC as jest.Mock).mockImplementation(async () => {
-        return Promise.resolve({});
-      });
-
-      (uploadJson as jest.Mock).mockRejectedValue(new Error('Invalid context'));
-
       const newContext = {
         ...contextTransformationEvent,
         storage: [],
       };
       try {
         await processTransformationEvent(dataTransformationEvent, newContext);
-      } catch (error) {
-        expect(error.message).toEqual('Error: Invalid context');
+      } catch (error: any) {
+        expect(error.message).toEqual('Error: Invalid storage context');
       }
     });
   });

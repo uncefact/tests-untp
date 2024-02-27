@@ -1,7 +1,7 @@
-import { uploadJson } from '../../build/storage.service';
-import { publicAPI } from '../../build/utils/httpService';
+import { uploadJson } from '../storage.service';
+import { publicAPI } from '../utils/httpService';
 
-jest.mock('../../build/utils/httpService', () => ({
+jest.mock('../utils/httpService', () => ({
   publicAPI: {
     post: jest.fn(),
     put: jest.fn(),
