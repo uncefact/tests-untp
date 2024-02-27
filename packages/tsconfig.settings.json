@@ -23,6 +23,6 @@
       "module": "CommonJS"
     }
   },
-  "exclude": ["**/build/**/*", "**/node_modules/**/*"],
+  "exclude": ["**/build/**/*", "**/node_modules/**/*", "**/*.test.ts", "**/*.spec.ts"],
   "include": ["src", "src/__tests__"]
 }

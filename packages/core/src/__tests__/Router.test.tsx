@@ -44,12 +44,49 @@ jest.mock(
         },
       },
     ],
+    scanningApp: {
+      config: {
+        path: '/scanning',
+        styles: {
+          primaryColor: 'rgb(41, 171, 48)',
+          secondaryColor: 'white',
+          tertiaryColor: 'black',
+        },
+      },
+      provider: 'gs1',
+      providerVerifyUrl: 'https://verified-by-gs1.agtrace.showthething.com',
+      services: {
+        certificationInfo: 'https://gs1.org/voc/certificationInfo',
+        verificationService: 'https://gs1.org/voc/verificationService',
+        serviceInfo: 'https://gs1.org/voc/serviceInfo',
+      },
+      defaultVerificationServiceLink: {
+        title: 'Default Verification Service',
+        context: 'Default Verification Service',
+        type: 'application/json',
+        href: 'https://verify.agtrace.showthething.com/credentials/verify',
+        hreflang: ['en'],
+      },
+    },
   }),
   { virtual: true },
 );
 
 jest.mock('@mock-app/components', () => ({
-  Footer: jest.fn()
+  Footer: jest.fn(),
+}));
+
+jest.mock('@mock-app/services', () => ({
+  services: jest.fn(),
+}));
+
+jest.mock('@veramo/utils', () => ({
+  computeEntryHash: jest.fn(),
+}));
+
+jest.mock('@vckit/renderer', () => ({
+  Renderer: jest.fn(),
+  WebRenderingTemplate2022: jest.fn(),
 }));
 
 describe('Router Component', () => {

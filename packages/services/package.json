@@ -5,7 +5,7 @@
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --build --clean && tsc",
     "watch": "tsc -b --watch",
     "test": "jest --ci --env=jest-environment-node",
     "coverage": "jest --coverage"
@@ -24,13 +24,28 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "typescript": "^4",
-    "axios-mock-adapter": "^1.19.0"
+    "axios-mock-adapter": "^1.19.0",
+    "typescript": "^5.3.3"
   },
   "jest": {
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "/build/"
+      "/build/",
+      "/__tests__/mocks/"
+    ],
+    "transform": {
+      "\\.[jt]sx?$": "ts-jest"
+    },
+    "globals": {
+      "ts-jest": {
+        "useESM": true
+      }
+    },
+    "moduleNameMapper": {
+      "(.+)\\.js": "$1"
+    },
+    "extensionsToTreatAsEsm": [
+      ".ts"
     ]
   }
 }
