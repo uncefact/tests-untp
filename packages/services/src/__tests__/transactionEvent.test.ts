@@ -1,8 +1,8 @@
-import { processObjectEvent } from '../epcisEvents/objectEvent';
+import { processTransactionEvent } from '../epcisEvents/transactionEvent';
 import { issueVC, contextDefault } from '../vckit.service';
 import { uploadJson } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType, DLREventEnum } from '../linkResolver.service';
-import { contextObjectEvent, dataObjectEvent } from './mocks/constants';
+import { contextTransactionEvent, dataTransactionEvent } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
@@ -26,7 +26,7 @@ jest.mock('../linkResolver.service', () => ({
   }
 }));
 
-describe('processObjectEvent', () => {
+describe('processTransactionEvent', () => {
   describe('successful case', () => {
     afterEach(() => {
       jest.clearAllMocks();
@@ -53,7 +53,7 @@ describe('processObjectEvent', () => {
       jest.clearAllMocks();
     });
 
-    it('should call process object event', async () => {
+    it('should call process transaction event', async () => {
       (uploadJson as jest.Mock).mockImplementation(({ filename, bucket }: { filename: string; bucket: string }) => {
         return `https://${bucket}.s3.ap-southeast-2.amazonaws.com/${filename}`;
       });
@@ -67,6 +67,7 @@ describe('processObjectEvent', () => {
           verificationPage,
           dlrAPIUrl: string,
           dlrAPIKey,
+          event: DLREventEnum
         ) => {
           console.log({
             url,
@@ -74,33 +75,34 @@ describe('processObjectEvent', () => {
             verificationPage,
             dlrAPIKey,
             identificationKey,
+            event
           });
           return `${dlrAPIUrl}/${identificationKeyType}/${identificationKey}?linkType=all`;
         },
       );
 
-      const vc = await processObjectEvent(dataObjectEvent, contextObjectEvent);
+      const vc = await processTransactionEvent(dataTransactionEvent, contextTransactionEvent);
       expect(vc).toEqual(expectVCResult);
       expect(uploadJson).toHaveBeenCalledWith({
         filename: expect.any(String),
         json: expectVCResult,
-        bucket: contextObjectEvent.storage.bucket,
-        storageAPIUrl: contextObjectEvent.storage.storageAPIUrl,
+        bucket: contextTransactionEvent.storage.bucket,
+        storageAPIUrl: contextTransactionEvent.storage.storageAPIUrl,
       });
 
       expect(registerLinkResolver).toHaveBeenCalled();
 
-      const dppContext = contextObjectEvent.dpp;
-      const dlrContext = contextObjectEvent.dlr;
+      const dppContext = contextTransactionEvent.dpp;
+      const dlrContext = contextTransactionEvent.dlr;
       expect(registerLinkResolver).toHaveBeenCalledWith(
         expect.any(String),
         dppContext.dlrIdentificationKeyType,
-        dataObjectEvent.data.herd.NLIS,
+        dataTransactionEvent.data.herd.NLIS,
         dppContext.dlrLinkTitle,
         dppContext.dlrVerificationPage,
         dlrContext.dlrAPIUrl,
         dlrContext.dlrAPIKey,
-        DLREventEnum.object
+        DLREventEnum.transaction
       );
     });
   });
@@ -113,7 +115,7 @@ describe('processObjectEvent', () => {
 
     it('should throw error when data is empty', async () => {
       try {
-        await processObjectEvent({ data: { herd: '' } }, contextObjectEvent);
+        await processTransactionEvent({ data: { herd: '' } }, contextTransactionEvent);
       } catch (error: any) {
         expect(error.message).toEqual('Identifier not found');
       }
@@ -128,7 +130,7 @@ describe('processObjectEvent', () => {
         identifierKeyPaths: [],
       };
       try {
-        await processObjectEvent(dataObjectEvent, newContext);
+        await processTransactionEvent(dataTransactionEvent, newContext);
       } catch (error: any) {
         console.log(error.message);
         expect(error.message).not.toBeNull();
@@ -139,11 +141,11 @@ describe('processObjectEvent', () => {
       (issueVC as jest.Mock).mockResolvedValue({});
 
       const newContext = {
-        ...contextObjectEvent,
+        ...contextTransactionEvent,
         identifierKeyPaths: [],
       };
       try {
-        await processObjectEvent(dataObjectEvent, newContext);
+        await processTransactionEvent(dataTransactionEvent, newContext);
       } catch (error: any) {
         expect(error.message).toEqual('identifierKeyPaths not found');
       }
@@ -151,12 +153,12 @@ describe('processObjectEvent', () => {
 
     it('should throw error when context is empty vckit field', async () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextTransactionEvent,
         vckit: {},
       };
 
       try {
-        await processObjectEvent(dataObjectEvent, newContext);
+        await processTransactionEvent(dataTransactionEvent, newContext);
       } catch (error: any) {
         expect(error.message).toEqual('Invalid vckit context');
       }
@@ -164,12 +166,12 @@ describe('processObjectEvent', () => {
 
     it('should throw error when context is empty dpp field', async () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextTransactionEvent,
         dpp: {},
       };
 
       try {
-        await processObjectEvent(dataObjectEvent, newContext);
+        await processTransactionEvent(dataTransactionEvent, newContext);
       } catch (error: any) {
         expect(error.message).toEqual('Invalid dpp context');
       }
@@ -177,12 +179,12 @@ describe('processObjectEvent', () => {
 
     it('should throw error when context is empty storage field', async () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextTransactionEvent,
         storage: {},
       };
 
       try {
-        await processObjectEvent(dataObjectEvent, newContext);
+        await processTransactionEvent(dataTransactionEvent, newContext);
       } catch (error: any) {
         expect(error.message).toEqual('Invalid storage context');
       }
@@ -190,11 +192,11 @@ describe('processObjectEvent', () => {
 
     it('should throw error when context is empty dlr field', async () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextTransactionEvent,
         dlr: {},
       };
       try {
-        await processObjectEvent(dataObjectEvent, newContext);
+        await processTransactionEvent(dataTransactionEvent, newContext);
       } catch (error: any) {
         expect(error.message).toEqual('Invalid dlr context');
       }

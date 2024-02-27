@@ -49,6 +49,12 @@ export enum IdentificationKeyType {
   consignment_id = 'consignment_id',
 }
 
+export enum DLREventEnum {
+  transaction = 'transaction',
+  object = 'object',
+  transformation = 'transformation',
+}
+
 export interface ILinkResolver {
   identificationKeyType: IdentificationKeyType;
   identificationKey: string;
@@ -159,6 +165,7 @@ export const registerLinkResolver = async (
   verificationPage: string,
   dlrAPIUrl: string,
   dlrAPIKey: string,
+  event: DLREventEnum,
   qualifierPath?: string,
 ) => {
   const linkResolver: ILinkResolver = {
@@ -169,29 +176,7 @@ export const registerLinkResolver = async (
   const query = encodeURIComponent(JSON.stringify({ payload: { uri: url } }));
   const queryString = `q=${query}`;
   const verificationPassportPage = `${verificationPage}/?${queryString}`;
-  const linkResponses: ILinkResponse[] = [
-    {
-      linkType: LinkType.verificationLinkType,
-      linkTitle: 'VCKit verify service',
-      targetUrl: verificationPage,
-      mimeType: MimeType.textPlain,
-    },
-    {
-      linkType: LinkType.certificationLinkType,
-      linkTitle: linkTitle,
-      targetUrl: url,
-      mimeType: MimeType.applicationJson,
-    },
-    {
-      linkType: LinkType.certificationLinkType,
-      linkTitle: linkTitle,
-      targetUrl: verificationPassportPage,
-      mimeType: MimeType.textHtml,
-      defaultLinkType: true,
-      defaultIanaLanguage: true,
-      defaultMimeType: true,
-    },
-  ];
+  const linkResponses = getLinkResponsesByEvent(event, { url, linkTitle, verificationPassportPage, verificationPage });
 
   return await createLinkResolver({
     dlrAPIUrl,
@@ -236,4 +221,62 @@ export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
 
   // Return the found DLR passport
   return dlrPassport;
+};
+
+export const getLinkResponsesByEvent = (
+  event: DLREventEnum,
+  {
+    url,
+    linkTitle,
+    verificationPassportPage,
+    verificationPage,
+  }: { url: string; linkTitle: string; verificationPassportPage: string; verificationPage: string },
+): ILinkResponse[] => {
+  switch (event) {
+    case DLREventEnum.transaction:
+      return [
+        {
+          linkTitle,
+          linkType: LinkType.epcisLinkType,
+          targetUrl: url,
+          mimeType: MimeType.applicationJson,
+        },
+        {
+          linkTitle,
+          linkType: LinkType.epcisLinkType,
+          targetUrl: verificationPassportPage,
+          mimeType: MimeType.textHtml,
+          defaultLinkType: true,
+          defaultIanaLanguage: true,
+          defaultMimeType: true,
+        },
+      ];
+    case DLREventEnum.object:
+    case DLREventEnum.transformation:
+      return [
+        {
+          linkType: LinkType.verificationLinkType,
+          linkTitle: 'VCKit verify service',
+          targetUrl: verificationPage,
+          mimeType: MimeType.textPlain,
+        },
+        {
+          linkType: LinkType.certificationLinkType,
+          linkTitle,
+          targetUrl: url,
+          mimeType: MimeType.applicationJson,
+        },
+        {
+          linkType: LinkType.certificationLinkType,
+          linkTitle,
+          targetUrl: verificationPassportPage,
+          mimeType: MimeType.textHtml,
+          defaultLinkType: true,
+          defaultIanaLanguage: true,
+          defaultMimeType: true,
+        },
+      ];
+    default:
+      return [];
+  }
 };

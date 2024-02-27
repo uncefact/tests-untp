@@ -6,7 +6,7 @@ import { generateUUID } from '../utils/helpers.js';
 
 import { uploadJson } from '../storage.service.js';
 import { issueVC } from '../vckit.service.js';
-import { registerLinkResolver } from '../linkResolver.service.js';
+import { DLREventEnum, registerLinkResolver } from '../linkResolver.service.js';
 import { validateContextObjectEvent } from './validateContext.js';
 
 /**
@@ -53,6 +53,7 @@ export const processObjectEvent: IService = async (data: any, context: IContext)
       dppContext.dlrVerificationPage,
       linkResolverContext.dlrAPIUrl,
       linkResolverContext.dlrAPIKey,
+      DLREventEnum.object
     );
 
     return vc;
