@@ -8,7 +8,7 @@
     "build": "tsc --build --clean && tsc",
     "watch": "tsc -b --watch",
     "test": "jest --ci --env=jest-environment-node",
-    "coverage": "jest --coverage"
+    "test:coverage": "jest --coverage"
   },
   "type": "module",
   "moduleDirectories": [
@@ -19,8 +19,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@babel/preset-typescript": "^7.23.3",
     "@vckit/core-types": "1.0.0-beta.7",
     "axios": "^1.6.7",
+    "babel-jest": "^29.7.0",
+    "lodash": "^4.17.21",
+    "moment": "^2.30.1",
     "uuid": "^9.0.1"
   },
   "devDependencies": {

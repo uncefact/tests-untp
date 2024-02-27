@@ -1,10 +1,18 @@
-const webpack = require('webpack');
+const { webpack } = require('webpack');
 
 module.exports = {
   jest: {
     configure: {
       preset: 'ts-jest',
       testEnvironment: 'jsdom',
+      globals: {
+        "ts-jest": {
+          "useESM": true
+        }
+      },
+      extensionsToTreatAsEsm: [
+        ".ts"
+      ],
       transform: {
         '^.+\\.ts?$': 'ts-jest',
         '^.+\\.tsx?$': 'ts-jest',
@@ -13,6 +21,7 @@ module.exports = {
       },
       moduleNameMapper: {
         '^axios$': require.resolve('axios'),
+          "(.+)\\.js": "$1"
       },
       setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
       collectCoverage: true,
@@ -25,9 +34,7 @@ module.exports = {
         '!src/index.tsx',
         '!src/**/*.test.{ts,tsx}',
         '!src/models/**/*.{ts,tsx}',
-        '!src/pages/Verify.tsx',
       ],
-      watchPlugins: ['jest-watch-typeahead/filename', 'jest-watch-typeahead/testname'],
     },
   },
   babel: {
@@ -36,20 +43,5 @@ module.exports = {
     loaderOptions: (babelLoaderOptions) => {
       return babelLoaderOptions;
     },
-  },
-  webpack: {
-    configure: (webpackConfig, { env, paths }) => {
-      webpackConfig.resolve.fallback = {
-        ...webpackConfig.resolve.fallback,
-        fs: false,
-      };
-      /* ... */
-      return webpackConfig;
-    },
-    plugins: [
-      new webpack.ProvidePlugin({
-        Buffer: ['buffer', 'Buffer'],
-      }),
-    ],
-  },
+  }
 };
