@@ -32,30 +32,56 @@ function Header() {
     setAnchorElNav(null);
   };
 
-  const renderMenuByScreenType = (screenType: string) => {
-    return appConfig.apps.map((app: any) => {
+  const renderMobileMenuItems = (apps: any[], scanningRoute: string, scanningStyles: IStyles) => {
+    const menuItems = apps.map((app: any) => {
       const route = `/${convertStringToPath(app.name)}`;
 
-      if (screenType === 'mobile') {
-        return (
-          <MenuItem
-            key={route}
-            onClick={() => {
-              handleCloseMobileNavMenu();
-              handleChangeStyles(app.styles);
-            }}
+      return (
+        <MenuItem
+          key={route}
+          onClick={() => {
+            handleCloseMobileNavMenu();
+            handleChangeStyles(app.styles);
+          }}
+        >
+          <Typography
+            textAlign='center'
+            component={Link}
+            to={route}
+            sx={{ textDecoration: 'none', color: app.styles.tertiaryColor }}
           >
-            <Typography
-              textAlign='center'
-              component={Link}
-              to={route}
-              sx={{ textDecoration: 'none', color: app.styles.tertiaryColor }}
-            >
-              {app.name}
-            </Typography>
-          </MenuItem>
-        );
-      }
+            {app.name}
+          </Typography>
+        </MenuItem>
+      );
+    });
+
+    // Add Scanning menu item
+    menuItems.push(
+      <MenuItem
+        key={scanningRoute}
+        onClick={() => {
+          handleCloseMobileNavMenu();
+          handleChangeStyles(scanningStyles);
+        }}
+      >
+        <Typography
+          textAlign='center'
+          component={Link}
+          to={scanningRoute}
+          sx={{ textDecoration: 'none', color: scanningStyles.tertiaryColor }}
+        >
+          Scanning
+        </Typography>
+      </MenuItem>,
+    );
+
+    return menuItems;
+  };
+
+  const renderDesktopMenuItems = (apps: any[], scanningRoute: string, scanningStyles: IStyles) => {
+    const menuItems = apps.map((app: any) => {
+      const route = `/${convertStringToPath(app.name)}`;
 
       return (
         <Button
@@ -69,6 +95,36 @@ function Header() {
         </Button>
       );
     });
+
+    // Add Scanning menu item
+    menuItems.push(
+      <Button
+        onClick={() => handleChangeStyles(scanningStyles)}
+        key={scanningRoute}
+        component={Link}
+        to={scanningRoute}
+        sx={{ color: scanningStyles.secondaryColor, display: 'block' }}
+      >
+        Scanning
+      </Button>,
+    );
+
+    return menuItems;
+  };
+
+  const renderMenuByScreenType = (screenType: string) => {
+    const scanningRoute = '/scanning';
+    const scanningStyles: IStyles = {
+      primaryColor: 'rgb(41, 171, 48)',
+      secondaryColor: 'white',
+      tertiaryColor: 'black'
+    };
+
+    if (screenType === 'mobile') {
+      return renderMobileMenuItems(appConfig.apps, scanningRoute, scanningStyles);
+    }
+
+    return renderDesktopMenuItems(appConfig.apps, scanningRoute, scanningStyles);
   };
 
   return (

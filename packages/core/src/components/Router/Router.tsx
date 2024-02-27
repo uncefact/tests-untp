@@ -1,11 +1,9 @@
-import React from 'react';
+import React, { Fragment } from 'react';
 import { Route, Routes, Navigate } from 'react-router-dom';
 import appConfig from '../../constants/app-config.json';
-import { Home } from '../../pages';
+import { Home, Scanning, Verify, Application, GenericPage } from '../../pages';
 import { convertStringToPath } from '../../utils';
-import Application from '../../pages/Application';
 import { IFeature } from '../../types/common.types';
-import GenericPage from '../../pages/GenericPage';
 
 function Router() {
   return (
@@ -13,6 +11,10 @@ function Router() {
     <Routes>
       {/* Default route for the home page, rendering the Home component */}
       <Route path='/' element={<Home />} />,
+      {/* Route for the Scanning page */}
+      <Route path='/scanning' element={<Scanning />} />,
+      {/* Route for the Verify page */}
+      <Route path='/verify' element={<Verify />} />
       {/* Catch-all route for any unknown paths, redirecting to the 404 page */}
       <Route path='*' element={<Navigate to='/404' />} />,
       {/* Iterate through the appConfig to dynamically generate routes */}
@@ -32,10 +34,10 @@ function Router() {
 
         // Create a React Router Route for the main path, rendering the main element and its child routes
         return (
-          <>
-            <Route key={mainPath} path={mainPath} element={mainElement} />
-            {childRoutes}
-          </>
+        <Fragment key={mainPath}>
+          <Route key={mainPath} path={mainPath} element={mainElement} />
+          {childRoutes}
+        </Fragment>
         );
       })}
     </Routes>

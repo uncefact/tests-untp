@@ -1,4 +1,4 @@
-import { IGenericFeatureProps } from "../components/GenericFeature";
+import { IGenericFeatureProps } from '../components/GenericFeature';
 
 export interface IFeature extends IGenericFeatureProps {
   name: string;

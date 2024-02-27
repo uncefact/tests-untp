@@ -245,5 +245,16 @@
         }
       ]
     }
-  ]
+  ],
+  "identifyProvider": {
+    "type": "gs1",
+    "url": "https://verified-by-gs1.agtrace.showthething.com"
+  },
+  "defaultVerificationServiceLink": {
+    "title": "Default Verification Service",
+    "context": "Default Verification Service",
+    "type": "application/json",
+    "href": "https://verify.agtrace.showthething.com/credentials/verify",
+    "hreflang": ["en"]
+  }
 }

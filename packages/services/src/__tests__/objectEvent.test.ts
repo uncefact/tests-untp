@@ -1,19 +1,19 @@
-import { processObjectEvent } from '../../build/epcisEvents/objectEvent';
-import { issueVC, contextDefault } from '../../build/vckit.service';
-import { uploadJson } from '../../build/storage.service';
-import { registerLinkResolver, IdentificationKeyType } from '../../build/linkResolver.service';
+import { processObjectEvent } from '../epcisEvents/objectEvent';
+import { issueVC, contextDefault } from '../vckit.service';
+import { uploadJson } from '../storage.service';
+import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
 import { contextObjectEvent, dataObjectEvent } from './mocks/constants';
 
-jest.mock('../../build/vckit.service', () => ({
+jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
   contextDefault: ['https://www.w3.org/2018/credentials/v1', 'https://w3id.org/vc-revocation-list-2020/v1'],
 }));
 
-jest.mock('../../build/storage.service', () => ({
+jest.mock('../storage.service', () => ({
   uploadJson: jest.fn(),
 }));
 
-jest.mock('../../build/linkResolver.service', () => ({
+jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
   IdentificationKeyType: {
     gtin: 'gtin',
@@ -108,7 +108,7 @@ describe('processObjectEvent', () => {
     it('should throw error when data is empty', async () => {
       try {
         await processObjectEvent({ data: { herd: '' } }, contextObjectEvent);
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).toEqual('Identifier not found');
       }
     });
@@ -123,7 +123,7 @@ describe('processObjectEvent', () => {
       };
       try {
         await processObjectEvent(dataObjectEvent, newContext);
-      } catch (error) {
+      } catch (error: any) {
         console.log(error.message);
         expect(error.message).not.toBeNull();
       }
@@ -138,7 +138,7 @@ describe('processObjectEvent', () => {
       };
       try {
         await processObjectEvent(dataObjectEvent, newContext);
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).toEqual('identifierKeyPaths not found');
       }
     });
@@ -151,7 +151,7 @@ describe('processObjectEvent', () => {
 
       try {
         await processObjectEvent(dataObjectEvent, newContext);
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).toEqual('Invalid vckit context');
       }
     });
@@ -164,7 +164,7 @@ describe('processObjectEvent', () => {
 
       try {
         await processObjectEvent(dataObjectEvent, newContext);
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).toEqual('Invalid dpp context');
       }
     });
@@ -177,7 +177,7 @@ describe('processObjectEvent', () => {
 
       try {
         await processObjectEvent(dataObjectEvent, newContext);
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).toEqual('Invalid storage context');
       }
     });
@@ -189,7 +189,7 @@ describe('processObjectEvent', () => {
       };
       try {
         await processObjectEvent(dataObjectEvent, newContext);
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).toEqual('Invalid dlr context');
       }
     });
