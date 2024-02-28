@@ -139,5 +139,7 @@ export const contextTransactionEvent = {
 export const dataTransactionEvent = {
   data: {
     livestockIds: ['9359502000010'],
+    sender: 'test-1234',
+    receiver: 'test-5678'
   },
 };

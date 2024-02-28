@@ -50,9 +50,19 @@ export enum IdentificationKeyType {
 }
 
 export enum DLREventEnum {
-  transaction = 'transaction',
-  object = 'object',
-  transformation = 'transformation',
+  Transformation = 'transformation',
+  Object = 'object',
+  Aggregation = 'aggregation',
+  Transaction = 'transaction',
+  Association = 'association'
+}
+
+export enum EPCISEventAction {
+  Observe = 'observe'
+}
+
+export enum EPCISEventDisposition {
+  InTransit = 'in_transit'
 }
 
 export interface ILinkResolver {
@@ -233,7 +243,7 @@ export const getLinkResponsesByEvent = (
   }: { url: string; linkTitle: string; verificationPassportPage: string; verificationPage: string },
 ): ILinkResponse[] => {
   switch (event) {
-    case DLREventEnum.transaction:
+    case DLREventEnum.Transaction:
       return [
         {
           linkTitle,
@@ -251,8 +261,8 @@ export const getLinkResponsesByEvent = (
           defaultMimeType: true,
         },
       ];
-    case DLREventEnum.object:
-    case DLREventEnum.transformation:
+    case DLREventEnum.Object:
+    case DLREventEnum.Transformation:
       return [
         {
           linkType: LinkType.verificationLinkType,

@@ -20,10 +20,18 @@ jest.mock('../linkResolver.service', () => ({
     nlisid: 'nlisid',
   },
   DLREventEnum: {
-    transaction: 'transaction',
-    object: 'object',
-    transformation: 'transformation',
-  }
+    Transformation: 'transformation',
+    Object: 'object',
+    Aggregation: 'aggregation',
+    Transaction: 'transaction',
+    Association: 'association',
+  },
+  EPCISEventAction: {
+    Observe: 'observe',
+  },
+  EPCISEventDisposition: {
+    InTransit: 'in_transit',
+  },
 }));
 
 describe('processTransactionEvent', () => {
@@ -67,7 +75,7 @@ describe('processTransactionEvent', () => {
           verificationPage,
           dlrAPIUrl: string,
           dlrAPIKey,
-          event: DLREventEnum
+          event: DLREventEnum,
         ) => {
           console.log({
             url,
@@ -75,7 +83,7 @@ describe('processTransactionEvent', () => {
             verificationPage,
             dlrAPIKey,
             identificationKey,
-            event
+            event,
           });
           return `${dlrAPIUrl}/${identificationKeyType}/${identificationKey}?linkType=all`;
         },
@@ -102,7 +110,7 @@ describe('processTransactionEvent', () => {
         dppContext.dlrVerificationPage,
         dlrContext.dlrAPIUrl,
         dlrContext.dlrAPIKey,
-        DLREventEnum.transaction
+        DLREventEnum.Transaction,
       );
     });
   });
@@ -115,7 +123,7 @@ describe('processTransactionEvent', () => {
 
     it('should throw error when data is empty', async () => {
       try {
-        await processTransactionEvent({ data: { herd: '' } }, contextTransactionEvent);
+        await processTransactionEvent({ data: { livestockIds: [] } }, contextTransactionEvent);
       } catch (error: any) {
         expect(error.message).toEqual('Identifier not found');
       }

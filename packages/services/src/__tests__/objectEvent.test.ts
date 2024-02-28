@@ -100,7 +100,7 @@ describe('processObjectEvent', () => {
         dppContext.dlrVerificationPage,
         dlrContext.dlrAPIUrl,
         dlrContext.dlrAPIKey,
-        DLREventEnum.object
+        DLREventEnum.Object
       );
     });
   });

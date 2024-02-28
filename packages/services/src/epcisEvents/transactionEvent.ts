@@ -4,8 +4,8 @@ import { issueVC } from '../vckit.service.js';
 import { IContext } from './types.js';
 import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { uploadJson } from '../storage.service.js';
-import { generateUUID } from '../utils/helpers.js';
-import { registerLinkResolver, DLREventEnum } from '../linkResolver.service.js';
+import { generateUUID, splitStringByDash } from '../utils/helpers.js';
+import { registerLinkResolver, DLREventEnum, EPCISEventAction, EPCISEventDisposition } from '../linkResolver.service.js';
 import { validateContextObjectEvent } from './validateContext.js';
 
 export interface ITransactionEvent {
@@ -18,10 +18,23 @@ export const processTransactionEvent: IService = async (transactionEvent: ITrans
     throw new Error(validationResult.value);
   }
 
-  const { data: credentialSubject } = transactionEvent;
+  const [senderName, senderPartyID] = splitStringByDash(transactionEvent.data?.sender || '');
+  const [receiverName, receiverPartyID] = splitStringByDash(transactionEvent.data?.receiver || '');
+
+  const credentialSubject = {
+    sourceParty: { partyID: senderPartyID, name: senderName },
+    destinationParty: { partyID: receiverPartyID, name: receiverName },
+    itemList: transactionEvent?.data?.livestockIds || [],
+    readPointId: generateUUID(),
+    eventID: generateUUID(),
+    eventTime: new Date().toUTCString(),
+    eventType: DLREventEnum.Transaction,
+    actionCode: EPCISEventAction.Observe,
+    dispositionCode: EPCISEventDisposition.InTransit,
+  };
   const { vckit, dpp, dlr, storage, identifierKeyPaths } = context;
 
-  const identifiers = getIdentifierByObjectKeyPaths(credentialSubject, identifierKeyPaths);
+  const identifiers = getIdentifierByObjectKeyPaths(transactionEvent.data, identifierKeyPaths);
   if (!identifiers) {
     throw new Error('Identifier not found');
   }
@@ -52,7 +65,7 @@ export const processTransactionEvent: IService = async (transactionEvent: ITrans
         dpp.dlrVerificationPage,
         dlr.dlrAPIUrl,
         dlr.dlrAPIKey,
-        DLREventEnum.transaction,
+        DLREventEnum.Transaction,
       );
     }),
   );

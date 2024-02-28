@@ -53,7 +53,7 @@ export const processObjectEvent: IService = async (data: any, context: IContext)
       dppContext.dlrVerificationPage,
       linkResolverContext.dlrAPIUrl,
       linkResolverContext.dlrAPIKey,
-      DLREventEnum.object
+      DLREventEnum.Object
     );
 
     return vc;
