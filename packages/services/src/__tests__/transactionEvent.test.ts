@@ -97,7 +97,7 @@ describe('processTransactionEvent', () => {
       expect(registerLinkResolver).toHaveBeenCalledWith(
         expect.any(String),
         dppContext.dlrIdentificationKeyType,
-        dataTransactionEvent.data.herd.NLIS,
+        dataTransactionEvent.data.livestockIds[0],
         dppContext.dlrLinkTitle,
         dppContext.dlrVerificationPage,
         dlrContext.dlrAPIUrl,

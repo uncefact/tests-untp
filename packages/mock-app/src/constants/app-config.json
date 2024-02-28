@@ -217,7 +217,7 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332",
-                    "issuer": "did:web:0af6-103-69-79-17.ngrok-free.app"
+                    "issuer": "did:web:2dc7-115-73-168-48.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -241,14 +241,62 @@
                   "identifierKeyPaths": ["herd", "NLIS"]
                 }
               ]
+            }
+          ]
+        },
+        {
+          "name": "National Vendor Declaration Passport",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "formTitle": "Digital Livestock Passport",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sender": {
+                      "type": "string",
+                      "enum": ["Wagu Wonder-NH020188"]
+                    },
+                    "receiver": {
+                      "type": "string",
+                      "enum": ["Pete's Meats-QBZZ2222"]
+                    },
+                    "livestockIds": {
+                      "type": "array",
+                      "title": "Livestock IDs",
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": ["9359502000010", "NH020188LEJ00005", "NH020188LEJ00008", "NH020188LEJ00012"]
+                      }
+                    }
+                  },
+                  "required": ["sender", "receiver", "livestockIds"]
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+              }
             },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "style": { "textAlign": "center", "paddingTop": "20px" }
+              }
+            }
+          ],
+          "services": [
             {
               "name": "processTransactionEvent",
               "parameters": [
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332",
-                    "issuer": "did:web:ae37-103-69-79-17.ngrok-free.app"
+                    "issuer": "did:web:2dc7-115-73-168-48.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -258,7 +306,7 @@
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Livestock Passport",
                     "dlrIdentificationKeyType": "nlisid",
-                    "dlrVerificationPage": "https://web.agtrace.showthething.com/verify"
+                    "dlrVerificationPage": "http://localhost:3000/verify"
                   },
                   "dlr": {
                     "dlrAPIUrl": "http://localhost:8080",
@@ -268,7 +316,7 @@
                     "storageAPIUrl": "https://storage.agtrace.showthething.com",
                     "bucket": "agtrace-test-verifiable-credentials"
                   },
-                  "identifierKeyPaths": ["herd", "NLIS"]
+                  "identifierKeyPaths": ["livestockIds"]
                 }
               ]
             }

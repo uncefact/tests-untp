@@ -5,7 +5,7 @@ import { IContext } from './types.js';
 import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { uploadJson } from '../storage.service.js';
 import { generateUUID } from '../utils/helpers.js';
-import { registerLinkResolver,DLREventEnum } from '../linkResolver.service.js';
+import { registerLinkResolver, DLREventEnum } from '../linkResolver.service.js';
 import { validateContextObjectEvent } from './validateContext.js';
 
 export interface ITransactionEvent {
@@ -21,8 +21,8 @@ export const processTransactionEvent: IService = async (transactionEvent: ITrans
   const { data: credentialSubject } = transactionEvent;
   const { vckit, dpp, dlr, storage, identifierKeyPaths } = context;
 
-  const identifier = getIdentifierByObjectKeyPaths(credentialSubject, identifierKeyPaths);
-  if (!identifier) {
+  const identifiers = getIdentifierByObjectKeyPaths(credentialSubject, identifierKeyPaths);
+  if (!identifiers) {
     throw new Error('Identifier not found');
   }
 
@@ -35,24 +35,27 @@ export const processTransactionEvent: IService = async (transactionEvent: ITrans
     type: dpp.type,
   });
 
-  const vcUrl = await uploadJson({
-    filename: `${identifier}/${generateUUID()}`,
-    json: vc,
-    bucket: storage.bucket,
-    storageAPIUrl: storage.storageAPIUrl,
-  });
+  await Promise.all(
+    (identifiers as string[]).map(async (identifier) => {
+      const vcUrl = await uploadJson({
+        filename: `${identifier}/${generateUUID()}`,
+        json: vc,
+        bucket: storage.bucket,
+        storageAPIUrl: storage.storageAPIUrl,
+      });
 
-  await registerLinkResolver(
-    vcUrl,
-    dpp.dlrIdentificationKeyType,
-    identifier,
-    dpp.dlrLinkTitle,
-    dpp.dlrVerificationPage,
-    dlr.dlrAPIUrl,
-    dlr.dlrAPIKey,
-    DLREventEnum.transaction,
+      await registerLinkResolver(
+        vcUrl,
+        dpp.dlrIdentificationKeyType,
+        identifier,
+        dpp.dlrLinkTitle,
+        dpp.dlrVerificationPage,
+        dlr.dlrAPIUrl,
+        dlr.dlrAPIKey,
+        DLREventEnum.transaction,
+      );
+    }),
   );
 
   return vc;
 };
-

@@ -133,13 +133,11 @@ export const contextTransactionEvent = {
     storageAPIUrl: 'https://storage.example.com',
     bucket: 'test-verifiable-credentials',
   },
-  identifierKeyPaths: ['herd', 'NLIS'],
+  identifierKeyPaths: ['livestockIds'],
 };
 
 export const dataTransactionEvent = {
   data: {
-    herd: {
-      NLIS: 'NH020188LEJ00012',
-    },
+    livestockIds: ['9359502000010'],
   },
 };
