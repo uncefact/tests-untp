@@ -1,0 +1,17 @@
+{
+  "name": "untp-test-suite",
+  "version": "1.0.0",
+  "description": "Test suite for the UNTP package",
+  "main": "index.js",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@babel/preset-typescript": "^7.23.3",
+    "@babel/preset-env": "^7.23.9",
+    "typescript": "5.1.6"
+  }
+}
