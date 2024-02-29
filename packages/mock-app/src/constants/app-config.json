@@ -333,8 +333,7 @@
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Livestock Passport",
                     "dlrIdentificationKeyType": "nlisid",
-                    "dlrVerificationPage": "http://localhost:3000/verify",
-                    "industryType": "Cattle"
+                    "dlrVerificationPage": "http://localhost:3000/verify"
                   },
                   "dlr": {
                     "dlrAPIUrl": "http://localhost:8080",

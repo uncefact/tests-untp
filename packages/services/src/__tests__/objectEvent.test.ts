@@ -20,9 +20,11 @@ jest.mock('../linkResolver.service', () => ({
     nlisid: 'nlisid',
   },
   DLREventEnum: {
-    transaction: 'transaction',
-    object: 'object',
-    transformation: 'transformation',
+    Transformation: 'transformation',
+    Object: 'object',
+    Aggregation: 'aggregation',
+    Transaction: 'transaction',
+    Association: 'association',
   }
 }));
 
