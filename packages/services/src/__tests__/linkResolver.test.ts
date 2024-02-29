@@ -1,4 +1,4 @@
-import { IdentificationKeyType, createLinkResolver, registerLinkResolver } from '../linkResolver.service';
+import { DLREventEnum, IdentificationKeyType, createLinkResolver, registerLinkResolver } from '../linkResolver.service';
 import { privateAPI } from '../utils/httpService';
 
 jest.mock('../utils/httpService', () => ({
@@ -30,6 +30,7 @@ describe('create link resolve service', () => {
       verificationPage: 'https://verify.com/dev/verifyCredential',
       dlrAPIUrl: 'https://dlr.com',
       dlrAPIKey: 'dlr-key',
+      event: DLREventEnum.Object,
       qualifierPath: '',
     };
 
@@ -41,6 +42,7 @@ describe('create link resolve service', () => {
       mockValue.verificationPage,
       mockValue.dlrAPIUrl,
       mockValue.dlrAPIKey,
+      mockValue.event
     );
 
     expect(resolverUrl).toEqual(
