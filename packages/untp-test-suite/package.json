@@ -1,12 +1,25 @@
 {
   "name": "untp-test-suite",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Test suite for the UNTP package",
-  "main": "index.js",
+   "main": "tests/",
   "license": "MIT",
   "type": "module",
+   "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uncefact/tests-untp"
+  },
+   "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "test",
+    "suite"
+  ],
   "scripts": {
     "test": "jest",
+    "build": "tsc --build --clean && tsc",
+    "watch": "tsc -b --watch",
     "lint": "eslint ."
   },
   "devDependencies": {

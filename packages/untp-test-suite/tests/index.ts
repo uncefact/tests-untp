@@ -1,3 +1,0 @@
-function testFun() {
-  return 'testFun';
-}

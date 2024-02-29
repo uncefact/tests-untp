@@ -13,9 +13,10 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "outDir": "build",
     "declaration": true,
     "sourceMap": true,
-    "rootDir": "tests"
+    "rootDir": "src"
   },
-  "include": ["tests"]
+  "include": ["src/**/*"],
 }

@@ -7,3 +7,9 @@ This directory contains the source code for the test suite that is used to test 
 ```bash
 $ yarn install
 ```
+
+# Usage
+
+```bash
+$ yarn test
+```
