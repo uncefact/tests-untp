@@ -269,6 +269,11 @@
                       "type": "string",
                       "enum": ["https://plus.codes/4RRHM6PR+MH"]
                     },
+                    "industryType": {
+                      "title": "Industry Type",
+                      "type": "string",
+                      "enum": ["Cattle", "Vegetable", "Mining"]
+                    },
                     "transaction": {
                       "type": "object",
                       "properties": {

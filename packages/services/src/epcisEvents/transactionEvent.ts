@@ -16,12 +16,12 @@ export interface ITransactionData {
   sender: string
   receiver: string;
   locationUrl: string;
+  industryType: string;
   transaction: {
     type: string;
     identifier: string;
     documentURL: string;
   };
-  identificationKeyType: string;
   livestockIds: string[];
 }
 
@@ -31,7 +31,7 @@ export const processTransactionEvent: IService = async (transactionEvent: ITrans
     throw new Error(validationResult.value);
   }
 
-  const { sender, receiver, locationUrl, transaction, livestockIds = [] } = transactionEvent.data as ITransactionData;
+  const { sender, receiver, locationUrl, industryType, transaction, livestockIds = [] } = transactionEvent.data as ITransactionData;
   const { vckit, dpp, dlr, storage, identifierKeyPaths } = context;
 
   const [senderName, senderPartyID] = splitStringByDash(sender || '');
@@ -40,7 +40,7 @@ export const processTransactionEvent: IService = async (transactionEvent: ITrans
   const itemList = livestockIds.map((livestockId: string) => {
     const linkResolver = `${dlr.dlrAPIUrl}/${dpp.dlrIdentificationKeyType}/${livestockId}?linkType=all`;
     return {
-      name: dpp.industryType,
+      name: industryType,
       itemID: livestockId,
       link: linkResolver,
     };
@@ -71,8 +71,10 @@ export const processTransactionEvent: IService = async (transactionEvent: ITrans
     vcKitAPIUrl: vckit.vckitAPIUrl,
     issuer: vckit.issuer,
     context: dpp.context,
-    render: dpp.renderTemplate,
     type: dpp.type,
+    restOfVC: {
+      render: dpp.renderTemplate
+    }
   });
 
   await Promise.all(
