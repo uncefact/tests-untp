@@ -12,27 +12,54 @@ export interface ITransactionEvent {
   data: CredentialSubject;
 }
 
+export interface ITransactionData {
+  sender: string
+  receiver: string;
+  locationUrl: string;
+  transaction: {
+    type: string;
+    identifier: string;
+    documentURL: string;
+  };
+  identificationKeyType: string;
+  livestockIds: string[];
+}
+
 export const processTransactionEvent: IService = async (transactionEvent: ITransactionEvent, context: IContext): Promise<VerifiableCredential> => {
   const validationResult = validateContextObjectEvent(context);
   if (!validationResult.ok) {
     throw new Error(validationResult.value);
   }
 
-  const [senderName, senderPartyID] = splitStringByDash(transactionEvent.data?.sender || '');
-  const [receiverName, receiverPartyID] = splitStringByDash(transactionEvent.data?.receiver || '');
+  const { sender, receiver, locationUrl, transaction, livestockIds = [] } = transactionEvent.data as ITransactionData;
+  const { vckit, dpp, dlr, storage, identifierKeyPaths } = context;
+
+  const [senderName, senderPartyID] = splitStringByDash(sender || '');
+  const [receiverName, receiverPartyID] = splitStringByDash(receiver || '');
+
+  const itemList = livestockIds.map((livestockId: string) => {
+    const linkResolver = `${dlr.dlrAPIUrl}/${dpp.dlrIdentificationKeyType}/${livestockId}?linkType=all`;
+    return {
+      name: dpp.industryType,
+      itemID: livestockId,
+      link: linkResolver,
+    };
+  });
 
   const credentialSubject = {
     sourceParty: { partyID: senderPartyID, name: senderName },
     destinationParty: { partyID: receiverPartyID, name: receiverName },
-    itemList: transactionEvent?.data?.livestockIds || [],
-    readPointId: generateUUID(),
+    transaction,
+    itemList,
     eventID: generateUUID(),
-    eventTime: new Date().toUTCString(),
     eventType: DLREventEnum.Transaction,
+    eventTime: new Date().toUTCString(),
     actionCode: EPCISEventAction.Observe,
     dispositionCode: EPCISEventDisposition.InTransit,
+    businessStepCode: generateUUID(),
+    readPointId: generateUUID(),
+    locationId: locationUrl,
   };
-  const { vckit, dpp, dlr, storage, identifierKeyPaths } = context;
 
   const identifiers = getIdentifierByObjectKeyPaths(transactionEvent.data, identifierKeyPaths);
   if (!identifiers) {

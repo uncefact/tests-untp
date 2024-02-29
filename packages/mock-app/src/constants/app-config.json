@@ -264,6 +264,28 @@
                       "type": "string",
                       "enum": ["Pete's Meats-QBZZ2222"]
                     },
+                    "locationUrl": {
+                      "title": "Location Url",
+                      "type": "string",
+                      "enum": ["https://plus.codes/4RRHM6PR+MH"]
+                    },
+                    "transaction": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["inv"]
+                        },
+                        "consignmentNumber": {
+                          "title": "Consignment Number",
+                          "type": "string"
+                        },
+                        "documentURL": {
+                          "title": "Document Url",
+                          "type": "string"
+                        }
+                      }
+                    },
                     "livestockIds": {
                       "type": "array",
                       "title": "Livestock IDs",
@@ -306,7 +328,8 @@
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Livestock Passport",
                     "dlrIdentificationKeyType": "nlisid",
-                    "dlrVerificationPage": "http://localhost:3000/verify"
+                    "dlrVerificationPage": "http://localhost:3000/verify",
+                    "industryType": "Cattle"
                   },
                   "dlr": {
                     "dlrAPIUrl": "http://localhost:8080",
