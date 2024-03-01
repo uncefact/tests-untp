@@ -16,7 +16,15 @@ This directory contains the source code for the test suite that is used to test 
 - `cli`: Define the output of the application's cli.
 - `service`: Define the output of the application's service.
 
-`schemas`: Contains the schema files for product passports, conformity credentials, and traceability events.\
+`schemas`: Contains the schema files for product passports, conformity credentials, and traceability events.
+
+- `productPassport`: Contains the schema files for the product passport.
+- `conformityCredential`: Contains the schema files for the conformity credential.
+- `aggregationEvent`: Contains the schema files for the aggregate event (An aggregation event describes that consolidation or de-consolidation of products such as stacking bales of cotton on a pallet for transportation).
+- `objectEvent`: Contains the schema files for the object event (An object event describes an action on specific product(s) such as an inspection).
+- `transactionEvent`: Contains the schema files for the transaction event (A transaction event describes the exchange of product(s) between two actors such as sale of goods between seller and buyer).
+- `transformationEvent`: Contains the schema files for the transformation event (A transformation event describes a manufacturing process that consumes input product(s) to create new output product(s)).
+
 `templates`: Contains the templates for the log messages include timestamps, log levels, and descriptive messages regarding the test execution and outcomes.
 
 # Installation
