@@ -528,6 +528,145 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Aggregation",
+      "type": "producer",
+      "assets": {
+        "logo": "https://example.com/logo.png",
+        "brandTitle": "Wagu Wonder",
+        "passportVC": "",
+        "transactionEventVC": ""
+      },
+      "styles": {
+        "primaryColor": "rgb(255, 128, 5)",
+        "secondaryColor": "white",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Aggregation Event",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "formTitle": "Aggregation Event",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "parentItem": {
+                      "type": "object",
+                      "title": "Parent Item",
+                      "properties": {
+                        "itemID": {
+                          "type": "string",
+                          "title": "Item ID",
+                          "enum": ["9359502000010"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "title": "Name",
+                          "enum": ["Beef Steak Variety Container"]
+                        }
+                      }
+                    },
+                    "childItems": {
+                      "type": "array",
+                      "title": "Child Items",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemID": {
+                            "type": "string",
+                            "title": "Item ID"
+                          },
+                          "name": {
+                            "type": "string",
+                            "title": "Name",
+                            "description": "Please enter your name"
+                          }
+                        }
+                      }
+                    },
+                    "childQuantityList": {
+                      "type": "array",
+                      "title": "Child Quantity List",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productClass": {
+                            "type": "string",
+                            "title": "Product Class"
+                          },
+                          "quantity": {
+                            "type": "string",
+                            "title": "Quantity"
+                          },
+                          "uom": {
+                            "type": "string",
+                            "title": "Uom"
+                          }
+                        }
+                      }
+                    },
+                    "locationId": {
+                      "title": "Location ID",
+                      "type": "string",
+                      "enum": ["https://plus.codes/4RRHM6PR+MH"]
+                    }
+                  }
+                }
+              },
+              "initialData": {},
+              "className": "json-form",
+              "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "style": { "textAlign": "center", "paddingTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processAggregationEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "issuer": "did:web:c317-103-69-79-17.ngrok-free.app"
+                  },
+                  "dpp": {
+                    "context": [
+                      "https://jargon.sh/user/unece/traceabilityEvents/v/working/artefacts/jsonldContexts/AggregationEvent.jsonld?class=AggregationEvent"
+                    ],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["AggregationEventCredential"],
+                    "dlrLinkTitle": "Aggregation Event",
+                    "dlrIdentificationKeyType": "nlisid",
+                    "dlrVerificationPage": "http://localhost:3001/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "identifierKeyPaths": ["parentItem", "itemID"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "identifyProvider": {

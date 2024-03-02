@@ -70,3 +70,21 @@ export interface ITraceabilityEvent {
 export interface ITransactionEventContext extends IContext {
   epcisTransactionEvent: IEntityIssue;
 }
+
+export interface IAggregationEvent {
+  data: {
+    parentItem: IItem;
+    childItems: IItem[];
+    childQuantityList: {
+      productClass: string;
+      quantity: string;
+      uom: string;
+    }[];
+    locationId: string;
+  };
+}
+
+export interface IItem {
+  itemID: string;
+  name: string;
+}
