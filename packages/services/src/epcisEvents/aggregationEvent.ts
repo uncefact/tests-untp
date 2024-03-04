@@ -7,7 +7,7 @@ import { IAggregationEvent, IContext } from './types';
 import { generateUUID } from '../utils/helpers.js';
 import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { validateContextObjectEvent } from './validateContext.js';
-import { EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
+import { EPCISBusinessStepCode, EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
 
 export const processAggregationEvent: IService = async (aggregationEvent: IAggregationEvent,context: IContext): Promise<VerifiableCredential> => {
   const validationResult = validateContextObjectEvent(context);
@@ -27,10 +27,10 @@ export const processAggregationEvent: IService = async (aggregationEvent: IAggre
   const credentialSubject = {
     eventID: generateUUID(),
     eventType: EPCISEventType.Aggregation,
-    eventTime: new Date().toUTCString(),
-    actionCode: EPCISEventAction.Observe,
+    eventTime: new Date().toISOString(),
+    actionCode: EPCISEventAction.Add,
     dispositionCode: EPCISEventDisposition.InTransit,
-    businessStepCode: generateUUID(),
+    businessStepCode: EPCISBusinessStepCode.Packing,
     readPointId: generateUUID(),
     locationId,
     parentItem: {
