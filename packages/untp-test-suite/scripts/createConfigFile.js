@@ -1,5 +1,3 @@
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 import fs from 'fs';
 import semver from 'semver';
 
@@ -7,9 +5,7 @@ const SCHEMAS_PATH = 'src/schemas';
 const CONFIG_PATH = 'src/config';
 
 const getPath = (path) => {
-  const __filename = fileURLToPath(new URL(import.meta.url));
-  const __dirname = dirname(__filename);
-  const parentDir = dirname(__dirname);
+  const parentDir = process.cwd();
   return `${parentDir}/${path}`;
 };
 
@@ -80,3 +76,5 @@ const createConfigFile = async () => {
 };
 
 createConfigFile();
+
+export { createConfigFile };
