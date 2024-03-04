@@ -1,220 +1,164 @@
-import { ITransactionEvent, processTransactionEvent } from '../epcisEvents/transactionEvent';
-import { issueVC, contextDefault } from '../vckit.service';
-import { uploadJson } from '../storage.service';
-import { registerLinkResolver, IdentificationKeyType, DLREventEnum } from '../linkResolver.service';
-import { contextTransactionEvent, dataTransactionEvent } from './mocks/constants';
+import * as vckitService from '../vckit.service';
+import * as linkResolverService from '../linkResolver.service';
+import * as helpers from '../epcisEvents/helpers';
 import * as validateContext from '../epcisEvents/validateContext';
+import { processTransactionEvent } from '../epcisEvents/transactionEvent';
+import { uploadJson } from '../storage.service';
+import { Result } from '../types/validateContext';
+import { ITransactionEventContext } from '../epcisEvents/types';
+import { publicAPI } from '../utils/httpService';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
-  contextDefault: ['https://www.w3.org/2018/credentials/v1', 'https://w3id.org/vc-revocation-list-2020/v1'],
 }));
-
 jest.mock('../storage.service', () => ({
   uploadJson: jest.fn(),
 }));
-
 jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
-  IdentificationKeyType: {
-    gtin: 'gtin',
-    nlisid: 'nlisid',
-  },
-  DLREventEnum: {
-    Transformation: 'transformation',
-    Object: 'object',
-    Aggregation: 'aggregation',
-    Transaction: 'transaction',
-    Association: 'association',
-  },
-  EPCISEventAction: {
-    Observe: 'observe',
-  },
-  EPCISEventDisposition: {
-    InTransit: 'in_transit',
-  },
+  createLinkResolver: jest.fn(),
+  IdentificationKeyType: jest.fn(),
 }));
 
+const nlisidMock = '9988776600000';
+const uploadedTransactionEventLinkMock = `https://s3.ap-southeast-2.amazonaws.com/${nlisidMock}`;
+const transactionEventDLRMock = `https://example.com/nlisid/${nlisidMock}?linkType=all`;
+const transactionVCMock = {
+  '@context': ['https://example.sh/TransactionEvent.jsonld'],
+  type: ['VerifiableCredential', 'TransactionEventCredential'],
+  issuer: 'did:web:example.com',
+  credentialSubject: {
+    sourceParty: { partyID: 'https://wholesalebeef.com/41161080146.json', name: 'Wholesale Beef' },
+    destinationParty: { partyID: 'https://primebeef.com/51161080100.json', name: 'Prime Beef' },
+    transaction: { type: 'bol', identifier: 'NH020188LEJ00005', documentURL: 'http://document.com' },
+    itemList: [{ itemID: 'http://example.com/beef-scotch-box.json', name: 'Beef Scotch Fillet Box' }],
+    quantityList: [{ productClass: 'Beef', quantity: '50', uom: 'units' }],
+  },
+};
+
 describe('processTransactionEvent', () => {
-  afterEach(() => {
-    jest.clearAllMocks();
+  const transactionEvent = {
+    data: {
+      parentItem: { itemID: nlisidMock, name: 'Beef Steak Variety Container' },
+      childItems: [{ itemID: 'http://example.com/beef-scotch-box.json', name: 'Beef Scotch Fillet Box' }],
+      childQuantityList: [{ productClass: 'Beef', quantity: '50', uom: 'units' }],
+      locationId: 'https://plus.codes/123MHR+PW',
+    },
+  };
+  const context = {
+    vckit: { vckitAPIUrl: 'https://example.com', issuer: 'did:web:example.com' },
+    epcisTransactionEvent: {
+      context: ['https://example.sh/TransactionEvent.jsonld'],
+      type: ['TransactionEventCredential'],
+      dlrLinkTitle: 'Transaction Event',
+      dlrIdentificationKeyType: linkResolverService.IdentificationKeyType.nlisid,
+      dlrVerificationPage: 'http://exampleUI.com/verify',
+    },
+    dlr: { dlrAPIUrl: 'http://exampleDLR.com', dlrAPIKey: 'test-key' },
+    storage: { storageAPIUrl: 'https://storage.dlr.com', bucket: 'agtrace-test-verifiable-credentials' },
+    identifierKeyPaths: ['transaction', 'identifier'],
+  };
+
+  it('should process transaction event', async () => {
+    (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
+    (uploadJson as jest.Mock).mockImplementationOnce(() => uploadedTransactionEventLinkMock);
+    jest
+      .spyOn(validateContext, 'validateTransactionEventContext')
+      .mockReturnValueOnce({ ok: true, value: context } as Result<ITransactionEventContext>);
+    jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(nlisidMock);
+    jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValueOnce(transactionEventDLRMock);
+
+    const transactionVC = await processTransactionEvent(transactionEvent, context);
+
+    expect(transactionVC).toBe(transactionVCMock);
+    expect(uploadJson).toHaveBeenCalled();
+    expect(validateContext.validateTransactionEventContext).toHaveBeenCalled();
+    expect(helpers.getIdentifierByObjectKeyPaths).toHaveBeenCalled();
+    expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
   });
 
-  let expectVCResult = {};
-  beforeAll(() => {
-    (issueVC as jest.Mock).mockImplementation((value) => {
-      expectVCResult = {
-        '@context': [...contextDefault, ...value.context],
-        type: ['VerifiableCredential', ...value.type],
-        issuer: {
-          id: value.issuer,
-        },
-        credentialSubject: value.credentialSubject,
-        render: value.render,
-      };
+  it('should throw error if context validation throws an error', async () => {
+    try {
+      jest
+        .spyOn(validateContext, 'validateTransactionEventContext')
+        .mockReturnValueOnce({ ok: false, value: 'Invalid context' });
 
-      return Promise.resolve(expectVCResult);
-    });
+      await processTransactionEvent(transactionEvent, context);
+    } catch (e) {
+      const error = e as Error;
+      expect(error.message).toBe('Invalid context');
+    }
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
+  it('should throw error if identifier not found', async () => {
+    try {
+      jest
+        .spyOn(validateContext, 'validateTransactionEventContext')
+        .mockReturnValueOnce({ ok: true, value: context } as Result<ITransactionEventContext>);
+      jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(undefined);
+
+      await processTransactionEvent(transactionEvent, context);
+    } catch (e) {
+      const error = e as Error;
+      expect(error.message).toBe('Identifier not found');
+      expect(validateContext.validateTransactionEventContext).toHaveBeenCalled();
+    }
   });
 
-  it('should call process transaction event', async () => {
-    (uploadJson as jest.Mock).mockImplementation(({ filename, bucket }: { filename: string; bucket: string }) => {
-      return `https://${bucket}.s3.ap-southeast-2.amazonaws.com/${filename}`;
-    });
+  it('should throw error if issueVC throws an error', async () => {
+    try {
+      jest
+        .spyOn(validateContext, 'validateTransactionEventContext')
+        .mockReturnValueOnce({ ok: true, value: context } as Result<ITransactionEventContext>);
+      jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(nlisidMock);
+      jest.spyOn(publicAPI, 'post').mockRejectedValueOnce("Can't issue VC");
 
-    (registerLinkResolver as jest.Mock).mockImplementation(
-      (
-        url,
-        identificationKeyType: IdentificationKeyType,
-        identificationKey: string,
-        linkTitle,
-        verificationPage,
-        dlrAPIUrl: string,
-        dlrAPIKey,
-        event: DLREventEnum,
-      ) => {
-        console.log({
-          url,
-          linkTitle,
-          verificationPage,
-          dlrAPIKey,
-          identificationKey,
-          event,
-        });
-        return `${dlrAPIUrl}/${identificationKeyType}/${identificationKey}?linkType=all`;
-      },
-    );
-
-    const vc = await processTransactionEvent(dataTransactionEvent, contextTransactionEvent);
-    expect(vc).toEqual(expectVCResult);
-    expect(uploadJson).toHaveBeenCalledWith({
-      filename: expect.any(String),
-      json: expectVCResult,
-      bucket: contextTransactionEvent.storage.bucket,
-      storageAPIUrl: contextTransactionEvent.storage.storageAPIUrl,
-    });
-
-    const dppContext = contextTransactionEvent.dpp;
-    const dlrContext = contextTransactionEvent.dlr;
-    expect(registerLinkResolver).toHaveBeenCalledWith(
-      expect.any(String),
-      dppContext.dlrIdentificationKeyType,
-      dataTransactionEvent.data.livestockIds[0],
-      dppContext.dlrLinkTitle,
-      dppContext.dlrVerificationPage,
-      dlrContext.dlrAPIUrl,
-      dlrContext.dlrAPIKey,
-      DLREventEnum.Transaction,
-    );
+      await processTransactionEvent(transactionEvent, context);
+    } catch (e) {
+      const error = e as Error;
+      expect(error.message).toBe("Can't issue VC");
+      expect(validateContext.validateTransactionEventContext).toHaveBeenCalled();
+      expect(helpers.getIdentifierByObjectKeyPaths).toHaveBeenCalled();
+    }
   });
 
-  describe('error case', () => {
-    afterEach(() => {
-      jest.clearAllMocks();
-      jest.resetAllMocks;
-    });
+  it('should throw error if uploadJson throws an error', async () => {
+    try {
+      (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
+      jest
+        .spyOn(validateContext, 'validateTransactionEventContext')
+        .mockReturnValueOnce({ ok: true, value: context } as Result<ITransactionEventContext>);
+      jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(nlisidMock);
+      jest.spyOn(publicAPI, 'put').mockRejectedValueOnce('Error upload json');
 
-    it('should throw an error if validation of context fails', async () => {
-      try {
-        jest.spyOn(validateContext, 'validateContextObjectEvent').mockReturnValueOnce({ ok: false, value: 'error validation'});
-    
-        await processTransactionEvent({ data: { livestockIds: [] } });
-      } catch (error: any) {
-        expect(error.message).toEqual('error validation');
-      }
-    });
+      await processTransactionEvent(transactionEvent, context);
+    } catch (e) {
+      const error = e as Error;
+      expect(error.message).toBe('Error upload json');
+      expect(validateContext.validateTransactionEventContext).toHaveBeenCalled();
+      expect(helpers.getIdentifierByObjectKeyPaths).toHaveBeenCalled();
+      expect(vckitService.issueVC).toHaveBeenCalled();
+    }
+  });
 
-    it('should throw an error if identifier is not found', async () => {
-      try {
-        await processTransactionEvent({ data: { livestockIds: [] } }, contextTransactionEvent);
-      } catch (error: any) {
-        expect(error.message).toEqual('Identifier not found');
-      }
-    });
+  it('should throw error if registerLinkResolver throws an error', async () => {
+    try {
+      (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
+      (uploadJson as jest.Mock).mockImplementationOnce(() => uploadedTransactionEventLinkMock);
+      jest
+        .spyOn(validateContext, 'validateTransactionEventContext')
+        .mockReturnValueOnce({ ok: true, value: context } as Result<ITransactionEventContext>);
+      jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(nlisidMock);
+      jest.spyOn(linkResolverService, 'createLinkResolver').mockRejectedValueOnce('Error creating link resolver');
 
-    it('should throw an error if context is empty', async () => {
-      const newContext = {
-        vckit: {},
-        dpp: {},
-        dlr: {},
-        storage: {},
-        identifierKeyPaths: [],
-      };
-      try {
-        await processTransactionEvent(dataTransactionEvent, newContext);
-      } catch (error: any) {
-        console.log(error.message);
-        expect(error.message).not.toBeNull();
-      }
-    });
-
-    it('should throw an error if context is empty identifierKeyPaths field', async () => {
-      (issueVC as jest.Mock).mockResolvedValue({});
-
-      const newContext = {
-        ...contextTransactionEvent,
-        identifierKeyPaths: [],
-      };
-      try {
-        await processTransactionEvent(dataTransactionEvent, newContext);
-      } catch (error: any) {
-        expect(error.message).toEqual('identifierKeyPaths not found');
-      }
-    });
-
-    it('should throw an error if context is empty vckit field', async () => {
-      const newContext = {
-        ...contextTransactionEvent,
-        vckit: {},
-      };
-
-      try {
-        await processTransactionEvent(dataTransactionEvent, newContext);
-      } catch (error: any) {
-        expect(error.message).toEqual('Invalid vckit context');
-      }
-    });
-
-    it('should throw an error if context is empty dpp field', async () => {
-      const newContext = {
-        ...contextTransactionEvent,
-        dpp: {},
-      };
-
-      try {
-        await processTransactionEvent(dataTransactionEvent, newContext);
-      } catch (error: any) {
-        expect(error.message).toEqual('Invalid dpp context');
-      }
-    });
-
-    it('should throw an error if context is empty storage field', async () => {
-      const newContext = {
-        ...contextTransactionEvent,
-        storage: {},
-      };
-
-      try {
-        await processTransactionEvent(dataTransactionEvent, newContext);
-      } catch (error: any) {
-        expect(error.message).toEqual('Invalid storage context');
-      }
-    });
-
-    it('should throw an error if context is empty dlr field', async () => {
-      const newContext = {
-        ...contextTransactionEvent,
-        dlr: {},
-      };
-      try {
-        await processTransactionEvent(dataTransactionEvent, newContext);
-      } catch (error: any) {
-        expect(error.message).toEqual('Invalid dlr context');
-      }
-    });
+      await processTransactionEvent(transactionEvent, context);
+    } catch (e) {
+      const error = e as Error;
+      expect(error.message).toBe('Error creating link resolver');
+      expect(validateContext.validateTransactionEventContext).toHaveBeenCalled();
+      expect(helpers.getIdentifierByObjectKeyPaths).toHaveBeenCalled();
+      expect(vckitService.issueVC).toHaveBeenCalled();
+      expect(uploadJson).toHaveBeenCalled();
+    }
   });
 });

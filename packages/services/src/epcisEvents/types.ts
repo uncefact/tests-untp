@@ -60,3 +60,7 @@ export interface ITransformationEvent extends IContext {
   epcisTransformationEvent: IEntityIssue;
   productTransformation: IProductTransformation;
 }
+
+export interface ITransactionEventContext extends IContext {
+  epcisTransactionEvent: IEntityIssue;
+}

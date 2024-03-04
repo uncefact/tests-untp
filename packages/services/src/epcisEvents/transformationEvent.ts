@@ -3,7 +3,7 @@ import _ from 'lodash';
 
 import { issueVC } from '../vckit.service.js';
 import { uploadJson } from '../storage.service.js';
-import { DLREventEnum, registerLinkResolver } from '../linkResolver.service.js';
+import { registerLinkResolver } from '../linkResolver.service.js';
 import { epcisTransformationCrendentialSubject } from '../epcis.service.js';
 import { buildDPPCredentialSubject } from '../dpp.service.js';
 
@@ -69,7 +69,6 @@ export const processTransformationEvent: IService = async (data: any, context: I
           epcisTransformationEventContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,
-          DLREventEnum.Transformation,
           epcisTransformationEventQualifierPath,
         );
 
@@ -92,7 +91,6 @@ export const processTransformationEvent: IService = async (data: any, context: I
           dppContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,
-          DLREventEnum.Transformation,
           dppQualifierPath,
         );
       }),

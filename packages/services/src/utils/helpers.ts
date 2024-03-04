@@ -46,7 +46,3 @@ export function incrementQuality(obj: any, numberOfItems: number) {
   }
   return obj;
 }
-
-export function splitStringByDash(string: string): string[] {
-  return string.split('-');
-}

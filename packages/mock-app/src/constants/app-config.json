@@ -245,63 +245,95 @@
           ]
         },
         {
-          "name": "National Vendor Declaration Passport",
+          "name": "Transaction Event",
           "id": "produce_product",
           "components": [
             {
               "name": "JsonForm",
               "type": "EntryData",
               "props": {
-                "formTitle": "Digital Livestock Passport",
+                "formTitle": "Transaction Event",
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "sender": {
-                      "type": "string",
-                      "enum": ["Wagu Wonder-NH020188"]
+                    "sourceParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://wholesalebeef.com/41161080146.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Wholesale Beef"]
+                        }
+                      }
                     },
-                    "receiver": {
-                      "type": "string",
-                      "enum": ["Pete's Meats-QBZZ2222"]
-                    },
-                    "locationUrl": {
-                      "title": "Location Url",
-                      "type": "string",
-                      "enum": ["https://plus.codes/4RRHM6PR+MH"]
-                    },
-                    "industryType": {
-                      "title": "Industry Type",
-                      "type": "string",
-                      "enum": ["Cattle", "Vegetable", "Mining"]
+                    "destinationParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://primebeef.com/51161080100.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Prime Beef"]
+                        }
+                      }
                     },
                     "transaction": {
                       "type": "object",
                       "properties": {
                         "type": {
                           "type": "string",
-                          "enum": ["inv"]
+                          "enum": ["bol", "cert", "desadv", "inv", "po"]
                         },
-                        "consignmentNumber": {
-                          "title": "Consignment Number",
+                        "identifier": {
                           "type": "string"
                         },
                         "documentURL": {
-                          "title": "Document Url",
                           "type": "string"
                         }
                       }
                     },
-                    "livestockIds": {
+                    "itemList": {
                       "type": "array",
-                      "title": "Livestock IDs",
-                      "uniqueItems": true,
                       "items": {
-                        "type": "string",
-                        "enum": ["9359502000010", "NH020188LEJ00005", "NH020188LEJ00008", "NH020188LEJ00012"]
+                        "type": "object",
+                        "properties": {
+                          "itemID": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
                       }
+                    },
+                    "quantityList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productClass": {
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "type": "string"
+                          },
+                          "uom": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "locationId": {
+                      "title": "Location ID",
+                      "type": "string",
+                      "enum": ["https://plus.codes/4RRHM6PR+MH"]
                     }
-                  },
-                  "required": ["sender", "receiver", "livestockIds"]
+                  }
                 },
                 "initialData": {},
                 "className": "json-form",
@@ -323,15 +355,15 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332",
-                    "issuer": "did:web:2dc7-115-73-168-48.ngrok-free.app"
+                    "issuer": "did:web:115a-27-75-225-151.ngrok-free.app"
                   },
-                  "dpp": {
+                  "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
                     "renderTemplate": [
                       { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
                     ],
                     "type": ["TransactionEventCredential"],
-                    "dlrLinkTitle": "Livestock Passport",
+                    "dlrLinkTitle": "Transaction Event",
                     "dlrIdentificationKeyType": "nlisid",
                     "dlrVerificationPage": "http://localhost:3000/verify"
                   },
@@ -343,7 +375,7 @@
                     "storageAPIUrl": "https://storage.agtrace.showthething.com",
                     "bucket": "agtrace-test-verifiable-credentials"
                   },
-                  "identifierKeyPaths": ["livestockIds"]
+                  "identifierKeyPaths": ["transaction", "identifier"]
                 }
               ]
             }

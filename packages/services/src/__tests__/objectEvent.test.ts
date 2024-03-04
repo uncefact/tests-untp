@@ -1,7 +1,7 @@
 import { processObjectEvent } from '../epcisEvents/objectEvent';
 import { issueVC, contextDefault } from '../vckit.service';
 import { uploadJson } from '../storage.service';
-import { registerLinkResolver, IdentificationKeyType, DLREventEnum } from '../linkResolver.service';
+import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
 import { contextObjectEvent, dataObjectEvent } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
@@ -19,13 +19,6 @@ jest.mock('../linkResolver.service', () => ({
     gtin: 'gtin',
     nlisid: 'nlisid',
   },
-  DLREventEnum: {
-    Transformation: 'transformation',
-    Object: 'object',
-    Aggregation: 'aggregation',
-    Transaction: 'transaction',
-    Association: 'association',
-  }
 }));
 
 describe('processObjectEvent', () => {
@@ -102,7 +95,6 @@ describe('processObjectEvent', () => {
         dppContext.dlrVerificationPage,
         dlrContext.dlrAPIUrl,
         dlrContext.dlrAPIKey,
-        DLREventEnum.Object
       );
     });
   });

@@ -7,7 +7,7 @@ import {
 import { issueVC, contextDefault } from '../vckit.service';
 import { epcisTransformationCrendentialSubject } from '../epcis.service';
 import { uploadJson } from '../storage.service';
-import { registerLinkResolver, IdentificationKeyType, DLREventEnum } from '../linkResolver.service';
+import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
 import { fillArray } from '../utils/helpers';
 import { IInputItems } from '../epcisEvents/types';
 import { contextTransformationEvent, dataTransformationEvent } from './mocks/constants';
@@ -30,19 +30,6 @@ jest.mock('../linkResolver.service', () => ({
   IdentificationKeyType: {
     gtin: 'gtin',
     nlisid: 'nlisid',
-  },
-  DLREventEnum: {
-    Transformation: 'transformation',
-    Object: 'object',
-    Aggregation: 'aggregation',
-    Transaction: 'transaction',
-    Association: 'association',
-  },
-  EPCISEventAction: {
-    Observe: 'observe',
-  },
-  EPCISEventDisposition: {
-    InTransit: 'in_transit',
   },
 }));
 
@@ -225,7 +212,6 @@ describe('Transformation event', () => {
           verificationPage,
           dlrAPIUrl: string,
           dlrAPIKey,
-          event: DLREventEnum,
           qualifierPath,
         ) => {
           console.log({
@@ -235,7 +221,6 @@ describe('Transformation event', () => {
             dlrAPIKey,
             qualifierPath,
             identificationKey,
-            event
           });
           return `${dlrAPIUrl}/${identificationKeyType}/${identificationKey}?linkType=all`;
         },
