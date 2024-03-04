@@ -25,6 +25,11 @@ This directory contains the source code for the test suite that is used to test 
 $ yarn install
 ```
 
+```bash
+# Create config file for the test suite
+yarn create:config
+```
+
 # Usage
 
 ```bash
