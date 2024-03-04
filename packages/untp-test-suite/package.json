@@ -17,12 +17,14 @@
     "suite"
   ],
   "scripts": {
+    "create:config": "node ./scripts/createConfigFile.js",
     "test": "jest",
     "build": "tsc --build --clean && tsc",
     "watch": "tsc -b --watch",
     "lint": "eslint ."
   },
   "dependencies": {
+    "semver": "^7.6.0",
     "ajv": "^8.12.0",
     "ajv-formats": "^2.1.1"
   },

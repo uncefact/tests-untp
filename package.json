@@ -19,6 +19,7 @@
     "test:untp-test-suite": "cd packages/untp-test-suite && yarn run test",
     "storybook:components": "cd packages/components && yarn run storybook",
     "storybook:mock-app": "cd packages/mock-app && yarn run storybook",
+    "create:config-test-suite": "cd packages/untp-test-suite && yarn run create:config",
     "upgrade:packages": "yarn -r --stream upgrade --latest",
     "version": "lerna version",
     "prepare": "husky install",
