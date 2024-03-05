@@ -39,7 +39,7 @@ export const contextTransformationEvent = {
         weight: 500,
         uom: 'kilogram',
         image:
-          'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000041/AgTace-Meats-Silverside.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
+        'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000041/AgTace-Meats-Silverside.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
         description: 'Deforestation-free Beef Silverside',
       },
       {
@@ -49,7 +49,7 @@ export const contextTransformationEvent = {
         weight: 300,
         uom: 'kilogram',
         image:
-          'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000034/Beef-Scotch-Fillet-Steak-300g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
+        'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000034/Beef-Scotch-Fillet-Steak-300g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
         description: 'Deforestation-free Beef Scotch Fillet',
       },
       {
@@ -59,7 +59,7 @@ export const contextTransformationEvent = {
         weight: 250,
         uom: 'kilogram',
         image:
-          'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000010/Beef-Rump-Steak-250g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
+        'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000010/Beef-Rump-Steak-250g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
         description: 'Deforestation-free Beef Rump Steak',
       },
     ],
@@ -126,6 +126,25 @@ export const transactionEventMock = {
       transaction: { type: 'inv', identifier: 'uuid-123456', documentURL: 'https://transaction-example.com/trans-uuid-1.json'},
       itemList: [{ itemID: 'https://beef-example.com/info-uuid-1.json', name: 'Beef' }],
       quantityList: [{ productClass: 'Beef', quantity: '50', uom: 'units' }]
+    },
+  },
+}
+
+/*============================= */
+
+export const aggregationEventMock = {
+  nlisidMock: '9988776600000',
+  uploadedAggregationEventLinkMock: `https://s3.ap-southeast-2.amazonaws.com/9988776600000`,
+  aggregationEventDLRMock: `https://example.com/nlisid/9988776600000?linkType=all`,
+  aggregationVCMock: {
+    '@context': ['https://example.sh/AggregationEvent.jsonld'],
+    type: ['VerifiableCredential', 'AggregationEventCredential'],
+    issuer: 'did:web:example.com',
+    credentialSubject: {
+      parentItem: { itemID: `https://example.com/nlisid/9988776600000?linkType=all`, name: 'Beef Steak Variety Container' },
+      childItems: [{ itemID: 'http://example.com/beef-scotch-box.json', name: 'Beef Scotch Fillet Box' }],
+      childQuantityList: [{ productClass: 'Beef', quantity: '50', uom: 'units' }],
+      locationId: 'https://plus.codes/123MHR+PW',
     },
   },
 }
