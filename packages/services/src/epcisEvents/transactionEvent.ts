@@ -1,7 +1,7 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import { IService } from '../types/index.js';
 import { issueVC } from '../vckit.service.js';
-import { ITransactionEventContext } from './types.js';
+import { ITraceabilityEvent, ITransactionEventContext } from './types.js';
 import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { uploadJson } from '../storage.service.js';
 import { generateUUID } from '../utils/helpers.js';
@@ -9,13 +9,7 @@ import { registerLinkResolver } from '../linkResolver.service.js';
 import { validateTransactionEventContext } from './validateContext.js';
 import { EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
 
-export interface ITransactionEvent {
-  data: {
-    [key: string]: any;
-  };
-}
-
-export const processTransactionEvent: IService = async (transactionEvent: ITransactionEvent, context: ITransactionEventContext): Promise<VerifiableCredential> => {
+export const processTransactionEvent: IService = async (transactionEvent: ITraceabilityEvent, context: ITransactionEventContext): Promise<VerifiableCredential> => {
   const validationResult = validateTransactionEventContext(context);
   if (!validationResult.ok) {
     throw new Error(validationResult.value);

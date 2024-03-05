@@ -112,34 +112,19 @@ export const dataObjectEvent = {
 
 /*============================= */
 
-export const contextTransactionEvent = {
-  vckit: {
-    vckitAPIUrl: 'https://vckit.example.com',
+export const transactionEventMock = {
+  nlisidMock: '9988776600000',
+  uploadedTransactionEventLinkMock: `https://s3.ap-southeast-2.amazonaws.com/9988776600000`,
+  transactionEventDLRMock: `https://example.com/nlisid/9988776600000?linkType=all`,
+  transactionVCMock: {
+    '@context': ['https://example.sh/TransactionEvent.jsonld'],
+    type: ['VerifiableCredential', 'TransactionEventCredential'],
     issuer: 'did:web:example.com',
+    credentialSubject: {
+      parentItem: { itemID: `https://example.com/nlisid/9988776600000?linkType=all`, name: 'Beef Steak Variety Container' },
+      childItems: [{ itemID: 'http://example.com/beef-scotch-box.json', name: 'Beef Scotch Fillet Box' }],
+      childQuantityList: [{ productClass: 'Beef', quantity: '50', uom: 'units' }],
+      locationId: 'https://plus.codes/123MHR+PW',
+    },
   },
-  dpp: {
-    context: ['https://www.w3.org/2018/credentials/v1'],
-    renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
-    type: ['TransactionEventCredential'],
-    dlrLinkTitle: 'Livestock Passport',
-    dlrIdentificationKeyType: 'nlisid',
-    dlrVerificationPage: 'https://web.example.com/verify',
-  },
-  dlr: {
-    dlrAPIUrl: 'http://dlr.example.com',
-    dlrAPIKey: '1234',
-  },
-  storage: {
-    storageAPIUrl: 'https://storage.example.com',
-    bucket: 'test-verifiable-credentials',
-  },
-  identifierKeyPaths: ['livestockIds'],
-};
-
-export const dataTransactionEvent = {
-  data: {
-    livestockIds: ['9359502000010'],
-    sender: 'test-1234',
-    receiver: 'test-5678'
-  },
-};
+}

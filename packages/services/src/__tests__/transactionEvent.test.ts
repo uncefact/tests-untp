@@ -7,6 +7,7 @@ import { uploadJson } from '../storage.service';
 import { Result } from '../types/validateContext';
 import { ITransactionEventContext } from '../epcisEvents/types';
 import { publicAPI } from '../utils/httpService';
+import { transactionEventMock } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
@@ -20,23 +21,8 @@ jest.mock('../linkResolver.service', () => ({
   IdentificationKeyType: jest.fn(),
 }));
 
-const nlisidMock = '9988776600000';
-const uploadedTransactionEventLinkMock = `https://s3.ap-southeast-2.amazonaws.com/${nlisidMock}`;
-const transactionEventDLRMock = `https://example.com/nlisid/${nlisidMock}?linkType=all`;
-const transactionVCMock = {
-  '@context': ['https://example.sh/TransactionEvent.jsonld'],
-  type: ['VerifiableCredential', 'TransactionEventCredential'],
-  issuer: 'did:web:example.com',
-  credentialSubject: {
-    sourceParty: { partyID: 'https://wholesalebeef.com/41161080146.json', name: 'Wholesale Beef' },
-    destinationParty: { partyID: 'https://primebeef.com/51161080100.json', name: 'Prime Beef' },
-    transaction: { type: 'bol', identifier: 'NH020188LEJ00005', documentURL: 'http://document.com' },
-    itemList: [{ itemID: 'http://example.com/beef-scotch-box.json', name: 'Beef Scotch Fillet Box' }],
-    quantityList: [{ productClass: 'Beef', quantity: '50', uom: 'units' }],
-  },
-};
-
 describe('processTransactionEvent', () => {
+  const { nlisidMock, uploadedTransactionEventLinkMock, transactionEventDLRMock, transactionVCMock } = transactionEventMock;
   const transactionEvent = {
     data: {
       parentItem: { itemID: nlisidMock, name: 'Beef Steak Variety Container' },
