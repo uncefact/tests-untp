@@ -73,18 +73,10 @@ export interface ITransactionEventContext extends IContext {
 
 export interface IAggregationEvent {
   data: {
-    parentItem: IItem;
-    childItems: IItem[];
-    childQuantityList: {
-      productClass: string;
-      quantity: string;
-      uom: string;
-    }[];
-    locationId: string;
+    [key: string]: any;
   };
 }
 
-export interface IItem {
-  itemID: string;
-  name: string;
+export interface IAggregationEventContext extends IContext {
+  epcisAggregationEvent: IEntityIssue;
 }

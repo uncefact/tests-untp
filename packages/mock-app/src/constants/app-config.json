@@ -539,7 +539,7 @@
         "transactionEventVC": ""
       },
       "styles": {
-        "primaryColor": "rgb(255, 128, 5)",
+        "primaryColor": "rgb(41, 171, 48)",
         "secondaryColor": "white",
         "tertiaryColor": "black"
       },
@@ -638,9 +638,9 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332",
-                    "issuer": "did:web:c317-103-69-79-17.ngrok-free.app"
+                    "issuer": "did:web:398f-103-69-79-17.ngrok-free.app"
                   },
-                  "dpp": {
+                  "epcisAggregationEvent": {
                     "context": [
                       "https://jargon.sh/user/unece/traceabilityEvents/v/working/artefacts/jsonldContexts/AggregationEvent.jsonld?class=AggregationEvent"
                     ],
