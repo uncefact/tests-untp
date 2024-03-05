@@ -43,3 +43,20 @@ export interface IRenderer {
   template: string;
   '@type': string;
 }
+
+export interface IInputItems {
+  quantity: number;
+  uom: string;
+  productClass: string;
+}
+
+export interface IProductTransformation {
+  inputItems: IInputItems[];
+  outputItems: any[];
+}
+
+export interface ITransformationEvent extends IContext {
+  identifiers: string[];
+  epcisTransformationEvent: IEntityIssue;
+  productTransformation: IProductTransformation;
+}

@@ -1,9 +1,8 @@
 import { GS1ServiceEnum } from './identityProviders/GS1Provider.js';
 import { MimeTypeEnum } from './types/types.js';
 import { privateAPI } from './utils/httpService.js';
-
 /**
- * Generates a link resolver URL based on the provided AgtraceLinkResolver and AgtraceLinkResponse objects.
+ * Generates a link resolver URL based on the provided linkResolver and linkResponse objects.
  *
  * @param arg - The arguments for the link resolver.
  *
@@ -122,7 +121,7 @@ export const constructLinkResolver = (
     responses: [],
   };
 
-  linkResponses.forEach((agtraceLinkResponse: ILinkResponse) => {
+  linkResponses.forEach((linkResponse: ILinkResponse) => {
     const gs1LinkResponseForUS: GS1LinkResponse = {
       ianaLanguage: 'en',
       context: 'us',
@@ -132,7 +131,7 @@ export const constructLinkResolver = (
       defaultMimeType: false,
       fwqs: false,
       active: true,
-      ...agtraceLinkResponse,
+      ...linkResponse,
     };
 
     const gs1LinkResponseForAU: GS1LinkResponse = {
@@ -144,7 +143,7 @@ export const constructLinkResolver = (
       defaultMimeType: false,
       fwqs: false,
       active: true,
-      ...agtraceLinkResponse,
+      ...linkResponse,
     };
 
     gs1LinkResolver.responses.push(gs1LinkResponseForUS, gs1LinkResponseForAU);

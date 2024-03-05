@@ -52,7 +52,7 @@ export const uploadJson = async ({ filename, bucket, json, storageAPIUrl }: IUpl
     await publicAPI.put(presignedUrl.toString(), file);
 
     return `https://${bucket}.s3.ap-southeast-2.amazonaws.com/${file.name}`;
-  } catch (error) {
-    throw new Error('Error uploading json');
+  } catch (error: any) {
+    throw new Error(error.message ?? 'Error uploading json');
   }
 };

@@ -1,3 +1,6 @@
+import { Buffer } from 'buffer';
+window.Buffer = Buffer;
+
 /*
   This utility function is designed to convert a string into a path.
   Example usage: 

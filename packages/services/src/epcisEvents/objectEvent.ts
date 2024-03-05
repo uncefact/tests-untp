@@ -22,14 +22,14 @@ export const processObjectEvent: IService = async (data: any, context: IContext)
 
     const vckitContext = context.vckit;
     const dppContext = context.dpp;
-    const restOfVC = { render: dppContext?.renderTemplate ?? [] };
+    const restOfVC = { render: dppContext?.renderTemplate ?? [] };    
     const vc: VerifiableCredential = await issueVC({
       context: dppContext.context,
       credentialSubject: data.data,
       issuer: vckitContext.issuer,
       type: [...dppContext.type],
       vcKitAPIUrl: vckitContext.vckitAPIUrl,
-      ...restOfVC,
+      restOfVC,
     });
 
     const identifier = getIdentifierByObjectKeyPaths(data.data, context.identifierKeyPaths) as string;
