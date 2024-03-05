@@ -23,8 +23,9 @@
     "lint": "eslint ."
   },
   "devDependencies": {
-    "@babel/preset-typescript": "^7.23.3",
     "@babel/preset-env": "^7.23.9",
+    "@babel/preset-typescript": "^7.23.3",
+    "babel-plugin-transform-import-meta": "^2.2.1",
     "typescript": "5.1.6"
   }
 }

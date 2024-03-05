@@ -3,8 +3,8 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __pathFilename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__pathFilename);
 
 type SchemaVerions = Record<string, { version: string[] }>;
 
@@ -41,7 +41,7 @@ export const getSchemasName = (): Promise<string[]> => {
  *   aggregationEvent: { version: ['v0.0.1' ] },
  * }
  */
-export const getSchemasVersion = async (): Promise<SchemaVerions> => {
+export const getSchemasTypeAndVersion = async (): Promise<SchemaVerions> => {
   const obj = {} as Record<string, { version: string[] }>;
   try {
     const files = await getSchemasName();

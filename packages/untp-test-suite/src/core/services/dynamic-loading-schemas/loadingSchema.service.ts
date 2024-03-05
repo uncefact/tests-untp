@@ -9,7 +9,7 @@ export const dynamicLoadingSchemaService: IDynamicLoadingSchemaService = async (
       throw new Error(`Schema not found`);
     }
 
-    const isValidVersion = version && (await schemas.getSchemasVersion())[schema].version.includes(version);
+    const isValidVersion = version && (await schemas.getSchemasTypeAndVersion())[schema].version.includes(version);
     if (!isValidVersion) {
       throw new Error(`Version not found for schema ${schema}`);
     }
