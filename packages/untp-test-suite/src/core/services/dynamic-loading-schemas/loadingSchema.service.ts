@@ -1,20 +1,19 @@
-import * as schemas from '../../../schemas';
 import { IDynamicLoadingSchemaService } from './types';
+import { checkSchemaExists, checkSchemaVersionExists, getSchemaContent } from './utils';
 
 export const dynamicLoadingSchemaService: IDynamicLoadingSchemaService = async (schema, version) => {
   try {
-    const isValidSchema = schema && (await schemas.getSchemasName()).includes(schema);
-
+    const isValidSchema = await checkSchemaExists(schema);
     if (!isValidSchema) {
       throw new Error(`Schema not found`);
     }
 
-    const isValidVersion = version && (await schemas.getSchemasTypeAndVersion())[schema].version.includes(version);
+    const isValidVersion = await checkSchemaVersionExists(schema, version);
     if (!isValidVersion) {
       throw new Error(`Version not found for schema ${schema}`);
     }
 
-    const content = await schemas.getContentSchema(schema, version);
+    const content = await getSchemaContent(schema, version);
     if (!content) {
       throw new Error(`Content in ${schema} schema not found`);
     }
