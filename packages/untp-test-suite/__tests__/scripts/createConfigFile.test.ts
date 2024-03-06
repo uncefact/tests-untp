@@ -35,27 +35,24 @@ describe('createConfigFile', () => {
       callback(error),
     );
 
-    try {
-      await createConfigFile();
-    } catch (error) {
+    createConfigFile().catch((error) => {
       expect(error).not.toBeNull();
-    }
+      expect(error.message).toBe('writeFile error');
+    });
   });
 
-  it('should show errors when fs.readdir return error', async () => {
+  it('should show errors when fs.readdir in getSchemaTypeName() catch error', async () => {
     const error = new Error('readdir error');
     (fs.readdir as any).mockImplementation((_path, callback) => {
       callback(error, null);
     });
 
-    try {
-      await createConfigFile();
-    } catch (error) {
+    createConfigFile().catch((error) => {
       expect(error).not.toBeNull();
-    }
+    });
   });
 
-  it('should show errors when fs.readdirSync return error', async () => {
+  it('should show errors when fs.readdirSync in getLastestSchemaVersion() catch error', async () => {
     const error = new Error('readdirSync error');
     (fs.readdir as any).mockImplementation((_path, callback) => {
       callback(null, ['objectEvent', 'productPassport']);
@@ -65,10 +62,8 @@ describe('createConfigFile', () => {
       throw error;
     });
 
-    try {
-      await createConfigFile();
-    } catch (error) {
+    createConfigFile().catch((error) => {
       expect(error).not.toBeNull();
-    }
+    });
   });
 });
