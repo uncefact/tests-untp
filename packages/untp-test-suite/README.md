@@ -45,7 +45,11 @@ This directory contains the source code for the test suite that is used to test 
 $ yarn install
 ```
 
+## Note: Please make sure to build the project before running the test suite.
+
 ```bash
+yarn run build
+
 # Create config file for the test suite
 yarn create:config
 ```
