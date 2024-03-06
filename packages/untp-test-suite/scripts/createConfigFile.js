@@ -23,31 +23,25 @@ const getSchemaTypeName = () => {
   });
 };
 
-const getLastestSchemaVersion = async () => {
+const getLastestSchemaVersion = (type) => {
   const schemaPath = getSchemaPath();
-  const versions = [];
   try {
-    const files = await getSchemaTypeName();
-    files.forEach((file) => {
-      const schemaVersions = fs.readdirSync(`${schemaPath}/${String(file)}`);
-      const latestVersion = semver.maxSatisfying(schemaVersions, '*');
-      versions.push({ version: latestVersion });
-    });
-    return versions;
+    const schemaVersions = fs.readdirSync(`${schemaPath}/${String(type)}`);
+    const latestVersion = semver.maxSatisfying(schemaVersions, '*');
+    return latestVersion;
   } catch (err) {
     console.error(err);
-    return [];
+    return '';
   }
 };
 
 const mapTypesAndVersions = async () => {
   try {
     const types = await getSchemaTypeName();
-    const versions = await getLastestSchemaVersion();
 
-    const mapped = types.map((type, index) => ({
+    const mapped = types.map((type) => ({
       type: type,
-      version: versions[index].version,
+      version: getLastestSchemaVersion(type),
       dataPath: '',
     }));
 
