@@ -14,7 +14,6 @@ const getSchemaTypeName = () => {
   return new Promise((resolve, reject) => {
     fs.readdir(getSchemaPath(), (err, files) => {
       if (err) {
-        console.error(`Error reading directory: ${err.toString()}`);
         reject(err);
       } else {
         resolve(files);
@@ -60,15 +59,23 @@ const getConfigPath = () => getPath(CONFIG_PATH);
 const createConfigFile = async () => {
   const config = await mapTypesAndVersions();
   const configData = JSON.stringify(config, null, 2);
-  fs.writeFile(`${getConfigPath()}/credentials.json`, configData, (err) => {
-    if (err) {
-      console.error(err);
-    } else {
-      console.log('Config file created successfully');
-    }
+  return new Promise((resolve, reject) => {
+    fs.writeFile(`${getConfigPath()}/credentials.json`, configData, (err) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
   });
 };
 
-createConfigFile();
+createConfigFile()
+  .then(() => {
+    console.log('Config file created successfully!');
+  })
+  .catch(() => {
+    throw new Error('Error creating config file');
+  });
 
 export { createConfigFile };
