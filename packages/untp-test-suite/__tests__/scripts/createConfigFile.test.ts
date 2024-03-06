@@ -1,5 +1,5 @@
 import fs from 'fs';
-const { createConfigFile } = require('../../scripts/createConfigFile.js');
+import { createConfigFile } from '../../build/interfaces/cli/createConfigFile';
 
 jest.mock('fs', () => ({
   writeFile: jest.fn(),
