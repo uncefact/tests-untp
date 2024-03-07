@@ -59,3 +59,37 @@ yarn create:config
 ```bash
 $ yarn test
 ```
+
+## UNTP Test Suite CLI Tool
+
+This CLI tool is written in Node.js and is designed to facilitate the management and execution of the UNTP test suite.
+
+### How to Use
+
+To use the UNTP Test Suite CLI Tool:
+
+---
+
+#### **Create Configuration File**
+  ```sh
+  untp config
+  ```
+
+  This command generates a `credentials.json` file at `./src/config/credentials.json` within the `untp-test-suite` package of the project with default configurations.
+
+  The `credentials.json` file contains configurations for running the test suite, including types and versions of events and their data paths.
+
+---
+
+#### Running UNTP Test Suite
+  ```sh
+  untp test
+  ```
+
+This command executes the UNTP test suite using the default `credentials.json` file at `./src/config/credentials.json`.
+
+To use a specific configuration file, use the `-c` or `--config` flag followed by the path to the file.
+
+  ```sh
+  untp test --config ./path/to/config.json
+  ```
