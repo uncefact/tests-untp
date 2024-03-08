@@ -1,32 +1,30 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-
-// TODO: Change this variable to a constant file for reusable purposes
-const defaultConfigFilePath = './src/config/credentials.json';
+import path from 'path';
+import { processTestSuite } from '../../core/test-runner.js';
+import { defaultConfigFilePath } from './config.js';
 
 const log = console.log;
 const test = new Command('test');
 test
   .description('Run Untp test suites')
   .option('-c, --config <path>', `Configuration file (default path: "${defaultConfigFilePath}")`, defaultConfigFilePath)
-  .action((options) => {
+  .action(async (options) => {
     try {
       log(chalk.yellow('Untp test suites are running......'));
 
-      // Call the function to run test suites...
-      let configPath = defaultConfigFilePath;
-      const { config: customConfigPath } = options;
-      if (customConfigPath) {
-        configPath = customConfigPath;
-      }
-      // const configFileJson = await fs.promises.readFile(configPath, { encoding: 'utf-8' });
-      // const configFileArray: { type: string, version: string, dataPath: string }[] = JSON.parse(configFileJson);
-      //TODO: Call the core function....
+      const configPath = options.config || defaultConfigFilePath;
+      const fullConfigPath = path.resolve(process.cwd(), configPath);
 
+      const testSuiteResults = await processTestSuite(fullConfigPath);
+      const isHaveAnyError = testSuiteResults.some((testSuiteResult) => testSuiteResult.errors);
+      isHaveAnyError
+        ? log(chalk.bgRed.white.bold('The UNTP test suites have encountered failures!'))
+        : log(chalk.bgGreen.white.bold('The UNTP test suites have completed successfully!'));
 
-      log(chalk.bgGreen.white.bold('Untp test suites have completed successfully!'));
+      console.log(testSuiteResults);
     } catch (error) {
-      log(chalk.bgRed.white.bold('Run Untp test suites failed'));
+      log(chalk.bgRed.white.bold('Run UNTP test suites failed'));
       log(chalk.red(error));
     }
   });
