@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import * as fs from 'fs';
-import { goUpLevels } from '../../utils/common.js';
 import { ConfigCredentials } from '../../types/index.js';
+import { goUpLevels } from '../../utils/common.js';
 
 export const readConfigContent = () => {
   const targetPath = goUpLevels(process.cwd(), 3);

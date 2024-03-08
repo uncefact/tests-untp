@@ -1,9 +1,9 @@
 import * as fs from 'fs';
 import { readConfigContent, validateConfigContent } from './utils';
+import { ConfigContent } from '../../types';
 import { goUpLevels } from '../../utils/common';
-// const results = await Promise.all(promises);
 
-export const loadingConfigContentServices = async () => {
+export const loadingConfigContentServices = async (): Promise<ConfigContent[]> => {
   try {
     const content = await readConfigContent();
     const validateContent = validateConfigContent(JSON.parse(content));
@@ -16,9 +16,7 @@ export const loadingConfigContentServices = async () => {
   }
 };
 
-export const loadingDataPath = async (schema: string) => {
-  const content = await loadingConfigContentServices();
-  const dataPathBySchema = content?.find((item) => item.type === schema);
+export const loadingDataPath = async (path: string) => {
   const rootPath = goUpLevels(process.cwd(), 3);
-  return fs.promises.readFile(`${rootPath}/${dataPathBySchema?.dataPath as string}`, 'utf-8');
+  return fs.promises.readFile(`${rootPath}/${path}`, 'utf-8');
 };

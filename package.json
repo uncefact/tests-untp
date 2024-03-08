@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "start": "cd packages/mock-app && yarn start",
-    "build": "yarn run build-clean && yarn build:components && yarn build:services",
+    "build": "yarn run build-clean && yarn build:components && yarn build:untp-test-suite",
     "build:components": "cd packages/components && yarn run build",
     "build:services": "cd packages/services && yarn run build",
     "build:untp-test-suite": "cd packages/untp-test-suite && yarn run build",

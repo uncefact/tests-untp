@@ -3,5 +3,11 @@ export interface TestRunner {
 }
 
 export interface ConfigCredentials {
-  credentials: { type: string; version: string; dataPath: string }[];
+  credentials: ConfigContent[];
+}
+
+export interface ConfigContent {
+  type: string;
+  version: string;
+  dataPath: string;
 }
