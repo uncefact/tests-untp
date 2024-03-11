@@ -46,7 +46,8 @@ describe('loadingConfigContentServices', () => {
     try {
       await loadingConfigContentServices();
     } catch (e) {
-      expect(e.message).toBe('Invalid config file');
+      const error = e as Error;
+      expect(error.message).toBe('Invalid config file');
     }
   });
 
@@ -79,7 +80,8 @@ describe('loadingDataPath', () => {
     try {
       await loadingDataPath('/data/value.json');
     } catch (e) {
-      expect(e.message).toBe('Invalid data path');
+      const error = e as Error;
+      expect(error.message).toBe('Invalid data path');
     }
   });
 });
