@@ -133,18 +133,17 @@ export const transactionEventMock = {
 /*============================= */
 
 export const aggregationEventMock = {
-  nlisidMock: '9988776600000',
-  uploadedAggregationEventLinkMock: `https://s3.ap-southeast-2.amazonaws.com/9988776600000`,
-  aggregationEventDLRMock: `https://example.com/nlisid/9988776600000?linkType=all`,
+  gtinMock: '9988776600000',
+  uploadedAggregationEventLinkMock: `https://s3.ap-southeast-2.amazonaws.com/9988776600000.json`,
+  aggregationEventDLRMock: `https://example.com/gtin/9988776600000.json`,
   aggregationVCMock: {
     '@context': ['https://example.sh/AggregationEvent.jsonld'],
     type: ['VerifiableCredential', 'AggregationEventCredential'],
     issuer: 'did:web:example.com',
     credentialSubject: {
-      parentItem: { itemID: `https://example.com/nlisid/9988776600000?linkType=all`, name: 'Beef Steak Variety Container' },
+      parentItem: { itemID: `https://example.com/gtin/beef-container-gin-9988776600000.json`, name: 'Beef Variety Container' },
       childItems: [{ itemID: 'http://example.com/beef-scotch-box.json', name: 'Beef Scotch Fillet Box' }],
-      childQuantityList: [{ productClass: 'Beef', quantity: '50', uom: 'units' }],
-      locationId: 'https://plus.codes/123MHR+PW',
+      childQuantityList: [{ productClass: 'Beef', quantity: '50', uom: 'box' }]
     },
   },
 }

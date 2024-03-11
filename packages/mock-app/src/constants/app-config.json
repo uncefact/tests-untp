@@ -649,7 +649,7 @@
                     ],
                     "type": ["AggregationEventCredential"],
                     "dlrLinkTitle": "Aggregation Event",
-                    "dlrIdentificationKeyType": "nlisid",
+                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3001/verify"
                   },
                   "dlr": {
