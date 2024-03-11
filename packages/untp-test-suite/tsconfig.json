@@ -1,9 +1,7 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "lib": [
-      "esnext"
-    ],
+    "lib": ["esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -20,7 +18,5 @@
     "sourceMap": true,
     "rootDir": "src"
   },
-  "include": [
-    "src"
-  ]
+  "include": ["src", "src/*"]
 }

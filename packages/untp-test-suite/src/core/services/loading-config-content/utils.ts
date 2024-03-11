@@ -1,11 +1,14 @@
 import _ from 'lodash';
 import * as fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 import { ConfigCredentials } from '../../types/index.js';
-import { goUpLevels } from '../../utils/common.js';
 
 export const readConfigContent = () => {
-  const targetPath = goUpLevels(process.cwd(), 3);
-  return fs.promises.readFile(`${targetPath}/config/credentials.json`, 'utf-8');
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const CONFIG_PATH = path.resolve(__dirname, '../../../config'); // ../tests-untp/packages/untp-test-suite/src/config
+  return fs.promises.readFile(`${CONFIG_PATH}/credentials.json`, 'utf-8');
 };
 
 export const validateConfigContent = (value: ConfigCredentials) => {

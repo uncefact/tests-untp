@@ -1,5 +1,7 @@
+import { ErrorObject } from 'ajv';
+
 export interface TestRunner {
-  (): unknown;
+  (): Promise<(ErrorObject[] | null)[]>;
 }
 
 export interface ConfigCredentials {

@@ -7,14 +7,8 @@ import {
 import { TestRunner } from './types';
 
 /**
- * Steps: (please remove when this function is implemented)
- * 1. Write a read config file function
- *   _ Check content of the file
- * 2. Check if the schema exists then load the schema
- * 3. Check if the schema version exists then load the schema version
- * 4. Check if the data path exists then load the data
- * 5. Call hasError function to compare the data and the schema
- * 6. If there is an error, throw an error, else return the result
+ * Process the test suite - Validate the data against the schema
+ * @returns A promise that resolves to an array of error objects or null
  */
 export const processTestRunner: TestRunner = async () => {
   try {
@@ -41,6 +35,7 @@ export const processTestRunner: TestRunner = async () => {
 
     return compareResult;
   } catch (e) {
-    throw new Error(e);
+    const error = e as Error;
+    throw new Error(error.message ?? 'Error processing test suite');
   }
 };
