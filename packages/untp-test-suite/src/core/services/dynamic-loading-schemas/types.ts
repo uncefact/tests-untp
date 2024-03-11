@@ -1,3 +1,3 @@
 export interface IDynamicLoadingSchemaService {
-  (schema: string, version: string): unknown;
+  (schema: string, version: string): Promise<JSON>;
 }

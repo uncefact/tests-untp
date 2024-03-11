@@ -18,7 +18,7 @@ export const dynamicLoadingSchemaService: IDynamicLoadingSchemaService = async (
       throw new Error(`Content in ${schema} schema not found`);
     }
 
-    return content;
+    return JSON.parse(content);
   } catch (e) {
     const error = e as Error;
     throw new Error(error.message ?? 'Error loading schema');
