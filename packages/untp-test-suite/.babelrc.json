@@ -5,11 +5,11 @@
       "@babel/preset-env",
       {
         "targets": {
-         "node": "current"
+          "node": "current"
         }
       }
     ],
     "@babel/preset-typescript"
   ],
-  "plugins": []
+  "plugins": [["babel-plugin-transform-import-meta", { "module": "ES6" }]]
 }
