@@ -17,7 +17,7 @@
     "suite"
   ],
   "bin": {
-    "untp": "build/cli/cli.js"
+    "untp": "build/interfaces/cli/cli.js"
   },
   "scripts": {
     "create:config": "node ./scripts/createConfigFile.js",
@@ -31,8 +31,7 @@
     "ajv": "^8.12.0",
     "ajv-formats": "^2.1.1",
     "chalk": "^5.3.0",
-    "commander": "^12.0.0",
-    "semver": "^7.6.0"
+    "commander": "^12.0.0"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.23.9",
