@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import _ from 'lodash';
-import { ConfigContent, ConfigCredentials } from '../types';
+import { ConfigContent } from '../types';
 
 /**
  * Asynchronously reads a file and parses its content as JSON.
@@ -13,13 +13,6 @@ import { ConfigContent, ConfigCredentials } from '../types';
 export const readFile = async <T>(filePath: string): Promise<T> => {
   const fileContent = await fs.readFile(filePath, 'utf-8');
   return JSON.parse(fileContent);
-};
-
-export const readConfigFile = async () => {
-  const configPath = path.resolve(process.cwd(), '../../config/credentials.json');
-  const result = await readFile<ConfigCredentials>(configPath);
-  validateCredentialConfigs(result.credentials);
-  return result;
 };
 
 /**

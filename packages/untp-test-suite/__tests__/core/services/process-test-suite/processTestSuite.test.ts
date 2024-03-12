@@ -1,7 +1,7 @@
 import { resolve } from 'path';
 import { processTestSuite } from '../../../../src/core/process-test-suite';
 import { hasErrors } from '../../../../src/core/services/json-schema/validator.service';
-import { readConfigFile, readFile } from '../../../../src/core/utils/common';
+import { readFile } from '../../../../src/core/utils/common';
 import { dynamicLoadingSchemaService } from '../../../../src/core/services/dynamic-loading-schemas/loadingSchema.service';
 
 jest.mock('path', () => ({
@@ -13,8 +13,8 @@ jest.mock('../../../../src/core/services/json-schema/validator.service', () => (
 }));
 
 jest.mock('../../../../src/core/utils/common', () => ({
-  readConfigFile: jest.fn().mockResolvedValue([]),
   readFile: jest.fn().mockResolvedValue({}),
+  validateCredentialConfigs: jest.fn(),
 }));
 
 jest.mock('../../../../src/core/services/dynamic-loading-schemas/loadingSchema.service', () => ({
@@ -23,16 +23,6 @@ jest.mock('../../../../src/core/services/dynamic-loading-schemas/loadingSchema.s
 
 describe('processTestSuite', () => {
   it('should process the test suite and return an array of null', async () => {
-    (readConfigFile as jest.Mock).mockResolvedValue({
-      credentials: [
-        {
-          type: 'objectEvent',
-          version: 'v0.0.1',
-          dataPath: 'testPath',
-        },
-      ],
-    });
-
     (dynamicLoadingSchemaService as jest.Mock).mockResolvedValue({
       type: 'object',
       additionalProperties: false,
@@ -46,30 +36,41 @@ describe('processTestSuite', () => {
       },
     });
 
-    (readFile as jest.Mock).mockResolvedValue({
-      parentItem: {
-        itemID: 'https://example.com/product/12345',
-        name: 'Product A',
-      },
+    (readFile as jest.Mock).mockImplementation(async (filePath: string) => {
+      if (filePath.includes('/untp-test-suite/src/config/credentials.json')) {
+        return {
+          credentials: [
+            {
+              type: 'objectEvent',
+              version: 'v0.0.1',
+              dataPath: 'test-data/parent-item.json',
+            },
+          ],
+        };
+      }
+
+      return {
+        parentItem: {
+          itemID: 'https://example.com/product/12345',
+          name: 'Product A',
+        },
+      };
     });
 
     (hasErrors as jest.Mock).mockReturnValue(null);
 
-    const result = await processTestSuite();
-    expect(result).toEqual([null]);
+    const result = await processTestSuite('/untp-test-suite/src/config/credentials.json');
+    expect(result).toEqual([
+      {
+        type: 'objectEvent',
+        version: 'v0.0.1',
+        dataPath: 'test-data/parent-item.json',
+        errors: null,
+      },
+    ]);
   });
 
   it('should process the test suite and return an array of errors', async () => {
-    (readConfigFile as jest.Mock).mockResolvedValue({
-      credentials: [
-        {
-          type: 'objectEvent',
-          version: 'v0.0.1',
-          dataPath: 'testPath',
-        },
-      ],
-    });
-
     (dynamicLoadingSchemaService as jest.Mock).mockResolvedValue({
       type: 'object',
       additionalProperties: false,
@@ -82,16 +83,44 @@ describe('processTestSuite', () => {
       },
     });
 
-    (readFile as jest.Mock).mockResolvedValue({
-      parentItem: {
-        itemID: 'https://example.com/product/12345',
-        name: 'Product A',
-      },
+    (readFile as jest.Mock).mockImplementation(async (filePath: string) => {
+      if (filePath.includes('/untp-test-suite/src/config/credentials.json')) {
+        return {
+          credentials: [
+            {
+              type: 'objectEvent',
+              version: 'v0.0.1',
+              dataPath: 'test-data/parent-item.json',
+            },
+          ],
+        };
+      }
+
+      return {
+        parentItem: {
+          itemID: 'https://example.com/product/12345',
+          name: 'Product A',
+        },
+      };
     });
 
     (hasErrors as jest.Mock).mockReturnValue({
-      errors: [
-        {
+      keyword: 'type',
+      dataPath: '.parentItem',
+      schemaPath: '#/$defs/Item/properties/itemID/type',
+      params: {
+        type: 'string',
+      },
+      message: 'should be string',
+    });
+
+    const result = await processTestSuite('/untp-test-suite/src/config/credentials.json');
+    expect(result).toEqual([
+      {
+        dataPath: 'test-data/parent-item.json',
+        type: 'objectEvent',
+        version: 'v0.0.1',
+        errors: {
           keyword: 'type',
           dataPath: '.parentItem',
           schemaPath: '#/$defs/Item/properties/itemID/type',
@@ -100,23 +129,6 @@ describe('processTestSuite', () => {
           },
           message: 'should be string',
         },
-      ],
-    });
-
-    const result = await processTestSuite();
-    expect(result).toEqual([
-      {
-        errors: [
-          {
-            keyword: 'type',
-            dataPath: '.parentItem',
-            schemaPath: '#/$defs/Item/properties/itemID/type',
-            params: {
-              type: 'string',
-            },
-            message: 'should be string',
-          },
-        ],
       },
     ]);
   });
