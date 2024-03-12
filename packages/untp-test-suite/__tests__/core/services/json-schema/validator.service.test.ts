@@ -39,7 +39,7 @@ describe('Validator Service', () => {
       const result = hasErrors(schema, data);
 
       expect(result).toEqual(expect.any(Array<any>));
-      expect(result.length).toBeGreaterThan(0);
+      expect(result?.length).toBeGreaterThan(0);
     });
   });
 });
