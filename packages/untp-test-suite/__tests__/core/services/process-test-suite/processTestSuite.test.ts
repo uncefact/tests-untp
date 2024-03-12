@@ -1,8 +1,8 @@
 import { resolve } from 'path';
-import { processTestSuite } from '../../../../src/core/process-test-suite';
 import { hasErrors } from '../../../../src/core/services/json-schema/validator.service';
-import { readFile } from '../../../../src/core/utils/common';
+import { readJsonFile } from '../../../../src/core/utils/common';
 import { dynamicLoadingSchemaService } from '../../../../src/core/services/dynamic-loading-schemas/loadingSchema.service';
+import { processTestSuite } from '../../../../src/core/processTestSuite';
 
 jest.mock('path', () => ({
   resolve: jest.fn(),
@@ -13,7 +13,7 @@ jest.mock('../../../../src/core/services/json-schema/validator.service', () => (
 }));
 
 jest.mock('../../../../src/core/utils/common', () => ({
-  readFile: jest.fn().mockResolvedValue({}),
+  readJsonFile: jest.fn().mockResolvedValue({}),
   validateCredentialConfigs: jest.fn(),
 }));
 
@@ -36,7 +36,7 @@ describe('processTestSuite', () => {
       },
     });
 
-    (readFile as jest.Mock).mockImplementation(async (filePath: string) => {
+    (readJsonFile as jest.Mock).mockImplementation(async (filePath: string) => {
       if (filePath.includes('/untp-test-suite/src/config/credentials.json')) {
         return {
           credentials: [
@@ -83,7 +83,7 @@ describe('processTestSuite', () => {
       },
     });
 
-    (readFile as jest.Mock).mockImplementation(async (filePath: string) => {
+    (readJsonFile as jest.Mock).mockImplementation(async (filePath: string) => {
       if (filePath.includes('/untp-test-suite/src/config/credentials.json')) {
         return {
           credentials: [

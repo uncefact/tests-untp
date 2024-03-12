@@ -1,5 +1,5 @@
 import * as fs from 'fs/promises';
-import { validateCredentialConfigs, readFile } from '../../../../src/core/utils/common';
+import { validateCredentialConfigs, readJsonFile } from '../../../../src/core/utils/common';
 import { resolve } from 'path';
 
 jest.mock('fs/promises', () => ({
@@ -50,14 +50,14 @@ describe('readFile', () => {
         test: 'test',
       };
     });
-    const result = await readFile('/untp-test-suite/src/config/credentials.json');
+    const result = await readJsonFile('/untp-test-suite/src/config/credentials.json');
     expect(result).toEqual({ test: 'test' });
   });
 
   it('should throw an error when the file is not found', async () => {
     jest.spyOn(fs, 'readFile' as any).mockRejectedValue(new Error('File not found'));
     try {
-      await readFile('/untp-test-suite/src/config/credentials.json');
+      await readJsonFile('/untp-test-suite/src/config/credentials.json');
     } catch (error) {
       expect(error).toEqual(new Error('File not found'));
     }

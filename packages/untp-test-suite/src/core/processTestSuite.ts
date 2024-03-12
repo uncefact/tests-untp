@@ -1,6 +1,6 @@
 import path from 'path';
 import { ConfigCredentials, TestSuite, TestSuiteResult } from './types/index';
-import { readFile, validateCredentialConfigs } from './utils/common.js';
+import { readJsonFile, validateCredentialConfigs } from './utils/common.js';
 import { dynamicLoadingSchemaService } from './services/dynamic-loading-schemas/loadingSchema.service.js';
 import { hasErrors } from './services/json-schema/validator.service.js';
 
@@ -10,7 +10,7 @@ import { hasErrors } from './services/json-schema/validator.service.js';
  * @returns The test suite result
  */
 export const processTestSuite: TestSuite = async (credentialConfigsPath) => {
-  const credentialConfigs = await readFile<ConfigCredentials>(credentialConfigsPath);
+  const credentialConfigs = await readJsonFile<ConfigCredentials>(credentialConfigsPath);
   validateCredentialConfigs(credentialConfigs.credentials);
 
   const testDataPath = path.resolve(process.cwd(), '../../');
@@ -19,7 +19,7 @@ export const processTestSuite: TestSuite = async (credentialConfigsPath) => {
       const { type, version, dataPath } = credentialConfig;
       const [schema, data] = await Promise.all([
         dynamicLoadingSchemaService(type, version),
-        readFile(`${testDataPath}/${dataPath}`),
+        readJsonFile(`${testDataPath}/${dataPath}`),
       ]);
 
       const errors = hasErrors(schema, data);

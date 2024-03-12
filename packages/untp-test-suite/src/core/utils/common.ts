@@ -10,7 +10,7 @@ import { ConfigContent } from '../types';
  * @template T
  */
 
-export const readFile = async <T>(filePath: string): Promise<T> => {
+export const readJsonFile = async <T>(filePath: string): Promise<T> => {
   const fileContent = await fs.readFile(filePath, 'utf-8');
   return JSON.parse(fileContent);
 };
