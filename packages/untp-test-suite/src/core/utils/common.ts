@@ -1,21 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import _ from 'lodash';
-import { ConfigContent } from '../types';
-
-/**
- * Go up levels in the directory tree
- * @param folderPath - The path to the current folder
- * @param levels - The number of levels to go up
- * @returns The path to the target folder
- */
-export const goUpLevels = (folderPath: string, levels: number): string => {
-  let targetPath = folderPath;
-  for (let i = 0; i < levels; i++) {
-    targetPath = path.dirname(targetPath);
-  }
-  return targetPath;
-};
+import { ConfigContent, ConfigCredentials } from '../types';
 
 /**
  * Asynchronously reads a file and parses its content as JSON.
@@ -27,6 +13,13 @@ export const goUpLevels = (folderPath: string, levels: number): string => {
 export const readFile = async <T>(filePath: string): Promise<T> => {
   const fileContent = await fs.readFile(filePath, 'utf-8');
   return JSON.parse(fileContent);
+};
+
+export const readConfigFile = async () => {
+  const configPath = path.resolve(process.cwd(), '../../config/credentials.json');
+  const result = await readFile<ConfigCredentials>(configPath);
+  validateCredentialConfigs(result.credentials);
+  return result;
 };
 
 /**

@@ -1,10 +1,7 @@
-export interface TestSuite  {
-  (credentialConfigsPath: string): Promise<TestSuiteResult[]>;
-}
+import { ErrorObject } from 'ajv';
 
-export interface TestSuiteResult extends ConfigContent {
-  result: 'FAIL' | 'PASS';
-  errors: string | null;
+export interface TestSuite {
+  (): Promise<(ErrorObject[] | null)[]>;
 }
 
 export interface ConfigCredentials {

@@ -1,22 +1,22 @@
-import { hasErrors } from './services/index.js';
-import { ConfigContent, TestSuite, TestSuiteResult } from './types/index.js';
-import { readFile, validateCredentialConfigs } from './utils/common.js';
+import path from 'path';
+import { TestSuite } from './types/index';
+import { readConfigFile, readFile } from './utils/common.js';
+import { dynamicLoadingSchemaService } from './services/dynamic-loading-schemas/loadingSchema.service.js';
+import { hasErrors } from './services/json-schema/validator.service.js';
 
-export const processTestSuite: TestSuite = async (credentialConfigsPath) => {
-  const credentialConfigs = await readFile<ConfigContent[]>(credentialConfigsPath);
-  validateCredentialConfigs(credentialConfigs);
-
-  const testSuiteResultPromises = credentialConfigs.map<Promise<TestSuiteResult>>(async (credentialConfig) => {
+export const processTestSuite: TestSuite = async () => {
+  const credentialConfigs = await readConfigFile();
+  const testDataPath = path.resolve(process.cwd(), '../../');
+  const testSuiteResultPromises = credentialConfigs.credentials.map(async (credentialConfig) => {
     const { type, version, dataPath } = credentialConfig;
-    const schemaPath = `${process.cwd()}/src/schemas/${type}/${version}/schema.json`;
-    const testDataPath = `${process.cwd()}/${dataPath}`;
-    const [schema, data] = await Promise.all([readFile(schemaPath), readFile(testDataPath)]);
+    const [schema, data] = await Promise.all([
+      dynamicLoadingSchemaService(type, version),
+      readFile(`${testDataPath}/${dataPath}`),
+    ]);
+
     const errors = hasErrors(schema, data);
-    return {
-      ...credentialConfig,
-      result: errors ? 'FAIL' : 'PASS',
-      errors: errors ? ajv.errorsText(errors) : null,
-    };
+
+    return errors;
   });
 
   const testSuiteResult = await Promise.all(testSuiteResultPromises);
