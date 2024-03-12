@@ -2,3 +2,4 @@ build
 lib
 coverage
 __tests__
+scripts
