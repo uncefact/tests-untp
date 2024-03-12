@@ -1,5 +1,5 @@
-import { IDynamicLoadingSchemaService } from './types';
-import { checkSchemaExists, checkSchemaVersionExists, getSchemaContent } from './utils';
+import { IDynamicLoadingSchemaService } from './types.js';
+import { checkSchemaExists, checkSchemaVersionExists, getSchemaContent } from './utils.js';
 
 export const dynamicLoadingSchemaService: IDynamicLoadingSchemaService = async (schema, version) => {
   try {

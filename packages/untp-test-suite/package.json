@@ -35,5 +35,26 @@
   },
   "dependencies": {
     "semver": "^7.6.0"
+  },
+  "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/build/",
+      "/__tests__/mocks/"
+    ],
+    "transform": {
+      "\\.[jt]sx?$": "ts-jest"
+    },
+    "globals": {
+      "ts-jest": {
+        "useESM": true
+      }
+    },
+    "moduleNameMapper": {
+      "(.+)\\.js": "$1"
+    },
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ]
   }
 }

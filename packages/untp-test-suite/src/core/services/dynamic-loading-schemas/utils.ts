@@ -15,8 +15,7 @@ const checkFileExists = async (filePath: string): Promise<boolean> => {
     return false; // The file does not exist
   }
 };
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCHEMA_PATH = path.resolve(__dirname, '../../../schemas'); // ../tests-untp/packages/untp-test-suite/src/schemas
+const SCHEMA_PATH = path.resolve(process.cwd(), '../../../schemas'); // ../tests-untp/packages/untp-test-suite/src/schemas
 
 /**
  * Check if a schema exists
