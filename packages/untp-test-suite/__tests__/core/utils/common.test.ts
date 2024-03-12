@@ -1,5 +1,5 @@
 import * as fs from 'fs/promises';
-import { validateCredentialConfigs, readJsonFile } from '../../../../src/core/utils/common';
+import { validateCredentialConfigs, readJsonFile } from '../../../src/core/utils/common';
 import { resolve } from 'path';
 
 jest.mock('fs/promises', () => ({

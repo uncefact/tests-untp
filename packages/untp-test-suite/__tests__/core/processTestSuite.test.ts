@@ -1,23 +1,22 @@
-import { resolve } from 'path';
-import { hasErrors } from '../../../../src/core/services/json-schema/validator.service';
-import { readJsonFile } from '../../../../src/core/utils/common';
-import { dynamicLoadingSchemaService } from '../../../../src/core/services/dynamic-loading-schemas/loadingSchema.service';
-import { processTestSuite } from '../../../../src/core/processTestSuite';
+import { hasErrors } from '../../src/core/services/json-schema/validator.service';
+import { readJsonFile } from '../../src/core/utils/common';
+import { dynamicLoadingSchemaService } from '../../src/core/services/dynamic-loading-schemas/loadingSchema.service';
+import { processTestSuite } from '../../src/core/processTestSuite';
 
 jest.mock('path', () => ({
   resolve: jest.fn(),
 }));
 
-jest.mock('../../../../src/core/services/json-schema/validator.service', () => ({
+jest.mock('../../src/core/services/json-schema/validator.service', () => ({
   hasErrors: jest.fn(),
 }));
 
-jest.mock('../../../../src/core/utils/common', () => ({
+jest.mock('../../src/core/utils/common', () => ({
   readJsonFile: jest.fn().mockResolvedValue({}),
   validateCredentialConfigs: jest.fn(),
 }));
 
-jest.mock('../../../../src/core/services/dynamic-loading-schemas/loadingSchema.service', () => ({
+jest.mock('../../src/core/services/dynamic-loading-schemas/loadingSchema.service', () => ({
   dynamicLoadingSchemaService: jest.fn(),
 }));
 
