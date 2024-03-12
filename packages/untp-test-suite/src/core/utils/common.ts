@@ -24,10 +24,10 @@ export const goUpLevels = (folderPath: string, levels: number): string => {
  * @template T
  */
 
-export const readFile = async<T>(filePath: string): Promise<T> => {
+export const readFile = async <T>(filePath: string): Promise<T> => {
   const fileContent = await fs.readFile(filePath, 'utf-8');
   return JSON.parse(fileContent);
-}
+};
 
 /**
  * Validates an array of credential configurations.
@@ -42,7 +42,9 @@ export const validateCredentialConfigs = (credentialConfigs: ConfigContent[]) =>
   for (let i = 0; i < credentialConfigs.length; i++) {
     const credential = credentialConfigs[i];
     if (_.isEmpty(credential.type) || _.isEmpty(credential.version) || _.isEmpty(credential.dataPath)) {
-      throw new Error(`Each credential object must contain 'type', 'version', and 'dataPath' fields. Please ensure all required fields are provided.`);
+      throw new Error(
+        `Each credential object must contain 'type', 'version', and 'dataPath' fields. Please ensure all required fields are provided.`,
+      );
     }
   }
 };

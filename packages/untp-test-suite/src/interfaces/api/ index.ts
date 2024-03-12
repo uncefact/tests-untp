@@ -1,1 +1,1 @@
-export { processTestSuite } from '../../core/test-runner.js';
+export { processTestSuite } from '../../core/process-test-suite.js';

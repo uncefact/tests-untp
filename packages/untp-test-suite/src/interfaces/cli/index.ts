@@ -1,1 +1,1 @@
-export * from './createConfigFile';
+export * from './createConfigFile.js';

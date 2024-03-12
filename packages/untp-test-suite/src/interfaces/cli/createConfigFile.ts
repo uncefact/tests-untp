@@ -2,6 +2,7 @@ import fs from 'fs';
 import semver from 'semver';
 
 const SCHEMAS_PATH = 'src/schemas';
+const CONFIG_PATH = 'src/config';
 
 const getPath = (path: string) => {
   const parentDir = process.cwd();
@@ -50,15 +51,17 @@ const mapTypesAndVersions = async () => {
   }
 };
 
+const getConfigPath = () => getPath(CONFIG_PATH);
+
 /**
  * Create a config file with the latest schema versions
  * @returns Promise<void> - A promise that resolves when the file is created
  */
-const createConfigFile = async (configFilePath = './credentials.json'): Promise<void> => {
+const createConfigFile = async (): Promise<void> => {
   const config = await mapTypesAndVersions();
   const configData = JSON.stringify(config, null, 2);
   return new Promise((resolve, reject) => {
-    fs.writeFile(configFilePath, configData, (err) => {
+    fs.writeFile(`${getConfigPath()}/credentials.json`, configData, (err) => {
       if (err) {
         reject(err);
       } else {
