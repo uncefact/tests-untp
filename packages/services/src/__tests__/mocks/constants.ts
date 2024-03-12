@@ -111,3 +111,21 @@ export const dataObjectEvent = {
 };
 
 /*============================= */
+
+export const transactionEventMock = {
+  nlisidMock: '9988776600000',
+  uploadedTransactionEventLinkMock: `https://s3.ap-southeast-2.amazonaws.com/9988776600000-mock.json`,
+  transactionEventDLRMock: `https://example-dlr.com/nlisid/9988776600000?linkType=all`,
+  transactionVCMock: {
+    '@context': ['https://example.sh/TransactionEvent.jsonld'],
+    type: ['VerifiableCredential', 'TransactionEventCredential'],
+    issuer: 'did:web:example.com',
+    credentialSubject: {
+      sourceParty: { partyID: `https://beef-steak-shop.com/info.json`, name: 'Beef Steak Shop' },
+      destinationParty: { partyID: 'https://beef-shop.com/info.json', name: 'Beef Shop' },
+      transaction: { type: 'inv', identifier: 'uuid-123456', documentURL: 'https://transaction-example.com/trans-uuid-1.json'},
+      itemList: [{ itemID: 'https://beef-example.com/info-uuid-1.json', name: 'Beef' }],
+      quantityList: [{ productClass: 'Beef', quantity: '50', uom: 'units' }]
+    },
+  },
+}
