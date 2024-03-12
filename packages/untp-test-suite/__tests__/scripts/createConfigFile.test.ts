@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { createConfigFile } from '../../build/interfaces/cli/createConfigFile';
+import { createConfigFile } from '../../src/interfaces/cli/createConfigFile';
 
 jest.mock('fs', () => ({
   writeFile: jest.fn(),
@@ -9,13 +9,13 @@ jest.mock('fs', () => ({
 
 describe('createConfigFile', () => {
   it('should call createConfigFile successful', async () => {
-    (fs.readdir as any).mockImplementation((_path, callback) => {
+    (fs.readdir as any).mockImplementation((_path: string, callback: any) => {
       callback(null, ['objectEvent', 'productPassport']);
     });
 
     (fs.readdirSync as any).mockImplementation(() => ['v0.0.2', 'v0.0.2']);
 
-    (fs.writeFile as any).mockImplementationOnce((_path, _data, callback) => {
+    (fs.writeFile as any).mockImplementationOnce((_path: string, _data: any, callback: any) => {
       callback(null);
     });
     await createConfigFile();
@@ -24,7 +24,7 @@ describe('createConfigFile', () => {
   });
 
   it('should show errors when fs.writeFile return error', async () => {
-    (fs.readdir as any).mockImplementation((_path, callback) => {
+    (fs.readdir as any).mockImplementation((_path: string, callback: any) => {
       callback(null, ['objectEvent', 'productPassport']);
     });
 
@@ -43,7 +43,7 @@ describe('createConfigFile', () => {
 
   it('should show errors when fs.readdir in getSchemaTypeName() catch error', async () => {
     const error = new Error('readdir error');
-    (fs.readdir as any).mockImplementation((_path, callback) => {
+    (fs.readdir as any).mockImplementation((_path: string, callback: any) => {
       callback(error, null);
     });
 
@@ -54,7 +54,7 @@ describe('createConfigFile', () => {
 
   it('should show errors when fs.readdirSync in getLastestSchemaVersion() catch error', async () => {
     const error = new Error('readdirSync error');
-    (fs.readdir as any).mockImplementation((_path, callback) => {
+    (fs.readdir as any).mockImplementation((_path: string, callback: any) => {
       callback(null, ['objectEvent', 'productPassport']);
     });
 

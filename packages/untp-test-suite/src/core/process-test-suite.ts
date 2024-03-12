@@ -4,6 +4,11 @@ import { readFile, validateCredentialConfigs } from './utils/common.js';
 import { dynamicLoadingSchemaService } from './services/dynamic-loading-schemas/loadingSchema.service.js';
 import { hasErrors } from './services/json-schema/validator.service.js';
 
+/**
+ * Process the test suite
+ * @param credentialConfigsPath - The path to the credential configs
+ * @returns The test suite result
+ */
 export const processTestSuite: TestSuite = async (credentialConfigsPath) => {
   const credentialConfigs = await readFile<ConfigCredentials>(credentialConfigsPath);
   validateCredentialConfigs(credentialConfigs.credentials);
