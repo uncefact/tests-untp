@@ -70,3 +70,13 @@ export interface ITraceabilityEvent {
 export interface ITransactionEventContext extends IContext {
   epcisTransactionEvent: IEntityIssue;
 }
+
+export interface IAggregationEvent {
+  data: {
+    [key: string]: any;
+  };
+}
+
+export interface IAggregationEventContext extends IContext {
+  epcisAggregationEvent: IEntityIssue;
+}

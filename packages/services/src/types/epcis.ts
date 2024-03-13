@@ -8,10 +8,20 @@ export enum EPCISEventType {
 
 export enum EPCISEventAction {
   Observe = 'observe',
+  Add = 'add',
+  Delete = 'delete'
 }
 
 export enum EPCISEventDisposition {
   InTransit = 'in_transit',
+}
+
+export enum EPCISBusinessStepCode {
+  Commissioning = 'commissioning',
+  Inspecting = 'inspecting',
+  Shipping = 'shipping',
+  Packing = 'packing',
+  Unpacking = 'unpacking',
 }
 
 export interface EPCISEvent {
