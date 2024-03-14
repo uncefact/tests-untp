@@ -3,3 +3,4 @@ lib
 coverage
 __tests__
 scripts
+jest.config.*

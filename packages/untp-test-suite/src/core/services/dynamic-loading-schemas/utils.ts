@@ -1,6 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const SCHEMA_PATH = path.resolve(__dirname, '../../../../src/schemas');
 
 /**
  * Check if a file exists
@@ -15,7 +20,6 @@ const checkFileExists = async (filePath: string): Promise<boolean> => {
     return false; // The file does not exist
   }
 };
-const SCHEMA_PATH = path.resolve(process.cwd(), '../../../schemas'); // ../tests-untp/packages/untp-test-suite/src/schemas
 
 /**
  * Check if a schema exists
