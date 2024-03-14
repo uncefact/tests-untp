@@ -1,19 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-
-/**
- * Go up levels in the directory tree
- * @param folderPath - The path to the current folder
- * @param levels - The number of levels to go up
- * @returns The path to the target folder
- */
-const goUpLevels = (folderPath: string, levels: number): string => {
-  let targetPath = folderPath;
-  for (let i = 0; i < levels; i++) {
-    targetPath = path.dirname(targetPath);
-  }
-  return targetPath;
-};
+import { fileURLToPath } from 'url';
 
 /**
  * Check if a file exists
@@ -28,6 +15,7 @@ const checkFileExists = async (filePath: string): Promise<boolean> => {
     return false; // The file does not exist
   }
 };
+const SCHEMA_PATH = path.resolve(process.cwd(), '../../../schemas'); // ../tests-untp/packages/untp-test-suite/src/schemas
 
 /**
  * Check if a schema exists
@@ -35,8 +23,7 @@ const checkFileExists = async (filePath: string): Promise<boolean> => {
  * @returns A promise that resolves to a boolean indicating if the schema exists
  */
 export const checkSchemaExists = async (schemaName: string): Promise<boolean> => {
-  const targetPath = goUpLevels(process.cwd(), 3);
-  return checkFileExists(`${targetPath}/schemas/${schemaName}`);
+  return checkFileExists(`${SCHEMA_PATH}/${schemaName}`);
 };
 
 /**
@@ -46,8 +33,7 @@ export const checkSchemaExists = async (schemaName: string): Promise<boolean> =>
  * @returns A promise that resolves to a boolean indicating if the schema version exists
  */
 export const checkSchemaVersionExists = async (folderName: string, version: string): Promise<boolean> => {
-  const targetPath = goUpLevels(process.cwd(), 3);
-  return checkFileExists(`${targetPath}/schemas/${folderName}/${version}`);
+  return checkFileExists(`${SCHEMA_PATH}/${folderName}/${version}`);
 };
 
 /**
@@ -57,6 +43,5 @@ export const checkSchemaVersionExists = async (folderName: string, version: stri
  * @returns A promise that resolves to the content of the schema
  */
 export const getSchemaContent = (folderName: string, version: string): Promise<string> => {
-  const targetPath = goUpLevels(process.cwd(), 3);
-  return fs.promises.readFile(`${targetPath}/schemas/${folderName}/${version}/schema.json`, 'utf-8');
+  return fs.promises.readFile(`${SCHEMA_PATH}/${folderName}/${version}/schema.json`, 'utf-8');
 };

@@ -1,2 +1,2 @@
 export * from './json-schema/index.js';
-export * from './dynamic-loading-schemas';
+export * from './dynamic-loading-schemas/index.js';

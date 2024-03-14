@@ -60,3 +60,23 @@ export interface ITransformationEvent extends IContext {
   epcisTransformationEvent: IEntityIssue;
   productTransformation: IProductTransformation;
 }
+
+export interface ITraceabilityEvent {
+  data: {
+    [key: string]: any;
+  };
+}
+
+export interface ITransactionEventContext extends IContext {
+  epcisTransactionEvent: IEntityIssue;
+}
+
+export interface IAggregationEvent {
+  data: {
+    [key: string]: any;
+  };
+}
+
+export interface IAggregationEventContext extends IContext {
+  epcisAggregationEvent: IEntityIssue;
+}

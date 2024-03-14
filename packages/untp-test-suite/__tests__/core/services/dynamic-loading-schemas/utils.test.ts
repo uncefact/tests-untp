@@ -16,6 +16,7 @@ jest.mock('fs', () => ({
 
 jest.mock('path', () => ({
   dirname: jest.fn(),
+  resolve: jest.fn().mockReturnValue('/tests-untp/packages/untp-test-suite/src/schemas'),
 }));
 
 describe('utils dynamic loading schema', () => {
@@ -24,9 +25,10 @@ describe('utils dynamic loading schema', () => {
   });
 
   const schemaName = 'event';
-  const currentPath = '/path/to';
+  const currentPath = '/tests-untp/packages/untp-test-suite/src/schemas';
+
   it('should check if a schema exists', async () => {
-    const expectedPath = `${currentPath}/schemas/${schemaName}`;
+    const expectedPath = `${currentPath}/${schemaName}`;
     const accessSpy = jest.spyOn(fs.promises, 'access').mockResolvedValue();
     jest.spyOn(path, 'dirname').mockReturnValue(currentPath);
 
@@ -38,7 +40,7 @@ describe('utils dynamic loading schema', () => {
 
   const version = 'v1.0.0';
   it('should check if a schema version exists', async () => {
-    const expectedPath = `${currentPath}/schemas/${schemaName}/${version}`;
+    const expectedPath = `${currentPath}/${schemaName}/${version}`;
     const accessSpy = jest.spyOn(fs.promises, 'access').mockResolvedValue();
     jest.spyOn(path, 'dirname').mockReturnValue(currentPath);
 

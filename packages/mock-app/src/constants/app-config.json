@@ -217,7 +217,7 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332",
-                    "issuer": "did:web:0af6-103-69-79-17.ngrok-free.app"
+                    "issuer": "did:web:2dc7-115-73-168-48.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -239,6 +239,143 @@
                     "bucket": "agtrace-test-verifiable-credentials"
                   },
                   "identifierKeyPaths": ["herd", "NLIS"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Transaction Event",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "formTitle": "Transaction Event",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sourceParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://wholesalebeef.com/41161080146.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Wholesale Beef"]
+                        }
+                      }
+                    },
+                    "destinationParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://primebeef.com/51161080100.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Prime Beef"]
+                        }
+                      }
+                    },
+                    "transaction": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["bol", "cert", "desadv", "inv", "po"]
+                        },
+                        "identifier": {
+                          "type": "string"
+                        },
+                        "documentURL": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "itemList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemID": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "quantityList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productClass": {
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "type": "string"
+                          },
+                          "uom": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "locationId": {
+                      "title": "Location ID",
+                      "type": "string",
+                      "enum": ["https://plus.codes/4RRHM6PR+MH"]
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "style": { "textAlign": "center", "paddingTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processTransactionEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "issuer": "did:web:115a-27-75-225-151.ngrok-free.app"
+                  },
+                  "epcisTransactionEvent": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["TransactionEventCredential"],
+                    "dlrLinkTitle": "Transaction Event",
+                    "dlrIdentificationKeyType": "nlisid",
+                    "dlrVerificationPage": "http://localhost:3000/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "identifierKeyPaths": ["transaction", "identifier"]
                 }
               ]
             }
@@ -385,6 +522,145 @@
                     ]
                   },
                   "identifierKeyPaths": ["NLIS"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Aggregation",
+      "type": "producer",
+      "assets": {
+        "logo": "https://example.com/logo.png",
+        "brandTitle": "Wagu Wonder",
+        "passportVC": "",
+        "transactionEventVC": ""
+      },
+      "styles": {
+        "primaryColor": "rgb(41, 171, 48)",
+        "secondaryColor": "white",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Aggregation Event",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "formTitle": "Aggregation Event",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "parentItem": {
+                      "type": "object",
+                      "title": "Parent Item",
+                      "properties": {
+                        "itemID": {
+                          "type": "string",
+                          "title": "Item ID",
+                          "enum": ["9359502000010"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "title": "Name",
+                          "enum": ["Beef Steak Variety Container"]
+                        }
+                      }
+                    },
+                    "childItems": {
+                      "type": "array",
+                      "title": "Child Items",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemID": {
+                            "type": "string",
+                            "title": "Item ID"
+                          },
+                          "name": {
+                            "type": "string",
+                            "title": "Name",
+                            "description": "Please enter your name"
+                          }
+                        }
+                      }
+                    },
+                    "childQuantityList": {
+                      "type": "array",
+                      "title": "Child Quantity List",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productClass": {
+                            "type": "string",
+                            "title": "Product Class"
+                          },
+                          "quantity": {
+                            "type": "string",
+                            "title": "Quantity"
+                          },
+                          "uom": {
+                            "type": "string",
+                            "title": "Uom"
+                          }
+                        }
+                      }
+                    },
+                    "locationId": {
+                      "title": "Location ID",
+                      "type": "string",
+                      "enum": ["https://plus.codes/4RRHM6PR+MH"]
+                    }
+                  }
+                }
+              },
+              "initialData": {},
+              "className": "json-form",
+              "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "style": { "textAlign": "center", "paddingTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processAggregationEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "issuer": "did:web:398f-103-69-79-17.ngrok-free.app"
+                  },
+                  "epcisAggregationEvent": {
+                    "context": [
+                      "https://jargon.sh/user/unece/traceabilityEvents/v/working/artefacts/jsonldContexts/AggregationEvent.jsonld?class=AggregationEvent"
+                    ],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["AggregationEventCredential"],
+                    "dlrLinkTitle": "Aggregation Event",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "http://localhost:3001/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "identifierKeyPaths": ["parentItem", "itemID"]
                 }
               ]
             }

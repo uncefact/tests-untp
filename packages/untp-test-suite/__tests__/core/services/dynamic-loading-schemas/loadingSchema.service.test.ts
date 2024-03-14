@@ -71,7 +71,9 @@ describe('loadingSchema.service', () => {
     (checkSchemaExists as jest.Mock).mockResolvedValue(true);
     (checkSchemaVersionExists as jest.Mock).mockResolvedValue(true);
     (getSchemaContent as jest.Mock).mockResolvedValue(content);
-
+    JSON.parse = jest.fn().mockImplementation(() => {
+      return content;
+    });
     const result = await dynamicLoadingSchemaService(schema, version);
 
     expect(checkSchemaExists).toHaveBeenCalledTimes(1);
