@@ -22,6 +22,7 @@
   "scripts": {
     "create:config": "node ./scripts/createConfigFile.js",
     "test": "jest",
+    "test:coverage": "jest --coverage",
     "build": "tsc --build --clean && tsc",
     "watch": "tsc -b --watch",
     "lint": "eslint ."
