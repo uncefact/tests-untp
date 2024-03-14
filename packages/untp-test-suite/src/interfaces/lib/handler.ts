@@ -1,44 +1,43 @@
 import path from 'path';
 import chalk from 'chalk';
-import { readJsonFile } from '../utils/index.js';
-import { createConfigFile } from './createConfigFile.js';
-import { CreateConfigHandler, TestSuiteHandler } from '../types/index.js';
+import { readJsonFile, generateCredentialFile } from '../utils/index.js';
+import { GenerateCredentialFileHandler, TestSuiteHandler } from '../types/index.js';
 
-const log = console.log;
 const rootPath = process.cwd();
-const configFileName = 'credentials.json';
-export const defaultConfigFilePath = `${rootPath}/${configFileName}`;
+const credentialFileName = 'credentials.json';
 
-export const processTestSuite: TestSuiteHandler = async (options: any) => {
+export const defaultCredentialFilePath = `${rootPath}/${credentialFileName}`;
+export const schemasPath = `${rootPath}/src/schemas`;
+
+export const testSuiteHandler: TestSuiteHandler = async (options: any) => {
   try {
-  log(chalk.yellow('Untp test suites are running......'));
+    console.log(chalk.yellow('Untp test suites are running......'));
 
-    let configPath = defaultConfigFilePath;
+    let credentialPath = defaultCredentialFilePath;
     if (options.config) {
-      configPath = path.resolve(rootPath, configPath);
+      credentialPath = path.resolve(rootPath, credentialPath);
     }
 
-    const testSuiteResults = await processTestSuite(configPath);
-    log(chalk.bgGreen.white.bold('Untp test suites have completed successfully!'));
+    // const testSuiteResults = await processTestSuite(credentialPath);
+    console.log(chalk.bgGreen.white.bold('Untp test suites have completed successfully!'));
   } catch (error) {
-    log(chalk.bgRed.white.bold('Run Untp test suites failed'));
-    log(chalk.red(error));
+    console.log(chalk.bgRed.white.bold('Run Untp test suites failed'));
+    console.log(chalk.red(error));
   }
 }
 
-export const processCreateConfig: CreateConfigHandler = async () => {
+export const generateCredentialFileHandler: GenerateCredentialFileHandler = async (storePath: string, schemasPath: string) => {
   try {
-    const configFilePath = `${process.cwd()}/${configFileName}`;
-    const configFile = await readJsonFile(configFilePath);
-    if (configFile) {
-      return log(chalk.bgRed.white.bold(`Config file '${configFileName}' already exists!`));
+    const credentialFile = await readJsonFile(defaultCredentialFilePath);
+    if (credentialFile) {
+      return console.log(chalk.bgRed.white.bold(`Credential file '${credentialFileName}' already exists!`));
     }
 
-    await createConfigFile(`${process.cwd()}/${configFileName}`);
+    await generateCredentialFile(storePath, schemasPath);
 
-    log(chalk.bgGreen.white.bold(`Config file '${configFileName}' created successfully!`));
+    console.log(chalk.bgGreen.white.bold(`Credential file '${credentialFileName}' generated successfully!`));
   } catch (error) {
-    log(chalk.bgRed.white.bold('Create the credentials file failed!'));
-    log(chalk.red(error));
+    console.log(chalk.bgRed.white.bold('Generate the credentials file failed!'));
+    console.log(chalk.red(error));
   }
 }

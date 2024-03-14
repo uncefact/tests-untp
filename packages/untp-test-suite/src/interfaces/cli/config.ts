@@ -1,11 +1,11 @@
 import { Command } from 'commander';
-import { processCreateConfig } from '../lib/index.js';
+import { generateCredentialFileHandler, schemasPath, defaultCredentialFilePath } from '../lib/index.js';
 
 const config = new Command('config');
 config
   .description('Create Untp test suites configuration file')
   .action(async () => {
-    await processCreateConfig();
+    await generateCredentialFileHandler(defaultCredentialFilePath, schemasPath);
   });
 
 export { config }

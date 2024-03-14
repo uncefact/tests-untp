@@ -1,12 +1,12 @@
 import { Command } from 'commander';
-import { defaultConfigFilePath, processTestSuite } from '../lib/index.js';
+import { defaultCredentialFilePath, testSuiteHandler } from '../lib/index.js';
 
 const test = new Command('test');
 test
   .description('Run Untp test suites')
-  .option('-c, --config <path>', `Configuration file (default path: "${defaultConfigFilePath}")`, defaultConfigFilePath)
+  .option('-c, --config <path>', `Configuration file (default path: "${defaultCredentialFilePath}")`, defaultCredentialFilePath)
   .action(async (options) => {
-    await processTestSuite(options);
+    await testSuiteHandler(options);
   });
 
 export { test };
