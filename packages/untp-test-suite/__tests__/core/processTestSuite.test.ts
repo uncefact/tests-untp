@@ -22,7 +22,20 @@ jest.mock('../../src/core/services/dynamic-loading-schemas/loadingSchema.service
 
 describe('processTestSuite', () => {
   it('should process the test suite and return an array of null', async () => {
-    (validateCredentialConfigs as jest.Mock).mockReturnValue(null);
+    (validateCredentialConfigs as jest.Mock).mockReturnValue([
+      {
+        type: 'objectEvent',
+        version: 'v0.0.1',
+        dataPath: 'test-data/parent-item-object.json',
+        errors: null,
+      },
+      {
+        type: 'transactionEvent',
+        version: 'v0.0.2',
+        dataPath: 'test-data/parent-item-transaction.json',
+        errors: null,
+      },
+    ]);
     (dynamicLoadingSchemaService as jest.Mock).mockResolvedValue({
       type: 'object',
       additionalProperties: false,
@@ -38,15 +51,20 @@ describe('processTestSuite', () => {
 
     (readJsonFile as jest.Mock).mockImplementation(async (filePath: string) => {
       if (filePath.includes('/untp-test-suite/src/config/credentials.json')) {
-        return {
-          credentials: [
-            {
-              type: 'objectEvent',
-              version: 'v0.0.1',
-              dataPath: 'test-data/parent-item.json',
-            },
-          ],
-        };
+        return [
+          {
+            type: 'objectEvent',
+            version: 'v0.0.1',
+            dataPath: 'test-data/parent-item-object.json',
+            errors: null,
+          },
+          {
+            type: 'transactionEvent',
+            version: 'v0.0.2',
+            dataPath: 'test-data/parent-item-transaction.json',
+            errors: null,
+          },
+        ];
       }
 
       return {
@@ -64,37 +82,79 @@ describe('processTestSuite', () => {
       {
         type: 'objectEvent',
         version: 'v0.0.1',
-        dataPath: 'test-data/parent-item.json',
+        dataPath: 'test-data/parent-item-object.json',
+        errors: null,
+      },
+      {
+        type: 'transactionEvent',
+        version: 'v0.0.2',
+        dataPath: 'test-data/parent-item-transaction.json',
         errors: null,
       },
     ]);
   });
 
   it('should process the test suite and return an array of errors with Ajv errors', async () => {
-    (validateCredentialConfigs as jest.Mock).mockReturnValue(null);
-    (dynamicLoadingSchemaService as jest.Mock).mockResolvedValue({
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        parentItem: {
-          $ref: '#/$defs/Item',
-          description:
-            'The unique item identifier that is the result of this aggreation. Typcially a packaging ID used in shipments that represents a box/ pallet / container of contained items.',
-        },
+    (validateCredentialConfigs as jest.Mock).mockReturnValue([
+      {
+        type: 'objectEvent',
+        version: 'v0.0.1',
+        dataPath: 'test-data/parent-item-object.json',
+        errors: null,
       },
+      {
+        type: 'transactionEvent',
+        version: 'v0.0.2',
+        dataPath: 'test-data/parent-item-transaction.json',
+        errors: null,
+      },
+    ]);
+
+    (dynamicLoadingSchemaService as jest.Mock).mockImplementation(async (type, version) => {
+      if (type === 'objectEvent') {
+        return {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            parentItem: {
+              type: 'string',
+              example: 'object',
+              description:
+                'The unique item identifier that is the result of this aggreation. Typcially a packaging ID used in shipments that represents a box/ pallet / container of contained items.',
+            },
+          },
+        };
+      }
+      return {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          sourceParty: {
+            $ref: '#/$defs/Party',
+            description: 'The source party for this supply chain transaction - typcially the seller party',
+          },
+          destinationParty: {
+            $ref: '#/$defs/Party',
+            description: 'The destination party for this supply chain transaction - typcially the buyer party.',
+          },
+        },
+      };
     });
 
     (readJsonFile as jest.Mock).mockImplementation(async (filePath: string) => {
       if (filePath.includes('/untp-test-suite/src/config/credentials.json')) {
-        return {
-          credentials: [
-            {
-              type: 'objectEvent',
-              version: 'v0.0.1',
-              dataPath: 'test-data/parent-item.json',
-            },
-          ],
-        };
+        return [
+          {
+            type: 'objectEvent',
+            version: 'v0.0.1',
+            dataPath: 'test-data/parent-item-object.json',
+          },
+          {
+            type: 'transactionEvent',
+            version: 'v0.0.2',
+            dataPath: 'test-data/parent-item-transaction.json',
+          },
+        ];
       }
 
       return {
@@ -117,38 +177,53 @@ describe('processTestSuite', () => {
       },
     ];
 
-    (hasErrors as jest.Mock).mockReturnValue(expectedHasError);
+    (hasErrors as jest.Mock).mockImplementation((schema, data) => {
+      if (schema.properties.destinationParty) {
+        return expectedHasError;
+      }
+
+      return null;
+    });
 
     const result = await processTestSuite('/untp-test-suite/src/config/credentials.json');
+
     expect(result).toEqual([
       {
-        dataPath: 'test-data/parent-item.json',
         type: 'objectEvent',
         version: 'v0.0.1',
+        dataPath: 'test-data/parent-item-object.json',
+        errors: null,
+      },
+      {
+        type: 'transactionEvent',
+        version: 'v0.0.2',
+        dataPath: 'test-data/parent-item-transaction.json',
         errors: expectedHasError,
       },
     ]);
   });
 
   it('should process the test suite and return an array of errors with validation errors', async () => {
-    const expectedError = [
+    (validateCredentialConfigs as jest.Mock).mockReturnValue([
       {
-        keyword: 'required',
-        dataPath: '',
-        schemaPath: '#/required',
-        params: { missingProperty: 'type' },
-        message: "should have required property 'type'",
+        type: 'objectEvent',
+        version: '',
+        dataPath: 'test-data/parent-item-object.json',
+        errors: 'should have required property `version`',
       },
       {
-        keyword: 'required',
+        type: 'transformationEvent',
+        version: 'v0.0.2',
         dataPath: '',
-        schemaPath: '#/required',
-        params: { missingProperty: 'version' },
-        message: "should have required property 'version'",
+        errors: 'should have required property `dataPath`',
       },
-    ];
-
-    (validateCredentialConfigs as jest.Mock).mockReturnValue(expectedError);
+      {
+        type: 'transactionEvent',
+        version: 'v0.0.2',
+        dataPath: 'test-data/parent-item-transaction.json',
+        errors: null,
+      },
+    ]);
     (dynamicLoadingSchemaService as jest.Mock).mockResolvedValue({
       type: 'object',
       additionalProperties: false,
@@ -161,7 +236,6 @@ describe('processTestSuite', () => {
         },
       },
     });
-
     (readJsonFile as jest.Mock).mockImplementation(async (filePath: string) => {
       if (filePath.includes('/untp-test-suite/src/config/credentials.json')) {
         return {
@@ -189,45 +263,63 @@ describe('processTestSuite', () => {
 
     expect(result).toEqual([
       {
+        type: 'transactionEvent',
+        version: 'v0.0.2',
+        dataPath: 'test-data/parent-item-transaction.json',
+        errors: null,
+      },
+      {
         type: 'objectEvent',
-        version: 'v0.0.1',
-        dataPath: 'test-data/parent-item.json',
-        errors: expectedError,
+        version: '',
+        dataPath: 'test-data/parent-item-object.json',
+        errors: 'should have required property `version`',
+      },
+      {
+        type: 'transformationEvent',
+        version: 'v0.0.2',
+        dataPath: '',
+        errors: 'should have required property `dataPath`',
       },
     ]);
   });
 
-  it('should process the test suite and return an array of errors with validation errors and hasError from Ajv', async () => {
-    const expectedError = [
+  it.only('should process the test suite and return an array of errors with validation errors and hasError from Ajv', async () => {
+    (validateCredentialConfigs as jest.Mock).mockReturnValue([
       {
-        keyword: 'required',
-        dataPath: '',
-        schemaPath: '#/required',
-        params: { missingProperty: 'type' },
-        message: "should have required property 'type'",
+        type: 'transactionEvent',
+        version: '',
+        dataPath: 'test-data/parent-item-object.json',
+        errors: 'should have required property `version`',
       },
       {
-        keyword: 'required',
-        dataPath: '',
-        schemaPath: '#/required',
-        params: { missingProperty: 'version' },
-        message: "should have required property 'version'",
+        type: 'objectEvent',
+        version: 'v0.0.2',
+        dataPath: 'test-data/parent-item-transaction.json',
+        errors: null,
       },
-    ];
-    (validateCredentialConfigs as jest.Mock).mockReturnValue(expectedError);
-    (dynamicLoadingSchemaService as jest.Mock).mockResolvedValue({
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        parentItem: {
-          type: 'string',
-          example: 'object',
-          description:
-            'The unique item identifier that is the result of this aggreation. Typcially a packaging ID used in shipments that represents a box/ pallet / container of contained items.',
-        },
-      },
-    });
+    ]);
 
+    (dynamicLoadingSchemaService as jest.Mock).mockImplementation(async (type) => {
+      if (type === 'objectEvent') {
+        return {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            parentItem: {
+              type: 'string',
+              example: 'object',
+              description:
+                'The unique item identifier that is the result of this aggreation. Typcially a packaging ID used in shipments that represents a box/ pallet / container of contained items.',
+            },
+          },
+        };
+      }
+      return {
+        type: 'string',
+        additionalProperties: false,
+        describe: 'Test description',
+      };
+    });
     (readJsonFile as jest.Mock).mockImplementation(async (filePath: string) => {
       if (filePath.includes('/untp-test-suite/src/config/credentials.json')) {
         return {
@@ -255,23 +347,47 @@ describe('processTestSuite', () => {
         dataPath: '.parentItem',
         schemaPath: '#/$defs/Item/properties/itemID/type',
         params: {
-          type: 'string',
+          type: 'object',
         },
-        message: 'should be string',
+        message: 'should be `object`',
       },
     ];
 
-    (hasErrors as jest.Mock).mockReturnValue(hasErrorExpect);
+    (hasErrors as jest.Mock).mockImplementation((schema) => {
+      if (schema.type === 'object') {
+        return hasErrorExpect;
+      }
 
+      return null;
+    });
     const result = await processTestSuite('/untp-test-suite/src/config/credentials.json');
 
     expect(result).toEqual([
       {
         type: 'objectEvent',
-        version: 'v0.0.1',
-        dataPath: 'test-data/parent-item.json',
-        errors: [...hasErrorExpect, ...expectedError],
+        version: 'v0.0.2',
+        dataPath: 'test-data/parent-item-transaction.json',
+        errors: hasErrorExpect,
+      },
+      {
+        type: 'transactionEvent',
+        version: '',
+        dataPath: 'test-data/parent-item-object.json',
+        errors: 'should have required property `version`',
       },
     ]);
+  });
+
+  it('should process the test suite and throw an error if the credentials array is empty', async () => {
+    (validateCredentialConfigs as jest.Mock).mockReturnValue([]);
+    (readJsonFile as jest.Mock).mockResolvedValue({ credentials: [] });
+
+    try {
+      await processTestSuite('/untp-test-suite/src/config/credentials.json');
+    } catch (error) {
+      expect(error).toEqual(
+        new Error('Credentials array cannot be empty. Please provide valid credentials to proceed.'),
+      );
+    }
   });
 });

@@ -1,7 +1,6 @@
 import fs from 'fs/promises';
 import _ from 'lodash';
-import { ConfigContent } from '../types';
-import { ErrorObject } from 'ajv';
+import { ConfigContent, TestSuiteResult } from '../types';
 
 /**
  * Asynchronously reads a file and parses its content as JSON.
@@ -17,46 +16,49 @@ export const readJsonFile = async <T>(filePath: string): Promise<T> => {
 
 /**
  * Map the required error object
- * @param {string} fieldName - The name of the field that is required.
+ * @param {string} missingField - The name of the field that is required.
  * @returns {ErrorObject} The required error object.
  */
-const createMissingFieldError = (fieldName: string): ErrorObject => {
+const createMissingFieldError = (
+  credential: ConfigContent,
+  credentialConfigsPath: string,
+  missingField?: string,
+): TestSuiteResult => {
+  const isErrorMessages = missingField ? `should have required property '${missingField}'` : null;
   return {
-    keyword: 'required',
-    dataPath: '',
-    schemaPath: '#/required',
-    params: { missingProperty: fieldName },
-    message: `should have required property '${fieldName}'`,
+    type: credential.version ?? '',
+    version: credential.type ?? '',
+    dataPath: credential.dataPath ?? '',
+    configPath: credentialConfigsPath,
+    errors: isErrorMessages,
   };
 };
 
 /**
  * Validates an array of credential configurations.
  * @param {ConfigContent[]} credentialConfigs - The array of credential configurations to be validated.
- * @returns {ErrorObject[] | null} An array of errors if the credential configurations are invalid, or null if they are valid.
+ * @returns {TestSuiteResult[] | null} An array of errors if the credential configurations are invalid, or null if they are valid.
  */
-export const validateCredentialConfigs = (credentialConfigs: ConfigContent[]): ErrorObject[] | null => {
+export const validateCredentialConfigs = (
+  credentialConfigsPath: string,
+  credentialConfigs: ConfigContent[],
+): TestSuiteResult[] => {
   if (_.isEmpty(credentialConfigs)) {
     throw new Error('Credentials array cannot be empty. Please provide valid credentials to proceed.');
   }
 
   const arrError = [];
-  for (let i = 0; i < credentialConfigs.length; i++) {
-    const credential = credentialConfigs[i];
+  for (const credential of credentialConfigs) {
     if (_.isEmpty(credential.type)) {
-      arrError.push(createMissingFieldError('type'));
-    }
-    if (_.isEmpty(credential.version)) {
-      arrError.push(createMissingFieldError('version'));
-    }
-    if (_.isEmpty(credential.dataPath)) {
-      arrError.push(createMissingFieldError('dataPath'));
+      arrError.push(createMissingFieldError(credential, credentialConfigsPath, 'type'));
+    } else if (_.isEmpty(credential.version)) {
+      arrError.push(createMissingFieldError(credential, credentialConfigsPath, 'version'));
+    } else if (_.isEmpty(credential.dataPath)) {
+      arrError.push(createMissingFieldError(credential, credentialConfigsPath, 'dataPath'));
+    } else {
+      arrError.push(createMissingFieldError(credential, credentialConfigsPath));
     }
   }
 
-  if (arrError.length > 0) {
-    return arrError;
-  }
-
-  return null;
+  return arrError;
 };

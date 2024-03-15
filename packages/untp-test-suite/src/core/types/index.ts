@@ -8,6 +8,8 @@ export interface ConfigContent {
   type: string;
   version: string;
   dataPath: string;
+
+  configPath?: string;
 }
 
 export interface TestSuite {
@@ -15,7 +17,7 @@ export interface TestSuite {
 }
 
 export interface TestErrors {
-  errors: ErrorObject[] | null;
+  errors: ErrorObject[] | string | null;
 }
 
 export interface TestSuiteResult extends ConfigContent, TestErrors {}

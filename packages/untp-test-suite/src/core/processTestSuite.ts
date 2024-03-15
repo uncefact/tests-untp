@@ -11,34 +11,29 @@ import { hasErrors } from './services/json-schema/validator.service.js';
  */
 export const processTestSuite: TestSuite = async (credentialConfigsPath) => {
   const credentialConfigs = await readJsonFile<ConfigCredentials>(credentialConfigsPath);
-  const validateCredentialResult = validateCredentialConfigs(credentialConfigs.credentials);
+  const validateCredentialResult = validateCredentialConfigs(credentialConfigsPath, credentialConfigs.credentials);
+
+  const configContentNoError = validateCredentialResult?.filter((config) => config.errors === null);
 
   const testDataPath = path.resolve(process.cwd(), '../../');
-  const testSuiteResultPromises = credentialConfigs.credentials.map<Promise<TestSuiteResult>>(
-    async (credentialConfig) => {
-      const { type, version, dataPath } = credentialConfig;
-      const [schema, data] = await Promise.all([
-        dynamicLoadingSchemaService(type, version),
-        readJsonFile(`${testDataPath}/${dataPath}`),
-      ]);
+  const testSuiteResultPromises = configContentNoError?.map<Promise<TestSuiteResult>>(async (credentialConfig) => {
+    const { type, version, dataPath } = credentialConfig;
+    const [schema, data] = await Promise.all([
+      dynamicLoadingSchemaService(type, version),
+      readJsonFile(`${testDataPath}/${dataPath}`),
+    ]);
 
-      const errors = hasErrors(schema, data);
+    const errors = hasErrors(schema, data);
 
-      return {
-        ...credentialConfig,
-        errors,
-      };
-    },
-  );
+    return {
+      ...credentialConfig,
+      errors,
+    };
+  });
 
   const testSuiteResult = await Promise.all(testSuiteResultPromises);
-  testSuiteResult.forEach((result) => {
-    if (result.errors && validateCredentialResult && validateCredentialResult?.length > 0) {
-      result.errors = [...result.errors, ...validateCredentialResult];
-    } else if (validateCredentialResult && validateCredentialResult?.length > 0) {
-      result.errors = [...validateCredentialResult];
-    }
-  });
+  const validConfigWithError = validateCredentialResult?.filter((config) => config.errors !== null);
+  testSuiteResult.push(...validConfigWithError);
 
   return testSuiteResult;
 };
