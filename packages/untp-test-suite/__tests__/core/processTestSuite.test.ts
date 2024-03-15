@@ -22,7 +22,7 @@ jest.mock('../../src/core/services/dynamic-loading-schemas/loadingSchema.service
 
 describe('processTestSuite', () => {
   it('should process the test suite and return an array of null', async () => {
-    (validateCredentialConfigs as jest.Mock).mockReturnValue({ errors: null });
+    (validateCredentialConfigs as jest.Mock).mockReturnValue(null);
     (dynamicLoadingSchemaService as jest.Mock).mockResolvedValue({
       type: 'object',
       additionalProperties: false,
@@ -71,7 +71,7 @@ describe('processTestSuite', () => {
   });
 
   it('should process the test suite and return an array of errors with Ajv errors', async () => {
-    (validateCredentialConfigs as jest.Mock).mockReturnValue({ errors: null });
+    (validateCredentialConfigs as jest.Mock).mockReturnValue(null);
     (dynamicLoadingSchemaService as jest.Mock).mockResolvedValue({
       type: 'object',
       additionalProperties: false,
