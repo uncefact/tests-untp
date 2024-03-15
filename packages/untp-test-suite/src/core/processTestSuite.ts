@@ -13,10 +13,10 @@ export const processTestSuite: TestSuite = async (credentialConfigsPath) => {
   const credentialConfigs = await readJsonFile<ConfigCredentials>(credentialConfigsPath);
   const validateCredentialResult = validateCredentialConfigs(credentialConfigsPath, credentialConfigs.credentials);
 
-  const configContentNoError = validateCredentialResult?.filter((config) => config.errors === null);
+  const configContentNoError = validateCredentialResult.filter((config) => config.errors === null);
 
   const testDataPath = path.resolve(process.cwd(), '../../');
-  const testSuiteResultPromises = configContentNoError?.map<Promise<TestSuiteResult>>(async (credentialConfig) => {
+  const testSuiteResultPromises = configContentNoError.map<Promise<TestSuiteResult>>(async (credentialConfig) => {
     const { type, version, dataPath } = credentialConfig;
     const [schema, data] = await Promise.all([
       dynamicLoadingSchemaService(type, version),
@@ -32,7 +32,7 @@ export const processTestSuite: TestSuite = async (credentialConfigsPath) => {
   });
 
   const testSuiteResult = await Promise.all(testSuiteResultPromises);
-  const validConfigWithError = validateCredentialResult?.filter((config) => config.errors !== null);
+  const validConfigWithError = validateCredentialResult.filter((config) => config.errors !== null);
   testSuiteResult.push(...validConfigWithError);
 
   return testSuiteResult;

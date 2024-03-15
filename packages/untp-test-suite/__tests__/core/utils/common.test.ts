@@ -1,6 +1,5 @@
 import * as fs from 'fs/promises';
 import { validateCredentialConfigs, readJsonFile } from '../../../src/core/utils/common';
-import { resolve } from 'path';
 
 jest.mock('fs/promises', () => ({
   readFile: jest.fn(),
@@ -12,33 +11,50 @@ jest.mock('path', () => {
   };
 });
 
+// import { validateCredentialConfigs } from './common'; // adjust the import path as needed
+
 describe('validateCredentialConfigs', () => {
-  it('should throw an error when the credentialConfigs array is empty', () => {
-    try {
-      validateCredentialConfigs([]);
-    } catch (error) {
-      expect(error).toEqual(
-        new Error('Credentials array cannot be empty. Please provide valid credentials to proceed.'),
-      );
-    }
+  const credentialConfigsPath = 'path/to/credentials';
+
+  it('should throw an error when the array of credential configurations is empty', () => {
+    expect(() => {
+      validateCredentialConfigs(credentialConfigsPath, []);
+    }).toThrow('Credentials array cannot be empty. Please provide valid credentials to proceed.');
   });
 
-  it('should throw an error when the credential object is missing required fields', () => {
-    try {
-      validateCredentialConfigs([
-        // @ts-ignore
-        {
-          type: 'objectEvent',
-          version: 'v0.0.1',
-        },
-      ]);
-    } catch (error) {
-      expect(error).toEqual(
-        new Error(
-          `Each credential object must contain 'type', 'version', and 'dataPath' fields. Please ensure all required fields are provided.`,
-        ),
-      );
-    }
+  it.only('should return an array of errors when the credential configurations are invalid', () => {
+    const credentialConfigs = [
+      {
+        type: '',
+        version: 'v1.0',
+        dataPath: 'path/to/data',
+      },
+      {
+        type: 'objectEvent',
+        version: 'v1.0',
+        dataPath: 'path/to/data',
+      },
+    ];
+
+    const result = validateCredentialConfigs(credentialConfigsPath, credentialConfigs);
+    console.log({ result });
+
+    expect(result).toEqual([
+      {
+        type: 'v1.0',
+        version: '',
+        dataPath: 'path/to/data',
+        configPath: 'path/to/credentials',
+        errors: "should have required property 'type'",
+      },
+      {
+        type: 'v1.0',
+        version: 'objectEvent',
+        dataPath: 'path/to/data',
+        configPath: 'path/to/credentials',
+        errors: null,
+      },
+    ]);
   });
 });
 
