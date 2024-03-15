@@ -1,5 +1,0 @@
-{
-  "testingCredential": "{{type}} {{version}}",
-  "path": "{{dataPath}}",
-  "result": "{{result}} - {{warningMessage}}"
-}

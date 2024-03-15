@@ -1,0 +1,18 @@
+{
+  "testingCredential": "{{type}} {{version}}",
+  "path": "{{dataPath}}",
+  "result": "{{result}}",
+  "errors": [
+    {{#each errors}}
+      {
+        "fieldName": "{{{replace instancePath "/" ""}}}",
+        "errorType": "{{keyword}}",
+        {{#if params.allowedValues}}
+        "allowedValues": {{{jsonArray params.allowedValues}}},
+        {{/if}}
+        "message": "{{{replace instancePath "/" ""}}} field {{message}}"
+      }
+      {{#unless @last}},{{/unless}}
+    {{/each}}
+  ]
+}
