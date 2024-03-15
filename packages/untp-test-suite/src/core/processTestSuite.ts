@@ -11,7 +11,7 @@ import { hasErrors } from './services/json-schema/validator.service.js';
  */
 export const processTestSuite: TestSuite = async (credentialConfigsPath) => {
   const credentialConfigs = await readJsonFile<ConfigCredentials>(credentialConfigsPath);
-  validateCredentialConfigs(credentialConfigs.credentials);
+  const validateCredentialResult = validateCredentialConfigs(credentialConfigs.credentials);
 
   const testDataPath = path.resolve(process.cwd(), '../../');
   const testSuiteResultPromises = credentialConfigs.credentials.map<Promise<TestSuiteResult>>(
@@ -32,5 +32,13 @@ export const processTestSuite: TestSuite = async (credentialConfigsPath) => {
   );
 
   const testSuiteResult = await Promise.all(testSuiteResultPromises);
+  testSuiteResult.forEach((result) => {
+    if (result.errors && validateCredentialResult && validateCredentialResult?.length > 0) {
+      result.errors = [...result.errors, ...validateCredentialResult];
+    } else if (validateCredentialResult && validateCredentialResult?.length > 0) {
+      result.errors = [...validateCredentialResult];
+    }
+  });
+
   return testSuiteResult;
 };

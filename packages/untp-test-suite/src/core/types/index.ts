@@ -14,6 +14,8 @@ export interface TestSuite {
   (credentialConfigsPath: string): Promise<TestSuiteResult[]>;
 }
 
-export interface TestSuiteResult extends ConfigContent {
+export interface TestErrors {
   errors: ErrorObject[] | null;
 }
+
+export interface TestSuiteResult extends ConfigContent, TestErrors {}
