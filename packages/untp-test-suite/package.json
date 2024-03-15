@@ -20,6 +20,7 @@
     "untp": "build/interfaces/cli/cli.js"
   },
   "scripts": {
+    "untp": "node build/interfaces/cli/cli.js",
     "test": "jest --config ./jest.config.js",
     "build": "tsc --build --clean && tsc",
     "watch": "tsc -b --watch",

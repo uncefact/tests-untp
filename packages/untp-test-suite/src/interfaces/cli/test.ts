@@ -9,7 +9,11 @@ const defaultCredentialFilePath = `${process.cwd()}/${credentialFileName}`;
 const test = new Command('test');
 test
   .description('Run Untp test suites')
-  .option('-c, --config <path>', `Configuration file (default path: "${defaultCredentialFilePath}")`, defaultCredentialFilePath)
+  .option(
+    '-c, --config <path>',
+    `Configuration file (default path: "${defaultCredentialFilePath}")`,
+    defaultCredentialFilePath,
+  )
   .action(async (options) => {
     try {
       let credentialPath = `${process.cwd()}/${credentialFileName}`;
@@ -19,7 +23,7 @@ test
 
       const testSuiteResults = await processTestSuite(credentialPath);
 
-      console.log(testSuiteResults);
+      console.log(JSON.stringify(testSuiteResults, null, 2));
     } catch (error) {
       console.log(chalk.bgRed.white.bold('Run Untp test suites failed'));
       console.log(chalk.red(error));
