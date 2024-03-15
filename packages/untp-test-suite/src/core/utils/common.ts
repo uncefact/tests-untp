@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import _ from 'lodash';
-import { ConfigContent, TestErrors } from '../types';
+import { ConfigContent } from '../types';
 import { ErrorObject } from 'ajv';
 
 /**
@@ -20,7 +20,7 @@ export const readJsonFile = async <T>(filePath: string): Promise<T> => {
  * @param {string} fieldName - The name of the field that is required.
  * @returns {ErrorObject} The required error object.
  */
-const mapingRequiredErrorObjectType = (fieldName: string): ErrorObject => {
+const createMissingFieldError = (fieldName: string): ErrorObject => {
   return {
     keyword: 'required',
     dataPath: '',
@@ -44,13 +44,13 @@ export const validateCredentialConfigs = (credentialConfigs: ConfigContent[]): E
   for (let i = 0; i < credentialConfigs.length; i++) {
     const credential = credentialConfigs[i];
     if (_.isEmpty(credential.type)) {
-      arrError.push(mapingRequiredErrorObjectType('type'));
+      arrError.push(createMissingFieldError('type'));
     }
     if (_.isEmpty(credential.version)) {
-      arrError.push(mapingRequiredErrorObjectType('version'));
+      arrError.push(createMissingFieldError('version'));
     }
     if (_.isEmpty(credential.dataPath)) {
-      arrError.push(mapingRequiredErrorObjectType('dataPath'));
+      arrError.push(createMissingFieldError('dataPath'));
     }
   }
 
