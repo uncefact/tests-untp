@@ -19,6 +19,11 @@ jest.mock('path', () => ({
   resolve: jest.fn().mockReturnValue('/tests-untp/packages/untp-test-suite/src/schemas'),
 }));
 
+jest.mock('../../../../src/utils/path', () => ({
+  getCurrentDirPath: jest.fn(),
+  getCurrentFilePath: jest.fn(),
+}));
+
 describe('utils dynamic loading schema', () => {
   afterEach(() => {
     jest.clearAllMocks();

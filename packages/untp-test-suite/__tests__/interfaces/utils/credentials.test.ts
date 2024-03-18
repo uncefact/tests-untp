@@ -1,6 +1,12 @@
 import fs from 'fs/promises';
 import semver from 'semver';
 import * as credentials from '../../../src/interfaces/utils/credentials';
+import path from 'path';
+
+jest.mock('../../../src/utils/path', () => ({
+  getCurrentDirPath: jest.fn(),
+  getCurrentFilePath: jest.fn(),
+}));
 
 const schemasPath = 'src/schemas';
 const schemaVersionMock = 'v0.0.3';
@@ -77,6 +83,7 @@ describe('generateCredentialFile', () => {
 
   it('should generate latest credential file successfully', async () => {
     const latestCredentialVersions = [{ type: 'aggregationEvent', version: 'v0.0.3', dataPath: '' }];
+    jest.spyOn(path, 'resolve').mockReturnValueOnce('../../../src/schemas');
     jest.spyOn(credentials, 'getLatestCredentialVersions').mockResolvedValueOnce(latestCredentialVersions);
     jest.spyOn(fs, 'writeFile').mockResolvedValueOnce();
 
@@ -88,6 +95,8 @@ describe('generateCredentialFile', () => {
 
   it('should throw an error when invalid store path', async () => {
     try {
+      jest.spyOn(path, 'resolve').mockReturnValueOnce('../../../src/schemas');
+      jest.spyOn(credentials, 'getLatestCredentialVersions').mockResolvedValueOnce([{ type: 'aggregationEvent', version: 'v0.0.3', dataPath: '' }]);
       jest.spyOn(fs, 'writeFile').mockRejectedValueOnce('invalid store path');
       const invalidStorePath = 'invalid-store-path';
 
@@ -99,6 +108,7 @@ describe('generateCredentialFile', () => {
 
   it('should throw an error when invalid schemas path', async () => {
     try {
+      jest.spyOn(path, 'resolve').mockReturnValueOnce('../../../src/schemas');
       jest.spyOn(credentials, 'getLatestCredentialVersions').mockRejectedValueOnce('invalid schemas path');
 
       await credentials.generateCredentialFile(storePath);
