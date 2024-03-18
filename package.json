@@ -20,6 +20,7 @@
     "storybook:components": "cd packages/components && yarn run storybook",
     "storybook:mock-app": "cd packages/mock-app && yarn run storybook",
     "create:config-test-suite": "cd packages/untp-test-suite && yarn run create:config",
+    "untp": "node ./packages/untp-test-suite/build/interfaces/cli/cli.js",
     "upgrade:packages": "yarn -r --stream upgrade --latest",
     "version": "lerna version",
     "prepare": "husky install",
