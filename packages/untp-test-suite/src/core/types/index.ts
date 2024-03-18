@@ -14,14 +14,14 @@ export interface TestSuite {
   (credentialConfigsPath: string): Promise<TestSuiteResult[]>;
 }
 
-export interface ICredentialConfig {
+export interface ICredentialConfigError {
   message: string;
   keyword: string;
   configPath: string;
 }
 
 export interface TestErrors {
-  errors: ErrorObject[] | ICredentialConfig | null;
+  errors: ErrorObject[] | ICredentialConfigError[] | null;
 }
 
 export interface TestSuiteResult extends ConfigContent, TestErrors {}
