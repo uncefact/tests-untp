@@ -305,7 +305,11 @@ describe('processTestSuite', () => {
         type: 'transactionEvent',
         version: '',
         dataPath: 'test-data/parent-item-object.json',
-        errors: 'should have required property `version`',
+        errors: {
+          message: "should have required property 'version'",
+          keyword: 'required',
+          configPath: 'path/to/credentials',
+        },
       },
       {
         type: 'objectEvent',
@@ -389,7 +393,11 @@ describe('processTestSuite', () => {
         type: 'transactionEvent',
         version: '',
         dataPath: 'test-data/parent-item-object.json',
-        errors: 'should have required property `version`',
+        errors: {
+          message: "should have required property 'version'",
+          keyword: 'required',
+          configPath: 'path/to/credentials',
+        },
       },
     ]);
   });
