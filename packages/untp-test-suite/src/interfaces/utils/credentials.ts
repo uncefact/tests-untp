@@ -1,7 +1,7 @@
 import { readdir, writeFile } from 'fs/promises';
 import path from 'path';
 import semver from 'semver';
-import { getCurrentDirPath, getCurrentFilePath } from '../../templates/utils/path.js';
+import { getCurrentDirPath, getCurrentFilePath } from '../../utils/path.js';
 
 export interface ICredentialFileData {
   credentials: {
@@ -37,7 +37,7 @@ export const getLatestCredentialVersions = async (schemasPath: string) => {
 
 export const generateCredentialFile = async (storePath: string): Promise<ICredentialFileData> => {
   const currentDirPath = getCurrentDirPath(getCurrentFilePath());
-  const schemasPath = path.resolve(currentDirPath, '../../../src/schemas');
+  const schemasPath = path.resolve(currentDirPath, '../../src/schemas');
   const latestCredentials = await getLatestCredentialVersions(schemasPath);
   const credentialFileData = {
     credentials: latestCredentials,

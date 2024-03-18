@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import { templateMapper } from '../../src/templates/mapper';
 import path from 'path';
 
-jest.mock('../../src/templates/utils/path', () => ({
+jest.mock('../../src/utils/path', () => ({
   getCurrentFilePath: jest.fn(),
   getCurrentDirPath: jest.fn(),
 }));

@@ -1,11 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { getCurrentDirPath, getCurrentFilePath } from '../../../utils/path.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const SCHEMA_PATH = path.resolve(__dirname, '../../../../src/schemas');
+const currentDirPath = getCurrentDirPath(getCurrentFilePath());
+const SCHEMA_PATH = path.resolve(currentDirPath, '../../src/schemas');
 
 /**
  * Check if a file exists

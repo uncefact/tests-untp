@@ -3,7 +3,7 @@ import semver from 'semver';
 import * as credentials from '../../../src/interfaces/utils/credentials';
 import path from 'path';
 
-jest.mock('../../../src/templates/utils/path', () => ({
+jest.mock('../../../src/utils/path', () => ({
   getCurrentDirPath: jest.fn(),
   getCurrentFilePath: jest.fn(),
 }));
