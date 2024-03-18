@@ -43,14 +43,16 @@ describe('validateCredentialConfigs', () => {
         dataPath: 'path/to/data',
         errors: [
           {
-            message: "should have required property 'type'",
+            message: 'should have required property',
             keyword: 'required',
-            configPath: 'path/to/credentials',
+            dataPath: 'path/to/credentials',
+            instancePath: 'type',
           },
           {
-            message: "should have required property 'version'",
+            message: 'should have required property',
             keyword: 'required',
-            configPath: 'path/to/credentials',
+            dataPath: 'path/to/credentials',
+            instancePath: 'version',
           },
         ],
       },

@@ -213,7 +213,7 @@ describe('processTestSuite', () => {
           {
             message: "should have required property 'version'",
             keyword: 'required',
-            configPath: 'path/to/credentials',
+            dataPath: 'path/to/credentials',
           },
         ],
       },
@@ -225,7 +225,7 @@ describe('processTestSuite', () => {
           {
             message: "should have required property 'dataPath'",
             keyword: 'required',
-            configPath: 'path/to/credentials',
+            dataPath: 'path/to/credentials',
           },
         ],
       },
@@ -288,7 +288,7 @@ describe('processTestSuite', () => {
           {
             message: "should have required property 'version'",
             keyword: 'required',
-            configPath: 'path/to/credentials',
+            dataPath: 'path/to/credentials',
           },
         ],
       },
@@ -300,7 +300,7 @@ describe('processTestSuite', () => {
           {
             message: "should have required property 'dataPath'",
             keyword: 'required',
-            configPath: 'path/to/credentials',
+            dataPath: 'path/to/credentials',
           },
         ],
       },
@@ -317,12 +317,12 @@ describe('processTestSuite', () => {
           {
             message: "should have required property 'version'",
             keyword: 'required',
-            configPath: 'path/to/credentials',
+            dataPath: 'path/to/credentials',
           },
           {
             message: "should have required property 'dataPath'",
             keyword: 'required',
-            configPath: 'path/to/credentials',
+            dataPath: 'path/to/credentials',
           },
         ],
       },
@@ -412,12 +412,12 @@ describe('processTestSuite', () => {
           {
             message: "should have required property 'version'",
             keyword: 'required',
-            configPath: 'path/to/credentials',
+            dataPath: 'path/to/credentials',
           },
           {
             message: "should have required property 'dataPath'",
             keyword: 'required',
-            configPath: 'path/to/credentials',
+            dataPath: 'path/to/credentials',
           },
         ],
       },

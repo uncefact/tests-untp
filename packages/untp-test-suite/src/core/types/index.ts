@@ -15,9 +15,10 @@ export interface TestSuite {
 }
 
 export interface ICredentialConfigError {
+  instancePath: string;
   message: string;
   keyword: string;
-  configPath: string;
+  dataPath: string;
 }
 
 export interface TestErrors {

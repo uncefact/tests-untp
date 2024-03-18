@@ -21,10 +21,12 @@ export const readJsonFile = async <T>(filePath: string): Promise<T> => {
  */
 const createMissingFieldError = (credentialConfigsPath: string, missingField?: string): ICredentialConfigError => {
   const error = {
-    message: missingField ? `should have required property '${missingField}'` : null,
+    instancePath: missingField,
+    message: missingField ? `should have required property` : null,
     keyword: missingField ? 'required' : null,
-    configPath: credentialConfigsPath,
+    dataPath: credentialConfigsPath,
   } as ICredentialConfigError;
+
   return error;
 };
 
