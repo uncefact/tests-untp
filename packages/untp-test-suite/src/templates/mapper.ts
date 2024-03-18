@@ -12,11 +12,6 @@ Handlebars.registerHelper('jsonArray', (array: object) => {
   return JSON.stringify(array);
 });
 
-Handlebars.registerHelper('replace', (input: string, target: string, replacement: string) => {
-  const regex = new RegExp(target, 'g');
-  return input.replace(regex, replacement);
-});
-
 export async function templateMapper(templateName: string, testSuiteResult: TestSuiteResult) {
   try {
     const templateFilePath = path.join(__dirname, `./templateMessages/${templateName}.hbs`);

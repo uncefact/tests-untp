@@ -5,12 +5,12 @@
   "errors": [
     {{#each errors}}
       {
-        "fieldName": "{{{replace instancePath "/" ""}}}",
+        "fieldName": "{{instancePath}}",
         "errorType": "{{keyword}}",
         {{#if params.allowedValues}}
         "allowedValues": {{{jsonArray params.allowedValues}}},
         {{/if}}
-        "message": "{{{replace instancePath "/" ""}}} field {{message}}"
+        "message": "{{instancePath}} field {{message}}"
       }
       {{#unless @last}},{{/unless}}
     {{/each}}
