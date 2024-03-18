@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import _ from 'lodash';
-import { ConfigContent, ICredentialConfig, TestSuiteResult } from '../types';
+import { ConfigContent, ICredentialConfigError, TestSuiteResult } from '../types';
 
 /**
  * Asynchronously reads a file and parses its content as JSON.
@@ -19,21 +19,13 @@ export const readJsonFile = async <T>(filePath: string): Promise<T> => {
  * @param {string} missingField - The name of the field that is required.
  * @returns {ErrorObject} The required error object.
  */
-const createMissingFieldError = (
-  credential: ConfigContent,
-  credentialConfigsPath: string,
-  missingField?: string,
-): TestSuiteResult => {
-  return {
-    type: credential.type ?? '',
-    version: credential.version ?? '',
-    dataPath: credential.dataPath ?? '',
-    errors: {
-      message: missingField ? `should have required property '${missingField}'` : null,
-      keyword: missingField ? 'required' : null,
-      configPath: credentialConfigsPath,
-    } as ICredentialConfig,
-  };
+const createMissingFieldError = (credentialConfigsPath: string, missingField?: string): ICredentialConfigError => {
+  const error = {
+    message: missingField ? `should have required property '${missingField}'` : null,
+    keyword: missingField ? 'required' : null,
+    configPath: credentialConfigsPath,
+  } as ICredentialConfigError;
+  return error;
 };
 
 /**
@@ -49,18 +41,20 @@ export const validateCredentialConfigs = (
     throw new Error('Credentials array cannot be empty. Please provide valid credentials to proceed.');
   }
 
-  const arrError = [];
+  const results = [];
   for (const credential of credentialConfigs) {
+    const errors = [] as ICredentialConfigError[];
     if (_.isEmpty(credential.type)) {
-      arrError.push(createMissingFieldError(credential, credentialConfigsPath, 'type'));
-    } else if (_.isEmpty(credential.version)) {
-      arrError.push(createMissingFieldError(credential, credentialConfigsPath, 'version'));
-    } else if (_.isEmpty(credential.dataPath)) {
-      arrError.push(createMissingFieldError(credential, credentialConfigsPath, 'dataPath'));
-    } else {
-      arrError.push(createMissingFieldError(credential, credentialConfigsPath));
+      errors.push(createMissingFieldError(credentialConfigsPath, 'type'));
     }
+    if (_.isEmpty(credential.version)) {
+      errors.push(createMissingFieldError(credentialConfigsPath, 'version'));
+    }
+    if (_.isEmpty(credential.dataPath)) {
+      errors.push(createMissingFieldError(credentialConfigsPath, 'dataPath'));
+    }
+    results.push({ ...credential, errors } as TestSuiteResult);
   }
 
-  return arrError;
+  return results;
 };

@@ -11,8 +11,6 @@ jest.mock('path', () => {
   };
 });
 
-// import { validateCredentialConfigs } from './common'; // adjust the import path as needed
-
 describe('validateCredentialConfigs', () => {
   const credentialConfigsPath = 'path/to/credentials';
 
@@ -26,7 +24,7 @@ describe('validateCredentialConfigs', () => {
     const credentialConfigs = [
       {
         type: '',
-        version: 'v1.0',
+        version: '',
         dataPath: 'path/to/data',
       },
       {
@@ -37,26 +35,30 @@ describe('validateCredentialConfigs', () => {
     ];
 
     const result = validateCredentialConfigs(credentialConfigsPath, credentialConfigs);
+
     expect(result).toEqual([
       {
         type: '',
-        version: 'v1.0',
+        version: '',
         dataPath: 'path/to/data',
-        errors: {
-          message: "should have required property 'type'",
-          keyword: 'required',
-          configPath: 'path/to/credentials',
-        },
+        errors: [
+          {
+            message: "should have required property 'type'",
+            keyword: 'required',
+            configPath: 'path/to/credentials',
+          },
+          {
+            message: "should have required property 'version'",
+            keyword: 'required',
+            configPath: 'path/to/credentials',
+          },
+        ],
       },
       {
         type: 'objectEvent',
         version: 'v1.0',
         dataPath: 'path/to/data',
-        errors: {
-          message: null,
-          keyword: null,
-          configPath: 'path/to/credentials',
-        },
+        errors: [],
       },
     ]);
   });

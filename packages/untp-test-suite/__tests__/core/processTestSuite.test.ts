@@ -209,21 +209,25 @@ describe('processTestSuite', () => {
         type: 'objectEvent',
         version: '',
         dataPath: 'test-data/parent-item-object.json',
-        errors: {
-          message: "should have required property 'version'",
-          keyword: 'required',
-          configPath: 'path/to/credentials',
-        },
+        errors: [
+          {
+            message: "should have required property 'version'",
+            keyword: 'required',
+            configPath: 'path/to/credentials',
+          },
+        ],
       },
       {
         type: 'transformationEvent',
         version: 'v0.0.2',
         dataPath: '',
-        errors: {
-          message: "should have required property 'dataPath'",
-          keyword: 'required',
-          configPath: 'path/to/credentials',
-        },
+        errors: [
+          {
+            message: "should have required property 'dataPath'",
+            keyword: 'required',
+            configPath: 'path/to/credentials',
+          },
+        ],
       },
       {
         type: 'transactionEvent',
@@ -280,21 +284,25 @@ describe('processTestSuite', () => {
         type: 'objectEvent',
         version: '',
         dataPath: 'test-data/parent-item-object.json',
-        errors: {
-          message: "should have required property 'version'",
-          keyword: 'required',
-          configPath: 'path/to/credentials',
-        },
+        errors: [
+          {
+            message: "should have required property 'version'",
+            keyword: 'required',
+            configPath: 'path/to/credentials',
+          },
+        ],
       },
       {
         type: 'transformationEvent',
         version: 'v0.0.2',
         dataPath: '',
-        errors: {
-          message: "should have required property 'dataPath'",
-          keyword: 'required',
-          configPath: 'path/to/credentials',
-        },
+        errors: [
+          {
+            message: "should have required property 'dataPath'",
+            keyword: 'required',
+            configPath: 'path/to/credentials',
+          },
+        ],
       },
     ]);
   });
@@ -304,12 +312,19 @@ describe('processTestSuite', () => {
       {
         type: 'transactionEvent',
         version: '',
-        dataPath: 'test-data/parent-item-object.json',
-        errors: {
-          message: "should have required property 'version'",
-          keyword: 'required',
-          configPath: 'path/to/credentials',
-        },
+        dataPath: '',
+        errors: [
+          {
+            message: "should have required property 'version'",
+            keyword: 'required',
+            configPath: 'path/to/credentials',
+          },
+          {
+            message: "should have required property 'dataPath'",
+            keyword: 'required',
+            configPath: 'path/to/credentials',
+          },
+        ],
       },
       {
         type: 'objectEvent',
@@ -392,12 +407,19 @@ describe('processTestSuite', () => {
       {
         type: 'transactionEvent',
         version: '',
-        dataPath: 'test-data/parent-item-object.json',
-        errors: {
-          message: "should have required property 'version'",
-          keyword: 'required',
-          configPath: 'path/to/credentials',
-        },
+        dataPath: '',
+        errors: [
+          {
+            message: "should have required property 'version'",
+            keyword: 'required',
+            configPath: 'path/to/credentials',
+          },
+          {
+            message: "should have required property 'dataPath'",
+            keyword: 'required',
+            configPath: 'path/to/credentials',
+          },
+        ],
       },
     ]);
   });
