@@ -1,20 +1,24 @@
 import Handlebars from 'handlebars';
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import _ from 'lodash';
 import { TestSuiteResult } from '../core/types/index.js';
+import { getCurrentDirPath, getCurrentFilePath } from './utils/path.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+Handlebars.registerHelper('jsonStringify', (jsonObject: object) => {
+  if (!_.isObject(jsonObject) || _.isEmpty(jsonObject)) {
+    throw new Error(
+      `An error occurred in the Handlebars registerHelper 'jsonStringify' function. Please provide a valid JSON object.`,
+    );
+  }
 
-Handlebars.registerHelper('jsonArray', (array: object) => {
-  return JSON.stringify(array);
+  return JSON.stringify(jsonObject);
 });
 
 export async function templateMapper(templateName: string, testSuiteResult: TestSuiteResult) {
   try {
-    const templateFilePath = path.join(__dirname, `./templateMessages/${templateName}.hbs`);
+    const currentDirPath = getCurrentDirPath(getCurrentFilePath());
+    const templateFilePath = path.join(currentDirPath, `../templateMessages/${templateName}.hbs`);
     const template = await fs.readFile(templateFilePath, 'utf-8');
 
     const compiledTemplate = Handlebars.compile(template);

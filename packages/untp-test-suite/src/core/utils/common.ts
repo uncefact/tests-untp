@@ -1,5 +1,4 @@
 import fs from 'fs/promises';
-import path from 'path';
 import _ from 'lodash';
 import { ConfigContent } from '../types';
 
