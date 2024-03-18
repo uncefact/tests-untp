@@ -209,13 +209,21 @@ describe('processTestSuite', () => {
         type: 'objectEvent',
         version: '',
         dataPath: 'test-data/parent-item-object.json',
-        errors: 'should have required property `version`',
+        errors: {
+          message: "should have required property 'version'",
+          keyword: 'required',
+          configPath: 'path/to/credentials',
+        },
       },
       {
         type: 'transformationEvent',
         version: 'v0.0.2',
         dataPath: '',
-        errors: 'should have required property `dataPath`',
+        errors: {
+          message: "should have required property 'dataPath'",
+          keyword: 'required',
+          configPath: 'path/to/credentials',
+        },
       },
       {
         type: 'transactionEvent',
@@ -272,18 +280,26 @@ describe('processTestSuite', () => {
         type: 'objectEvent',
         version: '',
         dataPath: 'test-data/parent-item-object.json',
-        errors: 'should have required property `version`',
+        errors: {
+          message: "should have required property 'version'",
+          keyword: 'required',
+          configPath: 'path/to/credentials',
+        },
       },
       {
         type: 'transformationEvent',
         version: 'v0.0.2',
         dataPath: '',
-        errors: 'should have required property `dataPath`',
+        errors: {
+          message: "should have required property 'dataPath'",
+          keyword: 'required',
+          configPath: 'path/to/credentials',
+        },
       },
     ]);
   });
 
-  it.only('should process the test suite and return an array of errors with validation errors and hasError from Ajv', async () => {
+  it('should process the test suite and return an array of errors with validation errors and hasError from Ajv', async () => {
     (validateCredentialConfigs as jest.Mock).mockReturnValue([
       {
         type: 'transactionEvent',

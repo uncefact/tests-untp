@@ -32,8 +32,8 @@ export const processTestSuite: TestSuite = async (credentialConfigsPath) => {
   });
 
   const testSuiteResult = await Promise.all(testSuiteResultPromises);
-  const validConfigWithError = validateCredentialResult.filter((config) => config.errors !== null);
-  testSuiteResult.push(...validConfigWithError);
+  const configsContainingErrors = validateCredentialResult.filter((config) => config.errors !== null);
+  testSuiteResult.push(...configsContainingErrors);
 
   return testSuiteResult;
 };
