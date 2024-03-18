@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import _ from 'lodash';
-import { ConfigContent, TestSuiteResult } from '../types';
+import { ConfigContent, ICredentialConfig, TestSuiteResult } from '../types';
 
 /**
  * Asynchronously reads a file and parses its content as JSON.
@@ -24,13 +24,15 @@ const createMissingFieldError = (
   credentialConfigsPath: string,
   missingField?: string,
 ): TestSuiteResult => {
-  const isErrorMessages = missingField ? `should have required property '${missingField}'` : null;
   return {
-    type: credential.version ?? '',
-    version: credential.type ?? '',
+    type: credential.type ?? '',
+    version: credential.version ?? '',
     dataPath: credential.dataPath ?? '',
-    configPath: credentialConfigsPath,
-    errors: isErrorMessages,
+    errors: {
+      message: missingField ? `should have required property '${missingField}'` : null,
+      keyword: missingField ? 'required' : null,
+      configPath: credentialConfigsPath,
+    } as ICredentialConfig,
   };
 };
 

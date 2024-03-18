@@ -22,7 +22,7 @@ describe('validateCredentialConfigs', () => {
     }).toThrow('Credentials array cannot be empty. Please provide valid credentials to proceed.');
   });
 
-  it.only('should return an array of errors when the credential configurations are invalid', () => {
+  it('should return an array of errors when the credential configurations are invalid', () => {
     const credentialConfigs = [
       {
         type: '',
@@ -37,22 +37,26 @@ describe('validateCredentialConfigs', () => {
     ];
 
     const result = validateCredentialConfigs(credentialConfigsPath, credentialConfigs);
-    console.log({ result });
-
     expect(result).toEqual([
       {
-        type: 'v1.0',
-        version: '',
+        type: '',
+        version: 'v1.0',
         dataPath: 'path/to/data',
-        configPath: 'path/to/credentials',
-        errors: "should have required property 'type'",
+        errors: {
+          message: "should have required property 'type'",
+          keyword: 'required',
+          configPath: 'path/to/credentials',
+        },
       },
       {
-        type: 'v1.0',
-        version: 'objectEvent',
+        type: 'objectEvent',
+        version: 'v1.0',
         dataPath: 'path/to/data',
-        configPath: 'path/to/credentials',
-        errors: null,
+        errors: {
+          message: null,
+          keyword: null,
+          configPath: 'path/to/credentials',
+        },
       },
     ]);
   });
