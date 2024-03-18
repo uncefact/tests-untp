@@ -14,6 +14,15 @@ export interface TestSuite {
   (credentialConfigsPath: string): Promise<TestSuiteResult[]>;
 }
 
-export interface TestSuiteResult extends ConfigContent {
-  errors: ErrorObject[] | null;
+export interface ICredentialConfigError {
+  instancePath: string;
+  message: string;
+  keyword: string;
+  dataPath: string;
 }
+
+export interface TestErrors {
+  errors: ErrorObject[] | ICredentialConfigError[] | null;
+}
+
+export interface TestSuiteResult extends ConfigContent, TestErrors {}
