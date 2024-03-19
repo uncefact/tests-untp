@@ -1,13 +1,12 @@
-import module from 'module';
 import { Command } from 'commander';
 import { test } from './test.js';
 import { config } from './config.js';
+import { getPackageVersion } from '../../utils/common.js';
 
-const requireCjs = module.createRequire(import.meta.url);
-const { version } = requireCjs('../../../package.json');
+const packageVersion = getPackageVersion();
 
 const untp = new Command('untp')
-  .version(version, '-v, --version')
+  .version(packageVersion, '-v, --version')
   .addCommand(test)
   .addCommand(config);
 

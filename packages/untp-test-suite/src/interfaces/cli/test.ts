@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import path from 'path';
 import { processTestSuite } from '../../core/index.js';
+import { getFinalReport, getLogStatus } from '../utils/logger.js';
 
 const credentialFileName = 'credentials.json';
 const defaultCredentialFilePath = `${process.cwd()}/${credentialFileName}`;
@@ -14,16 +15,20 @@ test
     `Configuration file (default path: "${defaultCredentialFilePath}")`,
     defaultCredentialFilePath,
   )
-  .action(async (options) => {
+  .action( (options) => {
     try {
       let credentialPath = `${process.cwd()}/${credentialFileName}`;
       if (options.config) {
         credentialPath = path.resolve(process.cwd(), options.config);
       }
 
-      const testSuiteResults = await processTestSuite(credentialPath);
+      // const testSuiteResults = await processTestSuite(credentialPath);
 
-      console.log(JSON.stringify(testSuiteResults, null, 2));
+      // const testSuiteMessage = getLogStatus(testSuiteResult.testSuiteResults);
+      // const testSuiteFinalReport = getFinalReport(testSuiteResult);
+
+      // console.log(testSuiteMessage);
+      // console.log(testSuiteFinalReport);
     } catch (error) {
       console.log(chalk.bgRed.white.bold('Run Untp test suites failed'));
       console.log(chalk.red(error));
