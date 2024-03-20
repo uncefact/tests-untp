@@ -59,3 +59,67 @@ yarn create:config
 ```bash
 $ yarn test
 ```
+
+---
+
+## UNTP Test Suite CLI Tool
+
+This CLI tool is designed to facilitate the management and execution of the UNTP test suite.
+
+### Installation
+
+Navigate to the `untp-test-suite` package folder. Type the following command into the terminal to install the UNTP Test Suite CLI Tool:
+
+  ```bash
+  npm install -g .
+  ```
+
+Alternatively, you can run the UNTP test suite by typing the following command into the terminal console:
+
+  ```bash
+  npm run untp
+  ```
+
+### **Create Credentials File**
+
+  This command generates a `credentials.json` file in the current working directory.
+
+  ```bash
+  untp config
+  ```
+
+  or
+
+  ```bash
+  npm run untp config
+  ```
+
+  The `credentials.json` file contains configurations for running the test suite, including types and versions of events and their data paths.
+
+---
+
+### Running UNTP Test Suite
+
+  This command executes the UNTP test suite using the default `credentials.json` file in the current working directory.
+
+  ```bash
+  untp test
+  ```
+
+  or
+
+  ```bash
+  npm run untp test
+  ```
+
+To use a specific configuration file, use the `-c` or `--config` flag followed by the path to the file.
+
+  ```bash
+  untp test --config path/to/credentials.json
+  ```
+
+  or
+
+  ```bash
+  npm run untp test --config path/to/credentials.json
+  ```
