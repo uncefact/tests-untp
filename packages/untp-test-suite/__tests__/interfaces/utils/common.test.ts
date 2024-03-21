@@ -43,10 +43,10 @@ describe('getTemplateName', () => {
 
     const result = getTemplateName(testSuiteResult);
 
-    expect(result).toEqual('PASS');
+    expect(result).toEqual('pass');
   });
 
-  it('should return "failed" when there are errors', () => {
+  it('should return "FAIL" when there are errors', () => {
     const testSuiteResult = {
       type: 'aggregationEvent',
       version: 'v0.0.1',
@@ -63,7 +63,7 @@ describe('getTemplateName', () => {
 
     const result = getTemplateName(testSuiteResult);
 
-    expect(result).toEqual('FAILED');
+    expect(result).toEqual('error');
   });
 
   it('should return "warn" when there are errors with additional properties', () => {
@@ -86,10 +86,10 @@ describe('getTemplateName', () => {
 
     const result = getTemplateName(testSuiteResult);
 
-    expect(result).toEqual('WARN');
+    expect(result).toEqual('warning');
   });
 
-  it('should return "failed" when there are errors without additional properties', () => {
+  it('should return "FAIL" when there are errors without additional properties', () => {
     const testSuiteResult = {
       type: 'aggregationEvent',
       version: 'v0.0.1',
@@ -99,7 +99,7 @@ describe('getTemplateName', () => {
 
     const result = getTemplateName(testSuiteResult);
 
-    expect(result).toEqual('FAILED');
+    expect(result).toEqual('error');
   });
 });
 
@@ -128,14 +128,14 @@ describe('generateFinalMessage', () => {
         credentialType: 'aggregationEvent',
         version: 'v0.0.1',
         path: '',
-        result: 'FAILED',
+        result: 'FAIL',
       },
     ];
 
     const result = generateFinalMessage(credentials);
 
     expect(result).toEqual({
-      finalStatus: 'FAILED',
+      finalStatus: 'FAIL',
       finalMessage: 'Your credentials are not UNTP compliant',
     });
   });

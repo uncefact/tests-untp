@@ -45,17 +45,21 @@ export interface TestSuiteResult extends IFinalReport {
   credentials: ICredentialTestResult[];
 }
 
-export type FinalStatus = 'FAILED' | 'PASS' | 'WARN';
+export enum FinalStatus {
+  fail = 'FAIL',
+  pass = 'PASS',
+  warn = 'WARN',
+}
 
 export enum TemplateName {
-  failed = 'FAILED',
-  pass = 'PASS',
-  warn = `WARN`,
+  error = 'error',
+  pass = 'pass',
+  warn = 'warning',
   finalReport = 'finalReport',
 }
 
 export enum TestSuiteMessage {
   Pass = 'Your credentials are UNTP compliant',
   Warning = 'Your credentials are UNTP compliant, but have extended the data model',
-  Failed = 'Your credentials are not UNTP compliant',
+  Fail = 'Your credentials are not UNTP compliant',
 }

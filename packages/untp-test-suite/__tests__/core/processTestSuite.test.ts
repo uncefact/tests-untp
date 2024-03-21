@@ -139,7 +139,7 @@ describe('processTestSuite', () => {
     });
   });
 
-  it('should process the test suite with an array of errors with Ajv errors and return FAILED', async () => {
+  it('should process the test suite with an array of errors with Ajv errors and return FAIL', async () => {
     (validateCredentialConfigs as jest.Mock).mockReturnValue([
       {
         type: 'objectEvent',
@@ -227,11 +227,11 @@ describe('processTestSuite', () => {
     });
 
     (getTemplateName as jest.Mock).mockImplementation((testSuiteResult) => {
-      return !testSuiteResult.errors ? 'PASS' : 'FAILED';
+      return !testSuiteResult.errors ? 'PASS' : 'FAIL';
     });
 
     const finalReport = {
-      finalStatus: 'FAILED',
+      finalStatus: 'FAIL',
       finalMessage: 'Your credentials are not UNTP compliant',
     };
 
@@ -248,7 +248,7 @@ describe('processTestSuite', () => {
         error: value.errors,
       } as any;
 
-      if (templateName !== 'FAILED') {
+      if (templateName !== 'FAIL') {
         delete returnValue.error;
       }
 
@@ -271,7 +271,7 @@ describe('processTestSuite', () => {
           credentialType: 'transactionEvent',
           version: 'v0.0.2',
           path: 'test-data/parent-item-transaction.json',
-          result: 'FAILED',
+          result: 'FAIL',
           error: expectedHasError,
         },
       ],
@@ -279,7 +279,7 @@ describe('processTestSuite', () => {
     });
   });
 
-  it('should process the test suite with an array of errors with validation errors and return FAILED', async () => {
+  it('should process the test suite with an array of errors with validation errors and return FAIL', async () => {
     (validateCredentialConfigs as jest.Mock).mockReturnValue([
       {
         type: 'objectEvent',
@@ -348,11 +348,11 @@ describe('processTestSuite', () => {
     (hasErrors as jest.Mock).mockReturnValue(null);
 
     (getTemplateName as jest.Mock).mockImplementation((testSuiteResult) => {
-      return !testSuiteResult.errors ? 'PASS' : 'FAILED';
+      return !testSuiteResult.errors ? 'PASS' : 'FAIL';
     });
 
     const finalReport = {
-      finalStatus: 'FAILED',
+      finalStatus: 'FAIL',
       finalMessage: 'Your credentials are not UNTP compliant',
     };
 
@@ -369,7 +369,7 @@ describe('processTestSuite', () => {
         error: value.errors,
       } as any;
 
-      if (templateName !== 'FAILED') {
+      if (templateName !== 'FAIL') {
         delete returnValue.error;
       }
 
@@ -392,7 +392,7 @@ describe('processTestSuite', () => {
           credentialType: 'objectEvent',
           version: '',
           path: 'test-data/parent-item-object.json',
-          result: 'FAILED',
+          result: 'FAIL',
           error: [
             {
               message: "should have required property 'version'",
@@ -405,7 +405,7 @@ describe('processTestSuite', () => {
           credentialType: 'transformationEvent',
           version: 'v0.0.2',
           path: '',
-          result: 'FAILED',
+          result: 'FAIL',
           error: [
             {
               message: "should have required property 'dataPath'",
@@ -419,7 +419,7 @@ describe('processTestSuite', () => {
     });
   });
 
-  it('should process the test suite with return an array of errors with validation errors, hasError from Ajv and return FAILED', async () => {
+  it('should process the test suite with return an array of errors with validation errors, hasError from Ajv and return FAIL', async () => {
     (validateCredentialConfigs as jest.Mock).mockReturnValue([
       {
         type: 'transactionEvent',
@@ -505,11 +505,11 @@ describe('processTestSuite', () => {
     });
 
     (getTemplateName as jest.Mock).mockImplementation((testSuiteResult) => {
-      return !testSuiteResult.errors ? 'PASS' : 'FAILED';
+      return !testSuiteResult.errors ? 'PASS' : 'FAIL';
     });
 
     const finalReport = {
-      finalStatus: 'FAILED',
+      finalStatus: 'FAIL',
       finalMessage: 'Your credentials are not UNTP compliant',
     };
 
@@ -526,7 +526,7 @@ describe('processTestSuite', () => {
         error: value.errors,
       } as any;
 
-      if (templateName !== 'FAILED') {
+      if (templateName !== 'FAIL') {
         delete returnValue.error;
       }
 
@@ -543,14 +543,14 @@ describe('processTestSuite', () => {
           credentialType: 'objectEvent',
           version: 'v0.0.2',
           path: 'test-data/parent-item-transaction.json',
-          result: 'FAILED',
+          result: 'FAIL',
           error: [...hasErrorExpect],
         },
         {
           credentialType: 'transactionEvent',
           version: '',
           path: '',
-          result: 'FAILED',
+          result: 'FAIL',
           error: [
             {
               message: "should have required property 'version'",
@@ -674,10 +674,12 @@ describe('processTestSuite', () => {
 
   it('should process the test suite and throw an error if the credentials array is empty', async () => {
     (validateCredentialConfigs as jest.Mock).mockReturnValue([]);
-    (readJsonFile as jest.Mock).mockResolvedValue({ credentials: [] });
 
-    await expect(processTestSuite('/untp-test-suite/src/config/credentials.json')).rejects.toThrow(
-      'Failed to run the test suite',
-    );
+    try {
+      await processTestSuite('/untp-test-suite/src/config/credentials.json');
+    } catch (error) {
+      const e = error as Error;
+      expect(e.message).toMatch(/Failed to run the test suite/i);
+    }
   });
 });

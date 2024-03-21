@@ -33,31 +33,25 @@ export const getTemplateName = (testSuiteResult: IValidatedCredentials): string 
       return TemplateName.warn;
     }
 
-    // If no ErrorObject has 'additionalProperty', return 'failed'
-    return TemplateName.failed;
+    // If no ErrorObject has 'additionalProperty', return 'FAIL'
+    return TemplateName.error;
+  } else {
+    return TemplateName.error;
   }
-
-  return TemplateName.failed;
 };
 
 export const generateFinalMessage = (credentials: ICredentialTestResult[]): IFinalReport => {
   let finalMessage = TestSuiteMessage.Pass;
+  let finalStatus: FinalStatus = FinalStatus.pass;
 
-  if (credentials.some((credential) => credential.result === TemplateName.failed)) {
-    finalMessage = TestSuiteMessage.Failed;
-  }
-
-  if (credentials.some((credential) => credential.result === TemplateName.warn)) {
+  if (credentials.some((credential) => credential.result === FinalStatus.warn)) {
     finalMessage = TestSuiteMessage.Warning;
+    finalStatus = FinalStatus.warn;
   }
 
-  let finalStatus: FinalStatus = 'PASS';
-  if (finalMessage === TestSuiteMessage.Failed) {
-    finalStatus = 'FAILED';
-  }
-
-  if (finalMessage === TestSuiteMessage.Warning) {
-    finalStatus = 'WARN';
+  if (credentials.some((credential) => credential.result === FinalStatus.fail)) {
+    finalMessage = TestSuiteMessage.Fail;
+    finalStatus = FinalStatus.fail;
   }
 
   return {
