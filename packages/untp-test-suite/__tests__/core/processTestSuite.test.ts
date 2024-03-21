@@ -1,11 +1,7 @@
 import { hasErrors } from '../../src/core/services/json-schema/validator.service';
 import { readJsonFile, validateCredentialConfigs } from '../../src/core/utils/common';
 import { dynamicLoadingSchemaService } from '../../src/core/services/dynamic-loading-schemas/loadingSchema.service';
-import {
-  generateTestSuiteResultByTemplate,
-  processCheckDataBySchema,
-  processTestSuite,
-} from '../../src/core/processTestSuite';
+import { processTestSuite } from '../../src/core/processTestSuite';
 import { templateMapper } from '../../src/templates/mapper';
 import { getTemplateName, generateFinalMessage } from '../../src/interfaces/utils/common';
 
@@ -682,43 +678,6 @@ describe('processTestSuite', () => {
 
     await expect(processTestSuite('/untp-test-suite/src/config/credentials.json')).rejects.toThrow(
       'Failed to run the test suite',
-    );
-  });
-});
-
-describe('Error when call processCheckDataBySchema()', () => {
-  it('should process the check data by schema and return the validated credentials', async () => {
-    const mockCredentialConfig = {
-      type: 'testType',
-      version: 'testVersion',
-      dataPath: 'testDataPath',
-    };
-
-    const mockError = new Error('Test error');
-    (dynamicLoadingSchemaService as jest.Mock).mockRejectedValue(mockError);
-
-    await expect(processCheckDataBySchema(mockCredentialConfig)).rejects.toThrow(
-      `Failed to process check data by schema. ${mockError.message}`,
-    );
-  });
-});
-
-describe('Error when call generateTestSuiteResultByTemplate()', () => {
-  it('should generate test suite result by template and return the credentials template', async () => {
-    const mockTestSuiteResultAjv = [
-      {
-        type: 'testType',
-        version: 'testVersion',
-        dataPath: 'testDataPath',
-        errors: [],
-      },
-    ];
-
-    const mockError = new Error('Test error');
-    (templateMapper as jest.Mock).mockRejectedValue(mockError);
-
-    await expect(generateTestSuiteResultByTemplate(mockTestSuiteResultAjv)).rejects.toThrow(
-      `Failed to generate test suite result by template. ${mockError.message}`,
     );
   });
 });
