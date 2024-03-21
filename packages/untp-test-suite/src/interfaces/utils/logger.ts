@@ -65,7 +65,7 @@ export function getPathMessage(path: string) {
 }
 
 export function getStatusMessage(result: TestSuiteResultEnum) {
-  let statusMessage = `Status: ${getMessageWithColorByResult(result, result)}`;
+  let statusMessage = `Result: ${getMessageWithColorByResult(result, result)}`;
   if (result !== TestSuiteResultEnum.PASS) {
     statusMessage += '\n';
   }

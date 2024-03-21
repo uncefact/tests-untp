@@ -1,4 +1,5 @@
 import * as loggerUtils from '../../../src/interfaces/utils/logger';
+import { ITestSuiteResult, TestSuiteResultEnum } from '../../../src/types/common';
 
 jest.mock('chalk', () => ({
   yellow: jest.fn((text: string) => text),
@@ -43,7 +44,7 @@ const errorTestSuite = {
   credentialType: 'aggregationEvent',
   version: 'v0.0.1',
   path: 'data/dataPath.json',
-  result: 'FAIL',
+  result: TestSuiteResultEnum.FAIL,
   errors: [
     {
       fieldName: 'fooField',
@@ -57,13 +58,13 @@ const passTestSuite = {
   credentialType: 'passPassport',
   version: 'v0.0.1',
   path: 'data/dataPath.json',
-  result: 'PASS',
+  result: TestSuiteResultEnum.PASS,
 };
 const warningTestSuite = {
   credentialType: 'warningPassport',
   version: 'v0.0.1',
   path: 'data/dataPath.json',
-  result: 'WARN',
+  result: TestSuiteResultEnum.WARN,
   warnings: [
     {
       fieldName: 'testField',
@@ -72,40 +73,38 @@ const warningTestSuite = {
   ],
 };
 const testSuiteResult = {
-  testSuiteResults: [errorTestSuite, passTestSuite, warningTestSuite],
-  finalStatus: 'FAIL',
+  credentialTestResults: [errorTestSuite, passTestSuite, warningTestSuite],
+  finalStatus: TestSuiteResultEnum.FAIL,
   finalMessage: 'Test suite failed with 2 errors and 1 warning.',
 };
 
 describe('getLogStatus', () => {
   it('Should return combined message with Pass, Error, and Warning statuses', () => {
-    const resultMessage = loggerUtils.getLogStatus(testSuiteResult.testSuiteResults);
+    const resultMessage = loggerUtils.getLogStatus(testSuiteResult.credentialTestResults);
 
     expect(resultMessage).toEqual(
-      `Testing Credential: aggregationEvent
+`Testing Credential: aggregationEvent
 Version: v0.0.1
 Path: data/dataPath.json
-Status: FAIL
+Result: FAIL
 Error: fooField must be equal to one of the allowed values. Allowed values: object, aggregationEvent.
 ---
 Testing Credential: passPassport
 Version: v0.0.1
 Path: data/dataPath.json
-Status: PASS
+Result: PASS
 ---
 Testing Credential: warningPassport
 Version: v0.0.1
 Path: data/dataPath.json
-Status: WARN
+Result: WARN
 Warning: This schema additionalFields.
----
-`,
-    );
+---\n`);
   });
 
   it('should throw an error when the testSuiteResult have an invalid result', () => {
     try {
-      const invalidTestSuiteResults = [{ result: 'invalid' }];
+      const invalidTestSuiteResults = [{ ...errorTestSuite, result: 'invalid' as TestSuiteResultEnum }];
 
       loggerUtils.getLogStatus(invalidTestSuiteResults);
     } catch (e) {
@@ -137,26 +136,25 @@ describe('getFinalReport', () => {
     );
   });
 
-  it('Should return an empty string when the testSuiteResult does not have the testSuiteResults nested inside', () => {
-    const notHaveTestSuiteResults = {};
+  it('Should return an empty string when the testSuiteResult does not have the credentialTestResults nested inside', () => {
+    const notHaveCredentialTestResults = {...testSuiteResult, credentialTestResults: []};
 
-    const finalReport = loggerUtils.getFinalReport(notHaveTestSuiteResults);
+    const finalReport = loggerUtils.getFinalReport(notHaveCredentialTestResults);
 
     expect(finalReport).toBe('');
   });
 
-  it('Should throw an error when the testSuiteResults has invalid data', () => {
+  it('Should throw an error when the credentialTestResults has invalid data', () => {
     try {
       jest.spyOn(loggerUtils, 'getMessageWithColorByResult').mockImplementationOnce((text, message) => message);
       const invalidTestSuiteResult = {
-        testSuiteResults: {
-          length: 'invalid data',
-        },
-      };
+        ...testSuiteResult, credentialTestResults: { length: 1 }
+      } as ITestSuiteResult;
+      
       loggerUtils.getFinalReport(invalidTestSuiteResult);
     } catch (e) {
       const error = e as Error;
-      expect(error.message).toBe('testSuiteResults.map is not a function');
+      expect(error.message).toBe('credentialTestResults.map is not a function');
     }
   });
 });
