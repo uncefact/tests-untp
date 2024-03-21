@@ -11,7 +11,8 @@ import { readJsonFile, validateCredentialConfigs } from './utils/common.js';
 import { dynamicLoadingSchemaService } from './services/dynamic-loading-schemas/loadingSchema.service.js';
 import { hasErrors } from './services/json-schema/validator.service.js';
 import { templateMapper } from '../templates/mapper.js';
-import { generateFinalMessage, getTemplateName } from '../interfaces/utils/common.js';
+import { getTemplateName } from '../templates/getTemplateName.js';
+import { generateFinalMessage } from '../templates/generateFinalMessage.js';
 
 const processCheckDataBySchema = async (credentialConfig: ConfigContent): Promise<IValidatedCredentials> => {
   const { type, version, dataPath } = credentialConfig;
@@ -52,14 +53,16 @@ export const processTestSuite: TestSuite = async (credentialConfigsPath) => {
     const validateCredentialResult = validateCredentialConfigs(credentialConfigsPath, credentialConfigs.credentials);
 
     // Filter out configs with no errors
-    const configContentNoError = validateCredentialResult.filter((config) => config.errors === null);
+    const configContentNoError = validateCredentialResult.filter((config) => config.errors?.length === 0);
 
     // Process each config to check data by schema
     const dataCheckPromises = configContentNoError.map(processCheckDataBySchema);
     const validatedCredentials = await Promise.all(dataCheckPromises);
 
     // Add configs with errors
-    const configsContainingErrors = validateCredentialResult.filter((config) => config.errors !== null);
+    const configsContainingErrors = validateCredentialResult.filter(
+      (config) => config?.errors && config.errors?.length > 0,
+    );
     validatedCredentials.push(...configsContainingErrors);
 
     // Generate final report

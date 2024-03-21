@@ -3,7 +3,8 @@ import { readJsonFile, validateCredentialConfigs } from '../../src/core/utils/co
 import { dynamicLoadingSchemaService } from '../../src/core/services/dynamic-loading-schemas/loadingSchema.service';
 import { processTestSuite } from '../../src/core/processTestSuite';
 import { templateMapper } from '../../src/templates/mapper';
-import { getTemplateName, generateFinalMessage } from '../../src/interfaces/utils/common';
+import { getTemplateName } from '../../src/templates/getTemplateName';
+import { generateFinalMessage } from '../../src/templates/generateFinalMessage';
 
 jest.mock('path', () => ({
   resolve: jest.fn(),
@@ -26,8 +27,11 @@ jest.mock('../../src/templates/mapper', () => ({
   templateMapper: jest.fn(),
 }));
 
-jest.mock('../../src/interfaces/utils/common', () => ({
+jest.mock('../../src/templates/getTemplateName', () => ({
   getTemplateName: jest.fn(),
+}));
+
+jest.mock('../../src/templates/generateFinalMessage', () => ({
   generateFinalMessage: jest.fn(),
 }));
 
@@ -49,13 +53,13 @@ describe('processTestSuite', () => {
         type: 'objectEvent',
         version: 'v0.0.1',
         dataPath: 'test-data/parent-item-object.json',
-        errors: null,
+        errors: [],
       },
       {
         type: 'transactionEvent',
         version: 'v0.0.2',
         dataPath: 'test-data/parent-item-transaction.json',
-        errors: null,
+        errors: [],
       },
     ]);
     (dynamicLoadingSchemaService as jest.Mock).mockResolvedValue({
@@ -145,13 +149,13 @@ describe('processTestSuite', () => {
         type: 'objectEvent',
         version: 'v0.0.1',
         dataPath: 'test-data/parent-item-object.json',
-        errors: null,
+        errors: [],
       },
       {
         type: 'transactionEvent',
         version: 'v0.0.2',
         dataPath: 'test-data/parent-item-transaction.json',
-        errors: null,
+        errors: [],
       },
     ]);
 
@@ -309,7 +313,7 @@ describe('processTestSuite', () => {
         type: 'transactionEvent',
         version: 'v0.0.2',
         dataPath: 'test-data/parent-item-transaction.json',
-        errors: null,
+        errors: [],
       },
     ]);
     (dynamicLoadingSchemaService as jest.Mock).mockResolvedValue({
@@ -442,7 +446,7 @@ describe('processTestSuite', () => {
         type: 'objectEvent',
         version: 'v0.0.2',
         dataPath: 'test-data/parent-item-transaction.json',
-        errors: null,
+        errors: [],
       },
     ]);
 
@@ -575,7 +579,7 @@ describe('processTestSuite', () => {
         type: 'objectEvent',
         version: 'v0.0.1',
         dataPath: 'test-data/parent-item-object.json',
-        errors: null,
+        errors: [],
       },
     ]);
 
