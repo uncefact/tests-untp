@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import _ from 'lodash';
-import { ConfigContent, ICredentialConfigError, IValidatedCredentials } from '../types';
+import { ConfigContent, ICredentialConfigError, IValidatedCredentials } from '../types/index.js';
 
 /**
  * Asynchronously reads a file and parses its content as JSON.
