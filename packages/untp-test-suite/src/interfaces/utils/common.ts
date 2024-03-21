@@ -36,7 +36,7 @@ export const getTemplateName = (testSuiteResult: IValidatedCredentials): string 
     // If no ErrorObject has 'additionalProperty', return 'FAIL'
     return TemplateName.error;
   } else {
-    return TemplateName.error;
+    return TemplateName.pass;
   }
 };
 
