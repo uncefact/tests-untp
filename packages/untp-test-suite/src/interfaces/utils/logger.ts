@@ -1,23 +1,18 @@
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import { getPackageVersion } from '../../utils/common.js';
+import { ICredentialTestResult, IError, ITestSuiteResult, IWarning, TestSuiteResultEnum } from '../../types/common.js';
 
-export enum TestSuiteResultEnum {
-  PASS = 'PASS',
-  FAIL = 'FAIL',
-  WARN = 'WARN',
-}
-
-export function getLogStatus(testSuiteResults: any[]) {
+export function getLogStatus(credentialTestResults: ICredentialTestResult[]) {
   let resultMessage = '';
 
-  for (const testSuiteResult of testSuiteResults) {
+  for (const testSuiteResult of credentialTestResults) {
     const { credentialType, version, path, result } = testSuiteResult;
 
     const credentialMessage = getCredentialTypeMessage(credentialType);
     const versionMessage = getVersionMessage(version);
     const pathMessage = getPathMessage(path);
-    const statusMessage = getStatusMessage(result as TestSuiteResultEnum);
+    const statusMessage = getStatusMessage(result);
     const errorOrWarningMessage = getErrorOrWarningMessage(testSuiteResult);
 
     resultMessage += `${credentialMessage}${versionMessage}${pathMessage}${statusMessage}${errorOrWarningMessage}`;
@@ -27,19 +22,19 @@ export function getLogStatus(testSuiteResults: any[]) {
   return resultMessage;
 }
 
-export function getFinalReport(testSuiteResult: any) {
-  const { testSuiteResults } = testSuiteResult;
-  if (!testSuiteResults || !testSuiteResults.length) {
+export function getFinalReport(testSuiteResult: ITestSuiteResult) {
+  const { credentialTestResults } = testSuiteResult;
+  if (!credentialTestResults.length) {
     return '';
   }
 
   const packageVersion = getPackageVersion();
   const table = new Table({ colWidths: [40] });
 
-  const credentialStatuses = testSuiteResults.map((testResult: any) => [
-    testResult.credentialType,
-    testResult.version,
-    getMessageWithColorByResult(testResult.result, testResult.result),
+  const credentialStatuses = credentialTestResults.map((credentialTestResult) => [
+    credentialTestResult.credentialType,
+    credentialTestResult.version,
+    getMessageWithColorByResult(credentialTestResult.result, credentialTestResult.result),
   ]);
 
   table.push([{ colSpan: 3, content: chalk.blue.bold('UNTP Core Test Suite'), hAlign: 'center' }]);
@@ -78,39 +73,33 @@ export function getStatusMessage(result: TestSuiteResultEnum) {
   return statusMessage;
 }
 
-export function getErrorOrWarningMessage(testSuiteResult: any) {
-  if (testSuiteResult.result === 'FAIL') {
+export function getErrorOrWarningMessage(testSuiteResult: ICredentialTestResult) {
+  if (testSuiteResult.result === TestSuiteResultEnum.FAIL && testSuiteResult.errors) {
     return chalk.red(`Error: ${getErrorMessage(testSuiteResult.errors)}`);
   }
-  if (testSuiteResult.result === 'WARN') {
+  if (testSuiteResult.result === TestSuiteResultEnum.WARN && testSuiteResult.warnings) {
     return chalk.yellow(`Warning: ${getWarningMessage(testSuiteResult.warnings)}`);
   }
 
   return '';
 }
 
-export function getWarningMessage(warnings: any[] | null) {
-  if (!warnings) {
-    return '';
-  }
-
+export function getWarningMessage(warnings: IWarning[]) {
   let warningMessage = '';
+
   for (const warning of warnings) {
-    warningMessage += `${warning.message as string}.`;
+    warningMessage += `${warning.message}.`;
   }
 
   return warningMessage;
 }
 
-export function getErrorMessage(errors: any[] | null) {
-  if (!errors) {
-    return '';
-  }
-
+export function getErrorMessage(errors: IError[]) {
   let errorMessage = '';
+
   for (const error of errors) {
-    errorMessage += `${error.message as string}. `;
-    errorMessage += error?.allowedValues ? `Allowed values: ${(error.allowedValues as string[]).join(', ')}.` : '';
+    errorMessage += `${error.message}. `;
+    errorMessage += error?.allowedValues ? `Allowed values: ${(error.allowedValues).join(', ')}.` : '';
   }
 
   return errorMessage;
