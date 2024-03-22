@@ -4,7 +4,7 @@ describe('generateFinalMessage', () => {
   it('should return FAIL when mix the Failed, Passed and Warning results', () => {
     const credentials = [
       {
-        credentialType: 'aggregationEvent',
+        credentialType: 'objectEvent',
         version: 'v0.0.1',
         path: '',
         result: 'PASS',
@@ -16,11 +16,23 @@ describe('generateFinalMessage', () => {
         result: 'FAIL',
       },
       {
-        credentialType: 'aggregationEvent',
+        credentialType: 'transactionEvent',
         version: 'v0.0.1',
         path: '',
         result: 'WARN',
       },
+      {
+        credentialType: 'transformationEvent',
+        version: 'v0.0.1',
+        path: '',
+        result: 'WARN',
+      },
+      {
+        credentialType: 'productPassport',
+        version: 'v0.0.1',
+        path: '',
+        result: 'FAIL',
+      }
     ];
 
     const result = generateFinalMessage(credentials);

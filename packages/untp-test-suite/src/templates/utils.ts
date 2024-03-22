@@ -29,7 +29,7 @@ export const generateFinalMessage = (credentials: ICredentialTestResult[]): IFin
   const initFinalReport = { finalStatus: FinalStatus.pass, finalMessage: TestSuiteMessage.Pass } as IFinalReport;
 
   return credentials.reduce((acc, credential) => {
-    if (credential.result === FinalStatus.warn) {
+    if (credential.result === FinalStatus.warn && acc.finalStatus !== FinalStatus.fail) {
       acc.finalMessage = TestSuiteMessage.Warning;
       acc.finalStatus = FinalStatus.warn;
     }
