@@ -76,8 +76,8 @@ export const processTestSuite: TestSuite = async (credentialConfigsPath) => {
 
     return {
       credentials: credentialsTemplate,
-      finalStatus: parsedMappingFinalReport?.finalStatus,
-      finalMessage: parsedMappingFinalReport?.finalMessage,
+      finalStatus: parsedMappingFinalReport.finalStatus,
+      finalMessage: parsedMappingFinalReport.finalMessage,
     };
   } catch (e) {
     const error = e as Error;

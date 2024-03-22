@@ -26,21 +26,19 @@ export const getTemplateName = (testSuiteResult: IValidatedCredentials): string 
 };
 
 export const generateFinalMessage = (credentials: ICredentialTestResult[]): IFinalReport => {
-  let finalMessage = TestSuiteMessage.Pass;
-  let finalStatus: FinalStatus = FinalStatus.pass;
+  const initFinalReport = { finalStatus: FinalStatus.pass, finalMessage: TestSuiteMessage.Pass } as IFinalReport;
 
-  if (credentials.some((credential) => credential.result === FinalStatus.warn)) {
-    finalMessage = TestSuiteMessage.Warning;
-    finalStatus = FinalStatus.warn;
-  }
+  return credentials.reduce((acc, credential) => {
+    if (credential.result === FinalStatus.warn) {
+      acc.finalMessage = TestSuiteMessage.Warning;
+      acc.finalStatus = FinalStatus.warn;
+    }
 
-  if (credentials.some((credential) => credential.result === FinalStatus.fail)) {
-    finalMessage = TestSuiteMessage.Fail;
-    finalStatus = FinalStatus.fail;
-  }
+    if (credential.result === FinalStatus.fail) {
+      acc.finalMessage = TestSuiteMessage.Fail;
+      acc.finalStatus = FinalStatus.fail;
+    }
 
-  return {
-    finalStatus,
-    finalMessage,
-  };
+    return acc;
+  }, initFinalReport);
 };
