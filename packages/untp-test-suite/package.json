@@ -22,7 +22,7 @@
   "scripts": {
     "untp": "node build/interfaces/cli/cli.js",
     "test": "jest --config ./jest.config.js",
-    "test:integration": "jest --config=jest.integration.config.js",
+    "test:integration": "jest --config=jest.integration.config.cjs",
     "build": "tsc --build --clean && tsc",
     "watch": "tsc -b --watch",
     "lint": "eslint ."

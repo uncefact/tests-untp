@@ -1,4 +1,5 @@
 const { exec } = require('child_process');
+const fs = require('fs');
 
 describe('yarn untp Options', () => {
   it('should returns the untp help', () => {
@@ -39,7 +40,7 @@ describe('yarn untp Options', () => {
 });
 
 describe('yarn untp test Commands', () => {
-  it('should show error when call the untp config without input file', () => {
+  it('should create credential file successful', () => {
     const credentialFileName = 'credentials.json';
     const storePath = `${process.cwd()}/${credentialFileName}`;
 
@@ -50,11 +51,62 @@ describe('yarn untp test Commands', () => {
       }
 
       expect(stdout).not.toBeNull();
-      if (!storePath) {
-        expect(stdout).toContain(`Credential file 'credentials.json' generated successfully!`);
+      expect(fs.existsSync(storePath)).toBe(true);
+    });
+  });
+});
+
+describe('npm untp test Commands', () => {
+  it('should returns the untp help', () => {
+    exec('npm run untp', (error, stdout) => {
+      if (error) {
+        console.error(`execSync error: ${error}`);
+        return;
       }
 
-      expect(stdout).toContain(`Credential file 'credentials.json' already exists!`);
+      expect(stdout).not.toBeNull();
+      expect(stdout).toContain('Usage: untp [options] [command]');
+    });
+  });
+
+  it('should returns the untp help', () => {
+    exec('npm run untp -- -h', (error, stdout) => {
+      if (error) {
+        console.error(`execSync error: ${error}`);
+        return;
+      }
+
+      expect(stdout).not.toBeNull();
+      expect(stdout).toContain('Usage: untp [options] [command]');
+    });
+  });
+
+  it('should returns the untp version', () => {
+    exec('npm run untp -- -v', (error, stdout) => {
+      if (error) {
+        console.error(`execSync error: ${error}`);
+        return;
+      }
+
+      expect(stdout).not.toBeNull();
+      expect(stdout).toContain('0.0.1');
+    });
+  });
+});
+
+describe('npm untp test Commands', () => {
+  it('should create credential file successful', () => {
+    const credentialFileName = 'credentials.json';
+    const storePath = `${process.cwd()}/${credentialFileName}`;
+
+    exec('npm run untp config', (error, stdout) => {
+      if (error) {
+        console.error(`execSync error: ${error}`);
+        return;
+      }
+
+      expect(stdout).not.toBeNull();
+      expect(fs.existsSync(storePath)).toBe(true);
     });
   });
 });
