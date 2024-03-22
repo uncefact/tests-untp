@@ -4,12 +4,7 @@ export default {
   rootDir: './',
   moduleFileExtensions: [...defaults.moduleFileExtensions, 'mts'],
   collectCoverage: false,
-  collectCoverageFrom: [
-    '!**/examples/**',
-    '!**/types/**',
-    '!**/build/**',
-    '!**/node_modules/**',
-  ],
+  collectCoverageFrom: ['!**/examples/**', '!**/types/**', '!**/build/**', '!**/node_modules/**', '!**/**/index.ts'],
   coverageReporters: ['text', 'lcov', 'json'],
   coverageProvider: 'v8',
   coverageDirectory: './coverage',
@@ -29,5 +24,5 @@ export default {
         useESM: true,
       },
     ],
-  }
+  },
 };

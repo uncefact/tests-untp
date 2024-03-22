@@ -11,7 +11,7 @@ export interface ConfigContent {
 }
 
 export interface TestSuite {
-  (credentialConfigsPath: string): Promise<TestSuiteResult[]>;
+  (credentialConfigsPath: string): Promise<TestSuiteResult>;
 }
 
 export interface ICredentialConfigError {
@@ -25,4 +25,41 @@ export interface TestErrors {
   errors: ErrorObject[] | ICredentialConfigError[] | null;
 }
 
-export interface TestSuiteResult extends ConfigContent, TestErrors {}
+export interface IValidatedCredentials extends ConfigContent, TestErrors {}
+
+export interface ICredentialTestResult {
+  credentialType: string;
+  version: string;
+  path: string;
+  result: string;
+  warnings?: string[];
+  error?: string[];
+}
+
+export interface IFinalReport {
+  finalStatus: FinalStatus;
+  finalMessage: TestSuiteMessage;
+}
+
+export interface TestSuiteResult extends IFinalReport {
+  credentials: ICredentialTestResult[];
+}
+
+export enum FinalStatus {
+  fail = 'FAIL',
+  pass = 'PASS',
+  warn = 'WARN',
+}
+
+export enum TemplateName {
+  error = 'error',
+  pass = 'pass',
+  warn = 'warning',
+  finalReport = 'finalReport',
+}
+
+export enum TestSuiteMessage {
+  Pass = 'Your credentials are UNTP compliant',
+  Warning = 'Your credentials are UNTP compliant, but have extended the data model',
+  Fail = 'Your credentials are not UNTP compliant',
+}

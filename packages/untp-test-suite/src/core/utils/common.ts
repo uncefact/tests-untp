@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import _ from 'lodash';
-import { ConfigContent, ICredentialConfigError, TestSuiteResult } from '../types';
+import { ConfigContent, ICredentialConfigError, IValidatedCredentials } from '../types/index.js';
 
 /**
  * Asynchronously reads a file and parses its content as JSON.
@@ -33,12 +33,12 @@ const createMissingFieldError = (credentialConfigsPath: string, missingField?: s
 /**
  * Validates an array of credential configurations.
  * @param {ConfigContent[]} credentialConfigs - The array of credential configurations to be validated.
- * @returns {TestSuiteResult[] | null} An array of errors if the credential configurations are invalid, or null if they are valid.
+ * @returns {IValidatedCredentials[] | null} An array of errors if the credential configurations are invalid, or null if they are valid.
  */
 export const validateCredentialConfigs = (
   credentialConfigsPath: string,
   credentialConfigs: ConfigContent[],
-): TestSuiteResult[] => {
+): IValidatedCredentials[] => {
   if (_.isEmpty(credentialConfigs)) {
     throw new Error('Credentials array cannot be empty. Please provide valid credentials to proceed.');
   }
@@ -55,7 +55,7 @@ export const validateCredentialConfigs = (
     if (_.isEmpty(credential.dataPath)) {
       errors.push(createMissingFieldError(credentialConfigsPath, 'dataPath'));
     }
-    results.push({ ...credential, errors } as TestSuiteResult);
+    results.push({ ...credential, errors } as IValidatedCredentials);
   }
 
   return results;
