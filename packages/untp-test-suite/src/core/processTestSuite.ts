@@ -1,8 +1,44 @@
-import path from 'path';
-import { ConfigCredentials, TestSuite, TestSuiteResult } from './types/index';
+import {
+  ConfigContent,
+  ConfigCredentials,
+  IValidatedCredentials,
+  ICredentialTestResult,
+  IFinalReport,
+  TemplateName,
+  TestSuite,
+} from './types/index.js';
 import { readJsonFile, validateCredentialConfigs } from './utils/common.js';
 import { dynamicLoadingSchemaService } from './services/dynamic-loading-schemas/loadingSchema.service.js';
 import { hasErrors } from './services/json-schema/validator.service.js';
+import { templateMapper } from '../templates/mapper.js';
+import { getTemplateName, generateFinalMessage } from '../templates/utils.js';
+
+const processCheckDataBySchema = async (credentialConfig: ConfigContent): Promise<IValidatedCredentials> => {
+  const { type, version, dataPath } = credentialConfig;
+  const [schema, data] = await Promise.all([dynamicLoadingSchemaService(type, version), readJsonFile(dataPath)]);
+
+  const errors = hasErrors(schema, data);
+
+  return {
+    ...credentialConfig,
+    errors,
+  };
+};
+
+const generateTestSuiteResultByTemplate = async (
+  testSuiteResultAjv: IValidatedCredentials[],
+): Promise<ICredentialTestResult[]> => {
+  const credentialsTemplate = await Promise.all(
+    testSuiteResultAjv.map(async (value) => {
+      const templateName = getTemplateName(value);
+      const message = await templateMapper(templateName, value);
+
+      return JSON.parse(message);
+    }),
+  );
+
+  return credentialsTemplate;
+};
 
 /**
  * Process the test suite
@@ -10,30 +46,41 @@ import { hasErrors } from './services/json-schema/validator.service.js';
  * @returns The test suite result
  */
 export const processTestSuite: TestSuite = async (credentialConfigsPath) => {
-  const credentialConfigs = await readJsonFile<ConfigCredentials>(credentialConfigsPath);
-  const validateCredentialResult = validateCredentialConfigs(credentialConfigsPath, credentialConfigs.credentials);
+  try {
+    // Read and validate credential configs
+    const credentialConfigs = await readJsonFile<ConfigCredentials>(credentialConfigsPath);
+    const validateCredentialResult = validateCredentialConfigs(credentialConfigsPath, credentialConfigs.credentials);
 
-  const configContentNoError = validateCredentialResult.filter((config) => config.errors === null);
+    // Filter out configs with no errors
+    const configContentNoError = validateCredentialResult.filter((config) => config.errors?.length === 0);
 
-  const testDataPath = path.resolve(process.cwd(), '../../');
-  const testSuiteResultPromises = configContentNoError.map<Promise<TestSuiteResult>>(async (credentialConfig) => {
-    const { type, version, dataPath } = credentialConfig;
-    const [schema, data] = await Promise.all([
-      dynamicLoadingSchemaService(type, version),
-      readJsonFile(`${testDataPath}/${dataPath}`),
-    ]);
+    // Process each config to check data by schema
+    const dataCheckPromises = configContentNoError.map(processCheckDataBySchema);
+    const validatedCredentials = await Promise.all(dataCheckPromises);
 
-    const errors = hasErrors(schema, data);
+    // Add configs with errors
+    const configsContainingErrors = validateCredentialResult.filter(
+      (config) => config?.errors && config.errors?.length > 0,
+    );
+    validatedCredentials.push(...configsContainingErrors);
+
+    // Generate final report
+    const credentialsTemplate = await generateTestSuiteResultByTemplate(validatedCredentials);
+    const finalReport = generateFinalMessage(credentialsTemplate);
+    const mappingFinalReport = await templateMapper(TemplateName.finalReport, {
+      finalStatus: finalReport.finalStatus,
+      finalMessage: finalReport.finalMessage,
+    });
+
+    const parsedMappingFinalReport = JSON.parse(mappingFinalReport) as IFinalReport;
 
     return {
-      ...credentialConfig,
-      errors,
+      credentials: credentialsTemplate,
+      finalStatus: parsedMappingFinalReport.finalStatus,
+      finalMessage: parsedMappingFinalReport.finalMessage,
     };
-  });
-
-  const testSuiteResult = await Promise.all(testSuiteResultPromises);
-  const configsContainingErrors = validateCredentialResult.filter((config) => config.errors !== null);
-  testSuiteResult.push(...configsContainingErrors);
-
-  return testSuiteResult;
+  } catch (e) {
+    const error = e as Error;
+    throw new Error(`Failed to run the test suite. ${error.message}`);
+  }
 };
