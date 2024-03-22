@@ -1,14 +1,17 @@
 import fs from 'fs/promises';
+
 import { readJsonFile } from '../../../src/interfaces/utils/common';
 
 describe('readJsonFile', () => {
   const credentialFilePath = 'config/credential.json';
   const dataFileJsonMock = JSON.stringify({
-    credentials: [{
-      type: 'aggregationEvent',
-      version: 'v0.0.1',
-      dataPath: ''
-    }],
+    credentials: [
+      {
+        type: 'aggregationEvent',
+        version: 'v0.0.1',
+        dataPath: '',
+      },
+    ],
   });
 
   it('should read JSON file successfully', async () => {

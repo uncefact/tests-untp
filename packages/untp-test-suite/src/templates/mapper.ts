@@ -2,7 +2,7 @@ import Handlebars from 'handlebars';
 import fs from 'fs/promises';
 import path from 'path';
 import _ from 'lodash';
-import { TestSuiteResult } from '../core/types/index.js';
+import { IFinalReport, IValidatedCredentials } from '../core/types/index.js';
 import { getCurrentDirPath, getCurrentFilePath } from '../utils/path.js';
 
 Handlebars.registerHelper('jsonStringify', (jsonObject: object) => {
@@ -15,7 +15,7 @@ Handlebars.registerHelper('jsonStringify', (jsonObject: object) => {
   return JSON.stringify(jsonObject);
 });
 
-export async function templateMapper(templateName: string, testSuiteResult: TestSuiteResult) {
+export async function templateMapper(templateName: string, testSuiteResult: IValidatedCredentials | IFinalReport) {
   try {
     const currentDirPath = getCurrentDirPath(getCurrentFilePath());
     const templateFilePath = path.join(currentDirPath, `../templates/templateMessages/${templateName}.hbs`);
