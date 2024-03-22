@@ -6,7 +6,7 @@ describe('getTemplateName', () => {
       type: 'aggregationEvent',
       version: 'v0.0.1',
       dataPath: '',
-      errors: null,
+      errors: [],
     };
 
     const result = getTemplateName(testSuiteResult);
