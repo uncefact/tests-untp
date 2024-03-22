@@ -11,8 +11,7 @@ import { readJsonFile, validateCredentialConfigs } from './utils/common.js';
 import { dynamicLoadingSchemaService } from './services/dynamic-loading-schemas/loadingSchema.service.js';
 import { hasErrors } from './services/json-schema/validator.service.js';
 import { templateMapper } from '../templates/mapper.js';
-import { getTemplateName } from '../templates/getTemplateName.js';
-import { generateFinalMessage } from '../templates/generateFinalMessage.js';
+import { getTemplateName, generateFinalMessage } from '../templates/utils.js';
 
 const processCheckDataBySchema = async (credentialConfig: ConfigContent): Promise<IValidatedCredentials> => {
   const { type, version, dataPath } = credentialConfig;

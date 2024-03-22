@@ -3,8 +3,7 @@ import { readJsonFile, validateCredentialConfigs } from '../../src/core/utils/co
 import { dynamicLoadingSchemaService } from '../../src/core/services/dynamic-loading-schemas/loadingSchema.service';
 import { processTestSuite } from '../../src/core/processTestSuite';
 import { templateMapper } from '../../src/templates/mapper';
-import { getTemplateName } from '../../src/templates/getTemplateName';
-import { generateFinalMessage } from '../../src/templates/generateFinalMessage';
+import { getTemplateName, generateFinalMessage } from '../../src/templates/utils';
 
 jest.mock('path', () => ({
   resolve: jest.fn(),
@@ -27,11 +26,8 @@ jest.mock('../../src/templates/mapper', () => ({
   templateMapper: jest.fn(),
 }));
 
-jest.mock('../../src/templates/getTemplateName', () => ({
+jest.mock('../../src/templates/utils', () => ({
   getTemplateName: jest.fn(),
-}));
-
-jest.mock('../../src/templates/generateFinalMessage', () => ({
   generateFinalMessage: jest.fn(),
 }));
 
