@@ -2,7 +2,7 @@ import { ErrorObject } from 'ajv';
 import {
   IValidatedCredentials,
   TemplateName,
-  FinalStatus,
+  TestSuiteResultEnum,
   ICredentialTestResult,
   IFinalReport,
   TestSuiteMessage,
@@ -15,7 +15,7 @@ export const getTemplateName = (testSuiteResult: IValidatedCredentials): string 
   }
 
   const errors = testSuiteResult.errors as ErrorObject[];
-  const isWarningType = errors.find((error) => error?.params?.additionalProperty);
+  const isWarningType = errors.every((error) => error?.params?.additionalProperty);
   if (isWarningType) {
     // If any ErrorObject has 'additionalProperty', return 'warning'
     return TemplateName.warn;
@@ -26,19 +26,49 @@ export const getTemplateName = (testSuiteResult: IValidatedCredentials): string 
 };
 
 export const generateFinalMessage = (credentials: ICredentialTestResult[]): IFinalReport => {
-  const initFinalReport = { finalStatus: FinalStatus.pass, finalMessage: TestSuiteMessage.Pass } as IFinalReport;
+  const initFinalReport = { finalStatus: TestSuiteResultEnum.PASS, finalMessage: TestSuiteMessage.Pass } as IFinalReport;
 
   return credentials.reduce((acc, credential) => {
-    if (credential.result === FinalStatus.warn && acc.finalStatus !== FinalStatus.fail) {
+    if (credential.result === TestSuiteResultEnum.WARN && acc.finalStatus !== TestSuiteResultEnum.FAIL) {
       acc.finalMessage = TestSuiteMessage.Warning;
-      acc.finalStatus = FinalStatus.warn;
+      acc.finalStatus = TestSuiteResultEnum.WARN;
     }
 
-    if (credential.result === FinalStatus.fail) {
+    if (credential.result === TestSuiteResultEnum.FAIL) {
       acc.finalMessage = TestSuiteMessage.Fail;
-      acc.finalStatus = FinalStatus.fail;
+      acc.finalStatus = TestSuiteResultEnum.FAIL;
     }
 
     return acc;
   }, initFinalReport);
 };
+
+export const getMapperValueByTemplate = (templateName: string, testSuiteResult: IValidatedCredentials) => {
+  if (templateName === TemplateName.pass) {
+    return testSuiteResult;
+  }
+
+  const errors = testSuiteResult.errors as ErrorObject[];
+  if (templateName === TemplateName.warn) {
+    return {
+      ...testSuiteResult,
+      warnings: errors
+    };
+  }
+
+  const { mapperErrors, mapperWarnings } = errors.reduce((result: { mapperErrors: ErrorObject[], mapperWarnings: ErrorObject[] }, current) => {
+    if (current.params?.additionalProperty) {
+      result.mapperWarnings.push(current);
+    } else {
+      result.mapperErrors.push(current);
+    }
+
+    return result;
+  }, { mapperErrors: [], mapperWarnings: [] });
+
+  return {
+    ...testSuiteResult,
+    errors: mapperErrors,
+    warnings: mapperWarnings
+  }
+}

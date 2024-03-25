@@ -31,13 +31,25 @@ export interface ICredentialTestResult {
   credentialType: string;
   version: string;
   path: string;
-  result: string;
-  warnings?: string[];
-  error?: string[];
+  result: TestSuiteResultEnum;
+  warnings?: IWarning[];
+  errors?: IError[];
+}
+
+export interface IWarning {
+  fieldName: string;
+  message: string;
+}
+
+export interface IError {
+  fieldName: string;
+  errorType: string;
+  allowedValues?: string[];
+  message: string;
 }
 
 export interface IFinalReport {
-  finalStatus: FinalStatus;
+  finalStatus: TestSuiteResultEnum;
   finalMessage: TestSuiteMessage;
 }
 
@@ -45,10 +57,10 @@ export interface TestSuiteResult extends IFinalReport {
   credentials: ICredentialTestResult[];
 }
 
-export enum FinalStatus {
-  fail = 'FAIL',
-  pass = 'PASS',
-  warn = 'WARN',
+export enum TestSuiteResultEnum {
+  PASS = 'PASS',
+  FAIL = 'FAIL',
+  WARN = 'WARN',
 }
 
 export enum TemplateName {

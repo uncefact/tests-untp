@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import { getPackageVersion } from '../../utils/common.js';
-import { ICredentialTestResult, IError, ITestSuiteResult, IWarning, TestSuiteResultEnum } from '../../types/common.js';
+import { ICredentialTestResult, IError, IWarning, TestSuiteResult, TestSuiteResultEnum } from '../../core/types/index.js';
 
 export function getLogStatus(credentialTestResults: ICredentialTestResult[]) {
   let resultMessage = '';
@@ -22,8 +22,8 @@ export function getLogStatus(credentialTestResults: ICredentialTestResult[]) {
   return resultMessage;
 }
 
-export function getFinalReport(testSuiteResult: ITestSuiteResult) {
-  const { credentialTestResults } = testSuiteResult;
+export function getFinalReport(testSuiteResult: TestSuiteResult) {
+  const { credentials: credentialTestResults } = testSuiteResult;
   if (!credentialTestResults.length) {
     return '';
   }
@@ -74,6 +74,9 @@ export function getStatusMessage(result: TestSuiteResultEnum) {
 }
 
 export function getErrorOrWarningMessage(testSuiteResult: ICredentialTestResult) {
+  if (testSuiteResult.result === TestSuiteResultEnum.FAIL && testSuiteResult.errors && testSuiteResult.warnings) {
+    return `${chalk.yellow(`Warning: ${getWarningMessage(testSuiteResult.warnings)}`)}\n${chalk.red(`Error: ${getErrorMessage(testSuiteResult.errors)}`)}`;
+  }
   if (testSuiteResult.result === TestSuiteResultEnum.FAIL && testSuiteResult.errors) {
     return chalk.red(`Error: ${getErrorMessage(testSuiteResult.errors)}`);
   }
@@ -88,7 +91,7 @@ export function getWarningMessage(warnings: IWarning[]) {
   let warningMessage = '';
 
   for (const warning of warnings) {
-    warningMessage += `${warning.message}.`;
+    warningMessage += `${warning.message}. Additional property found: '${warning.fieldName}'.`;
   }
 
   return warningMessage;

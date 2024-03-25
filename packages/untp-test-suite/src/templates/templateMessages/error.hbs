@@ -3,6 +3,19 @@
   "version": "{{version}}",
   "path": "{{dataPath}}",
   "result": "FAIL",
+
+  {{#if warnings.length}}
+  "warnings": [
+    {{#each warnings}}
+      {
+        "fieldName": "{{params.additionalProperty}}",
+        "message": "This schema {{message}}"
+      }
+      {{#unless @last}},{{/unless}}
+    {{/each}}
+  ],
+  {{/if}}
+
   "errors": [
     {{#each errors}}
       {

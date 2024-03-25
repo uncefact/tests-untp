@@ -3,7 +3,6 @@ import chalk from 'chalk';
 import path from 'path';
 import { processTestSuite } from '../../core/index.js';
 import { getFinalReport, getLogStatus } from '../utils/logger.js';
-import { ITestSuiteResult } from '../../types/common.js';
 
 const credentialFileName = 'credentials.json';
 const defaultCredentialFilePath = `${process.cwd()}/${credentialFileName}`;
@@ -23,10 +22,9 @@ test
         credentialPath = path.resolve(process.cwd(), options.config);
       }
 
-      // The error on this line will be resolved once we have updated the 'processTestSuite' function.
-      const testSuiteResult = await processTestSuite(credentialPath) as ITestSuiteResult;
-      
-      const testSuiteMessage = getLogStatus(testSuiteResult.credentialTestResults);
+      const testSuiteResult = await processTestSuite(credentialPath);
+
+      const testSuiteMessage = getLogStatus(testSuiteResult.credentials);
       const testSuiteFinalReport = getFinalReport(testSuiteResult);
 
       console.log(testSuiteMessage);

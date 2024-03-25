@@ -11,7 +11,7 @@ import { readJsonFile, validateCredentialConfigs } from './utils/common.js';
 import { dynamicLoadingSchemaService } from './services/dynamic-loading-schemas/loadingSchema.service.js';
 import { hasErrors } from './services/json-schema/validator.service.js';
 import { templateMapper } from '../templates/mapper.js';
-import { getTemplateName, generateFinalMessage } from '../templates/utils.js';
+import { getTemplateName, generateFinalMessage, getMapperValueByTemplate } from '../templates/utils.js';
 
 const processCheckDataBySchema = async (credentialConfig: ConfigContent): Promise<IValidatedCredentials> => {
   const { type, version, dataPath } = credentialConfig;
@@ -31,7 +31,8 @@ const generateTestSuiteResultByTemplate = async (
   const credentialsTemplate = await Promise.all(
     testSuiteResultAjv.map(async (value) => {
       const templateName = getTemplateName(value);
-      const message = await templateMapper(templateName, value);
+      const mapperValue = getMapperValueByTemplate(templateName, value);
+      const message = await templateMapper(templateName, mapperValue);
 
       return JSON.parse(message);
     }),
