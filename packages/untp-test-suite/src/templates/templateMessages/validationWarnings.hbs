@@ -1,10 +1,6 @@
 {
-  "credentialType": "{{type}}",
-  "version": "{{version}}",
-  "path": "{{dataPath}}",
-  "result": "WARN",
-  "warnings": [
-    {{#each warnings}}
+  "validationWarnings": [
+    {{#each validationWarnings}}
       {
         "fieldName": "{{params.additionalProperty}}",
         "message": "This schema {{message}}"

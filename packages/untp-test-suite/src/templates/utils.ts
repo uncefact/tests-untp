@@ -1,34 +1,83 @@
 import { ErrorObject } from 'ajv';
 import {
   IValidatedCredentials,
-  TemplateName,
   TestSuiteResultEnum,
   ICredentialTestResult,
   IFinalReport,
   TestSuiteMessage,
+  IValidationTemplateData,
+  TemplateEnum,
 } from '../core/types/index.js';
+import { templateMapper } from './mapper.js';
 
-export const getTemplateName = (testSuiteResult: IValidatedCredentials): string => {
-  // If there are no errors, return 'pass'
-  if (!testSuiteResult.errors || !testSuiteResult.errors.length) {
-    return TemplateName.pass;
+export const getValidationTemplateData = (validatedCredential: IValidatedCredentials): IValidationTemplateData => {
+  const errors = validatedCredential.errors as ErrorObject[];
+
+  // Pass template
+  const isPassTemplate = !errors?.length;
+  if (isPassTemplate) {
+    return {
+      ...validatedCredential,
+      result: TestSuiteResultEnum.PASS,
+      subTemplates: []
+    };
   }
 
-  const errors = testSuiteResult.errors as ErrorObject[];
-  const isWarningType = errors.every((error) => error?.params?.additionalProperty);
-  if (isWarningType) {
-    // If any ErrorObject has 'additionalProperty', return 'warning'
-    return TemplateName.warn;
+  // Warning template
+  const isWarningTemplate = errors.every((error) => error?.params?.additionalProperty);
+  if (isWarningTemplate) {
+    return {
+      ...validatedCredential,
+      result: TestSuiteResultEnum.WARN,
+      validationWarnings: errors,
+      subTemplates: [TemplateEnum.VALIDATION_WARNINGS],
+    };
   }
+  
+  // Error or Error and warning template
+  const { validationErrors, validationWarnings } = errors.reduce((validationResult, current) => {
+    const key = current.params?.additionalProperty ? TemplateEnum.VALIDATION_WARNINGS : TemplateEnum.VALIDATION_ERRORS;
+    validationResult[key].push(current);
 
-  // If no ErrorObject has 'additionalProperty', return 'FAIL'
-  return TemplateName.error;
+    return validationResult;
+  }, {
+    [TemplateEnum.VALIDATION_ERRORS]: [] as ErrorObject[],
+    [TemplateEnum.VALIDATION_WARNINGS]: [] as ErrorObject[]
+  });
+
+  return {
+    ...validatedCredential,
+    result: TestSuiteResultEnum.FAIL,
+    validationErrors,
+    validationWarnings,
+    subTemplates: validationWarnings.length ? [TemplateEnum.VALIDATION_ERRORS, TemplateEnum.VALIDATION_WARNINGS] : [TemplateEnum.VALIDATION_ERRORS],
+  };
 };
 
-export const generateFinalMessage = (credentials: ICredentialTestResult[]): IFinalReport => {
+export const getCredentialResults = async (validatedCredentials: IValidatedCredentials[]): Promise<ICredentialTestResult[]> => {
+  const credentialsResultPromises = validatedCredentials.map(async (validatedCredential) => {
+    const { subTemplates, ...templateData } = getValidationTemplateData(validatedCredential);
+
+    const credentialResultJson = await templateMapper(TemplateEnum.CREDENTIAL_RESULT, templateData);
+    const credentialResult = JSON.parse(credentialResultJson);
+
+    const subTemplateDataPromises = subTemplates.map(async (subTemplate) => {
+      const subTemplateData = await templateMapper(subTemplate, templateData);
+      credentialResult[subTemplate] = JSON.parse(subTemplateData)[subTemplate];
+    });
+
+    await Promise.all(subTemplateDataPromises);
+    return credentialResult;
+  });
+
+  const credentialResults = await Promise.all(credentialsResultPromises);
+  return credentialResults;
+};
+
+export const getFinalReport = async (credentialResults: ICredentialTestResult[]): Promise<IFinalReport> => {
   const initFinalReport = { finalStatus: TestSuiteResultEnum.PASS, finalMessage: TestSuiteMessage.Pass } as IFinalReport;
 
-  return credentials.reduce((acc, credential) => {
+  const finalReportTemplateData = credentialResults.reduce((acc, credential) => {
     if (credential.result === TestSuiteResultEnum.WARN && acc.finalStatus !== TestSuiteResultEnum.FAIL) {
       acc.finalMessage = TestSuiteMessage.Warning;
       acc.finalStatus = TestSuiteResultEnum.WARN;
@@ -41,34 +90,7 @@ export const generateFinalMessage = (credentials: ICredentialTestResult[]): IFin
 
     return acc;
   }, initFinalReport);
+
+  const finalReportJson = await templateMapper(TemplateEnum.FINAL_REPORT, finalReportTemplateData);
+  return JSON.parse(finalReportJson);
 };
-
-export const getMapperValueByTemplate = (templateName: string, testSuiteResult: IValidatedCredentials) => {
-  if (templateName === TemplateName.pass) {
-    return testSuiteResult;
-  }
-
-  const errors = testSuiteResult.errors as ErrorObject[];
-  if (templateName === TemplateName.warn) {
-    return {
-      ...testSuiteResult,
-      warnings: errors
-    };
-  }
-
-  const { mapperErrors, mapperWarnings } = errors.reduce((result: { mapperErrors: ErrorObject[], mapperWarnings: ErrorObject[] }, current) => {
-    if (current.params?.additionalProperty) {
-      result.mapperWarnings.push(current);
-    } else {
-      result.mapperErrors.push(current);
-    }
-
-    return result;
-  }, { mapperErrors: [], mapperWarnings: [] });
-
-  return {
-    ...testSuiteResult,
-    errors: mapperErrors,
-    warnings: mapperWarnings
-  }
-}
