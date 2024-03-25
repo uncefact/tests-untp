@@ -1,5 +1,5 @@
+import { ICredentialTestResult, TestSuiteMessage, TestSuiteResultEnum } from '../../../src/core/types';
 import * as loggerUtils from '../../../src/interfaces/utils/logger';
-import { ITestSuiteResult, TestSuiteResultEnum } from '../../../src/types/common';
 
 jest.mock('chalk', () => ({
   yellow: jest.fn((text: string) => text),
@@ -47,10 +47,10 @@ const errorTestSuite = {
   result: TestSuiteResultEnum.FAIL,
   errors: [
     {
-      fieldName: 'fooField',
+      fieldName: 'test',
       errorType: 'enum',
       allowedValues: ['object', 'aggregationEvent'],
-      message: 'fooField must be equal to one of the allowed values',
+      message: 'test field must be equal to one of the allowed values',
     },
   ],
 };
@@ -72,22 +72,42 @@ const warningTestSuite = {
     },
   ],
 };
+const errorAndWarningTestSuite = {
+  credentialType: 'errorAndWarningTestSuite',
+  version: 'v0.0.1',
+  path: 'data/dataPath.json',
+  result: TestSuiteResultEnum.FAIL,
+  warnings: [
+    {
+      fieldName: 'testField',
+      message: 'This schema additionalFields',
+    },
+  ],
+  errors: [
+    {
+      fieldName: 'test',
+      errorType: 'enum',
+      allowedValues: ['object', 'aggregationEvent'],
+      message: 'test field must be equal to one of the allowed values',
+    },
+  ],
+};
 const testSuiteResult = {
-  credentialTestResults: [errorTestSuite, passTestSuite, warningTestSuite],
+  credentials: [errorTestSuite, passTestSuite, warningTestSuite, errorAndWarningTestSuite],
   finalStatus: TestSuiteResultEnum.FAIL,
-  finalMessage: 'Test suite failed with 2 errors and 1 warning.',
+  finalMessage: TestSuiteMessage.Fail,
 };
 
 describe('getLogStatus', () => {
   it('Should return combined message with Pass, Error, and Warning statuses', () => {
-    const resultMessage = loggerUtils.getLogStatus(testSuiteResult.credentialTestResults);
+    const resultMessage = loggerUtils.getLogStatus(testSuiteResult.credentials);
 
     expect(resultMessage).toEqual(
 `Testing Credential: aggregationEvent
 Version: v0.0.1
 Path: data/dataPath.json
 Result: FAIL
-Error: fooField must be equal to one of the allowed values. Allowed values: object, aggregationEvent.
+Error: test field must be equal to one of the allowed values. Allowed values: object, aggregationEvent.
 ---
 Testing Credential: passPassport
 Version: v0.0.1
@@ -98,7 +118,66 @@ Testing Credential: warningPassport
 Version: v0.0.1
 Path: data/dataPath.json
 Result: WARN
-Warning: This schema additionalFields.
+Warning: This schema additionalFields. Additional property found: 'testField'.
+---
+Testing Credential: errorAndWarningTestSuite
+Version: v0.0.1
+Path: data/dataPath.json
+Result: FAIL
+Warning: This schema additionalFields. Additional property found: 'testField'.
+Error: test field must be equal to one of the allowed values. Allowed values: object, aggregationEvent.
+---\n`);
+  });
+
+  it('Should return message with PASS status', () => {
+    const passCredentials = [passTestSuite];
+    const resultMessage = loggerUtils.getLogStatus(passCredentials);
+
+    expect(resultMessage).toEqual(
+`Testing Credential: passPassport
+Version: v0.0.1
+Path: data/dataPath.json
+Result: PASS
+---\n`);
+  });
+
+  it('Should return message with FAIL status', () => {
+    const failCredentials = [errorTestSuite];
+    const resultMessage = loggerUtils.getLogStatus(failCredentials);
+
+    expect(resultMessage).toEqual(
+`Testing Credential: aggregationEvent
+Version: v0.0.1
+Path: data/dataPath.json
+Result: FAIL
+Error: test field must be equal to one of the allowed values. Allowed values: object, aggregationEvent.
+---\n`);
+  });
+
+  it('Should return message with WARN status', () => {
+    const warningCredentials = [warningTestSuite];
+    const resultMessage = loggerUtils.getLogStatus(warningCredentials);
+
+    expect(resultMessage).toEqual(
+`Testing Credential: warningPassport
+Version: v0.0.1
+Path: data/dataPath.json
+Result: WARN
+Warning: This schema additionalFields. Additional property found: 'testField'.
+---\n`);
+  });
+
+  it('Should return message with warning and error, and status should be FAIL', () => {
+    const errorAndWarningCredentials = [errorAndWarningTestSuite];
+    const resultMessage = loggerUtils.getLogStatus(errorAndWarningCredentials);
+
+    expect(resultMessage).toEqual(
+`Testing Credential: errorAndWarningTestSuite
+Version: v0.0.1
+Path: data/dataPath.json
+Result: FAIL
+Warning: This schema additionalFields. Additional property found: 'testField'.
+Error: test field must be equal to one of the allowed values. Allowed values: object, aggregationEvent.
 ---\n`);
   });
 
@@ -115,8 +194,8 @@ Warning: This schema additionalFields.
 });
 
 describe('getFinalReport', () => {
-  it('Should return a table message with Pass, Error, and Warning statuses', () => {
-    const testSuiteResultMock = {...testSuiteResult, testSuiteResults: [errorTestSuite]};
+  it('Should return a table message with FAIL status', () => {
+    const testSuiteResultMock = {...testSuiteResult, credentials: [errorTestSuite]};
     const finalReport = loggerUtils.getFinalReport(testSuiteResultMock);
 
     expect(finalReport).toEqual(
@@ -128,7 +207,7 @@ describe('getFinalReport', () => {
         [
           {
             colSpan: 3,
-            content: 'Test suite failed with 2 errors and 1 warning.',
+            content: 'Your credentials are not UNTP compliant',
             hAlign: 'center',
           },
         ],
@@ -137,7 +216,7 @@ describe('getFinalReport', () => {
   });
 
   it('Should return an empty string when the testSuiteResult does not have the credentialTestResults nested inside', () => {
-    const notHaveCredentialTestResults = {...testSuiteResult, credentialTestResults: []};
+    const notHaveCredentialTestResults = {...testSuiteResult, credentials: []};
 
     const finalReport = loggerUtils.getFinalReport(notHaveCredentialTestResults);
 
@@ -149,7 +228,7 @@ describe('getFinalReport', () => {
       jest.spyOn(loggerUtils, 'getMessageWithColorByResult').mockImplementationOnce((text, message) => message);
       const invalidTestSuiteResult = {
         ...testSuiteResult, credentialTestResults: { length: 1 }
-      } as ITestSuiteResult;
+      };
       
       loggerUtils.getFinalReport(invalidTestSuiteResult);
     } catch (e) {
