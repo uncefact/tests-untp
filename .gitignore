@@ -70,3 +70,4 @@ tmp/
 # logs
 /logs
 packages/services/tsconfig.tsbuildinfo
+packages/mock-app/src/constants/app-config.json
