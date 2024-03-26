@@ -1,37 +1,28 @@
-import { hasErrors } from '../../src/core/services/json-schema/validator.service';
-import { readJsonFile, validateCredentialConfigs } from '../../src/core/utils/common';
-import { dynamicLoadingSchemaService } from '../../src/core/services/dynamic-loading-schemas/loadingSchema.service';
-import { processTestSuite } from '../../src/core/processTestSuite';
-import { templateMapper } from '../../src/templates/mapper';
-import { getTemplateName, generateFinalMessage } from '../../src/templates/utils';
+import * as commonUtils from '../../src/core/utils/common';
+import * as testRunner from '../../src/core/processTestSuite';
+import * as templateUtils from '../../src/templates/utils';
+import { TestSuiteMessage, TestSuiteResultEnum } from '../../src/core/types';
 
-jest.mock('path', () => ({
-  resolve: jest.fn(),
+jest.mock('../../src/utils/path', () => ({
+  getCurrentDirPath: jest.fn(() => '/test/data/data.json'),
+  getCurrentFilePath: jest.fn(),
 }));
 
-jest.mock('../../src/core/services/json-schema/validator.service', () => ({
-  hasErrors: jest.fn(),
-}));
-
-jest.mock('../../src/core/utils/common', () => ({
-  readJsonFile: jest.fn().mockResolvedValue({}),
-  validateCredentialConfigs: jest.fn(),
-}));
-
-jest.mock('../../src/core/services/dynamic-loading-schemas/loadingSchema.service', () => ({
-  dynamicLoadingSchemaService: jest.fn(),
-}));
-
-jest.mock('../../src/templates/mapper', () => ({
-  templateMapper: jest.fn(),
-}));
-
-jest.mock('../../src/templates/utils', () => ({
-  getTemplateName: jest.fn(),
-  generateFinalMessage: jest.fn(),
-}));
+const credentialFileData = {
+  credentials: [{
+    type: 'productPassport',
+    version: 'v0.0.1',
+    dataPath: 'data/productPassport.json',
+  }]
+};
+const passFinalReport = {
+  finalStatus: 'PASS',
+  finalMessage: 'Your credentials are UNTP compliant',
+};
 
 describe('processTestSuite', () => {
+  const credentialPath = 'src/config/credentials.json';
+
   beforeEach(() => {
     JSON.parse = jest.fn().mockImplementation((value) => {
       return value;
@@ -43,643 +34,227 @@ describe('processTestSuite', () => {
     jest.resetAllMocks();
   });
 
-  it('should process the test suite and return PASS', async () => {
-    (validateCredentialConfigs as jest.Mock).mockReturnValue([
+  it('should process the test suite and finalStatus PASS', async () => {
+    jest.spyOn(commonUtils, 'readJsonFile').mockResolvedValueOnce(credentialFileData);
+    jest.spyOn(commonUtils, 'validateCredentialConfigs').mockReturnValueOnce([
       {
-        type: 'objectEvent',
+        type: 'productPassport',
         version: 'v0.0.1',
-        dataPath: 'test-data/parent-item-object.json',
-        errors: [],
-      },
-      {
-        type: 'transactionEvent',
-        version: 'v0.0.2',
-        dataPath: 'test-data/parent-item-transaction.json',
+        dataPath: 'data/productPassport.json',
         errors: [],
       },
     ]);
-    (dynamicLoadingSchemaService as jest.Mock).mockResolvedValue({
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        parentItem: {
-          type: 'string',
-          example: 'object',
-          description:
-            'The unique item identifier that is the result of this aggreation. Typcially a packaging ID used in shipments that represents a box/ pallet / container of contained items.',
-        },
+    jest.spyOn(testRunner, 'processCheckDataBySchema').mockResolvedValueOnce({
+      type: 'productPassport',
+      version: 'v0.0.1',
+      dataPath: 'data/productPassport.json',
+      errors: [],
+    });
+    jest.spyOn(templateUtils, 'getCredentialResults').mockResolvedValueOnce([
+      {
+        credentialType: 'productPassport',
+        version: 'v0.0.1',
+        path: 'data/productPassport.json',
+        result: TestSuiteResultEnum.PASS,
       },
+    ]);
+    jest.spyOn(templateUtils, 'getFinalReport').mockResolvedValueOnce({
+      finalStatus: TestSuiteResultEnum.PASS,
+      finalMessage: TestSuiteMessage.Pass,
     });
 
-    (readJsonFile as jest.Mock).mockImplementation(async (filePath: string) => {
-      if (filePath.includes('/untp-test-suite/src/config/credentials.json')) {
-        return [
-          {
-            type: 'objectEvent',
-            version: 'v0.0.1',
-            dataPath: 'test-data/parent-item-object.json',
-          },
-          {
-            type: 'transactionEvent',
-            version: 'v0.0.2',
-            dataPath: 'test-data/parent-item-transaction.json',
-          },
-        ];
-      }
-
-      return {
-        parentItem: {
-          itemID: 'https://example.com/product/12345',
-          name: 'Product A',
-        },
-      };
-    });
-
-    (hasErrors as jest.Mock).mockReturnValue(null);
-
-    (getTemplateName as jest.Mock).mockReturnValue('PASS');
-
-    const finalReport = {
-      finalStatus: 'PASS',
-      finalMessage: 'Your credentials are UNTP compliant',
-    };
-    (generateFinalMessage as jest.Mock).mockReturnValue(finalReport);
-
-    (templateMapper as jest.Mock).mockImplementation((templateName, value) => {
-      if (templateName === 'finalReport') {
-        return finalReport;
-      }
-
-      return {
-        credentialType: `${value.type}`,
-        version: `${value.version}`,
-        path: `${value.dataPath}`,
-        result: 'PASS',
-      };
-    });
-
-    const result = await processTestSuite('/untp-test-suite/src/config/credentials.json');
+    const result = await testRunner.processTestSuite(credentialPath);
 
     expect(result).toEqual({
       credentials: [
         {
-          credentialType: 'objectEvent',
+          credentialType: 'productPassport',
           version: 'v0.0.1',
-          path: 'test-data/parent-item-object.json',
-          result: 'PASS',
-        },
-        {
-          credentialType: 'transactionEvent',
-          version: 'v0.0.2',
-          path: 'test-data/parent-item-transaction.json',
+          path: 'data/productPassport.json',
           result: 'PASS',
         },
       ],
-      ...finalReport,
+      ...passFinalReport,
     });
   });
 
-  it('should process the test suite with an array of errors with Ajv errors and return FAIL', async () => {
-    (validateCredentialConfigs as jest.Mock).mockReturnValue([
+  it('should process the test suite with an array of errors and finalStatus FAIL', async () => {
+    jest.spyOn(commonUtils, 'readJsonFile').mockResolvedValueOnce(credentialFileData);
+    jest.spyOn(commonUtils, 'validateCredentialConfigs').mockReturnValueOnce([
       {
-        type: 'objectEvent',
+        type: 'productPassport',
         version: 'v0.0.1',
-        dataPath: 'test-data/parent-item-object.json',
-        errors: [],
-      },
-      {
-        type: 'transactionEvent',
-        version: 'v0.0.2',
-        dataPath: 'test-data/parent-item-transaction.json',
+        dataPath: 'data/productPassport.json',
         errors: [],
       },
     ]);
-
-    (dynamicLoadingSchemaService as jest.Mock).mockImplementation(async (type, version) => {
-      if (type === 'objectEvent') {
-        return {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            parentItem: {
-              type: 'string',
-              example: 'object',
-              description:
-                'The unique item identifier that is the result of this aggreation. Typcially a packaging ID used in shipments that represents a box/ pallet / container of contained items.',
-            },
-          },
-        };
-      }
-      return {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          sourceParty: {
-            $ref: '#/$defs/Party',
-            description: 'The source party for this supply chain transaction - typcially the seller party',
-          },
-          destinationParty: {
-            $ref: '#/$defs/Party',
-            description: 'The destination party for this supply chain transaction - typcially the buyer party.',
-          },
-        },
-      };
-    });
-
-    (readJsonFile as jest.Mock).mockImplementation(async (filePath: string) => {
-      if (filePath.includes('/untp-test-suite/src/config/credentials.json')) {
-        return [
-          {
-            type: 'objectEvent',
-            version: 'v0.0.1',
-            dataPath: 'test-data/parent-item-object.json',
-          },
-          {
-            type: 'transactionEvent',
-            version: 'v0.0.2',
-            dataPath: 'test-data/parent-item-transaction.json',
-          },
-        ];
-      }
-
-      return {
-        parentItem: {
-          itemID: 'https://example.com/product/12345',
-          name: 'Product A',
-        },
-      };
-    });
-
-    const expectedHasError = [
+    jest.spyOn(templateUtils, 'getCredentialResults').mockResolvedValueOnce([
       {
-        keyword: 'type',
-        dataPath: '.parentItem',
-        schemaPath: '#/$defs/Item/properties/itemID/type',
-        params: {
-          type: 'string',
-        },
-        message: 'should be string',
+        credentialType: 'productPassport',
+        version: 'v0.0.1',
+        path: 'data/productPassport.json',
+        result: TestSuiteResultEnum.FAIL,
+        validationErrors: [
+          {
+            fieldName: '/eventType',
+            errorType: 'enum',
+            allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
+            message: '/eventType field must be equal to one of the allowed values',
+          },
+        ],
+        validationWarnings: [],
       },
-    ];
-
-    (hasErrors as jest.Mock).mockImplementation((schema) => {
-      return schema.properties.destinationParty ? expectedHasError : null;
+    ]);
+    jest.spyOn(templateUtils, 'getFinalReport').mockResolvedValueOnce({
+      finalStatus: TestSuiteResultEnum.FAIL,
+      finalMessage: TestSuiteMessage.Fail,
     });
 
-    (getTemplateName as jest.Mock).mockImplementation((testSuiteResult) => {
-      return !testSuiteResult.errors ? 'PASS' : 'FAIL';
-    });
-
-    const finalReport = {
-      finalStatus: 'FAIL',
-      finalMessage: 'Your credentials are not UNTP compliant',
-    };
-
-    (templateMapper as jest.Mock).mockImplementation((templateName, value) => {
-      if (templateName === 'finalReport') {
-        return finalReport;
-      }
-
-      const returnValue = {
-        credentialType: value.type,
-        version: value.version,
-        path: value.dataPath,
-        result: templateName,
-        error: value.errors,
-      } as any;
-
-      if (templateName !== 'FAIL') {
-        delete returnValue.error;
-      }
-
-      return returnValue;
-    });
-
-    (generateFinalMessage as jest.Mock).mockReturnValue(finalReport);
-
-    const result = await processTestSuite('/untp-test-suite/src/config/credentials.json');
+    const result = await testRunner.processTestSuite(credentialPath);
 
     expect(result).toEqual({
       credentials: [
         {
-          credentialType: 'objectEvent',
+          credentialType: 'productPassport',
           version: 'v0.0.1',
-          path: 'test-data/parent-item-object.json',
-          result: 'PASS',
-        },
-        {
-          credentialType: 'transactionEvent',
-          version: 'v0.0.2',
-          path: 'test-data/parent-item-transaction.json',
-          result: 'FAIL',
-          error: expectedHasError,
-        },
-      ],
-      ...finalReport,
-    });
-  });
-
-  it('should process the test suite with an array of errors with validation errors and return FAIL', async () => {
-    (validateCredentialConfigs as jest.Mock).mockReturnValue([
-      {
-        type: 'objectEvent',
-        version: '',
-        dataPath: 'test-data/parent-item-object.json',
-        errors: [
-          {
-            message: "should have required property 'version'",
-            keyword: 'required',
-            dataPath: 'path/to/credentials',
-          },
-        ],
-      },
-      {
-        type: 'transformationEvent',
-        version: 'v0.0.2',
-        dataPath: '',
-        errors: [
-          {
-            message: "should have required property 'dataPath'",
-            keyword: 'required',
-            dataPath: 'path/to/credentials',
-          },
-        ],
-      },
-      {
-        type: 'transactionEvent',
-        version: 'v0.0.2',
-        dataPath: 'test-data/parent-item-transaction.json',
-        errors: [],
-      },
-    ]);
-    (dynamicLoadingSchemaService as jest.Mock).mockResolvedValue({
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        parentItem: {
-          type: 'string',
-          example: 'object',
-          description:
-            'The unique item identifier that is the result of this aggreation. Typcially a packaging ID used in shipments that represents a box/ pallet / container of contained items.',
-        },
-      },
-    });
-    (readJsonFile as jest.Mock).mockImplementation(async (filePath: string) => {
-      if (filePath.includes('/untp-test-suite/src/config/credentials.json')) {
-        return {
-          credentials: [
+          path: 'data/productPassport.json',
+          result: TestSuiteResultEnum.FAIL,
+          validationErrors: [
             {
-              type: 'objectEvent',
-              version: 'v0.0.1',
-              dataPath: 'test-data/parent-item.json',
+              allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
+              errorType: 'enum',
+              fieldName: '/eventType',
+              message: '/eventType field must be equal to one of the allowed values',
             },
           ],
-        };
-      }
-
-      return {
-        parentItem: {
-          itemID: 'https://example.com/product/12345',
-          name: 'Product A',
+          validationWarnings: []
         },
-      };
-    });
-
-    (hasErrors as jest.Mock).mockReturnValue(null);
-
-    (getTemplateName as jest.Mock).mockImplementation((testSuiteResult) => {
-      return !testSuiteResult.errors ? 'PASS' : 'FAIL';
-    });
-
-    const finalReport = {
+      ],
       finalStatus: 'FAIL',
       finalMessage: 'Your credentials are not UNTP compliant',
-    };
-
-    (templateMapper as jest.Mock).mockImplementation((templateName, value) => {
-      if (templateName === 'finalReport') {
-        return finalReport;
-      }
-
-      const returnValue = {
-        credentialType: `${value.type}`,
-        version: `${value.version}`,
-        path: `${value.dataPath}`,
-        result: templateName,
-        error: value.errors,
-      } as any;
-
-      if (templateName !== 'FAIL') {
-        delete returnValue.error;
-      }
-
-      return returnValue;
-    });
-
-    (generateFinalMessage as jest.Mock).mockReturnValue(finalReport);
-
-    const result = await processTestSuite('/untp-test-suite/src/config/credentials.json');
-
-    expect(result).toEqual({
-      credentials: [
-        {
-          credentialType: 'transactionEvent',
-          version: 'v0.0.2',
-          path: 'test-data/parent-item-transaction.json',
-          result: 'PASS',
-        },
-        {
-          credentialType: 'objectEvent',
-          version: '',
-          path: 'test-data/parent-item-object.json',
-          result: 'FAIL',
-          error: [
-            {
-              message: "should have required property 'version'",
-              keyword: 'required',
-              dataPath: 'path/to/credentials',
-            },
-          ],
-        },
-        {
-          credentialType: 'transformationEvent',
-          version: 'v0.0.2',
-          path: '',
-          result: 'FAIL',
-          error: [
-            {
-              message: "should have required property 'dataPath'",
-              keyword: 'required',
-              dataPath: 'path/to/credentials',
-            },
-          ],
-        },
-      ],
-      ...finalReport,
     });
   });
 
-  it('should process the test suite with return an array of errors with validation errors, hasError from Ajv and return FAIL', async () => {
-    (validateCredentialConfigs as jest.Mock).mockReturnValue([
+  it('should process the test suite with an array of warnings and finalStatus WARN status', async () => {
+    jest.spyOn(commonUtils, 'readJsonFile').mockResolvedValueOnce(credentialFileData);
+    jest.spyOn(commonUtils, 'validateCredentialConfigs').mockReturnValueOnce([
       {
-        type: 'transactionEvent',
-        version: '',
-        dataPath: '',
-        errors: [
-          {
-            message: "should have required property 'version'",
-            keyword: 'required',
-            dataPath: 'path/to/credentials',
-          },
-          {
-            message: "should have required property 'dataPath'",
-            keyword: 'required',
-            dataPath: 'path/to/credentials',
-          },
-        ],
-      },
-      {
-        type: 'objectEvent',
-        version: 'v0.0.2',
-        dataPath: 'test-data/parent-item-transaction.json',
-        errors: [],
-      },
-    ]);
-
-    (dynamicLoadingSchemaService as jest.Mock).mockImplementation(async (type) => {
-      if (type === 'objectEvent') {
-        return {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            parentItem: {
-              type: 'string',
-              example: 'object',
-              description:
-                'The unique item identifier that is the result of this aggreation. Typcially a packaging ID used in shipments that represents a box/ pallet / container of contained items.',
-            },
-          },
-        };
-      }
-      return {
-        type: 'string',
-        additionalProperties: false,
-        describe: 'Test description',
-      };
-    });
-    (readJsonFile as jest.Mock).mockImplementation(async (filePath: string) => {
-      if (filePath.includes('/untp-test-suite/src/config/credentials.json')) {
-        return {
-          credentials: [
-            {
-              type: 'objectEvent',
-              version: 'v0.0.1',
-              dataPath: 'test-data/parent-item.json',
-            },
-          ],
-        };
-      }
-
-      return {
-        parentItem: {
-          itemID: 'https://example.com/product/12345',
-          name: 'Product A',
-        },
-      };
-    });
-
-    const hasErrorExpect = [
-      {
-        keyword: 'type',
-        dataPath: '.parentItem',
-        schemaPath: '#/$defs/Item/properties/itemID/type',
-        params: {
-          type: 'object',
-        },
-        message: 'should be `object`',
-      },
-    ];
-
-    (hasErrors as jest.Mock).mockImplementation((schema) => {
-      return schema.type === 'object' ? hasErrorExpect : null;
-    });
-
-    (getTemplateName as jest.Mock).mockImplementation((testSuiteResult) => {
-      return !testSuiteResult.errors ? 'PASS' : 'FAIL';
-    });
-
-    const finalReport = {
-      finalStatus: 'FAIL',
-      finalMessage: 'Your credentials are not UNTP compliant',
-    };
-
-    (templateMapper as jest.Mock).mockImplementation((templateName, value) => {
-      if (templateName === 'finalReport') {
-        return finalReport;
-      }
-
-      const returnValue = {
-        credentialType: `${value.type}`,
-        version: `${value.version}`,
-        path: `${value.dataPath}`,
-        result: templateName,
-        error: value.errors,
-      } as any;
-
-      if (templateName !== 'FAIL') {
-        delete returnValue.error;
-      }
-
-      return returnValue;
-    });
-
-    (generateFinalMessage as jest.Mock).mockReturnValue(finalReport);
-
-    const result = await processTestSuite('/untp-test-suite/src/config/credentials.json');
-
-    expect(result).toEqual({
-      credentials: [
-        {
-          credentialType: 'objectEvent',
-          version: 'v0.0.2',
-          path: 'test-data/parent-item-transaction.json',
-          result: 'FAIL',
-          error: [...hasErrorExpect],
-        },
-        {
-          credentialType: 'transactionEvent',
-          version: '',
-          path: '',
-          result: 'FAIL',
-          error: [
-            {
-              message: "should have required property 'version'",
-              keyword: 'required',
-              dataPath: 'path/to/credentials',
-            },
-            {
-              message: "should have required property 'dataPath'",
-              keyword: 'required',
-              dataPath: 'path/to/credentials',
-            },
-          ],
-        },
-      ],
-      ...finalReport,
-    });
-  });
-
-  it('should process the test suite and return the WARN', async () => {
-    (validateCredentialConfigs as jest.Mock).mockReturnValue([
-      {
-        type: 'objectEvent',
+        type: 'productPassport',
         version: 'v0.0.1',
-        dataPath: 'test-data/parent-item-object.json',
+        dataPath: 'data/productPassport.json',
         errors: [],
       },
     ]);
-
-    (dynamicLoadingSchemaService as jest.Mock).mockResolvedValue({
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        parentItem: {
-          type: 'string',
-          example: 'object',
-          description:
-            'The unique item identifier that is the result of this aggreation. Typcially a packaging ID used in shipments that represents a box/ pallet / container of contained items.',
-        },
-      },
-    });
-
-    (readJsonFile as jest.Mock).mockImplementation(async (filePath: string) => {
-      if (filePath.includes('/untp-test-suite/src/config/credentials.json')) {
-        return {
-          credentials: [
-            {
-              type: 'objectEvent',
-              version: 'v0.0.1',
-              dataPath: 'test-data/parent-item-object.json',
-            },
-          ],
-        };
-      }
-      return {
-        parentItem: {
-          itemID: 'https://example.com/product/12345',
-          name: 'Product A',
-        },
-      };
-    });
-
-    const hasErrorExpect = [
+    jest.spyOn(templateUtils, 'getCredentialResults').mockResolvedValueOnce([
       {
-        keyword: 'type',
-        dataPath: '.parentItem',
-        schemaPath: '#/$defs/Item/properties/itemID/type',
-        params: {
-          type: 'object',
-          additionalProperty: 'itemID',
-        },
-        message: 'should be `object`',
+        credentialType: 'productPassport',
+        version: 'v0.0.1',
+        path: 'data/productPassport.json',
+        result: TestSuiteResultEnum.WARN,
+        validationErrors: [],
+        validationWarnings: [{
+          fieldName: 'additionalFieldTest',
+          message: 'This schema must NOT have additional properties',
+        }],
       },
-    ];
+    ]);
+    jest.spyOn(templateUtils, 'getFinalReport').mockResolvedValueOnce({
+      finalStatus: TestSuiteResultEnum.WARN,
+      finalMessage: TestSuiteMessage.Warning,
+    });
 
-    (hasErrors as jest.Mock).mockReturnValue(hasErrorExpect);
+    const result = await testRunner.processTestSuite(credentialPath);
 
-    (getTemplateName as jest.Mock).mockReturnValue('WARN');
-
-    const finalReport = {
+    expect(result).toEqual({
+      credentials: [
+        {
+          credentialType: 'productPassport',
+          version: 'v0.0.1',
+          path: 'data/productPassport.json',
+          result: TestSuiteResultEnum.WARN,
+          validationErrors: [],
+          validationWarnings: [{
+            fieldName: 'additionalFieldTest',
+            message: 'This schema must NOT have additional properties',
+          }]
+        },
+      ],
       finalStatus: 'WARN',
       finalMessage: 'Your credentials are UNTP compliant, but have extended the data model',
-    };
+    });
+  });
 
-    (templateMapper as jest.Mock).mockImplementation((templateName, value) => {
-      if (templateName === 'finalReport') {
-        return finalReport;
-      }
-
-      return {
-        credentialType: `${value.type}`,
-        version: `${value.version}`,
-        path: `${value.dataPath}`,
-        result: value.errors && value.errors.length > 0 ? 'WARN' : 'PASS',
-        warnings: {
-          fieldName: value.errors[0].params.additionalProperty,
-          message: value.errors[0].message,
-        },
-      };
+  it('should process the test suite with an array of warnings and warnings, and finalStatus FAIL status', async () => {
+    jest.spyOn(commonUtils, 'readJsonFile').mockResolvedValueOnce(credentialFileData);
+    jest.spyOn(commonUtils, 'validateCredentialConfigs').mockReturnValueOnce([
+      {
+        type: 'productPassport',
+        version: 'v0.0.1',
+        dataPath: 'data/productPassport.json',
+        errors: [],
+      },
+    ]);
+    jest.spyOn(templateUtils, 'getCredentialResults').mockResolvedValueOnce([
+      {
+        credentialType: 'productPassport',
+        version: 'v0.0.1',
+        path: 'data/productPassport.json',
+        result: TestSuiteResultEnum.WARN,
+        validationErrors: [{
+          fieldName: '/eventType',
+          errorType: 'enum',
+          allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
+          message: '/eventType field must be equal to one of the allowed values',
+        }],
+        validationWarnings: [{
+          fieldName: 'additionalFieldTest',
+          message: 'This schema must NOT have additional properties',
+        }],
+      },
+    ]);
+    jest.spyOn(templateUtils, 'getFinalReport').mockResolvedValueOnce({
+      finalStatus: TestSuiteResultEnum.FAIL,
+      finalMessage: TestSuiteMessage.Fail,
     });
 
-    (generateFinalMessage as jest.Mock).mockReturnValue(finalReport);
-
-    const result = await processTestSuite('/untp-test-suite/src/config/credentials.json');
+    const result = await testRunner.processTestSuite(credentialPath);
 
     expect(result).toEqual({
       credentials: [
         {
-          credentialType: 'objectEvent',
+          credentialType: 'productPassport',
           version: 'v0.0.1',
-          path: 'test-data/parent-item-object.json',
-          result: 'WARN',
-          warnings: {
-            fieldName: 'itemID',
-            message: 'should be `object`',
-          },
+          path: 'data/productPassport.json',
+          result: TestSuiteResultEnum.WARN,
+          validationErrors: [{
+            fieldName: '/eventType',
+            errorType: 'enum',
+            allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
+            message: '/eventType field must be equal to one of the allowed values',
+          }],
+          validationWarnings: [{
+            fieldName: 'additionalFieldTest',
+            message: 'This schema must NOT have additional properties',
+          }]
         },
       ],
-      ...finalReport,
+      finalStatus: 'FAIL',
+      finalMessage: 'Your credentials are not UNTP compliant',
     });
   });
 
-  it('should process the test suite and throw an error if the credentials array is empty', async () => {
-    (validateCredentialConfigs as jest.Mock).mockReturnValue([]);
-
+  it('Should throw an error when validation of the credential configuration fails', async () => {
     try {
-      await processTestSuite('/untp-test-suite/src/config/credentials.json');
-    } catch (error) {
-      const e = error as Error;
-      expect(e.message).toMatch(/Failed to run the test suite/i);
+      const emptyCredentialPath = 'config/empty-credentials.json';
+      jest.spyOn(commonUtils, 'readJsonFile').mockResolvedValueOnce({});
+      jest.spyOn(commonUtils, 'validateCredentialConfigs').mockImplementationOnce(() => { throw new Error('Credentials array cannot be empty. Please provide valid credentials to proceed.') });
+  
+  
+      await testRunner.processTestSuite(emptyCredentialPath);
+      
+    } catch (e) {
+      const error = e as Error;
+      expect(error.message).toBe('Failed to run the test suite. Credentials array cannot be empty. Please provide valid credentials to proceed.');
     }
   });
 });

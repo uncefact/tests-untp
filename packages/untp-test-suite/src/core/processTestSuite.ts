@@ -9,7 +9,7 @@ import { dynamicLoadingSchemaService } from './services/dynamic-loading-schemas/
 import { hasErrors } from './services/json-schema/validator.service.js';
 import {  getCredentialResults, getFinalReport } from '../templates/utils.js';
 
-const processCheckDataBySchema = async (credentialConfig: ConfigContent): Promise<IValidatedCredentials> => {
+export const processCheckDataBySchema = async (credentialConfig: ConfigContent): Promise<IValidatedCredentials> => {
   const { type, version, dataPath } = credentialConfig;
   const [schema, data] = await Promise.all([dynamicLoadingSchemaService(type, version), readJsonFile(dataPath)]);
 
