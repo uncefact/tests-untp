@@ -4,3 +4,5 @@ coverage
 __tests__
 scripts
 jest.config.*
+jest.*.config.*
+integration
