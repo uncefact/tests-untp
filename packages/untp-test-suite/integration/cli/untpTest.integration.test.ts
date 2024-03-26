@@ -27,6 +27,7 @@ describe("CLI 'untp test' Commands", () => {
     });
   });
 
+  let credentials: ConfigContent[];
   it('should exist the config file provided by the user', () => {
     exec(`yarn untp test -c ${storePath}`, (error, stdout) => {
       if (error) {
@@ -41,7 +42,7 @@ describe("CLI 'untp test' Commands", () => {
 
   describe('check content of the config file', () => {
     let stdout: any;
-    let credentials: ConfigContent[];
+
     beforeAll((done) => {
       const fileContent = fs.readFileSync(storePath, 'utf8');
 
@@ -62,52 +63,46 @@ describe("CLI 'untp test' Commands", () => {
       });
     });
 
-    it('should retrieve and validate a non-empty `type` field', () => {
-      expect(stdout).not.toBeNull();
-      expect(fs.existsSync(storePath)).toBe(true);
-      expect(credentials).toBeInstanceOf(Array);
-      for (const credential of credentials) {
-        expect(credential).toHaveProperty('type');
-        expect(credential.type).toEqual(expect.any(String));
-        expect(credential.type).not.toBe('');
-      }
+    describe('Validation of `schema` in the configuration file', () => {
+      it('should ensure that the schema file of each credential exists', () => {
+        expect(stdout).not.toBeNull();
+        for (const credential of credentials) {
+          expect(
+            fs.existsSync(`${process.cwd()}/src/schemas/${credential.type}/${credential.version}/schema.json`),
+          ).toBe(true);
+        }
+      });
+
+      it('should return the content of `schema` when file is valid', () => {
+        expect(stdout).not.toBeNull();
+        for (const credential of credentials) {
+          const data = fs.readFileSync(
+            `${process.cwd()}/src/schemas/${credential.type}/${credential.version}/schema.json`,
+            'utf8',
+          );
+
+          expect(data).not.toBe('');
+        }
+      });
     });
 
-    it('should retrieve and validate a non-empty `version` field', () => {
-      expect(stdout).not.toBeNull();
-      expect(fs.existsSync(storePath)).toBe(true);
-      expect(credentials).toBeInstanceOf(Array);
-      for (const credential of credentials) {
-        expect(credential).toHaveProperty('version');
-        expect(credential.version).toEqual(expect.any(String));
-        expect(credential.version).not.toBe('');
-      }
+    describe('Validation of `dataPath` in the configuration file', () => {
+      it('should ensure that the `dataPath` of each credential exists and format the JSON file', () => {
+        expect(stdout).not.toBeNull();
+        for (const credential of credentials) {
+          expect(fs.existsSync(`${process.cwd()}/${credential.dataPath}`)).toBe(true);
+          expect(credential.dataPath).toMatch(/\.json$/);
+        }
+      });
+
+      it('should return the content of `dataPath` when file is valid', () => {
+        expect(stdout).not.toBeNull();
+        for (const credential of credentials) {
+          const data = fs.readFileSync(`${process.cwd()}/${credential.dataPath}`, 'utf8');
+          expect(data).not.toBe('');
+        }
+      });
     });
-
-    it('should retrieve and validate a non-empty `dataPath` field', () => {
-      expect(stdout).not.toBeNull();
-      expect(fs.existsSync(storePath)).toBe(true);
-      expect(credentials).toBeInstanceOf(Array);
-      for (const credential of credentials) {
-        expect(credential).toHaveProperty('dataPath');
-        expect(credential.dataPath).toEqual(expect.any(String));
-        expect(credential.dataPath).not.toBe('');
-      }
-    });
-  });
-
-  describe('check dataPath in the config file', () => {
-    it('should display an error message when the dataPath is not a valid path', () => {});
-    it('should display an error message when the dataPath does not exist', () => {});
-    it('should display an error message when the dataPath is not a JSON file', () => {});
-    it('should return the data when the dataPath is a valid path', () => {});
-  });
-
-  describe('check schema file', () => {
-    it('should display an error message when the schema does not exist', () => {});
-    it('should display an error message when the schema does not contain version', () => {});
-    it('should display an error message when the schema does not contain content', () => {});
-    it('should return the schema when the schema is a valid schema', () => {});
   });
 
   describe('check data by schema', () => {
