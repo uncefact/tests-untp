@@ -82,3 +82,17 @@ Run the test suite by running the following command:
 ```bash
 yarn untp test
 ```
+
+## Integration test
+
+The integration test is used to test the UNTP Test Suite's interface, such as cli and library.
+
+```bash
+yarn run test:integration
+```
+
+### How to write test cases for the integration test?
+
+1. Create a new folder in the `integration` directory that features the name of the test suite's interface (e.g., cli, library).
+2. Create a new file in the folder and name it as `featureA.integration.test.ts`.
+3. Write the integration test in the file.
