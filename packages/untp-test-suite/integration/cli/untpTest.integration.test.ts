@@ -3,47 +3,19 @@ import { exec } from 'child_process';
 import { ConfigContent } from '../../build/core/types';
 
 describe("CLI 'untp test' Commands", () => {
-  let credentialFileName: string;
-  let storePath: string;
-
-  beforeAll(() => {
-    credentialFileName = 'credentials.json';
-    storePath = `${process.cwd()}/${credentialFileName}`;
-  });
-
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  it('should exist default config when user do not provide any config', () => {
-    exec('yarn untp test', (error, stdout) => {
-      if (error) {
-        console.error(`execSync error: ${error}`);
-        return;
-      }
-
-      expect(stdout).not.toBeNull();
-      expect(fs.existsSync(storePath)).toBe(true);
-    });
-  });
-
-  let credentials: ConfigContent[];
-  it('should exist the config file provided by the user', () => {
-    exec(`yarn untp test -c ${storePath}`, (error, stdout) => {
-      if (error) {
-        console.error(`execSync error: ${error}`);
-        return;
-      }
-
-      expect(stdout).not.toBeNull();
-      expect(fs.existsSync(storePath)).toBe(true);
-    });
-  });
-
-  describe('check content of the config file', () => {
+  describe('process test runner and final report return PASS', () => {
+    let credentialFileName: string;
+    let storePath: string;
     let stdout: any;
+    let credentials: ConfigContent[];
 
     beforeAll((done) => {
+      credentialFileName = 'credentials.json';
+      storePath = `${process.cwd()}/${credentialFileName}`;
       const fileContent = fs.readFileSync(storePath, 'utf8');
 
       try {
@@ -103,19 +75,56 @@ describe("CLI 'untp test' Commands", () => {
         }
       });
     });
+
+    describe('generate test suite result by template', () => {
+      it('should show PASS in report when all data validate', () => {
+        expect(stdout).toMatch(/PASS/);
+      });
+    });
   });
 
-  describe('check data by schema', () => {
-    it('should display an error message when the data does not match the schema', () => {});
-    it('should display warning when the data lacks of information', () => {});
-    it('should return the data when the data matches the schema', () => {});
-  });
+  describe('process test runner and final report return FAIL', () => {
+    let credentialFileName: string;
+    let storePath: string;
+    let stdout: any;
+    let credentials: ConfigContent[];
 
-  describe('generate test suite result by template', () => {
-    it('should show PASS in report when all data validate', () => {});
-    it('should show FAIL in report when all data not validate', () => {});
-    it('should show WARN in report when a few data lacks of information and the result does not FAIL', () => {});
-    it('should show FAIL in the report when the result contain WARN, FAIL and PASS', () => {});
-    it('should display name, version and status of the test suite in table', () => {});
+    const mockPath = `${process.cwd()}/integration/cli/mock/untpTestFail`;
+    beforeAll((done) => {
+      credentialFileName = 'credentialsExample.json';
+      storePath = `${mockPath}/${credentialFileName}`;
+      const fileContent = fs.readFileSync(storePath, 'utf8');
+
+      try {
+        credentials = JSON.parse(fileContent).credentials;
+      } catch (error) {
+        expect(error).toBeNull();
+      }
+
+      exec(`yarn untp test -c ${storePath}`, (error, result) => {
+        if (error) {
+          console.error(`execSync error: ${error}`);
+          return;
+        }
+
+        stdout = result;
+        done();
+      });
+    });
+
+    it('should show the certification in objectEvent data is object', () => {
+      // get only data path of object event
+      const data = fs.readFileSync(`${process.cwd()}/${credentials[1].dataPath}`, 'utf8');
+      const jsonData = JSON.parse(data);
+      expect(jsonData.certification).toEqual(expect.any(Object));
+    });
+
+    describe('generate test suite result by template', () => {
+      it('should show FAIL in the report when data invalidate', () => {
+        expect(stdout).toMatch(/FAIL/);
+        expect(stdout).toMatch(/Your credentials are not UNTP compliant/);
+        expect(stdout).toContain('certification field must be array');
+      });
+    });
   });
 });
