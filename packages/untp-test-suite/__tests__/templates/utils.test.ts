@@ -72,47 +72,44 @@ const errorAndWarningCredential = {
 
 const validatedCredentials = [passCredential, warningCredential, errorCredential, errorAndWarningCredential];
 
-describe('getValidationTemplateData', () => {
+describe('getTemplateData', () => {
   it('should return pass template when no errors are present', () => {
-    const result = templateUtils.getValidationTemplateData(passCredential);
+    const result = templateUtils.getTemplateData(passCredential);
 
     expect(result).toEqual({
-      ...passCredential,
       result: TestSuiteResultEnum.PASS,
-      subTemplates: [],
+      templates: [TemplateEnum.CREDENTIAL_RESULT],
     });
   });
 
   it('should return warning template when all errors have additional properties', () => {
-    const result = templateUtils.getValidationTemplateData(warningCredential);
+    const result = templateUtils.getTemplateData(warningCredential);
 
     expect(result).toEqual({
-      ...warningCredential,
       result: TestSuiteResultEnum.WARN,
-      validationWarnings: warningCredential.errors,
-      subTemplates: [TemplateEnum.VALIDATION_WARNINGS],
+      errors: [],
+      warnings: warningCredential.errors,
+      templates: [TemplateEnum.CREDENTIAL_RESULT, TemplateEnum.WARNINGS],
     });
   });
 
   it('should return error template when at least one error does not have additional properties', () => {
-    const result = templateUtils.getValidationTemplateData(errorCredential);
+    const result = templateUtils.getTemplateData(errorCredential);
 
     expect(result).toEqual({
-      ...errorCredential,
       result: TestSuiteResultEnum.FAIL,
-      validationErrors: errorCredential.errors,
-      validationWarnings: [],
-      subTemplates: [TemplateEnum.VALIDATION_ERRORS],
+      errors: errorCredential.errors,
+      warnings: [],
+      templates: [TemplateEnum.CREDENTIAL_RESULT, TemplateEnum.ERRORS],
     });
   });
 
   it('should return error and warning templates when there are both error and warning errors', () => {
-    const result = templateUtils.getValidationTemplateData(errorAndWarningCredential);
+    const result = templateUtils.getTemplateData(errorAndWarningCredential);
 
     expect(result).toEqual({
-      ...errorAndWarningCredential,
       result: TestSuiteResultEnum.FAIL,
-      validationErrors: [
+      errors: [
         {
           keyword: 'enum',
           instancePath: 'type',
@@ -120,7 +117,7 @@ describe('getValidationTemplateData', () => {
           params: {},
         },
       ],
-      validationWarnings: [
+      warnings: [
         {
           keyword: 'required',
           instancePath: 'type',
@@ -128,7 +125,7 @@ describe('getValidationTemplateData', () => {
           params: { additionalProperty: 'testField' },
         },
       ],
-      subTemplates: [TemplateEnum.VALIDATION_ERRORS, TemplateEnum.VALIDATION_WARNINGS],
+      templates: [TemplateEnum.CREDENTIAL_RESULT, TemplateEnum.ERRORS, TemplateEnum.WARNINGS],
     });
   });
 });
@@ -151,18 +148,9 @@ describe('getCredentialResults', () => {
         type: 'productPassport',
         version: 'v0.0.1',
         dataPath: 'data/productPassport.json',
-        errors: [
-          {
-            keyword: 'required',
-            instancePath: 'type',
-            schemaPath: '/',
-            params: {
-              additionalProperty: 'testField',
-            },
-          },
-        ],
+        errors: [],
         result: 'WARN',
-        validationWarnings: [
+        warnings: [
           {
             keyword: 'required',
             instancePath: 'type',
@@ -177,6 +165,7 @@ describe('getCredentialResults', () => {
         type: 'productPassport',
         version: 'v0.0.1',
         dataPath: 'data/productPassport.json',
+        result: 'FAIL',
         errors: [
           {
             keyword: 'required',
@@ -185,47 +174,22 @@ describe('getCredentialResults', () => {
             params: {},
           },
         ],
-        result: 'FAIL',
-        validationErrors: [
-          {
-            keyword: 'required',
-            instancePath: 'type',
-            schemaPath: '/',
-            params: {},
-          },
-        ],
-        validationWarnings: [],
+        warnings: [],
       },
       {
         type: 'productPassport',
         version: 'v0.0.1',
         dataPath: 'data/productPassport.json',
+        result: 'FAIL',
         errors: [
           {
-            keyword: 'required',
-            instancePath: 'type',
-            schemaPath: '/',
-            params: {
-              additionalProperty: 'testField',
-            },
-          },
-          {
             keyword: 'enum',
             instancePath: 'type',
             schemaPath: '/',
             params: {},
           },
         ],
-        result: 'FAIL',
-        validationErrors: [
-          {
-            keyword: 'enum',
-            instancePath: 'type',
-            schemaPath: '/',
-            params: {},
-          },
-        ],
-        validationWarnings: [
+        warnings: [
           {
             keyword: 'required',
             instancePath: 'type',
@@ -262,18 +226,9 @@ describe('getCredentialResults', () => {
       type: 'productPassport',
       version: 'v0.0.1',
       dataPath: 'data/productPassport.json',
-      errors: [
-        {
-          keyword: 'required',
-          instancePath: 'type',
-          schemaPath: '/',
-          params: {
-            additionalProperty: 'testField',
-          },
-        },
-      ],
+      errors: [],
       result: 'WARN',
-      validationWarnings: [
+      warnings: [
         {
           keyword: 'required',
           instancePath: 'type',
@@ -302,15 +257,7 @@ describe('getCredentialResults', () => {
         params: {},
       }],
       result: 'FAIL',
-      validationErrors: [
-        {
-          keyword: 'required',
-          instancePath: 'type',
-          schemaPath: '/',
-          params: {},
-        },
-      ],
-      validationWarnings: [],
+      warnings: [],
     }]);
   });
 
@@ -323,32 +270,16 @@ describe('getCredentialResults', () => {
       type: 'productPassport',
       version: 'v0.0.1',
       dataPath: 'data/productPassport.json',
+      result: 'FAIL',
       errors: [
         {
-          keyword: 'required',
-          instancePath: 'type',
-          schemaPath: '/',
-          params: {
-            additionalProperty: 'testField',
-          },
-        },
-        {
           keyword: 'enum',
           instancePath: 'type',
           schemaPath: '/',
           params: {},
         },
       ],
-      result: 'FAIL',
-      validationErrors: [
-        {
-          keyword: 'enum',
-          instancePath: 'type',
-          schemaPath: '/',
-          params: {},
-        },
-      ],
-      validationWarnings: [
+      warnings: [
         {
           keyword: 'required',
           instancePath: 'type',
@@ -388,7 +319,7 @@ describe('getCredentialResults', () => {
         version: 'v0.0.1',
         path: 'data/productPassport.json',
         result: TestSuiteResultEnum.WARN,
-        validationWarnings: [{
+        warnings: [{
           fieldName: 'additionalFieldTest',
           message: 'This schema must NOT have additional properties',
         }],
@@ -409,7 +340,7 @@ describe('getCredentialResults', () => {
         version: 'v0.0.1',
         path: 'data/productPassport.json',
         result: TestSuiteResultEnum.FAIL,
-        validationErrors: [
+        errors: [
           {
             fieldName: '/eventType',
             errorType: 'enum',
@@ -417,7 +348,7 @@ describe('getCredentialResults', () => {
             message: '/eventType field must be equal to one of the allowed values',
           },
         ],
-        validationWarnings: [],
+        warnings: [],
       };
 
       const credentialResults = await templateUtils.getFinalReport([errorCredentialResult]);
@@ -435,7 +366,7 @@ describe('getCredentialResults', () => {
         version: 'v0.0.1',
         path: 'data/productPassport.json',
         result: TestSuiteResultEnum.FAIL,
-        validationErrors: [
+        errors: [
           {
             fieldName: '/eventType',
             errorType: 'enum',
@@ -443,7 +374,7 @@ describe('getCredentialResults', () => {
             message: '/eventType field must be equal to one of the allowed values',
           },
         ],
-        validationWarnings: [{
+        warnings: [{
           fieldName: 'additionalFieldTest',
           message: 'must NOT have additional properties',
         }],
