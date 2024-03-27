@@ -179,7 +179,7 @@ describe("CLI 'untp test' Commands", () => {
     let stdout: any;
     let credentials: ConfigContent[];
 
-    const mockPath = `${process.cwd()}/integration/cli/mock/untpTestMixFailAndWarn`;
+    const mockPath = `${process.cwd()}/integration/cli/mock/untpTestFailuresAndWarnings`;
     beforeAll((done) => {
       credentialFileName = 'credentialsExample.json';
       storePath = `${mockPath}/${credentialFileName}`;
