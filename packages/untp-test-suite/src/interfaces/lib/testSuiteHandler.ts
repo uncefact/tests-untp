@@ -1,9 +1,9 @@
 import { dynamicLoadingSchemaService, hasErrors } from '../../core/index.js';
 import { generateTestSuiteResultByTemplate, processCheckDataBySchema } from '../../core/processTestSuite.js';
-import { ITestCredentialHandlerResult, TestCredentialHandler, TestMultiCredentialHandler } from './types.js';
-import { ConfigCredentials, FinalStatus, TemplateName, TestSuiteResult } from '../../core/types/index.js';
+import { ITestCredentialHandlerResult, ITestMultiCredentialHandlerResult, TestCredentialHandler, TestMultiCredentialHandler } from './types.js';
+import { ConfigCredentials, FinalStatus, TemplateName } from '../../core/types/index.js';
 import { readJsonFile } from '../utils/common.js';
-import { generateFinalMessage, getTemplateName } from '../../templates/utils.js';
+import { generateFinalMessage } from '../../templates/utils.js';
 import { templateMapper } from '../../templates/mapper.js';
 
 /**
@@ -208,7 +208,7 @@ import { templateMapper } from '../../templates/mapper.js';
  * @returns {Promise<TestSuiteResult>} A promise that resolves to the test results for all credentials and the final report.
  */
 
-export const testMultiCredentialHandler: TestMultiCredentialHandler = async (credentialOrCredentialPath: string | ConfigCredentials): Promise<TestSuiteResult> => {
+export const testMultiCredentialHandler: TestMultiCredentialHandler = async (credentialOrCredentialPath: string | ConfigCredentials): Promise<ITestMultiCredentialHandlerResult> => {
   let credential = credentialOrCredentialPath as ConfigCredentials;
 
   if (typeof credentialOrCredentialPath === 'string') {

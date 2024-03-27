@@ -1,5 +1,12 @@
 import { ErrorObject } from 'ajv';
-import { ConfigCredentials, FinalStatus, TestSuiteResult } from '../../core/types/index.js';
+import { ConfigCredentials, FinalStatus, ICredentialTestResult, TestSuiteResult } from '../../core/types/index.js';
+
+export interface ITestMultiCredentialHandlerResult {
+  credentials: ICredentialTestResult[],
+  result: FinalStatus
+  version?: string,
+  errors?: ErrorObject[] | null,
+}
 
 export interface ITestCredentialHandlerResult {
   credentialType?: string,
@@ -10,10 +17,10 @@ export interface ITestCredentialHandlerResult {
 
 export interface TestMultiCredentialHandler {
   // This library function is intended for the test suite function to read the `credentials.json` file by the `credentialPath` parameter and run the entire test suite.
-  (credentialPath: string): Promise<TestSuiteResult>;
+  (credentialPath: string): Promise<ITestMultiCredentialHandlerResult>;
 
   // This library function is used to pass the configuration credentials directly into the parameter and then run the test suite with those parameters.
-  (credential: ConfigCredentials): Promise<TestSuiteResult>;
+  (credential: ConfigCredentials): Promise<ITestMultiCredentialHandlerResult>;
 };
 
 export interface TestCredentialHandler {
