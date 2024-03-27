@@ -5,68 +5,55 @@ import {
   ICredentialTestResult,
   IFinalReport,
   TestSuiteMessage,
-  IValidationTemplateData,
   TemplateEnum,
 } from '../core/types/index.js';
 import { templateMapper } from './mapper.js';
 
-export const getValidationTemplateData = (validatedCredential: IValidatedCredentials): IValidationTemplateData => {
+export const getTemplates = (validatedCredential: IValidatedCredentials): TemplateEnum[] => {
   const errors = validatedCredential.errors as ErrorObject[];
 
   // Pass template
   const isPassTemplate = !errors?.length;
   if (isPassTemplate) {
-    return {
-      ...validatedCredential,
-      result: TestSuiteResultEnum.PASS,
-      subTemplates: []
-    };
-  }
-
-  // Warning template
-  const isWarningTemplate = errors.every((error) => error?.params?.additionalProperty);
-  if (isWarningTemplate) {
-    return {
-      ...validatedCredential,
-      result: TestSuiteResultEnum.WARN,
-      validationWarnings: errors,
-      subTemplates: [TemplateEnum.VALIDATION_WARNINGS],
-    };
+    return [TemplateEnum.CREDENTIAL_RESULT];
   }
   
   // Error or Error and warning template
-  const { validationErrors, validationWarnings } = errors.reduce((validationResult, current) => {
-    const key = current.params?.additionalProperty ? TemplateEnum.VALIDATION_WARNINGS : TemplateEnum.VALIDATION_ERRORS;
-    validationResult[key].push(current);
+  return errors.reduce((validationResult, current) => {
+    const template = current.params?.additionalProperty ? TemplateEnum.WARNINGS : TemplateEnum.ERRORS;
+    validationResult.push(template);
 
     return validationResult;
-  }, {
-    [TemplateEnum.VALIDATION_ERRORS]: [] as ErrorObject[],
-    [TemplateEnum.VALIDATION_WARNINGS]: [] as ErrorObject[]
-  });
-
-  return {
-    ...validatedCredential,
-    result: TestSuiteResultEnum.FAIL,
-    validationErrors,
-    validationWarnings,
-    subTemplates: validationWarnings.length ? [TemplateEnum.VALIDATION_ERRORS, TemplateEnum.VALIDATION_WARNINGS] : [TemplateEnum.VALIDATION_ERRORS],
-  };
+  }, [TemplateEnum.CREDENTIAL_RESULT] as TemplateEnum[]);
 };
 
 export const getCredentialResults = async (validatedCredentials: IValidatedCredentials[]): Promise<ICredentialTestResult[]> => {
   const credentialsResultPromises = validatedCredentials.map(async (validatedCredential) => {
-    const { subTemplates, ...templateData } = getValidationTemplateData(validatedCredential);
+    const templates = getTemplates(validatedCredential);
+    const result = getResult(templates);
 
-    const credentialResultJson = await templateMapper(TemplateEnum.CREDENTIAL_RESULT, templateData);
-    const credentialResult = JSON.parse(credentialResultJson);
-
-    const subTemplateDataPromises = subTemplates.map(async (subTemplate) => {
-      const subTemplateData = await templateMapper(subTemplate, templateData);
-      credentialResult[subTemplate] = JSON.parse(subTemplateData)[subTemplate];
+    const totalErrors = validatedCredential.errors ? validatedCredential.errors as ErrorObject[] : [];
+    const { errors, warnings } = totalErrors.reduce((validationResult, current) => {
+      const key = current.params?.additionalProperty ? TemplateEnum.WARNINGS : TemplateEnum.ERRORS;
+      validationResult[key].push(current);
+      return validationResult;
+    }, {
+      errors: [] as ErrorObject[],
+      warnings: [] as ErrorObject[]
     });
 
-    await Promise.all(subTemplateDataPromises);
+    const mappedCredentialPromises = templates.map(async (template) => {
+      const templateData = { ...validatedCredential, result, errors, warnings };
+      const credentialMessage = await templateMapper(template, templateData);
+      return JSON.parse(credentialMessage);
+    });
+
+    const mappedCredentials = await Promise.all(mappedCredentialPromises);
+    const credentialResult: ICredentialTestResult = mappedCredentials.reduce((result, current) => {
+
+      return { ...result, ...current };
+    }, {});
+
     return credentialResult;
   });
 
@@ -94,3 +81,18 @@ export const getFinalReport = async (credentialResults: ICredentialTestResult[])
   const finalReportJson = await templateMapper(TemplateEnum.FINAL_REPORT, finalReportTemplateData);
   return JSON.parse(finalReportJson);
 };
+
+function getResult(templates: TemplateEnum[]) {
+  const isPassType = templates.length === 1;
+  if (isPassType) {
+    return TestSuiteResultEnum.PASS;
+  }
+
+  const [, ...errorOrWarningTemplate] = templates;
+  const isWarningType = errorOrWarningTemplate.every(template => template === TemplateEnum.WARNINGS);
+  if (isWarningType) {
+    return TestSuiteResultEnum.WARN;
+  }
+
+  return TestSuiteResultEnum.FAIL;
+}

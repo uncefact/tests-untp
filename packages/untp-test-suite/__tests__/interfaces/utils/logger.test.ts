@@ -45,7 +45,7 @@ const errorTestSuite = {
   version: 'v0.0.1',
   path: 'data/dataPath.json',
   result: TestSuiteResultEnum.FAIL,
-  validationErrors: [
+  errors: [
     {
       fieldName: 'test',
       errorType: 'enum',
@@ -65,7 +65,7 @@ const warningTestSuite = {
   version: 'v0.0.1',
   path: 'data/dataPath.json',
   result: TestSuiteResultEnum.WARN,
-  validationWarnings: [
+  warnings: [
     {
       fieldName: 'testField',
       message: 'This schema additionalFields',
@@ -77,13 +77,13 @@ const errorAndWarningTestSuite = {
   version: 'v0.0.1',
   path: 'data/dataPath.json',
   result: TestSuiteResultEnum.FAIL,
-  validationWarnings: [
+  warnings: [
     {
       fieldName: 'testField',
       message: 'This schema additionalFields',
     },
   ],
-  validationErrors: [
+  errors: [
     {
       fieldName: 'test',
       errorType: 'enum',

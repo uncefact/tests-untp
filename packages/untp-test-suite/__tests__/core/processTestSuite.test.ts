@@ -94,7 +94,7 @@ describe('processTestSuite', () => {
         version: 'v0.0.1',
         path: 'data/productPassport.json',
         result: TestSuiteResultEnum.FAIL,
-        validationErrors: [
+        errors: [
           {
             fieldName: '/eventType',
             errorType: 'enum',
@@ -102,7 +102,7 @@ describe('processTestSuite', () => {
             message: '/eventType field must be equal to one of the allowed values',
           },
         ],
-        validationWarnings: [],
+        warnings: [],
       },
     ]);
     jest.spyOn(templateUtils, 'getFinalReport').mockResolvedValueOnce({
@@ -119,7 +119,7 @@ describe('processTestSuite', () => {
           version: 'v0.0.1',
           path: 'data/productPassport.json',
           result: TestSuiteResultEnum.FAIL,
-          validationErrors: [
+          errors: [
             {
               allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
               errorType: 'enum',
@@ -127,7 +127,7 @@ describe('processTestSuite', () => {
               message: '/eventType field must be equal to one of the allowed values',
             },
           ],
-          validationWarnings: []
+          warnings: []
         },
       ],
       finalStatus: 'FAIL',
@@ -151,8 +151,8 @@ describe('processTestSuite', () => {
         version: 'v0.0.1',
         path: 'data/productPassport.json',
         result: TestSuiteResultEnum.WARN,
-        validationErrors: [],
-        validationWarnings: [{
+        errors: [],
+        warnings: [{
           fieldName: 'additionalFieldTest',
           message: 'This schema must NOT have additional properties',
         }],
@@ -172,8 +172,8 @@ describe('processTestSuite', () => {
           version: 'v0.0.1',
           path: 'data/productPassport.json',
           result: TestSuiteResultEnum.WARN,
-          validationErrors: [],
-          validationWarnings: [{
+          errors: [],
+          warnings: [{
             fieldName: 'additionalFieldTest',
             message: 'This schema must NOT have additional properties',
           }]
@@ -200,13 +200,13 @@ describe('processTestSuite', () => {
         version: 'v0.0.1',
         path: 'data/productPassport.json',
         result: TestSuiteResultEnum.WARN,
-        validationErrors: [{
+        errors: [{
           fieldName: '/eventType',
           errorType: 'enum',
           allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
           message: '/eventType field must be equal to one of the allowed values',
         }],
-        validationWarnings: [{
+        warnings: [{
           fieldName: 'additionalFieldTest',
           message: 'This schema must NOT have additional properties',
         }],
@@ -226,13 +226,13 @@ describe('processTestSuite', () => {
           version: 'v0.0.1',
           path: 'data/productPassport.json',
           result: TestSuiteResultEnum.WARN,
-          validationErrors: [{
+          errors: [{
             fieldName: '/eventType',
             errorType: 'enum',
             allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
             message: '/eventType field must be equal to one of the allowed values',
           }],
-          validationWarnings: [{
+          warnings: [{
             fieldName: 'additionalFieldTest',
             message: 'This schema must NOT have additional properties',
           }]
