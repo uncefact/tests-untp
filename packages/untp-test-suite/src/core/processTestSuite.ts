@@ -13,7 +13,7 @@ import { hasErrors } from './services/json-schema/validator.service.js';
 import { templateMapper } from '../templates/mapper.js';
 import { getTemplateName, generateFinalMessage } from '../templates/utils.js';
 
-const processCheckDataBySchema = async (credentialConfig: ConfigContent): Promise<IValidatedCredentials> => {
+export const processCheckDataBySchema = async (credentialConfig: ConfigContent): Promise<IValidatedCredentials> => {
   const { type, version, dataPath } = credentialConfig;
   const [schema, data] = await Promise.all([dynamicLoadingSchemaService(type, version), readJsonFile(dataPath)]);
 
@@ -25,7 +25,7 @@ const processCheckDataBySchema = async (credentialConfig: ConfigContent): Promis
   };
 };
 
-const generateTestSuiteResultByTemplate = async (
+export const generateTestSuiteResultByTemplate = async (
   testSuiteResultAjv: IValidatedCredentials[],
 ): Promise<ICredentialTestResult[]> => {
   const credentialsTemplate = await Promise.all(
