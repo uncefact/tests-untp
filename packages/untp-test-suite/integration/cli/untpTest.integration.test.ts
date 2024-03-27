@@ -126,6 +126,9 @@ describe("CLI 'untp test' Commands", () => {
         expect(stdout).toMatch(/FAIL/);
         expect(stdout).toMatch(/Your credentials are not UNTP compliant/);
         expect(stdout).toContain('certification field must be array');
+        expect(stdout).toContain('type field should have required property');
+        expect(stdout).toContain('version field should have required property');
+        expect(stdout).toContain('dataPath field should have required property');
       });
     });
   });
