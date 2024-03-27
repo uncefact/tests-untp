@@ -13,7 +13,7 @@ describe("CLI 'untp test' Commands", () => {
     let stdout: any;
     let credentials: ConfigContent[];
 
-    const mockPath = `${process.cwd()}/integration/cli/mock/untpTestPass`;
+    const mockPath = `${process.cwd()}/integration/mock/untpTestPass`;
     beforeAll((done) => {
       credentialFileName = 'credentialsExample.json';
       storePath = `${mockPath}/${credentialFileName}`;
@@ -91,7 +91,7 @@ describe("CLI 'untp test' Commands", () => {
     let stdout: any;
     let credentials: ConfigContent[];
 
-    const mockPath = `${process.cwd()}/integration/cli/mock/untpTestFail`;
+    const mockPath = `${process.cwd()}/integration/mock/untpTestFail`;
     beforeAll((done) => {
       credentialFileName = 'credentialsExample.json';
       storePath = `${mockPath}/${credentialFileName}`;
@@ -139,7 +139,7 @@ describe("CLI 'untp test' Commands", () => {
     let stdout: any;
     let credentials: ConfigContent[];
 
-    const mockPath = `${process.cwd()}/integration/cli/mock/untpTestWarn`;
+    const mockPath = `${process.cwd()}/integration/mock/untpTestWarn`;
     beforeAll((done) => {
       credentialFileName = 'credentialsExample.json';
       storePath = `${mockPath}/${credentialFileName}`;
@@ -182,7 +182,7 @@ describe("CLI 'untp test' Commands", () => {
     let stdout: any;
     let credentials: ConfigContent[];
 
-    const mockPath = `${process.cwd()}/integration/cli/mock/untpTestFailuresAndWarnings`;
+    const mockPath = `${process.cwd()}/integration/mock/untpTestFailuresAndWarnings`;
     beforeAll((done) => {
       credentialFileName = 'credentialsExample.json';
       storePath = `${mockPath}/${credentialFileName}`;
