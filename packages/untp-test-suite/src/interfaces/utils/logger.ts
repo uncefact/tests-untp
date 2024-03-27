@@ -74,33 +74,33 @@ export function getStatusMessage(result: TestSuiteResultEnum) {
 }
 
 export function getErrorOrWarningMessage(testSuiteResult: ICredentialTestResult) {
-  if (testSuiteResult.result === TestSuiteResultEnum.FAIL && testSuiteResult.validationErrors && testSuiteResult.validationWarnings) {
-    return `${chalk.yellow(`Warning: ${getWarningMessage(testSuiteResult.validationWarnings)}`)}\n${chalk.red(`Error: ${getErrorMessage(testSuiteResult.validationErrors)}`)}`;
+  if (testSuiteResult.result === TestSuiteResultEnum.FAIL && testSuiteResult.errors && testSuiteResult.warnings) {
+    return `${chalk.yellow(`Warning: ${getWarningMessage(testSuiteResult.warnings)}`)}\n${chalk.red(`Error: ${getErrorMessage(testSuiteResult.errors)}`)}`;
   }
-  if (testSuiteResult.result === TestSuiteResultEnum.FAIL && testSuiteResult.validationErrors) {
-    return chalk.red(`Error: ${getErrorMessage(testSuiteResult.validationErrors)}`);
+  if (testSuiteResult.result === TestSuiteResultEnum.FAIL && testSuiteResult.errors) {
+    return chalk.red(`Error: ${getErrorMessage(testSuiteResult.errors)}`);
   }
-  if (testSuiteResult.result === TestSuiteResultEnum.WARN && testSuiteResult.validationWarnings) {
-    return chalk.yellow(`Warning: ${getWarningMessage(testSuiteResult.validationWarnings)}`);
+  if (testSuiteResult.result === TestSuiteResultEnum.WARN && testSuiteResult.warnings) {
+    return chalk.yellow(`Warning: ${getWarningMessage(testSuiteResult.warnings)}`);
   }
 
   return '';
 }
 
-export function getWarningMessage(validationWarnings: IWarning[]) {
+export function getWarningMessage(warnings: IWarning[]) {
   let warningMessage = '';
 
-  for (const warning of validationWarnings) {
+  for (const warning of warnings) {
     warningMessage += `${warning.message}. Additional property found: '${warning.fieldName}'.`;
   }
 
   return warningMessage;
 }
 
-export function getErrorMessage(validationErrors: IError[]) {
+export function getErrorMessage(errors: IError[]) {
   let errorMessage = '';
 
-  for (const error of validationErrors) {
+  for (const error of errors) {
     errorMessage += `${error.message}. `;
     errorMessage += error?.allowedValues ? `Allowed values: ${(error.allowedValues).join(', ')}.` : '';
   }
