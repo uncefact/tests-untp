@@ -32,8 +32,8 @@ export interface ICredentialTestResult {
   version: string;
   path: string;
   result: TestSuiteResultEnum;
-  validationWarnings?: IWarning[];
-  validationErrors?: IError[];
+  warnings?: IWarning[];
+  errors?: IError[];
 }
 
 export interface IWarning {
@@ -53,11 +53,11 @@ export interface IFinalReport {
   finalMessage: TestSuiteMessage;
 }
 
-export interface IValidationTemplateData extends IValidatedCredentials {
+export interface IValidationTemplateData {
   result: TestSuiteResultEnum;
-  subTemplates: string[];
-  validationWarnings?: ErrorObject[];
-  validationErrors?: ErrorObject[];
+  templates: TemplateEnum[];
+  warnings?: ErrorObject[];
+  errors?: ErrorObject[];
 }
 
 export interface TestSuiteResult extends IFinalReport {
@@ -72,8 +72,8 @@ export enum TestSuiteResultEnum {
 
 export enum TemplateEnum {
   CREDENTIAL_RESULT = 'credentialResult',
-  VALIDATION_ERRORS = 'validationErrors',
-  VALIDATION_WARNINGS = 'validationWarnings',
+  ERRORS = 'errors',
+  WARNINGS = 'warnings',
   FINAL_REPORT = 'finalReport',
 }
 

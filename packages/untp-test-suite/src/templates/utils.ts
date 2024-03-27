@@ -10,67 +10,64 @@ import {
 } from '../core/types/index.js';
 import { templateMapper } from './mapper.js';
 
-export const getValidationTemplateData = (validatedCredential: IValidatedCredentials): IValidationTemplateData => {
+export const getTemplateData = (validatedCredential: IValidatedCredentials): IValidationTemplateData => {
   const errors = validatedCredential.errors as ErrorObject[];
+  const templates = [TemplateEnum.CREDENTIAL_RESULT];
 
   // Pass template
   const isPassTemplate = !errors?.length;
   if (isPassTemplate) {
     return {
-      ...validatedCredential,
       result: TestSuiteResultEnum.PASS,
-      subTemplates: []
-    };
-  }
-
-  // Warning template
-  const isWarningTemplate = errors.every((error) => error?.params?.additionalProperty);
-  if (isWarningTemplate) {
-    return {
-      ...validatedCredential,
-      result: TestSuiteResultEnum.WARN,
-      validationWarnings: errors,
-      subTemplates: [TemplateEnum.VALIDATION_WARNINGS],
+      templates
     };
   }
   
   // Error or Error and warning template
-  const { validationErrors, validationWarnings } = errors.reduce((validationResult, current) => {
-    const key = current.params?.additionalProperty ? TemplateEnum.VALIDATION_WARNINGS : TemplateEnum.VALIDATION_ERRORS;
-    validationResult[key].push(current);
+  const { errorList, warningList } = errors.reduce((result, current) => {
+    const errorOrWarningList = current.params?.additionalProperty ? result.warningList : result.errorList;
+    errorOrWarningList.push(current);
 
-    return validationResult;
+    return result;
   }, {
-    [TemplateEnum.VALIDATION_ERRORS]: [] as ErrorObject[],
-    [TemplateEnum.VALIDATION_WARNINGS]: [] as ErrorObject[]
+    errorList: [] as ErrorObject[],
+    warningList: [] as ErrorObject[]
   });
 
+  let result = TestSuiteResultEnum.WARN;
+  if (errorList.length) {
+    result = TestSuiteResultEnum.FAIL;
+    templates.push(TemplateEnum.ERRORS);
+  }
+  if (warningList.length) {
+    templates.push(TemplateEnum.WARNINGS);
+  }
+
   return {
-    ...validatedCredential,
-    result: TestSuiteResultEnum.FAIL,
-    validationErrors,
-    validationWarnings,
-    subTemplates: validationWarnings.length ? [TemplateEnum.VALIDATION_ERRORS, TemplateEnum.VALIDATION_WARNINGS] : [TemplateEnum.VALIDATION_ERRORS],
+    result,
+    errors: errorList,
+    warnings: warningList,
+    templates
   };
 };
 
 export const getCredentialResults = async (validatedCredentials: IValidatedCredentials[]): Promise<ICredentialTestResult[]> => {
-  const credentialsResultPromises = validatedCredentials.map(async (validatedCredential) => {
-    const { subTemplates, ...templateData } = getValidationTemplateData(validatedCredential);
+  const credentialResultPromises = validatedCredentials.map(async (validatedCredential) => {
+    const { templates, ...templateData } = getTemplateData(validatedCredential);
 
-    const credentialResultJson = await templateMapper(TemplateEnum.CREDENTIAL_RESULT, templateData);
-    const credentialResult = JSON.parse(credentialResultJson);
+    const mappedTemplateComponentPromises = templates.map(async (template) => {
+      const mappedTemplateDataJson = await templateMapper(template, { ...validatedCredential, ...templateData });
+      const mappedTemplateData = JSON.parse(mappedTemplateDataJson);
 
-    const subTemplateDataPromises = subTemplates.map(async (subTemplate) => {
-      const subTemplateData = await templateMapper(subTemplate, templateData);
-      credentialResult[subTemplate] = JSON.parse(subTemplateData)[subTemplate];
+      return mappedTemplateData as ICredentialTestResult;
     });
 
-    await Promise.all(subTemplateDataPromises);
-    return credentialResult;
+    const mappedTemplateComponents = await Promise.all(mappedTemplateComponentPromises);
+    const mappedTemplate = mappedTemplateComponents.reduce((result, current) => ({ ...result, ...current }), {} as ICredentialTestResult);
+    return mappedTemplate;
   });
 
-  const credentialResults = await Promise.all(credentialsResultPromises);
+  const credentialResults = await Promise.all(credentialResultPromises);
   return credentialResults;
 };
 
