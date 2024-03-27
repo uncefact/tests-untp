@@ -21,6 +21,21 @@ export const processCheckDataBySchema = async (credentialConfig: ConfigContent):
   };
 };
 
+export const generateTestSuiteResultByTemplate = async (
+  testSuiteResultAjv: IValidatedCredentials[],
+): Promise<ICredentialTestResult[]> => {
+  const credentialsTemplate = await Promise.all(
+    testSuiteResultAjv.map(async (value) => {
+      const templateName = getTemplateName(value);
+      const message = await templateMapper(templateName, value);
+
+      return JSON.parse(message);
+    }),
+  );
+
+  return credentialsTemplate;
+};
+
 /**
  * Process the test suite
  * @param credentialConfigsPath - The path to the credential configs
