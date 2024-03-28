@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import path from 'path';
 import { processTestSuite } from '../../core/index.js';
-import { getFinalReport, getLogStatus } from '../utils/logger.js';
+import { getFinalReport, getLogStatus } from './testResultProcessor.js';
 
 const credentialFileName = 'credentials.json';
 const defaultCredentialFilePath = `${process.cwd()}/${credentialFileName}`;

@@ -75,37 +75,26 @@ export function getStatusMessage(result: TestSuiteResultEnum) {
 
 export function getErrorOrWarningMessage(testSuiteResult: ICredentialTestResult) {
   if (testSuiteResult.result === TestSuiteResultEnum.FAIL && testSuiteResult.errors && testSuiteResult.warnings) {
-    return `${chalk.yellow(`Warning: ${getWarningMessage(testSuiteResult.warnings)}`)}\n${chalk.red(`Error: ${getErrorMessage(testSuiteResult.errors)}`)}`;
+    return `${chalk.yellow(`Warning: ${getMessage(testSuiteResult.warnings)}`)}\n${chalk.red(`Error: ${getMessage(testSuiteResult.errors)}`)}`;
   }
   if (testSuiteResult.result === TestSuiteResultEnum.FAIL && testSuiteResult.errors) {
-    return chalk.red(`Error: ${getErrorMessage(testSuiteResult.errors)}`);
+    return chalk.red(`Error: ${getMessage(testSuiteResult.errors)}`);
   }
   if (testSuiteResult.result === TestSuiteResultEnum.WARN && testSuiteResult.warnings) {
-    return chalk.yellow(`Warning: ${getWarningMessage(testSuiteResult.warnings)}`);
+    return chalk.yellow(`Warning: ${getMessage(testSuiteResult.warnings)}`);
   }
 
   return '';
 }
 
-export function getWarningMessage(warnings: IWarning[]) {
-  let warningMessage = '';
+export function getMessage(resultMessages: IWarning[] | IError[]) {
+  let finalMessage = '';
 
-  for (const warning of warnings) {
-    warningMessage += `${warning.message}. Additional property found: '${warning.fieldName}'.`;
+  for (const resultMessage of resultMessages) {
+    finalMessage += `\n${resultMessage.message}`;
   }
 
-  return warningMessage;
-}
-
-export function getErrorMessage(errors: IError[]) {
-  let errorMessage = '';
-
-  for (const error of errors) {
-    errorMessage += `${error.message}. `;
-    errorMessage += error?.allowedValues ? `Allowed values: ${(error.allowedValues).join(', ')}.` : '';
-  }
-
-  return errorMessage;
+  return finalMessage;
 }
 
 export function getMessageWithColorByResult(result: TestSuiteResultEnum, message: string) {
