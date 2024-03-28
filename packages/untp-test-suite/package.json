@@ -23,7 +23,7 @@
     "untp": "node build/interfaces/cli/cli.js",
     "test": "jest --config ./jest.config.js",
     "test:integration": "jest --config=jest.integration.config.cjs",
-    "build": "tsc --build --clean && tsc",
+    "build": "tsc --build --clean && tsc && cp -r src/templates/templateMessages/ build/templates/templateMessages",
     "watch": "tsc -b --watch",
     "lint": "eslint ."
   },

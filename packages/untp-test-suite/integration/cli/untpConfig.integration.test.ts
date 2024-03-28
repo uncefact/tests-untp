@@ -1,5 +1,5 @@
-import { exec } from 'child_process';
 import fs from 'fs';
+import { exec } from 'child_process';
 
 describe("CLI 'untp config' Commands", () => {
   it('should create a credential file successfully', () => {
