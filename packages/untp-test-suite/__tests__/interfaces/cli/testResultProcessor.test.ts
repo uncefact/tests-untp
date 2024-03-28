@@ -1,5 +1,5 @@
 import { ICredentialTestResult, TestSuiteMessage, TestSuiteResultEnum } from '../../../src/core/types';
-import * as loggerUtils from '../../../src/interfaces/utils/logger';
+import * as testResultProcessor from '../../../src/interfaces/cli/testResultProcessor';
 
 jest.mock('chalk', () => ({
   yellow: jest.fn((text: string) => text),
@@ -100,14 +100,15 @@ const testSuiteResult = {
 
 describe('getLogStatus', () => {
   it('Should return combined message with Pass, Error, and Warning statuses', () => {
-    const resultMessage = loggerUtils.getLogStatus(testSuiteResult.credentials);
+    const resultMessage = testResultProcessor.getLogStatus(testSuiteResult.credentials);
 
     expect(resultMessage).toEqual(
 `Testing Credential: aggregationEvent
 Version: v0.0.1
 Path: data/dataPath.json
 Result: FAIL
-Error: test field must be equal to one of the allowed values. Allowed values: object, aggregationEvent.
+Error: 
+test field must be equal to one of the allowed values
 ---
 Testing Credential: passPassport
 Version: v0.0.1
@@ -118,20 +119,23 @@ Testing Credential: warningPassport
 Version: v0.0.1
 Path: data/dataPath.json
 Result: WARN
-Warning: This schema additionalFields. Additional property found: 'testField'.
+Warning: 
+This schema additionalFields
 ---
 Testing Credential: errorAndWarningTestSuite
 Version: v0.0.1
 Path: data/dataPath.json
 Result: FAIL
-Warning: This schema additionalFields. Additional property found: 'testField'.
-Error: test field must be equal to one of the allowed values. Allowed values: object, aggregationEvent.
+Warning: 
+This schema additionalFields
+Error: 
+test field must be equal to one of the allowed values
 ---\n`);
   });
 
   it('Should return message with PASS status', () => {
     const passCredentials = [passTestSuite];
-    const resultMessage = loggerUtils.getLogStatus(passCredentials);
+    const resultMessage = testResultProcessor.getLogStatus(passCredentials);
 
     expect(resultMessage).toEqual(
 `Testing Credential: passPassport
@@ -143,41 +147,45 @@ Result: PASS
 
   it('Should return message with FAIL status', () => {
     const failCredentials = [errorTestSuite];
-    const resultMessage = loggerUtils.getLogStatus(failCredentials);
+    const resultMessage = testResultProcessor.getLogStatus(failCredentials);
 
     expect(resultMessage).toEqual(
 `Testing Credential: aggregationEvent
 Version: v0.0.1
 Path: data/dataPath.json
 Result: FAIL
-Error: test field must be equal to one of the allowed values. Allowed values: object, aggregationEvent.
+Error: 
+test field must be equal to one of the allowed values
 ---\n`);
   });
 
   it('Should return message with WARN status', () => {
     const warningCredentials = [warningTestSuite];
-    const resultMessage = loggerUtils.getLogStatus(warningCredentials);
+    const resultMessage = testResultProcessor.getLogStatus(warningCredentials);
 
     expect(resultMessage).toEqual(
 `Testing Credential: warningPassport
 Version: v0.0.1
 Path: data/dataPath.json
 Result: WARN
-Warning: This schema additionalFields. Additional property found: 'testField'.
+Warning: 
+This schema additionalFields
 ---\n`);
   });
 
   it('Should return message with warning and error, and status should be FAIL', () => {
     const errorAndWarningCredentials = [errorAndWarningTestSuite];
-    const resultMessage = loggerUtils.getLogStatus(errorAndWarningCredentials);
+    const resultMessage = testResultProcessor.getLogStatus(errorAndWarningCredentials);
 
     expect(resultMessage).toEqual(
 `Testing Credential: errorAndWarningTestSuite
 Version: v0.0.1
 Path: data/dataPath.json
 Result: FAIL
-Warning: This schema additionalFields. Additional property found: 'testField'.
-Error: test field must be equal to one of the allowed values. Allowed values: object, aggregationEvent.
+Warning: 
+This schema additionalFields
+Error: 
+test field must be equal to one of the allowed values
 ---\n`);
   });
 
@@ -185,7 +193,7 @@ Error: test field must be equal to one of the allowed values. Allowed values: ob
     try {
       const invalidTestSuiteResults = [{ ...errorTestSuite, result: 'invalid' as TestSuiteResultEnum }];
 
-      loggerUtils.getLogStatus(invalidTestSuiteResults);
+      testResultProcessor.getLogStatus(invalidTestSuiteResults);
     } catch (e) {
       const error = e as Error;
       expect(error.message).toBe('colorMap[result] is not a function');
@@ -196,7 +204,7 @@ Error: test field must be equal to one of the allowed values. Allowed values: ob
 describe('getFinalReport', () => {
   it('Should return a table message with FAIL status', () => {
     const testSuiteResultMock = {...testSuiteResult, credentials: [errorTestSuite]};
-    const finalReport = loggerUtils.getFinalReport(testSuiteResultMock);
+    const finalReport = testResultProcessor.getFinalReport(testSuiteResultMock);
 
     expect(finalReport).toEqual(
       JSON.stringify([
@@ -218,19 +226,19 @@ describe('getFinalReport', () => {
   it('Should return an empty string when the testSuiteResult does not have the credentialTestResults nested inside', () => {
     const notHaveCredentialTestResults = {...testSuiteResult, credentials: []};
 
-    const finalReport = loggerUtils.getFinalReport(notHaveCredentialTestResults);
+    const finalReport = testResultProcessor.getFinalReport(notHaveCredentialTestResults);
 
     expect(finalReport).toBe('');
   });
 
   it('Should throw an error when the credentialTestResults has invalid data', () => {
     try {
-      jest.spyOn(loggerUtils, 'getMessageWithColorByResult').mockImplementationOnce((text, message) => message);
+      jest.spyOn(testResultProcessor, 'getMessageWithColorByResult').mockImplementationOnce((text, message) => message);
       const invalidTestSuiteResult = {
         ...testSuiteResult, credentialTestResults: { length: 1 }
       };
       
-      loggerUtils.getFinalReport(invalidTestSuiteResult);
+      testResultProcessor.getFinalReport(invalidTestSuiteResult);
     } catch (e) {
       const error = e as Error;
       expect(error.message).toBe('credentialTestResults.map is not a function');
