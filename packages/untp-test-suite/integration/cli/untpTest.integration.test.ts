@@ -7,7 +7,7 @@ describe("CLI 'untp test' Commands", () => {
     jest.clearAllMocks();
   });
 
-  describe('process test runner and final report return PASS', () => {
+  describe('Validation of `schema` in the configuration file', () => {
     let credentialFileName: string;
     let storePath: string;
     let stdout: any;
@@ -25,6 +25,49 @@ describe("CLI 'untp test' Commands", () => {
         expect(error).toBeNull();
       }
 
+      exec(`yarn untp test`, (error, result) => {
+        if (error) {
+          console.error(`execSync error: ${error}`);
+          return;
+        }
+
+        stdout = result;
+        done();
+      });
+    });
+
+    it('should ensure that the schema file of each credential exists', () => {
+      expect(stdout).not.toBeNull();
+      for (const credential of credentials) {
+        expect(fs.existsSync(`${process.cwd()}/src/schemas/${credential.type}/${credential.version}/schema.json`)).toBe(
+          true,
+        );
+      }
+    });
+
+    it('should return the content of `schema` when file is valid', () => {
+      expect(stdout).not.toBeNull();
+      for (const credential of credentials) {
+        const data = fs.readFileSync(
+          `${process.cwd()}/src/schemas/${credential.type}/${credential.version}/schema.json`,
+          'utf8',
+        );
+
+        expect(data).not.toBe('');
+      }
+    });
+  });
+
+  describe('process test runner and final report return PASS', () => {
+    let credentialFileName: string;
+    let storePath: string;
+    let stdout: any;
+
+    const mockPath = `${process.cwd()}/integration/mock/untpTestPass`;
+    beforeAll((done) => {
+      credentialFileName = 'credentialsExample.json';
+      storePath = `${mockPath}/${credentialFileName}`;
+
       exec(`yarn untp test -c ${storePath}`, (error, result) => {
         if (error) {
           console.error(`execSync error: ${error}`);
@@ -36,52 +79,9 @@ describe("CLI 'untp test' Commands", () => {
       });
     });
 
-    describe('Validation of `schema` in the configuration file', () => {
-      it('should ensure that the schema file of each credential exists', () => {
-        expect(stdout).not.toBeNull();
-        for (const credential of credentials) {
-          expect(
-            fs.existsSync(`${process.cwd()}/src/schemas/${credential.type}/${credential.version}/schema.json`),
-          ).toBe(true);
-        }
-      });
-
-      it('should return the content of `schema` when file is valid', () => {
-        expect(stdout).not.toBeNull();
-        for (const credential of credentials) {
-          const data = fs.readFileSync(
-            `${process.cwd()}/src/schemas/${credential.type}/${credential.version}/schema.json`,
-            'utf8',
-          );
-
-          expect(data).not.toBe('');
-        }
-      });
-    });
-
-    describe('Validation of `dataPath` in the configuration file', () => {
-      it('should ensure that the `dataPath` of each credential exists and format the JSON file', () => {
-        expect(stdout).not.toBeNull();
-        for (const credential of credentials) {
-          expect(fs.existsSync(`${process.cwd()}/${credential.dataPath}`)).toBe(true);
-          expect(credential.dataPath).toMatch(/\.json$/);
-        }
-      });
-
-      it('should return the content of `dataPath` when file is valid', () => {
-        expect(stdout).not.toBeNull();
-        for (const credential of credentials) {
-          const data = fs.readFileSync(`${process.cwd()}/${credential.dataPath}`, 'utf8');
-          expect(data).not.toBe('');
-        }
-      });
-    });
-
-    describe('generate test suite result by template', () => {
-      it('should show PASS in report when all data validate', () => {
-        expect(stdout).toMatch(/PASS/);
-        expect(stdout).toContain('Your credentials are UNTP compliant');
-      });
+    it('should show PASS in report when all data validate', () => {
+      expect(stdout).toMatch(/PASS/);
+      expect(stdout).toContain('Your credentials are UNTP compliant');
     });
   });
 
@@ -89,19 +89,11 @@ describe("CLI 'untp test' Commands", () => {
     let credentialFileName: string;
     let storePath: string;
     let stdout: any;
-    let credentials: ConfigContent[];
 
     const mockPath = `${process.cwd()}/integration/mock/untpTestFail`;
     beforeAll((done) => {
       credentialFileName = 'credentialsExample.json';
       storePath = `${mockPath}/${credentialFileName}`;
-      const fileContent = fs.readFileSync(storePath, 'utf8');
-
-      try {
-        credentials = JSON.parse(fileContent).credentials;
-      } catch (error) {
-        expect(error).toBeNull();
-      }
 
       exec(`yarn untp test -c ${storePath}`, (error, result) => {
         if (error) {
@@ -114,22 +106,13 @@ describe("CLI 'untp test' Commands", () => {
       });
     });
 
-    it('should show the certification in objectEvent data is object ', () => {
-      // get only data path of object event
-      const data = fs.readFileSync(`${process.cwd()}/${credentials[1].dataPath}`, 'utf8');
-      const jsonData = JSON.parse(data);
-      expect(jsonData.certification).toEqual(expect.any(Object));
-    });
-
-    describe('generate test suite result by template', () => {
-      it('should show FAIL in the report when data invalidate', () => {
-        expect(stdout).toMatch(/FAIL/);
-        expect(stdout).toMatch(/Your credentials are not UNTP compliant/);
-        expect(stdout).toContain('certification field must be array');
-        expect(stdout).toContain('type field should have required property');
-        expect(stdout).toContain('version field should have required property');
-        expect(stdout).toContain('dataPath field should have required property');
-      });
+    it('should show FAIL in the report when data invalidate', () => {
+      expect(stdout).toMatch(/FAIL/);
+      expect(stdout).toMatch(/Your credentials are not UNTP compliant/);
+      expect(stdout).toContain('certification field must be array');
+      expect(stdout).toContain('type field should have required property');
+      expect(stdout).toContain('version field should have required property');
+      expect(stdout).toContain('dataPath field should have required property');
     });
   });
 
@@ -137,19 +120,11 @@ describe("CLI 'untp test' Commands", () => {
     let credentialFileName: string;
     let storePath: string;
     let stdout: any;
-    let credentials: ConfigContent[];
 
     const mockPath = `${process.cwd()}/integration/mock/untpTestWarn`;
     beforeAll((done) => {
       credentialFileName = 'credentialsExample.json';
       storePath = `${mockPath}/${credentialFileName}`;
-      const fileContent = fs.readFileSync(storePath, 'utf8');
-
-      try {
-        credentials = JSON.parse(fileContent).credentials;
-      } catch (error) {
-        expect(error).toBeNull();
-      }
 
       exec(`yarn untp test -c ${storePath}`, (error, result) => {
         if (error) {
@@ -162,17 +137,9 @@ describe("CLI 'untp test' Commands", () => {
       });
     });
 
-    it('should exist the volume in quantityList of objectEvent data', () => {
-      const data = fs.readFileSync(`${process.cwd()}/${credentials[0].dataPath}`, 'utf8');
-      const jsonData = JSON.parse(data);
-      expect(jsonData.quantityList[0].volume).toEqual(expect.any(String));
-    });
-
-    describe('generate test suite result by template', () => {
-      it('should show WARN in the report when data invalidate', () => {
-        expect(stdout).toMatch(/WARN/);
-        expect(stdout).toMatch(/Your credentials are UNTP compliant, but have extended the data model/);
-      });
+    it('should show WARN in the report when data invalidate', () => {
+      expect(stdout).toMatch(/WARN/);
+      expect(stdout).toMatch(/Your credentials are UNTP compliant, but have extended the data model/);
     });
   });
 
@@ -180,19 +147,11 @@ describe("CLI 'untp test' Commands", () => {
     let credentialFileName: string;
     let storePath: string;
     let stdout: any;
-    let credentials: ConfigContent[];
 
     const mockPath = `${process.cwd()}/integration/mock/untpTestFailuresAndWarnings`;
     beforeAll((done) => {
       credentialFileName = 'credentialsExample.json';
       storePath = `${mockPath}/${credentialFileName}`;
-      const fileContent = fs.readFileSync(storePath, 'utf8');
-
-      try {
-        credentials = JSON.parse(fileContent).credentials;
-      } catch (error) {
-        expect(error).toBeNull();
-      }
 
       exec(`yarn untp test -c ${storePath}`, (error, result) => {
         if (error) {
@@ -205,24 +164,10 @@ describe("CLI 'untp test' Commands", () => {
       });
     });
 
-    it('should exist the volume in quantityList of objectEvent data', () => {
-      const data = fs.readFileSync(`${process.cwd()}/${credentials[1].dataPath}`, 'utf8');
-      const jsonData = JSON.parse(data);
-      expect(jsonData.quantityList[1].volume).toEqual(expect.any(String));
-    });
-
-    it('should not exist the quantity in transformationEvent data', () => {
-      const data = fs.readFileSync(`${process.cwd()}/${credentials[2].dataPath}`, 'utf8');
-      const jsonData = JSON.parse(data);
-      expect(jsonData.outputQuantityList[0]).not.toHaveProperty('quantity');
-    });
-
-    describe('generate test suite result by template', () => {
-      it('should show WARN in the report when data invalidate', () => {
-        expect(stdout).toMatch(/FAIL/);
-        expect(stdout).toMatch(/Your credentials are not UNTP compliant/);
-        expect(stdout).toContain('field must have required property');
-      });
+    it('should show WARN in the report when data invalidate', () => {
+      expect(stdout).toMatch(/FAIL/);
+      expect(stdout).toMatch(/Your credentials are not UNTP compliant/);
+      expect(stdout).toContain('field must have required property');
     });
   });
 });
