@@ -2,18 +2,14 @@ import {
   ConfigContent,
   ConfigCredentials,
   IValidatedCredentials,
-  ICredentialTestResult,
-  IFinalReport,
-  TemplateName,
   TestSuite,
 } from './types/index.js';
 import { readJsonFile, validateCredentialConfigs } from './utils/common.js';
 import { dynamicLoadingSchemaService } from './services/dynamic-loading-schemas/loadingSchema.service.js';
 import { hasErrors } from './services/json-schema/validator.service.js';
-import { templateMapper } from '../templates/mapper.js';
-import { getTemplateName, generateFinalMessage } from '../templates/utils.js';
+import {  getCredentialResults, getFinalReport } from '../templates/utils.js';
 
-const processCheckDataBySchema = async (credentialConfig: ConfigContent): Promise<IValidatedCredentials> => {
+export const processCheckDataBySchema = async (credentialConfig: ConfigContent): Promise<IValidatedCredentials> => {
   const { type, version, dataPath } = credentialConfig;
   const [schema, data] = await Promise.all([dynamicLoadingSchemaService(type, version), readJsonFile(dataPath)]);
 
@@ -23,21 +19,6 @@ const processCheckDataBySchema = async (credentialConfig: ConfigContent): Promis
     ...credentialConfig,
     errors,
   };
-};
-
-const generateTestSuiteResultByTemplate = async (
-  testSuiteResultAjv: IValidatedCredentials[],
-): Promise<ICredentialTestResult[]> => {
-  const credentialsTemplate = await Promise.all(
-    testSuiteResultAjv.map(async (value) => {
-      const templateName = getTemplateName(value);
-      const message = await templateMapper(templateName, value);
-
-      return JSON.parse(message);
-    }),
-  );
-
-  return credentialsTemplate;
 };
 
 /**
@@ -64,20 +45,13 @@ export const processTestSuite: TestSuite = async (credentialConfigsPath) => {
     );
     validatedCredentials.push(...configsContainingErrors);
 
-    // Generate final report
-    const credentialsTemplate = await generateTestSuiteResultByTemplate(validatedCredentials);
-    const finalReport = generateFinalMessage(credentialsTemplate);
-    const mappingFinalReport = await templateMapper(TemplateName.finalReport, {
-      finalStatus: finalReport.finalStatus,
-      finalMessage: finalReport.finalMessage,
-    });
-
-    const parsedMappingFinalReport = JSON.parse(mappingFinalReport) as IFinalReport;
+    // Mapping message templates and final report
+    const credentialResults = await getCredentialResults(validatedCredentials);
+    const finalReport = await getFinalReport(credentialResults);
 
     return {
-      credentials: credentialsTemplate,
-      finalStatus: parsedMappingFinalReport.finalStatus,
-      finalMessage: parsedMappingFinalReport.finalMessage,
+      credentials: credentialResults,
+      ...finalReport,
     };
   } catch (e) {
     const error = e as Error;

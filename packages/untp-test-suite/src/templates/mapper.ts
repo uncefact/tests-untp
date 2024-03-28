@@ -12,6 +12,10 @@ Handlebars.registerHelper('jsonStringify', (jsonObject: object) => {
     );
   }
 
+  if (Array.isArray(jsonObject)) {
+    return jsonObject.join(', ');
+  }
+
   return JSON.stringify(jsonObject);
 });
 

@@ -1,12 +1,9 @@
 {
-  "testingCredential": "{{type}} {{version}}",
-  "path": "{{dataPath}}",
-  "result": "WARN",
   "warnings": [
     {{#each warnings}}
       {
         "fieldName": "{{params.additionalProperty}}",
-        "message": "This schema {{message}}"
+        "message": "Additional property found: '{{params.additionalProperty}}'."
       }
       {{#unless @last}},{{/unless}}
     {{/each}}
