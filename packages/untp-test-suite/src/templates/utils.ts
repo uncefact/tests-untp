@@ -27,7 +27,7 @@ export const getTemplateData = (validatedCredential: IValidatedCredentials): IVa
   const { errorList, warningList } = errors.reduce((result, current) => {
     const errorOrWarningList = current.params?.additionalProperty ? result.warningList : result.errorList;
     if (current.message) {
-      current.message = removeQuotes(current.message);
+      current.message = replaceQuotesToSingleQuote(current.message);
     }
     errorOrWarningList.push(current);
 
@@ -95,10 +95,4 @@ export const getFinalReport = async (credentialResults: ICredentialTestResult[])
   return JSON.parse(finalReportJson);
 };
 
-export const removeQuotes = (text = '') => {
-  if (text.match(/'|"/g)) {
-    return text.replace(/'|"/g, '');
-  }
-
-  return text;
-}
+const replaceQuotesToSingleQuote = (text: string) => text.replace(/"/g, "'");

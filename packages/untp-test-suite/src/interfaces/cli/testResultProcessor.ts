@@ -52,19 +52,19 @@ export function getFinalReport(testSuiteResult: TestSuiteResult) {
   return table.toString();
 }
 
-export function getCredentialTypeMessage(credentialType: string) {
+function getCredentialTypeMessage(credentialType: string) {
   return `Testing Credential: ${credentialType}\n`;
 }
 
-export function getVersionMessage(version: string) {
+function getVersionMessage(version: string) {
   return `Version: ${version}\n`;
 }
 
-export function getPathMessage(path: string) {
+function getPathMessage(path: string) {
   return `Path: ${path}\n`;
 }
 
-export function getStatusMessage(result: TestSuiteResultEnum) {
+function getStatusMessage(result: TestSuiteResultEnum) {
   let statusMessage = `Result: ${getMessageWithColorByResult(result, result)}`;
   if (result !== TestSuiteResultEnum.PASS) {
     statusMessage += '\n';
@@ -73,7 +73,7 @@ export function getStatusMessage(result: TestSuiteResultEnum) {
   return statusMessage;
 }
 
-export function getErrorOrWarningMessage(testSuiteResult: ICredentialTestResult) {
+function getErrorOrWarningMessage(testSuiteResult: ICredentialTestResult) {
   if (testSuiteResult.result === TestSuiteResultEnum.FAIL && testSuiteResult.errors && testSuiteResult.warnings) {
     return `${chalk.yellow(`Warning: ${getMessage(testSuiteResult.warnings)}`)}\n${chalk.red(`Error: ${getMessage(testSuiteResult.errors)}`)}`;
   }
@@ -87,7 +87,7 @@ export function getErrorOrWarningMessage(testSuiteResult: ICredentialTestResult)
   return '';
 }
 
-export function getMessage(resultMessages: IWarning[] | IError[]) {
+function getMessage(resultMessages: IWarning[] | IError[]) {
   let finalMessage = '';
 
   for (const resultMessage of resultMessages) {
@@ -97,7 +97,7 @@ export function getMessage(resultMessages: IWarning[] | IError[]) {
   return finalMessage;
 }
 
-export function getMessageWithColorByResult(result: TestSuiteResultEnum, message: string) {
+function getMessageWithColorByResult(result: TestSuiteResultEnum, message: string) {
   const colorMap = {
     [TestSuiteResultEnum.FAIL]: chalk.red,
     [TestSuiteResultEnum.WARN]: chalk.yellow,
