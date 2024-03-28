@@ -21,10 +21,7 @@ describe('templateMapper', () => {
       {
         "fieldName": "{{instancePath}}",
         "errorType": "{{keyword}}",
-          {{#if params.allowedValues}}
-        "allowedValues": {{{jsonStringify params.allowedValues}}},
-          {{/if}}
-        "message": "{{instancePath}} field {{message}}"
+        "message": "{{instancePath}} field {{message}}.{{#if params.allowedValues}} Allowed values: {{{jsonStringify params.allowedValues}}}.{{/if}}"
       }
       {{#unless @last}},{{/unless}}
       {{/each}}
@@ -86,8 +83,7 @@ describe('templateMapper', () => {
       {
         "fieldName": "/eventType",
         "errorType": "enum",
-        "allowedValues": ["object","transaction","aggregation","transformation"],
-        "message": "/eventType field must be equal to one of the allowed values"
+        "message": "/eventType field must be equal to one of the allowed values. Allowed values: object, transaction, aggregation, transformation."
       }
       
     ]

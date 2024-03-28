@@ -4,9 +4,6 @@
       {
         "fieldName": "{{instancePath}}",
         "errorType": "{{keyword}}",
-        {{#if params.allowedValues}}
-        "allowedValues": {{{jsonStringify params.allowedValues}}},
-        {{/if}}
         "message": "{{instancePath}} field {{message}}.{{#if params.allowedValues}} Allowed values: {{{jsonStringify params.allowedValues}}}.{{/if}}"
       }
       {{#unless @last}},{{/unless}}
