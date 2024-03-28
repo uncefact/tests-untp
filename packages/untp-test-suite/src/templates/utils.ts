@@ -26,6 +26,9 @@ export const getTemplateData = (validatedCredential: IValidatedCredentials): IVa
   // Error or Error and warning template
   const { errorList, warningList } = errors.reduce((result, current) => {
     const errorOrWarningList = current.params?.additionalProperty ? result.warningList : result.errorList;
+    if (current.message) {
+      current.message = removeQuotes(current.message);
+    }
     errorOrWarningList.push(current);
 
     return result;
@@ -91,3 +94,11 @@ export const getFinalReport = async (credentialResults: ICredentialTestResult[])
   const finalReportJson = await templateMapper(TemplateEnum.FINAL_REPORT, finalReportTemplateData);
   return JSON.parse(finalReportJson);
 };
+
+export const removeQuotes = (text = '') => {
+  if (text.match(/'|"/g)) {
+    return text.replace(/'|"/g, '');
+  }
+
+  return text;
+}
