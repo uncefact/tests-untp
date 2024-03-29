@@ -1,0 +1,12 @@
+{
+  "errors": [
+    {{#each errors}}
+      {
+        "fieldName": "{{instancePath}}",
+        "errorType": "{{keyword}}",
+        "message": "{{instancePath}} field {{{message}}}.{{#if params.allowedValues}} Allowed values: {{{jsonStringify params.allowedValues}}}.{{/if}}"
+      }
+      {{#unless @last}},{{/unless}}
+    {{/each}}
+  ]
+}

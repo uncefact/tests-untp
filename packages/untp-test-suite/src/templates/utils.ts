@@ -1,44 +1,98 @@
 import { ErrorObject } from 'ajv';
 import {
   IValidatedCredentials,
-  TemplateName,
-  FinalStatus,
+  TestSuiteResultEnum,
   ICredentialTestResult,
   IFinalReport,
   TestSuiteMessage,
+  IValidationTemplateData,
+  TemplateEnum,
 } from '../core/types/index.js';
+import { templateMapper } from './mapper.js';
 
-export const getTemplateName = (testSuiteResult: IValidatedCredentials): string => {
-  // If there are no errors, return 'pass'
-  if (!testSuiteResult.errors || !testSuiteResult.errors.length) {
-    return TemplateName.pass;
+export const getTemplateData = (validatedCredential: IValidatedCredentials): IValidationTemplateData => {
+  const errors = validatedCredential.errors as ErrorObject[];
+  const templates = [TemplateEnum.CREDENTIAL_RESULT];
+
+  // Pass template
+  const isPassTemplate = !errors?.length;
+  if (isPassTemplate) {
+    return {
+      result: TestSuiteResultEnum.PASS,
+      templates
+    };
+  }
+  
+  // Error or Error and warning template
+  const { errorList, warningList } = errors.reduce((result, current) => {
+    const errorOrWarningList = current.params?.additionalProperty ? result.warningList : result.errorList;
+    if (current.message) {
+      current.message = replaceQuotesToSingleQuote(current.message);
+    }
+    errorOrWarningList.push(current);
+
+    return result;
+  }, {
+    errorList: [] as ErrorObject[],
+    warningList: [] as ErrorObject[]
+  });
+
+  let result = TestSuiteResultEnum.WARN;
+  if (errorList.length) {
+    result = TestSuiteResultEnum.FAIL;
+    templates.push(TemplateEnum.ERRORS);
+  }
+  if (warningList.length) {
+    templates.push(TemplateEnum.WARNINGS);
   }
 
-  const errors = testSuiteResult.errors as ErrorObject[];
-  const isWarningType = errors.find((error) => error?.params?.additionalProperty);
-  if (isWarningType) {
-    // If any ErrorObject has 'additionalProperty', return 'warning'
-    return TemplateName.warn;
-  }
-
-  // If no ErrorObject has 'additionalProperty', return 'FAIL'
-  return TemplateName.error;
+  return {
+    result,
+    errors: errorList,
+    warnings: warningList,
+    templates
+  };
 };
 
-export const generateFinalMessage = (credentials: ICredentialTestResult[]): IFinalReport => {
-  const initFinalReport = { finalStatus: FinalStatus.pass, finalMessage: TestSuiteMessage.Pass } as IFinalReport;
+export const getCredentialResults = async (validatedCredentials: IValidatedCredentials[]): Promise<ICredentialTestResult[]> => {
+  const credentialResultPromises = validatedCredentials.map(async (validatedCredential) => {
+    const { templates, ...templateData } = getTemplateData(validatedCredential);
 
-  return credentials.reduce((acc, credential) => {
-    if (credential.result === FinalStatus.warn && acc.finalStatus !== FinalStatus.fail) {
+    const mappedTemplateComponentPromises = templates.map(async (template) => {
+      const mappedTemplateDataJson = await templateMapper(template, { ...validatedCredential, ...templateData });
+      const mappedTemplateData = JSON.parse(mappedTemplateDataJson);
+
+      return mappedTemplateData as ICredentialTestResult;
+    });
+
+    const mappedTemplateComponents = await Promise.all(mappedTemplateComponentPromises);
+    const mappedTemplate = mappedTemplateComponents.reduce((result, current) => ({ ...result, ...current }), {} as ICredentialTestResult);
+    return mappedTemplate;
+  });
+
+  const credentialResults = await Promise.all(credentialResultPromises);
+  return credentialResults;
+};
+
+export const getFinalReport = async (credentialResults: ICredentialTestResult[]): Promise<IFinalReport> => {
+  const initFinalReport = { finalStatus: TestSuiteResultEnum.PASS, finalMessage: TestSuiteMessage.Pass } as IFinalReport;
+
+  const finalReportTemplateData = credentialResults.reduce((acc, credential) => {
+    if (credential.result === TestSuiteResultEnum.WARN && acc.finalStatus !== TestSuiteResultEnum.FAIL) {
       acc.finalMessage = TestSuiteMessage.Warning;
-      acc.finalStatus = FinalStatus.warn;
+      acc.finalStatus = TestSuiteResultEnum.WARN;
     }
 
-    if (credential.result === FinalStatus.fail) {
+    if (credential.result === TestSuiteResultEnum.FAIL) {
       acc.finalMessage = TestSuiteMessage.Fail;
-      acc.finalStatus = FinalStatus.fail;
+      acc.finalStatus = TestSuiteResultEnum.FAIL;
     }
 
     return acc;
   }, initFinalReport);
+
+  const finalReportJson = await templateMapper(TemplateEnum.FINAL_REPORT, finalReportTemplateData);
+  return JSON.parse(finalReportJson);
 };
+
+const replaceQuotesToSingleQuote = (text: string) => text.replace(/"/g, "'");

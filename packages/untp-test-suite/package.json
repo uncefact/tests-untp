@@ -21,7 +21,7 @@
   },
   "scripts": {
     "untp": "node build/interfaces/cli/cli.js",
-    "test": "jest --config ./jest.config.js",
+    "test": "jest",
     "test:integration": "jest --config=jest.integration.config.cjs",
     "build": "tsc --build --clean && tsc && cp -r src/templates/templateMessages/ build/templates/templateMessages",
     "watch": "tsc -b --watch",
@@ -31,6 +31,7 @@
     "ajv": "^8.12.0",
     "ajv-formats": "^2.1.1",
     "chalk": "^5.3.0",
+    "cli-table3": "^0.6.3",
     "commander": "^12.0.0",
     "handlebars": "^4.7.8",
     "lodash": "^4.17.21",
