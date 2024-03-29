@@ -72,3 +72,4 @@ tmp/
 packages/services/tsconfig.tsbuildinfo
 packages/mock-app/src/constants/app-config.json
 packages/untp-test-suite/credentials.json
+packages/untp-test-suite/data

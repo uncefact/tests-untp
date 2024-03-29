@@ -67,24 +67,6 @@ yarn build
 
 # Usage
 
-## CLI
-
-Configure the credential configuration by running the following command:
-
-```bash
-yarn untp config
-```
-
-**Note: After run the configuration command, you need to provide the data path of the product passport, conformity credential, and traceability events to the configuration file.**
-
-Run the test suite by running the following command:
-
-```bash
-yarn untp test
-```
-
----
-
 ## UNTP Test Suite CLI Tool
 
 This CLI tool is designed to facilitate the management and execution of the UNTP test suite.
@@ -105,7 +87,7 @@ yarn run untp
 
 ### **Create Credentials File**
 
-  This command generates a `credentials.json` file in the current working directory.
+This command generates a `credentials.json` file in the current working directory.
 
 ```bash
 untp config
@@ -117,13 +99,13 @@ or
 yarn run untp config
 ```
 
-  The `credentials.json` file contains configurations for running the test suite, including types and versions of events and their data paths.
+The `credentials.json` file contains configurations for running the test suite, including types and versions of events and their data paths.
 
 ---
 
 ### Running UNTP Test Suite
 
-  This command executes the UNTP test suite using the default `credentials.json` file in the current working directory.
+This command executes the UNTP test suite using the default `credentials.json` file in the current working directory.
 
 ```bash
 untp test
@@ -146,3 +128,17 @@ or
 ```bash
 yarn run untp test --config path/to/credentials.json
 ```
+
+## Integration test
+
+The integration test is used to test the UNTP Test Suite's interface, such as cli and library.
+
+```bash
+yarn run test:integration
+```
+
+### How to write test cases for the integration test?
+
+1. Create a new folder in the `integration` directory that features the name of the test suite's interface (e.g., cli, library).
+2. Create a new file in the folder and name it as `featureA.integration.test.ts`.
+3. Write the integration test in the file.
