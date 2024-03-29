@@ -1,7 +1,7 @@
 import * as commonUtils from '../../src/core/utils/common';
 import * as testRunner from '../../src/core/processTestSuite';
 import * as templateUtils from '../../src/templates/utils';
-import { TestSuiteMessage, TestSuiteResultEnum } from '../../src/core/types';
+import { TestSuiteMessageEnum, TestSuiteResultEnum } from '../../src/core/types';
 
 jest.mock('../../src/utils/path', () => ({
   getCurrentDirPath: jest.fn(() => '/test/data/data.json'),
@@ -9,18 +9,20 @@ jest.mock('../../src/utils/path', () => ({
 }));
 
 const credentialFileData = {
-  credentials: [{
-    type: 'productPassport',
-    version: 'v0.0.1',
-    dataPath: 'data/productPassport.json',
-  }]
+  credentials: [
+    {
+      type: 'productPassport',
+      version: 'v0.0.1',
+      dataPath: 'data/productPassport.json',
+    },
+  ],
 };
 const passFinalReport = {
   finalStatus: 'PASS',
   finalMessage: 'Your credentials are UNTP compliant',
 };
 
-describe('processTestSuite', () => {
+describe('processTestSuiteForConfigPath', () => {
   const credentialPath = 'src/config/credentials.json';
 
   beforeEach(() => {
@@ -50,7 +52,7 @@ describe('processTestSuite', () => {
       dataPath: 'data/productPassport.json',
       errors: [],
     });
-    jest.spyOn(templateUtils, 'getCredentialResults').mockResolvedValueOnce([
+    jest.spyOn(templateUtils, 'constructCredentialTestResults').mockResolvedValueOnce([
       {
         credentialType: 'productPassport',
         version: 'v0.0.1',
@@ -58,12 +60,12 @@ describe('processTestSuite', () => {
         result: TestSuiteResultEnum.PASS,
       },
     ]);
-    jest.spyOn(templateUtils, 'getFinalReport').mockResolvedValueOnce({
+    jest.spyOn(templateUtils, 'constructFinalReport').mockResolvedValueOnce({
       finalStatus: TestSuiteResultEnum.PASS,
-      finalMessage: TestSuiteMessage.Pass,
+      finalMessage: TestSuiteMessageEnum.PASS,
     });
 
-    const result = await testRunner.processTestSuite(credentialPath);
+    const result = await testRunner.processTestSuiteForConfigPath(credentialPath);
 
     expect(result).toEqual({
       credentials: [
@@ -88,7 +90,7 @@ describe('processTestSuite', () => {
         errors: [],
       },
     ]);
-    jest.spyOn(templateUtils, 'getCredentialResults').mockResolvedValueOnce([
+    jest.spyOn(templateUtils, 'constructCredentialTestResults').mockResolvedValueOnce([
       {
         credentialType: 'productPassport',
         version: 'v0.0.1',
@@ -105,12 +107,12 @@ describe('processTestSuite', () => {
         warnings: [],
       },
     ]);
-    jest.spyOn(templateUtils, 'getFinalReport').mockResolvedValueOnce({
+    jest.spyOn(templateUtils, 'constructFinalReport').mockResolvedValueOnce({
       finalStatus: TestSuiteResultEnum.FAIL,
-      finalMessage: TestSuiteMessage.Fail,
+      finalMessage: TestSuiteMessageEnum.FAIL,
     });
 
-    const result = await testRunner.processTestSuite(credentialPath);
+    const result = await testRunner.processTestSuiteForConfigPath(credentialPath);
 
     expect(result).toEqual({
       credentials: [
@@ -127,7 +129,7 @@ describe('processTestSuite', () => {
               message: '/eventType field must be equal to one of the allowed values',
             },
           ],
-          warnings: []
+          warnings: [],
         },
       ],
       finalStatus: 'FAIL',
@@ -145,25 +147,27 @@ describe('processTestSuite', () => {
         errors: [],
       },
     ]);
-    jest.spyOn(templateUtils, 'getCredentialResults').mockResolvedValueOnce([
+    jest.spyOn(templateUtils, 'constructCredentialTestResults').mockResolvedValueOnce([
       {
         credentialType: 'productPassport',
         version: 'v0.0.1',
         path: 'data/productPassport.json',
         result: TestSuiteResultEnum.WARN,
         errors: [],
-        warnings: [{
-          fieldName: 'additionalFieldTest',
-          message: 'This schema must NOT have additional properties',
-        }],
+        warnings: [
+          {
+            fieldName: 'additionalFieldTest',
+            message: 'This schema must NOT have additional properties',
+          },
+        ],
       },
     ]);
-    jest.spyOn(templateUtils, 'getFinalReport').mockResolvedValueOnce({
+    jest.spyOn(templateUtils, 'constructFinalReport').mockResolvedValueOnce({
       finalStatus: TestSuiteResultEnum.WARN,
-      finalMessage: TestSuiteMessage.Warning,
+      finalMessage: TestSuiteMessageEnum.WARN,
     });
 
-    const result = await testRunner.processTestSuite(credentialPath);
+    const result = await testRunner.processTestSuiteForConfigPath(credentialPath);
 
     expect(result).toEqual({
       credentials: [
@@ -173,10 +177,12 @@ describe('processTestSuite', () => {
           path: 'data/productPassport.json',
           result: TestSuiteResultEnum.WARN,
           errors: [],
-          warnings: [{
-            fieldName: 'additionalFieldTest',
-            message: 'This schema must NOT have additional properties',
-          }]
+          warnings: [
+            {
+              fieldName: 'additionalFieldTest',
+              message: 'This schema must NOT have additional properties',
+            },
+          ],
         },
       ],
       finalStatus: 'WARN',
@@ -194,30 +200,34 @@ describe('processTestSuite', () => {
         errors: [],
       },
     ]);
-    jest.spyOn(templateUtils, 'getCredentialResults').mockResolvedValueOnce([
+    jest.spyOn(templateUtils, 'constructCredentialTestResults').mockResolvedValueOnce([
       {
         credentialType: 'productPassport',
         version: 'v0.0.1',
         path: 'data/productPassport.json',
         result: TestSuiteResultEnum.WARN,
-        errors: [{
-          fieldName: '/eventType',
-          errorType: 'enum',
-          allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
-          message: '/eventType field must be equal to one of the allowed values',
-        }],
-        warnings: [{
-          fieldName: 'additionalFieldTest',
-          message: 'This schema must NOT have additional properties',
-        }],
+        errors: [
+          {
+            fieldName: '/eventType',
+            errorType: 'enum',
+            allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
+            message: '/eventType field must be equal to one of the allowed values',
+          },
+        ],
+        warnings: [
+          {
+            fieldName: 'additionalFieldTest',
+            message: 'This schema must NOT have additional properties',
+          },
+        ],
       },
     ]);
-    jest.spyOn(templateUtils, 'getFinalReport').mockResolvedValueOnce({
+    jest.spyOn(templateUtils, 'constructFinalReport').mockResolvedValueOnce({
       finalStatus: TestSuiteResultEnum.FAIL,
-      finalMessage: TestSuiteMessage.Fail,
+      finalMessage: TestSuiteMessageEnum.FAIL,
     });
 
-    const result = await testRunner.processTestSuite(credentialPath);
+    const result = await testRunner.processTestSuiteForConfigPath(credentialPath);
 
     expect(result).toEqual({
       credentials: [
@@ -226,16 +236,20 @@ describe('processTestSuite', () => {
           version: 'v0.0.1',
           path: 'data/productPassport.json',
           result: TestSuiteResultEnum.WARN,
-          errors: [{
-            fieldName: '/eventType',
-            errorType: 'enum',
-            allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
-            message: '/eventType field must be equal to one of the allowed values',
-          }],
-          warnings: [{
-            fieldName: 'additionalFieldTest',
-            message: 'This schema must NOT have additional properties',
-          }]
+          errors: [
+            {
+              fieldName: '/eventType',
+              errorType: 'enum',
+              allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
+              message: '/eventType field must be equal to one of the allowed values',
+            },
+          ],
+          warnings: [
+            {
+              fieldName: 'additionalFieldTest',
+              message: 'This schema must NOT have additional properties',
+            },
+          ],
         },
       ],
       finalStatus: 'FAIL',
@@ -247,14 +261,16 @@ describe('processTestSuite', () => {
     try {
       const emptyCredentialPath = 'config/empty-credentials.json';
       jest.spyOn(commonUtils, 'readJsonFile').mockResolvedValueOnce({});
-      jest.spyOn(commonUtils, 'validateCredentialConfigs').mockImplementationOnce(() => { throw new Error('Credentials array cannot be empty. Please provide valid credentials to proceed.') });
-  
-  
-      await testRunner.processTestSuite(emptyCredentialPath);
-      
+      jest.spyOn(commonUtils, 'validateCredentialConfigs').mockImplementationOnce(() => {
+        throw new Error('Credentials array cannot be empty. Please provide valid credentials to proceed.');
+      });
+
+      await testRunner.processTestSuiteForConfigPath(emptyCredentialPath);
     } catch (e) {
       const error = e as Error;
-      expect(error.message).toBe('Failed to run the test suite. Credentials array cannot be empty. Please provide valid credentials to proceed.');
+      expect(error.message).toBe(
+        'Failed to run the test suite. Credentials array cannot be empty. Please provide valid credentials to proceed.',
+      );
     }
   });
 });

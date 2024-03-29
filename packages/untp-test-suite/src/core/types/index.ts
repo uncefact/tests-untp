@@ -1,17 +1,13 @@
 import { ErrorObject } from 'ajv';
 
-export interface ConfigCredentials {
-  credentials: ConfigContent[];
+export interface ICredentialConfigs {
+  credentials: IConfigContent[];
 }
 
-export interface ConfigContent {
+export interface IConfigContent {
   type: string;
   version: string;
-  dataPath: string;
-}
-
-export interface TestSuite {
-  (credentialConfigsPath: string): Promise<TestSuiteResult>;
+  dataPath?: string;
 }
 
 export interface ICredentialConfigError {
@@ -21,11 +17,11 @@ export interface ICredentialConfigError {
   dataPath: string;
 }
 
-export interface TestErrors {
+export interface ITestErrors {
   errors: ErrorObject[] | ICredentialConfigError[] | null;
 }
 
-export interface IValidatedCredentials extends ConfigContent, TestErrors {}
+export interface IValidatedCredentials extends IConfigContent, ITestErrors {}
 
 export interface ICredentialTestResult {
   credentialType: string;
@@ -50,7 +46,7 @@ export interface IError {
 
 export interface IFinalReport {
   finalStatus: TestSuiteResultEnum;
-  finalMessage: TestSuiteMessage;
+  finalMessage: TestSuiteMessageEnum;
 }
 
 export interface IValidationTemplateData {
@@ -60,7 +56,7 @@ export interface IValidationTemplateData {
   errors?: ErrorObject[];
 }
 
-export interface TestSuiteResult extends IFinalReport {
+export interface ITestSuiteResult extends IFinalReport {
   credentials: ICredentialTestResult[];
 }
 
@@ -77,8 +73,8 @@ export enum TemplateEnum {
   FINAL_REPORT = 'finalReport',
 }
 
-export enum TestSuiteMessage {
-  Pass = 'Your credentials are UNTP compliant',
-  Warning = 'Your credentials are UNTP compliant, but have extended the data model',
-  Fail = 'Your credentials are not UNTP compliant',
+export enum TestSuiteMessageEnum {
+  PASS = 'Your credentials are UNTP compliant',
+  WARN = 'Your credentials are UNTP compliant, but have extended the data model',
+  FAIL = 'Your credentials are not UNTP compliant',
 }

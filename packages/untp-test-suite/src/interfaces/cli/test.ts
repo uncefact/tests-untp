@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import path from 'path';
-import { processTestSuite } from '../../core/index.js';
+import { processTestSuiteForConfigPath } from '../../core/index.js';
 import { getFinalReport, getLogStatus } from './testResultProcessor.js';
 
 const credentialFileName = 'credentials.json';
@@ -22,7 +22,7 @@ test
         credentialPath = path.resolve(process.cwd(), options.config);
       }
 
-      const testSuiteResult = await processTestSuite(credentialPath);
+      const testSuiteResult = await processTestSuiteForConfigPath(credentialPath);
 
       const testSuiteMessage = getLogStatus(testSuiteResult.credentials);
       const testSuiteFinalReport = getFinalReport(testSuiteResult);

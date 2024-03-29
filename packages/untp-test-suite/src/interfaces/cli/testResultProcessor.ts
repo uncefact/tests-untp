@@ -1,7 +1,13 @@
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import { getPackageVersion } from '../../utils/common.js';
-import { ICredentialTestResult, IError, IWarning, TestSuiteResult, TestSuiteResultEnum } from '../../core/types/index.js';
+import {
+  ICredentialTestResult,
+  IError,
+  IWarning,
+  ITestSuiteResult,
+  TestSuiteResultEnum,
+} from '../../core/types/index.js';
 
 export function getLogStatus(credentialTestResults: ICredentialTestResult[]) {
   let resultMessage = '';
@@ -22,7 +28,7 @@ export function getLogStatus(credentialTestResults: ICredentialTestResult[]) {
   return resultMessage;
 }
 
-export function getFinalReport(testSuiteResult: TestSuiteResult) {
+export function getFinalReport(testSuiteResult: ITestSuiteResult) {
   const { credentials: credentialTestResults } = testSuiteResult;
   if (!credentialTestResults.length) {
     return '';
@@ -75,7 +81,9 @@ function getStatusMessage(result: TestSuiteResultEnum) {
 
 function getErrorOrWarningMessage(testSuiteResult: ICredentialTestResult) {
   if (testSuiteResult.result === TestSuiteResultEnum.FAIL && testSuiteResult.errors && testSuiteResult.warnings) {
-    return `${chalk.yellow(`Warning: ${getMessage(testSuiteResult.warnings)}`)}\n${chalk.red(`Error: ${getMessage(testSuiteResult.errors)}`)}`;
+    return `${chalk.yellow(`Warning: ${getMessage(testSuiteResult.warnings)}`)}\n${chalk.red(
+      `Error: ${getMessage(testSuiteResult.errors)}`,
+    )}`;
   }
   if (testSuiteResult.result === TestSuiteResultEnum.FAIL && testSuiteResult.errors) {
     return chalk.red(`Error: ${getMessage(testSuiteResult.errors)}`);
