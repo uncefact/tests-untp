@@ -26,7 +26,7 @@ export interface IValidatedCredentials extends IConfigContent, ITestErrors {}
 export interface ICredentialTestResult {
   credentialType: string;
   version: string;
-  path: string;
+  path?: string;
   result: TestSuiteResultEnum;
   warnings?: IWarning[];
   errors?: IError[];

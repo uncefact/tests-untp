@@ -66,7 +66,7 @@ function getVersionMessage(version: string) {
   return `Version: ${version}\n`;
 }
 
-function getPathMessage(path: string) {
+function getPathMessage(path = '') {
   return `Path: ${path}\n`;
 }
 

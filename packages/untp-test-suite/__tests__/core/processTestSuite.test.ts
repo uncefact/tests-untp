@@ -268,9 +268,7 @@ describe('processTestSuiteForConfigPath', () => {
       await testRunner.processTestSuiteForConfigPath(emptyCredentialPath);
     } catch (e) {
       const error = e as Error;
-      expect(error.message).toBe(
-        'Failed to run the test suite. Credentials array cannot be empty. Please provide valid credentials to proceed.',
-      );
+      expect(error.message).toBe('Credentials array cannot be empty. Please provide valid credentials to proceed.');
     }
   });
 });
