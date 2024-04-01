@@ -1,11 +1,6 @@
 import * as testSuiteCore from '../../../src/core/processTestSuite';
-import * as commonUtils from '../../../src/interfaces/utils/common';
-import * as templateMapperUtils from '../../../src/templates/mapper';
-import * as loadingSchemaService from '../../../src/core/services/dynamic-loading-schemas/loadingSchema.service';
-import * as validatorService from '../../../src/core/services/json-schema/validator.service';
 import { testCredentialsHandler, testCredentialHandler } from '../../../src/interfaces/lib/testSuiteHandler';
 import { TestSuiteResultEnum, TestSuiteMessageEnum } from '../../../src/core/types';
-import schema from '../../../src/schemas/aggregationEvent/v0.0.1/schema.json';
 
 jest.mock('../../../src/utils/path', () => ({
   getCurrentDirPath: jest.fn(() => 'test/data'),

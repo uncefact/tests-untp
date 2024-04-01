@@ -1,4 +1,4 @@
-import { ICredentialTestResult, TestSuiteMessageEnum, TestSuiteResultEnum } from '../../../src/core/types';
+import { TestSuiteMessageEnum, TestSuiteResultEnum } from '../../../src/core/types';
 import * as testResultProcessor from '../../../src/interfaces/cli/testResultProcessor';
 
 jest.mock('chalk', () => ({

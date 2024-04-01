@@ -1,5 +1,5 @@
 import { TestCredentialHandler, TestCredentialsHandler } from './types.js';
-import { ICredentialConfigs, ICredentialTestResult } from '../../core/types/index.js';
+import { ICredentialConfigs } from '../../core/types/index.js';
 import {
   processTestSuite,
   processTestSuiteForConfigPath,

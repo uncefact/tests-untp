@@ -1,4 +1,3 @@
-import { ErrorObject } from 'ajv';
 import { ICredentialConfigs, ICredentialTestResult, ITestSuiteResult, IConfigContent } from '../../core/types/index.js';
 
 export interface TestCredentialsHandler {
