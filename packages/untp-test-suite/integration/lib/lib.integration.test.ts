@@ -43,9 +43,44 @@ describe('lib.integration.test.ts', () => {
       ]);
     });
 
-    it('should return failed results while testData is an object empty', async () => {
-      const result = await testCredentialHandler(credentialSchemaConfigMock, {});
-      expect(result.result).toBe('FAIL');
+    it('should return multiple result when receive many credentials', async () => {
+      const credentialsSchemaConfigMock = [
+        {
+          type: 'aggregationEvent',
+          version: 'v0.0.1',
+        },
+        {
+          type: 'conformityCredential',
+          version: 'v0.0.1',
+        },
+        {
+          type: 'objectEvent',
+          version: 'v0.0.1',
+        },
+        {
+          type: 'productPassport',
+          version: 'v0.0.1',
+        },
+        {
+          type: 'transactionEvent',
+          version: 'v0.0.1',
+        },
+        {
+          type: 'transformationEvent',
+          version: 'v0.0.1',
+        },
+      ];
+
+      const result = await Promise.all(
+        credentialsSchemaConfigMock.map((credential) => testCredentialHandler(credential, testDataMock)),
+      );
+
+      expect(result[0].result).toBe('PASS');
+      expect(result[1].result).toBe('WARN');
+      expect(result[2].result).toBe('PASS');
+      expect(result[3].result).toBe('WARN');
+      expect(result[4].result).toBe('PASS');
+      expect(result[5].result).toBe('PASS');
     });
 
     it('should throw an error when the credential is contain all empty field', async () => {

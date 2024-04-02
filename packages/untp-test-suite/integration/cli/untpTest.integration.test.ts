@@ -1,6 +1,7 @@
+import { jest } from '@jest/globals';
 import fs from 'fs';
 import { exec } from 'child_process';
-import { ConfigContent } from '../../build/core/types';
+import { IConfigContent } from '../../build/core/types';
 
 describe("CLI 'untp test' Commands", () => {
   afterEach(() => {
@@ -11,7 +12,7 @@ describe("CLI 'untp test' Commands", () => {
     let credentialFileName: string;
     let storePath: string;
     let stdout: any;
-    let credentials: ConfigContent[];
+    let credentials: IConfigContent[];
 
     const mockPath = `${process.cwd()}/integration/mock/untpTestPass`;
     beforeAll((done) => {
