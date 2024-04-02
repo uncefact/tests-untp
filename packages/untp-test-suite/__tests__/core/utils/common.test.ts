@@ -16,7 +16,7 @@ describe('validateCredentialConfigs', () => {
 
   it('should throw an error when the array of credential configurations is empty', () => {
     expect(() => {
-      validateCredentialConfigs(credentialConfigsPath, []);
+      validateCredentialConfigs([], credentialConfigsPath);
     }).toThrow('Credentials array cannot be empty. Please provide valid credentials to proceed.');
   });
 
@@ -34,7 +34,7 @@ describe('validateCredentialConfigs', () => {
       },
     ];
 
-    const result = validateCredentialConfigs(credentialConfigsPath, credentialConfigs);
+    const result = validateCredentialConfigs(credentialConfigs, credentialConfigsPath);
 
     expect(result).toEqual([
       {
@@ -87,4 +87,3 @@ describe('readFile', () => {
     }
   });
 });
-
