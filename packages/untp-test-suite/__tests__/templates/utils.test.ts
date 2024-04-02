@@ -130,11 +130,15 @@ describe('getTemplateData', () => {
   });
 });
 
-describe('getCredentialResults', () => {
+describe('constructCredentialTestResults', () => {
   it('should return an array of credential test results', async () => {
-    jest.spyOn(mapperUtils, 'templateMapper').mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) => Promise.resolve(JSON.stringify(testSuiteResult)));
+    jest
+      .spyOn(mapperUtils, 'templateMapper')
+      .mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) =>
+        Promise.resolve(JSON.stringify(testSuiteResult)),
+      );
 
-    const credentialResults = await templateUtils.getCredentialResults(validatedCredentials);
+    const credentialResults = await templateUtils.constructCredentialTestResults(validatedCredentials);
 
     expect(credentialResults).toEqual([
       {
@@ -204,187 +208,232 @@ describe('getCredentialResults', () => {
   });
 
   it('should correctly map validated credentials to credential test results with pass template', async () => {
-    jest.spyOn(mapperUtils, 'templateMapper').mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) => Promise.resolve(JSON.stringify(testSuiteResult)));
+    jest
+      .spyOn(mapperUtils, 'templateMapper')
+      .mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) =>
+        Promise.resolve(JSON.stringify(testSuiteResult)),
+      );
 
-    const credentialResults = await templateUtils.getCredentialResults([passCredential]);
+    const credentialResults = await templateUtils.constructCredentialTestResults([passCredential]);
 
-    expect(credentialResults).toEqual([{
-      type: 'productPassport',
-      version: 'v0.0.1',
-      dataPath: 'data/productPassport.json',
-      errors: [],
-      result: 'PASS',
-    }]);
+    expect(credentialResults).toEqual([
+      {
+        type: 'productPassport',
+        version: 'v0.0.1',
+        dataPath: 'data/productPassport.json',
+        errors: [],
+        result: 'PASS',
+      },
+    ]);
   });
 
   it('should correctly map validated credentials to credential test results with warning template', async () => {
-    jest.spyOn(mapperUtils, 'templateMapper').mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) => Promise.resolve(JSON.stringify(testSuiteResult)));
+    jest
+      .spyOn(mapperUtils, 'templateMapper')
+      .mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) =>
+        Promise.resolve(JSON.stringify(testSuiteResult)),
+      );
 
-    const credentialResults = await templateUtils.getCredentialResults([warningCredential]);
+    const credentialResults = await templateUtils.constructCredentialTestResults([warningCredential]);
 
-    expect(credentialResults).toEqual([{
-      type: 'productPassport',
-      version: 'v0.0.1',
-      dataPath: 'data/productPassport.json',
-      errors: [],
-      result: 'WARN',
-      warnings: [
-        {
-          keyword: 'required',
-          instancePath: 'type',
-          schemaPath: '/',
-          params: {
-            additionalProperty: 'testField',
+    expect(credentialResults).toEqual([
+      {
+        type: 'productPassport',
+        version: 'v0.0.1',
+        dataPath: 'data/productPassport.json',
+        errors: [],
+        result: 'WARN',
+        warnings: [
+          {
+            keyword: 'required',
+            instancePath: 'type',
+            schemaPath: '/',
+            params: {
+              additionalProperty: 'testField',
+            },
           },
-        },
-      ],
-    }]);
+        ],
+      },
+    ]);
   });
 
   it('should correctly map validated credentials to credential test results with error template', async () => {
-    jest.spyOn(mapperUtils, 'templateMapper').mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) => Promise.resolve(JSON.stringify(testSuiteResult)));
+    jest
+      .spyOn(mapperUtils, 'templateMapper')
+      .mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) =>
+        Promise.resolve(JSON.stringify(testSuiteResult)),
+      );
 
-    const credentialResults = await templateUtils.getCredentialResults([errorCredential]);
+    const credentialResults = await templateUtils.constructCredentialTestResults([errorCredential]);
 
-    expect(credentialResults).toEqual([{
-      type: 'productPassport',
-      version: 'v0.0.1',
-      dataPath: 'data/productPassport.json',
-      errors: [{
-        keyword: 'required',
-        instancePath: 'type',
-        schemaPath: '/',
-        params: {},
-      }],
-      result: 'FAIL',
-      warnings: [],
-    }]);
+    expect(credentialResults).toEqual([
+      {
+        type: 'productPassport',
+        version: 'v0.0.1',
+        dataPath: 'data/productPassport.json',
+        errors: [
+          {
+            keyword: 'required',
+            instancePath: 'type',
+            schemaPath: '/',
+            params: {},
+          },
+        ],
+        result: 'FAIL',
+        warnings: [],
+      },
+    ]);
   });
 
   it('should correctly map validated credentials to credential test results with error and warning templates', async () => {
-    jest.spyOn(mapperUtils, 'templateMapper').mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) => Promise.resolve(JSON.stringify(testSuiteResult)));
+    jest
+      .spyOn(mapperUtils, 'templateMapper')
+      .mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) =>
+        Promise.resolve(JSON.stringify(testSuiteResult)),
+      );
 
-    const credentialResults = await templateUtils.getCredentialResults([errorAndWarningCredential]);
+    const credentialResults = await templateUtils.constructCredentialTestResults([errorAndWarningCredential]);
 
-    expect(credentialResults).toEqual([{
-      type: 'productPassport',
+    expect(credentialResults).toEqual([
+      {
+        type: 'productPassport',
+        version: 'v0.0.1',
+        dataPath: 'data/productPassport.json',
+        result: 'FAIL',
+        errors: [
+          {
+            keyword: 'enum',
+            instancePath: 'type',
+            schemaPath: '/',
+            params: {},
+          },
+        ],
+        warnings: [
+          {
+            keyword: 'required',
+            instancePath: 'type',
+            schemaPath: '/',
+            params: {
+              additionalProperty: 'testField',
+            },
+          },
+        ],
+      },
+    ]);
+  });
+});
+
+describe('constructFinalReport', () => {
+  it('should return a final report with PASS status when all credentials pass', async () => {
+    jest
+      .spyOn(mapperUtils, 'templateMapper')
+      .mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) =>
+        Promise.resolve(JSON.stringify(testSuiteResult)),
+      );
+    const passCredentialResult = {
+      credentialType: 'productPassport',
       version: 'v0.0.1',
-      dataPath: 'data/productPassport.json',
-      result: 'FAIL',
+      path: 'data/productPassport.json',
+      result: TestSuiteResultEnum.PASS,
+    };
+
+    const credentialResults = await templateUtils.constructFinalReport([passCredentialResult, passCredentialResult]);
+
+    expect(credentialResults).toEqual({
+      finalStatus: 'PASS',
+      finalMessage: 'Your credentials are UNTP compliant',
+    });
+  });
+
+  it('should return a final report with WARNING status when at least one credential warns', async () => {
+    jest
+      .spyOn(mapperUtils, 'templateMapper')
+      .mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) =>
+        Promise.resolve(JSON.stringify(testSuiteResult)),
+      );
+    const warningCredentialResult = {
+      credentialType: 'productPassport',
+      version: 'v0.0.1',
+      path: 'data/productPassport.json',
+      result: TestSuiteResultEnum.WARN,
+      warnings: [
+        {
+          fieldName: 'additionalFieldTest',
+          message: 'This schema must NOT have additional properties',
+        },
+      ],
+    };
+
+    const credentialResults = await templateUtils.constructFinalReport([warningCredentialResult]);
+
+    expect(credentialResults).toEqual({
+      finalStatus: 'WARN',
+      finalMessage: 'Your credentials are UNTP compliant, but have extended the data model',
+    });
+  });
+
+  it('should return a final report with FAIL status when at least one credential fails', async () => {
+    jest
+      .spyOn(mapperUtils, 'templateMapper')
+      .mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) =>
+        Promise.resolve(JSON.stringify(testSuiteResult)),
+      );
+    const errorCredentialResult = {
+      credentialType: 'productPassport',
+      version: 'v0.0.1',
+      path: 'data/productPassport.json',
+      result: TestSuiteResultEnum.FAIL,
       errors: [
         {
-          keyword: 'enum',
-          instancePath: 'type',
-          schemaPath: '/',
-          params: {},
+          fieldName: '/eventType',
+          errorType: 'enum',
+          allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
+          message: '/eventType field must be equal to one of the allowed values',
+        },
+      ],
+      warnings: [],
+    };
+
+    const credentialResults = await templateUtils.constructFinalReport([errorCredentialResult]);
+
+    expect(credentialResults).toEqual({
+      finalStatus: 'FAIL',
+      finalMessage: 'Your credentials are not UNTP compliant',
+    });
+  });
+
+  it('should prioritize FAIL status over WARNING status when both are present', async () => {
+    jest
+      .spyOn(mapperUtils, 'templateMapper')
+      .mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) =>
+        Promise.resolve(JSON.stringify(testSuiteResult)),
+      );
+    const errorAndWarningCredentialResult = {
+      credentialType: 'productPassport',
+      version: 'v0.0.1',
+      path: 'data/productPassport.json',
+      result: TestSuiteResultEnum.FAIL,
+      errors: [
+        {
+          fieldName: '/eventType',
+          errorType: 'enum',
+          allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
+          message: '/eventType field must be equal to one of the allowed values',
         },
       ],
       warnings: [
         {
-          keyword: 'required',
-          instancePath: 'type',
-          schemaPath: '/',
-          params: {
-            additionalProperty: 'testField',
-          },
-        },
-      ],
-    }]);
-  });
-
-});
-
-  describe('getFinalReport', () => {
-    it('should return a final report with PASS status when all credentials pass', async () => {
-      jest.spyOn(mapperUtils, 'templateMapper').mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) => Promise.resolve(JSON.stringify(testSuiteResult)));
-      const passCredentialResult = {
-        credentialType: 'productPassport',
-        version: 'v0.0.1',
-        path: 'data/productPassport.json',
-        result: TestSuiteResultEnum.PASS,
-      };
-
-      const credentialResults = await templateUtils.getFinalReport([passCredentialResult, passCredentialResult]);
-
-      expect(credentialResults).toEqual({
-        finalStatus: 'PASS',
-        finalMessage: 'Your credentials are UNTP compliant'
-      });
-    });
-
-    it('should return a final report with WARNING status when at least one credential warns', async () => {
-      jest.spyOn(mapperUtils, 'templateMapper').mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) => Promise.resolve(JSON.stringify(testSuiteResult)));
-      const warningCredentialResult = {
-        credentialType: 'productPassport',
-        version: 'v0.0.1',
-        path: 'data/productPassport.json',
-        result: TestSuiteResultEnum.WARN,
-        warnings: [{
-          fieldName: 'additionalFieldTest',
-          message: 'This schema must NOT have additional properties',
-        }],
-      };
-
-      const credentialResults = await templateUtils.getFinalReport([warningCredentialResult]);
-
-      expect(credentialResults).toEqual({
-        finalStatus: 'WARN',
-        finalMessage: 'Your credentials are UNTP compliant, but have extended the data model'
-      });
-    });
-  
-    it('should return a final report with FAIL status when at least one credential fails', async () => {
-      jest.spyOn(mapperUtils, 'templateMapper').mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) => Promise.resolve(JSON.stringify(testSuiteResult)));
-      const errorCredentialResult = {
-        credentialType: 'productPassport',
-        version: 'v0.0.1',
-        path: 'data/productPassport.json',
-        result: TestSuiteResultEnum.FAIL,
-        errors: [
-          {
-            fieldName: '/eventType',
-            errorType: 'enum',
-            allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
-            message: '/eventType field must be equal to one of the allowed values',
-          },
-        ],
-        warnings: [],
-      };
-
-      const credentialResults = await templateUtils.getFinalReport([errorCredentialResult]);
-
-      expect(credentialResults).toEqual({
-        finalStatus: 'FAIL',
-        finalMessage: 'Your credentials are not UNTP compliant'
-      });
-    });
-  
-    it('should prioritize FAIL status over WARNING status when both are present', async () => {
-      jest.spyOn(mapperUtils, 'templateMapper').mockImplementation((_: string, testSuiteResult: IValidatedCredentials | IFinalReport) => Promise.resolve(JSON.stringify(testSuiteResult)));
-      const errorAndWarningCredentialResult = {
-        credentialType: 'productPassport',
-        version: 'v0.0.1',
-        path: 'data/productPassport.json',
-        result: TestSuiteResultEnum.FAIL,
-        errors: [
-          {
-            fieldName: '/eventType',
-            errorType: 'enum',
-            allowedValues: ['object', 'transaction', 'aggregation', 'transformation'],
-            message: '/eventType field must be equal to one of the allowed values',
-          },
-        ],
-        warnings: [{
           fieldName: 'additionalFieldTest',
           message: 'must NOT have additional properties',
-        }],
-      };
+        },
+      ],
+    };
 
-      const credentialResults = await templateUtils.getFinalReport([errorAndWarningCredentialResult]);
+    const credentialResults = await templateUtils.constructFinalReport([errorAndWarningCredentialResult]);
 
-      expect(credentialResults).toEqual({
-        finalStatus: 'FAIL',
-        finalMessage: 'Your credentials are not UNTP compliant'
-      });
+    expect(credentialResults).toEqual({
+      finalStatus: 'FAIL',
+      finalMessage: 'Your credentials are not UNTP compliant',
     });
   });
+});
