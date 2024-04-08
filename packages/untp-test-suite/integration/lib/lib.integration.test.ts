@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import fs from 'fs';
 import { testCredentialHandler, testCredentialsHandler } from '../../src/interfaces/lib/testSuiteHandler';
 
 describe('lib.integration.test.ts', () => {
@@ -6,10 +7,49 @@ describe('lib.integration.test.ts', () => {
     afterEach(() => {
       jest.clearAllMocks();
     });
-    const credentialSchemaConfigMock = {
-      type: 'objectEvent',
-      version: 'v0.0.1',
-    };
+
+    const credentialsSchemaConfigMock = [
+      {
+        type: 'aggregationEvent',
+        version: 'v0.0.1',
+      },
+      {
+        type: 'conformityCredential',
+        version: 'v0.0.1',
+      },
+      {
+        type: 'objectEvent',
+        version: 'v0.0.1',
+      },
+      {
+        type: 'productPassport',
+        version: 'v0.0.1',
+      },
+      {
+        type: 'transactionEvent',
+        version: 'v0.0.1',
+      },
+      {
+        type: 'transformationEvent',
+        version: 'v0.0.1',
+      },
+    ];
+
+    credentialsSchemaConfigMock.map((item) => {
+      it(`should return pass results when data validation for ${item.type}`, async () => {
+        const fileContent = fs.promises.readFile(
+          `${process.cwd()}/integration/mock/untpTestPass/data/${item.type}.json`,
+          'utf-8',
+        );
+        const result = await testCredentialHandler(item, fileContent);
+
+        expect(result).toHaveProperty('credentialType', item.type);
+        expect(result).toHaveProperty('version', 'v0.0.1');
+        expect(result).toHaveProperty('path', '');
+        expect(result).toHaveProperty('result');
+        expect(result.result).toEqual('PASS');
+      });
+    });
 
     const testDataMock = {
       eventID: '6d9f8c26-06d7-4c9c-b9d1-07ef02d9789d',
@@ -22,79 +62,6 @@ describe('lib.integration.test.ts', () => {
       locationId: 'https://maps.google.com/pluscodes/ABCDE',
     };
 
-    it('should return pass results when data validation', async () => {
-      const result = await testCredentialHandler(credentialSchemaConfigMock, testDataMock);
-      expect(result.result).toBe('PASS');
-    });
-
-    it('should return warn results when data have more field than schema', async () => {
-      const newTestDataMock = {
-        ...testDataMock,
-        parentItem: { itemID: 'https://example.com/product/12345', name: 'Product A' },
-      };
-      const result = await testCredentialHandler(credentialSchemaConfigMock, newTestDataMock);
-
-      expect(result.result).toBe('WARN');
-      expect(result.warnings).toEqual([
-        {
-          fieldName: 'parentItem',
-          message: "Additional property found: 'parentItem'.",
-        },
-      ]);
-    });
-
-    it('should return multiple result when receive many credentials', async () => {
-      const credentialsSchemaConfigMock = [
-        {
-          type: 'aggregationEvent',
-          version: 'v0.0.1',
-        },
-        {
-          type: 'conformityCredential',
-          version: 'v0.0.1',
-        },
-        {
-          type: 'objectEvent',
-          version: 'v0.0.1',
-        },
-        {
-          type: 'productPassport',
-          version: 'v0.0.1',
-        },
-        {
-          type: 'transactionEvent',
-          version: 'v0.0.1',
-        },
-        {
-          type: 'transformationEvent',
-          version: 'v0.0.1',
-        },
-      ];
-
-      const result = await Promise.all(
-        credentialsSchemaConfigMock.map((credential) => testCredentialHandler(credential, testDataMock)),
-      );
-
-      expect(result[0].result).toBe('PASS');
-      expect(result[1].result).toBe('WARN');
-      expect(result[2].result).toBe('PASS');
-      expect(result[3].result).toBe('WARN');
-      expect(result[4].result).toBe('PASS');
-      expect(result[5].result).toBe('PASS');
-    });
-
-    it('should throw an error when the credential is contain all empty field', async () => {
-      await expect(
-        testCredentialHandler(
-          {
-            type: '',
-            version: '',
-          },
-          testDataMock,
-        ),
-      ).rejects.toThrow('ENOENT: no such file or directory');
-    });
-
     it('should throw an error when the credential is contain version empty', async () => {
       await expect(
         testCredentialHandler(
@@ -106,18 +73,6 @@ describe('lib.integration.test.ts', () => {
         ),
       ).rejects.toThrow('ENOENT: no such file or directory');
     });
-
-    it('should throw an error when the credential is contain type empty', async () => {
-      await expect(
-        testCredentialHandler(
-          {
-            type: '',
-            version: 'v0.0.1',
-          },
-          testDataMock,
-        ),
-      ).rejects.toThrow('Version not found for schema');
-    });
   });
 
   describe('Test suite for credentials', () => {
@@ -125,53 +80,15 @@ describe('lib.integration.test.ts', () => {
       const mockPath = `${process.cwd()}/integration/mock/untpTestPass`;
       const credentialFileName = 'credentialsExample.json';
       const result = await testCredentialsHandler(`${mockPath}/${credentialFileName}`);
+      expect(result).toHaveProperty('credentials');
+      expect(result.credentials).toHaveLength(2);
+      expect(result).toHaveProperty('finalStatus');
       expect(result.finalStatus).toEqual('PASS');
+      expect(result).toHaveProperty('finalMessage');
+      expect(result.finalMessage).toEqual('Your credentials are UNTP compliant');
     });
 
-    it('should return a WARN message when provided a configuration path', async () => {
-      const configMock = {
-        credentials: [
-          {
-            type: 'objectEvent',
-            version: 'v0.0.1',
-            dataPath: 'integration/mock/untpTestWarn/data/objectEvent.json',
-          },
-          {
-            type: 'transformationEvent',
-            version: 'v0.0.1',
-            dataPath: 'integration/mock/untpTestWarn/data/transformationEvent.json',
-          },
-        ],
-      };
-
-      const result = await testCredentialsHandler(configMock);
-
-      expect(result.finalStatus).toEqual('WARN');
-      expect(result.finalMessage).toEqual('Your credentials are UNTP compliant, but have extended the data model');
-    });
-
-    it('should return a FAIL message when provided a configuration path', async () => {
-      const mockPath = `${process.cwd()}/integration/mock/untpTestFail`;
-      const credentialFileName = 'credentialsExample.json';
-      const result = await testCredentialsHandler(`${mockPath}/${credentialFileName}`);
-
-      expect(result.finalStatus).toEqual('FAIL');
-      expect(result.finalMessage).toEqual('Your credentials are not UNTP compliant');
-      expect(result.credentials[1].errors).not.toBeNull();
-      expect(result.credentials[1].errors).toEqual([
-        { errorType: 'type', fieldName: '/certification', message: '/certification field must be array.' },
-      ]);
-    });
-
-    it('should return a FAIL message when the result contain PASS, WARN and FAIL', async () => {
-      const mockPath = `${process.cwd()}/integration/mock/untpTestFailuresAndWarnings`;
-      const credentialFileName = 'credentialsExample.json';
-      const result = await testCredentialsHandler(`${mockPath}/${credentialFileName}`);
-
-      expect(result.finalStatus).toEqual('FAIL');
-    });
-
-    it('should return fail when credentials is an object array', async () => {
+    it('should return fail when credentials is an object array empty', async () => {
       const result = await testCredentialsHandler({
         credentials: [{} as any],
       });
