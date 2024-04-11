@@ -22,7 +22,7 @@ const Scanning = () => {
     try {
       setIsLoading(true);
 
-      const dlrUrl = await identityProvider.getDlrUrl(scannedCode);
+      const dlrUrl = identityProvider.getDlrUrl(scannedCode);
       if (!dlrUrl) {
         return toastMessage({ status: Status.error, message: 'There no DLR url' });
       }

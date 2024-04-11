@@ -1,4 +1,4 @@
-import { publicAPI } from '../utils/httpService.js';
+import GS1DigitalLinkToolkit from 'digiatllink_toolkit_server/src/GS1DigitalLinkToolkit.js';
 import { IdentityProviderStrategy } from './IdentityProvider.js';
 
 export enum GS1ServiceEnum {
@@ -12,21 +12,11 @@ export class GS1Provider implements IdentityProviderStrategy {
    * Function to retrieve the DLR URL based on the GTIN code and identification provider URL.
    * @returns The DLR (Digital Link Resolver) URL corresponding to the provided GTIN code, or null if not found.
    */
-  async getDlrUrl(code: string, providerUrl: string): Promise<string | null> {
+  getDlrUrl(code: string, providerUrl: string): string | null {
     try {
-      const fetchProductPayload = { keys: [code] };
-      const products: any[] = await publicAPI.post(providerUrl, fetchProductPayload);
-      if (!products || !products.length) {
-        return null;
-      }
-      // Extract the GS1 service host from the fetched products data
-      const gs1ServiceHost: string = products[0]?.linkset?.[GS1ServiceEnum.serviceInfo]?.[0]?.href;
-      if (!gs1ServiceHost) {
-        return null;
-      }
-      // Construct and return the DLR URL using the GS1 service host and GTIN code
-      const dlrUrl = `${gs1ServiceHost}/gtin/${code}?linkType=all`;
-      return dlrUrl;
+      const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
+      const gs1DigitalLink = gs1DigitalLinkToolkit.gs1ElementStringsToGS1DigitalLink(code, true, providerUrl);
+      return gs1DigitalLink;
     } catch (error) {
       return null;
     }
@@ -39,12 +29,9 @@ export class GS1Provider implements IdentityProviderStrategy {
    * @returns The extracted GTIN code.
    */
   getCode(decodedText: string, formatName: string): string {
-    if (formatName === 'DATA_MATRIX') {
-      return decodedText.slice(2, 16);
-    }
-
-    if (decodedText.length < 14) {
-      return `0${decodedText}`;
+    const isGTINFormat = formatName.includes('EAN');
+    if (isGTINFormat) {
+      return `010${decodedText}`;
     }
 
     return decodedText;

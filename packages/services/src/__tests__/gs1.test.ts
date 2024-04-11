@@ -1,5 +1,4 @@
-import { GS1Provider, GS1ServiceEnum } from '../identityProviders/GS1Provider';
-import { publicAPI } from '../utils/httpService';
+import { GS1Provider } from '../identityProviders/GS1Provider';
 
 jest.mock('../types/types', () => ({
   SupportedProviderTypesEnum: {
@@ -8,8 +7,7 @@ jest.mock('../types/types', () => ({
 }));
 
 describe('Gs1Provider', () => {
-  const mockCode = '12345678901234';
-  const providerUrl = 'https://example.com/gs1';
+  const providerUrl = 'https://example.com';
 
   let gs1Provider: GS1Provider;
 
@@ -20,64 +18,38 @@ describe('Gs1Provider', () => {
 
   describe('getDlrUrl', () => {
     it('should return null if code is not set', async () => {
-      // Call the getDlrUrl method without setting the code
-      const dlrUrl = await gs1Provider.getDlrUrl(mockCode, providerUrl);
+      const dlrUrl = gs1Provider.getDlrUrl('', providerUrl);
 
-      // Ensure that the returned DLR URL is null
       expect(dlrUrl).toBeNull();
     });
 
-    it('should return null if no products are fetched', async () => {
-      jest.spyOn(publicAPI, 'post').mockResolvedValueOnce([]);
+    it('should return null if invalid  element string', async () => {
+      const invalidElementString = '12345678901234';
+      const dlrUrl = gs1Provider.getDlrUrl(invalidElementString, providerUrl);
 
-      // Call the getDlrUrl method
-      const dlrUrl = await gs1Provider.getDlrUrl(mockCode, providerUrl);
-
-      // Ensure that the returned DLR URL is null
       expect(dlrUrl).toBeNull();
     });
 
-    it('should return null if gs1ServiceHost is not found', async () => {
-      const mockProducts = [{
-        linkset: {
-          [GS1ServiceEnum.serviceInfo]: []
-        },
-      }];
-      jest.spyOn(publicAPI, 'post').mockResolvedValueOnce(mockProducts);
+    it('should return DLR URL if the element string is valid', async () => {
+      const gtinAI = '01';
+      const elementString = '01234567890128';
+      const gtinElementString = `${gtinAI}${elementString}`;
 
-      // Call the getDlrUrl method
-      const dlrUrl = await gs1Provider.getDlrUrl(mockCode, providerUrl);
+      const dlrUrl = gs1Provider.getDlrUrl(gtinElementString, providerUrl);
 
-      // Ensure that the returned DLR URL is null
-      expect(dlrUrl).toBeNull();
+      expect(dlrUrl).toBe(`${providerUrl}/gtin/${elementString}`);
     });
 
-    it('should return null if fetch fails', async () => {
-      jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('Failed to fetch'));
+    it('should return DLR URL if the element string is combined multi AIs', async () => {
+      const gtinAI = '01';
+      const lotAI = '10';
+      const elementString = '01234567890128';
+      const lotValue = '1234';
+      const gtinElementString = `${gtinAI}${elementString}${lotAI}${lotValue}`;
 
-      // Call the getDlrUrl method
-      const dlrUrl = await gs1Provider.getDlrUrl(mockCode, providerUrl);
+      const dlrUrl = gs1Provider.getDlrUrl(gtinElementString, providerUrl);
 
-      // Ensure that the returned DLR URL is null
-      expect(dlrUrl).toBeNull();
-    });
-
-    it('should return DLR URL if gs1ServiceHost is found', async () => {
-      // Set a code, mock the post method to return products with gs1ServiceHost, and specify the mock GS1 host
-      const mockGs1Host = 'https://gs1ServiceHost.com';
-      const mockProducts = [{
-        linkset: {
-            [GS1ServiceEnum.serviceInfo]: [{ href: mockGs1Host }]
-        },
-      }];
-
-      jest.spyOn(publicAPI, 'post').mockResolvedValueOnce(mockProducts);
-
-      // Call the getDlrUrl method
-      const dlrUrl = await gs1Provider.getDlrUrl(mockCode, providerUrl);
-
-      // Ensure that the returned DLR URL matches the expected format
-      expect(dlrUrl).toBe(`${mockGs1Host}/gtin/${mockCode}?linkType=all`);
+      expect(dlrUrl).toBe(`${providerUrl}/gtin/${elementString}/lot/${lotValue}`);
     });
   });
 
@@ -87,23 +59,23 @@ describe('Gs1Provider', () => {
       const extractedCode = gs1Provider.getCode('456789012341233423342', 'DATA_MATRIX');
 
       // Assert the extracted code matches the expected value
-      expect(extractedCode).toBe('67890123412334');
+      expect(extractedCode).toBe('456789012341233423342');
     });
 
-    it('should pad GTIN code with leading zero if length is less than 14', () => {
+    it('should pad GTIN code with leading zero if length is less than 8', () => {
       // Call getCode method with sample decoded text and empty format name
-      const extractedCode = gs1Provider.getCode('12345678901', '');
+      const extractedCode = gs1Provider.getCode('123401', 'EAN_8');
 
       // Assert the extracted code matches the expected value
-      expect(extractedCode).toBe('012345678901');
+      expect(extractedCode).toBe('010123401');
     });
 
     it('should return GTIN code as is if length is 14 or more', () => {
       // Call getCode method with sample decoded text and empty format name
-      const extractedCode = gs1Provider.getCode('12345678901234', '');
+      const extractedCode = gs1Provider.getCode('12345678901234', 'EAN_13');
 
       // Assert the extracted code matches the expected value
-      expect(extractedCode).toBe('12345678901234');
+      expect(extractedCode).toBe('01012345678901234');
     });
   });
 
