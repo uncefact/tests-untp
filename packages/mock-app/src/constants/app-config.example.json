@@ -1027,6 +1027,66 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Conformity Credential",
+      "type": "",
+      "assets": {
+        "logo": "",
+        "brandTitle": "Conformity Credential",
+        "passportVC": "",
+        "transactionEventVC": ""
+      },
+      "styles": {
+        "primaryColor": "rgb(41, 171, 48)",
+        "secondaryColor": "white",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Conformity Credential",
+          "id": "conformity_credential",
+          "components": [
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "style": { "textAlign": "center", "paddingTop": "40px" },
+                "label": "Request Conformity Credential"
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "conformityCredentialService",
+              "parameters": [
+                {
+                  "credentialRequestConfig": [
+                    {
+                      "url": "http://example.com/getConformityCredential",
+                      "params": {
+                        "id": "conformityCredential"
+                      },
+                      "options": {
+                        "headers": [],
+                        "method": "POST"
+                      }
+                    }
+                  ],
+                  "uploadCredentialConfig": {
+                    "url": "https://storage.example.com",
+                    "params": {},
+                    "options": {
+                      "bucket": "bucket-stored-example"
+                    },
+                    "type": "s3"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "identifyProvider": {
