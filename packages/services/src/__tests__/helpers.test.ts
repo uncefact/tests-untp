@@ -1,4 +1,10 @@
-import { fillArray, randomIntegerString, generateUUID, incrementQuality } from '../utils/helpers';
+import {
+  fillArray,
+  randomIntegerString,
+  generateUUID,
+  incrementQuality,
+  hasNonEmptyObjectProperty,
+} from '../utils/helpers';
 
 describe('first', () => {
   it('should return an array with the same length as the first argument', () => {
@@ -41,5 +47,39 @@ describe('first', () => {
     const obj = { quantity: 2 };
     const result = incrementQuality(obj, 1);
     expect(result.quantity).toBe(2);
+  });
+});
+
+describe('hasNonEmptyObjectProperty', () => {
+  it('should return true if the object has a non-empty object property', () => {
+    const obj = {
+      prop: {
+        key: 'value',
+      },
+    };
+    expect(hasNonEmptyObjectProperty(obj, 'prop')).toBe(true);
+  });
+
+  it('should return false if the object does not have the property', () => {
+    const obj = {
+      otherProp: {
+        key: 'value',
+      },
+    };
+    expect(hasNonEmptyObjectProperty(obj, 'prop')).toBe(false);
+  });
+
+  it('should return false if the property is not an object', () => {
+    const obj = {
+      prop: 'not an object',
+    };
+    expect(hasNonEmptyObjectProperty(obj, 'prop')).toBe(false);
+  });
+
+  it('should return false if the object property is empty', () => {
+    const obj = {
+      prop: {},
+    };
+    expect(hasNonEmptyObjectProperty(obj, 'prop')).toBe(false);
   });
 });
