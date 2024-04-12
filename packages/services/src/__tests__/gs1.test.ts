@@ -9,7 +9,7 @@ jest.mock('../types/types', () => ({
 
 describe('Gs1Provider', () => {
   const gtinAI = 'gtin';
-  const mockCode = '09359502000010';
+  const mockCode = '0109359502000010';
   const providerUrl = 'https://example.com';
 
   let gs1Provider: GS1Provider;
@@ -50,13 +50,9 @@ describe('Gs1Provider', () => {
     });
 
     it('should return null if fetch fails', async () => {
-      jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('Failed to fetch'));
+      jest.spyOn(publicAPI, 'post').mockRejectedValueOnce(new Error('Failed to fetch'));
 
-      // Call the getDlrUrl method
-      const dlrUrl = await gs1Provider.getDlrUrl(mockCode, providerUrl);
-
-      // Ensure that the returned DLR URL is null
-      expect(dlrUrl).toBeNull();
+      await expect(gs1Provider.getDlrUrl(mockCode, providerUrl)).rejects.toThrow('Failed to run get DLR Url. Failed to fetch');
     });
 
     it('should return DLR URL if gs1ServiceHost is found', async () => {
@@ -74,7 +70,7 @@ describe('Gs1Provider', () => {
       const dlrUrl = await gs1Provider.getDlrUrl(mockCode, providerUrl);
 
       // Ensure that the returned DLR URL matches the expected format
-      expect(dlrUrl).toBe(`${mockGs1Host}/gtin/${mockCode}?linkType=all`);
+      expect(dlrUrl).toBe(`${mockGs1Host}/gtin/${mockCode.slice(2)}?linkType=all`);
     });
 
     it('should return DLR URL if the element string is combined multi AIs', async () => {
@@ -92,7 +88,7 @@ describe('Gs1Provider', () => {
 
       const dlrUrl = await gs1Provider.getDlrUrl(elementStrings, providerUrl);
 
-      expect(dlrUrl).toBe(`${mockGs1Host}/gtin/${mockCode}/lot/${lotValue}?linkType=all`);
+      expect(dlrUrl).toBe(`${mockGs1Host}/gtin/${mockCode.slice(2)}/lot/${lotValue}?linkType=all`);
     });
   });
 

@@ -1,4 +1,4 @@
-import GS1DigitalLinkToolkit from 'digiatllink_toolkit_server/src/GS1DigitalLinkToolkit.js';
+import GS1DigitalLinkToolkit from 'GS1_DigitalLink_Resolver_CE/digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js';
 import { IdentityProviderStrategy } from './IdentityProvider.js';
 import { publicAPI } from '../utils/httpService.js';
 
@@ -22,23 +22,21 @@ export class GS1Provider implements IdentityProviderStrategy {
       }
 
       // Extract the GS1 service host from the fetched products data
-      const [product] = products;
-      const gs1ServiceHost: string = product?.linkset?.[GS1ServiceEnum.serviceInfo]?.[0]?.href;
+      const gs1ServiceHost: string = products[0]?.linkset?.[GS1ServiceEnum.serviceInfo]?.[0]?.href;
       if (!gs1ServiceHost) {
         return null;
       }
-      const isGTINFormat = Object.keys(product).includes('gtin');
-      const elementStrings = isGTINFormat ? `01${code}` : code;
       
       const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
-      const gs1DigitalLink = gs1DigitalLinkToolkit.gs1ElementStringsToGS1DigitalLink(elementStrings, true, gs1ServiceHost);
+      const gs1DigitalLink = gs1DigitalLinkToolkit.gs1ElementStringsToGS1DigitalLink(code, true, gs1ServiceHost);
 
       const dlrUrl = new URL(gs1DigitalLink);
       dlrUrl.searchParams.append('linkType', 'all');
 
       return dlrUrl.toString();
-    } catch (error) {
-      return null;
+    } catch (e) {
+      const error = e as Error;
+      throw new Error(`Failed to run get DLR Url. ${error.message}`);
     }
   }
 

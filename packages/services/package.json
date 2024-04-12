@@ -21,9 +21,9 @@
   "dependencies": {
     "@babel/preset-typescript": "^7.23.3",
     "@vckit/core-types": "1.0.0-beta.7",
+    "GS1_DigitalLink_Resolver_CE": "git+ssh://git@github.com:gs1/GS1_DigitalLink_Resolver_CE.git",
     "axios": "^1.6.7",
     "babel-jest": "^29.7.0",
-    "digiatllink_toolkit_server": "https://gitpkg.now.sh/gs1/GS1_DigitalLink_Resolver_CE/digitallink_toolkit_server?master",
     "lodash": "^4.17.21",
     "moment": "^2.30.1",
     "uuid": "^9.0.1"
