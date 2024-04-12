@@ -1,5 +1,5 @@
 export interface IdentityProviderStrategy {
-  getDlrUrl: (code: string, providerUrl: string) => string | null;
+  getDlrUrl: (code: string, providerUrl: string) => Promise<string | null>;
   getCode: (decodedText: string, formatName: string) => string;
 }
 
@@ -12,7 +12,7 @@ export class IdentityProvider {
     this.identityProviderUrl = identityProviderUrl;
   }
 
-  getDlrUrl(code: string): string | null {
+  getDlrUrl(code: string): Promise<string | null> {
     return this.identityProviderStrategy.getDlrUrl(code, this.identityProviderUrl);
   }
 
