@@ -8,8 +8,9 @@ jest.mock('../types/types', () => ({
 }));
 
 describe('Gs1Provider', () => {
-  const mockCode = '12345678901234';
-  const providerUrl = 'https://example.com/gs1';
+  const gtinAI = 'gtin';
+  const mockCode = '0109359502000010';
+  const providerUrl = 'https://example.com';
 
   let gs1Provider: GS1Provider;
 
@@ -20,20 +21,16 @@ describe('Gs1Provider', () => {
 
   describe('getDlrUrl', () => {
     it('should return null if code is not set', async () => {
-      // Call the getDlrUrl method without setting the code
-      const dlrUrl = await gs1Provider.getDlrUrl(mockCode, providerUrl);
+      const dlrUrl = await gs1Provider.getDlrUrl('', providerUrl);
 
-      // Ensure that the returned DLR URL is null
       expect(dlrUrl).toBeNull();
     });
 
     it('should return null if no products are fetched', async () => {
       jest.spyOn(publicAPI, 'post').mockResolvedValueOnce([]);
 
-      // Call the getDlrUrl method
       const dlrUrl = await gs1Provider.getDlrUrl(mockCode, providerUrl);
 
-      // Ensure that the returned DLR URL is null
       expect(dlrUrl).toBeNull();
     });
 
@@ -53,31 +50,45 @@ describe('Gs1Provider', () => {
     });
 
     it('should return null if fetch fails', async () => {
-      jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('Failed to fetch'));
+      jest.spyOn(publicAPI, 'post').mockRejectedValueOnce(new Error('Failed to fetch'));
 
-      // Call the getDlrUrl method
-      const dlrUrl = await gs1Provider.getDlrUrl(mockCode, providerUrl);
-
-      // Ensure that the returned DLR URL is null
-      expect(dlrUrl).toBeNull();
+      await expect(gs1Provider.getDlrUrl(mockCode, providerUrl)).rejects.toThrow('Failed to run get DLR Url. Failed to fetch');
     });
 
     it('should return DLR URL if gs1ServiceHost is found', async () => {
       // Set a code, mock the post method to return products with gs1ServiceHost, and specify the mock GS1 host
-      const mockGs1Host = 'https://gs1ServiceHost.com';
+      const mockGs1Host = 'https://gs1servicehost.com';
       const mockProducts = [{
+        [gtinAI]: mockCode,
         linkset: {
             [GS1ServiceEnum.serviceInfo]: [{ href: mockGs1Host }]
         },
       }];
-
       jest.spyOn(publicAPI, 'post').mockResolvedValueOnce(mockProducts);
 
       // Call the getDlrUrl method
       const dlrUrl = await gs1Provider.getDlrUrl(mockCode, providerUrl);
 
       // Ensure that the returned DLR URL matches the expected format
-      expect(dlrUrl).toBe(`${mockGs1Host}/gtin/${mockCode}?linkType=all`);
+      expect(dlrUrl).toBe(`${mockGs1Host}/gtin/${mockCode.slice(2)}?linkType=all`);
+    });
+
+    it('should return DLR URL if the element string is combined multi AIs', async () => {
+      const lotAI = '10';
+      const lotValue = '3000189';
+      const mockGs1Host = 'https://gs1servicehost.com';
+      const elementStrings = `${mockCode}${lotAI}${lotValue}`;
+      const mockProducts = [{
+        [gtinAI]: elementStrings,
+        linkset: {
+            [GS1ServiceEnum.serviceInfo]: [{ href: mockGs1Host }]
+        },
+      }];
+      jest.spyOn(publicAPI, 'post').mockResolvedValueOnce(mockProducts);
+
+      const dlrUrl = await gs1Provider.getDlrUrl(elementStrings, providerUrl);
+
+      expect(dlrUrl).toBe(`${mockGs1Host}/gtin/${mockCode.slice(2)}/lot/${lotValue}?linkType=all`);
     });
   });
 

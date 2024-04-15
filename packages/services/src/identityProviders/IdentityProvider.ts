@@ -12,7 +12,7 @@ export class IdentityProvider {
     this.identityProviderUrl = identityProviderUrl;
   }
 
-  async getDlrUrl(code: string): Promise<string | null> {
+  getDlrUrl(code: string): Promise<string | null> {
     return this.identityProviderStrategy.getDlrUrl(code, this.identityProviderUrl);
   }
 
