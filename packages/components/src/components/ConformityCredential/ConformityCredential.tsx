@@ -3,11 +3,13 @@ import _ from 'lodash';
 
 import { LoadingButton } from '@mui/lab';
 import { Table, TableBody, TableCell, TableRow, TableContainer, TableHead, Paper } from '@mui/material';
-import { uploadJson, generateUUID, getJsonDataFromConformityAPI, hasNonEmptyObjectProperty } from '@mock-app/services';
+import { uploadJson, generateUUID, getJsonDataFromConformityAPI } from '@mock-app/services';
 
-import { checkStoredCredentials } from './utils.js';
+import { checkStoredCredentials, getCredentialByPath } from './utils.js';
 import { Status, ToastMessage, toastMessage } from '../ToastMessage/ToastMessage.js';
 import { IConformityCredentialProps, ICredentialRequestConfig } from '../../types/conformityCredential.types.js';
+
+const STORAGE_KEY = 'conformityCredentials';
 
 export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
   credentialRequestConfigs,
@@ -24,12 +26,13 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
     }
 
     return credentialRequestConfigs?.map((config, index) => (
-      <div style={{ marginBottom: '20px' }}>
+      <div key={config.credentialName} style={{ marginBottom: '20px' }}>
         <LoadingButton
           component='label'
           variant='outlined'
-          key={index}
+          key={config.credentialName}
           loading={loading && loadingButtonIndex === index}
+          disabled={loading && loadingButtonIndex !== index}
           onClick={() => {
             setLoadingButtonIndex(index);
             onClickStorageCredential(config);
@@ -63,8 +66,8 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
         </TableHead>
 
         <TableBody>
-          {JSON.parse(conformityCredentials as string)?.map((credential: any, index: number) => (
-            <TableRow key={index}>
+          {JSON.parse(conformityCredentials as string)?.map((credential: any) => (
+            <TableRow key={credential.name}>
               <TableCell>{credential.name}</TableCell>
               <TableCell>
                 <a href={credential.url}>{credential.url}</a>
@@ -95,7 +98,7 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
       };
     }
     const conformityCredentialsString = JSON.stringify(credentials);
-    localStorage.setItem('conformityCredentials', conformityCredentialsString);
+    localStorage.setItem(STORAGE_KEY, conformityCredentialsString);
     toastMessage({ status: Status.success, message: 'Conformity credentials have been saved' });
     setLoading(false);
     setConformityCredentials(conformityCredentialsString);
@@ -115,15 +118,25 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
         return;
       }
 
-      let conformityCredentials = JSON.parse(localStorage.getItem('conformityCredentials') ?? '[]');
-
+      let conformityCredentials = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
       if (!_.isArray(conformityCredentials)) {
-        localStorage.removeItem('conformityCredentials');
+        localStorage.removeItem(STORAGE_KEY);
         conformityCredentials = [];
       }
 
       // Get the JSON data from the API
       const getJsonData = await getJsonDataFromConformityAPI(credentialRequestConfig);
+      if (!_.isString(getJsonData) || !_.isObject(getJsonData)) {
+        showErrorAndStopLoading('Invalid credential data');
+        return;
+      }
+
+      // Extract the credentials from the JSON data based on the path
+      const extractedCredential = getCredentialByPath(getJsonData, credentialRequestConfig.credentialPath);
+      if (!extractedCredential) {
+        showErrorAndStopLoading('Invalid credential data');
+        return;
+      }
 
       // Check if the credential already exists
       const findExistCredential = conformityCredentials.findIndex(
@@ -131,22 +144,16 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
       );
 
       // Save the credentials to the local storage if the data is a url string
-      if (_.isString(getJsonData)) {
+      if (_.isString(extractedCredential)) {
         saveConformityCredentials(
           conformityCredentials,
           findExistCredential,
           credentialRequestConfig.credentialName,
-          getJsonData,
+          extractedCredential,
         );
         return;
       }
 
-      if (!hasNonEmptyObjectProperty(getJsonData, 'credentials')) {
-        showErrorAndStopLoading('Invalid credentials provided in the response API');
-        return;
-      }
-
-      // change tempValue to getJsonData
       if (!checkStoredCredentials(storedCredentials)) {
         showErrorAndStopLoading('Invalid stored credentials');
         return;
@@ -155,16 +162,18 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
       // Upload the credentials to the server
       const vcUrl = await uploadJson({
         filename: generateUUID(),
-        json: getJsonData,
+        json: extractedCredential,
         bucket: storedCredentials?.options?.bucket as string,
         storageAPIUrl: storedCredentials.url,
       });
+
       saveConformityCredentials(
         conformityCredentials,
         findExistCredential,
         credentialRequestConfig.credentialName,
         vcUrl,
       );
+
       return;
     } catch (error) {
       showErrorAndStopLoading('Something went wrong! Please retry again');
@@ -174,7 +183,7 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
   };
 
   useEffect(() => {
-    const storedCredentials = localStorage.getItem('conformityCredentials');
+    const storedCredentials = localStorage.getItem(STORAGE_KEY);
     if (storedCredentials) {
       setConformityCredentials(storedCredentials);
     }

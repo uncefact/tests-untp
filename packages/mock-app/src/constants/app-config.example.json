@@ -1050,7 +1050,8 @@
             {
               "name": "ConformityCredential",
               "type": "",
-              "props": {"credentialRequestConfigs": [
+              "props": {
+                "credentialRequestConfigs": [
                   {
                     "url": "http://example.com/credential-request",
                     "params": {},
@@ -1058,7 +1059,8 @@
                       "headers": [],
                       "method": "POST"
                     },
-                    "credentialName": "Deforestation Free Assessment"
+                    "credentialName": "Deforestation Free Assessment",
+                    "credentialPath": ""
                   }
                 ],
                 

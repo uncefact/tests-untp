@@ -12,8 +12,9 @@ export interface IStoredCredentials {
 export interface ICredentialRequestConfig {
   url: string;
   params: Record<string, string>;
-  options: FetchOptions;
   credentialName: string;
+  credentialPath: string;
+  options?: FetchOptions;
 }
 
 export interface IConformityCredentialProps {
