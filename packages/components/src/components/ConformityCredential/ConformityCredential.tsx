@@ -50,11 +50,17 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
       return;
     }
 
-    const parseData = JSON.parse(conformityCredentials as string) ?? [];
+    const parseCredentials = JSON.parse(conformityCredentials as string) ?? [];
 
-    if (_.isEmpty(parseData) || !_.isArray(parseData)) {
+    if (_.isEmpty(parseCredentials) || !_.isObject(parseCredentials)) {
       return <p>No stored credentials available</p>;
     }
+
+    // Flatten the credentials in localStorage into an array
+    const flattenedData = Object.entries(parseCredentials).flatMap(([app, credentials]) =>
+      (credentials as any[]).map((credential) => ({ app, ...credential })),
+    );
+
     return (
       <TableContainer sx={{ maxWidth: 650 }} component={Paper}>
         <Table aria-label='simple table'></Table>
@@ -66,7 +72,7 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
         </TableHead>
 
         <TableBody>
-          {JSON.parse(conformityCredentials as string)?.map((credential: any) => (
+          {flattenedData?.map((credential: any) => (
             <TableRow key={credential.name}>
               <TableCell>{credential.name}</TableCell>
               <TableCell>
@@ -80,28 +86,30 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
   }, [conformityCredentials]);
 
   // Helper function to save credentials
-  const saveConformityCredentials = (
-    credentials: any[],
-    findExistCredential: number,
-    credentialName: string,
-    url: string,
-  ) => {
-    if (findExistCredential === -1) {
-      credentials.push({
+  const saveConformityCredentials = (credentialName: string, url: string, credentialAppExclusive: string) => {
+    let storedData = localStorage.getItem(STORAGE_KEY);
+    let dataObject = storedData ? JSON.parse(storedData) : {};
+
+    // Update the data with the new credential
+    let credentialAppData = dataObject[credentialAppExclusive] || [];
+    let existingCredentialIndex = credentialAppData.findIndex((credential: any) => credential.name === credentialName);
+    if (existingCredentialIndex !== -1) {
+      // Update an existing credential
+      credentialAppData[existingCredentialIndex] = {
         name: credentialName,
         url,
-      });
-    } else {
-      credentials[findExistCredential] = {
-        name: credentialName,
-        url: url,
       };
+    } else {
+      // Add a new credential
+      credentialAppData.push({ name: credentialName, url });
     }
-    const conformityCredentialsString = JSON.stringify(credentials);
-    localStorage.setItem(STORAGE_KEY, conformityCredentialsString);
+    dataObject[credentialAppExclusive] = credentialAppData;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(dataObject));
+
     toastMessage({ status: Status.success, message: 'Conformity credentials have been saved' });
+
     setLoading(false);
-    setConformityCredentials(conformityCredentialsString);
+    setConformityCredentials(JSON.stringify(dataObject));
   };
 
   const showErrorAndStopLoading = (message: string) => {
@@ -119,17 +127,13 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
       }
 
       let conformityCredentials = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
-      if (!_.isArray(conformityCredentials)) {
+      if (!_.isObject(conformityCredentials)) {
         localStorage.removeItem(STORAGE_KEY);
-        conformityCredentials = [];
+        conformityCredentials = {};
       }
 
       // Get the JSON data from the API
       const getJsonData = await getJsonDataFromConformityAPI(credentialRequestConfig);
-      if (!_.isString(getJsonData) || !_.isObject(getJsonData)) {
-        showErrorAndStopLoading('Invalid credential data');
-        return;
-      }
 
       // Extract the credentials from the JSON data based on the path
       const extractedCredential = getCredentialByPath(getJsonData, credentialRequestConfig.credentialPath);
@@ -138,22 +142,17 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
         return;
       }
 
-      // Check if the credential already exists
-      const findExistCredential = conformityCredentials.findIndex(
-        (obj: any) => obj?.name === credentialRequestConfig.credentialName,
-      );
-
       // Save the credentials to the local storage if the data is a url string
       if (_.isString(extractedCredential)) {
         saveConformityCredentials(
-          conformityCredentials,
-          findExistCredential,
           credentialRequestConfig.credentialName,
           extractedCredential,
+          credentialRequestConfig.credentialAppExclusive,
         );
         return;
       }
 
+      // Check if the stored credentials are valid
       if (!checkStoredCredentials(storedCredentials)) {
         showErrorAndStopLoading('Invalid stored credentials');
         return;
@@ -168,10 +167,9 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
       });
 
       saveConformityCredentials(
-        conformityCredentials,
-        findExistCredential,
         credentialRequestConfig.credentialName,
         vcUrl,
+        credentialRequestConfig.credentialAppExclusive,
       );
 
       return;

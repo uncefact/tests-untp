@@ -14,6 +14,7 @@ export interface ICredentialRequestConfig {
   params: Record<string, string>;
   credentialName: string;
   credentialPath: string;
+  credentialAppExclusive: string;
   options?: FetchOptions;
 }
 
