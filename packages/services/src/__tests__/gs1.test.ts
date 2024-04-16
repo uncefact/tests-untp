@@ -118,4 +118,51 @@ describe('Gs1Provider', () => {
     });
   });
 
+  describe('extractElementString', () => {
+    it('should extract element string from GS1 element strings', () => {
+      const gtinCode = '0109359502000010';
+      const lotCode = '10ABC123';
+      const elementString = gtinCode + lotCode;
+      const dlrAIs = gs1Provider.extractElementString(elementString);
+
+      expect(dlrAIs['01']).toBe('09359502000010');
+      expect(dlrAIs['10']).toBe('ABC123');
+    });
+
+    it('should throw an error if element string is invalid', () => {
+      const invalidElementString = '09090909090909';
+      expect(() => gs1Provider.extractElementString(invalidElementString)).toThrow('No matching GS1 AI found for 09090909090909');
+    });
+  });
+
+  describe('getLinkResolverIdentifier', () => {
+    it('should extract identifier and qualifier path from element string', () => {
+      const gtinCode = '0109359502000010';
+      const { identifier, qualifierPath } = gs1Provider.getLinkResolverIdentifier(gtinCode);
+
+      expect(identifier).toBe('0109359502000010');
+      expect(qualifierPath).toBe('/');
+    });
+
+    it('should extract identifier and qualifier path from element string with elementString is combined multi AIs', () => {
+      const gtinCode = '0109359502000010';
+      const lotCode = '10ABC123';
+      const elementString = gtinCode + lotCode;
+      const { identifier, qualifierPath } = gs1Provider.getLinkResolverIdentifier(elementString);
+
+      expect(identifier).toBe('09359502000010');
+      expect(qualifierPath).toBe('/10/ABC123');
+    });
+
+    it('should throw an error if element string is invalid', () => {
+      const invalidElementString = '09090909090909';
+      expect(() => gs1Provider.getLinkResolverIdentifier(invalidElementString)).toThrow('No matching GS1 AI found for 09090909090909');
+    });
+
+    it('should throw an error if element string 01 and 8006 are primary keys present at the same time.', () => {
+      const invalidElementString = '0109359502000010800612341234';
+      expect(() => gs1Provider.getLinkResolverIdentifier(invalidElementString)).toThrow('Invalid DLR AIs. Both 01 and 8006 are primary keys and cannot be present at the same time.');
+    });
+  });
+
 });

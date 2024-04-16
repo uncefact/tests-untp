@@ -1,12 +1,20 @@
 import GS1DigitalLinkToolkit from 'GS1_DigitalLink_Resolver_CE/digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js';
 import { IdentityProviderStrategy } from './IdentityProvider.js';
 import { publicAPI } from '../utils/httpService.js';
+import { IDLRAI } from '../epcisEvents/types.js';
 
 export enum GS1ServiceEnum {
   certificationInfo = 'https://gs1.org/voc/certificationInfo',
   verificationService = 'https://gs1.org/voc/verificationService',
   serviceInfo = 'https://gs1.org/voc/serviceInfo',
 }
+
+export enum PrimaryAIEnum {
+  ITIP = '8006',
+  GTIN = '01',
+}
+
+const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
 
 export class GS1Provider implements IdentityProviderStrategy {
   /**
@@ -27,7 +35,6 @@ export class GS1Provider implements IdentityProviderStrategy {
         return null;
       }
       
-      const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
       const gs1DigitalLink = gs1DigitalLinkToolkit.gs1ElementStringsToGS1DigitalLink(code, true, gs1ServiceHost);
 
       const dlrUrl = new URL(gs1DigitalLink);
@@ -57,5 +64,46 @@ export class GS1Provider implements IdentityProviderStrategy {
 
     return decodedText;
   }
+
+  /**
+   * Function to extract the element string to an object.
+   * @param elementString The string containing the element string.
+   * @returns The extracted object.
+   */
+  extractElementString = (elementString: string): IDLRAI => {
+    const dlrAIs = gs1DigitalLinkToolkit.extractFromGS1elementStrings(elementString);
+    return dlrAIs;
+  }
+  
+  /**
+   * Function to extract the element string to identifier and qualifier path.
+   * @param elementString The string containing the element string.
+   * @returns The extracted identifier and qualifier path.
+   */
+  getLinkResolverIdentifier = (elementString: string): { identifier: string, qualifierPath: string } => {
+    const dlrAIs = this.extractElementString(elementString);
+    const AIs = Object.keys(dlrAIs);
+    if (Object.keys(AIs).length <= 1) {
+      return { identifier: elementString, qualifierPath: '/' };
+    }
+
+    const primaryAIs = Object.values(PrimaryAIEnum) as string[];
+    const isDlrAIsInvalid = primaryAIs.every(primaryAI => AIs.includes(primaryAI));
+    if (isDlrAIsInvalid) {
+      throw new Error('Invalid DLR AIs. Both 01 and 8006 are primary keys and cannot be present at the same time.');
+    }
+  
+    const { identifier, qualifierPath } = AIs.reduce((linkResolverIdentifier, currentAI) => {
+      if (primaryAIs.includes(currentAI)) {
+        linkResolverIdentifier.identifier = dlrAIs[currentAI];
+      } else {
+        linkResolverIdentifier.qualifierPath += `/${currentAI}/${dlrAIs[currentAI]}`;
+      }
+  
+      return linkResolverIdentifier;
+    }, { identifier: '', qualifierPath: '' });
+  
+    return { identifier, qualifierPath };
+  };
 
 }

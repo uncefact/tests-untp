@@ -19,7 +19,12 @@ export interface ILinkResolverContext {
 }
 
 export interface IEntityIssue extends ICredential, ILinkResolverContext {
+  dlrAIs?: IDLRAI;
   [key: string]: any; // TODO: define the specific properties
+}
+
+export interface IDLRAI {
+  [key: string]: string;
 }
 
 export interface IConfigDLR {

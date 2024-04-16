@@ -1,6 +1,7 @@
 export interface IdentityProviderStrategy {
   getDlrUrl: (code: string, providerUrl: string) => Promise<string | null>;
   getCode: (decodedText: string, formatName: string) => string;
+  getLinkResolverIdentifier?: (elementString: string) => { identifier: string, qualifierPath: string };
 }
 
 export class IdentityProvider {
