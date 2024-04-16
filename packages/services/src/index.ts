@@ -5,5 +5,5 @@ export * from './linkResolver.service.js';
 export * from './storage.service.js';
 export * from './utils/index.js';
 export * from './identityProviders/index.js';
+
 export * from './api.service.js';
-export * from './features/index.js';

@@ -1048,43 +1048,32 @@
           "id": "conformity_credential",
           "components": [
             {
-              "name": "CustomButton",
-              "type": "Submit",
-              "props": {
-                "style": { "textAlign": "center", "paddingTop": "40px" },
-                "label": "Request Conformity Credential"
+              "name": "ConformityCredential",
+              "type": "",
+              "props": {"credentialRequestConfigs": [
+                  {
+                    "url": "http://example.com/credential-request",
+                    "params": {},
+                    "options": {
+                      "headers": [],
+                      "method": "POST"
+                    },
+                    "credentialName": "Deforestation Free Assessment"
+                  }
+                ],
+                
+                "storedCredentials": {
+                  "url": "https://storage.example.com",
+                  "params": {},
+                  "options": {
+                    "bucket": "bucket-stored-example"
+                  },
+                  "type": "s3"
+                }
               }
             }
           ],
-          "services": [
-            {
-              "name": "conformityCredentialService",
-              "parameters": [
-                {
-                  "credentialRequestConfig": [
-                    {
-                      "url": "http://example.com/getConformityCredential",
-                      "params": {
-                        "id": "conformityCredential"
-                      },
-                      "options": {
-                        "headers": [],
-                        "method": "POST"
-                      }
-                    }
-                  ],
-                  "uploadCredentialConfig": {
-                    "url": "https://storage.example.com",
-                    "params": {},
-                    "options": {
-                      "bucket": "bucket-stored-example"
-                    },
-                    "type": "s3"
-                  }
-                }
-              ]
-            }
-          ]
+          "services": []
         }
       ]
     }
