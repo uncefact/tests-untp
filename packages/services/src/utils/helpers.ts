@@ -46,11 +46,3 @@ export function incrementQuality(obj: any, numberOfItems: number) {
   }
   return obj;
 }
-
-export function hasNonEmptyObjectProperty(obj: any, propertyName: string): boolean {
-  return (
-    Object.prototype.hasOwnProperty.call(obj, propertyName) &&
-    typeof obj[propertyName] === 'object' &&
-    Object.keys(obj[propertyName]).length > 0
-  );
-}

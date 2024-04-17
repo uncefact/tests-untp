@@ -9,7 +9,6 @@ jest.mock('@mock-app/services', () => ({
   uploadJson: jest.fn(),
   generateUUID: jest.fn(),
   getJsonDataFromConformityAPI: jest.fn(),
-  hasNonEmptyObjectProperty: jest.fn(),
 }));
 
 jest.mock('../components/ToastMessage/ToastMessage', () => ({
