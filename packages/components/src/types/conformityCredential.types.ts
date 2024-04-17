@@ -8,6 +8,8 @@ export interface IStoredCredentials {
   options: {
     bucket: string;
   };
+
+  [key: string]: any;
 }
 export interface ICredentialRequestConfig {
   url: string;

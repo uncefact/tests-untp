@@ -9,7 +9,7 @@ import { checkStoredCredentials, getCredentialByPath } from './utils.js';
 import { Status, ToastMessage, toastMessage } from '../ToastMessage/ToastMessage.js';
 import { IConformityCredentialProps, ICredentialRequestConfig } from '../../types/conformityCredential.types.js';
 
-const STORAGE_KEY = 'conformityCredentials';
+export const STORAGE_KEY = 'conformityCredentials';
 
 export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
   credentialRequestConfigs,
@@ -56,17 +56,17 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
       return <p>No stored credentials available</p>;
     }
 
-    // Flatten the credentials in localStorage into an array
     const flattenedData = Object.entries(parseCredentials).flatMap(([app, credentials]) =>
       (credentials as any[]).map((credential) => ({ app, ...credential })),
     );
 
     return (
-      <TableContainer sx={{ maxWidth: 650 }} component={Paper}>
+      <TableContainer component={Paper}>
         <Table aria-label='simple table'></Table>
         <TableHead>
           <TableRow>
             <TableCell sx={{ width: 200 }}>Credential Name</TableCell>
+            <TableCell sx={{ width: 200 }}>Context of the app</TableCell>
             <TableCell>URL</TableCell>
           </TableRow>
         </TableHead>
@@ -75,6 +75,7 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
           {flattenedData?.map((credential: any) => (
             <TableRow key={credential.name}>
               <TableCell>{credential.name}</TableCell>
+              <TableCell>{credential.app}</TableCell>
               <TableCell>
                 <a href={credential.url}>{credential.url}</a>
               </TableCell>
@@ -126,7 +127,7 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
         return;
       }
 
-      let conformityCredentials = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
+      let conformityCredentials = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
       if (!_.isObject(conformityCredentials)) {
         localStorage.removeItem(STORAGE_KEY);
         conformityCredentials = {};
@@ -152,9 +153,10 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
         return;
       }
 
+      const { ok, value } = checkStoredCredentials(storedCredentials);
       // Check if the stored credentials are valid
-      if (!checkStoredCredentials(storedCredentials)) {
-        showErrorAndStopLoading('Invalid stored credentials');
+      if (!ok) {
+        showErrorAndStopLoading(value);
         return;
       }
 
