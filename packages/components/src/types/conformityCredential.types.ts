@@ -8,12 +8,12 @@ export interface IStoredCredentials {
   options: {
     bucket: string;
   };
-
-  [key: string]: any;
+  params?: any;
+  type?: string;
 }
 export interface ICredentialRequestConfig {
   url: string;
-  params: Record<string, string>;
+  params: any;
   credentialName: string;
   credentialPath: string;
   credentialAppExclusive: string;
@@ -23,4 +23,10 @@ export interface ICredentialRequestConfig {
 export interface IConformityCredentialProps {
   credentialRequestConfigs: ICredentialRequestConfig[];
   storedCredentials: IStoredCredentials;
+}
+
+export interface IConformityCredential {
+  name: string;
+  url: string;
+  app: string;
 }

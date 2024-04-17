@@ -1060,10 +1060,21 @@
                       "method": "POST"
                     },
                     "credentialName": "Deforestation Free Assessment",
-                    "credentialPath": ""
+                    "credentialPath": "",
+                    "credentialAppExclusive": "Farm"
+                  },
+                  {
+                    "url": "http://example1.com/credential-request",
+                    "params": {},
+                    "options": {
+                      "headers": [],
+                      "method": "GET"
+                    },
+                    "credentialName": "CE Marking",
+                    "credentialPath": "",
+                    "credentialAppExclusive": "Feedlot"
                   }
                 ],
-                
                 "storedCredentials": {
                   "url": "https://storage.example.com",
                   "params": {},

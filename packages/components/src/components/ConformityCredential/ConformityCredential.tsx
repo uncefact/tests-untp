@@ -7,7 +7,11 @@ import { uploadJson, generateUUID, getJsonDataFromConformityAPI } from '@mock-ap
 
 import { checkStoredCredentials, getCredentialByPath } from './utils.js';
 import { Status, ToastMessage, toastMessage } from '../ToastMessage/ToastMessage.js';
-import { IConformityCredentialProps, ICredentialRequestConfig } from '../../types/conformityCredential.types.js';
+import {
+  IConformityCredentialProps,
+  ICredentialRequestConfig,
+  IConformityCredential,
+} from '../../types/conformityCredential.types.js';
 
 export const STORAGE_KEY = 'conformityCredentials';
 
@@ -50,7 +54,7 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
       return;
     }
 
-    const parseCredentials = JSON.parse(conformityCredentials as string) ?? [];
+    const parseCredentials = JSON.parse(conformityCredentials as string) ?? {};
 
     if (_.isEmpty(parseCredentials) || !_.isObject(parseCredentials)) {
       return <p>No stored credentials available</p>;
@@ -72,7 +76,7 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
         </TableHead>
 
         <TableBody>
-          {flattenedData?.map((credential: any) => (
+          {flattenedData?.map((credential: IConformityCredential) => (
             <TableRow key={credential.name}>
               <TableCell>{credential.name}</TableCell>
               <TableCell>{credential.app}</TableCell>
@@ -92,7 +96,7 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
     let dataObject = storedData ? JSON.parse(storedData) : {};
 
     // Update the data with the new credential
-    let credentialAppData = dataObject[credentialAppExclusive] || [];
+    let credentialAppData = dataObject[credentialAppExclusive] ?? [];
     let existingCredentialIndex = credentialAppData.findIndex((credential: any) => credential.name === credentialName);
     if (existingCredentialIndex !== -1) {
       // Update an existing credential
@@ -108,7 +112,6 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataObject));
 
     toastMessage({ status: Status.success, message: 'Conformity credentials have been saved' });
-
     setLoading(false);
     setConformityCredentials(JSON.stringify(dataObject));
   };
@@ -153,8 +156,8 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
         return;
       }
 
-      const { ok, value } = checkStoredCredentials(storedCredentials);
       // Check if the stored credentials are valid
+      const { ok, value } = checkStoredCredentials(storedCredentials);
       if (!ok) {
         showErrorAndStopLoading(value);
         return;
