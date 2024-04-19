@@ -179,8 +179,9 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
 
       return;
     } catch (error) {
-      showErrorAndStopLoading('Something went wrong! Please retry again');
-      console.error(error);
+      const e = error as Error;
+      showErrorAndStopLoading(e.message ?? 'Something went wrong! Please retry again');
+      console.error(e);
       return;
     }
   };

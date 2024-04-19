@@ -1,5 +1,6 @@
 import _ from 'lodash';
 import { IStoredCredentials } from '../../types/conformityCredential.types.js';
+import JSONPointer from 'jsonpointer';
 
 export type Result<T> = { ok: true; value: T } | { ok: false; value: string };
 
@@ -28,23 +29,9 @@ export const checkStoredCredentials = (storedCredentials: IStoredCredentials): R
  * @returns The credential or the link to the credential within the API response
  */
 export const getCredentialByPath = (apiResp: any, path: string) => {
-  if (typeof apiResp !== 'object' || !apiResp) {
-    return apiResp;
+  if (_.isNil(path)) {
+    throw new Error('Invalid credential path');
   }
 
-  if (!path) {
-    return apiResp;
-  }
-
-  const keys = path.split('.');
-  let value = apiResp;
-
-  for (const key of keys) {
-    if (!value.hasOwnProperty(key)) {
-      return undefined; // Property does not exist
-    }
-    value = value[key];
-  }
-
-  return value;
+  return JSONPointer.get(apiResp, path);
 };
