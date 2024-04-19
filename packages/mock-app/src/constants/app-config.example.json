@@ -916,14 +916,25 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "parentItem": {
+                    "parentEPC": {
                       "type": "object",
                       "title": "Parent Item",
                       "properties": {
                         "itemID": {
-                          "type": "string",
-                          "title": "Item ID",
-                          "enum": ["9359502000010"]
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "ai": {
+                                "type": "string",
+                                "title": "AI"
+                              },
+                              "value": {
+                                "type": "string",
+                                "title": "Value"
+                              }
+                            }
+                          }
                         },
                         "name": {
                           "type": "string",
@@ -932,7 +943,7 @@
                         }
                       }
                     },
-                    "childItems": {
+                    "childEPCs": {
                       "type": "array",
                       "title": "Child Items",
                       "items": {
@@ -1010,7 +1021,7 @@
                     "type": ["AggregationEventCredential"],
                     "dlrLinkTitle": "Aggregation Event",
                     "dlrIdentificationKeyType": "gtin",
-                    "dlrVerificationPage": "http://localhost:3001/verify"
+                    "dlrVerificationPage": "http://localhost:3000/verify"
                   },
                   "dlr": {
                     "dlrAPIUrl": "http://dlr.example.com",
@@ -1020,7 +1031,7 @@
                     "storageAPIUrl": "https://storage.example.com",
                     "bucket": "bucket-stored-example"
                   },
-                  "identifierKeyPaths": ["parentItem", "itemID"]
+                  "identifierKeyPaths": ["parentEPC", "itemID"]
                 }
               ]
             }

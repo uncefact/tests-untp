@@ -65,39 +65,21 @@ export class GS1Provider implements IdentityProviderStrategy {
     return decodedText;
   }
 
-  /**
-   * Function to extract the element string to an object.
-   * @param elementString The string containing the element string.
-   * @returns The extracted object.
-   */
-  extractElementString = (elementString: string): IDLRAI => {
-    const dlrAIs = gs1DigitalLinkToolkit.extractFromGS1elementStrings(elementString);
-    return dlrAIs;
-  }
-  
-  /**
-   * Function to extract the element string to identifier and qualifier path.
-   * @param elementString The string containing the element string.
-   * @returns The extracted identifier and qualifier path.
-   */
-  getLinkResolverIdentifier = (elementString: string): { identifier: string, qualifierPath: string } => {
-    const dlrAIs = this.extractElementString(elementString);
-    const AIs = Object.keys(dlrAIs);
-    if (Object.keys(AIs).length <= 1) {
-      return { identifier: elementString, qualifierPath: '/' };
-    }
-
+  getLinkResolverIdentifier = (dlrAIs: IDLRAI[]): { identifier: string, qualifierPath: string } => {
     const primaryAIs = Object.values(PrimaryAIEnum) as string[];
-    const isDlrAIsInvalid = primaryAIs.every(primaryAI => AIs.includes(primaryAI));
+    const isDlrAIsInvalid = primaryAIs.every(primaryAI => {
+      const AIs = dlrAIs.map(dlrAI => dlrAI.ai);
+      return AIs.includes(primaryAI);
+    });
     if (isDlrAIsInvalid) {
       throw new Error('Invalid DLR AIs. Both 01 and 8006 are primary keys and cannot be present at the same time.');
     }
   
-    const { identifier, qualifierPath } = AIs.reduce((linkResolverIdentifier, currentAI) => {
-      if (primaryAIs.includes(currentAI)) {
-        linkResolverIdentifier.identifier = dlrAIs[currentAI];
+    const { identifier, qualifierPath } = dlrAIs.reduce((linkResolverIdentifier, currentAI) => {
+      if (primaryAIs.includes(currentAI.ai)) {
+        linkResolverIdentifier.identifier = currentAI.value;
       } else {
-        linkResolverIdentifier.qualifierPath += `/${currentAI}/${dlrAIs[currentAI]}`;
+        linkResolverIdentifier.qualifierPath += `/${currentAI.ai}/${currentAI.value}`;
       }
   
       return linkResolverIdentifier;
