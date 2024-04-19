@@ -1,5 +1,5 @@
-import { Checkbox, FormControl, FormControlLabel, FormGroup, FormLabel } from '@mui/material';
 import React, { useEffect, useState } from 'react';
+import { Checkbox, FormControl, FormControlLabel, FormGroup, FormLabel } from '@mui/material';
 import { getCaseInsensitive } from './utils.js';
 
 type CheckboxData = {
@@ -51,8 +51,8 @@ export const ConformityCredentialCheckbox = ({ onChange }: CheckboxFieldProps) =
     const credentials = getCaseInsensitive(data, category);
     const mapCredentials =
       credentials?.map((item: any) => ({
-        value: item.url ?? 0,
-        label: item.name ?? '',
+        value: item.url,
+        label: item.name,
       })) ?? [];
 
     setData(mapCredentials);
