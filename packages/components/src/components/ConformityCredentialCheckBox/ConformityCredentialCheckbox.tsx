@@ -31,16 +31,19 @@ export const ConformityCredentialCheckbox = ({ onChange }: CheckboxFieldProps) =
     });
 
     const selectedItems = data?.filter((item) => newArray.includes(item.label));
-    const transformedData ={
-      conformityCredential: selectedItems?.map((item) => ({ [item.label]: item.value }))
-    }
-    // onChange({ data: selectedItems ?? [] });
+    const transformedData = {
+      conformityCredential: selectedItems?.map((item) => ({
+        name: item.label,
+        url: item.value,
+      })),
+    };
+
     onChange({ data: transformedData ?? [] });
   };
 
   useEffect(() => {
     const path = window.location.pathname;
-    let parts = path.split('/'); // ["", "farm", "digital-livestock"]
+    let parts = path.split('/');
     let category = parts[1].toLowerCase();
 
     const getConformityCredential = localStorage.getItem('conformityCredentials');
@@ -56,7 +59,7 @@ export const ConformityCredentialCheckbox = ({ onChange }: CheckboxFieldProps) =
   }, []);
 
   return (
-    <FormControl component='fieldset'>
+    <FormControl component='section' style={{ width: '80%', display: 'flex', margin: 'auto' }}>
       <FormLabel component='legend'>Conformity Credential</FormLabel>
       {data?.map(({ label, value }: CheckboxData, index: number) => (
         <FormGroup key={index}>
