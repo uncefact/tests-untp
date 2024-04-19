@@ -12,18 +12,3 @@ export type RequestConfig = {
 export interface IFetchFunction {
   (config: RequestConfig): Promise<any | string>;
 }
-
-export interface IContext {
-  [key: string]: any;
-}
-
-export type ExtendedOptions =
-  FetchOptions & {
-    bucket?: string;
-  };
-
-export interface IUploadCredentialConfig {
-  url: string;
-  options: ExtendedOptions;
-  params: any;
-}

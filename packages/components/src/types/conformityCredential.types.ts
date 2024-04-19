@@ -5,9 +5,8 @@ export type FetchOptions = {
 
 export interface IStoredCredentials {
   url: string;
-  options: {
-    bucket: string;
-  };
+
+  options?: any;
   params?: any;
   type?: string;
 }
