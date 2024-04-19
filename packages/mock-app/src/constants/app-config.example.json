@@ -203,6 +203,10 @@
               }
             },
             {
+              "name": "ConformityCredentialCheckbox",
+              "type": "EntryData"
+            },
+            {
               "name": "CustomButton",
               "type": "Submit",
               "props": {
@@ -211,6 +215,10 @@
             }
           ],
           "services": [
+            {
+              "name": "constructorEntryData",
+              "parameters": []
+            },
             {
               "name": "processObjectEvent",
               "parameters": [
@@ -580,6 +588,10 @@
               }
             },
             {
+              "name": "ConformityCredentialCheckbox",
+              "type": "EntryData"
+            },
+            {
               "name": "CustomButton",
               "type": "Submit",
               "props": {
@@ -588,6 +600,10 @@
             }
           ],
           "services": [
+            {
+              "name": "constructorEntryData",
+              "parameters": []
+            },
             {
               "name": "processObjectEvent",
               "parameters": [
