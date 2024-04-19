@@ -1095,68 +1095,6 @@
           ]
         }
       ]
-    },
-    {
-      "name": "Conformity Credential",
-      "type": "",
-      "assets": {
-        "logo": "",
-        "brandTitle": "Conformity Credential",
-        "passportVC": "",
-        "transactionEventVC": ""
-      },
-      "styles": {
-        "primaryColor": "rgb(41, 171, 48)",
-        "secondaryColor": "white",
-        "tertiaryColor": "black"
-      },
-      "features": [
-        {
-          "name": "Conformity Credential",
-          "id": "conformity_credential",
-          "components": [
-            {
-              "name": "ConformityCredential",
-              "type": "",
-              "props": {
-                "credentialRequestConfigs": [
-                  {
-                    "url": "http://example.com/credential-request",
-                    "params": {},
-                    "options": {
-                      "headers": [],
-                      "method": "POST"
-                    },
-                    "credentialName": "Deforestation Free Assessment",
-                    "credentialPath": "",
-                    "credentialAppExclusive": "Farm"
-                  },
-                  {
-                    "url": "http://example1.com/credential-request",
-                    "params": {},
-                    "options": {
-                      "headers": [],
-                      "method": "GET"
-                    },
-                    "credentialName": "CE Marking",
-                    "credentialPath": "",
-                    "credentialAppExclusive": "Feedlot"
-                  }
-                ],
-                "storedCredentials": {
-                  "url": "https://storage.example.com",
-                  "params": {},
-                  "options": {
-                    "bucket": "bucket-stored-example"
-                  },
-                  "type": "s3"
-                }
-              }
-            }
-          ],
-          "services": []
-        }
-      ]
     }
   ],
   "identifyProvider": {

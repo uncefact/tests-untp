@@ -16,7 +16,6 @@ export const error: <T>(message: string) => Result<T> = (message) => ({
  */
 export const checkStoredCredentials = (storedCredentials: IStoredCredentials): Result<IStoredCredentials> => {
   if (_.isEmpty(storedCredentials)) return error('Invalid upload credential config');
-
   if (_.isEmpty(storedCredentials.url)) return error('Invalid upload credential config url');
 
   return { ok: true, value: storedCredentials };

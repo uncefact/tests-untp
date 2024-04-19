@@ -6,7 +6,6 @@ import { publicAPI } from './utils/httpService.js';
  * @param url The URL to get the JSON data from
  * @returns The JSON data
  */
-
 export const getJsonDataFromConformityAPI: IFetchFunction = async (config: RequestConfig) => {
   const { url, params, options = { method: 'POST', headers: [] } } = config;
 
