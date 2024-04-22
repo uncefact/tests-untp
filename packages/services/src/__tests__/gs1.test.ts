@@ -138,11 +138,8 @@ describe('Gs1Provider', () => {
       expect(qualifierPath).toBe('/10/ABC123');
     });
 
-    it('should extract empty both identifier and qualifier from a an empty AI', () => {
-      const { identifier, qualifierPath } = gs1Provider.getLinkResolverIdentifier([]);
-
-      expect(identifier).toBe('');
-      expect(qualifierPath).toBe('');
+    it('should throw an invalid DLR AIs error if input is empty array', () => {
+      expect(() => gs1Provider.getLinkResolverIdentifier([])).toThrow('Invalid DLR AIs. At least one DLR AI is required to resolve the identifier.');
     });
 
     it('should throw an invalid DLR AIs error if input 01 and 8006 are primary keys present at the same time.', () => {

@@ -22,4 +22,8 @@ export class IdentityProvider {
   getCode(decodedText: string, formatName: string): string {
     return this.identityProviderStrategy.getCode(decodedText, formatName);
   }
+
+  getLinkResolverIdentifier(dlrAIs: IDLRAI[]): { identifier: string, qualifierPath: string } {
+    return this.identityProviderStrategy.getLinkResolverIdentifier(dlrAIs);
+  }
 }

@@ -22,11 +22,11 @@ jest.mock('../linkResolver.service', () => ({
 }));
 
 describe('processAggregationEvent', () => {
-  const { gtinMock, aggregationVCMock, uploadedAggregationEventLinkMock, aggregationEventDLRMock } = aggregationEventMock;
+  const { parentEPC, aggregationVCMock, uploadedAggregationEventLinkMock, aggregationEventDLRMock } = aggregationEventMock;
   const aggregationEvent = {
     data: {
-      parentItem: { itemID: gtinMock, name: 'Beef Variety Container' },
-      childItems: [{ itemID: 'http://example.com/beef-scotch-box.json', name: 'Beef Scotch Fillet Box' }],
+      parentEPC: { itemID: [{ ai: '01', value: '09359502000010' }], name: 'Beef Variety Container' },
+      childEPCs: [{ itemID: 'http://example.com/beef-scotch-box.json', name: 'Beef Scotch Fillet Box' }],
       childQuantityList: [{ productClass: 'Beef', quantity: '50', uom: 'box' }]
     },
   };
@@ -43,7 +43,7 @@ describe('processAggregationEvent', () => {
     },
     dlr: { dlrAPIUrl: 'http://exampleDLR.com', dlrAPIKey: 'test-key' },
     storage: { storageAPIUrl: 'https://storage.dlr.com', bucket: 'agtrace-test-verifiable-credentials' },
-    identifierKeyPaths: ['parentItem', 'itemID'],
+    identifierKeyPaths: ['parentEPC', 'itemID'],
   };
 
   it('should process aggregation event', async () => {
@@ -52,7 +52,7 @@ describe('processAggregationEvent', () => {
     jest
       .spyOn(validateContext, 'validateAggregationEventContext')
       .mockReturnValueOnce({ ok: true, value: context } as Result<IAggregationEventContext>);
-    jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(gtinMock);
+    jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(parentEPC);
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValueOnce(aggregationEventDLRMock);
 
     const aggregationVC = await processAggregationEvent(aggregationEvent, context);
@@ -109,7 +109,7 @@ describe('processAggregationEvent', () => {
       jest
         .spyOn(validateContext, 'validateAggregationEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as Result<IAggregationEventContext>);
-      jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(gtinMock);
+      jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(parentEPC);
       jest.spyOn(publicAPI, 'post').mockRejectedValueOnce("Can't issue VC");
 
       await processAggregationEvent(aggregationEvent, invalidIssuerContext);
@@ -131,7 +131,7 @@ describe('processAggregationEvent', () => {
       jest
         .spyOn(validateContext, 'validateAggregationEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as Result<IAggregationEventContext>);
-      jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(gtinMock);
+      jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(parentEPC);
       jest.spyOn(publicAPI, 'put').mockRejectedValueOnce('Invalid storage provider');
 
       await processAggregationEvent(aggregationEvent, invalidStorageContext);
@@ -155,7 +155,7 @@ describe('processAggregationEvent', () => {
       jest
         .spyOn(validateContext, 'validateAggregationEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as Result<IAggregationEventContext>);
-      jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(gtinMock);
+      jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(parentEPC);
       jest.spyOn(linkResolverService, 'createLinkResolver').mockRejectedValueOnce('Invalid DLR API link resolver url');
 
       await processAggregationEvent(aggregationEvent, invalidDLRContext);

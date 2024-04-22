@@ -65,7 +65,17 @@ export class GS1Provider implements IdentityProviderStrategy {
     return decodedText;
   }
 
+  /**
+   * This function is used to resolve the identifier and qualifier path from a list of DLR AIs.
+   * @param dlrAIs - An array of DLR AI objects. Each object should have 'ai' and 'value' properties.
+   * @throws {Error} Will throw an error if the dlrAIs array is empty or if both 01 and 8006 AIs are present as they are primary keys.
+   * @returns {Object} An object containing the resolved identifier and qualifier path.
+   */
   getLinkResolverIdentifier = (dlrAIs: IDLRAI[]): { identifier: string, qualifierPath: string } => {
+    if (!dlrAIs.length) {
+      throw new Error('Invalid DLR AIs. At least one DLR AI is required to resolve the identifier.');
+    }
+
     const primaryAIs = Object.values(PrimaryAIEnum) as string[];
     const isDlrAIsInvalid = primaryAIs.every(primaryAI => {
       const AIs = dlrAIs.map(dlrAI => dlrAI.ai);
@@ -87,5 +97,4 @@ export class GS1Provider implements IdentityProviderStrategy {
   
     return { identifier, qualifierPath };
   };
-
 }
