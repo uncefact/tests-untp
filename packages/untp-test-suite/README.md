@@ -73,10 +73,16 @@ This CLI tool is designed to facilitate the management and execution of the UNTP
 
 ### Installation
 
-Navigate to the `untp-test-suite` package folder. Type the following command into the terminal to install the UNTP Test Suite CLI Tool:
+Navigate to the `untp-test-suite` package folder. Build the `untp-test-suite` package:
 
 ```bash
-yarn install -g .
+yarn run build
+```
+
+Install the UNTP Test Suite CLI Tool:
+
+```bash
+npm install -g .
 ```
 
 Alternatively, you can run the UNTP test suite by typing the following command into the terminal console:
