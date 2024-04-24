@@ -1,6 +1,6 @@
 import moment from 'moment';
 import { EPCISEventType } from './types/epcis.js';
-import { IdentificationKeyType, LinkType } from './linkResolver.service.js';
+import { IdentificationKeyType, LinkType, getLinkResolverIdentifier } from './linkResolver.service.js';
 import { fillArray, generateUUID } from './utils/helpers.js';
 import { IProductTransformation } from './epcisEvents/types.js';
 
@@ -14,15 +14,21 @@ export const epcisTransformationCrendentialSubject = (
   inputItemList: any[],
   dlrUrl: string,
   productTransformation: IProductTransformation,
+  dlrIdentificationKeyType: IdentificationKeyType,
 ) => {
-  const { outputItems } = productTransformation;
-
   const countInputItems = fillArray(inputItemList, productTransformation.inputItems);
 
   const inputItems = inputItemList.map((item: string) => {
     return {
       productID: item,
       link: `${dlrUrl}/${IdentificationKeyType.nlisid}/${item}?linkType=${LinkType.certificationLinkType}`,
+    };
+  });
+
+  const outputItems = productTransformation.outputItems.map((item) => {
+    const { identifier, qualifierPath } = getLinkResolverIdentifier(item.productID);
+    return {
+      itemID: `${dlrUrl}/${dlrIdentificationKeyType}/${identifier}${qualifierPath}`,
     };
   });
 

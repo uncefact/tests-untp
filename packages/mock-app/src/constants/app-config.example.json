@@ -290,7 +290,20 @@
                           "enum": ["bol", "cert", "desadv", "inv", "po"]
                         },
                         "identifier": {
-                          "type": "string"
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "ai": {
+                                "type": "string",
+                                "title": "AI"
+                              },
+                              "value": {
+                                "type": "string",
+                                "title": "Value"
+                              }
+                            }
+                          }
                         },
                         "documentURL": {
                           "type": "string"
@@ -440,11 +453,21 @@
                             }
                           }
                         },
-                        "NLIS": {
-                          "title": "NLIS",
-                          "type": "string",
-                          "uniqueItems": true,
-                          "enum": ["NH020188LEJ00005", "NH020188LEJ00008", "NH020188LEJ00012"]
+                        "identifier": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "ai": {
+                                "type": "string",
+                                "title": "AI"
+                              },
+                              "value": {
+                                "type": "string",
+                                "title": "Value"
+                              }
+                            }
+                          }
                         },
                         "batchQrCode": {
                           "type": "string",
@@ -527,7 +550,7 @@
                           }
                         }
                       },
-                      "required": ["NLIS"]
+                      "required": ["identifier"]
                     },
                     "breed": {
                       "type": "object",
@@ -603,7 +626,7 @@
                     ],
                     "type": ["DigitalProductPassport"],
                     "dlrLinkTitle": "Livestock Passport",
-                    "dlrIdentificationKeyType": "nlisid",
+                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://dlr.example.com/verify"
                   },
 
@@ -615,7 +638,7 @@
                     "storageAPIUrl": "https://storage.example.com",
                     "bucket": "bucket-stored-example"
                   },
-                  "identifierKeyPaths": ["herd", "NLIS"]
+                  "identifierKeyPaths": ["herd", "identifier"]
                 }
               ]
             }
@@ -667,7 +690,20 @@
                           "enum": ["bol", "cert", "desadv", "inv", "po"]
                         },
                         "identifier": {
-                          "type": "string"
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "ai": {
+                                "type": "string",
+                                "title": "AI"
+                              },
+                              "value": {
+                                "type": "string",
+                                "title": "Value"
+                              }
+                            }
+                          }
                         },
                         "documentURL": {
                           "type": "string"
@@ -870,7 +906,10 @@
                     "inputItems": [{ "quantity": 1, "uom": "head", "productClass": "cattle" }],
                     "outputItems": [
                       {
-                        "productID": "9359502000041",
+                        "productID": {
+                          "01": "9359502000041",
+                          "10": "ABC123"
+                        },
                         "productClass": "Beef Silverside",
                         "quantity": 500,
                         "weight": 500,
@@ -879,7 +918,10 @@
                         "description": "Deforestation-free Beef Silverside"
                       },
                       {
-                        "productID": "9359502000034",
+                        "productID": {
+                          "01": "9359502000034",
+                          "10": "ABC123"
+                        },
                         "productClass": "Beef Scotch Fillet",
                         "quantity": 300,
                         "weight": 300,
@@ -888,7 +930,10 @@
                         "description": "Deforestation-free Beef Scotch Fillet"
                       },
                       {
-                        "productID": "9359502000010",
+                        "productID": {
+                          "01": "9359502000010",
+                          "10": "ABC123"
+                        },
                         "productClass": "Beef Rump Steak",
                         "quantity": 250,
                         "weight": 250,

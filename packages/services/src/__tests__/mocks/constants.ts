@@ -33,33 +33,60 @@ export const contextTransformationEvent = {
     inputItems: [{ quantity: 1, uom: 'head', productClass: 'cattle' }],
     outputItems: [
       {
-        productID: '9359502000041',
+        productID: [
+          {
+            ai: '01',
+            value: '9359502000041',
+          },
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
         productClass: 'Beef Silverside',
         quantity: 500,
         weight: 500,
         uom: 'kilogram',
         image:
-        'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000041/AgTace-Meats-Silverside.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
+          'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000041/AgTace-Meats-Silverside.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
         description: 'Deforestation-free Beef Silverside',
       },
       {
-        productID: '9359502000034',
+        productID: [
+          {
+            ai: '01',
+            value: '9359502000034',
+          },
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
         productClass: 'Beef Scotch Fillet',
         quantity: 300,
         weight: 300,
         uom: 'kilogram',
         image:
-        'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000034/Beef-Scotch-Fillet-Steak-300g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
+          'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000034/Beef-Scotch-Fillet-Steak-300g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
         description: 'Deforestation-free Beef Scotch Fillet',
       },
       {
-        productID: '9359502000010',
+        productID: [
+          {
+            ai: '01',
+            value: '9359502000010',
+          },
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
         productClass: 'Beef Rump Steak',
         quantity: 250,
         weight: 250,
         uom: 'kilogram',
         image:
-        'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000010/Beef-Rump-Steak-250g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
+          'https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000010/Beef-Rump-Steak-250g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D',
         description: 'Deforestation-free Beef Rump Steak',
       },
     ],
@@ -99,15 +126,16 @@ export const contextObjectEvent = {
     storageAPIUrl: 'https://storage.example.com',
     bucket: 'test-verifiable-credentials',
   },
-  identifierKeyPaths: ['herd', 'NLIS'],
+  identifierKeyPaths: ['herd', 'identifier'],
 };
 
 export const dataObjectEvent = {
   data: {
     herd: {
-      NLIS: 'NH020188LEJ00012',
+      identifier: '9359502000010',
     },
   },
+  qualifierPath: '/10/ABC123',
 };
 
 /*============================= */
