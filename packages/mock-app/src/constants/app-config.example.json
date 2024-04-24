@@ -916,7 +916,7 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "parentEPC": {
+                    "parentItem": {
                       "type": "object",
                       "title": "Parent Item",
                       "properties": {
@@ -943,7 +943,7 @@
                         }
                       }
                     },
-                    "childEPCs": {
+                    "childItems": {
                       "type": "array",
                       "title": "Child Items",
                       "items": {
@@ -1031,7 +1031,7 @@
                     "storageAPIUrl": "https://storage.example.com",
                     "bucket": "bucket-stored-example"
                   },
-                  "identifierKeyPaths": ["parentEPC", "itemID"]
+                  "identifierKeyPaths": ["parentItem", "itemID"]
                 }
               ]
             }

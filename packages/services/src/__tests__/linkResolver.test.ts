@@ -1,4 +1,4 @@
-import { IdentificationKeyType, createLinkResolver, registerLinkResolver } from '../linkResolver.service';
+import { IdentificationKeyType, createLinkResolver, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service';
 import { privateAPI } from '../utils/httpService';
 
 jest.mock('../utils/httpService', () => ({
@@ -71,5 +71,37 @@ describe('create link resolve service', () => {
     } catch (error: any) {
       expect(error.message).toEqual(errorMessage);
     }
+  });
+});
+
+describe('getLinkResolverIdentifier', () => {
+  it('should extract identifier and qualifier path from an gtin AI', () => {
+    const { identifier, qualifierPath } = getLinkResolverIdentifier([
+      { ai: '01', value: '09359502000010' }
+    ]);
+
+    expect(identifier).toBe('09359502000010');
+    expect(qualifierPath).toBe('');
+  });
+
+  it('should extract identifier and qualifier path from a combined multi AIs', () => {
+    const { identifier, qualifierPath } = getLinkResolverIdentifier([
+      { ai: '01', value: '09359502000010' },
+      { ai: '10', value: 'ABC123' }
+    ]);
+
+    expect(identifier).toBe('09359502000010');
+    expect(qualifierPath).toBe('/10/ABC123');
+  });
+
+  it('should throw an invalid DLR AIs error if input is empty array', () => {
+    expect(() => getLinkResolverIdentifier([])).toThrow('Invalid DLR AIs. At least one DLR AI is required to resolve the identifier.');
+  });
+
+  it('should throw an invalid DLR AIs error if input 01 and 8006 are primary keys present at the same time.', () => {
+    expect(() => getLinkResolverIdentifier([
+      { ai: '01', value: '09359502000010' },
+      { ai: '8006', value: 'ABC123' }
+    ])).toThrow('Invalid DLR AIs. Both 01 and 8006 are primary keys and cannot be present at the same time.');
   });
 });

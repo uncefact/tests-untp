@@ -9,11 +9,6 @@ export enum GS1ServiceEnum {
   serviceInfo = 'https://gs1.org/voc/serviceInfo',
 }
 
-export enum PrimaryAIEnum {
-  ITIP = '8006',
-  GTIN = '01',
-}
-
 const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
 
 export class GS1Provider implements IdentityProviderStrategy {
@@ -64,37 +59,4 @@ export class GS1Provider implements IdentityProviderStrategy {
 
     return decodedText;
   }
-
-  /**
-   * This function is used to resolve the identifier and qualifier path from a list of DLR AIs.
-   * @param dlrAIs - An array of DLR AI objects. Each object should have 'ai' and 'value' properties.
-   * @throws {Error} Will throw an error if the dlrAIs array is empty or if both 01 and 8006 AIs are present as they are primary keys.
-   * @returns {Object} An object containing the resolved identifier and qualifier path.
-   */
-  getLinkResolverIdentifier = (dlrAIs: IDLRAI[]): { identifier: string, qualifierPath: string } => {
-    if (!dlrAIs.length) {
-      throw new Error('Invalid DLR AIs. At least one DLR AI is required to resolve the identifier.');
-    }
-
-    const primaryAIs = Object.values(PrimaryAIEnum) as string[];
-    const isDlrAIsInvalid = primaryAIs.every(primaryAI => {
-      const AIs = dlrAIs.map(dlrAI => dlrAI.ai);
-      return AIs.includes(primaryAI);
-    });
-    if (isDlrAIsInvalid) {
-      throw new Error('Invalid DLR AIs. Both 01 and 8006 are primary keys and cannot be present at the same time.');
-    }
-  
-    const { identifier, qualifierPath } = dlrAIs.reduce((linkResolverIdentifier, currentAI) => {
-      if (primaryAIs.includes(currentAI.ai)) {
-        linkResolverIdentifier.identifier = currentAI.value;
-      } else {
-        linkResolverIdentifier.qualifierPath += `/${currentAI.ai}/${currentAI.value}`;
-      }
-  
-      return linkResolverIdentifier;
-    }, { identifier: '', qualifierPath: '' });
-  
-    return { identifier, qualifierPath };
-  };
 }

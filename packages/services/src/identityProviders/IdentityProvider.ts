@@ -1,9 +1,6 @@
-import { IDLRAI } from '../epcisEvents/types';
-
 export interface IdentityProviderStrategy {
   getDlrUrl: (code: string, providerUrl: string) => Promise<string | null>;
   getCode: (decodedText: string, formatName: string) => string;
-  getLinkResolverIdentifier: (dlrAIs: IDLRAI[]) => { identifier: string, qualifierPath: string };
 }
 
 export class IdentityProvider {
@@ -21,9 +18,5 @@ export class IdentityProvider {
 
   getCode(decodedText: string, formatName: string): string {
     return this.identityProviderStrategy.getCode(decodedText, formatName);
-  }
-
-  getLinkResolverIdentifier(dlrAIs: IDLRAI[]): { identifier: string, qualifierPath: string } {
-    return this.identityProviderStrategy.getLinkResolverIdentifier(dlrAIs);
   }
 }

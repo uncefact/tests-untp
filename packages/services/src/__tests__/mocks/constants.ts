@@ -133,7 +133,7 @@ export const transactionEventMock = {
 /*============================= */
 
 export const aggregationEventMock = {
-  parentEPC: [{ai: '01', value: '09359502000010'}],
+  parentItem: [{ai: '01', value: '09359502000010'}],
   uploadedAggregationEventLinkMock: `https://s3.ap-southeast-2.amazonaws.com/9988776600000.json`,
   aggregationEventDLRMock: `https://example.com/gtin/9988776600000.json`,
   aggregationVCMock: {

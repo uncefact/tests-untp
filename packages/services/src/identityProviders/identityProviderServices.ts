@@ -9,7 +9,6 @@ import { GS1Provider } from './GS1Provider.js';
 export function getProviderByType(providerType: string): IdentityProviderStrategy {
   switch(providerType) {
     case 'gs1': 
-    case 'gtin':
       return new GS1Provider();
 
     default:

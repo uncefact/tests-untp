@@ -85,10 +85,10 @@ const Verify = () => {
     setCurrentScreen(screen);
   };
 
-  const verifyCredential = async (credential: VerifiableCredential) => {
+  const verifyCredential = async (verifiableCredential: VerifiableCredential) => {
     try {
       const verifyCredentialParams = {
-        credential,
+        verifiableCredential,
         fetchRemoteContexts: true,
         policies: {
           credentialStatus: true,

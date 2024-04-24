@@ -1,3 +1,4 @@
+import { IDLRAI } from './epcisEvents/types.js';
 import { GS1ServiceEnum } from './identityProviders/GS1Provider.js';
 import { MimeTypeEnum } from './types/types.js';
 import { privateAPI } from './utils/httpService.js';
@@ -236,4 +237,37 @@ export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
 
   // Return the found DLR passport
   return dlrPassport;
+};
+
+/**
+ * This function is used to resolve the identifier and qualifier path from a list of DLR AIs.
+ * @param dlrAIs - An array of DLR AI objects. Each object should have 'ai' and 'value' properties.
+ * @throws {Error} Will throw an error if the dlrAIs array is empty or if both 01 and 8006 AIs are present as they are primary keys.
+ * @returns {Object} An object containing the resolved identifier and qualifier path.
+ */
+export const getLinkResolverIdentifier = (dlrAIs: IDLRAI[]): { identifier: string, qualifierPath: string } => {
+  if (!dlrAIs.length) {
+    throw new Error('Invalid DLR AIs. At least one DLR AI is required to resolve the identifier.');
+  }
+
+  const primaryAIs = ['01', '8006'];
+  const isDlrAIsInvalid = primaryAIs.every(primaryAI => {
+    const AIs = dlrAIs.map(dlrAI => dlrAI.ai);
+    return AIs.includes(primaryAI);
+  });
+  if (isDlrAIsInvalid) {
+    throw new Error('Invalid DLR AIs. Both 01 and 8006 are primary keys and cannot be present at the same time.');
+  }
+
+  const { identifier, qualifierPath } = dlrAIs.reduce((linkResolverIdentifier, currentAI) => {
+    if (primaryAIs.includes(currentAI.ai)) {
+      linkResolverIdentifier.identifier = currentAI.value;
+    } else {
+      linkResolverIdentifier.qualifierPath += `/${currentAI.ai}/${currentAI.value}`;
+    }
+
+    return linkResolverIdentifier;
+  }, { identifier: '', qualifierPath: '' });
+
+  return { identifier, qualifierPath };
 };
