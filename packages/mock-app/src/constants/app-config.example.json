@@ -33,7 +33,7 @@
                     },
                     "credentialName": "Deforestation Free Assessment",
                     "credentialPath": "/body/credentil",
-                    "credentialAppExclusive": "Farm"
+                    "appOnly": "Farm"
                   },
                   {
                     "url": "http://example.com/ce",
@@ -44,7 +44,7 @@
                     },
                     "credentialName": "CE Marking",
                     "credentialPath": "",
-                    "credentialAppExclusive": "Farm"
+                    "appOnly": "Farm"
                   },
                   {
                     "url": "http://example.com/conformity",
@@ -54,10 +54,10 @@
                       "method": "POST"
                     },
                     "credentialName": "Conformity",
-                    "credentialAppExclusive": "Feedlot"
+                    "appOnly": "Feedlot"
                   }
                 ],
-                "storedCredentials": {
+                "storedCredentialsConfig": {
                   "url": "https://storage.example.com",
                   "params": {},
                   "options": {

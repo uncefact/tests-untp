@@ -5,23 +5,22 @@ import { LoadingButton } from '@mui/lab';
 import { Table, TableBody, TableCell, TableRow, TableContainer, TableHead, Paper } from '@mui/material';
 import { uploadJson, generateUUID, getJsonDataFromConformityAPI } from '@mock-app/services';
 
-import { checkStoredCredentials, getCredentialByPath } from './utils.js';
+import { checkStoredCredentialsConfig, getCredentialByPath } from './utils.js';
 import { Status, ToastMessage, toastMessage } from '../ToastMessage/ToastMessage.js';
 import {
   IConformityCredentialProps,
   ICredentialRequestConfig,
   IConformityCredential,
 } from '../../types/conformityCredential.types.js';
-
-export const STORAGE_KEY = 'conformityCredentials';
+import { STORAGE_KEY } from '../../constants/conformityCredential.js';
 
 export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
   credentialRequestConfigs,
-  storedCredentials,
+  storedCredentialsConfig,
 }) => {
   const [conformityCredentials, setConformityCredentials] = useState<string>();
   const [loading, setLoading] = useState<boolean>(false);
-  const [loadingButtonIndex, setLoadingButtonIndex] = useState<number>(-1);
+  const [disabledButtonByIndex, setDisabledButtonByIndex] = useState<number>(-1);
 
   // Render buttons based on credentialConfigs
   const renderButtons = () => {
@@ -35,10 +34,10 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
           component='label'
           variant='outlined'
           key={config.credentialName}
-          loading={loading && loadingButtonIndex === index}
-          disabled={loading && loadingButtonIndex !== index}
+          loading={loading && disabledButtonByIndex === index}
+          disabled={loading && disabledButtonByIndex !== index}
           onClick={() => {
-            setLoadingButtonIndex(index);
+            setDisabledButtonByIndex(index);
             onClickStorageCredential(config);
           }}
         >
@@ -91,12 +90,12 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
   }, [conformityCredentials]);
 
   // Helper function to save credentials
-  const saveConformityCredentials = (credentialName: string, url: string, credentialAppExclusive: string) => {
+  const saveConformityCredentials = (credentialName: string, url: string, appOnly: string) => {
     let storedData = localStorage.getItem(STORAGE_KEY);
     let dataObject = storedData ? JSON.parse(storedData) : {};
 
     // Update the data with the new credential
-    let credentialAppData = dataObject[credentialAppExclusive] ?? [];
+    let credentialAppData = dataObject[appOnly] ?? [];
     let existingCredentialIndex = credentialAppData.findIndex((credential: any) => credential.name === credentialName);
     if (existingCredentialIndex !== -1) {
       // Update an existing credential
@@ -108,7 +107,7 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
       // Add a new credential
       credentialAppData.push({ name: credentialName, url });
     }
-    dataObject[credentialAppExclusive] = credentialAppData;
+    dataObject[appOnly] = credentialAppData;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataObject));
 
     toastMessage({ status: Status.success, message: 'Conformity credentials have been saved' });
@@ -148,16 +147,20 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
 
       // Save the credentials to the local storage if the data is a url string
       if (_.isString(extractedCredential)) {
+        if (!new URL(extractedCredential)) {
+          showErrorAndStopLoading('Data should be URL');
+          return;
+        }
         saveConformityCredentials(
           credentialRequestConfig.credentialName,
           extractedCredential,
-          credentialRequestConfig.credentialAppExclusive,
+          credentialRequestConfig.appOnly,
         );
         return;
       }
 
       // Check if the stored credentials are valid
-      const { ok, value } = checkStoredCredentials(storedCredentials);
+      const { ok, value } = checkStoredCredentialsConfig(storedCredentialsConfig);
       if (!ok) {
         showErrorAndStopLoading(value);
         return;
@@ -167,15 +170,11 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
       const vcUrl = await uploadJson({
         filename: generateUUID(),
         json: extractedCredential,
-        bucket: storedCredentials?.options?.bucket as string,
-        storageAPIUrl: storedCredentials.url,
+        bucket: storedCredentialsConfig?.options?.bucket as string,
+        storageAPIUrl: storedCredentialsConfig.url,
       });
 
-      saveConformityCredentials(
-        credentialRequestConfig.credentialName,
-        vcUrl,
-        credentialRequestConfig.credentialAppExclusive,
-      );
+      saveConformityCredentials(credentialRequestConfig.credentialName, vcUrl, credentialRequestConfig.appOnly);
 
       return;
     } catch (error) {

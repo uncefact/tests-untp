@@ -3,7 +3,7 @@ import { act } from 'react-dom/test-utils';
 import { ConformityCredential } from '../components';
 import { FetchOptions } from '../types/conformityCredential.types';
 import { getJsonDataFromConformityAPI, uploadJson } from '@mock-app/services';
-import { checkStoredCredentials, getCredentialByPath } from '../components/ConformityCredential/utils';
+import { checkStoredCredentialsConfig, getCredentialByPath } from '../components/ConformityCredential/utils';
 
 jest.mock('@mock-app/services', () => ({
   uploadJson: jest.fn(),
@@ -19,7 +19,7 @@ jest.mock('../components/ToastMessage/ToastMessage', () => ({
 
 jest.mock('../components/ConformityCredential/utils', () => ({
   getCredentialByPath: jest.fn(),
-  checkStoredCredentials: jest.fn(),
+  checkStoredCredentialsConfig: jest.fn(),
 }));
 
 describe('ConformityCredential', () => {
@@ -38,11 +38,11 @@ describe('ConformityCredential', () => {
         } as FetchOptions,
         credentialName: 'Deforestation Free Assessment',
         credentialPath: '',
-        credentialAppExclusive: '',
+        appOnly: '',
       },
     ];
 
-    const storedCredentials = {
+    const storedCredentialsConfig = {
       url: 'https://example.com',
       options: {
         bucket: 'example',
@@ -52,7 +52,7 @@ describe('ConformityCredential', () => {
     render(
       <ConformityCredential
         credentialRequestConfigs={credentialRequestConfigs}
-        storedCredentials={storedCredentials}
+        storedCredentialsConfig={storedCredentialsConfig}
       />,
     );
 
@@ -76,11 +76,11 @@ describe('ConformityCredential', () => {
         } as FetchOptions,
         credentialName: 'Deforestation Free Assessment',
         credentialPath: '',
-        credentialAppExclusive: 'Farm',
+        appOnly: 'Farm',
       },
     ];
 
-    const storedCredentials = {
+    const storedCredentialsConfig = {
       url: 'https://storage.example.com',
       params: {},
       options: {
@@ -98,7 +98,7 @@ describe('ConformityCredential', () => {
         render(
           <ConformityCredential
             credentialRequestConfigs={credentialRequestConfigs}
-            storedCredentials={storedCredentials}
+            storedCredentialsConfig={storedCredentialsConfig}
           />,
         );
       });
@@ -136,14 +136,14 @@ describe('ConformityCredential', () => {
 
       (getJsonDataFromConformityAPI as jest.Mock).mockResolvedValue(apiResp);
       (getCredentialByPath as jest.Mock).mockReturnValue(apiResp);
-      (checkStoredCredentials as jest.Mock).mockReturnValue({ ok: true, value: '' });
+      (checkStoredCredentialsConfig as jest.Mock).mockReturnValue({ ok: true, value: '' });
       (uploadJson as jest.Mock).mockResolvedValue('https://storage.example.com/credential');
 
       await act(async () => {
         render(
           <ConformityCredential
             credentialRequestConfigs={credentialRequestConfigs}
-            storedCredentials={storedCredentials}
+            storedCredentialsConfig={storedCredentialsConfig}
           />,
         );
       });
@@ -170,14 +170,14 @@ describe('ConformityCredential', () => {
           } as FetchOptions,
           credentialName: 'Deforestation Free Assessment',
           credentialPath: '',
-          credentialAppExclusive: '',
+          appOnly: '',
         },
       ];
       await act(async () => {
         render(
           <ConformityCredential
             credentialRequestConfigs={newCredentialRequestConfigs}
-            storedCredentials={storedCredentials}
+            storedCredentialsConfig={storedCredentialsConfig}
           />,
         );
       });
@@ -198,7 +198,7 @@ describe('ConformityCredential', () => {
         render(
           <ConformityCredential
             credentialRequestConfigs={credentialRequestConfigs}
-            storedCredentials={storedCredentials}
+            storedCredentialsConfig={storedCredentialsConfig}
           />,
         );
       });
@@ -234,13 +234,16 @@ describe('ConformityCredential', () => {
 
       (getJsonDataFromConformityAPI as jest.Mock).mockResolvedValue(apiResp);
       (getCredentialByPath as jest.Mock).mockReturnValue(apiResp);
-      (checkStoredCredentials as jest.Mock).mockReturnValue({ ok: false, value: 'Invalid upload credential config' });
+      (checkStoredCredentialsConfig as jest.Mock).mockReturnValue({
+        ok: false,
+        value: 'Invalid upload credential config',
+      });
 
       await act(async () => {
         render(
           <ConformityCredential
             credentialRequestConfigs={credentialRequestConfigs}
-            storedCredentials={{
+            storedCredentialsConfig={{
               url: '',
               options: {
                 bucket: '',
@@ -265,7 +268,7 @@ describe('ConformityCredential', () => {
         render(
           <ConformityCredential
             credentialRequestConfigs={credentialRequestConfigs}
-            storedCredentials={storedCredentials}
+            storedCredentialsConfig={storedCredentialsConfig}
           />,
         );
       });
@@ -276,6 +279,28 @@ describe('ConformityCredential', () => {
       });
 
       expect(screen.findByText('Something went wrong! Please retry again')).not.toBeNull();
+    });
+
+    it('should throw error when data from API is not a url', async () => {
+      const url = 'https://';
+      (getJsonDataFromConformityAPI as jest.Mock).mockResolvedValue(url);
+      (getCredentialByPath as jest.Mock).mockReturnValue(url);
+
+      await act(async () => {
+        render(
+          <ConformityCredential
+            credentialRequestConfigs={credentialRequestConfigs}
+            storedCredentialsConfig={storedCredentialsConfig}
+          />,
+        );
+      });
+
+      await act(async () => {
+        const credentialButton = screen.getByText('Deforestation Free Assessment');
+        fireEvent.click(credentialButton);
+      });
+
+      expect(screen.findByText('Data should be URL')).not.toBeNull();
     });
   });
 });

@@ -3,7 +3,7 @@ export type FetchOptions = {
   headers?: any;
 };
 
-export interface IStoredCredentials {
+export interface IStoredCredentialsConfig {
   url: string;
 
   options?: any;
@@ -15,13 +15,13 @@ export interface ICredentialRequestConfig {
   params: any;
   credentialName: string;
   credentialPath: string;
-  credentialAppExclusive: string;
+  appOnly: string;
   options?: FetchOptions;
 }
 
 export interface IConformityCredentialProps {
   credentialRequestConfigs: ICredentialRequestConfig[];
-  storedCredentials: IStoredCredentials;
+  storedCredentialsConfig: IStoredCredentialsConfig;
 }
 
 export interface IConformityCredential {

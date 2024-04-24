@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { IStoredCredentials } from '../../types/conformityCredential.types.js';
+import { IStoredCredentialsConfig } from '../../types/conformityCredential.types.js';
 import JSONPointer from 'jsonpointer';
 
 export type Result<T> = { ok: true; value: T } | { ok: false; value: string };
@@ -11,14 +11,16 @@ export const error: <T>(message: string) => Result<T> = (message) => ({
 
 /**
  * Check if the stored credentials are valid
- * @param storedCredentials Stored credentials
+ * @param storedCredentialsConfig Stored credentials
  * @returns The stored credentials if they are valid
  */
-export const checkStoredCredentials = (storedCredentials: IStoredCredentials): Result<IStoredCredentials> => {
-  if (_.isEmpty(storedCredentials)) return error('Invalid upload credential config');
-  if (_.isEmpty(storedCredentials.url)) return error('Invalid upload credential config url');
+export const checkStoredCredentialsConfig = (
+  storedCredentialsConfig: IStoredCredentialsConfig,
+): Result<IStoredCredentialsConfig> => {
+  if (_.isEmpty(storedCredentialsConfig)) return error('Invalid upload credential config');
+  if (_.isEmpty(storedCredentialsConfig.url)) return error('Invalid upload credential config url');
 
-  return { ok: true, value: storedCredentials };
+  return { ok: true, value: storedCredentialsConfig };
 };
 
 /**

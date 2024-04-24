@@ -1,4 +1,4 @@
-import { getCredentialByPath, checkStoredCredentials } from '../components/ConformityCredential/utils';
+import { getCredentialByPath, checkStoredCredentialsConfig } from '../components/ConformityCredential/utils';
 
 describe('checkStoredCredentials', () => {
   it('should return the stored credentials if they are valid', () => {
@@ -9,14 +9,14 @@ describe('checkStoredCredentials', () => {
       },
     };
 
-    const result = checkStoredCredentials(storedCredentials);
+    const result = checkStoredCredentialsConfig(storedCredentials);
 
     expect(result).toEqual({ ok: true, value: storedCredentials });
   });
 
   it('should throw an error if the stored credentials are invalid', () => {
     //@ts-ignore
-    const result = checkStoredCredentials({});
+    const result = checkStoredCredentialsConfig({});
     expect(result).toEqual({ ok: false, value: 'Invalid upload credential config' });
   });
 
@@ -28,14 +28,14 @@ describe('checkStoredCredentials', () => {
       },
     };
 
-    const result = checkStoredCredentials(storedCredentials);
+    const result = checkStoredCredentialsConfig(storedCredentials);
 
     expect(result).toEqual({ ok: false, value: 'Invalid upload credential config url' });
   });
 
   it('should throw an error if the stored credentials are nil', () => {
     //@ts-ignore
-    const result = checkStoredCredentials(undefined);
+    const result = checkStoredCredentialsConfig(undefined);
     expect(result).toEqual({ ok: false, value: 'Invalid upload credential config' });
   });
 });
