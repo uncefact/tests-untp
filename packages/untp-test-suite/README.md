@@ -135,6 +135,63 @@ or
 yarn run untp test --config path/to/credentials.json
 ```
 
+## UNTP Test Suite Library
+
+This repository contains two UNTP Test Suite Library functions for running the UNTP test suite. The `testCredentialsHandler` function is designed to handle testing of multiple credentials against their respective schemas and generates a final report. Depending on the data passed to the function, it will execute corresponding actions. Additionally, the `testCredentialHandler` function is specialized for testing a credential based on a credential schema configuration.
+
+### Installation
+
+Navigate to the `untp-test-suite` package folder. Build the `untp-test-suite` package:
+
+```bash
+yarn run build
+```
+
+To use these functions in your project locally, follow these steps:
+
+1. Navigate to the `build` folder inside the `untp-test-suite` package folder.
+2. Run `npm link` command.
+
+Now, go to your project folder where you want to integrate the UNTP Test Suite. Initialize a `package.json` file using the `npm init` command. After the `package.json` file is generated, add the following line to it, as the library is an ES module:
+
+```json
+"type": "module"
+```
+
+Then, install the UNTP Test Suite to the `node_modules` directory of your project by using the `npm link untp-test-suite` command. Now you can use the UNTP Test Suite for your project.
+
+If you want to run UNTP tests with a configuration file, then create a `credentials.json` file by using the UNTP Test Suite CLI tool. Type the following command in your terminal:
+
+```bash
+untp config
+```
+
+The `credentials.json` file will be generated in the current directory.
+
+Open the `credentials.json` file and update it with the following structure, including the `type` and `version` fields, along with the `dataPath` field pointing to the file you want to use for running the UNTP test suite:
+
+```json
+{
+  "type": "aggregationEvent", // Example event schema type
+  "version": "v0.0.1", // Example event schema version
+  "dataPath": "/path/to/your/data/file" // Example test data path
+}
+```
+
+Now, use the `testCredentialsHandler` function in your project and pass the path to the `credentials.json` file as an argument to the function:
+
+```js
+const credentialsFilePath = '/path/to/credentials.json';
+
+testCredentialsHandler(credentialsFilePath)
+  .then(results => {
+    // Handle the test results here
+  })
+  .catch(error => {
+    // Handle any errors here
+  });
+```
+
 ## Integration test
 
 The integration test is used to test the UNTP Test Suite's interface, such as cli and library.
