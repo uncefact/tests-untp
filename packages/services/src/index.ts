@@ -6,3 +6,4 @@ export * from './storage.service.js';
 export * from './utils/index.js';
 export * from './identityProviders/index.js';
 export * from './features/index.js';
+export * from './api.service.js';
