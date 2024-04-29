@@ -1,6 +1,6 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import { issueVC } from '../vckit.service.js';
-import { uploadJson } from '../storage.service.js';
+import { getStorageServiceLink } from '../storage.service.js';
 import { IdentificationKeyType, registerLinkResolver } from '../linkResolver.service.js';
 import { IService } from '../types/IService.js';
 import { ITraceabilityEvent, IAggregationEventContext } from './types';
@@ -9,7 +9,10 @@ import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { validateAggregationEventContext } from './validateContext.js';
 import { EPCISBusinessStepCode, EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
 
-export const processAggregationEvent: IService = async (aggregationEvent: ITraceabilityEvent, context: IAggregationEventContext): Promise<VerifiableCredential> => {
+export const processAggregationEvent: IService = async (
+  aggregationEvent: ITraceabilityEvent,
+  context: IAggregationEventContext,
+): Promise<VerifiableCredential> => {
   const validationResult = validateAggregationEventContext(context);
   if (!validationResult.ok) {
     throw new Error(validationResult.value);
@@ -42,13 +45,8 @@ export const processAggregationEvent: IService = async (aggregationEvent: ITrace
       render: epcisAggregationEvent.renderTemplate,
     },
   });
-
-  const aggregationVCLink = await uploadJson({
-    filename: `${identifier}/${generateUUID()}`,
-    json: aggregationVC,
-    bucket: storage.bucket,
-    storageAPIUrl: storage.storageAPIUrl,
-  });
+  
+  const aggregationVCLink = await getStorageServiceLink(storage, aggregationVC, `${identifier}/${generateUUID()}`);
 
   await registerLinkResolver(
     aggregationVCLink,

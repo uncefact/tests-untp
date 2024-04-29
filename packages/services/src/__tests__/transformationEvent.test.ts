@@ -6,7 +6,7 @@ import {
 } from '../epcisEvents/transformationEvent';
 import { issueVC, contextDefault } from '../vckit.service';
 import { epcisTransformationCrendentialSubject } from '../epcis.service';
-import { uploadJson } from '../storage.service';
+import { getStorageServiceLink } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
 import { fillArray } from '../utils/helpers';
 import { IInputItems } from '../epcisEvents/types';
@@ -22,7 +22,7 @@ jest.mock('../epcis.service', () => ({
 }));
 
 jest.mock('../storage.service', () => ({
-  uploadJson: jest.fn(),
+  getStorageServiceLink: jest.fn(),
 }));
 
 jest.mock('../linkResolver.service', () => ({
@@ -110,11 +110,8 @@ describe('Transformation event', () => {
     });
 
     it('should upload vc and return link to the uploaded json file', async () => {
-      let expectResult = '';
-      (uploadJson as jest.Mock).mockImplementation(({ filename, bucket }: { filename: string; bucket: string }) => {
-        expectResult = `https://${bucket}.s3.ap-southeast-2.amazonaws.com/${filename}`;
-        return expectResult;
-      });
+      let expectResult = 'http://localhost/epcis-transformation-event/1234';
+      (getStorageServiceLink as jest.Mock).mockResolvedValue(expectResult);
       const mockVc = {
         '@context': ['https://www.w3.org/2018/credentials/v1'],
         type: ['VerifiableCredential', 'MockEvent'],
@@ -132,7 +129,7 @@ describe('Transformation event', () => {
       };
 
       const filename = 'epcis-transformation-event/1234';
-      const urlUpload = await uploadVC(filename, mockVc, { storageAPIUrl: 'http://localhost', bucket: 'bucket' });
+      const urlUpload = await uploadVC(filename, mockVc, { url: 'http://localhost', params: { resultPath: '' } });
       expect(urlUpload).toEqual(expectResult);
     });
 
@@ -200,8 +197,8 @@ describe('Transformation event', () => {
     });
 
     it('should call registerLinkResolver transformation event', async () => {
-      (uploadJson as jest.Mock).mockImplementation(() => {
-        return `https://bucket.s3.ap-southeast-2.amazonaws.com/epcis-transformation-event/1234`;
+      (getStorageServiceLink as jest.Mock).mockImplementation(({ url, _data, path }) => {
+        return `${url}/${path}`;
       });
       (registerLinkResolver as jest.Mock).mockImplementation(
         (
@@ -338,7 +335,7 @@ describe('Transformation event', () => {
       }
     });
 
-    it('should throw error when context is empty productTransformation field', async () => {
+    it('should throw error when context is empty storage field', async () => {
       const newContext = {
         ...contextTransformationEvent,
         storage: [],

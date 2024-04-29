@@ -26,8 +26,10 @@ export const contextTransformationEvent = {
     dlrAPIKey: '5555555555555',
   },
   storage: {
-    storageAPIUrl: 'https://storage.agtrace.showthething.com',
-    bucket: 'agtrace-test-verifiable-credentials',
+    url: 'https://storage.example.com',
+    params: {
+      resultPath: '',
+    }
   },
   productTransformation: {
     inputItems: [{ quantity: 1, uom: 'head', productClass: 'cattle' }],
@@ -96,8 +98,10 @@ export const contextObjectEvent = {
     dlrAPIKey: '1234',
   },
   storage: {
-    storageAPIUrl: 'https://storage.example.com',
-    bucket: 'test-verifiable-credentials',
+    url: 'https://storage.example.com',
+    params: {
+      resultPath: '',
+    },
   },
   identifierKeyPaths: ['herd', 'NLIS'],
 };
