@@ -107,7 +107,7 @@ The default verification service link configuration has the following structure:
 
 # How to configure the mock app to demonstrate the working of your system
 
-First, you can copy the example configuration `packages/mock-app/src/constants/app-config.example.ts` to `packages/mock-app/src/constants/app-config.ts` and modify the configuration file.
+First, you can copy the example configuration `packages/mock-app/src/constants/app-config.example.json` to `packages/mock-app/src/constants/app-config.json` and modify the configuration file.
 
 Then, you need to figure out your apps system, for example, in the example we used the `red meat` domain that has 3 apps: farm, feedlot, and processor. Now you need to list down the main feature of the apps that impact the supply chain system, the features is represented by the [traceability events](https://uncefact.github.io/spec-untp/docs/specification/TraceabilityEvents) such as `object event`, `aggregation event`, `transformation event`, and `transaction event`.
 For example, the `farm` app has the `object event` in the breeding process, the `feedlot` app has the `transaction event` in the selling process, and the `processor` app has the `transformation event` in the processing process.
@@ -397,7 +397,7 @@ The conformity credentials request are built as a component with the name `Confo
                     "appOnly": "Farm" // The app that can receive the conformity credential when issue the credential
                   }
                 ],
-                "storage": {
+                "storedCredentialsConfig": {
                   "url": "https://storage.example.com",
                   "params": {},
                   "options": {
