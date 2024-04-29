@@ -2,11 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { act } from 'react-dom/test-utils';
 import { ConformityCredential } from '../components';
 import { FetchOptions } from '../types/conformityCredential.types';
-import { getJsonDataFromConformityAPI, uploadJson } from '@mock-app/services';
+import { getJsonDataFromConformityAPI, getStorageServiceLink } from '@mock-app/services';
 import { checkStoredCredentialsConfig, getCredentialByPath } from '../components/ConformityCredential/utils';
 
 jest.mock('@mock-app/services', () => ({
-  uploadJson: jest.fn(),
+  getStorageServiceLink: jest.fn(),
   generateUUID: jest.fn(),
   getJsonDataFromConformityAPI: jest.fn(),
 }));
@@ -44,8 +44,8 @@ describe('ConformityCredential', () => {
 
     const storedCredentialsConfig = {
       url: 'https://example.com',
-      options: {
-        bucket: 'example',
+      params: {
+        resultPath: '',
       },
     };
 
@@ -81,12 +81,10 @@ describe('ConformityCredential', () => {
     ];
 
     const storedCredentialsConfig = {
-      url: 'https://storage.example.com',
-      params: {},
-      options: {
-        bucket: 'bucket-stored-example',
+      url: 'https://example.com',
+      params: {
+        resultPath: '',
       },
-      type: 's3',
     };
 
     it('should save credential as string when trigger onClickStorageCredential function', async () => {
@@ -137,7 +135,7 @@ describe('ConformityCredential', () => {
       (getJsonDataFromConformityAPI as jest.Mock).mockResolvedValue(apiResp);
       (getCredentialByPath as jest.Mock).mockReturnValue(apiResp);
       (checkStoredCredentialsConfig as jest.Mock).mockReturnValue({ ok: true, value: '' });
-      (uploadJson as jest.Mock).mockResolvedValue('https://storage.example.com/credential');
+      (getStorageServiceLink as jest.Mock).mockResolvedValue('https://storage.example.com/credential');
 
       await act(async () => {
         render(
@@ -245,9 +243,8 @@ describe('ConformityCredential', () => {
             credentialRequestConfigs={credentialRequestConfigs}
             storedCredentialsConfig={{
               url: '',
-              options: {
-                bucket: '',
-              },
+              //@ts-ignore
+              params:{},
             }}
           />,
         );

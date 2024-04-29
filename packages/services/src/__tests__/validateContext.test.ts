@@ -161,25 +161,25 @@ describe('validateContext', () => {
         ...contextObjectEvent,
         storage: {
           ...contextObjectEvent.storage,
-          storageAPIUrl: '',
+          url: '',
         },
       };
       const result = validateContextObjectEvent(newContext as any);
       expect(result.ok).toBe(false);
-      expect(result.value).toEqual('Invalid storageAPIUrl');
+      expect(result.value).toEqual('Invalid storage url');
     });
 
-    it('should return error when bucket in storage context is invalid', () => {
+    it('should return error when params in storage context is invalid', () => {
       const newContext = {
         ...contextObjectEvent,
         storage: {
           ...contextObjectEvent.storage,
-          bucket: '',
+          params: {},
         },
       };
       const result = validateContextObjectEvent(newContext as any);
       expect(result.ok).toBe(false);
-      expect(result.value).toEqual('Invalid bucket');
+      expect(result.value).toEqual('Invalid storage params');
     });
 
     it('should return error when dlrAPIUrl in dlr context is invalid', () => {
