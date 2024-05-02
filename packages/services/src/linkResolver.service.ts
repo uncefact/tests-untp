@@ -254,6 +254,17 @@ export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
  * @param {string} elementString - The GS1 element string.
  * @returns {{ identifier: string, qualifierPath: string }} - An object containing the identifier and qualifier path.
  * @throws {Error} Throws an error if the element string contains more or less than one primary identification key.
+ * 
+ * How to use:
+  try {
+    const elementString = '(01)09359502000010(10)ABC123';
+    const { identifier, qualifierPath } = getLinkResolverIdentifier(elementString);
+
+    console.log('Identifier:', identifier);
+    console.log('Qualifier Path:', qualifierPath);
+  } catch (error) {
+    console.error(error.message);
+  }
  */
 export const getLinkResolverIdentifier = (elementString: string): { identifier: string, qualifierPath: string } => {
   // Instantiate GS1DigitalLinkToolkit to utilize its methods
