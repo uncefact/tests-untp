@@ -57,5 +57,4 @@ export class GS1Provider implements IdentityProviderStrategy {
 
     return decodedText;
   }
-
 }

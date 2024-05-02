@@ -6,7 +6,7 @@ import { generateUUID } from '../utils/helpers.js';
 
 import { uploadJson } from '../storage.service.js';
 import { issueVC } from '../vckit.service.js';
-import { registerLinkResolver } from '../linkResolver.service.js';
+import { getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { validateContextObjectEvent } from './validateContext.js';
 
 /**
@@ -20,20 +20,22 @@ export const processObjectEvent: IService = async (data: any, context: IContext)
     const validationResult = validateContextObjectEvent(context);
     if (!validationResult.ok) throw new Error(validationResult.value);
 
+    const objectIdentifier = getIdentifierByObjectKeyPaths(data.data, context.identifierKeyPaths);
+    if (!objectIdentifier) throw new Error('Identifier not found');
+
+    const { identifier, qualifierPath } = getLinkResolverIdentifier(objectIdentifier);
+
     const vckitContext = context.vckit;
     const dppContext = context.dpp;
     const restOfVC = { render: dppContext?.renderTemplate ?? [] };    
     const vc: VerifiableCredential = await issueVC({
       context: dppContext.context,
-      credentialSubject: data.data,
+      credentialSubject: {itemList: [{ itemID: `${context.dlr.dlrAPIUrl}/${context.dpp.dlrIdentificationKeyType}/${identifier}${qualifierPath}` }]},
       issuer: vckitContext.issuer,
       type: [...dppContext.type],
       vcKitAPIUrl: vckitContext.vckitAPIUrl,
       restOfVC,
     });
-
-    const identifier = getIdentifierByObjectKeyPaths(data.data, context.identifierKeyPaths) as string;
-    if (!identifier) throw new Error('Identifier not found');
 
     const storageContext = context.storage;
 
@@ -53,6 +55,7 @@ export const processObjectEvent: IService = async (data: any, context: IContext)
       dppContext.dlrVerificationPage,
       linkResolverContext.dlrAPIUrl,
       linkResolverContext.dlrAPIKey,
+      qualifierPath
     );
 
     return vc;
