@@ -24,8 +24,7 @@ export interface IEntityIssue extends ICredential, ILinkResolverContext {
 }
 
 export interface IDLRAI {
-  ai: string;
-  value: string;
+  [key: string]: string;
 }
 
 export interface IConfigDLR {

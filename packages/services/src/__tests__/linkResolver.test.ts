@@ -75,33 +75,50 @@ describe('create link resolve service', () => {
 });
 
 describe('getLinkResolverIdentifier', () => {
-  it('should extract identifier and qualifier path from an gtin AI', () => {
-    const { identifier, qualifierPath } = getLinkResolverIdentifier([
-      { ai: '01', value: '09359502000010' }
-    ]);
+  it('should correctly handle element strings with only identifier AIs', () => {
+    const { identifier, qualifierPath } = getLinkResolverIdentifier('0109359502000010');
 
     expect(identifier).toBe('09359502000010');
     expect(qualifierPath).toBe('');
   });
 
-  it('should extract identifier and qualifier path from a combined multi AIs', () => {
-    const { identifier, qualifierPath } = getLinkResolverIdentifier([
-      { ai: '01', value: '09359502000010' },
-      { ai: '10', value: 'ABC123' }
-    ]);
+  it('should correctly handle element strings with both identifier and qualifier AIs', () => {
+    const { identifier, qualifierPath } = getLinkResolverIdentifier('010935950200001010ABC123');
 
     expect(identifier).toBe('09359502000010');
     expect(qualifierPath).toBe('/10/ABC123');
   });
 
-  it('should throw an invalid DLR AIs error if input is empty array', () => {
-    expect(() => getLinkResolverIdentifier([])).toThrow('Invalid DLR AIs. At least one DLR AI is required to resolve the identifier.');
+  it('should correctly handle element strings with identifier and query strings', () => {
+    const { identifier, qualifierPath } = getLinkResolverIdentifier('01093595020000103103000189');
+
+    expect(identifier).toBe('09359502000010');
+    expect(qualifierPath).toBe('?3103=000189');
   });
 
-  it('should throw an invalid DLR AIs error if input 01 and 8006 are primary keys present at the same time.', () => {
-    expect(() => getLinkResolverIdentifier([
-      { ai: '01', value: '09359502000010' },
-      { ai: '8006', value: 'ABC123' }
-    ])).toThrow('Invalid DLR AIs. Both 01 and 8006 are primary keys and cannot be present at the same time.');
+  it('should correctly handle element strings with complex combinations of AIs', () => {
+    const { identifier, qualifierPath } = getLinkResolverIdentifier('0109359502000010310300018910ABC123');
+
+    expect(identifier).toBe('09359502000010');
+    expect(qualifierPath).toBe('/10/ABC123?3103=000189');
+  });
+
+  it('should throw an error when the element string does not contain exactly one primary identification key', () => {
+    expect(() => getLinkResolverIdentifier('10ABCDEF')).toThrow('getLinkResolverIdentifier Error: ===> analyseuri ERROR ===> The element string should contain exactly one primary identification key - it contained 0 []; please check for a syntax error.');
+  });
+
+  it('should throw an error when the element string contains invalid syntax', () => {
+    expect(() => getLinkResolverIdentifier('01093595')).toThrow('SYNTAX ERROR: invalid syntax for value of (01)093595');
+  });
+
+  it('should throw an error when the element string contains two primary AI codes', () => {
+    const gtin = '01';
+    const gtinValue = '09359502000010';
+    const itip = '8006';
+    const itipValue = '123456789012315678';
+    const elementString = `${gtin}${gtinValue}${itip}${itipValue}`;
+
+    expect(() => getLinkResolverIdentifier(elementString)).toThrow('getLinkResolverIdentifier Error: ===> analyseuri ERROR ===> The element string should contain exactly one primary identification key - '
+    + `it contained 2 [${JSON.stringify({ ai: itip, value: itipValue })},${JSON.stringify({ ai: gtin, value: gtinValue })}]; please check for a syntax error.`);
   });
 });

@@ -1,3 +1,4 @@
+import GS1DigitalLinkToolkit from 'GS1_DigitalLink_Resolver_CE/digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js';
 import { IDLRAI } from './epcisEvents/types.js';
 import { GS1ServiceEnum } from './identityProviders/GS1Provider.js';
 import { MimeTypeEnum } from './types/types.js';
@@ -96,7 +97,12 @@ export interface GS1LinkResponse extends ILinkResponse {
 
 export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<string> => {
   const { dlrAPIUrl, linkResolver, linkResponses, qualifierPath, responseLinkType = 'all' } = arg;
-  const registerQualifierPath = arg.queryString ? qualifierPath + '?' + arg.queryString : qualifierPath;
+  let registerQualifierPath = qualifierPath;
+  if (arg.queryString) {
+    registerQualifierPath = qualifierPath.includes('?')
+      ? `${qualifierPath}&${arg.queryString}`
+      : `${qualifierPath}?${arg.queryString}`;
+  }
   const params: GS1LinkResolver[] = [constructLinkResolver(linkResolver, linkResponses, registerQualifierPath)];
   try {
     privateAPI.setBearerTokenAuthorizationHeaders(arg.dlrAPIKey || '');
@@ -240,34 +246,74 @@ export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
 };
 
 /**
- * This function is used to resolve the identifier and qualifier path from a list of DLR AIs.
- * @param dlrAIs - An array of DLR AI objects. Each object should have 'ai' and 'value' properties.
- * @throws {Error} Will throw an error if the dlrAIs array is empty or if both 01 and 8006 AIs are present as they are primary keys.
- * @returns {Object} An object containing the resolved identifier and qualifier path.
+ * Retrieves the identifier and qualifier path from a GS1 element string.
+ * This method will convert either a bracketed element string or an unbracketed element string into an associative array.
+ * Input could be "(01)05412345000013(3103)000189(3923)2172(10)ABC123";
+ * or input could be "3103000189010541234500001339232172"+groupSeparator+"10ABC123";
+ * 
+ * @param {string} elementString - The GS1 element string.
+ * @returns {{ identifier: string, qualifierPath: string }} - An object containing the identifier and qualifier path.
+ * @throws {Error} Throws an error if the element string contains more or less than one primary identification key.
  */
-export const getLinkResolverIdentifier = (dlrAIs: IDLRAI[]): { identifier: string, qualifierPath: string } => {
-  if (!dlrAIs.length) {
-    throw new Error('Invalid DLR AIs. At least one DLR AI is required to resolve the identifier.');
-  }
+export const getLinkResolverIdentifier = (elementString: string): { identifier: string, qualifierPath: string } => {
+  // Instantiate GS1DigitalLinkToolkit to utilize its methods
+  const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
 
-  const primaryAIs = ['01', '8006'];
-  const isDlrAIsInvalid = primaryAIs.every(primaryAI => {
-    const AIs = dlrAIs.map(dlrAI => dlrAI.ai);
-    return AIs.includes(primaryAI);
-  });
-  if (isDlrAIsInvalid) {
-    throw new Error('Invalid DLR AIs. Both 01 and 8006 are primary keys and cannot be present at the same time.');
-  }
+  // Extract AI values from the GS1 element string
+  const dlrAIValues = gs1DigitalLinkToolkit.extractFromGS1elementStrings(elementString);
+  // Get the list of AIs present in the element string
+  const dlrAIs = Object.keys(dlrAIValues);
 
-  const { identifier, qualifierPath } = dlrAIs.reduce((linkResolverIdentifier, currentAI) => {
-    if (primaryAIs.includes(currentAI.ai)) {
-      linkResolverIdentifier.identifier = currentAI.value;
+  // Initialize arrays to store identifier AIs, qualifier AIs, and query strings
+  const { identifierAIs, qualifierAIs, queryStrings } = dlrAIs.reduce((result, currentAI) => {
+    // Verify syntax and check digit for each AI
+    gs1DigitalLinkToolkit.verifySyntax(currentAI, dlrAIValues[currentAI]);
+    gs1DigitalLinkToolkit.verifyCheckDigit(currentAI, dlrAIValues[currentAI]);
+
+    // Categorize AIs into identifier AIs, qualifier AIs, and query strings
+    if (gs1DigitalLinkToolkit.aiMaps.identifiers.includes(currentAI)) {
+      result.identifierAIs.push({ ai: currentAI, value: dlrAIValues[currentAI] });
+    } else if (gs1DigitalLinkToolkit.aiMaps.qualifiers.includes(currentAI)) {
+      result.qualifierAIs.push({ ai: currentAI, value: dlrAIValues[currentAI] });
     } else {
-      linkResolverIdentifier.qualifierPath += `/${currentAI.ai}/${currentAI.value}`;
+      const queryString = `${currentAI}=${gs1DigitalLinkToolkit.percentEncode(dlrAIValues[currentAI]) as string}`;
+      result.queryStrings.push(queryString);
     }
 
-    return linkResolverIdentifier;
-  }, { identifier: '', qualifierPath: '' });
+    return result;
+  }, { identifierAIs: [] as IDLRAI[], qualifierAIs: [] as IDLRAI[], queryStrings: [] as string[]});
 
-  return { identifier, qualifierPath };
+  // Ensure that there is exactly one primary identification key
+  if (identifierAIs.length !== 1) {
+    throw new Error('getLinkResolverIdentifier Error: ===> analyseuri ERROR ===> ' + 
+    `The element string should contain exactly one primary identification key - it contained ${identifierAIs.length} ${JSON.stringify(identifierAIs)}; please check for a syntax error.`);
+  }
+
+  // Retrieve the primary identifier AI
+  const primaryIdentifierAI = identifierAIs[0];
+  // Get the qualifier AIs associated with the primary identifier AI
+  const primaryQualifierAIs = gs1DigitalLinkToolkit.aiQualifiers[primaryIdentifierAI.ai] as string[] || [];
+  // Iterate over primary qualifier AIs to construct the qualifier path
+  const path = primaryQualifierAIs.reduce((result, primaryQualifierAI) => {
+    const validQualifierAI = qualifierAIs.find(qualifier => qualifier.ai === primaryQualifierAI) as IDLRAI;
+    if (validQualifierAI) {
+      result += `/${primaryQualifierAI}/${gs1DigitalLinkToolkit.percentEncode(validQualifierAI.value) as string}`;
+    }
+
+    return result;
+  }, '');
+
+  // Concatenate the qualifier path and query strings
+  const combinedQueryString = queryStrings.length ? `?${queryStrings.join('&')}` : '';
+  const qualifierPath = path + combinedQueryString;
+
+  // Construct the URI stem using the primary identifier AI and qualifier path
+  const uriStem = `/${primaryIdentifierAI.ai}/${primaryIdentifierAI.value}${qualifierPath}`;
+   // Verify the constructed URI stem
+  gs1DigitalLinkToolkit.analyseURI(uriStem, true);
+
+  return { 
+    identifier: primaryIdentifierAI.value,
+    qualifierPath
+  };
 };

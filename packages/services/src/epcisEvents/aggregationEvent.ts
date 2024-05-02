@@ -3,7 +3,7 @@ import { issueVC } from '../vckit.service.js';
 import { uploadJson } from '../storage.service.js';
 import { getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { IService } from '../types/IService.js';
-import { ITraceabilityEvent, IAggregationEventContext, IDLRAI } from './types.js';
+import { ITraceabilityEvent, IAggregationEventContext } from './types.js';
 import { generateUUID } from '../utils/helpers.js';
 import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { validateAggregationEventContext } from './validateContext.js';
@@ -16,7 +16,7 @@ export const processAggregationEvent: IService = async (aggregationEvent: ITrace
   }
 
   const { vckit, epcisAggregationEvent, dlr, storage, identifierKeyPaths } = context;
-  const parentIdentifier = getIdentifierByObjectKeyPaths(aggregationEvent.data, identifierKeyPaths) as IDLRAI[];
+  const parentIdentifier = getIdentifierByObjectKeyPaths(aggregationEvent.data, identifierKeyPaths);
   if (!parentIdentifier) {
     throw new Error('Identifier not found');
   }

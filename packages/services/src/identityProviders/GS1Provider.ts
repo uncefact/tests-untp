@@ -1,15 +1,12 @@
 import GS1DigitalLinkToolkit from 'GS1_DigitalLink_Resolver_CE/digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js';
 import { IdentityProviderStrategy } from './IdentityProvider.js';
 import { publicAPI } from '../utils/httpService.js';
-import { IDLRAI } from '../epcisEvents/types.js';
 
 export enum GS1ServiceEnum {
   certificationInfo = 'https://gs1.org/voc/certificationInfo',
   verificationService = 'https://gs1.org/voc/verificationService',
   serviceInfo = 'https://gs1.org/voc/serviceInfo',
 }
-
-const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
 
 export class GS1Provider implements IdentityProviderStrategy {
   /**
@@ -30,6 +27,7 @@ export class GS1Provider implements IdentityProviderStrategy {
         return null;
       }
       
+      const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
       const gs1DigitalLink = gs1DigitalLinkToolkit.gs1ElementStringsToGS1DigitalLink(code, true, gs1ServiceHost);
 
       const dlrUrl = new URL(gs1DigitalLink);

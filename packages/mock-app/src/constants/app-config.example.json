@@ -63,411 +63,9 @@
                             }
                           }
                         },
-                        "NLIS": {
-                          "title": "NLIS",
-                          "type": "string",
-                          "uniqueItems": true,
-                          "enum": ["NH020188LEJ00005", "NH020188LEJ00008", "NH020188LEJ00012"]
-                        },
-                        "batchQrCode": {
-                          "type": "string",
-                          "title": "Batch QR Code"
-                        },
-                        "traceabilityInfo": {
-                          "type": "array",
-                          "title": "Traceability Information",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "EventReference": {
-                                "type": "string",
-                                "title": "Event Reference"
-                              },
-                              "EventType": {
-                                "type": "string",
-                                "title": "Event Type"
-                              }
-                            }
-                          }
-                        },
-                        "sustainabilityInfo": {
-                          "type": "array",
-                          "title": "Sustainability Information",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "Topic": {
-                                "type": "string",
-                                "title": "Topic"
-                              },
-                              "Evidence": {
-                                "type": "string",
-                                "title": "Evidence"
-                              },
-                              "metric": {
-                                "type": "array",
-                                "title": "Metric",
-                                "items": {
-                                  "type": "object",
-                                  "properties": {
-                                    "Metric": {
-                                      "type": "string",
-                                      "title": "Metric"
-                                    },
-                                    "Value": {
-                                      "type": "integer",
-                                      "title": "Value"
-                                    },
-                                    "Unit": {
-                                      "type": "string",
-                                      "title": "Unit"
-                                    }
-                                  }
-                                }
-                              },
-                              "compliance": {
-                                "type": "boolean",
-                                "title": "Compliance"
-                              }
-                            }
-                          }
-                        },
-                        "provenance": {
-                          "type": "array",
-                          "title": "Provenance",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "country": {
-                                "type": "string",
-                                "title": "Country"
-                              },
-                              "percentage": {
-                                "type": "integer",
-                                "title": "Percentage"
-                              }
-                            }
-                          }
-                        }
-                      },
-                      "required": ["NLIS"]
-                    },
-                    "breed": {
-                      "type": "object",
-                      "title": "Breed",
-                      "properties": {
-                        "productId": {
-                          "type": "string",
-                          "title": "Product ID"
-                        },
-                        "breed": {
-                          "type": "string",
-                          "title": "Breed"
-                        },
-                        "manufacturer": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "title": "Name"
-                            }
-                          }
-                        },
-                        "image": {
-                          "type": "string",
-                          "title": "Image"
-                        },
-                        "description": {
-                          "type": "string",
-                          "title": "Description"
-                        },
-                        "productClass": {
-                          "type": "string",
-                          "title": "Product Class"
-                        }
-                      }
-                    },
-                    "sustainabilityScore": {
-                      "type": "integer",
-                      "title": "Sustainability Score"
-                    },
-                    "trustScore": {
-                      "type": "integer",
-                      "title": "Trust Score"
-                    }
-                  }
-                },
-                "initialData": {},
-                "className": "json-form",
-                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
-              }
-            },
-            {
-              "name": "CustomButton",
-              "type": "Submit",
-              "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
-              }
-            }
-          ],
-          "services": [
-            {
-              "name": "processObjectEvent",
-              "parameters": [
-                {
-                  "vckit": {
-                    "vckitAPIUrl": "https://vckit.example.com",
-                    "issuer": "did:web:vckit.example.com"
-                  },
-                  "dpp": {
-                    "context": ["https://dpp.example.com/dppld.json"],
-                    "renderTemplate": [
-                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
-                    ],
-                    "type": ["DigitalProductPassport"],
-                    "dlrLinkTitle": "Livestock Passport",
-                    "dlrIdentificationKeyType": "nlisid",
-                    "dlrVerificationPage": "http://dlr.example.com/verify"
-                  },
-
-                  "dlr": {
-                    "dlrAPIUrl": "http://dlr.example.com",
-                    "dlrAPIKey": "5555555555555"
-                  },
-                  "storage": {
-                    "storageAPIUrl": "https://storage.example.com",
-                    "bucket": "bucket-stored-example"
-                  },
-                  "identifierKeyPaths": ["herd", "NLIS"]
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "name": "National Vendor Declaration",
-          "id": "produce_product",
-          "components": [
-            {
-              "name": "JsonForm",
-              "type": "EntryData",
-              "props": {
-                "formTitle": "National Vendor Declaration",
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "sourceParty": {
-                      "type": "object",
-                      "properties": {
-                        "partyID": {
-                          "type": "string",
-                          "enum": ["https://wholesalebeef.com/41161080146.json"]
-                        },
-                        "name": {
-                          "type": "string",
-                          "enum": ["Wholesale Beef"]
-                        }
-                      }
-                    },
-                    "destinationParty": {
-                      "type": "object",
-                      "properties": {
-                        "partyID": {
-                          "type": "string",
-                          "enum": ["https://primebeef.com/51161080100.json"]
-                        },
-                        "name": {
-                          "type": "string",
-                          "enum": ["Prime Beef"]
-                        }
-                      }
-                    },
-                    "transaction": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "enum": ["bol", "cert", "desadv", "inv", "po"]
-                        },
                         "identifier": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "ai": {
-                                "type": "string",
-                                "title": "AI"
-                              },
-                              "value": {
-                                "type": "string",
-                                "title": "Value"
-                              }
-                            }
-                          }
-                        },
-                        "documentURL": {
-                          "type": "string"
-                        }
-                      }
-                    },
-                    "itemList": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "itemID": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    },
-                    "quantityList": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "productClass": {
-                            "type": "string"
-                          },
-                          "quantity": {
-                            "type": "string"
-                          },
-                          "uom": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    },
-                    "locationId": {
-                      "title": "Location ID",
-                      "type": "string",
-                      "enum": ["https://plus.codes/4RRHM6PR+MH"]
-                    }
-                  }
-                },
-                "initialData": {},
-                "className": "json-form",
-                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
-              }
-            },
-            {
-              "name": "CustomButton",
-              "type": "Submit",
-              "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
-              }
-            }
-          ],
-          "services": [
-            {
-              "name": "processTransactionEvent",
-              "parameters": [
-                {
-                  "vckit": {
-                    "vckitAPIUrl": "https://vckit.example.com",
-                    "issuer": "did:web:vckit.example.com"
-                  },
-                  "epcisTransactionEvent": {
-                    "context": ["https://dpp.example.com/transaction-event-ld.json"],
-                    "renderTemplate": [
-                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
-                    ],
-                    "type": ["TransactionEventCredential"],
-                    "dlrLinkTitle": "Transaction Event",
-                    "dlrIdentificationKeyType": "nlisid",
-                    "dlrVerificationPage": "http://dlr.example.com/verify"
-                  },
-                  "dlr": {
-                    "dlrAPIUrl": "http://dlr.example.com",
-                    "dlrAPIKey": "5555555555555"
-                  },
-                  "storage": {
-                    "storageAPIUrl": "https://storage.example.com",
-                    "bucket": "bucket-stored-example"
-                  },
-                  "identifierKeyPaths": ["transaction", "identifier"]
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Feedlot",
-      "type": "producer",
-      "assets": {
-        "logo": "https://example.com/logo.png",
-        "brandTitle": "Wagu Wonder",
-        "passportVC": "",
-        "transactionEventVC": ""
-      },
-      "styles": {
-        "primaryColor": "rgb(41, 171, 48)",
-        "secondaryColor": "white",
-        "tertiaryColor": "black"
-      },
-      "features": [
-        {
-          "name": "Digital Livestock",
-          "id": "produce_product",
-          "components": [
-            {
-              "name": "JsonForm",
-              "type": "EntryData",
-              "props": {
-                "formTitle": "Digital Livestock Passport",
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "herd": {
-                      "type": "object",
-                      "title": "Herd Information",
-                      "properties": {
-                        "batchId": {
                           "type": "string",
-                          "title": "Batch ID"
-                        },
-                        "manufacturedDate": {
-                          "type": "string",
-                          "format": "date",
-                          "title": "Manufactured Date"
-                        },
-                        "manufacturedAt": {
-                          "type": "object",
-                          "title": "Manufactured At",
-                          "properties": {
-                            "name": { "type": "string", "title": "Name" },
-                            "operatedBy": {
-                              "type": "object",
-                              "title": "Operated By",
-                              "properties": {
-                                "name": {
-                                  "type": "string",
-                                  "title": "Name"
-                                }
-                              }
-                            }
-                          }
-                        },
-                        "identifier": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "ai": {
-                                "type": "string",
-                                "title": "AI"
-                              },
-                              "value": {
-                                "type": "string",
-                                "title": "Value"
-                              }
-                            }
-                          }
+                          "title": "Identifier (GS1 Barcode)"
                         },
                         "batchQrCode": {
                           "type": "string",
@@ -690,25 +288,391 @@
                           "enum": ["bol", "cert", "desadv", "inv", "po"]
                         },
                         "identifier": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "ai": {
-                                "type": "string",
-                                "title": "AI"
-                              },
-                              "value": {
-                                "type": "string",
-                                "title": "Value"
-                              }
-                            }
-                          }
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
                         },
                         "documentURL": {
                           "type": "string"
                         }
+                      },
+                      "required": ["identifier"]
+                    },
+                    "itemList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemID": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
                       }
+                    },
+                    "quantityList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productClass": {
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "type": "string"
+                          },
+                          "uom": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "locationId": {
+                      "title": "Location ID",
+                      "type": "string",
+                      "enum": ["https://plus.codes/4RRHM6PR+MH"]
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "style": { "textAlign": "center", "paddingTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processTransactionEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "https://vckit.example.com",
+                    "issuer": "did:web:vckit.example.com"
+                  },
+                  "epcisTransactionEvent": {
+                    "context": ["https://dpp.example.com/transaction-event-ld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["TransactionEventCredential"],
+                    "dlrLinkTitle": "Transaction Event",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "http://dlr.example.com/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://dlr.example.com",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.example.com",
+                    "bucket": "bucket-stored-example"
+                  },
+                  "identifierKeyPaths": ["transaction", "identifier"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Feedlot",
+      "type": "producer",
+      "assets": {
+        "logo": "https://example.com/logo.png",
+        "brandTitle": "Wagu Wonder",
+        "passportVC": "",
+        "transactionEventVC": ""
+      },
+      "styles": {
+        "primaryColor": "rgb(41, 171, 48)",
+        "secondaryColor": "white",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Digital Livestock",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "formTitle": "Digital Livestock Passport",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "herd": {
+                      "type": "object",
+                      "title": "Herd Information",
+                      "properties": {
+                        "batchId": {
+                          "type": "string",
+                          "title": "Batch ID"
+                        },
+                        "manufacturedDate": {
+                          "type": "string",
+                          "format": "date",
+                          "title": "Manufactured Date"
+                        },
+                        "manufacturedAt": {
+                          "type": "object",
+                          "title": "Manufactured At",
+                          "properties": {
+                            "name": { "type": "string", "title": "Name" },
+                            "operatedBy": {
+                              "type": "object",
+                              "title": "Operated By",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "title": "Name"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "identifier": {
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
+                        },
+                        "batchQrCode": {
+                          "type": "string",
+                          "title": "Batch QR Code"
+                        },
+                        "traceabilityInfo": {
+                          "type": "array",
+                          "title": "Traceability Information",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "EventReference": {
+                                "type": "string",
+                                "title": "Event Reference"
+                              },
+                              "EventType": {
+                                "type": "string",
+                                "title": "Event Type"
+                              }
+                            }
+                          }
+                        },
+                        "sustainabilityInfo": {
+                          "type": "array",
+                          "title": "Sustainability Information",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "Topic": {
+                                "type": "string",
+                                "title": "Topic"
+                              },
+                              "Evidence": {
+                                "type": "string",
+                                "title": "Evidence"
+                              },
+                              "metric": {
+                                "type": "array",
+                                "title": "Metric",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "Metric": {
+                                      "type": "string",
+                                      "title": "Metric"
+                                    },
+                                    "Value": {
+                                      "type": "integer",
+                                      "title": "Value"
+                                    },
+                                    "Unit": {
+                                      "type": "string",
+                                      "title": "Unit"
+                                    }
+                                  }
+                                }
+                              },
+                              "compliance": {
+                                "type": "boolean",
+                                "title": "Compliance"
+                              }
+                            }
+                          }
+                        },
+                        "provenance": {
+                          "type": "array",
+                          "title": "Provenance",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "country": {
+                                "type": "string",
+                                "title": "Country"
+                              },
+                              "percentage": {
+                                "type": "integer",
+                                "title": "Percentage"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "required": ["identifier"]
+                    },
+                    "breed": {
+                      "type": "object",
+                      "title": "Breed",
+                      "properties": {
+                        "productId": {
+                          "type": "string",
+                          "title": "Product ID"
+                        },
+                        "breed": {
+                          "type": "string",
+                          "title": "Breed"
+                        },
+                        "manufacturer": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "title": "Name"
+                            }
+                          }
+                        },
+                        "image": {
+                          "type": "string",
+                          "title": "Image"
+                        },
+                        "description": {
+                          "type": "string",
+                          "title": "Description"
+                        },
+                        "productClass": {
+                          "type": "string",
+                          "title": "Product Class"
+                        }
+                      }
+                    },
+                    "sustainabilityScore": {
+                      "type": "integer",
+                      "title": "Sustainability Score"
+                    },
+                    "trustScore": {
+                      "type": "integer",
+                      "title": "Trust Score"
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "style": { "textAlign": "center", "paddingTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processObjectEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "https://vckit.example.com",
+                    "issuer": "did:web:vckit.example.com"
+                  },
+                  "dpp": {
+                    "context": ["https://dpp.example.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["DigitalProductPassport"],
+                    "dlrLinkTitle": "Livestock Passport",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "http://dlr.example.com/verify"
+                  },
+
+                  "dlr": {
+                    "dlrAPIUrl": "http://dlr.example.com",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.example.com",
+                    "bucket": "bucket-stored-example"
+                  },
+                  "identifierKeyPaths": ["herd", "identifier"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "National Vendor Declaration",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "formTitle": "National Vendor Declaration",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sourceParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://wholesalebeef.com/41161080146.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Wholesale Beef"]
+                        }
+                      }
+                    },
+                    "destinationParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://primebeef.com/51161080100.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Prime Beef"]
+                        }
+                      }
+                    },
+                    "transaction": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["bol", "cert", "desadv", "inv", "po"]
+                        },
+                        "identifier": {
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
+                        },
+                        "documentURL": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["identifier"]
                     },
                     "itemList": {
                       "type": "array",
@@ -777,7 +741,7 @@
                     ],
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Transaction Event",
-                    "dlrIdentificationKeyType": "nlisid",
+                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://dlr.example.com/verify"
                   },
                   "dlr": {
@@ -906,10 +870,7 @@
                     "inputItems": [{ "quantity": 1, "uom": "head", "productClass": "cattle" }],
                     "outputItems": [
                       {
-                        "productID": {
-                          "01": "9359502000041",
-                          "10": "ABC123"
-                        },
+                        "productID": "010935950200004110ACB123",
                         "productClass": "Beef Silverside",
                         "quantity": 500,
                         "weight": 500,
@@ -918,10 +879,7 @@
                         "description": "Deforestation-free Beef Silverside"
                       },
                       {
-                        "productID": {
-                          "01": "9359502000034",
-                          "10": "ABC123"
-                        },
+                        "productID": "010935950200003410ACB123",
                         "productClass": "Beef Scotch Fillet",
                         "quantity": 300,
                         "weight": 300,
@@ -930,10 +888,7 @@
                         "description": "Deforestation-free Beef Scotch Fillet"
                       },
                       {
-                        "productID": {
-                          "01": "9359502000010",
-                          "10": "ABC123"
-                        },
+                        "productID": "010935950200001010ACB123",
                         "productClass": "Beef Rump Steak",
                         "quantity": 250,
                         "weight": 250,
@@ -966,27 +921,16 @@
                       "title": "Parent Item",
                       "properties": {
                         "itemID": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "ai": {
-                                "type": "string",
-                                "title": "AI"
-                              },
-                              "value": {
-                                "type": "string",
-                                "title": "Value"
-                              }
-                            }
-                          }
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
                         },
                         "name": {
                           "type": "string",
                           "title": "Name",
                           "enum": ["Beef Steak Variety Container"]
                         }
-                      }
+                      },
+                      "required": ["itemID"]
                     },
                     "childItems": {
                       "type": "array",
