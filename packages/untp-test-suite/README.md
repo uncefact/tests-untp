@@ -160,6 +160,8 @@ Now, go to your project folder where you want to integrate the UNTP Test Suite. 
 
 Then, install the UNTP Test Suite to the `node_modules` directory of your project by using the `npm link untp-test-suite` command. Now you can use the UNTP Test Suite for your project.
 
+### UNTP Test Suite Library with the `credentials.json` file
+
 If you want to run UNTP tests with a configuration file, then create a `credentials.json` file by using the UNTP Test Suite CLI tool. Type the following command in your terminal:
 
 ```bash
@@ -185,6 +187,46 @@ const credentialsFilePath = '/path/to/credentials.json';
 
 testCredentialsHandler(credentialsFilePath)
   .then(results => {
+    // Handle the test results here
+  })
+  .catch(error => {
+    // Handle any errors here
+  });
+```
+
+### UNTP Test Suite Library with direct credential objects
+
+If you want to run UNTP tests with direct credential objects, then you can using the content inside the `credentials.json` file that you generated before and pass it to `testCredentialsHandler` function as an argument:
+
+```js
+testCredentialsHandler({
+  credentials: [
+    {
+      type: "aggregationEvent",
+      version: "v0.0.1",
+      dataPath: "/data/aggregationEvent.json"
+    },
+    // Add more credentials as needed...
+  ]
+}).then(results => {
+    // Handle the test results here
+  })
+  .catch(error => {
+    // Handle any errors here
+  });
+```
+
+### UNTP Test Suite Library with a credential object
+
+You can run the UNTP test with a credentials object, where the first argument is the credential schema and the second is a test data object.
+
+```js
+testCredentialHandler({
+  type: 'aggregationEvent', version: 'v0.0.1'},
+  {
+    'exampleField': 'example data',
+    // Add more fields as needed...
+  }).then(results => {
     // Handle the test results here
   })
   .catch(error => {
