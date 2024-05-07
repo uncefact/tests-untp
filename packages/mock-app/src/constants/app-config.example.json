@@ -1085,9 +1085,7 @@
                     "issuer": "did:web:398f-103-69-79-17.ngrok-free.app"
                   },
                   "epcisAggregationEvent": {
-                    "context": [
-                      "https://jargon.sh/user/unece/traceabilityEvents/v/working/artefacts/jsonldContexts/AggregationEvent.jsonld?class=AggregationEvent"
-                    ],
+                    "context": ["https://dpp.example.com/aggregation-event-ld.json"],
                     "renderTemplate": [
                       { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
                     ],
