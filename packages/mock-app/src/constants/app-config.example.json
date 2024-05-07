@@ -5,6 +5,74 @@
     "secondaryColor": "white",
     "tertiaryColor": "black"
   },
+  "generateFeatures": [
+    {
+      "name": "General features",
+      "type": "",
+      "styles": {
+        "primaryColor": "rgb(41, 171, 48)",
+        "secondaryColor": "white",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Conformity Credential",
+          "id": "conformity_credential",
+          "components": [
+            {
+              "name": "ConformityCredential",
+              "type": "",
+              "props": {
+                "credentialRequestConfigs": [
+                  {
+                    "url": "http://example.com/deforestation-free-assessment",
+                    "params": {},
+                    "options": {
+                      "headers": [],
+                      "method": "POST"
+                    },
+                    "credentialName": "Deforestation Free Assessment",
+                    "credentialPath": "/body/credentil",
+                    "appOnly": "Farm"
+                  },
+                  {
+                    "url": "http://example.com/ce",
+                    "params": {},
+                    "options": {
+                      "headers": [],
+                      "method": "GET"
+                    },
+                    "credentialName": "CE Marking",
+                    "credentialPath": "",
+                    "appOnly": "Farm"
+                  },
+                  {
+                    "url": "http://example.com/conformity",
+                    "params": {},
+                    "options": {
+                      "headers": [],
+                      "method": "POST"
+                    },
+                    "credentialName": "Conformity",
+                    "appOnly": "Feedlot"
+                  }
+                ],
+                "storedCredentialsConfig": {
+                  "url": "https://storage.example.com",
+                  "params": {},
+                  "options": {
+                    "bucket": "bucket-stored-example"
+                  },
+                  "type": "s3"
+                }
+              }
+            }
+          ],
+          "services": []
+        }
+      ]
+    }
+  ],
   "apps": [
     {
       "name": "Farm",
@@ -63,11 +131,9 @@
                             }
                           }
                         },
-                        "NLIS": {
-                          "title": "NLIS",
+                        "identifier": {
                           "type": "string",
-                          "uniqueItems": true,
-                          "enum": ["NH020188LEJ00005", "NH020188LEJ00008", "NH020188LEJ00012"]
+                          "title": "Identifier (GS1 Barcode)"
                         },
                         "batchQrCode": {
                           "type": "string",
@@ -150,7 +216,7 @@
                           }
                         }
                       },
-                      "required": ["NLIS"]
+                      "required": ["identifier"]
                     },
                     "breed": {
                       "type": "object",
@@ -203,6 +269,10 @@
               }
             },
             {
+              "name": "ConformityCredentialCheckbox",
+              "type": "EntryData"
+            },
+            {
               "name": "CustomButton",
               "type": "Submit",
               "props": {
@@ -211,6 +281,10 @@
             }
           ],
           "services": [
+            {
+              "name": "constructorEntryData",
+              "parameters": []
+            },
             {
               "name": "processObjectEvent",
               "parameters": [
@@ -226,7 +300,7 @@
                     ],
                     "type": ["DigitalProductPassport"],
                     "dlrLinkTitle": "Livestock Passport",
-                    "dlrIdentificationKeyType": "nlisid",
+                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://dlr.example.com/verify"
                   },
 
@@ -238,7 +312,7 @@
                     "storageAPIUrl": "https://storage.example.com",
                     "bucket": "bucket-stored-example"
                   },
-                  "identifierKeyPaths": ["herd", "NLIS"]
+                  "identifierKeyPaths": ["herd", "identifier"]
                 }
               ]
             }
@@ -290,12 +364,14 @@
                           "enum": ["bol", "cert", "desadv", "inv", "po"]
                         },
                         "identifier": {
-                          "type": "string"
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
                         },
                         "documentURL": {
                           "type": "string"
                         }
-                      }
+                      },
+                      "required": ["identifier"]
                     },
                     "itemList": {
                       "type": "array",
@@ -364,7 +440,7 @@
                     ],
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Transaction Event",
-                    "dlrIdentificationKeyType": "nlisid",
+                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://dlr.example.com/verify"
                   },
                   "dlr": {
@@ -440,11 +516,9 @@
                             }
                           }
                         },
-                        "NLIS": {
-                          "title": "NLIS",
+                        "identifier": {
                           "type": "string",
-                          "uniqueItems": true,
-                          "enum": ["NH020188LEJ00005", "NH020188LEJ00008", "NH020188LEJ00012"]
+                          "title": "Identifier (GS1 Barcode)"
                         },
                         "batchQrCode": {
                           "type": "string",
@@ -527,7 +601,7 @@
                           }
                         }
                       },
-                      "required": ["NLIS"]
+                      "required": ["identifier"]
                     },
                     "breed": {
                       "type": "object",
@@ -580,6 +654,10 @@
               }
             },
             {
+              "name": "ConformityCredentialCheckbox",
+              "type": "EntryData"
+            },
+            {
               "name": "CustomButton",
               "type": "Submit",
               "props": {
@@ -588,6 +666,10 @@
             }
           ],
           "services": [
+            {
+              "name": "constructorEntryData",
+              "parameters": []
+            },
             {
               "name": "processObjectEvent",
               "parameters": [
@@ -603,7 +685,7 @@
                     ],
                     "type": ["DigitalProductPassport"],
                     "dlrLinkTitle": "Livestock Passport",
-                    "dlrIdentificationKeyType": "nlisid",
+                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://dlr.example.com/verify"
                   },
 
@@ -615,7 +697,7 @@
                     "storageAPIUrl": "https://storage.example.com",
                     "bucket": "bucket-stored-example"
                   },
-                  "identifierKeyPaths": ["herd", "NLIS"]
+                  "identifierKeyPaths": ["herd", "identifier"]
                 }
               ]
             }
@@ -667,12 +749,14 @@
                           "enum": ["bol", "cert", "desadv", "inv", "po"]
                         },
                         "identifier": {
-                          "type": "string"
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
                         },
                         "documentURL": {
                           "type": "string"
                         }
-                      }
+                      },
+                      "required": ["identifier"]
                     },
                     "itemList": {
                       "type": "array",
@@ -741,7 +825,7 @@
                     ],
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Transaction Event",
-                    "dlrIdentificationKeyType": "nlisid",
+                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://dlr.example.com/verify"
                   },
                   "dlr": {
@@ -870,7 +954,7 @@
                     "inputItems": [{ "quantity": 1, "uom": "head", "productClass": "cattle" }],
                     "outputItems": [
                       {
-                        "productID": "9359502000041",
+                        "productID": "010935950200004110ACB123",
                         "productClass": "Beef Silverside",
                         "quantity": 500,
                         "weight": 500,
@@ -879,7 +963,7 @@
                         "description": "Deforestation-free Beef Silverside"
                       },
                       {
-                        "productID": "9359502000034",
+                        "productID": "010935950200003410ACB123",
                         "productClass": "Beef Scotch Fillet",
                         "quantity": 300,
                         "weight": 300,
@@ -888,7 +972,7 @@
                         "description": "Deforestation-free Beef Scotch Fillet"
                       },
                       {
-                        "productID": "9359502000010",
+                        "productID": "010935950200001010ACB123",
                         "productClass": "Beef Rump Steak",
                         "quantity": 250,
                         "weight": 250,
@@ -922,15 +1006,15 @@
                       "properties": {
                         "itemID": {
                           "type": "string",
-                          "title": "Item ID",
-                          "enum": ["9359502000010"]
+                          "title": "Identifier (GS1 Barcode)"
                         },
                         "name": {
                           "type": "string",
                           "title": "Name",
                           "enum": ["Beef Steak Variety Container"]
                         }
-                      }
+                      },
+                      "required": ["itemID"]
                     },
                     "childItems": {
                       "type": "array",
@@ -1010,7 +1094,7 @@
                     "type": ["AggregationEventCredential"],
                     "dlrLinkTitle": "Aggregation Event",
                     "dlrIdentificationKeyType": "gtin",
-                    "dlrVerificationPage": "http://localhost:3001/verify"
+                    "dlrVerificationPage": "http://localhost:3000/verify"
                   },
                   "dlr": {
                     "dlrAPIUrl": "http://dlr.example.com",

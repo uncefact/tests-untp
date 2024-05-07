@@ -9,19 +9,50 @@ const Home = () => {
     const apps = appConfig.apps.map((configApp) => {
       const path = `/${convertStringToPath(configApp.name)}`;
       return (
-        <Button sx={{ background: appConfig.styles.primaryColor }} key={path} variant='contained' component={Link} to={path}>
+        <Button
+          sx={{ background: appConfig.styles.primaryColor }}
+          key={path}
+          variant='contained'
+          component={Link}
+          to={path}
+        >
           {configApp.name}
         </Button>
       );
     });
 
     apps.push(
-    <Button sx={{ background: appConfig.styles.primaryColor }} key={'/scanning'} variant='contained' component={Link} to={'/scanning'}>
-      Scanning
-    </Button>
+      <Button
+        sx={{ background: appConfig.styles.primaryColor }}
+        key={'/scanning'}
+        variant='contained'
+        component={Link}
+        to={'/scanning'}
+      >
+        Scanning
+      </Button>,
     );
 
     return apps;
+  };
+
+  const renderGenericFeature = () => {
+    const generateFeature = appConfig.generateFeatures.map((feature) => {
+      const path = `/${convertStringToPath(feature.name)}`;
+      return (
+        <Button
+          sx={{ background: appConfig.styles.primaryColor }}
+          key={path}
+          variant='contained'
+          component={Link}
+          to={path}
+        >
+          {feature.name}
+        </Button>
+      );
+    });
+
+    return generateFeature;
   };
 
   return (
@@ -38,6 +69,7 @@ const Home = () => {
       }}
     >
       {renderApps()}
+      {renderGenericFeature()}
     </Box>
   );
 };

@@ -7,9 +7,9 @@ import {
 import { issueVC, contextDefault } from '../vckit.service';
 import { epcisTransformationCrendentialSubject } from '../epcis.service';
 import { uploadJson } from '../storage.service';
-import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
+import { registerLinkResolver, IdentificationKeyType, getLinkResolverIdentifier } from '../linkResolver.service';
 import { fillArray } from '../utils/helpers';
-import { IInputItems } from '../epcisEvents/types';
+import { IEntityIssue, IInputItems } from '../epcisEvents/types';
 import { contextTransformationEvent, dataTransformationEvent } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
@@ -31,6 +31,7 @@ jest.mock('../linkResolver.service', () => ({
     gtin: 'gtin',
     nlisid: 'nlisid',
   },
+  getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' }))
 }));
 
 describe('Transformation event', () => {
@@ -101,7 +102,7 @@ describe('Transformation event', () => {
 
       const vc = await issueEpcisTransformationEvent(
         contextTransformationEvent.vckit,
-        contextTransformationEvent.epcisTransformationEvent,
+        contextTransformationEvent.epcisTransformationEvent as IEntityIssue,
         contextTransformationEvent.dlr,
         contextTransformationEvent.productTransformation,
         contextTransformationEvent.identifierKeyPaths,

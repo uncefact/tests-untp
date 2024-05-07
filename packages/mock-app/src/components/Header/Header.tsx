@@ -76,6 +76,30 @@ function Header() {
       </MenuItem>,
     );
 
+    const menuItemGeneratorFeatures = appConfig.generateFeatures.map((app) => {
+      const path = `/${convertStringToPath(app.name)}`;
+      return (
+        <MenuItem
+          key={path}
+          onClick={() => {
+            handleCloseMobileNavMenu();
+            handleChangeStyles(app.styles);
+          }}
+        >
+          <Typography
+            textAlign='center'
+            component={Link}
+            to={path}
+            sx={{ textDecoration: 'none', color: app.styles.tertiaryColor }}
+          >
+            {app.name}
+          </Typography>
+        </MenuItem>
+      );
+    });
+
+    menuItems.push(...menuItemGeneratorFeatures);
+
     return menuItems;
   };
 
@@ -117,7 +141,7 @@ function Header() {
     const scanningStyles: IStyles = {
       primaryColor: 'rgb(41, 171, 48)',
       secondaryColor: 'white',
-      tertiaryColor: 'black'
+      tertiaryColor: 'black',
     };
 
     if (screenType === 'mobile') {
@@ -125,6 +149,17 @@ function Header() {
     }
 
     return renderDesktopMenuItems(appConfig.apps, scanningRoute, scanningStyles);
+  };
+
+  const renderMenuWithGenerateFeatures = () => {
+    return appConfig.generateFeatures.map((feature) => {
+      const path = `/${convertStringToPath(feature.name)}`;
+      return (
+        <Button sx={{ color: feature.styles.secondaryColor, display: 'block' }} key={path} component={Link} to={path}>
+          {feature.name}
+        </Button>
+      );
+    });
   };
 
   return (
@@ -209,6 +244,12 @@ function Header() {
           {/* Menu item on  desktop or tablet */}
           <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }} data-testid='menu-desktop'>
             {renderMenuByScreenType('desktop')}
+          </Box>
+          <Box
+            sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex', justifyContent: 'end' } }}
+            data-testid='menu-desktop'
+          >
+            {renderMenuWithGenerateFeatures()}
           </Box>
         </Toolbar>
       </Container>
