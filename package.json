@@ -7,12 +7,12 @@
   ],
   "scripts": {
     "start": "cd packages/mock-app && yarn start",
-    "build": "yarn run build-clean && yarn build:components && yarn build:untp-test-suite && yarn build:services",
-    "build:components": "cd packages/components && yarn run build",
+    "build": "yarn run build-clean && yarn build:services && yarn build:components && yarn build:untp-test-suite",
     "build:services": "cd packages/services && yarn run build",
+    "build:components": "cd packages/components && yarn run build",
     "build:untp-test-suite": "cd packages/untp-test-suite && yarn run build",
     "build-clean": "rimraf --glob ./packages/*/tsconfig.tsbuildinfo",
-    "test": "yarn run test:components && yarn run test:services && yarn run test:mock-app",
+    "test": "yarn run test:services && yarn run test:components && yarn run test:mock-app",
     "test:components": "cd packages/components && yarn run test",
     "test:services": "cd packages/services && yarn run test",
     "test:mock-app": "cd packages/mock-app && yarn run test",
@@ -51,7 +51,8 @@
     "access": "public"
   },
   "resolutions": {
-    "@types/eslint": "^8.4.6"
+    "@types/eslint": "^8.4.6",
+    "string-width": "4.2.3"
   },
   "engines": {
     "node": ">= 18.0.0"

@@ -2,6 +2,6 @@
 
 // export * from './config';
 // export * from './core';
-// export * from './interfaces'
+export * from './interfaces'
 // export * from './schemas'
 // export * from './templates'

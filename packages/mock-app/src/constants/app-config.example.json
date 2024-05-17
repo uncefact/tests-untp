@@ -5,6 +5,74 @@
     "secondaryColor": "white",
     "tertiaryColor": "black"
   },
+  "generateFeatures": [
+    {
+      "name": "General features",
+      "type": "",
+      "styles": {
+        "primaryColor": "rgb(41, 171, 48)",
+        "secondaryColor": "white",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Conformity Credential",
+          "id": "conformity_credential",
+          "components": [
+            {
+              "name": "ConformityCredential",
+              "type": "",
+              "props": {
+                "credentialRequestConfigs": [
+                  {
+                    "url": "http://example.com/deforestation-free-assessment",
+                    "params": {},
+                    "options": {
+                      "headers": [],
+                      "method": "POST"
+                    },
+                    "credentialName": "Deforestation Free Assessment",
+                    "credentialPath": "/body/credentil",
+                    "appOnly": "Farm"
+                  },
+                  {
+                    "url": "http://example.com/ce",
+                    "params": {},
+                    "options": {
+                      "headers": [],
+                      "method": "GET"
+                    },
+                    "credentialName": "CE Marking",
+                    "credentialPath": "",
+                    "appOnly": "Farm"
+                  },
+                  {
+                    "url": "http://example.com/conformity",
+                    "params": {},
+                    "options": {
+                      "headers": [],
+                      "method": "POST"
+                    },
+                    "credentialName": "Conformity",
+                    "appOnly": "Feedlot"
+                  }
+                ],
+                "storedCredentialsConfig": {
+                  "url": "https://storage.example.com",
+                  "params": {},
+                  "options": {
+                    "bucket": "bucket-stored-example"
+                  },
+                  "type": "s3"
+                }
+              }
+            }
+          ],
+          "services": []
+        }
+      ]
+    }
+  ],
   "apps": [
     {
       "name": "Farm",
@@ -201,6 +269,10 @@
               }
             },
             {
+              "name": "ConformityCredentialCheckbox",
+              "type": "EntryData"
+            },
+            {
               "name": "CustomButton",
               "type": "Submit",
               "props": {
@@ -209,6 +281,10 @@
             }
           ],
           "services": [
+            {
+              "name": "constructorEntryData",
+              "parameters": []
+            },
             {
               "name": "processObjectEvent",
               "parameters": [
@@ -578,6 +654,10 @@
               }
             },
             {
+              "name": "ConformityCredentialCheckbox",
+              "type": "EntryData"
+            },
+            {
               "name": "CustomButton",
               "type": "Submit",
               "props": {
@@ -586,6 +666,10 @@
             }
           ],
           "services": [
+            {
+              "name": "constructorEntryData",
+              "parameters": []
+            },
             {
               "name": "processObjectEvent",
               "parameters": [

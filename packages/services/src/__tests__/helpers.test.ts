@@ -1,4 +1,9 @@
-import { fillArray, randomIntegerString, generateUUID, incrementQuality } from '../utils/helpers';
+import {
+  fillArray,
+  randomIntegerString,
+  generateUUID,
+  incrementQuality,
+} from '../utils/helpers';
 
 describe('first', () => {
   it('should return an array with the same length as the first argument', () => {
