@@ -30,7 +30,10 @@ export const processObjectEvent: IService = async (data: any, context: IContext)
     const restOfVC = { render: dppContext?.renderTemplate ?? [] };    
     const vc: VerifiableCredential = await issueVC({
       context: dppContext.context,
-      credentialSubject: {itemList: [{ itemID: `${context.dlr.dlrAPIUrl}/${context.dpp.dlrIdentificationKeyType}/${identifier}${qualifierPath}` }]},
+      credentialSubject: {
+        ...data.data,
+        itemList: [{ itemID: `${context.dlr.dlrAPIUrl}/${context.dpp.dlrIdentificationKeyType}/${identifier}${qualifierPath}` }]
+      },
       issuer: vckitContext.issuer,
       type: [...dppContext.type],
       vcKitAPIUrl: vckitContext.vckitAPIUrl,
