@@ -16,6 +16,6 @@ type Story = StoryObj<typeof meta>;
 
 
 export const Default: Story = {
-  args: { fetchDataFromScanQR: () => {} },
+  args: { onChange: () => {} },
   decorators: [(Story) => <Story />],
 };

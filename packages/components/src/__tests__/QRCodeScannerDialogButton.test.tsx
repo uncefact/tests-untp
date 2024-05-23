@@ -20,11 +20,11 @@ describe('QRCodeScannerDialogButton', () => {
     });
 
     it('should render QRCodeScannerDialogButton', () => {
-        render(<QRCodeScannerDialogButton fetchDataFromScanQR={jest.fn()} />);
+        render(<QRCodeScannerDialogButton onChange={jest.fn()} />);
         expect(screen.getByRole('button')).toBeInTheDocument();
     });
 
-    it('should call fetchDataFromScanQR with result when getQRCodeDataFromUrl is called with valid URL', async () => {
+    it('should call onChange with result when getQRCodeDataFromUrl is called with valid URL', async () => {
         const url = 'https://example.com';
         function MockScannerDialog({ onScanQRResult }: { onScanQRResult: (value: string) => () => void }) {
             return (
@@ -37,7 +37,7 @@ describe('QRCodeScannerDialogButton', () => {
         (ScannerDialog as any).mockImplementation(MockScannerDialog);
         
 
-        const fetchDataFromScanQR = jest.fn();
+        const onChange = jest.fn();
         const result = [{
             '@context': [
                 'https://www.w3.org/2018/credentials/v1',
@@ -55,7 +55,7 @@ describe('QRCodeScannerDialogButton', () => {
         }]
         publicAPI.get = jest.fn().mockResolvedValue(result);
         act(() => {
-            render(<QRCodeScannerDialogButton fetchDataFromScanQR={fetchDataFromScanQR} />);
+            render(<QRCodeScannerDialogButton onChange={onChange} />);
         })
 
         act(() => {
@@ -63,7 +63,7 @@ describe('QRCodeScannerDialogButton', () => {
             fireEvent.click(button);
         });
       
-         act(() => {
+        act(() => {
             const button = getByText(document.body, 'Click');
             fireEvent.click(button);
          })
@@ -71,7 +71,7 @@ describe('QRCodeScannerDialogButton', () => {
 
 
         expect(publicAPI.get).toHaveBeenCalledWith(url);
-        expect(await fetchDataFromScanQR).toHaveBeenCalledWith(result);
+        expect(await onChange).toHaveBeenCalledWith(result);
     })
 
     it('should show toast message with error message when getQRCodeDataFromUrl is called with invalid URL', async () => {
@@ -86,9 +86,9 @@ describe('QRCodeScannerDialogButton', () => {
 
         (ScannerDialog as any).mockImplementation(MockScannerDialog);
 
-        const fetchDataFromScanQR = jest.fn();
+        const onChange = jest.fn();
         act(() => {
-            render(<QRCodeScannerDialogButton fetchDataFromScanQR={fetchDataFromScanQR} />);
+            render(<QRCodeScannerDialogButton onChange={onChange} />);
         })
 
         act(() => {
@@ -101,7 +101,7 @@ describe('QRCodeScannerDialogButton', () => {
             fireEvent.click(button);
         });
 
-        expect(fetchDataFromScanQR).not.toHaveBeenCalled();
+        expect(onChange).not.toHaveBeenCalled();
         expect(screen.getByText(/Invalid URL/i)).toBeInTheDocument();
     });
 
@@ -116,9 +116,9 @@ describe('QRCodeScannerDialogButton', () => {
 
         (ScannerDialog as any).mockImplementation(MockScannerDialog);
 
-        const fetchDataFromScanQR = jest.fn();
+        const onChange = jest.fn();
         act(() => {
-            render(<QRCodeScannerDialogButton fetchDataFromScanQR={fetchDataFromScanQR} />);
+            render(<QRCodeScannerDialogButton onChange={onChange} />);
         })
 
         act(() => {

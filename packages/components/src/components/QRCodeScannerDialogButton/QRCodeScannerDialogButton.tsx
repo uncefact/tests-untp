@@ -6,11 +6,11 @@ import { ScannerDialog } from './ScannerDialog.js';
 import { Status, ToastMessage, toastMessage } from '../ToastMessage/ToastMessage.js';
 
 export interface IQRCodeScannerDialogButton {
-  fetchDataFromScanQR: (result: any) => Promise<Array<CredentialPayload>>;
+  onChange: (result: any) => Promise<Array<CredentialPayload>>;
   style?: React.CSSProperties;
 }
 
-export const QRCodeScannerDialogButton = ({ fetchDataFromScanQR, style}: IQRCodeScannerDialogButton) => {
+export const QRCodeScannerDialogButton = ({ onChange, style}: IQRCodeScannerDialogButton) => {
   const [isOpenScanDialog, setIsOpenScanDialog] = useState(false);
 
   const getQRCodeDataFromUrl = async (url: string) => {    
@@ -20,7 +20,7 @@ export const QRCodeScannerDialogButton = ({ fetchDataFromScanQR, style}: IQRCode
     new URL(url)
 
     const result = await publicAPI.get(url);            
-    await fetchDataFromScanQR(result);
+    await onChange(result);
   } catch (error) {      
     const e = error as Error;
     toastMessage({ status: Status.error, message: e.message });
