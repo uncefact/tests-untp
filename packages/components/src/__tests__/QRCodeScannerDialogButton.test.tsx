@@ -19,7 +19,7 @@ describe('QRCodeScannerDialogButton', () => {
         jest.resetAllMocks();
     });
 
-    it.skip('should render QRCodeScannerDialogButton', () => {
+    it('should render QRCodeScannerDialogButton', () => {
         render(<QRCodeScannerDialogButton fetchDataFromScanQR={jest.fn()} />);
         expect(screen.getByRole('button')).toBeInTheDocument();
     });
@@ -38,7 +38,21 @@ describe('QRCodeScannerDialogButton', () => {
         
 
         const fetchDataFromScanQR = jest.fn();
-        const result = { data: 'mock data' };
+        const result = [{
+            '@context': [
+                'https://www.w3.org/2018/credentials/v1',
+                'https://www.w3.org/2018/credentials/examples/v1'
+            ],
+            type: ['VerifiableCredential', 'UniversityDegreeCredential'],
+            issuer: 'https://example.edu/issuers/565049',
+            credentialSubject: {
+                id: 'did:example:ebfeb1f712ebc6f1c276e12ec21',
+                degree: {
+                    type: 'BachelorDegree',
+                    name: 'Bachelor of Science and Arts'
+                }
+            }
+        }]
         publicAPI.get = jest.fn().mockResolvedValue(result);
         act(() => {
             render(<QRCodeScannerDialogButton fetchDataFromScanQR={fetchDataFromScanQR} />);

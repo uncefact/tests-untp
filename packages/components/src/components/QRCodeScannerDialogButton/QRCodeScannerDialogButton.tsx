@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Button } from '@mui/material';
+import { CredentialPayload } from '@vckit/core-types';
 import { publicAPI } from '@mock-app/services'
 import { ScannerDialog } from './ScannerDialog.js';
 import { Status, ToastMessage, toastMessage } from '../ToastMessage/ToastMessage.js';
 
 export interface IQRCodeScannerDialogButton {
-  fetchDataFromScanQR: (result: any) => Promise<void>;
+  fetchDataFromScanQR: (result: any) => Promise<Array<CredentialPayload>>;
   style?: React.CSSProperties;
 }
 
