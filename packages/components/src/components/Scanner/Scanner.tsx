@@ -69,7 +69,7 @@ const Scanner = forwardRef((props: IHtml5QrcodePluginProps, ref: ForwardedRef<IS
     return () => {
       handleStop();
     };
-  }, []);
+  }, [deviceType, startHtml5QrcodeScanner]);
 
   // Handle switch camera.
   const handleSwitchCamera = async () => {

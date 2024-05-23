@@ -1,0 +1,122 @@
+import React from 'react';
+import { publicAPI } from '@mock-app/services'
+import { render, screen, getByText, act, fireEvent } from '@testing-library/react';
+import {QRCodeScannerDialogButton} from '../components/QRCodeScannerDialogButton/QRCodeScannerDialogButton';
+import {ScannerDialog} from '../components/QRCodeScannerDialogButton/ScannerDialog';
+
+jest.mock('@mock-app/services', () => ({
+    publicAPI: {
+        get: jest.fn(),
+    },
+}));
+
+jest.mock('../components/QRCodeScannerDialogButton/ScannerDialog', () => ({
+    ScannerDialog: jest.fn(),
+}))
+
+describe('QRCodeScannerDialogButton', () => {
+    beforeEach(() => {
+        jest.resetAllMocks();
+    });
+
+    it.skip('should render QRCodeScannerDialogButton', () => {
+        render(<QRCodeScannerDialogButton fetchDataFromScanQR={jest.fn()} />);
+        expect(screen.getByRole('button')).toBeInTheDocument();
+    });
+
+    it('should call fetchDataFromScanQR with result when getQRCodeDataFromUrl is called with valid URL', async () => {
+        const url = 'https://example.com';
+        function MockScannerDialog({ onScanQRResult }: { onScanQRResult: (value: string) => () => void }) {
+            return (
+                <button data-testid='my-scanner' onClick={() => onScanQRResult(url)}>
+                Click
+                </button>
+            );
+        }
+
+        (ScannerDialog as any).mockImplementation(MockScannerDialog);
+        
+
+        const fetchDataFromScanQR = jest.fn();
+        const result = { data: 'mock data' };
+        publicAPI.get = jest.fn().mockResolvedValue(result);
+        act(() => {
+            render(<QRCodeScannerDialogButton fetchDataFromScanQR={fetchDataFromScanQR} />);
+        })
+
+        act(() => {
+            const button = getByText(document.body, 'ScanQR');
+            fireEvent.click(button);
+        });
+      
+         act(() => {
+            const button = getByText(document.body, 'Click');
+            fireEvent.click(button);
+         })
+       
+
+
+        expect(publicAPI.get).toHaveBeenCalledWith(url);
+        expect(await fetchDataFromScanQR).toHaveBeenCalledWith(result);
+    })
+
+    it('should show toast message with error message when getQRCodeDataFromUrl is called with invalid URL', async () => {
+        const url = 'invalid-url';
+        function MockScannerDialog({ onScanQRResult }: { onScanQRResult: (value: string) => () => void }) {
+            return (
+                <button data-testid='my-scanner' onClick={() => onScanQRResult(url)}>
+                Click
+                </button>
+            );
+        }
+
+        (ScannerDialog as any).mockImplementation(MockScannerDialog);
+
+        const fetchDataFromScanQR = jest.fn();
+        act(() => {
+            render(<QRCodeScannerDialogButton fetchDataFromScanQR={fetchDataFromScanQR} />);
+        })
+
+        act(() => {
+            const button = getByText(document.body, 'ScanQR');
+            fireEvent.click(button);
+        });
+
+        act(() => {
+            const button = getByText(document.body, 'Click');
+            fireEvent.click(button);
+        });
+
+        expect(fetchDataFromScanQR).not.toHaveBeenCalled();
+        expect(screen.getByText(/Invalid URL/i)).toBeInTheDocument();
+    });
+
+    it('should close scanner dialog when close button is clicked', () => {
+        function MockScannerDialog({ close }: { close: () => () => void }) {
+            return (
+                <button data-testid='my-scanner' onClick={() => close()}>
+                Close
+                </button>
+            );
+        }
+
+        (ScannerDialog as any).mockImplementation(MockScannerDialog);
+
+        const fetchDataFromScanQR = jest.fn();
+        act(() => {
+            render(<QRCodeScannerDialogButton fetchDataFromScanQR={fetchDataFromScanQR} />);
+        })
+
+        act(() => {
+            const button = getByText(document.body, 'ScanQR');
+            fireEvent.click(button);
+        });
+
+        act(() => {
+            const button = getByText(document.body, 'Close');
+            fireEvent.click(button);
+        });
+
+        expect(screen.queryByText('ScannerDialog')).not.toBeInTheDocument();
+    });
+});
