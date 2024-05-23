@@ -7,6 +7,11 @@ export interface IssueEvent {
   restOfVC: any;
 }
 
+export interface IImportedData {
+  label: string;
+  value: any;
+}
+
 export enum MimeTypeEnum {
   textPlain = 'text/plain',
   textHtml = 'text/html',

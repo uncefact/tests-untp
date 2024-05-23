@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import * as components from '@mock-app/components';
+import * as components from '../index.js';
 
 export enum ComponentType {
   EntryData = 'EntryData',

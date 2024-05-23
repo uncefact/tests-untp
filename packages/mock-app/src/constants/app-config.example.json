@@ -265,7 +265,7 @@
                 },
                 "initialData": {},
                 "className": "json-form",
-                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
             },
             {
@@ -276,7 +276,8 @@
               "name": "CustomButton",
               "type": "Submit",
               "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "white", "display": "block", "margin": "0 auto", "marginTop": "20px" }
               }
             }
           ],
@@ -413,14 +414,15 @@
                 },
                 "initialData": {},
                 "className": "json-form",
-                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
             },
             {
               "name": "CustomButton",
               "type": "Submit",
               "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
               }
             }
           ],
@@ -650,7 +652,7 @@
                 },
                 "initialData": {},
                 "className": "json-form",
-                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
             },
             {
@@ -661,7 +663,8 @@
               "name": "CustomButton",
               "type": "Submit",
               "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
               }
             }
           ],
@@ -798,14 +801,15 @@
                 },
                 "initialData": {},
                 "className": "json-form",
-                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
             },
             {
               "name": "CustomButton",
               "type": "Submit",
               "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
               }
             }
           ],
@@ -900,14 +904,15 @@
                 },
                 "initialData": {},
                 "className": "json-form",
-                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
             },
             {
               "name": "CustomButton",
               "type": "Submit",
               "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
               }
             }
           ],
@@ -1065,13 +1070,14 @@
               },
               "initialData": {},
               "className": "json-form",
-              "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+              "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
             },
             {
               "name": "CustomButton",
               "type": "Submit",
               "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
               }
             }
           ],

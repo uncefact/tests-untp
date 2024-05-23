@@ -1,1 +1,1 @@
-export { ImportButton } from './ImportButton';
+export { ImportButton } from './ImportButton.js';

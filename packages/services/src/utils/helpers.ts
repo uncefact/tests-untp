@@ -46,3 +46,26 @@ export function incrementQuality(obj: any, numberOfItems: number) {
   }
   return obj;
 }
+
+/**
+ * Create a nested object with the specified keys and data
+ * @param keys - An array of keys representing the nested structure of the object
+ * @param data - The data to be assigned to the innermost key
+ * @returns The created nested object
+ */
+export function createNestedObject(keys: string[], data: any) {
+  const result = {};
+  let current = result as any;
+
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (i === keys.length - 1) {
+      current[key] = data;
+    } else {
+      current[key] = {};
+      current = current[key];
+    }
+  }
+
+  return result;
+}
