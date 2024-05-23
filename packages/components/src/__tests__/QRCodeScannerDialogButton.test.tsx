@@ -38,7 +38,7 @@ describe('QRCodeScannerDialogButton', () => {
         
 
         const onChange = jest.fn();
-        const result = [{
+        const result = {
             '@context': [
                 'https://www.w3.org/2018/credentials/v1',
                 'https://www.w3.org/2018/credentials/examples/v1'
@@ -52,7 +52,7 @@ describe('QRCodeScannerDialogButton', () => {
                     name: 'Bachelor of Science and Arts'
                 }
             }
-        }]
+        }
         publicAPI.get = jest.fn().mockResolvedValue(result);
         act(() => {
             render(<QRCodeScannerDialogButton onChange={onChange} />);

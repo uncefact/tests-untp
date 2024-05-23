@@ -6,7 +6,7 @@ import { ScannerDialog } from './ScannerDialog.js';
 import { Status, ToastMessage, toastMessage } from '../ToastMessage/ToastMessage.js';
 
 export interface IQRCodeScannerDialogButton {
-  onChange: (result: any) => Promise<Array<CredentialPayload>>;
+  onChange: (credential: CredentialPayload) => void;
   style?: React.CSSProperties;
 }
 
@@ -19,8 +19,8 @@ export const QRCodeScannerDialogButton = ({ onChange, style}: IQRCodeScannerDial
     // Attempt to check url params is valid URL , if it fails, it will throw an error
     new URL(url)
 
-    const result = await publicAPI.get(url);            
-    await onChange(result);
+    const credential = await publicAPI.get(url);            
+    await onChange(credential);
   } catch (error) {      
     const e = error as Error;
     toastMessage({ status: Status.error, message: e.message });
