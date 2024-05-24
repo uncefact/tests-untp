@@ -4,10 +4,10 @@ import { Box, Checkbox, FormControl, FormControlLabel, FormGroup, FormLabel } fr
 export interface ICheckBoxList {
   label?: string;
   data: { label: string; value: any; }[];
-  onChangeCheckBox: (data: object[]) => void;
+  onChange: (data: object[]) => void;
 }
 
-export const CheckBoxList = ({ label = 'CheckBoxList', data, onChangeCheckBox }: ICheckBoxList) => {
+export const CheckBoxList = ({ label = 'CheckBoxList', data, onChange }: ICheckBoxList) => {
   const [isCheck, setIsCheck] = useState<{ [key: string]: boolean }>({});
   const [checkList, setCheckList] = useState<string[]>([]);
 
@@ -26,7 +26,7 @@ export const CheckBoxList = ({ label = 'CheckBoxList', data, onChangeCheckBox }:
 
     const selectedItems = data.filter((item) => newArray.includes(item.label));
 
-    onChangeCheckBox(selectedItems);
+    onChange(selectedItems);
   };
 
   return (

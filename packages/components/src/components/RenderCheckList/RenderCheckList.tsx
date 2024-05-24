@@ -19,7 +19,7 @@ export enum AllowNestedComponent {
 }
 
 export const RenderCheckList = ({ checkBoxLabel, requiredFields, onChange, nestedComponents }: IRenderCheckList) => {
-  const [renderCheckboxList, setRenderCheckboxList] = useState<any[]>([]);
+  const [renderCheckBoxList, setRenderCheckBoxList] = useState<any[]>([]);
   const props: Record<string, any> = {};
 
   const getRequiredFieldValue = (jsonData: any, requiredFields: string[]) => {
@@ -63,7 +63,7 @@ export const RenderCheckList = ({ checkBoxLabel, requiredFields, onChange, neste
                   return [...acc, { label: requiredFieldValue, value: item }];
                 }, []);
 
-                return setRenderCheckboxList((prev) => [...prev, ...validItems]);
+                return setRenderCheckBoxList((prev) => [...prev, ...validItems]);
               }
 
               // Check the object data is valid
@@ -73,7 +73,7 @@ export const RenderCheckList = ({ checkBoxLabel, requiredFields, onChange, neste
               }
               
               const validData = { label: requiredFieldValue, value: data };
-              setRenderCheckboxList((prev) => [...prev, validData]);
+              setRenderCheckBoxList((prev) => [...prev, validData]);
             };
 
             break;
@@ -100,8 +100,8 @@ export const RenderCheckList = ({ checkBoxLabel, requiredFields, onChange, neste
           />
         );
       })}
-      {renderCheckboxList.length > 0 && (
-        <CheckBoxList label={checkBoxLabel} data={renderCheckboxList} onChangeCheckBox={onChange} />
+      {renderCheckBoxList.length > 0 && (
+        <CheckBoxList label={checkBoxLabel} data={renderCheckBoxList} onChange={onChange} />
       )}
     </Box>
   );
