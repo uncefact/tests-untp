@@ -59,6 +59,10 @@ export const RenderCheckList = ({ checkBoxLabel, requiredFields, onChange, neste
                   if (!requiredFieldValue) {
                     return acc;
                   }
+                  const isAvailableItem = renderCheckBoxList.find((renderCheckBox: any) => renderCheckBox.label === requiredFieldValue);
+                  if (isAvailableItem) {
+                    return acc;
+                  }
 
                   return [...acc, { label: requiredFieldValue, value: item }];
                 }, []);
