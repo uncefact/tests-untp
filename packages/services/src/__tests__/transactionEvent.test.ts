@@ -19,6 +19,7 @@ jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
   createLinkResolver: jest.fn(),
   IdentificationKeyType: jest.fn(),
+  getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' }))
 }));
 
 describe('processTransactionEvent', () => {

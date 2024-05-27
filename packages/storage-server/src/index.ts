@@ -25,7 +25,7 @@ app.post('/upload', (req, res) => {
     return res.status(400).json({ message: 'Both filePath and jsonData are required' });
   }
   const filePath = path.join(__dirname, 'uploads', inputPath);
-  const host = req.get('host');
+  const host = req.get('host') ?? '';
 
   try {
     const directory = path.dirname(filePath);
@@ -35,13 +35,13 @@ app.post('/upload', (req, res) => {
     // Write JSON data to file
     fs.writeFileSync(filePath, JSON.stringify(data));
     res.status(200).json({
-      url: `http://${host}/${req.body.path}`,
+      url: `http://${host}/${req.body.path as string}`,
     });
   } catch (error: any) {
     res.status(500).json({ message: `Error storing data: ${error.message as string}` });
   }
 });
 
-app.listen(3000, () => {
-  console.log('Server is running on port 3000');
+app.listen(3001, () => {
+  console.log('Server is running on port 3001');
 });

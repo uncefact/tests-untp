@@ -1,9 +1,9 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import { issueVC } from '../vckit.service.js';
 import { getStorageServiceLink } from '../storage.service.js';
-import { IdentificationKeyType, registerLinkResolver } from '../linkResolver.service.js';
+import { getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { IService } from '../types/IService.js';
-import { ITraceabilityEvent, IAggregationEventContext } from './types';
+import { ITraceabilityEvent, IAggregationEventContext } from './types.js';
 import { generateUUID } from '../utils/helpers.js';
 import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { validateAggregationEventContext } from './validateContext.js';
@@ -19,10 +19,13 @@ export const processAggregationEvent: IService = async (
   }
 
   const { vckit, epcisAggregationEvent, dlr, storage, identifierKeyPaths } = context;
-  const identifier: string = getIdentifierByObjectKeyPaths(aggregationEvent.data, identifierKeyPaths);
-  if (!identifier) {
+  const parentIdentifier = getIdentifierByObjectKeyPaths(aggregationEvent.data, identifierKeyPaths);
+  if (!parentIdentifier) {
     throw new Error('Identifier not found');
   }
+
+  const { identifier, qualifierPath } = getLinkResolverIdentifier(parentIdentifier);
+  aggregationEvent.data.parentItem.itemID = `${dlr.dlrAPIUrl}/${epcisAggregationEvent.dlrIdentificationKeyType}/${identifier}${qualifierPath}`;
 
   const credentialSubject = {
     ...aggregationEvent.data,
@@ -50,12 +53,13 @@ export const processAggregationEvent: IService = async (
 
   await registerLinkResolver(
     aggregationVCLink,
-    IdentificationKeyType.nlisid,
+    epcisAggregationEvent.dlrIdentificationKeyType,
     identifier,
     epcisAggregationEvent.dlrLinkTitle,
     epcisAggregationEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
-    dlr.dlrAPIKey
+    dlr.dlrAPIKey,
+    qualifierPath
   );
 
   return aggregationVC;

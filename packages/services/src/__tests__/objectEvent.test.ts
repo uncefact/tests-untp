@@ -19,6 +19,7 @@ jest.mock('../linkResolver.service', () => ({
     gtin: 'gtin',
     nlisid: 'nlisid',
   },
+  getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' }))
 }));
 
 describe('processObjectEvent', () => {
@@ -84,11 +85,12 @@ describe('processObjectEvent', () => {
       expect(registerLinkResolver).toHaveBeenCalledWith(
         expect.any(String),
         dppContext.dlrIdentificationKeyType,
-        dataObjectEvent.data.herd.NLIS,
+        dataObjectEvent.data.herd.identifier,
         dppContext.dlrLinkTitle,
         dppContext.dlrVerificationPage,
         dlrContext.dlrAPIUrl,
         dlrContext.dlrAPIKey,
+        dataObjectEvent.qualifierPath,
       );
     });
   });

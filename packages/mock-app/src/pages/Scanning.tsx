@@ -92,7 +92,7 @@ const Scanning = () => {
     >
       <Scanner
         ref={scannerRef}
-        fps={10}
+        fps={30}
         qrbox={{ width: 250, height: 150 }}
         disableFlip={false}
         qrCodeSuccessCallback={onScanResult}

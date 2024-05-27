@@ -3,12 +3,19 @@ import _ from 'lodash';
 
 import { issueVC } from '../vckit.service.js';
 import { getStorageServiceLink } from '../storage.service.js';
-import { registerLinkResolver } from '../linkResolver.service.js';
+import { getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { epcisTransformationCrendentialSubject } from '../epcis.service.js';
 import { buildDPPCredentialSubject } from '../dpp.service.js';
 
 import { IService } from '../types/IService.js';
-import { IConfigDLR, ICredential, IProductTransformation, ITransformationEvent, IVCKitContext } from './types';
+import {
+  IConfigDLR,
+  ICredential,
+  IEntityIssue,
+  IProductTransformation,
+  ITransformationEvent,
+  IVCKitContext,
+} from './types';
 import { generateUUID, incrementQuality } from '../utils/helpers.js';
 import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { validateContextTransformationEvent } from './validateContext.js';
@@ -53,17 +60,17 @@ export const processTransformationEvent: IService = async (data: any, context: I
 
     await Promise.all(
       detailOfOutputProducts.map(async (outputItem: any) => {
-        const epcisTransformationEventQualifierPath = epcisTransformationEventContext?.dlrQualifierPath;
+        const { identifier, qualifierPath } = getLinkResolverIdentifier(outputItem.productID);
 
         const transformationEventLinkResolver = await registerLinkResolver(
           transformantionEventLink,
           epcisTransformationEventContext.dlrIdentificationKeyType,
-          outputItem.productID,
+          identifier,
           epcisTransformationEventContext.dlrLinkTitle,
           epcisTransformationEventContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,
-          epcisTransformationEventQualifierPath,
+          qualifierPath,
         );
 
         const dpp = await issueDPP(
@@ -76,16 +83,15 @@ export const processTransformationEvent: IService = async (data: any, context: I
         );
         const DPPLink = await uploadVC(`${outputItem.productID as string}/${generateUUID()}`, dpp, storageContext);
 
-        const dppQualifierPath = dppContext?.dlrQualifierPath;
         await registerLinkResolver(
           DPPLink,
           dppContext.dlrIdentificationKeyType,
-          outputItem.productID,
+          identifier,
           dppContext.dlrLinkTitle,
           dppContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,
-          dppQualifierPath,
+          qualifierPath,
         );
       }),
     );
@@ -105,7 +111,7 @@ export const processTransformationEvent: IService = async (data: any, context: I
  */
 export const issueEpcisTransformationEvent = async (
   vcKitContext: IVCKitContext,
-  epcisTransformationEvent: ICredential,
+  epcisTransformationEvent: IEntityIssue,
   dlrContext: IConfigDLR,
   productTransformation: IProductTransformation,
   inputIdentifiers: string[],
@@ -119,6 +125,7 @@ export const issueEpcisTransformationEvent = async (
 
       dlrContext.dlrAPIUrl,
       productTransformation,
+      epcisTransformationEvent.dlrIdentificationKeyType,
     ),
     issuer: vcKitContext.issuer,
     type: [...epcisTransformationEvent.type],

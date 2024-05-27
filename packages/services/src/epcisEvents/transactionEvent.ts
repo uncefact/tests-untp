@@ -5,7 +5,7 @@ import { ITraceabilityEvent, ITransactionEventContext } from './types.js';
 import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { getStorageServiceLink } from '../storage.service.js';
 import { generateUUID } from '../utils/helpers.js';
-import { registerLinkResolver } from '../linkResolver.service.js';
+import { getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { validateTransactionEventContext } from './validateContext.js';
 import { EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
 
@@ -19,10 +19,13 @@ export const processTransactionEvent: IService = async (
   }
 
   const { vckit, epcisTransactionEvent, dlr, storage, identifierKeyPaths } = context;
-  const identifier: string = getIdentifierByObjectKeyPaths(transactionEvent.data, identifierKeyPaths);
-  if (!identifier) {
+  const transactionIdentifier = getIdentifierByObjectKeyPaths(transactionEvent.data, identifierKeyPaths);
+  if (!transactionIdentifier) {
     throw new Error('Identifier not found');
   }
+
+  const { identifier, qualifierPath } = getLinkResolverIdentifier(transactionIdentifier);
+  transactionEvent.data.transaction.identifier = identifier;
 
   const credentialSubject = {
     ...transactionEvent.data,
@@ -55,6 +58,7 @@ export const processTransactionEvent: IService = async (
     epcisTransactionEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
+    qualifierPath
   );
 
   return vc;
