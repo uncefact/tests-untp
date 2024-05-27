@@ -276,7 +276,17 @@
               "name": "CustomButton",
               "type": "Submit",
               "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
+                "style": { "textAlign": "center", "paddingTop": "20px" },
+                "nestedComponent": {
+                  "name": "DownloadButton",
+                  "type": "",
+                  "props": {
+                    "fileName": "vc",
+                    "fileExtension": "json",
+                    "fileType": "application/json",
+                    "style": { "backgroundColor": "rgb(41, 171, 48)", "marginLeft": "20px" }
+                  }
+                }
               }
             }
           ],
