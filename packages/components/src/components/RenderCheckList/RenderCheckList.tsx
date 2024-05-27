@@ -45,15 +45,17 @@ export const RenderCheckList = ({ checkBoxLabel, requiredFields, onChange, neste
       }}
     >
       {nestedComponents.map((component, index) => {
+        // Check if the component is allowed to be nested
         if (!(Object.values(AllowNestedComponent) as string[]).includes(component.name)) {
           return null;
         }
 
         switch (component.type) {
           case 'EntryData':
-            // unknown is used to flexibilize the type of the value, since it can be any type
+            // Handle onChange event for EntryData component
             props.onChange = (data: any) => {
               if (Array.isArray(data)) {
+                // Handle array data
                 const validItems = data.reduce((acc, item) => {
                   const requiredFieldValue = getRequiredFieldValue(item, requiredFields);
                   if (!requiredFieldValue) {
