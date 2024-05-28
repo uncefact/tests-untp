@@ -8,8 +8,7 @@ export interface IssueEvent {
 }
 
 export interface IImportedData {
-  label: string;
-  value: any;
+  [key: string]: { value: any, checked: boolean };
 }
 
 export enum MimeTypeEnum {

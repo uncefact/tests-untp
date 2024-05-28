@@ -95,6 +95,8 @@ export const processTransformationEvent: IService = async (data: any, context: I
         );
       }),
     );
+
+    return epcisVc;
   } catch (error: any) {
     throw new Error(error);
   }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box } from '@mui/material';
-import { CheckBoxList } from '../CheckBoxList/CheckBoxList.js';
+import { CheckBoxList, ICheckBoxes } from '../CheckBoxList/CheckBoxList.js';
 import {
   DynamicComponentRenderer,
   IDynamicComponentRendererProps,
@@ -10,7 +10,7 @@ export interface IRenderCheckList {
   checkBoxLabel?: string;
   requiredFields: string[];
   nestedComponents: IDynamicComponentRendererProps[];
-  onChange: (data: object) => void;
+  onChange: (data: any) => void;
 }
 
 export enum AllowNestedComponent {
@@ -19,20 +19,73 @@ export enum AllowNestedComponent {
 }
 
 export const RenderCheckList = ({ checkBoxLabel, requiredFields, onChange, nestedComponents }: IRenderCheckList) => {
-  const [renderCheckBoxList, setRenderCheckBoxList] = useState<any[]>([]);
-  const props: Record<string, any> = {};
+  const [checkBoxes, setCheckBoxes] = useState<ICheckBoxes>({});
 
-  const getRequiredFieldValue = (jsonData: any, requiredFields: string[]) => {
+  const getRequiredFieldValue = (jsonData: any, requiredFields: string[]): string | null => {
     let requiredFieldValue = jsonData;
     for (const requiredField of requiredFields) {
       if (!requiredFieldValue[requiredField]) {
         return null;
       }
-
       requiredFieldValue = requiredFieldValue[requiredField];
     }
 
     return requiredFieldValue;
+  };
+
+  const handleOnChange = (data: object | object[]) => {
+    if (!Array.isArray(data) && typeof data !== 'object') {
+      return;
+    }
+
+    const uploadedFiles = [];
+    if (Array.isArray(data)) {
+      uploadedFiles.push(...data);
+    }
+    if (typeof data === 'object') {
+      uploadedFiles.push(data);
+    }
+
+    const validItems = uploadedFiles.reduce((acc, item) => {
+      const requiredFieldValue = getRequiredFieldValue(item, requiredFields);
+      if (!requiredFieldValue) {
+        return acc;
+      }
+
+      return {...acc, [requiredFieldValue]: item};
+    }, {});
+
+    return setCheckBoxes((prev) => ({...prev, ...validItems}));
+  };
+
+  const renderDynamicComponent = () => {
+    return nestedComponents.map((component, index) => {
+      if (!(Object.values(AllowNestedComponent) as string[]).includes(component.name)) {
+        return null;
+      }
+  
+      const props = {
+        ...component.props,
+        onChange: component.type === 'EntryData' ? handleOnChange : undefined,
+      };
+  
+      return (
+        <DynamicComponentRenderer
+          key={index}
+          name={component.name}
+          type={component.type}
+          props={props}
+        />
+      );
+    });
+  };
+
+  const renderCheckBoxes = () => {
+    if (!Object.values(checkBoxes).length) {
+      return null;
+    }
+
+    return <CheckBoxList label={checkBoxLabel} data={checkBoxes} onChange={onChange} />;
   };
 
   return (
@@ -44,71 +97,8 @@ export const RenderCheckList = ({ checkBoxLabel, requiredFields, onChange, neste
         alignItems: 'center',
       }}
     >
-      {nestedComponents.map((component, index) => {
-        // Check if the component is allowed to be nested
-        if (!(Object.values(AllowNestedComponent) as string[]).includes(component.name)) {
-          return null;
-        }
-
-        switch (component.type) {
-          case 'EntryData':
-            // Handle onChange event for EntryData component
-            props.onChange = (data: any) => {
-              if (Array.isArray(data)) {
-                // Handle array data
-                const validItems = data.reduce((acc, item) => {
-                  const requiredFieldValue = getRequiredFieldValue(item, requiredFields);
-                  if (!requiredFieldValue) {
-                    return acc;
-                  }
-                  const isAvailableItem = renderCheckBoxList.find((renderCheckBox: any) => renderCheckBox.label === requiredFieldValue);
-                  if (isAvailableItem) {
-                    return acc;
-                  }
-
-                  return [...acc, { label: requiredFieldValue, value: item }];
-                }, []);
-
-                return setRenderCheckBoxList((prev) => [...prev, ...validItems]);
-              }
-
-              // Check the object data is valid
-              const requiredFieldValue = getRequiredFieldValue(data, requiredFields);
-              if (!requiredFieldValue) {
-                return null;
-              }
-              
-              const validData = { label: requiredFieldValue, value: data };
-              setRenderCheckBoxList((prev) => [...prev, validData]);
-            };
-
-            break;
-            // case ComponentType.Submit:
-            //   props.onClick = async () => {
-            //     try {
-            //       await executeServices(services, state);
-            //       toastMessage({ status: Status.success, message: 'Submit success' });
-            //     } catch (error: any) {
-            //       toastMessage({ status: Status.error, message: error.message });
-            //     }
-            //   };
-            // break;
-          default:
-            break;
-        }
-
-        return (
-          <DynamicComponentRenderer
-            key={index}
-            name={component.name}
-            type={component.type}
-            props={{ ...props, ...component.props }}
-          />
-        );
-      })}
-      {renderCheckBoxList.length > 0 && (
-        <CheckBoxList label={checkBoxLabel} data={renderCheckBoxList} onChange={onChange} />
-      )}
+      {renderDynamicComponent()}
+      {renderCheckBoxes()}
     </Box>
   );
 };

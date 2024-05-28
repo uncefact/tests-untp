@@ -1,33 +1,52 @@
-import React, { ChangeEvent, useState } from 'react';
+import React, { ChangeEvent, useEffect, useState } from 'react';
 import { Box, Checkbox, FormControl, FormControlLabel, FormGroup, FormLabel } from '@mui/material';
 
+export interface ICheckBoxes {
+  [key: string]: any;
+}
 export interface ICheckBoxList {
   label?: string;
-  data: { label: string; value: any; }[];
-  onChange: (data: object[]) => void;
+  data: ICheckBoxes;
+  onChange: (data: any) => void;
 }
 
 export const CheckBoxList = ({ label = 'CheckBoxList', data, onChange }: ICheckBoxList) => {
-  const [isCheck, setIsCheck] = useState<{ [key: string]: boolean }>({});
-  const [checkList, setCheckList] = useState<string[]>([]);
+  const [checkList, setCheckList] = useState<{ [key: string]: { value: any, checked: boolean } }>(data);
 
-  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
-    let newArray = [...checkList, event.target.name];
-
-    if (checkList.includes(event.target.name)) {
-      newArray = newArray.filter((item) => item !== event.target.name);
+  useEffect(() => {
+    for (const key in data) {
+      data[key] = { value: data[key] }; 
     }
 
-    setCheckList(newArray);
-    setIsCheck({
-      ...isCheck,
-      [event.target.name]: event.target.checked,
-    });
+    setCheckList(data);
+  }, [data]);
 
-    const selectedItems = data.filter((item) => newArray.includes(item.label));
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const changedCheckBox = checkList[event.target.name];
+    if (!changedCheckBox) {
+      return;
+    }
 
-    onChange(selectedItems);
+    checkList[event.target.name] = {
+      ...changedCheckBox,
+      checked: event.target.checked,
+    };
+
+    setCheckList(checkList);
+    onChange(checkList);
   };
+
+  const renderCheckBoxList = () => Object.keys(data).map((key) => {
+    const { value, checked } = data[key];
+    return (
+      <FormGroup key={key}>
+        <FormControlLabel
+          control={<Checkbox checked={checked} onChange={handleChange} name={key} value={value} />}
+          label={key}
+        />
+      </FormGroup>
+    );
+  })
 
   return (
     <Box
@@ -40,14 +59,7 @@ export const CheckBoxList = ({ label = 'CheckBoxList', data, onChange }: ICheckB
     >
       <FormControl component='fieldset'>
         <FormLabel component='legend'>{label}</FormLabel>
-        {data.map(({ label, value }, index: number) => (
-          <FormGroup key={index}>
-            <FormControlLabel
-              control={<Checkbox checked={isCheck[index]} onChange={handleChange} name={label} value={value} />}
-              label={label}
-            />
-          </FormGroup>
-        ))}
+        {renderCheckBoxList()}
       </FormControl>
     </Box>
   );

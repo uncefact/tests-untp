@@ -142,10 +142,15 @@ export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, ser
           case ComponentType.Submit:
             props.onClick = async () => {
               try {
-                await executeServices(services, state);
+                const result = await executeServices(services, state);
+                if (!result)  {
+                  return toastMessage({ status: Status.error, message: 'Something went wrong' });  
+                }
+
                 toastMessage({ status: Status.success, message: 'Submit success' });
               } catch (error: any) {
-                toastMessage({ status: Status.error, message: error.message });
+                console.log(error.message);
+                toastMessage({ status: Status.error, message: 'Something went wrong' });
               }
             };
             break;

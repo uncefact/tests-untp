@@ -8,12 +8,12 @@ import { createNestedObject } from './utils/helpers.js';
  * @returns The mapped data object.
  * @throws Error if importedData or requiredFields are missing.
  */
-export const mappingImportedData = (importedData: IImportedData[], parameters: any) => {
-  if (!importedData?.length || !parameters?.requiredFields) {
+export const mappingImportedData = (importedData: IImportedData, parameters: any) => {
+  if (!importedData || !Object.keys(importedData).length || !parameters?.requiredFields) {
     throw new Error('Import data or required fields are missing');
   }
-  
-  const identifiers = importedData.map((item) => item.label);
+
+  const identifiers = Object.keys(importedData).filter((key) => importedData[key].checked);
   const mappedData = {
     data: createNestedObject(parameters.requiredFields, identifiers)
   }

@@ -6,7 +6,7 @@ describe('render CheckBoxList component', () => {
   const onChange = jest.fn();
 
   it('Should display a label passed as a prop', () => {
-    const data = [{ label: 'label1', value: 'value1' }];
+    const data = { label1: { value: 'value1' } };
 
     render(<CheckBoxList data={data} onChange={onChange} />);
     const checkbox1 = screen.getByLabelText('label1');
@@ -15,10 +15,10 @@ describe('render CheckBoxList component', () => {
   });
 
   it('Should render a checkbox for each item in the data array', () => {
-    const data = [
-      { label: 'label1', value: 'value1' },
-      { label: 'label2', value: 'value2' },
-    ];
+    const data = {
+      label1: { value: 'value1' },
+      label2: { value: 'value2' },
+    };
 
     render(<CheckBoxList data={data} onChange={onChange} />);
     const checkbox1 = screen.getByLabelText('label1');
@@ -29,9 +29,10 @@ describe('render CheckBoxList component', () => {
   });
 
   it('Should call onChange with the selected items when a checkbox is checked', () => {
-    const data = [{ label: 'label1', value: 'value1' }];
+    const data = { label1: { value: 'value1' } };
+    let CheckBoxListState: object[] = [];
     const onChangeCheckBoxList = (data: object[]) => {
-      expect(data).toEqual([{ label: 'label1', value: 'value1' }]);
+      CheckBoxListState = data;
     };
 
     render(<CheckBoxList data={data} onChange={onChangeCheckBoxList} />);
@@ -39,27 +40,15 @@ describe('render CheckBoxList component', () => {
     fireEvent.click(checkbox1);
 
     expect(checkbox1).toBeChecked();
-  });
-
-  it('Should call onChange with the selected items when a checkbox is checked', () => {
-    const data = [{ label: 'label1', value: 'value1' }];
-    const onChangeCheckBoxList = (data: object[]) => {
-      expect(data).toEqual([{ label: 'label1', value: 'value1' }]);
-    };
-
-    render(<CheckBoxList data={data} onChange={onChangeCheckBoxList} />);
-    const checkbox1 = screen.getByLabelText('label1');
-    fireEvent.click(checkbox1);
-
-    expect(checkbox1).toBeChecked();
+    expect(data).toEqual({ label1: { checked: true, value: { value: 'value1' } } });
   });
 
   it('Should call onChange with the selected items when multiple checkbox are checked', () => {
-    const data = [
-      { label: 'label1', value: 'value1' },
-      { label: 'label2', value: 'value2' },
-      { label: 'label3', value: 'value3' },
-    ];
+    const data = {
+      label1: { value: 'value1' },
+      label2: { value: 'value2' },
+      label3: { value: 'value3' },
+    };
     let CheckBoxListState: object[] = [];
     const onChangeCheckBoxList = (data: object[]) => {
       CheckBoxListState = data;
@@ -75,43 +64,45 @@ describe('render CheckBoxList component', () => {
     expect(checkbox1).toBeChecked();
     expect(checkbox2).not.toBeChecked();
     expect(checkbox3).not.toBeChecked();
-    expect(CheckBoxListState).toEqual([
-      { label: 'label1', value: 'value1' }
-    ]);
+    expect(CheckBoxListState).toEqual({
+      label1: { checked: true, value: { value: 'value1' } },
+      label2: { value: { value: 'value2' } },
+      label3: { value: { value: 'value3' } },
+    });
 
     // Check the second checkbox
     fireEvent.click(checkbox2);
     expect(checkbox1).toBeChecked();
     expect(checkbox2).toBeChecked();
     expect(checkbox3).not.toBeChecked();
-    expect(CheckBoxListState).toEqual([
-      { label: 'label1', value: 'value1' },
-      { label: 'label2', value: 'value2' },
-    ]);
+    expect(CheckBoxListState).toEqual({
+      label1: { checked: true, value: { value: 'value1' } },
+      label2: { checked: true, value: { value: 'value2' } },
+      label3: { value: { value: 'value3' } },
+    });
 
     // Check the third checkbox
     fireEvent.click(checkbox3);
     expect(checkbox1).toBeChecked();
     expect(checkbox2).toBeChecked();
     expect(checkbox3).toBeChecked();
-    expect(CheckBoxListState).toEqual([
-      { label: 'label1', value: 'value1' },
-      { label: 'label2', value: 'value2' },
-      { label: 'label3', value: 'value3' },
-    ]);
-
+    expect(CheckBoxListState).toEqual({
+      label1: { checked: true, value: { value: 'value1' } },
+      label2: { checked: true, value: { value: 'value2' } },
+      label3: { checked: true, value: { value: 'value3' } },
+    });
   });
 
   it('Should update the state correctly when a checked checkbox is unchecked', () => {
-    const data = [
-      { label: 'label1', value: 'value1' },
-      { label: 'label2', value: 'value2' },
-    ];
+    const data = {
+      label1: { value: 'value1' },
+      label2: { value: 'value2' },
+    };
     let CheckBoxListState: object[] = [];
     const onChangeCheckBoxList = (data: object[]) => {
       CheckBoxListState = data;
     };
-    
+
     render(<CheckBoxList data={data} onChange={onChangeCheckBoxList} />);
     const checkbox1 = screen.getByLabelText('label1');
     const checkbox2 = screen.getByLabelText('label2');
@@ -120,20 +111,23 @@ describe('render CheckBoxList component', () => {
     fireEvent.click(checkbox1);
     expect(checkbox1).toBeChecked();
     expect(checkbox2).not.toBeChecked();
-    expect(CheckBoxListState).toEqual([
-      { label: 'label1', value: 'value1' }
-    ]);
+    expect(CheckBoxListState).toEqual({
+      label1: { checked: true, value: { value: 'value1' } },
+      label2: { value: { value: 'value2' } },
+    });
 
     // Uncheck the first checkbox
     fireEvent.click(checkbox1);
     expect(checkbox1).not.toBeChecked();
     expect(checkbox2).not.toBeChecked();
-    expect(CheckBoxListState).toEqual([]);
-
+    expect(CheckBoxListState).toEqual({
+      label1: { checked: false, value: { value: 'value1' } },
+      label2: { value: { value: 'value2' } },
+    });
   });
 
   it("Should display the default label 'CheckBoxList' when no label prop is provided", () => {
-    const data = [{ label: 'label1', value: 'value1' }];
+    const data = { label1: { value: 'value1' } };
 
     render(<CheckBoxList data={data} onChange={onChange} />);
     const label = screen.getByText('CheckBoxList');
@@ -145,7 +139,7 @@ describe('render CheckBoxList component', () => {
     try {
       render(<CheckBoxList data={undefined as unknown as []} onChange={onChange} />);
     } catch (error: any) {
-      expect(error.message).toBe("Cannot read properties of undefined (reading 'map')");
+      expect(error.message).toBe('Cannot convert undefined or null to object');
     }
   });
 });
