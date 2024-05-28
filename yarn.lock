@@ -5315,9 +5315,9 @@
   dependencies:
     argparse "^2.0.1"
 
-"GS1_DigitalLink_Resolver_CE@git+ssh://git@github.com:gs1/GS1_DigitalLink_Resolver_CE.git":
+"GS1_DigitalLink_Resolver_CE@git+https://github.com/gs1/GS1_DigitalLink_Resolver_CE.git":
   version "0.0.0"
-  resolved "git+ssh://git@github.com:gs1/GS1_DigitalLink_Resolver_CE.git#3d864f31ca4a1561b2c9186f26b36da98c4b2bd1"
+  resolved "git+https://github.com/gs1/GS1_DigitalLink_Resolver_CE.git#3d864f31ca4a1561b2c9186f26b36da98c4b2bd1"
 
 JSONStream@^1.3.5:
   version "1.3.5"
@@ -17587,6 +17587,7 @@ workbox-window@6.6.1:
     workbox-core "6.6.1"
 
 "wrap-ansi-cjs@npm:wrap-ansi@^7.0.0", wrap-ansi@^7.0.0:
+  name wrap-ansi-cjs
   version "7.0.0"
   resolved "https://registry.yarnpkg.com/wrap-ansi/-/wrap-ansi-7.0.0.tgz#67e145cff510a6a6984bdf1152911d69d2eb9e43"
   integrity sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q==
