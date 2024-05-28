@@ -7,8 +7,7 @@ COPY package*.json yarn.lock ./
 FROM base AS dependencies
 COPY . .
 RUN yarn install && yarn cache clean
-ARG APP_CONFIG
-RUN cp $APP_CONFIG packages/mock-app/src/constants/app-config.json
+RUN cp packages/mock-app/src/constants/app-config.example.json packages/mock-app/src/constants/app-config.json
 
 # ---- Build ----
 FROM dependencies AS build
