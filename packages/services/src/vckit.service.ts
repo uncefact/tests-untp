@@ -46,7 +46,7 @@ export const issueVC = async ({
   vcKitAPIUrl,
 }: IVcKitIssueVC): Promise<VerifiableCredential> => {
   const body = constructCredentialObject({ context, type, issuer, credentialSubject, ...restOfVC });
-  const response = await publicAPI.post<VerifiableCredential>(`${vcKitAPIUrl}/credentials/issue`, body);
+  const response = await publicAPI.post<VerifiableCredential>(`${vcKitAPIUrl}/v1/credentials/issue`, body);
   return response;
 };
 
