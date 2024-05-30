@@ -1,9 +1,11 @@
-*Dockerfile*
-*docker-compose*
-node_modules
-*/__test__/*
-coverage
-build
+docker-compose.yaml
+.dockerignore
+**/Dockerfile
+**/node_modules
+**/__test__
+**/coverage
+**/build
+**/tsconfig.tsbuildinfo
 .git
 .gitignore
 jest.*
