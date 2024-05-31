@@ -1,10 +1,12 @@
 import { LoadingButton } from '@mui/lab';
 import { useState } from 'react';
 import { Status, ToastMessage, toastMessage } from '../ToastMessage/ToastMessage.js';
+import { Tooltip } from '@mui/material';
 
 type ButtonProps = {
   onClick: () => any;
   label?: string;
+  description?: string;
 };
 
 export const CustomButton: React.FC<ButtonProps> = ({ onClick, label = 'Submit', ...props }) => {
@@ -32,10 +34,11 @@ export const CustomButton: React.FC<ButtonProps> = ({ onClick, label = 'Submit',
 
   return (
     <div {...props}>
-      <LoadingButton loading={loading} variant='contained' onClick={handleOnClick}>
-        {label}
-      </LoadingButton>
-
+      <Tooltip title={props.description}>
+        <LoadingButton loading={loading} variant='contained' onClick={handleOnClick}>
+          {label}
+        </LoadingButton>
+      </Tooltip>
       <ToastMessage />
     </div>
   );
