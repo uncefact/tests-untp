@@ -1,6 +1,6 @@
 import _ from 'lodash';
-import { IStoredCredentialsConfig } from '../../types/conformityCredential.types.js';
 import JSONPointer from 'jsonpointer';
+import { StorageServiceConfig } from '@mock-app/services/build/types/storage.js';
 
 export type Result<T> = { ok: true; value: T } | { ok: false; value: string };
 
@@ -15,8 +15,8 @@ export const error: <T>(message: string) => Result<T> = (message) => ({
  * @returns The stored credentials if they are valid
  */
 export const checkStoredCredentialsConfig = (
-  storedCredentialsConfig: IStoredCredentialsConfig,
-): Result<IStoredCredentialsConfig> => {
+  storedCredentialsConfig: StorageServiceConfig,
+): Result<StorageServiceConfig> => {
   if (_.isEmpty(storedCredentialsConfig)) return error('Invalid upload credential config');
   if (_.isEmpty(storedCredentialsConfig.url)) return error('Invalid upload credential config url');
 

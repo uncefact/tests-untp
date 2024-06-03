@@ -40,7 +40,7 @@ const Home = () => {
   };
 
   const renderGenericFeature = () => {
-    const generateFeature = appConfig.generateFeatures.map((feature) => {
+    const generateFeature = appConfig.generalFeatures.map((feature) => {
       const path = `/${convertStringToPath(feature.name)}`;
       return (
         <Button

@@ -2,7 +2,7 @@ import { VerifiableCredential } from '@vckit/core-types';
 import _ from 'lodash';
 
 import { issueVC } from '../vckit.service.js';
-import { uploadJson } from '../storage.service.js';
+import { getStorageServiceLink } from '../storage.service.js';
 import { getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { epcisTransformationCrendentialSubject } from '../epcis.service.js';
 import { buildDPPCredentialSubject } from '../dpp.service.js';
@@ -13,13 +13,13 @@ import {
   ICredential,
   IEntityIssue,
   IProductTransformation,
-  IStorageContext,
   ITransformationEvent,
   IVCKitContext,
 } from './types';
 import { generateUUID, incrementQuality } from '../utils/helpers.js';
 import { getIdentifierByObjectKeyPaths } from './helpers.js';
-import {  validateContextTransformationEvent } from './validateContext.js';
+import { validateContextTransformationEvent } from './validateContext.js';
+import { StorageServiceConfig } from '../types/storage.js';
 
 /**
  * Process transformation event, issue epcis transformation event and dpp for each identifiers, then upload to storage and register link resolver for each dpp
@@ -27,7 +27,7 @@ import {  validateContextTransformationEvent } from './validateContext.js';
  * @param context - context for the transformation event
  */
 export const processTransformationEvent: IService = async (data: any, context: ITransformationEvent): Promise<any> => {
-  try {
+  try {    
     const validationResult = validateContextTransformationEvent(context);
     if (!validationResult.ok) throw new Error(validationResult.value);
 
@@ -138,18 +138,13 @@ export const issueEpcisTransformationEvent = async (
 
 /**
  * Upload the verifiable credential to the storage
- * @param filename - filename of the verifiable credential
+ * @param path - filename of the verifiable credential
  * @param vc - verifiable credential to be uploaded
  * @param storageContext - context for the storage to upload the verifiable credential
  * @returns string - url of the uploaded verifiable credential
  */
-export const uploadVC = async (filename: string, vc: VerifiableCredential, storageContext: IStorageContext) => {
-  const result = await uploadJson({
-    filename: filename,
-    json: vc,
-    bucket: storageContext.bucket,
-    storageAPIUrl: storageContext.storageAPIUrl,
-  });
+export const uploadVC = async (path: string, vc: VerifiableCredential, storageContext: StorageServiceConfig) => {  
+  const result = await getStorageServiceLink(storageContext, vc, path);
   return result;
 };
 
