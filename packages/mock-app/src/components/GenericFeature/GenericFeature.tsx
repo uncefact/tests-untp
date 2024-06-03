@@ -147,7 +147,7 @@ export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, ser
                   return toastMessage({ status: Status.error, message: 'Something went wrong' });  
                 }
 
-                toastMessage({ status: Status.success, message: 'Submit success' });
+                toastMessage({ status: Status.success, message: 'Action Successful' });
               } catch (error: any) {
                 console.log(error.message);
                 toastMessage({ status: Status.error, message: 'Something went wrong' });
