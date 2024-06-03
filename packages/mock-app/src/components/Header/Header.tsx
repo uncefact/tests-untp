@@ -16,6 +16,7 @@ import {
   ListItemText,
   Drawer,
   ListItemIcon,
+  Button,
 } from '@mui/material';
 import { Menu as MenuIcon } from '@mui/icons-material';
 import appConfig from '../../constants/app-config.json';
@@ -39,6 +40,12 @@ function Header() {
 
   useEffect(() => {
     const path = location.pathname;
+    const getNameLinkFromSesion = sessionStorage.getItem('nameLink');
+
+    if (getNameLinkFromSesion) {
+      setNameLink(getNameLinkFromSesion);
+      sessionStorage.removeItem('nameLink');
+    }
 
     if (path === '/') {
       setNameLink(appConfig.name);
@@ -136,8 +143,6 @@ function Header() {
             </Drawer>
 
             <Stack
-              component={Link}
-              to='/'
               sx={{
                 textDecoration: 'none',
                 alignItems: 'center',
@@ -164,6 +169,23 @@ function Header() {
               </Typography>
             </Stack>
           </Box>
+
+          <Stack
+            component={Link}
+            to='/'
+            sx={{
+              textDecoration: 'none',
+              alignItems: 'end',
+              flexDirection: 'row',
+              margin: {
+                xs: 'auto',
+                md: '2px',
+                lg: '2px',
+              },
+            }}
+          >
+            <Button variant='contained'>Back to Home</Button>
+          </Stack>
         </Toolbar>
       </Container>
     </AppBar>

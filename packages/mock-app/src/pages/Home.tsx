@@ -1,4 +1,3 @@
-import React from 'react';
 import { Box, Button } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { convertStringToPath } from '../utils';
@@ -15,6 +14,9 @@ const Home = () => {
           variant='contained'
           component={Link}
           to={path}
+          onClick={() => {
+            sessionStorage.setItem('nameLink', configApp.name);
+          }}
         >
           {configApp.name}
         </Button>
@@ -28,6 +30,7 @@ const Home = () => {
         variant='contained'
         component={Link}
         to={'/scanning'}
+        onClick={() => sessionStorage.setItem('nameLink', 'Scanning')}
       >
         Scanning
       </Button>,
@@ -46,6 +49,7 @@ const Home = () => {
           variant='contained'
           component={Link}
           to={path}
+          onClick={() => sessionStorage.setItem('nameLink', feature.name)}
         >
           {feature.name}
         </Button>
