@@ -154,7 +154,7 @@
                     "dlrQualifierPath": ""
                   },
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
+                    "vckitAPIUrl": "https://vckit.example.com",
                     "issuer": "did:web:708f-27-75-129-38.ngrok-free.app"
                   },
                   "dlr": {
