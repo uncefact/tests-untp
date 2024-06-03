@@ -35,8 +35,9 @@ export const validateContextObjectEvent = (context: IContext): Result<IContext> 
   if (_.isEmpty(context.dpp.dlrVerificationPage)) return error('Invalid dlrVerificationPage');
   if (_.isEmpty(context.dpp.dlrIdentificationKeyType)) return error('Invalid dlrIdentificationKeyType');
 
-  if (_.isEmpty(context.storage.storageAPIUrl)) return error('Invalid storageAPIUrl');
-  if (_.isEmpty(context.storage.bucket)) return error('Invalid bucket');
+  if (_.isEmpty(context.storage)) return error('Invalid storage context');
+  if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
+  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
@@ -57,23 +58,29 @@ export const validateContextTransformationEvent = (context: ITransformationEvent
   if (_.isEmpty(context.dpp.dlrVerificationPage)) return error('Invalid dpp dlrVerificationPage');
   if (_.isEmpty(context.dpp.dlrIdentificationKeyType)) return error('Invalid dpp dlrIdentificationKeyType');
 
-  if (_.isEmpty(context.storage.storageAPIUrl)) return error('Invalid storageAPIUrl');
-  if (_.isEmpty(context.storage.bucket)) return error('Invalid bucket');
+  if (_.isEmpty(context.storage)) return error('Invalid storage context');
+  if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
+  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
 
-  if(_.isEmpty(context.epcisTransformationEvent)) return error('epcisTransformationEvent not found');
-  if(_.isEmpty(context.epcisTransformationEvent.context)) return error('Invalid epcisTransformationEvent context')
-  if(_.isEmpty(context.epcisTransformationEvent.type)) return error('Invalid epcisTransformationEvent type')
-  if(_.isEmpty(context.epcisTransformationEvent.dlrLinkTitle)) return error('Invalid epcisTransformationEvent dlrLinkTitle')
-  if(_.isEmpty(context.epcisTransformationEvent.dlrVerificationPage)) return error('Invalid epcisTransformationEvent dlrVerificationPage')
-  if(_.isEmpty(context.epcisTransformationEvent.dlrIdentificationKeyType)) return error('Invalid epcisTransformationEvent dlrIdentificationKeyType')
-  
+  if (_.isEmpty(context.epcisTransformationEvent)) return error('epcisTransformationEvent not found');
+  if (_.isEmpty(context.epcisTransformationEvent.context)) return error('Invalid epcisTransformationEvent context');
+  if (_.isEmpty(context.epcisTransformationEvent.type)) return error('Invalid epcisTransformationEvent type');
+  if (_.isEmpty(context.epcisTransformationEvent.dlrLinkTitle))
+    return error('Invalid epcisTransformationEvent dlrLinkTitle');
+  if (_.isEmpty(context.epcisTransformationEvent.dlrVerificationPage))
+    return error('Invalid epcisTransformationEvent dlrVerificationPage');
+  if (_.isEmpty(context.epcisTransformationEvent.dlrIdentificationKeyType))
+    return error('Invalid epcisTransformationEvent dlrIdentificationKeyType');
+
   return { ok: true, value: context };
 };
 
-export const validateTransactionEventContext = (context: ITransactionEventContext): Result<ITransactionEventContext> => {
+export const validateTransactionEventContext = (
+  context: ITransactionEventContext,
+): Result<ITransactionEventContext> => {
   if (_.isEmpty(context.vckit)) return error('Invalid vckit context');
   if (_.isEmpty(context.epcisTransactionEvent)) return error('Invalid epcisTransactionEvent context');
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
@@ -83,22 +90,27 @@ export const validateTransactionEventContext = (context: ITransactionEventContex
   if (_.isEmpty(context.vckit.vckitAPIUrl)) return error('Invalid vckitAPIUrl');
   if (_.isEmpty(context.vckit.issuer)) return error('Invalid issuer');
 
-  if(_.isEmpty(context.epcisTransactionEvent.context)) return error('Invalid epcisTransactionEvent context')
-  if(_.isEmpty(context.epcisTransactionEvent.type)) return error('Invalid epcisTransactionEvent type')
-  if(_.isEmpty(context.epcisTransactionEvent.dlrLinkTitle)) return error('Invalid epcisTransactionEvent dlrLinkTitle')
-  if(_.isEmpty(context.epcisTransactionEvent.dlrVerificationPage)) return error('Invalid epcisTransactionEvent dlrVerificationPage')
-  if(_.isEmpty(context.epcisTransactionEvent.dlrIdentificationKeyType)) return error('Invalid epcisTransactionEvent dlrIdentificationKeyType')
+  if (_.isEmpty(context.epcisTransactionEvent.context)) return error('Invalid epcisTransactionEvent context');
+  if (_.isEmpty(context.epcisTransactionEvent.type)) return error('Invalid epcisTransactionEvent type');
+  if (_.isEmpty(context.epcisTransactionEvent.dlrLinkTitle)) return error('Invalid epcisTransactionEvent dlrLinkTitle');
+  if (_.isEmpty(context.epcisTransactionEvent.dlrVerificationPage))
+    return error('Invalid epcisTransactionEvent dlrVerificationPage');
+  if (_.isEmpty(context.epcisTransactionEvent.dlrIdentificationKeyType))
+    return error('Invalid epcisTransactionEvent dlrIdentificationKeyType');
 
-  if (_.isEmpty(context.storage.storageAPIUrl)) return error('Invalid storageAPIUrl');
-  if (_.isEmpty(context.storage.bucket)) return error('Invalid bucket');
+  if (_.isEmpty(context.storage)) return error('Invalid storage context');
+  if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
+  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
 
   return { ok: true, value: context };
-}
+};
 
-export const validateAggregationEventContext = (context: IAggregationEventContext): Result<IAggregationEventContext> => {
+export const validateAggregationEventContext = (
+  context: IAggregationEventContext,
+): Result<IAggregationEventContext> => {
   if (_.isEmpty(context.vckit)) return error('Invalid vckit context');
   if (_.isEmpty(context.epcisAggregationEvent)) return error('Invalid epcisAggregationEvent context');
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
@@ -108,14 +120,17 @@ export const validateAggregationEventContext = (context: IAggregationEventContex
   if (_.isEmpty(context.vckit.vckitAPIUrl)) return error('Invalid vckitAPIUrl');
   if (_.isEmpty(context.vckit.issuer)) return error('Invalid issuer');
 
-  if(_.isEmpty(context.epcisAggregationEvent.context)) return error('Invalid epcisAggregationEvent context')
-  if(_.isEmpty(context.epcisAggregationEvent.type)) return error('Invalid epcisAggregationEvent type')
-  if(_.isEmpty(context.epcisAggregationEvent.dlrLinkTitle)) return error('Invalid epcisAggregationEvent dlrLinkTitle')
-  if(_.isEmpty(context.epcisAggregationEvent.dlrVerificationPage)) return error('Invalid epcisAggregationEvent dlrVerificationPage')
-  if(_.isEmpty(context.epcisAggregationEvent.dlrIdentificationKeyType)) return error('Invalid epcisAggregationEvent dlrIdentificationKeyType')
+  if (_.isEmpty(context.epcisAggregationEvent.context)) return error('Invalid epcisAggregationEvent context');
+  if (_.isEmpty(context.epcisAggregationEvent.type)) return error('Invalid epcisAggregationEvent type');
+  if (_.isEmpty(context.epcisAggregationEvent.dlrLinkTitle)) return error('Invalid epcisAggregationEvent dlrLinkTitle');
+  if (_.isEmpty(context.epcisAggregationEvent.dlrVerificationPage))
+    return error('Invalid epcisAggregationEvent dlrVerificationPage');
+  if (_.isEmpty(context.epcisAggregationEvent.dlrIdentificationKeyType))
+    return error('Invalid epcisAggregationEvent dlrIdentificationKeyType');
 
-  if (_.isEmpty(context.storage.storageAPIUrl)) return error('Invalid storageAPIUrl');
-  if (_.isEmpty(context.storage.bucket)) return error('Invalid bucket');
+  if (_.isEmpty(context.storage)) return error('Invalid storage context');
+  if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
+  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');

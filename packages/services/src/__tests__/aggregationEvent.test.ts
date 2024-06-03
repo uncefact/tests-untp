@@ -1,5 +1,5 @@
 import * as vckitService from '../vckit.service';
-import { uploadJson } from '../storage.service';
+import { getStorageServiceLink } from '../storage.service';
 import * as linkResolverService from '../linkResolver.service';
 import { IAggregationEventContext } from '../epcisEvents/types';
 import { Result } from '../types/validateContext';
@@ -13,7 +13,7 @@ jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
 }));
 jest.mock('../storage.service', () => ({
-  uploadJson: jest.fn(),
+  getStorageServiceLink: jest.fn(),
 }));
 jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
@@ -43,13 +43,14 @@ describe('processAggregationEvent', () => {
       dlrQualifierPath: '',
     },
     dlr: { dlrAPIUrl: 'http://exampleDLR.com', dlrAPIKey: 'test-key' },
-    storage: { storageAPIUrl: 'https://storage.dlr.com', bucket: 'agtrace-test-verifiable-credentials' },
+    storage: { url: 'https://exampleStorage.com'},
     identifierKeyPaths: ['parentItem', 'itemID'],
   };
 
   it('should process aggregation event', async () => {
     (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => aggregationVCMock);
-    (uploadJson as jest.Mock).mockImplementationOnce(() => uploadedAggregationEventLinkMock);
+    (getStorageServiceLink as jest.Mock).mockResolvedValueOnce('https://exampleStorage.com/vc.json');
+
     jest
       .spyOn(validateContext, 'validateAggregationEventContext')
       .mockReturnValueOnce({ ok: true, value: context } as Result<IAggregationEventContext>);
@@ -59,7 +60,7 @@ describe('processAggregationEvent', () => {
     const aggregationVC = await processAggregationEvent(aggregationEvent, context);
 
     expect(aggregationVC).toBe(aggregationVCMock);
-    expect(uploadJson).toHaveBeenCalled();
+    expect(getStorageServiceLink).toHaveBeenCalled();
     expect(validateContext.validateAggregationEventContext).toHaveBeenCalled();
     expect(helpers.getIdentifierByObjectKeyPaths).toHaveBeenCalled();
     expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
@@ -123,7 +124,7 @@ describe('processAggregationEvent', () => {
     }
   });
 
-  it('should throw error if uploadJson throws an error', async () => {
+  it('should throw error if storage service throws an error', async () => {
     try {
       const invalidStorageContext = {
         ...context,
@@ -154,7 +155,9 @@ describe('processAggregationEvent', () => {
         dlr: { ...context.dlr, dlrAPIUrl: 'http://invalid-dlr.com' },
       };
       (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => aggregationVCMock);
-      (uploadJson as jest.Mock).mockImplementationOnce(() => uploadedAggregationEventLinkMock);
+      (getStorageServiceLink as jest.Mock).mockImplementation(({ url, _data, path }) => {
+        return `${url}/${path}`;
+      });
       jest
         .spyOn(validateContext, 'validateAggregationEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as Result<IAggregationEventContext>);
@@ -169,7 +172,7 @@ describe('processAggregationEvent', () => {
       expect(validateContext.validateAggregationEventContext).toHaveBeenCalled();
       expect(helpers.getIdentifierByObjectKeyPaths).toHaveBeenCalled();
       expect(vckitService.issueVC).toHaveBeenCalled();
-      expect(uploadJson).toHaveBeenCalled();
+      expect(getStorageServiceLink).toHaveBeenCalled();
     }
   });
 });

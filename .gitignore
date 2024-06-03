@@ -57,6 +57,8 @@ testem.log
 /packages/*/coverage/
 /packages/*/node_modules/
 
+**/uploads/
+
 
 .npmrc
 
