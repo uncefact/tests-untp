@@ -6,3 +6,4 @@ export * from './CheckBoxList/index.js';
 export * from './RenderCheckList/index.js';
 export * from './DynamicComponentRenderer/index.js';
 export * from './ImportButton/index.js';
+export * from './QRCodeScannerDialogButton/index.js';

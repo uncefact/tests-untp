@@ -9,3 +9,4 @@ export * from './components/RenderCheckList/RenderCheckList.js';
 export * from './components/DynamicComponentRenderer/DynamicComponentRenderer.js';
 export * from './components/CheckBoxList/CheckBoxList.js';
 export * from './constants/index.js';
+export * from './types/index.js'
