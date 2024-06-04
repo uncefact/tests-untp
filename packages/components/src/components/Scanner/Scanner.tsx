@@ -17,7 +17,7 @@ const Scanner = forwardRef((props: IHtml5QrcodePluginProps, ref: ForwardedRef<IS
    */
   const config = useMemo(() => ({
     fps: props.fps || 10,
-    qrbox: props.qrbox || { width: 250, height: 150 },
+    qrbox: props.qrbox || { width: 250, height: 250 },
     disableFlip: props.disableFlip || false,
   }), [props.fps, props.qrbox, props.disableFlip]);
 

@@ -11,7 +11,7 @@
     "build:services": "cd packages/services && yarn run build",
     "build:components": "cd packages/components && yarn run build",
     "build:untp-test-suite": "cd packages/untp-test-suite && yarn run build",
-    "build-clean": "rimraf --glob ./node_modules ./packages/*/tsconfig.tsbuildinfo ./packages/*/build ./packages/*/node_modules",
+    "build-clean": "rimraf --glob ./yarn.lock ./node_modules ./packages/*/tsconfig.tsbuildinfo ./packages/*/build ./packages/*/node_modules",
     "test": "yarn run test:services && yarn run test:components && yarn run test:mock-app",
     "test:components": "cd packages/components && yarn run test",
     "test:services": "cd packages/services && yarn run test",
@@ -54,7 +54,7 @@
     "@types/eslint": "^8.4.6"
   },
   "engines": {
-    "node": ">= 18.0.0"
+    "node": ">= 21.0.0"
   },
   "dependencies": {
     "rimraf": "^5.0.5"

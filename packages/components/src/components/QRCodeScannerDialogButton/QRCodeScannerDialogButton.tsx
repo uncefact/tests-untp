@@ -13,18 +13,19 @@ export interface IQRCodeScannerDialogButton {
 export const QRCodeScannerDialogButton = ({ onChange, style}: IQRCodeScannerDialogButton) => {
   const [isOpenScanDialog, setIsOpenScanDialog] = useState(false);
 
-  const getQRCodeDataFromUrl = async (url: string) => {    
-   
-  try {
-    // Attempt to check url params is valid URL , if it fails, it will throw an error
-    new URL(url)
+  const getQRCodeDataFromUrl = async (url: string) => {
+    try {
+      // Attempt to check url params is valid URL , if it fails, it will throw an error
+      new URL(url)
 
-    const credential = await publicAPI.get(url);            
-    await onChange(credential);
-  } catch (error) {      
-    const e = error as Error;
-    toastMessage({ status: Status.error, message: e.message });
-  }
+      const credential = await publicAPI.get(url);
+      await onChange(credential);
+    } catch (error) {
+      const e = error as Error;
+      toastMessage({ status: Status.error, message: e.message });
+    } finally {
+      setIsOpenScanDialog(false);
+    }
   };
 
   return (
