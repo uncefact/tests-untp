@@ -19,15 +19,32 @@ import {
   Button,
 } from '@mui/material';
 import { Menu as MenuIcon } from '@mui/icons-material';
+import SearchIcon from '@mui/icons-material/Search';
+import DialpadIcon from '@mui/icons-material/Dialpad';
+
 import appConfig from '../../constants/app-config.json';
 import { convertStringToPath } from '../../utils';
 import { IStyles } from '../../types/common.types';
+
+const initialHeaderBrandInfo = {
+  name: appConfig.name,
+  assets: {
+    logo: '',
+  },
+};
+
+const ICON_SIZE = '30px';
+
+const iconConfig: { [key: string]: JSX.Element } = {
+  Scanning: <SearchIcon sx={{ fontSize: ICON_SIZE }} />,
+  'General features': <DialpadIcon sx={{ fontSize: ICON_SIZE }} />,
+};
 
 function Header() {
   const location = useLocation();
 
   const [open, setOpen] = useState(false);
-  const [nameLink, setNameLink] = useState(appConfig.name);
+  const [headerBrandInfo, setHeaderBrandInfo] = useState(initialHeaderBrandInfo);
   const [styles, setStyles] = useState<IStyles>({
     primaryColor: appConfig.styles.primaryColor,
     secondaryColor: appConfig.styles.secondaryColor,
@@ -43,15 +60,28 @@ function Header() {
     const getNameLinkFromSesion = sessionStorage.getItem('nameLink');
 
     if (getNameLinkFromSesion) {
-      setNameLink(getNameLinkFromSesion);
+      setHeaderBrandInfo({
+        name: getNameLinkFromSesion,
+        assets: {
+          logo: '',
+        },
+      });
       sessionStorage.removeItem('nameLink');
     }
 
     if (path === '/') {
-      setNameLink(appConfig.name);
+      setHeaderBrandInfo(initialHeaderBrandInfo);
       setStyles(appConfig.styles);
     }
   }, [location.pathname]);
+
+  const renderAvatar = (value: any) => {
+    if (value?.assets?.logo) {
+      return <Avatar sx={{ marginRight: '10px' }} alt='Company logo' src={value.assets.logo} />;
+    }
+
+    return iconConfig[value.name];
+  };
 
   const SideBarComponent = ({ app, route, styles }: { app: any; route: string; styles: IStyles }) => (
     <List>
@@ -62,10 +92,15 @@ function Header() {
           onClick={() => {
             toggleDrawer(false);
             setStyles(styles);
-            setNameLink(app.name);
+            setHeaderBrandInfo({
+              name: app.name,
+              assets: {
+                logo: app.assets?.logo,
+              },
+            });
           }}
         >
-          <ListItemIcon>{app.assets?.logo && <Avatar alt='Company logo' src={app.assets.logo} />}</ListItemIcon>
+          <ListItemIcon>{renderAvatar(app)}</ListItemIcon>
           <ListItemText primary={app.name} />
         </ListItemButton>
       </ListItem>
@@ -154,6 +189,10 @@ function Header() {
                 },
               }}
             >
+              {/* Render avatar */}
+              {headerBrandInfo.assets?.logo && (
+                <Avatar sx={{ marginRight: '10px' }} alt='Company logo' src={headerBrandInfo.assets.logo} />
+              )}
               <Typography
                 variant='h5'
                 sx={{
@@ -165,7 +204,7 @@ function Header() {
                   },
                 }}
               >
-                {nameLink ?? appConfig.name}
+                {headerBrandInfo.name ?? appConfig.name}
               </Typography>
             </Stack>
           </Box>
@@ -184,7 +223,13 @@ function Header() {
               },
             }}
           >
-            <Button variant='contained'>Back to Home</Button>
+            <Button
+              sx={{
+                color: appConfig.styles.secondaryColor,
+              }}
+            >
+              Back to Home
+            </Button>
           </Stack>
         </Toolbar>
       </Container>
