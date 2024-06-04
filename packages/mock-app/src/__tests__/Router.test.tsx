@@ -14,7 +14,7 @@ jest.mock(
       secondaryColor: 'white',
       tertiaryColor: 'black',
     },
-    generateFeatures: [
+    generalFeatures: [
       {
         name: 'General features',
         type: '',
