@@ -1,0 +1,1441 @@
+{
+  "name": "ACRS",
+  "styles": {
+    "primaryColor": "rgb(255, 207, 7)",
+    "secondaryColor": "black",
+    "tertiaryColor": "black"
+  },
+  "generateFeatures": [
+    {
+      "name": "General features",
+      "type": "",
+      "styles": {
+        "primaryColor": "rgb(255, 207, 7)",
+        "secondaryColor": "black",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Conformity Credential",
+          "id": "conformity_credential",
+          "components": [
+            {
+              "name": "ConformityCredential",
+              "type": "",
+              "props": {
+                "credentialRequestConfigs": [
+                  {
+                    "url": "http://example.com/deforestation-free-assessment",
+                    "params": {},
+                    "options": {
+                      "headers": [],
+                      "method": "POST"
+                    },
+                    "credentialName": "Deforestation Free Assessment",
+                    "credentialPath": "/body/credentil",
+                    "appOnly": "Farm"
+                  },
+                  {
+                    "url": "http://example.com/ce",
+                    "params": {},
+                    "options": {
+                      "headers": [],
+                      "method": "GET"
+                    },
+                    "credentialName": "CE Marking",
+                    "credentialPath": "",
+                    "appOnly": "Farm"
+                  },
+                  {
+                    "url": "http://example.com/conformity",
+                    "params": {},
+                    "options": {
+                      "headers": [],
+                      "method": "POST"
+                    },
+                    "credentialName": "Conformity",
+                    "appOnly": "Feedlot"
+                  }
+                ],
+                "storedCredentialsConfig": {
+                  "url": "https://storage.example.com",
+                  "params": {},
+                  "options": {
+                    "bucket": "bucket-stored-example"
+                  },
+                  "type": "s3"
+                }
+              }
+            }
+          ],
+          "services": []
+        }
+      ]
+    }
+  ],
+  "apps": [
+    {
+      "name": "Toms Top Line Steel",
+      "type": "producer",
+      "assets": {
+        "logo": "https://example.com/logo.png",
+        "brandTitle": "Toms Top Line Steel",
+        "passportVC": "",
+        "transactionEventVC": ""
+      },
+      "styles": {
+        "primaryColor": "rgb(255, 207, 7)",
+        "secondaryColor": "black",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Issue DPP",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "product": {
+                      "type": "object",
+                      "properties": {
+                        "modelName": {
+                          "type": "string"
+                        },
+                        "identifier": {
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
+                        },
+                        "traceabilityInformation": {
+                          "type": "array",
+                          "title": "Traceability Information",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "EventReference": {
+                                "type": "string"
+                              },
+                              "EventType": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "issuedBy": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "identifiers": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "identifierURI": {
+                                "type": "string"
+                              },
+                              "identiferValue": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "sustainabilityScore": {
+                      "type": "integer",
+                      "title": "Sustainability Score"
+                    },
+                    "trustScore": {
+                      "type": "integer",
+                      "title": "Trust Score"
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(255, 207, 7)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processObjectEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "issuer": "did:web:fd85-103-69-79-17.ngrok-free.app"
+                  },
+                  "dpp": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["DigitalProductPassport"],
+                    "dlrLinkTitle": "Steel Passport",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "https://localhost:3000/verify"
+                  },
+
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "identifierKeyPaths": ["product", "identifier"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Sell",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sourceParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://tomstoplinesteel.com/41161080146.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Toms Top Line Steel"]
+                        }
+                      }
+                    },
+                    "destinationParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://sammyssteelprocessor.com/51161080100.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Sammys Steel Processor"]
+                        }
+                      }
+                    },
+                    "transaction": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["bol", "cert", "desadv", "inv", "po"]
+                        },
+                        "identifier": {
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
+                        },
+                        "documentURL": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["identifier"]
+                    },
+                    "itemList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemID": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "quantityList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productClass": {
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "type": "string"
+                          },
+                          "uom": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(255, 207, 7)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processTransactionEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "issuer": "did:web:fd85-103-69-79-17.ngrok-free.app"
+                  },
+                  "epcisTransactionEvent": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["TransactionEventCredential"],
+                    "dlrLinkTitle": "Transaction Event",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "https://localhost:3000/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "identifierKeyPaths": ["transaction", "identifier"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Quincys Quality Steel",
+      "type": "producer",
+      "assets": {
+        "logo": "https://example.com/logo.png",
+        "brandTitle": "Quincys Quality Steel",
+        "passportVC": "",
+        "transactionEventVC": ""
+      },
+      "styles": {
+        "primaryColor": "rgb(255, 207, 7)",
+        "secondaryColor": "black",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Issue DPP",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "product": {
+                      "type": "object",
+                      "properties": {
+                        "modelName": {
+                          "type": "string"
+                        },
+                        "identifier": {
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
+                        },
+                        "traceabilityInformation": {
+                          "type": "array",
+                          "title": "Traceability Information",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "EventReference": {
+                                "type": "string"
+                              },
+                              "EventType": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "issuedBy": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "identifiers": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "identifierURI": {
+                                "type": "string"
+                              },
+                              "identiferValue": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "sustainabilityScore": {
+                      "type": "integer",
+                      "title": "Sustainability Score"
+                    },
+                    "trustScore": {
+                      "type": "integer",
+                      "title": "Trust Score"
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(255, 207, 7)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processObjectEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "issuer": "did:web:fd85-103-69-79-17.ngrok-free.app"
+                  },
+                  "dpp": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["DigitalProductPassport"],
+                    "dlrLinkTitle": "Steel Passport",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "https://localhost:3000/verify"
+                  },
+
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "identifierKeyPaths": ["product", "identifier"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Sell",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sourceParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://quincysqualitysteel.com/41161080146.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Quincys Quality Steel"]
+                        }
+                      }
+                    },
+                    "destinationParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://sammyssteelprocessor.com/51161080100.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Sammys Steel Processor"]
+                        }
+                      }
+                    },
+                    "transaction": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["bol", "cert", "desadv", "inv", "po"]
+                        },
+                        "identifier": {
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
+                        },
+                        "documentURL": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["identifier"]
+                    },
+                    "itemList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemID": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "quantityList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productClass": {
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "type": "string"
+                          },
+                          "uom": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(255, 207, 7)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processTransactionEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "issuer": "did:web:fd85-103-69-79-17.ngrok-free.app"
+                  },
+                  "epcisTransactionEvent": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["TransactionEventCredential"],
+                    "dlrLinkTitle": "Transaction Event",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "https://localhost:3000/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "identifierKeyPaths": ["transaction", "identifier"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sammys Steel Processor",
+      "type": "producer",
+      "assets": {
+        "logo": "https://example.com/logo.png",
+        "brandTitle": "Sammys Steel Processor",
+        "passportVC": "",
+        "transactionEventVC": ""
+      },
+      "styles": {
+        "primaryColor": "rgb(255, 207, 7)",
+        "secondaryColor": "black",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Upload VC",
+          "components": [
+            {
+              "name": "ImportButton",
+              "type": "EntryData",
+              "props": {
+                "variant": "contained",
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(255, 207, 7)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+              }
+            }
+          ],
+          "props": {
+            "variant": "contained",
+            "style": { "backgroundColor": "rgb(255, 207, 7)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+          },
+          "services": [
+            {
+              "name": "importJson",
+              "parameters": []
+            },
+            {
+              "name": "processTransformationEvent",
+              "parameters": [
+                {
+                  "epcisTransformationEvent": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transformation-event-ld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render epcis template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["TransformationEventCredential"],
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrLinkTitle": "EPCIS transformation event VC",
+                    "dlrVerificationPage": "https://localhost:3000/verify",
+                    "dlrQualifierPath": ""
+                  },
+                  "dpp": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["DigitalProductPassport"],
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrLinkTitle": "Digital Product Passport",
+                    "dlrVerificationPage": "http://localhost:3000/verify",
+                    "dlrQualifierPath": ""
+                  },
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "issuer": "did:web:fd85-103-69-79-17.ngrok-free.app"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "productTransformation": {
+                    "inputItems": [{ "quantity": 1, "uom": "tons", "productClass": "Steel" }],
+                    "outputItems": [
+                      {
+                        "productID": "0109359502000034",
+                        "productClass": "Welding steel",
+                        "quantity": 300,
+                        "weight": 200,
+                        "uom": "kilogram",
+                        "description": "Welding steel is the process of joining steel pieces together using heat and pressure to create a strong, durable bond"
+                      },
+                      {
+                        "productID": "0109359502000010",
+                        "productClass": "Incorporating steel",
+                        "quantity": 300,
+                        "weight": 100,
+                        "uom": "kilogram",
+                        "description": "Incorporating steel involves integrating steel materials into various products, structures, or systems"
+                      }
+                    ]
+                  },
+                  "identifierKeyPaths": ["steelID"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Steel welding",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "steelID": {
+                      "type": "array",
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": ["304#4-Grade", "304#5-Grade", "304#6-Grade"]
+                      }
+                    },
+                    "product": {
+                      "type": "object",
+                      "title": "Product Information",
+                      "properties": {
+                        "manufacturer": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "enum": ["Sammys Steel Processor"]
+                            }
+                          }
+                        }
+                      },
+                      "required": ["steelID"]
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(255, 207, 7)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processTransformationEvent",
+              "parameters": [
+                {
+                  "epcisTransformationEvent": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transformation-event-ld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render epcis template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["TransformationEventCredential"],
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrLinkTitle": "EPCIS transformation event VC",
+                    "dlrVerificationPage": "https://localhost:3000/verify",
+                    "dlrQualifierPath": ""
+                  },
+                  "dpp": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["DigitalProductPassport"],
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrLinkTitle": "Digital Product Passport",
+                    "dlrVerificationPage": "http://localhost:3000/verify",
+                    "dlrQualifierPath": ""
+                  },
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "issuer": "did:web:fd85-103-69-79-17.ngrok-free.app"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "productTransformation": {
+                    "inputItems": [{ "quantity": 1, "uom": "tons", "productClass": "Steel" }],
+                    "outputItems": [
+                      {
+                        "productID": "0109359502000034",
+                        "productClass": "Welding steel",
+                        "quantity": 300,
+                        "weight": 200,
+                        "uom": "kilogram",
+                        "description": "Welding steel is the process of joining steel pieces together using heat and pressure to create a strong, durable bond"
+                      },
+                      {
+                        "productID": "0109359502000010",
+                        "productClass": "Incorporating steel",
+                        "quantity": 300,
+                        "weight": 100,
+                        "uom": "kilogram",
+                        "description": "Incorporating steel involves integrating steel materials into various products, structures, or systems"
+                      }
+                    ]
+                  },
+                  "identifierKeyPaths": ["steelID"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Sell",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sourceParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://sammyssteelprocessor.com/41161080146.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Sammys Steel Processor"]
+                        }
+                      }
+                    },
+                    "destinationParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://chetsconcretefabricator.com/51161080100.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Chets Concrete Fabricator"]
+                        }
+                      }
+                    },
+                    "transaction": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["bol", "cert", "desadv", "inv", "po"]
+                        },
+                        "identifier": {
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
+                        },
+                        "documentURL": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["identifier"]
+                    },
+                    "itemList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemID": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "quantityList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productClass": {
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "type": "string"
+                          },
+                          "uom": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(255, 207, 7)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processTransactionEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "issuer": "did:web:fd85-103-69-79-17.ngrok-free.app"
+                  },
+                  "epcisTransactionEvent": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["TransactionEventCredential"],
+                    "dlrLinkTitle": "Transaction Event",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "https://localhost:3000/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "identifierKeyPaths": ["transaction", "identifier"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chets Concrete Fabricator",
+      "type": "producer",
+      "assets": {
+        "logo": "https://example.com/logo.png",
+        "brandTitle": "Chets Concrete Fabricator",
+        "passportVC": "",
+        "transactionEventVC": ""
+      },
+      "styles": {
+        "primaryColor": "rgb(255, 207, 7)",
+        "secondaryColor": "black",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Produces concrete",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "steelID": {
+                      "type": "array",
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": ["0109359502000034", "0109359502000010"]
+                      }
+                    },
+                    "product": {
+                      "type": "object",
+                      "title": "Product Information",
+                      "properties": {
+                        "manufacturer": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "enum": ["Chets Concrete Fabricator"]
+                            }
+                          }
+                        }
+                      },
+                      "required": ["steelID"]
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(255, 207, 7)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processTransformationEvent",
+              "parameters": [
+                {
+                  "epcisTransformationEvent": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transformation-event-ld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render epcis template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["TransformationEventCredential"],
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrLinkTitle": "EPCIS transformation event VC",
+                    "dlrVerificationPage": "https://localhost:3000/verify",
+                    "dlrQualifierPath": ""
+                  },
+                  "dpp": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["DigitalProductPassport"],
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrLinkTitle": "Digital Product Passport",
+                    "dlrVerificationPage": "http://localhost:3000/verify",
+                    "dlrQualifierPath": ""
+                  },
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "issuer": "did:web:fd85-103-69-79-17.ngrok-free.app"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "productTransformation": {
+                    "inputItems": [{ "quantity": 1, "uom": "tons", "productClass": "Incorporating steel" }],
+                    "outputItems": [
+                      {
+                        "productID": "0109359502000041",
+                        "productClass": "Concrete",
+                        "quantity": 100,
+                        "weight": 500,
+                        "uom": "kilogram",
+                        "description": "Concrete products incorporating steel combine the compressive strength of concrete with the tensile strength of steel reinforcement"
+                      }
+                    ]
+                  },
+                  "identifierKeyPaths": ["steelID"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Sell",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sourceParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://chetsconcretefabricator.com/41161080146.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Chets Concrete Fabricator"]
+                        }
+                      }
+                    },
+                    "destinationParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://bonniebuilder.com/51161080100.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Bonnie Builder"]
+                        }
+                      }
+                    },
+                    "transaction": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["bol", "cert", "desadv", "inv", "po"]
+                        },
+                        "identifier": {
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
+                        },
+                        "documentURL": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["identifier"]
+                    },
+                    "itemList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemID": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "quantityList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productClass": {
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "type": "string"
+                          },
+                          "uom": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(255, 207, 7)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processTransactionEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "issuer": "did:web:fd85-103-69-79-17.ngrok-free.app"
+                  },
+                  "epcisTransactionEvent": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["TransactionEventCredential"],
+                    "dlrLinkTitle": "Transaction Event",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "https://localhost:3000/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "identifierKeyPaths": ["transaction", "identifier"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bonnie Builder",
+      "type": "producer",
+      "assets": {
+        "logo": "https://example.com/logo.png",
+        "brandTitle": "Bonnie Builder",
+        "passportVC": "",
+        "transactionEventVC": ""
+      },
+      "styles": {
+        "primaryColor": "rgb(255, 207, 7)",
+        "secondaryColor": "black",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Construct building",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "steelID": {
+                      "type": "array",
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": ["978020137960", "978020137961"]
+                      }
+                    },
+                    "product": {
+                      "type": "object",
+                      "title": "Product Information",
+                      "properties": {
+                        "manufacturer": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "enum": ["Chets Concrete Fabricator"]
+                            }
+                          }
+                        }
+                      },
+                      "required": ["steelID"]
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(255, 207, 7)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processTransformationEvent",
+              "parameters": [
+                {
+                  "epcisTransformationEvent": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transformation-event-ld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render epcis template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["TransformationEventCredential"],
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrLinkTitle": "EPCIS transformation event VC",
+                    "dlrVerificationPage": "https://localhost:3000/verify",
+                    "dlrQualifierPath": ""
+                  },
+                  "dpp": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["DigitalProductPassport"],
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrLinkTitle": "Digital Product Passport",
+                    "dlrVerificationPage": "http://localhost:3000/verify",
+                    "dlrQualifierPath": ""
+                  },
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332",
+                    "issuer": "did:web:fd85-103-69-79-17.ngrok-free.app"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "productTransformation": {
+                    "inputItems": [
+                      { "quantity": 10, "uom": "tons", "productClass": "Concrete" },
+                      { "quantity": 10, "uom": "tons", "productClass": "Glass" },
+                      { "quantity": 10, "uom": "tons", "productClass": "Steel" }
+                    ],
+                    "outputItems": [
+                      {
+                        "productID": "978020137962",
+                        "productClass": "Building",
+                        "quantity": 1,
+                        "weight": 0,
+                        "uom": "building",
+                        "description": "This process involves assembling and integrating concrete, glass, and steel materials to create a complete, functional building"
+                      }
+                    ]
+                  },
+                  "identifierKeyPaths": ["steelID"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Conformity Credential",
+      "type": "",
+      "assets": {
+        "logo": "",
+        "brandTitle": "Conformity Credential",
+        "passportVC": "",
+        "transactionEventVC": ""
+      },
+      "styles": {
+        "primaryColor": "rgb(255, 207, 7)",
+        "secondaryColor": "black",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Conformity Credential",
+          "id": "conformity_credential",
+          "components": [
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "style": { "textAlign": "center", "paddingTop": "40px" },
+                "label": "Request Conformity Credential"
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "conformityCredentialService",
+              "parameters": [
+                {
+                  "credentialRequestConfig": [
+                    {
+                      "url": "http://example.com/getConformityCredential",
+                      "params": {
+                        "id": "conformityCredential"
+                      },
+                      "options": {
+                        "headers": [],
+                        "method": "POST"
+                      }
+                    }
+                  ],
+                  "uploadCredentialConfig": {
+                    "url": "https://storage.example.com",
+                    "params": {},
+                    "options": {
+                      "bucket": "bucket-stored-example"
+                    },
+                    "type": "s3"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "identifyProvider": {
+    "type": "gs1",
+    "url": "http://localhost:3333/products"
+  },
+  "defaultVerificationServiceLink": {
+    "title": "Default Verification Service",
+    "context": "Default Verification Service",
+    "type": "application/json",
+    "href": "http://localhost:3332/agent/routeVerificationCredential",
+    "hreflang": ["en"]
+  }
+}
