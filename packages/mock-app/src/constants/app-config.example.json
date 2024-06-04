@@ -1109,6 +1109,19 @@
               ]
             }
           ]
+        },
+        {
+          "name": "Scan QR",
+          "id":"scan_qr",
+          "components": [
+            {
+              "name": "QRCodeScannerDialogButton",
+              "type": "",
+              "props": {
+                "style": { "margin": "auto", "paddingTop": "40px", "width": "100%" }
+              }
+            }
+          ]
         }
       ]
     }

@@ -6,3 +6,4 @@ export * from './components/ToastMessage/ToastMessage.js';
 export * from './components/DownloadButton/DownloadButton.js';
 export * from './components/ImportButton/ImportButton.js';
 export * from './constants/index.js';
+export * from './types/index.js'
