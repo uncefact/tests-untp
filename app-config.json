@@ -1,0 +1,1127 @@
+{
+  "name": "Red meat",
+  "styles": {
+    "primaryColor": "rgb(41, 171, 48)",
+    "secondaryColor": "white",
+    "tertiaryColor": "black"
+  },
+  "generateFeatures": [
+    {
+      "name": "General features",
+      "type": "",
+      "styles": {
+        "primaryColor": "rgb(41, 171, 48)",
+        "secondaryColor": "white",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Conformity Credential",
+          "id": "conformity_credential",
+          "components": [
+            {
+              "name": "ConformityCredential",
+              "type": "",
+              "props": {
+                "credentialRequestConfigs": [
+                  {
+                    "url": "http://example.com/deforestation-free-assessment",
+                    "params": {},
+                    "options": {
+                      "headers": [],
+                      "method": "POST"
+                    },
+                    "credentialName": "Deforestation Free Assessment",
+                    "credentialPath": "/body/credentil",
+                    "appOnly": "Farm"
+                  },
+                  {
+                    "url": "http://example.com/ce",
+                    "params": {},
+                    "options": {
+                      "headers": [],
+                      "method": "GET"
+                    },
+                    "credentialName": "CE Marking",
+                    "credentialPath": "",
+                    "appOnly": "Farm"
+                  },
+                  {
+                    "url": "http://example.com/conformity",
+                    "params": {},
+                    "options": {
+                      "headers": [],
+                      "method": "POST"
+                    },
+                    "credentialName": "Conformity",
+                    "appOnly": "Feedlot"
+                  }
+                ],
+                "storedCredentialsConfig": {
+                  "url": "https://storage.example.com",
+                  "params": {},
+                  "options": {
+                    "bucket": "bucket-stored-example"
+                  },
+                  "type": "s3"
+                }
+              }
+            }
+          ],
+          "services": []
+        }
+      ]
+    }
+  ],
+  "apps": [
+    {
+      "name": "Farm",
+      "type": "producer",
+      "assets": {
+        "logo": "https://example.com/logo.png",
+        "brandTitle": "Wagu Wonder",
+        "passportVC": "",
+        "transactionEventVC": ""
+      },
+      "styles": {
+        "primaryColor": "rgb(41, 171, 48)",
+        "secondaryColor": "white",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Digital Livestock",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "formTitle": "Digital Livestock Passport",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "herd": {
+                      "type": "object",
+                      "title": "Herd Information",
+                      "properties": {
+                        "batchId": {
+                          "type": "string",
+                          "title": "Batch ID"
+                        },
+                        "manufacturedDate": {
+                          "type": "string",
+                          "format": "date",
+                          "title": "Manufactured Date"
+                        },
+                        "manufacturedAt": {
+                          "type": "object",
+                          "title": "Manufactured At",
+                          "properties": {
+                            "name": { "type": "string", "title": "Name" },
+                            "operatedBy": {
+                              "type": "object",
+                              "title": "Operated By",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "title": "Name"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "identifier": {
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
+                        },
+                        "batchQrCode": {
+                          "type": "string",
+                          "title": "Batch QR Code"
+                        },
+                        "traceabilityInfo": {
+                          "type": "array",
+                          "title": "Traceability Information",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "EventReference": {
+                                "type": "string",
+                                "title": "Event Reference"
+                              },
+                              "EventType": {
+                                "type": "string",
+                                "title": "Event Type"
+                              }
+                            }
+                          }
+                        },
+                        "sustainabilityInfo": {
+                          "type": "array",
+                          "title": "Sustainability Information",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "Topic": {
+                                "type": "string",
+                                "title": "Topic"
+                              },
+                              "Evidence": {
+                                "type": "string",
+                                "title": "Evidence"
+                              },
+                              "metric": {
+                                "type": "array",
+                                "title": "Metric",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "Metric": {
+                                      "type": "string",
+                                      "title": "Metric"
+                                    },
+                                    "Value": {
+                                      "type": "integer",
+                                      "title": "Value"
+                                    },
+                                    "Unit": {
+                                      "type": "string",
+                                      "title": "Unit"
+                                    }
+                                  }
+                                }
+                              },
+                              "compliance": {
+                                "type": "boolean",
+                                "title": "Compliance"
+                              }
+                            }
+                          }
+                        },
+                        "provenance": {
+                          "type": "array",
+                          "title": "Provenance",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "country": {
+                                "type": "string",
+                                "title": "Country"
+                              },
+                              "percentage": {
+                                "type": "integer",
+                                "title": "Percentage"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "required": ["identifier"]
+                    },
+                    "breed": {
+                      "type": "object",
+                      "title": "Breed",
+                      "properties": {
+                        "productId": {
+                          "type": "string",
+                          "title": "Product ID"
+                        },
+                        "breed": {
+                          "type": "string",
+                          "title": "Breed"
+                        },
+                        "manufacturer": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "title": "Name"
+                            }
+                          }
+                        },
+                        "image": {
+                          "type": "string",
+                          "title": "Image"
+                        },
+                        "description": {
+                          "type": "string",
+                          "title": "Description"
+                        },
+                        "productClass": {
+                          "type": "string",
+                          "title": "Product Class"
+                        }
+                      }
+                    },
+                    "sustainabilityScore": {
+                      "type": "integer",
+                      "title": "Sustainability Score"
+                    },
+                    "trustScore": {
+                      "type": "integer",
+                      "title": "Trust Score"
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "ConformityCredentialCheckbox",
+              "type": "EntryData"
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "style": { "textAlign": "center", "paddingTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "constructorEntryData",
+              "parameters": []
+            },
+            {
+              "name": "processObjectEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "https://vckit.example.com",
+                    "issuer": "did:web:vckit.example.com"
+                  },
+                  "dpp": {
+                    "context": ["https://dpp.example.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["DigitalProductPassport"],
+                    "dlrLinkTitle": "Livestock Passport",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "http://dlr.example.com/verify"
+                  },
+
+                  "dlr": {
+                    "dlrAPIUrl": "http://dlr.example.com",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.example.com",
+                    "bucket": "bucket-stored-example"
+                  },
+                  "identifierKeyPaths": ["herd", "identifier"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "National Vendor Declaration",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "formTitle": "National Vendor Declaration",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sourceParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://wholesalebeef.com/41161080146.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Wholesale Beef"]
+                        }
+                      }
+                    },
+                    "destinationParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://primebeef.com/51161080100.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Prime Beef"]
+                        }
+                      }
+                    },
+                    "transaction": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["bol", "cert", "desadv", "inv", "po"]
+                        },
+                        "identifier": {
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
+                        },
+                        "documentURL": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["identifier"]
+                    },
+                    "itemList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemID": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "quantityList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productClass": {
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "type": "string"
+                          },
+                          "uom": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "locationId": {
+                      "title": "Location ID",
+                      "type": "string",
+                      "enum": ["https://plus.codes/4RRHM6PR+MH"]
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "style": { "textAlign": "center", "paddingTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processTransactionEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "https://vckit.example.com",
+                    "issuer": "did:web:vckit.example.com"
+                  },
+                  "epcisTransactionEvent": {
+                    "context": ["https://dpp.example.com/transaction-event-ld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["TransactionEventCredential"],
+                    "dlrLinkTitle": "Transaction Event",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "http://dlr.example.com/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://dlr.example.com",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.example.com",
+                    "bucket": "bucket-stored-example"
+                  },
+                  "identifierKeyPaths": ["transaction", "identifier"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Feedlot",
+      "type": "producer",
+      "assets": {
+        "logo": "https://example.com/logo.png",
+        "brandTitle": "Wagu Wonder",
+        "passportVC": "",
+        "transactionEventVC": ""
+      },
+      "styles": {
+        "primaryColor": "rgb(41, 171, 48)",
+        "secondaryColor": "white",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Digital Livestock",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "formTitle": "Digital Livestock Passport",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "herd": {
+                      "type": "object",
+                      "title": "Herd Information",
+                      "properties": {
+                        "batchId": {
+                          "type": "string",
+                          "title": "Batch ID"
+                        },
+                        "manufacturedDate": {
+                          "type": "string",
+                          "format": "date",
+                          "title": "Manufactured Date"
+                        },
+                        "manufacturedAt": {
+                          "type": "object",
+                          "title": "Manufactured At",
+                          "properties": {
+                            "name": { "type": "string", "title": "Name" },
+                            "operatedBy": {
+                              "type": "object",
+                              "title": "Operated By",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "title": "Name"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "identifier": {
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
+                        },
+                        "batchQrCode": {
+                          "type": "string",
+                          "title": "Batch QR Code"
+                        },
+                        "traceabilityInfo": {
+                          "type": "array",
+                          "title": "Traceability Information",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "EventReference": {
+                                "type": "string",
+                                "title": "Event Reference"
+                              },
+                              "EventType": {
+                                "type": "string",
+                                "title": "Event Type"
+                              }
+                            }
+                          }
+                        },
+                        "sustainabilityInfo": {
+                          "type": "array",
+                          "title": "Sustainability Information",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "Topic": {
+                                "type": "string",
+                                "title": "Topic"
+                              },
+                              "Evidence": {
+                                "type": "string",
+                                "title": "Evidence"
+                              },
+                              "metric": {
+                                "type": "array",
+                                "title": "Metric",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "Metric": {
+                                      "type": "string",
+                                      "title": "Metric"
+                                    },
+                                    "Value": {
+                                      "type": "integer",
+                                      "title": "Value"
+                                    },
+                                    "Unit": {
+                                      "type": "string",
+                                      "title": "Unit"
+                                    }
+                                  }
+                                }
+                              },
+                              "compliance": {
+                                "type": "boolean",
+                                "title": "Compliance"
+                              }
+                            }
+                          }
+                        },
+                        "provenance": {
+                          "type": "array",
+                          "title": "Provenance",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "country": {
+                                "type": "string",
+                                "title": "Country"
+                              },
+                              "percentage": {
+                                "type": "integer",
+                                "title": "Percentage"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "required": ["identifier"]
+                    },
+                    "breed": {
+                      "type": "object",
+                      "title": "Breed",
+                      "properties": {
+                        "productId": {
+                          "type": "string",
+                          "title": "Product ID"
+                        },
+                        "breed": {
+                          "type": "string",
+                          "title": "Breed"
+                        },
+                        "manufacturer": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "title": "Name"
+                            }
+                          }
+                        },
+                        "image": {
+                          "type": "string",
+                          "title": "Image"
+                        },
+                        "description": {
+                          "type": "string",
+                          "title": "Description"
+                        },
+                        "productClass": {
+                          "type": "string",
+                          "title": "Product Class"
+                        }
+                      }
+                    },
+                    "sustainabilityScore": {
+                      "type": "integer",
+                      "title": "Sustainability Score"
+                    },
+                    "trustScore": {
+                      "type": "integer",
+                      "title": "Trust Score"
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "ConformityCredentialCheckbox",
+              "type": "EntryData"
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "style": { "textAlign": "center", "paddingTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "constructorEntryData",
+              "parameters": []
+            },
+            {
+              "name": "processObjectEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "https://vckit.example.com",
+                    "issuer": "did:web:vckit.example.com"
+                  },
+                  "dpp": {
+                    "context": ["https://dpp.example.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["DigitalProductPassport"],
+                    "dlrLinkTitle": "Livestock Passport",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "http://dlr.example.com/verify"
+                  },
+
+                  "dlr": {
+                    "dlrAPIUrl": "http://dlr.example.com",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.example.com",
+                    "bucket": "bucket-stored-example"
+                  },
+                  "identifierKeyPaths": ["herd", "identifier"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "National Vendor Declaration",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "formTitle": "National Vendor Declaration",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sourceParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://wholesalebeef.com/41161080146.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Wholesale Beef"]
+                        }
+                      }
+                    },
+                    "destinationParty": {
+                      "type": "object",
+                      "properties": {
+                        "partyID": {
+                          "type": "string",
+                          "enum": ["https://primebeef.com/51161080100.json"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "enum": ["Prime Beef"]
+                        }
+                      }
+                    },
+                    "transaction": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["bol", "cert", "desadv", "inv", "po"]
+                        },
+                        "identifier": {
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
+                        },
+                        "documentURL": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["identifier"]
+                    },
+                    "itemList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemID": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "quantityList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productClass": {
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "type": "string"
+                          },
+                          "uom": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "locationId": {
+                      "title": "Location ID",
+                      "type": "string",
+                      "enum": ["https://plus.codes/4RRHM6PR+MH"]
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "style": { "textAlign": "center", "paddingTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processTransactionEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "https://vckit.example.com",
+                    "issuer": "did:web:115a-27-75-225-151.ngrok-free.app"
+                  },
+                  "epcisTransactionEvent": {
+                    "context": ["https://dpp.example.com/transaction-event-ld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["TransactionEventCredential"],
+                    "dlrLinkTitle": "Transaction Event",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "http://dlr.example.com/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://dlr.example.com",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.example.com",
+                    "bucket": "bucket-stored-example"
+                  },
+                  "identifierKeyPaths": ["transaction", "identifier"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Processor",
+      "type": "producer",
+      "assets": {
+        "logo": "https://processor.example.com/Processor.png",
+        "brandTitle": "Pete's Meats",
+        "passportVC": "",
+        "transactionEventVC": ""
+      },
+      "styles": {
+        "primaryColor": "rgb(41, 171, 48)",
+        "secondaryColor": "white",
+        "tertiaryColor": "black"
+      },
+      "features": [
+        {
+          "name": "Process cow",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "formTitle": "Digital Livestock Passport",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "NLIS": {
+                      "title": "NLIS",
+                      "type": "array",
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": ["NH020188LEJ00005", "NH020188LEJ00008", "NH020188LEJ00012"]
+                      }
+                    },
+                    "product": {
+                      "type": "object",
+                      "title": "Product Information",
+                      "properties": {
+                        "manufacturer": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "title": "Name"
+                            }
+                          }
+                        }
+                      },
+                      "required": ["NLIS"]
+                    }
+                  }
+                },
+                "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "style": { "textAlign": "center", "paddingTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processTransformationEvent",
+              "parameters": [
+                {
+                  "epcisTransformationEvent": {
+                    "context": ["https://dpp.example.com/transformation-event-ld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render epcis template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["TransformationEventCredential"],
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrLinkTitle": "EPCIS transformation event VC",
+                    "dlrVerificationPage": "https://web.example.com/verify",
+                    "dlrQualifierPath": ""
+                  },
+                  "dpp": {
+                    "context": ["https://dpp.example.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["DigitalProductPassport"],
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrLinkTitle": "Digital Product Passport",
+                    "dlrVerificationPage": "https://web.example.com/verify",
+                    "dlrQualifierPath": ""
+                  },
+                  "vckit": {
+                    "vckitAPIUrl": "https://vckit.example.com",
+                    "issuer": "did:web:0af6-103-69-79-17.ngrok-free.app"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.example.com",
+                    "bucket": "bucket-stored-example"
+                  },
+                  "productTransformation": {
+                    "inputItems": [{ "quantity": 1, "uom": "head", "productClass": "cattle" }],
+                    "outputItems": [
+                      {
+                        "productID": "010935950200004110ACB123",
+                        "productClass": "Beef Silverside",
+                        "quantity": 500,
+                        "weight": 500,
+                        "uom": "kilogram",
+                        "image": "https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000041/AgTace-Meats-Silverside.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D",
+                        "description": "Deforestation-free Beef Silverside"
+                      },
+                      {
+                        "productID": "010935950200003410ACB123",
+                        "productClass": "Beef Scotch Fillet",
+                        "quantity": 300,
+                        "weight": 300,
+                        "uom": "kilogram",
+                        "image": "https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000034/Beef-Scotch-Fillet-Steak-300g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D",
+                        "description": "Deforestation-free Beef Scotch Fillet"
+                      },
+                      {
+                        "productID": "010935950200001010ACB123",
+                        "productClass": "Beef Rump Steak",
+                        "quantity": 250,
+                        "weight": 250,
+                        "uom": "kilogram",
+                        "image": "https://gs1ausaactivateprod1.blob.core.windows.net/935950200000/09359502000010/Beef-Rump-Steak-250g.png?sv=2019-07-07&sr=c&si=read&sig=1b9unDt%2FV7M0jCuNIbn47AaES0XK%2FOgL6QbRcuBGPOw%3D",
+                        "description": "Deforestation-free Beef Rump Steak"
+                      }
+                    ]
+                  },
+                  "identifierKeyPaths": ["NLIS"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Packaging beef",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "formTitle": "Aggregation Event",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "parentItem": {
+                      "type": "object",
+                      "title": "Parent Item",
+                      "properties": {
+                        "itemID": {
+                          "type": "string",
+                          "title": "Identifier (GS1 Barcode)"
+                        },
+                        "name": {
+                          "type": "string",
+                          "title": "Name",
+                          "enum": ["Beef Steak Variety Container"]
+                        }
+                      },
+                      "required": ["itemID"]
+                    },
+                    "childItems": {
+                      "type": "array",
+                      "title": "Child Items",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemID": {
+                            "type": "string",
+                            "title": "Item ID"
+                          },
+                          "name": {
+                            "type": "string",
+                            "title": "Name",
+                            "description": "Please enter your name"
+                          }
+                        }
+                      }
+                    },
+                    "childQuantityList": {
+                      "type": "array",
+                      "title": "Child Quantity List",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productClass": {
+                            "type": "string",
+                            "title": "Product Class"
+                          },
+                          "quantity": {
+                            "type": "string",
+                            "title": "Quantity"
+                          },
+                          "uom": {
+                            "type": "string",
+                            "title": "Uom"
+                          }
+                        }
+                      }
+                    },
+                    "locationId": {
+                      "title": "Location ID",
+                      "type": "string",
+                      "enum": ["https://plus.codes/4RRHM6PR+MH"]
+                    }
+                  }
+                }
+              },
+              "initialData": {},
+              "className": "json-form",
+              "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "style": { "textAlign": "center", "paddingTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processAggregationEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "https://vckit.example.com",
+                    "issuer": "did:web:398f-103-69-79-17.ngrok-free.app"
+                  },
+                  "epcisAggregationEvent": {
+                    "context": [
+                      "https://jargon.sh/user/unece/traceabilityEvents/v/working/artefacts/jsonldContexts/AggregationEvent.jsonld?class=AggregationEvent"
+                    ],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["AggregationEventCredential"],
+                    "dlrLinkTitle": "Aggregation Event",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "http://localhost:3000/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://dlr.example.com",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.example.com",
+                    "bucket": "bucket-stored-example"
+                  },
+                  "identifierKeyPaths": ["parentItem", "itemID"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "identifyProvider": {
+    "type": "gs1",
+    "url": "https://verified-example.com"
+  },
+  "defaultVerificationServiceLink": {
+    "title": "Default Verification Service",
+    "context": "Default Verification Service",
+    "type": "application/json",
+    "href": "https://dlr.example.com/verify",
+    "hreflang": ["en"]
+  }
+}

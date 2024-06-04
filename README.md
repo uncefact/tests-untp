@@ -20,3 +20,18 @@ yarn build
 ```bash
 yarn start
 ```
+## Docker
+
+* Dockerfile
+Build image
+```bash
+docker build --build-arg CONFIG_FILE=./app-config.json -t mock-app:latest .
+```
+Run image
+```bash
+docker run -p 3000:80 mock-app:latest
+```
+* Docker compose
+```bash
+docker-compose up
+```
