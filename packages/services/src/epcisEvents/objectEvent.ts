@@ -4,7 +4,7 @@ import { IContext } from './types.js';
 import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { generateUUID } from '../utils/helpers.js';
 
-import { uploadJson } from '../storage.service.js';
+import { getStorageServiceLink } from '../storage.service.js';
 import { issueVC } from '../vckit.service.js';
 import { getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { validateContextObjectEvent } from './validateContext.js';
@@ -38,13 +38,8 @@ export const processObjectEvent: IService = async (data: any, context: IContext)
     });
 
     const storageContext = context.storage;
+    const vcUrl = await getStorageServiceLink(storageContext, vc, `${identifier}/${generateUUID()}`);
 
-    const vcUrl = await uploadJson({
-      filename: `${identifier}/${generateUUID()}`,
-      json: vc,
-      bucket: storageContext.bucket,
-      storageAPIUrl: storageContext.storageAPIUrl,
-    });
 
     const linkResolverContext = context.dlr;
     await registerLinkResolver(

@@ -1,4 +1,6 @@
+import _ from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
+import JSONPointer from 'jsonpointer';
 
 export function generateUUID() {
   return uuidv4();
@@ -69,3 +71,17 @@ export function createNestedObject(keys: string[], data: any) {
 
   return result;
 }
+
+/**
+ * Define the path to access the credential or the link to the credential within the API response
+ * @param apiResp API response data
+ * @param path Path to the credential or the link to the credential within the API response
+ * @returns The credential or the link to the credential within the API response
+ */
+export const getStorageUrlByPath = (apiResp: any, path: string) => {
+  if (_.isNil(path)) {
+    throw new Error('Invalid result path');
+  }
+
+  return JSONPointer.get(apiResp, path);
+};

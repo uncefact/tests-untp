@@ -76,7 +76,7 @@ function Header() {
       </MenuItem>,
     );
 
-    const menuItemGeneratorFeatures = appConfig.generateFeatures.map((app) => {
+    const menuItemGeneratorFeatures = appConfig.generalFeatures.map((app) => {
       const path = `/${convertStringToPath(app.name)}`;
       return (
         <MenuItem
@@ -147,7 +147,7 @@ function Header() {
   };
 
   const renderMenuWithGenerateFeatures = () => {
-    return appConfig.generateFeatures.map((feature) => {
+    return appConfig.generalFeatures.map((feature) => {
       const path = `/${convertStringToPath(feature.name)}`;
       return (
         <Button sx={{ color: feature.styles.secondaryColor, display: 'block' }} key={path} component={Link} to={path}>

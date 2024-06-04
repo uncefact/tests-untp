@@ -3,7 +3,7 @@ import _ from 'lodash';
 
 import { LoadingButton } from '@mui/lab';
 import { Table, TableBody, TableCell, TableRow, TableContainer, TableHead, Paper } from '@mui/material';
-import { uploadJson, generateUUID, getJsonDataFromConformityAPI } from '@mock-app/services';
+import { generateUUID, getJsonDataFromConformityAPI, getStorageServiceLink } from '@mock-app/services';
 
 import { checkStoredCredentialsConfig, getCredentialByPath } from './utils.js';
 import { Status, ToastMessage, toastMessage } from '../ToastMessage/ToastMessage.js';
@@ -166,13 +166,7 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
         return;
       }
 
-      // Upload the credentials to the server
-      const vcUrl = await uploadJson({
-        filename: generateUUID(),
-        json: extractedCredential,
-        bucket: storedCredentialsConfig?.options?.bucket as string,
-        storageAPIUrl: storedCredentialsConfig.url,
-      });
+      const vcUrl = await getStorageServiceLink(storedCredentialsConfig, extractedCredential, generateUUID());
 
       saveConformityCredentials(credentialRequestConfig.credentialName, vcUrl, credentialRequestConfig.appOnly);
 
