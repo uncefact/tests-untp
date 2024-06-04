@@ -5,7 +5,7 @@
     "secondaryColor": "white",
     "tertiaryColor": "black"
   },
-  "generalFeatures": [
+  "generateFeatures": [
     {
       "name": "General features",
       "type": "",
@@ -1107,19 +1107,6 @@
                   "identifierKeyPaths": ["parentItem", "itemID"]
                 }
               ]
-            }
-          ]
-        },
-        {
-          "name": "Scan QR",
-          "id":"scan_qr",
-          "components": [
-            {
-              "name": "QRCodeScannerDialogButton",
-              "type": "",
-              "props": {
-                "style": { "margin": "auto", "paddingTop": "40px", "width": "100%" }
-              }
             }
           ]
         }

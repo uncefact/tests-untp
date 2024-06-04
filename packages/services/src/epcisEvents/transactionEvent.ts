@@ -3,13 +3,16 @@ import { IService } from '../types/index.js';
 import { issueVC } from '../vckit.service.js';
 import { ITraceabilityEvent, ITransactionEventContext } from './types.js';
 import { getIdentifierByObjectKeyPaths } from './helpers.js';
-import { uploadJson } from '../storage.service.js';
+import { getStorageServiceLink } from '../storage.service.js';
 import { generateUUID } from '../utils/helpers.js';
 import { getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { validateTransactionEventContext } from './validateContext.js';
 import { EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
 
-export const processTransactionEvent: IService = async (transactionEvent: ITraceabilityEvent, context: ITransactionEventContext): Promise<VerifiableCredential> => {
+export const processTransactionEvent: IService = async (
+  transactionEvent: ITraceabilityEvent,
+  context: ITransactionEventContext,
+): Promise<VerifiableCredential> => {
   const validationResult = validateTransactionEventContext(context);
   if (!validationResult.ok) {
     throw new Error(validationResult.value);
@@ -41,16 +44,11 @@ export const processTransactionEvent: IService = async (transactionEvent: ITrace
     context: epcisTransactionEvent.context,
     type: epcisTransactionEvent.type,
     restOfVC: {
-      render: epcisTransactionEvent.renderTemplate
-    }
+      render: epcisTransactionEvent.renderTemplate,
+    },
   });
 
-  const vcUrl = await uploadJson({
-    filename: `${identifier}/${generateUUID()}`,
-    json: vc,
-    bucket: storage.bucket,
-    storageAPIUrl: storage.storageAPIUrl,
-  });
+  const vcUrl = await getStorageServiceLink(storage, vc, `${identifier}/${generateUUID()}`);
 
   await registerLinkResolver(
     vcUrl,

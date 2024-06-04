@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  mock-app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - CONFIG_FILE=./app-config.json
+    ports: 
+      - 3000:80

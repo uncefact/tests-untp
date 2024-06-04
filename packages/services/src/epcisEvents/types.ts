@@ -1,4 +1,5 @@
 import { IdentificationKeyType } from '../linkResolver.service';
+import { StorageServiceConfig } from '../types';
 
 export interface IVCKitContext {
   issuer: string;
@@ -39,7 +40,7 @@ export interface IStorageContext {
 export interface IContext {
   vckit: IVCKitContext;
   dlr: IConfigDLR;
-  storage: IStorageContext;
+  storage: StorageServiceConfig;
   identifierKeyPaths: string[];
   dpp: IEntityIssue;
 }
