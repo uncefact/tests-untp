@@ -1,22 +1,28 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import { ImportButton } from '../src/components/ImportButton/ImportButton';
+import { RenderCheckList } from '../build/components/RenderCheckList/RenderCheckList';
 
 const meta: any = {
-  title: 'ImportButton',
-  component: ImportButton,
+  title: 'RenderCheckList',
+  component: RenderCheckList,
   parameters: { layout: 'centered' },
   tags: ['autodocs'],
   argTypes: {},
-} satisfies Meta<typeof ImportButton>;
+} satisfies Meta<typeof RenderCheckList>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    label: 'Import',
-    onChange: (data) => console.log(data)
+    checkBoxLabel: 'checkBoxLabel',
+    requiredFields: ['test'],
+    onChange: (data) => console.log(data),
+    nestedComponents: [{
+      name: 'ImportButton',
+      type: 'EntryData',
+      props: {}
+    }]
   },
   decorators: [
     (Story) => (

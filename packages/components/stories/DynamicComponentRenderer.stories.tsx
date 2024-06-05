@@ -1,22 +1,22 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import { ImportButton } from '../src/components/ImportButton/ImportButton';
+import { DynamicComponentRenderer } from '../build/components/DynamicComponentRenderer/DynamicComponentRenderer';
 
 const meta: any = {
-  title: 'ImportButton',
-  component: ImportButton,
+  title: 'DynamicComponentRenderer',
+  component: DynamicComponentRenderer,
   parameters: { layout: 'centered' },
   tags: ['autodocs'],
   argTypes: {},
-} satisfies Meta<typeof ImportButton>;
+} satisfies Meta<typeof DynamicComponentRenderer>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    label: 'Import',
-    onChange: (data) => console.log(data)
+    name: 'ImportButton',
+    props: {},
   },
   decorators: [
     (Story) => (
