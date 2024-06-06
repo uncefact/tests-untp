@@ -76,7 +76,7 @@ function Header() {
       </MenuItem>,
     );
 
-    const menuItemGeneratorFeatures = appConfig.generateFeatures.map((app) => {
+    const menuItemGeneratorFeatures = appConfig.generalFeatures.map((app) => {
       const path = `/${convertStringToPath(app.name)}`;
       return (
         <MenuItem
@@ -138,21 +138,16 @@ function Header() {
 
   const renderMenuByScreenType = (screenType: string) => {
     const scanningRoute = '/scanning';
-    const scanningStyles: IStyles = {
-      primaryColor: 'rgb(41, 171, 48)',
-      secondaryColor: 'white',
-      tertiaryColor: 'black',
-    };
 
     if (screenType === 'mobile') {
-      return renderMobileMenuItems(appConfig.apps, scanningRoute, scanningStyles);
+      return renderMobileMenuItems(appConfig.apps, scanningRoute, appConfig.styles);
     }
 
-    return renderDesktopMenuItems(appConfig.apps, scanningRoute, scanningStyles);
+    return renderDesktopMenuItems(appConfig.apps, scanningRoute, appConfig.styles);
   };
 
   const renderMenuWithGenerateFeatures = () => {
-    return appConfig.generateFeatures.map((feature) => {
+    return appConfig.generalFeatures.map((feature) => {
       const path = `/${convertStringToPath(feature.name)}`;
       return (
         <Button sx={{ color: feature.styles.secondaryColor, display: 'block' }} key={path} component={Link} to={path}>

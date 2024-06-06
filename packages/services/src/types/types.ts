@@ -7,6 +7,10 @@ export interface IssueEvent {
   restOfVC: any;
 }
 
+export interface IImportedData {
+  [key: string]: { value: any, checked: boolean };
+}
+
 export enum MimeTypeEnum {
   textPlain = 'text/plain',
   textHtml = 'text/html',

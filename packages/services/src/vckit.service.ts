@@ -9,7 +9,7 @@ export const contextDefault = [
   'https://w3id.org/security/suites/jws-2020/v1',
 ];
 
-export const typeDefault = [];
+export const typeDefault = ['VerifiableCredential'];
 
 export interface IArgIssueVC {
   credentialSubject: CredentialSubject;
@@ -50,7 +50,7 @@ export const issueVC = async ({
   return response;
 };
 
-const constructCredentialObject = ({ context, type, issuer, credentialSubject, ...restOfVC }: CredentialPayload) => {  
+const constructCredentialObject = ({ context, type, issuer, credentialSubject, ...restOfVC }: CredentialPayload) => {
   return {
     credential: {
       '@context': [...contextDefault, ...(context || [])],

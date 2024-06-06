@@ -1,4 +1,6 @@
+import _ from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
+import JSONPointer from 'jsonpointer';
 
 export function generateUUID() {
   return uuidv4();
@@ -46,3 +48,40 @@ export function incrementQuality(obj: any, numberOfItems: number) {
   }
   return obj;
 }
+
+/**
+ * Create a nested object with the specified keys and data
+ * @param keys - An array of keys representing the nested structure of the object
+ * @param data - The data to be assigned to the innermost key
+ * @returns The created nested object
+ */
+export function createNestedObject(keys: string[], data: any) {
+  const result = {};
+  let current = result as any;
+
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (i === keys.length - 1) {
+      current[key] = data;
+    } else {
+      current[key] = {};
+      current = current[key];
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Define the path to access the credential or the link to the credential within the API response
+ * @param apiResp API response data
+ * @param path Path to the credential or the link to the credential within the API response
+ * @returns The credential or the link to the credential within the API response
+ */
+export const getStorageUrlByPath = (apiResp: any, path: string) => {
+  if (_.isNil(path)) {
+    throw new Error('Invalid result path');
+  }
+
+  return JSONPointer.get(apiResp, path);
+};

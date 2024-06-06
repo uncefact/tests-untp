@@ -3,6 +3,7 @@ import {
   randomIntegerString,
   generateUUID,
   incrementQuality,
+  createNestedObject,
 } from '../utils/helpers';
 
 describe('first', () => {
@@ -47,4 +48,70 @@ describe('first', () => {
     const result = incrementQuality(obj, 1);
     expect(result.quantity).toBe(2);
   });
+});
+
+describe('createNestedObject', () => {
+  it('Should return an empty object when keys array is empty', () => {
+    const keys: string[] = [];
+    const data = 'data';
+
+    const result = createNestedObject(keys, data);
+
+    expect(result).toEqual({});
+  });
+
+  it('Should return an object with one property when keys array has one element', () => {
+    const keys = ['field1'];
+    const data = 'data';
+
+    const result = createNestedObject(keys, data);
+
+    expect(result).toEqual({ field1: 'data' });
+  });
+
+  it('Should return an object with nested properties when keys array has multiple elements', () => {
+    const keys = ['a', 'b', 'c'];
+    const data = 'data';
+
+    const result = createNestedObject(keys, data);
+
+    expect(result).toEqual({ a: { b: { c: 'data' } } });
+  });
+
+  it('Should assign the data to the deepest nested property', () => {
+    const keys = ['a', 'b', 'c'];
+    const data = { data: 'data' };
+
+    const result = createNestedObject(keys, data);
+
+    expect(result).toEqual({ a: { b: { c: data } } });
+  });
+
+  it('Should handle keys of different types (string, number, etc.)', () => {
+    const keys = ['a', '3'];
+    const data = { data: 'data' };
+
+    const result = createNestedObject(keys, data);
+
+    expect(result).toEqual({ a: { 3: data } });
+  });
+
+  it('Should return an empty object when keys is not an array', () => {
+    const keys = ['field1'];
+    const data = undefined;
+
+    const result = createNestedObject(keys, data);
+
+    expect(result).toEqual({});
+  });
+
+  it('Should return an object with one property have undefined value when data is undefined', () => {
+    const keys = ['field1'];
+    const data = undefined;
+
+    const result = createNestedObject(keys, data);
+
+    expect(result).toEqual({ field1: undefined });
+  });
+
 });

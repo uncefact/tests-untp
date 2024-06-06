@@ -1,6 +1,6 @@
 import { processObjectEvent } from '../epcisEvents/objectEvent';
 import { issueVC, contextDefault } from '../vckit.service';
-import { uploadJson } from '../storage.service';
+import { getStorageServiceLink } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
 import { contextObjectEvent, dataObjectEvent } from './mocks/constants';
 
@@ -10,7 +10,7 @@ jest.mock('../vckit.service', () => ({
 }));
 
 jest.mock('../storage.service', () => ({
-  uploadJson: jest.fn(),
+  getStorageServiceLink: jest.fn(),
 }));
 
 jest.mock('../linkResolver.service', () => ({
@@ -50,8 +50,8 @@ describe('processObjectEvent', () => {
     });
 
     it('should call process object event', async () => {
-      (uploadJson as jest.Mock).mockImplementation(({ filename, bucket }: { filename: string; bucket: string }) => {
-        return `https://${bucket}.s3.ap-southeast-2.amazonaws.com/${filename}`;
+      (getStorageServiceLink as jest.Mock).mockImplementation(({ url, _data, path }) => {
+        return `${url}/${path}`;
       });
 
       (registerLinkResolver as jest.Mock).mockImplementation(
@@ -77,13 +77,7 @@ describe('processObjectEvent', () => {
 
       const vc = await processObjectEvent(dataObjectEvent, contextObjectEvent);
       expect(vc).toEqual(expectVCResult);
-      expect(uploadJson).toHaveBeenCalledWith({
-        filename: expect.any(String),
-        json: expectVCResult,
-        bucket: contextObjectEvent.storage.bucket,
-        storageAPIUrl: contextObjectEvent.storage.storageAPIUrl,
-      });
-
+      expect(getStorageServiceLink).toHaveBeenCalled();
       expect(registerLinkResolver).toHaveBeenCalled();
 
       const dppContext = contextObjectEvent.dpp;

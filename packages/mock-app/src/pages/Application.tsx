@@ -17,7 +17,14 @@ const Application = ({ app }: IApplication) => {
       const childPath = `${parentPath}/${convertStringToPath(feature.name)}`;
       return (
         <Button
-          sx={{ background: app.styles.primaryColor }}
+          sx={{
+            background: app.styles.primaryColor,
+            color: app.styles.secondaryColor,
+            '&:hover': {
+              backgroundColor: app.styles.primaryColor,
+              filter: 'brightness(0.9)',
+            }
+          }}
           key={childPath}
           variant='contained'
           component={Link}
@@ -37,7 +44,7 @@ const Application = ({ app }: IApplication) => {
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'column',
-        height: '50vh',
+        height: '100vh',
         width: '100%',
         gap: '24px',
       }}

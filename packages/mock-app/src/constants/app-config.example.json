@@ -5,7 +5,7 @@
     "secondaryColor": "white",
     "tertiaryColor": "black"
   },
-  "generateFeatures": [
+  "generalFeatures": [
     {
       "name": "General features",
       "type": "",
@@ -89,6 +89,109 @@
         "tertiaryColor": "black"
       },
       "features": [
+        {
+          "name": "Upload VC",
+          "components": [
+            {
+              "name": "RenderCheckList",
+              "type": "EntryData",
+              "props": {
+                "requiredFields": ["steelID"],
+                "checkBoxLabel": "Imported valid json:",
+                "nestedComponents": [
+                  {
+                    "name": "ImportButton",
+                    "type": "EntryData",
+                    "props": {
+                      "label": "Import JSON",
+                      "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
+                    }
+                  }
+                ],
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(255, 207, 7)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "mappingImportedData",
+              "parameters": [
+                {"requiredFields": ["steelID"]}
+              ]
+            },
+            {
+              "name": "processTransformationEvent",
+              "parameters": [
+                {
+                  "epcisTransformationEvent": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transformation-event-ld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render epcis template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["TransformationEventCredential"],
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrLinkTitle": "EPCIS transformation event VC",
+                    "dlrVerificationPage": "https://localhost:3000/verify",
+                    "dlrQualifierPath": ""
+                  },
+                  "dpp": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["DigitalProductPassport"],
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrLinkTitle": "Digital Product Passport",
+                    "dlrVerificationPage": "http://localhost:3000/verify",
+                    "dlrQualifierPath": ""
+                  },
+                  "vckit": {
+                    "vckitAPIUrl": "https://vckit.example.com",
+                    "issuer": "did:web:708f-27-75-129-38.ngrok-free.app"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
+                    "bucket": "agtrace-test-verifiable-credentials"
+                  },
+                  "productTransformation": {
+                    "inputItems": [{ "quantity": 1, "uom": "tons", "productClass": "Steel" }],
+                    "outputItems": [
+                      {
+                        "productID": "0109359502000034",
+                        "productClass": "Welding steel",
+                        "quantity": 300,
+                        "weight": 200,
+                        "uom": "kilogram",
+                        "description": "Welding steel is the process of joining steel pieces together using heat and pressure to create a strong, durable bond"
+                      },
+                      {
+                        "productID": "0109359502000010",
+                        "productClass": "Incorporating steel",
+                        "quantity": 300,
+                        "weight": 100,
+                        "uom": "kilogram",
+                        "description": "Incorporating steel involves integrating steel materials into various products, structures, or systems"
+                      }
+                    ]
+                  },
+                  "identifierKeyPaths": ["steelID"]
+                }
+              ]
+            }
+          ]
+        },
         {
           "name": "Digital Livestock",
           "id": "produce_product",
@@ -265,7 +368,7 @@
                 },
                 "initialData": {},
                 "className": "json-form",
-                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
             },
             {
@@ -276,7 +379,8 @@
               "name": "CustomButton",
               "type": "Submit",
               "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "white", "display": "block", "margin": "0 auto", "marginTop": "20px" }
               }
             }
           ],
@@ -413,14 +517,15 @@
                 },
                 "initialData": {},
                 "className": "json-form",
-                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
             },
             {
               "name": "CustomButton",
               "type": "Submit",
               "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
               }
             }
           ],
@@ -650,7 +755,7 @@
                 },
                 "initialData": {},
                 "className": "json-form",
-                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
             },
             {
@@ -661,7 +766,8 @@
               "name": "CustomButton",
               "type": "Submit",
               "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
               }
             }
           ],
@@ -798,14 +904,15 @@
                 },
                 "initialData": {},
                 "className": "json-form",
-                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
             },
             {
               "name": "CustomButton",
               "type": "Submit",
               "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
               }
             }
           ],
@@ -900,14 +1007,15 @@
                 },
                 "initialData": {},
                 "className": "json-form",
-                "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
             },
             {
               "name": "CustomButton",
               "type": "Submit",
               "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
               }
             }
           ],
@@ -1065,13 +1173,14 @@
               },
               "initialData": {},
               "className": "json-form",
-              "style": { "margin": "auto", "paddingTop": "40px", "width": "80%" }
+              "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
             },
             {
               "name": "CustomButton",
               "type": "Submit",
               "props": {
-                "style": { "textAlign": "center", "paddingTop": "20px" }
+                "variant": "contained",
+                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
               }
             }
           ],
@@ -1107,6 +1216,19 @@
                   "identifierKeyPaths": ["parentItem", "itemID"]
                 }
               ]
+            }
+          ]
+        },
+        {
+          "name": "Scan QR",
+          "id":"scan_qr",
+          "components": [
+            {
+              "name": "QRCodeScannerDialogButton",
+              "type": "",
+              "props": {
+                "style": { "margin": "auto", "paddingTop": "40px", "width": "100%" }
+              }
             }
           ]
         }
