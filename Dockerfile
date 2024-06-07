@@ -1,5 +1,5 @@
 # ---- Base Node ----
-FROM node:18 AS base
+FROM node:21 AS base
 WORKDIR /app
 COPY package*.json yarn.lock ./
 
