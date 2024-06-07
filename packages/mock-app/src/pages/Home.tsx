@@ -10,7 +10,14 @@ const Home = () => {
       const path = `/${convertStringToPath(configApp.name)}`;
       return (
         <Button
-          sx={{ background: appConfig.styles.primaryColor }}
+          sx={{
+            background: appConfig.styles.primaryColor,
+            color: appConfig.styles.secondaryColor,
+            '&:hover': {
+              backgroundColor: appConfig.styles.primaryColor,
+              filter: 'brightness(0.9)',
+            }
+          }}
           key={path}
           variant='contained'
           component={Link}
@@ -26,7 +33,14 @@ const Home = () => {
 
     apps.push(
       <Button
-        sx={{ background: appConfig.styles.primaryColor }}
+        sx={{
+          background: appConfig.styles.primaryColor,
+          color: appConfig.styles.secondaryColor,
+          '&:hover': {
+              backgroundColor: appConfig.styles.primaryColor,
+              filter: 'brightness(0.9)',
+            }
+        }}
         key={'/scanning'}
         variant='contained'
         component={Link}
@@ -45,7 +59,14 @@ const Home = () => {
       const path = `/${convertStringToPath(feature.name)}`;
       return (
         <Button
-          sx={{ background: appConfig.styles.primaryColor }}
+          sx={{
+            background: appConfig.styles.primaryColor,
+            color: appConfig.styles.secondaryColor,
+            '&:hover': {
+              backgroundColor: appConfig.styles.primaryColor,
+              filter: 'brightness(0.9)',
+            }
+          }}
           key={path}
           variant='contained'
           component={Link}
@@ -68,7 +89,7 @@ const Home = () => {
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'column',
-        height: '50vh',
+        height: '100vh',
         width: '100%',
         gap: '24px',
       }}

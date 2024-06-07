@@ -68,7 +68,7 @@ export const ImportButton = ({ label = 'Import', onChange }: IImportButtonProps)
   return (
     <Box
       sx={{
-        paddingTop: '40px',
+        paddingTop: '60px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
