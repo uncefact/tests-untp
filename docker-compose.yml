@@ -1,10 +1,25 @@
 version: '3.8'
 services:
   mock-app:
+    container_name: mock-app
     build: 
       context: .
       dockerfile: Dockerfile
       args:
-        - CONFIG_FILE=./app-config.json
+        - CONFIG_FILE=./app-config.template.json
+        - CONFORMITY_CREDENTIALS_URL=http://localhost:3332/v1
+        - CONFORMITY_STORED_CREDENTIALS_URL=http://localhost:3333/v1/credentials
+        - CONFORMITY_STORED_CREDENTIALS_BUCKET=conformity-bucket
+        - CONFORMITY_UPLOAD_CREDENTIALS_URL=http://localhost:3333/v1/credentials
+        - CONFORMITY_UPLOAD_CREDENTIALS_BUCKET=conformity-bucket
+        - DLR_API_URL=http://localhost:8080
+        - VCKIT_API_URL=http://localhost:3332/v1
+        - DLR_API_KEY=5555555555555
+        - STORAGE_API_URL=http://localhost:3333/v1/credentials
+        - STORAGE_BUCKET=epcis-events
+        - RESULT_PATH_URI=/uri
+        - VCKIT_ISSUER=did:web:281b-222-253-79-48.ngrok-free.app
+        - DLR_VERIFICATION_PAGE=http://localhost:3000/verify
+        - IDENTIFY_PROVIDER_URL=http://localhost:3334
     ports: 
       - 3000:80

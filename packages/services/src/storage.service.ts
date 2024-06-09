@@ -36,7 +36,7 @@ export const getStorageServiceLink = async (
     params: {
       ...storage.params,
       data: data,
-      path: path,
+      filename: path,
     },
     options: storage.options,
   });

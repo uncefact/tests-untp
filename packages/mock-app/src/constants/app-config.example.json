@@ -162,8 +162,17 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
-                    "bucket": "agtrace-test-verifiable-credentials"
+                    "url": "http://localhost:3333/v1/credentials",
+                    "params": {
+                      "bucket": "verifiable-credentials",
+                      "resultPath": "/uri"
+                    },
+                    "options": {
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
+                    }
                   },
                   "productTransformation": {
                     "inputItems": [{ "quantity": 1, "uom": "tons", "productClass": "Steel" }],
@@ -413,8 +422,17 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "storageAPIUrl": "https://storage.example.com",
-                    "bucket": "bucket-stored-example"
+                    "url": "http://localhost:3333/v1/credentials",
+                    "params": {
+                      "bucket": "verifiable-credentials",
+                      "resultPath": "/uri"
+                    },
+                    "options": {
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
+                    }
                   },
                   "identifierKeyPaths": ["herd", "identifier"]
                 }
@@ -553,8 +571,17 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "storageAPIUrl": "https://storage.example.com",
-                    "bucket": "bucket-stored-example"
+                    "url": "http://localhost:3333/v1/credentials",
+                    "params": {
+                      "bucket": "verifiable-credentials",
+                      "resultPath": "/uri"
+                    },
+                    "options": {
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
+                    }
                   },
                   "identifierKeyPaths": ["transaction", "identifier"]
                 }
@@ -800,8 +827,17 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "storageAPIUrl": "https://storage.example.com",
-                    "bucket": "bucket-stored-example"
+                    "url": "http://localhost:3333/v1/credentials",
+                    "params": {
+                      "bucket": "verifiable-credentials",
+                      "resultPath": "/uri"
+                    },
+                    "options": {
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
+                    }
                   },
                   "identifierKeyPaths": ["herd", "identifier"]
                 }
@@ -940,8 +976,17 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "storageAPIUrl": "https://storage.example.com",
-                    "bucket": "bucket-stored-example"
+                    "url": "http://localhost:3333/v1/credentials",
+                    "params": {
+                      "bucket": "verifiable-credentials",
+                      "resultPath": "/uri"
+                    },
+                    "options": {
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
+                    }
                   },
                   "identifierKeyPaths": ["transaction", "identifier"]
                 }
@@ -1055,8 +1100,17 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "storageAPIUrl": "https://storage.example.com",
-                    "bucket": "bucket-stored-example"
+                    "url": "http://localhost:3333/v1/credentials",
+                    "params": {
+                      "bucket": "verifiable-credentials",
+                      "resultPath": "/uri"
+                    },
+                    "options": {
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
+                    }
                   },
                   "productTransformation": {
                     "inputItems": [{ "quantity": 1, "uom": "head", "productClass": "cattle" }],
@@ -1210,8 +1264,17 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "storageAPIUrl": "https://storage.example.com",
-                    "bucket": "bucket-stored-example"
+                    "url": "http://localhost:3333/v1/credentials",
+                    "params": {
+                      "bucket": "verifiable-credentials",
+                      "resultPath": "/uri"
+                    },
+                    "options": {
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
+                    }
                   },
                   "identifierKeyPaths": ["parentItem", "itemID"]
                 }

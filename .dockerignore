@@ -6,6 +6,7 @@ docker-compose.yaml
 **/coverage
 **/build
 **/tsconfig.tsbuildinfo
+**/app-config.json
 .git
 .gitignore
 jest.*
