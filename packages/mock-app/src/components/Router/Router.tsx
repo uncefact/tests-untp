@@ -40,7 +40,7 @@ function Router() {
       <Route path='*' element={<Navigate to='/404' />} />,
       {/* Iterate through the appConfig to dynamically generate routes */}
       {appConfig.apps.map(renderRoutes)}
-      {appConfig.generateFeatures.map(renderRoutes)}
+      {appConfig.generalFeatures.map(renderRoutes)}
     </Routes>
   );
 }
