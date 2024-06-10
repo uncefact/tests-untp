@@ -4,9 +4,9 @@ services:
     container_name: mock-app
     build: 
       context: .
-      dockerfile: Dockerfile
+      dockerfile: packages/mock-app/Dockerfile
       args:
-        - CONFIG_FILE=./app-config.template.json
+        - CONFIG_FILE=./packages/mock-app/src/constants/app-config.template.json
         - CONFORMITY_CREDENTIALS_URL=http://localhost:3332/v1
         - CONFORMITY_STORED_CREDENTIALS_URL=http://localhost:3333/v1/credentials
         - CONFORMITY_STORED_CREDENTIALS_BUCKET=conformity-bucket

@@ -47,7 +47,7 @@ ENV IDENTIFY_PROVIDER_URL=${IDENTIFY_PROVIDER_URL}
 # Add and run the entrypoint script to the image
 RUN apt update && apt install gettext -y
 COPY ${CONFIG_FILE} .
-COPY entrypoint.sh .
+COPY packages/mock-app/entrypoint.sh .
 RUN chmod +x entrypoint.sh
 RUN ./entrypoint.sh
 
