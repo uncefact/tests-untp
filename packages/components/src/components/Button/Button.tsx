@@ -1,9 +1,9 @@
-import { LoadingButton } from '@mui/lab';
 import { useState } from 'react';
+import { LoadingButton } from '@mui/lab';
 import { Tooltip } from '@mui/material';
 
 type ButtonProps = {
-  onClick: () => any;
+  onClick: () => void;
   label?: string;
   description?: string;
 };
