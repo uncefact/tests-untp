@@ -116,16 +116,20 @@
               "type": "Submit",
               "props": {
                 "variant": "contained",
-                "style": { "backgroundColor": "rgb(255, 207, 7)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+                "style": {
+                  "backgroundColor": "rgb(255, 207, 7)",
+                  "color": "black",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
               }
             }
           ],
           "services": [
             {
               "name": "mappingImportedData",
-              "parameters": [
-                {"requiredFields": ["steelID"]}
-              ]
+              "parameters": [{ "requiredFields": ["steelID"] }]
             },
             {
               "name": "processTransformationEvent",
@@ -162,8 +166,10 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "storageAPIUrl": "https://storage.agtrace.showthething.com",
-                    "bucket": "agtrace-test-verifiable-credentials"
+                    "url": "https://storage.example.com",
+                    "params": {
+                      "resultPath": ""
+                    }
                   },
                   "productTransformation": {
                     "inputItems": [{ "quantity": 1, "uom": "tons", "productClass": "Steel" }],
@@ -380,7 +386,13 @@
               "type": "Submit",
               "props": {
                 "variant": "contained",
-                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "white", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+                "style": {
+                  "backgroundColor": "rgb(41, 171, 48)",
+                  "color": "white",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
               }
             }
           ],
@@ -413,8 +425,10 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "storageAPIUrl": "https://storage.example.com",
-                    "bucket": "bucket-stored-example"
+                    "url": "https://storage.example.com",
+                    "params": {
+                      "resultPath": ""
+                    }
                   },
                   "identifierKeyPaths": ["herd", "identifier"]
                 }
@@ -525,7 +539,13 @@
               "type": "Submit",
               "props": {
                 "variant": "contained",
-                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+                "style": {
+                  "backgroundColor": "rgb(41, 171, 48)",
+                  "color": "black",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
               }
             }
           ],
@@ -553,8 +573,10 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "storageAPIUrl": "https://storage.example.com",
-                    "bucket": "bucket-stored-example"
+                    "url": "https://storage.example.com",
+                    "params": {
+                      "resultPath": ""
+                    }
                   },
                   "identifierKeyPaths": ["transaction", "identifier"]
                 }
@@ -767,7 +789,13 @@
               "type": "Submit",
               "props": {
                 "variant": "contained",
-                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+                "style": {
+                  "backgroundColor": "rgb(41, 171, 48)",
+                  "color": "black",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
               }
             }
           ],
@@ -800,8 +828,10 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "storageAPIUrl": "https://storage.example.com",
-                    "bucket": "bucket-stored-example"
+                    "url": "https://storage.example.com",
+                    "params": {
+                      "resultPath": ""
+                    }
                   },
                   "identifierKeyPaths": ["herd", "identifier"]
                 }
@@ -912,7 +942,13 @@
               "type": "Submit",
               "props": {
                 "variant": "contained",
-                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+                "style": {
+                  "backgroundColor": "rgb(41, 171, 48)",
+                  "color": "black",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
               }
             }
           ],
@@ -940,8 +976,10 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "storageAPIUrl": "https://storage.example.com",
-                    "bucket": "bucket-stored-example"
+                    "url": "https://storage.example.com",
+                    "params": {
+                      "resultPath": ""
+                    }
                   },
                   "identifierKeyPaths": ["transaction", "identifier"]
                 }
@@ -1015,7 +1053,13 @@
               "type": "Submit",
               "props": {
                 "variant": "contained",
-                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+                "style": {
+                  "backgroundColor": "rgb(41, 171, 48)",
+                  "color": "black",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
               }
             }
           ],
@@ -1055,8 +1099,10 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "storageAPIUrl": "https://storage.example.com",
-                    "bucket": "bucket-stored-example"
+                    "url": "https://storage.example.com",
+                    "params": {
+                      "resultPath": ""
+                    }
                   },
                   "productTransformation": {
                     "inputItems": [{ "quantity": 1, "uom": "head", "productClass": "cattle" }],
@@ -1180,7 +1226,13 @@
               "type": "Submit",
               "props": {
                 "variant": "contained",
-                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+                "style": {
+                  "backgroundColor": "rgb(41, 171, 48)",
+                  "color": "black",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
               }
             }
           ],
@@ -1210,8 +1262,10 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "storageAPIUrl": "https://storage.example.com",
-                    "bucket": "bucket-stored-example"
+                    "url": "https://storage.example.com",
+                    "params": {
+                      "resultPath": ""
+                    }
                   },
                   "identifierKeyPaths": ["parentItem", "itemID"]
                 }
@@ -1221,7 +1275,7 @@
         },
         {
           "name": "Scan QR",
-          "id":"scan_qr",
+          "id": "scan_qr",
           "components": [
             {
               "name": "QRCodeScannerDialogButton",
