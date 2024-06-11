@@ -39,14 +39,17 @@ const Application = ({ app }: IApplication) => {
   return (
     <Box
       sx={{
-        marginTop: '64px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'column',
-        height: '100vh',
+
+        height: '100%',
         width: '100%',
         gap: '24px',
+
+        paddingTop: '50px',
+        marginTop: '64px',
       }}
     >
       {renderFeatures(app)}

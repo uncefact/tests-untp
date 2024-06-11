@@ -2,7 +2,7 @@
   "name": "Red meat",
   "styles": {
     "primaryColor": "rgb(41, 171, 48)",
-    "secondaryColor": "white",
+    "secondaryColor": "black",
     "tertiaryColor": "black"
   },
   "generalFeatures": [
@@ -117,7 +117,7 @@
               "props": {
                 "variant": "contained",
                 "style": {
-                  "backgroundColor": "rgb(255, 207, 7)",
+                  "textAlign": "center",
                   "color": "black",
                   "display": "block",
                   "margin": "0 auto",
@@ -143,7 +143,7 @@
                     "type": ["TransformationEventCredential"],
                     "dlrIdentificationKeyType": "gtin",
                     "dlrLinkTitle": "EPCIS transformation event VC",
-                    "dlrVerificationPage": "https://localhost:3000/verify",
+                    "dlrVerificationPage": "https://dlr.example.com/verify",
                     "dlrQualifierPath": ""
                   },
                   "dpp": {
@@ -154,7 +154,7 @@
                     "type": ["DigitalProductPassport"],
                     "dlrIdentificationKeyType": "gtin",
                     "dlrLinkTitle": "Digital Product Passport",
-                    "dlrVerificationPage": "http://localhost:3000/verify",
+                    "dlrVerificationPage": "http://dlr.example.com/verify",
                     "dlrQualifierPath": ""
                   },
                   "vckit": {
@@ -162,13 +162,19 @@
                     "issuer": "did:web:708f-27-75-129-38.ngrok-free.app"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:8080",
+                    "dlrAPIUrl": "http://dlr.example.com",
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
                     "url": "https://storage.example.com",
                     "params": {
                       "resultPath": ""
+                    },
+                    "options": {
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
                     }
                   },
                   "productTransformation": {
@@ -387,7 +393,7 @@
               "props": {
                 "variant": "contained",
                 "style": {
-                  "backgroundColor": "rgb(41, 171, 48)",
+                  "textAlign": "center",
                   "color": "white",
                   "display": "block",
                   "margin": "0 auto",
@@ -540,7 +546,7 @@
               "props": {
                 "variant": "contained",
                 "style": {
-                  "backgroundColor": "rgb(41, 171, 48)",
+                  "textAlign": "center",
                   "color": "black",
                   "display": "block",
                   "margin": "0 auto",
@@ -790,7 +796,7 @@
               "props": {
                 "variant": "contained",
                 "style": {
-                  "backgroundColor": "rgb(41, 171, 48)",
+                  "textAlign": "center",
                   "color": "black",
                   "display": "block",
                   "margin": "0 auto",
@@ -943,7 +949,7 @@
               "props": {
                 "variant": "contained",
                 "style": {
-                  "backgroundColor": "rgb(41, 171, 48)",
+                  "textAlign": "center",
                   "color": "black",
                   "display": "block",
                   "margin": "0 auto",
@@ -1054,7 +1060,7 @@
               "props": {
                 "variant": "contained",
                 "style": {
-                  "backgroundColor": "rgb(41, 171, 48)",
+                  "textAlign": "center",
                   "color": "black",
                   "display": "block",
                   "margin": "0 auto",
@@ -1095,7 +1101,7 @@
                     "issuer": "did:web:0af6-103-69-79-17.ngrok-free.app"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost",
+                    "dlrAPIUrl": "http://dlr.example.com",
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
@@ -1227,7 +1233,7 @@
               "props": {
                 "variant": "contained",
                 "style": {
-                  "backgroundColor": "rgb(41, 171, 48)",
+                  "textAlign": "center",
                   "color": "black",
                   "display": "block",
                   "margin": "0 auto",
@@ -1255,7 +1261,7 @@
                     "type": ["AggregationEventCredential"],
                     "dlrLinkTitle": "Aggregation Event",
                     "dlrIdentificationKeyType": "gtin",
-                    "dlrVerificationPage": "http://localhost:3000/verify"
+                    "dlrVerificationPage": "http://dlr.example.com/verify"
                   },
                   "dlr": {
                     "dlrAPIUrl": "http://dlr.example.com",

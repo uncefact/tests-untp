@@ -37,9 +37,9 @@ const Home = () => {
           background: appConfig.styles.primaryColor,
           color: appConfig.styles.secondaryColor,
           '&:hover': {
-              backgroundColor: appConfig.styles.primaryColor,
-              filter: 'brightness(0.9)',
-            }
+            backgroundColor: appConfig.styles.primaryColor,
+            filter: 'brightness(0.9)',
+          }
         }}
         key={'/scanning'}
         variant='contained'
@@ -84,14 +84,17 @@ const Home = () => {
   return (
     <Box
       sx={{
-        marginTop: '64px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'column',
-        height: '100vh',
+
+        height: '100%',
         width: '100%',
         gap: '24px',
+
+        paddingTop: '50px',
+        marginTop: '64px',
       }}
     >
       {renderApps()}
