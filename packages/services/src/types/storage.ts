@@ -1,13 +1,13 @@
 export type StorageServiceOptions = {
-    method: 'POST' | 'PUT';
-    headers?: any;
+  method: 'POST' | 'PUT';
+  headers?: any;
 };
 
 export type StorageServiceParams = {
   resultPath: string;
   [key: string]: any;
-}
-  
+};
+
 export type StorageServiceConfig = {
   url: string;
   params: StorageServiceParams;
@@ -16,4 +16,8 @@ export type StorageServiceConfig = {
 
 export interface IStorageService {
   (config: StorageServiceConfig): Promise<string>;
+}
+
+export interface IGetStorageServiceLink {
+  (storage: StorageServiceConfig, data: any, filename: string): Promise<string>;
 }

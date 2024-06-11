@@ -1,7 +1,6 @@
-import { IStorageService, StorageServiceConfig } from './types/storage.js';
+import { IGetStorageServiceLink, IStorageService } from './types/storage.js';
 import { getStorageUrlByPath } from './utils/helpers.js';
 import { publicAPI } from './utils/httpService.js';
-
 
 export const storageService: IStorageService = async (config) => {
   const { url, params, options = { method: 'POST', headers: [] } } = config;
@@ -26,17 +25,13 @@ export const storageService: IStorageService = async (config) => {
   }
 };
 
-export const getStorageServiceLink = async (
-  storage: StorageServiceConfig,
-  data: any,
-  path: string,
-): Promise<string> => {
+export const getStorageServiceLink: IGetStorageServiceLink = async (storage, data, filename) => {
   return await storageService({
     url: storage.url,
     params: {
       ...storage.params,
-      data: data,
-      path: path,
+      data,
+      filename,
     },
     options: storage.options,
   });
