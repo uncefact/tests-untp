@@ -51,7 +51,8 @@
     "access": "public"
   },
   "resolutions": {
-    "@types/eslint": "^8.4.6"
+    "@types/eslint": "^8.4.6",
+    "strip-ansi": "6.0.0"
   },
   "engines": {
     "node": ">= 20.12.2"
