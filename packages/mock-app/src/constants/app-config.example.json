@@ -116,16 +116,20 @@
               "type": "Submit",
               "props": {
                 "variant": "contained",
-                "style": { "backgroundColor": "rgb(255, 207, 7)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+                "style": {
+                  "backgroundColor": "rgb(255, 207, 7)",
+                  "color": "black",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
               }
             }
           ],
           "services": [
             {
               "name": "mappingImportedData",
-              "parameters": [
-                {"requiredFields": ["steelID"]}
-              ]
+              "parameters": [{ "requiredFields": ["steelID"] }]
             },
             {
               "name": "processTransformationEvent",
@@ -388,7 +392,13 @@
               "type": "Submit",
               "props": {
                 "variant": "contained",
-                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "white", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+                "style": {
+                  "backgroundColor": "rgb(41, 171, 48)",
+                  "color": "white",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
               }
             }
           ],
@@ -535,7 +545,13 @@
               "type": "Submit",
               "props": {
                 "variant": "contained",
-                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+                "style": {
+                  "backgroundColor": "rgb(41, 171, 48)",
+                  "color": "black",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
               }
             }
           ],
@@ -779,7 +795,13 @@
               "type": "Submit",
               "props": {
                 "variant": "contained",
-                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+                "style": {
+                  "backgroundColor": "rgb(41, 171, 48)",
+                  "color": "black",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
               }
             }
           ],
@@ -926,7 +948,13 @@
               "type": "Submit",
               "props": {
                 "variant": "contained",
-                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+                "style": {
+                  "backgroundColor": "rgb(41, 171, 48)",
+                  "color": "black",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
               }
             }
           ],
@@ -1031,7 +1059,13 @@
               "type": "Submit",
               "props": {
                 "variant": "contained",
-                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+                "style": {
+                  "backgroundColor": "rgb(41, 171, 48)",
+                  "color": "black",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
               }
             }
           ],
@@ -1198,7 +1232,13 @@
               "type": "Submit",
               "props": {
                 "variant": "contained",
-                "style": { "backgroundColor": "rgb(41, 171, 48)", "color": "black", "display": "block", "margin": "0 auto", "marginTop": "20px" }
+                "style": {
+                  "backgroundColor": "rgb(41, 171, 48)",
+                  "color": "black",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
               }
             }
           ],
