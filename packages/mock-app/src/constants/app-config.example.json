@@ -546,7 +546,7 @@
               "props": {
                 "variant": "contained",
                 "style": {
-                  "backgroundColor": "rgb(41, 171, 48)",
+                  "textAlign": "center",
                   "color": "black",
                   "display": "block",
                   "margin": "0 auto",
