@@ -1,8 +1,9 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { Router as RouterDom } from 'react-router-dom';
 import { createMemoryHistory } from 'history';
-import { Router } from '../components/Router';
+import { Router as RouterDom } from 'react-router-dom';
+
+import Header from '../components/Header/Header';
 
 // Mock the appConfig to provide test data
 jest.mock(
@@ -118,76 +119,65 @@ jest.mock(
   { virtual: true },
 );
 
-jest.mock('@mock-app/components', () => ({
-  Footer: jest.fn(),
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useLocation: () => ({
+    pathname: 'localhost:3000/',
+  }),
 }));
 
-jest.mock('@mock-app/services', () => ({
-  services: jest.fn(),
-}));
-
-jest.mock('@veramo/utils', () => ({
-  computeEntryHash: jest.fn(),
-}));
-
-jest.mock('@vckit/renderer', () => ({
-  Renderer: jest.fn(),
-  WebRenderingTemplate2022: jest.fn(),
-}));
-
-describe('Router Component', () => {
-  // Test case to check if the Router redirects to the 404 page for an invalid route
-  it('should renders route incorrectly', () => {
-    // Create a memory history object with an initial entry of an invalid route
-    const history = createMemoryHistory({ initialEntries: ['/invalid-route'] });
-    // Render the Router component with the provided history
-    render(
-      <RouterDom location={history.location} navigator={history}>
-        <Router />
-      </RouterDom>,
-    );
-
-    // Expect the Router to navigate to the '/404' route
-    expect(history.location.pathname).toBe('/404');
-  });
-
-  // Test case to verifies the rendering of the home page
-  it('should renders home page', () => {
-    // Create a memory history object with an initial entry of the home route ('/')
+describe('Header', () => {
+  it('should render the header', () => {
     const history = createMemoryHistory({ initialEntries: ['/'] });
 
-    // Render the Router component with the provided history
     render(
       <RouterDom location={history.location} navigator={history}>
-        <Router />
+        <Header />
       </RouterDom>,
     );
 
-    // Find all buttons with text matching 'Farm', 'Feedlot', and 'Processor'
-    const farmButton = screen.getAllByText(/Farm/i);
-    const feedlotButton = screen.getAllByText(/Feedlot/i);
-    const processorButton = screen.getAllByText(/Processor/i);
-
-    // Assert that all buttons for the respective apps are displayed on the Home page
-    expect(farmButton).not.toBeNull();
-    expect(feedlotButton).not.toBeNull();
-    expect(processorButton).not.toBeNull();
+    expect(screen.getByText('Red meat')).toBeInTheDocument();
   });
 
-  // Test case to check if clicking on a feature in the Router navigates to the correct subpath
-  it('should renders route subpath correctly', () => {
-    // Create a memory history object with an initial entry of the '/farm' route
-    const history = createMemoryHistory({ initialEntries: ['/farm'] });
-    // Render the Router component with the provided history
+  it('should open sidebar menu in header', () => {
+    const history = createMemoryHistory({ initialEntries: ['/'] });
+
     render(
       <RouterDom location={history.location} navigator={history}>
-        <Router />
+        <Header />
       </RouterDom>,
     );
 
-    // Simulate a click on a feature in the Router (Issue DLP)
-    fireEvent.click(screen.getByText('Issue DLP'));
-    // Expect the Router to navigate to the '/farm/issue-dlp' subpath
-    expect(history.location.pathname).toBe('/farm/issue-dlp');
+    fireEvent.click(screen.getByTestId('icon-button'));
+    expect(screen.getByTestId('menu')).toBeInTheDocument();
+  });
+
+  it('should set title get from sessionStorage', () => {
+    sessionStorage.setItem('nameLink', 'Farm');
+    const history = createMemoryHistory({ initialEntries: ['/farm'] });
+
+    render(
+      <RouterDom location={history.location} navigator={history}>
+        <Header />
+      </RouterDom>,
+    );
+
+    expect(screen.getByText('Farm')).toBeInTheDocument();
+  });
+
+  it('should redirect to sub app when clicking on button on Home page', () => {
+    const history = createMemoryHistory({ initialEntries: ['/'] });
+
+    render(
+      <RouterDom location={history.location} navigator={history}>
+        <Header />
+      </RouterDom>,
+    );
+
+    fireEvent.click(screen.getByTestId('icon-button'));
+    const linkElement = screen.getByText('Feedlot');
+    fireEvent.click(linkElement);
+
+    expect(history.location.pathname).toBe('/feedlot');
   });
 });

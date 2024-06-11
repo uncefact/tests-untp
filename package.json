@@ -54,7 +54,7 @@
     "@types/eslint": "^8.4.6"
   },
   "engines": {
-    "node": ">= 21.0.0"
+    "node": ">= 20.12.2"
   },
   "dependencies": {
     "rimraf": "^5.0.5"
