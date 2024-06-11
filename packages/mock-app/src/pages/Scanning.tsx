@@ -67,9 +67,8 @@ const Scanning = () => {
       return toastMessage({ status: Status.error, message: 'Failed to scanning code' });
     }
 
-    const { type: providerType, url: providerUrl } = appConfig.identifyProvider;
-    const providerInstance = getProviderByType(providerType);
-    const identityProvider = new IdentityProvider(providerInstance, providerUrl);
+    const providerInstance = getProviderByType(appConfig.identifyProvider.type);
+    const identityProvider = new IdentityProvider(providerInstance, appConfig.identifyProvider.url);
 
     const scannedCodeResult = providerInstance.getCode(decodedText, formatName);
     setScannedCode(scannedCodeResult);
