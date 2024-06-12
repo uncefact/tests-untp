@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppBar,
   Toolbar,
@@ -44,6 +44,7 @@ const iconConfig: { [key: string]: JSX.Element } = {
 
 function Header() {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [open, setOpen] = useState(false);
   const [headerBrandInfo, setHeaderBrandInfo] = useState(initialHeaderBrandInfo);
@@ -159,11 +160,23 @@ function Header() {
             md: '24px',
             lg: '24px',
           },
+          cursor: 'pointer',
         }}
+        onClick={() => handleClickHeaderText(headerBrandInfo.name ?? appConfig.name)}
       >
         {headerBrandInfo.name ?? appConfig.name}
       </Typography>
     );
+  };
+
+  const handleClickHeaderText = (title: string) => {
+    if (title === appConfig.name) {
+      navigate('/');
+      return;
+    }
+
+    const path = `/${convertStringToPath(title)}`;
+    navigate(path);
   };
 
   return (
