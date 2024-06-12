@@ -6,7 +6,7 @@ The mock app present how the supply chain interact each other through the tracea
 
 ## Prerequisites
 
-- Node.js >= v18.17.0
+- Node.js >= v20.12.2
 - Yarn >= 1.22.17
 
 ## Configuration
