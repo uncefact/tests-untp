@@ -4,7 +4,7 @@ This is a simple storage server to store JSON data in a file.
 
 ## Installation
 
-Requires Node.js version 18 and Yarn verion 1.22.
+Requires Node.js version 20 and Yarn verion 1.22.
 
 ```bash
 yarn install
