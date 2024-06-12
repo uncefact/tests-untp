@@ -23,7 +23,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import DialpadIcon from '@mui/icons-material/Dialpad';
 
 import appConfig from '../../constants/app-config.json';
-import { convertStringToPath } from '../../utils';
+import { convertPathToString, convertStringToPath } from '../../utils';
 import { IStyles } from '../../types/common.types';
 
 type ConfigAppType = typeof appConfig;
@@ -53,6 +53,11 @@ function Header() {
     tertiaryColor: appConfig.styles.tertiaryColor,
     menuIconColor: appConfig.styles.menuIconColor,
   });
+  const [scanningStyles] = useState({
+    primaryColor: 'yellow',
+    secondaryColor: 'white',
+    tertiaryColor: 'black',
+  });
 
   const toggleDrawer = (newOpen: boolean) => () => {
     setOpen(newOpen);
@@ -60,22 +65,29 @@ function Header() {
 
   useEffect(() => {
     const path = location.pathname;
-    const getNameLinkFromSesion = sessionStorage.getItem('nameLink');
+    const nameLink = convertPathToString(path ?? '');
+    const subAppStyles =
+      appConfig.apps.find((app) => app.name.toLocaleLowerCase() === nameLink.toLocaleLowerCase()) ??
+      appConfig.generalFeatures.find((app) => app.name.toLocaleLowerCase() === nameLink.toLocaleLowerCase());
 
-    if (getNameLinkFromSesion) {
-      setHeaderBrandInfo({
-        name: getNameLinkFromSesion,
-        assets: {
-          logo: '',
-        },
-      });
-      sessionStorage.removeItem('nameLink');
-    }
+    setHeaderBrandInfo({
+      name: convertPathToString(path ?? ''),
+      assets: {
+        logo: subAppStyles && 'assets' in subAppStyles ? subAppStyles?.assets?.logo : '',
+      },
+    });
+
+    setStyles(subAppStyles?.styles ?? appConfig.styles);
 
     if (path === '/') {
       setHeaderBrandInfo(initialHeaderBrandInfo);
       setStyles(appConfig.styles);
     }
+
+    if (path === '/scanning') {
+      setStyles(scanningStyles);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
   const renderAvatar = (value: any) => {
@@ -131,11 +143,6 @@ function Header() {
 
   const renderSidebar = () => {
     const scanningRoute = '/scanning';
-    const scanningStyles: IStyles = {
-      primaryColor: 'rgb(41, 171, 48)',
-      secondaryColor: 'white',
-      tertiaryColor: 'black',
-    };
 
     return renderSidebarElements(appConfig, scanningRoute, scanningStyles);
   };
@@ -204,11 +211,7 @@ function Header() {
                 textDecoration: 'none',
                 alignItems: 'center',
                 flexDirection: 'row',
-                margin: {
-                  xs: 'auto',
-                  md: '2px',
-                  lg: '2px',
-                },
+                margin: '2px',
               }}
             >
               {/* Render avatar */}
@@ -226,20 +229,18 @@ function Header() {
               textDecoration: 'none',
               alignItems: 'end',
               flexDirection: 'row',
-              margin: {
-                xs: 'auto',
-                md: '2px',
-                lg: '2px',
-              },
+              margin: '2px',
             }}
           >
-            <Button
-              sx={{
-                color: appConfig.styles.secondaryColor,
-              }}
-            >
-              Back to Home
-            </Button>
+            {!headerBrandInfo.name.includes(appConfig.name) && (
+              <Button
+                sx={{
+                  color: appConfig.styles.secondaryColor,
+                }}
+              >
+                Back to Home
+              </Button>
+            )}
           </Stack>
         </Toolbar>
       </Container>

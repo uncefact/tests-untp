@@ -37,3 +37,21 @@ export function detectDevice(userAgent: string) {
 export function convertBase64ToString(base64: string) {
   return Buffer.from(base64, 'base64').toString('utf8');
 }
+
+export function convertPathToString(path: string) {
+  // Remove leading '/'
+  if (path.startsWith('/')) {
+    path = path.substring(1);
+  }
+
+  // Get the first path segment
+  path = path.split('/')[0];
+
+  // Replace all hyphens with spaces
+  let string = path.replace(/-/g, ' ');
+
+  // Convert to title case
+  string = string.replace(/\b\w/g, (l) => l.toUpperCase());
+
+  return string;
+}
