@@ -26,6 +26,8 @@ import appConfig from '../../constants/app-config.json';
 import { convertStringToPath } from '../../utils';
 import { IStyles } from '../../types/common.types';
 
+type ConfigAppType = typeof appConfig;
+
 const initialHeaderBrandInfo = {
   name: appConfig.name,
   assets: {
@@ -49,6 +51,7 @@ function Header() {
     primaryColor: appConfig.styles.primaryColor,
     secondaryColor: appConfig.styles.secondaryColor,
     tertiaryColor: appConfig.styles.tertiaryColor,
+    menuIconColor: appConfig.styles.menuIconColor,
   });
 
   const toggleDrawer = (newOpen: boolean) => () => {
@@ -107,8 +110,8 @@ function Header() {
     </List>
   );
 
-  const renderSidebarElements = (apps: any[], scanningRoute: string, scanningStyles: IStyles) => {
-    const menuItems = apps.map((app: any) => {
+  const renderSidebarElements = (configApp: ConfigAppType, scanningRoute: string, scanningStyles: IStyles) => {
+    const menuItems = configApp.apps.map((app: any) => {
       const route = `/${convertStringToPath(app.name)}`;
       return <SideBarComponent app={app} route={route} styles={app.styles} />;
     });
@@ -134,7 +137,26 @@ function Header() {
       tertiaryColor: 'black',
     };
 
-    return renderSidebarElements(appConfig.apps, scanningRoute, scanningStyles);
+    return renderSidebarElements(appConfig, scanningRoute, scanningStyles);
+  };
+
+  const renderHeaderText = (appConfig: ConfigAppType, headerTitle: typeof initialHeaderBrandInfo) => {
+    const app = appConfig.apps.find((app) => app.name === headerTitle.name);
+    return (
+      <Typography
+        variant='h5'
+        sx={{
+          color: app ? app.styles.secondaryColor : appConfig.styles.secondaryColor,
+          fontSize: {
+            xs: '20px',
+            md: '24px',
+            lg: '24px',
+          },
+        }}
+      >
+        {headerBrandInfo.name ?? appConfig.name}
+      </Typography>
+    );
   };
 
   return (
@@ -149,7 +171,7 @@ function Header() {
               aria-haspopup='true'
               onClick={toggleDrawer(true)}
             >
-              <MenuIcon sx={{ color: styles.secondaryColor }} />
+              <MenuIcon sx={{ color: styles.menuIconColor }} />
             </IconButton>
 
             <Drawer open={open} onClose={toggleDrawer(false)}>
@@ -193,19 +215,7 @@ function Header() {
               {headerBrandInfo.assets?.logo && (
                 <Avatar sx={{ marginRight: '10px' }} alt='Company logo' src={headerBrandInfo.assets.logo} />
               )}
-              <Typography
-                variant='h5'
-                sx={{
-                  color: appConfig.styles.secondaryColor,
-                  fontSize: {
-                    xs: '20px',
-                    md: '24px',
-                    lg: '24px',
-                  },
-                }}
-              >
-                {headerBrandInfo.name ?? appConfig.name}
-              </Typography>
+              {renderHeaderText(appConfig, headerBrandInfo)}
             </Stack>
           </Box>
 
