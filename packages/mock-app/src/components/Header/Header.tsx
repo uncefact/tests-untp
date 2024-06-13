@@ -48,12 +48,7 @@ function Header() {
 
   const [open, setOpen] = useState(false);
   const [headerBrandInfo, setHeaderBrandInfo] = useState(initialHeaderBrandInfo);
-  const [styles, setStyles] = useState<IStyles>({
-    primaryColor: appConfig.styles.primaryColor,
-    secondaryColor: appConfig.styles.secondaryColor,
-    tertiaryColor: appConfig.styles.tertiaryColor,
-    menuIconColor: appConfig.styles.menuIconColor,
-  });
+  const [styles, setStyles] = useState<IStyles>();
   const [scanningStyles] = useState({
     primaryColor: 'yellow',
     secondaryColor: 'white',
@@ -179,7 +174,7 @@ function Header() {
     navigate(path);
   };
 
-  return (
+  return styles?.primaryColor && styles?.secondaryColor && styles?.tertiaryColor ? (
     <AppBar component='nav' sx={{ background: styles.primaryColor }}>
       <Container maxWidth='xl'>
         <Toolbar disableGutters>
@@ -258,7 +253,7 @@ function Header() {
         </Toolbar>
       </Container>
     </AppBar>
-  );
+  ) : null;
 }
 
 export default Header;
