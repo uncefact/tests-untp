@@ -80,7 +80,8 @@ function Header() {
 
     setStyles(subAppStyles?.styles ?? appConfig.styles);
 
-    if (path === '/') {
+    const defaultHeader = ['/', '/404'];
+    if (defaultHeader.includes(path)) {
       setHeaderBrandInfo(initialHeaderBrandInfo);
       setStyles(appConfig.styles);
     }
