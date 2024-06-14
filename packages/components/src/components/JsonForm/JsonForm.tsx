@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { materialRenderers, materialCells } from '@jsonforms/material-renderers';
 import { JsonForms } from '@jsonforms/react';
+import Ajv2020 from 'ajv/dist/2020';
+import addFormats from 'ajv-formats';
 import { JsonSchema, UISchemaElement } from '@jsonforms/core';
 import { IComponentFunc } from '../../types';
 
@@ -26,6 +28,27 @@ export interface IJsonFormProps extends IComponentFunc {
  */
 export const JsonForm = ({ schema, uiSchema, initialData, onChange, className, ...props }: IJsonFormProps) => {
   const [data, setData] = useState(initialData);
+  const [ajv, setAjv] = useState<Ajv2020>();
+  useEffect(() => {
+    initialise();
+  }, [schema]);
+
+  const initialise = () => {
+    const ajv = new Ajv2020({
+      allErrors: true,
+      strict: false,
+    });
+    addFormats(ajv);
+
+    try {
+      const validate = ajv.compile(schema);
+
+      setAjv(ajv);
+      console.log(validate.errors);
+    } catch (error: any) {
+      console.error(error.message);
+    }
+  };
 
   const handleChange = ({ errors, data }: { errors: any[]; data: any }) => {
     setData(data);
@@ -34,14 +57,17 @@ export const JsonForm = ({ schema, uiSchema, initialData, onChange, className, .
 
   return (
     <div className={className} {...props}>
-      <JsonForms
-        schema={schema}
-        uischema={uiSchema}
-        data={data}
-        renderers={materialRenderers}
-        cells={materialCells}
-        onChange={handleChange}
-      />
+      {ajv ? (
+        <JsonForms
+          ajv={ajv}
+          schema={schema}
+          uischema={uiSchema}
+          data={data}
+          renderers={materialRenderers}
+          cells={materialCells}
+          onChange={handleChange}
+        />
+      ) : null}
     </div>
   );
 };
