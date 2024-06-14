@@ -48,7 +48,7 @@ The UNTP Test Suite is a tool that allows you to test your credentials against t
 
 ## Prerequisites
 
-- Node.js >= v18.17.0
+- Node.js >= v20.12.2
 - Yarn >= 1.22.17
 
 ## Install the dependencies and build the project
@@ -186,10 +186,10 @@ Now, use the `testCredentialsHandler` function in your project and pass the path
 const credentialsFilePath = '/path/to/credentials.json';
 
 testCredentialsHandler(credentialsFilePath)
-  .then(results => {
+  .then((results) => {
     // Handle the test results here
   })
-  .catch(error => {
+  .catch((error) => {
     // Handle any errors here
   });
 ```
@@ -202,16 +202,17 @@ If you want to run UNTP tests with direct credential objects, then you can using
 testCredentialsHandler({
   credentials: [
     {
-      type: "aggregationEvent",
-      version: "v0.0.1",
-      dataPath: "/data/aggregationEvent.json"
+      type: 'aggregationEvent',
+      version: 'v0.0.1',
+      dataPath: '/data/aggregationEvent.json',
     },
     // Add more credentials as needed...
-  ]
-}).then(results => {
+  ],
+})
+  .then((results) => {
     // Handle the test results here
   })
-  .catch(error => {
+  .catch((error) => {
     // Handle any errors here
   });
 ```
@@ -221,15 +222,20 @@ testCredentialsHandler({
 You can run the UNTP test with a credentials object, where the first argument is the credential schema and the second is a test data object.
 
 ```js
-testCredentialHandler({
-  type: 'aggregationEvent', version: 'v0.0.1'},
+testCredentialHandler(
   {
-    'exampleField': 'example data',
+    type: 'aggregationEvent',
+    version: 'v0.0.1',
+  },
+  {
+    exampleField: 'example data',
     // Add more fields as needed...
-  }).then(results => {
+  },
+)
+  .then((results) => {
     // Handle the test results here
   })
-  .catch(error => {
+  .catch((error) => {
     // Handle any errors here
   });
 ```

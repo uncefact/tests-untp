@@ -4,7 +4,7 @@ import { IVerifyResult, VerifiableCredential } from '@vckit/core-types';
 import { useLocation } from 'react-router-dom';
 import { computeEntryHash } from '@veramo/utils';
 import { Status } from '@mock-app/components';
-import { publicAPI } from '@mock-app/services';
+import { publicAPI, privateAPI } from '@mock-app/services';
 import { MessageText } from '../components/MessageText';
 import { LoadingWithText } from '../components/LoadingWithText';
 import { BackButton } from '../components/BackButton';
@@ -88,7 +88,7 @@ const Verify = () => {
   const verifyCredential = async (verifiableCredential: VerifiableCredential) => {
     try {
       const verifyCredentialParams = {
-        verifiableCredential,
+        credential: verifiableCredential,
         fetchRemoteContexts: true,
         policies: {
           credentialStatus: true,
@@ -96,7 +96,8 @@ const Verify = () => {
       };
 
       const verifyServiceUrl = appConfig.defaultVerificationServiceLink.href;
-      const verifiedCredentialResult = await publicAPI.post<IVerifyResult>(verifyServiceUrl, verifyCredentialParams);
+      privateAPI.setBearerTokenAuthorizationHeaders(appConfig.defaultVerificationServiceLink.apiKey ?? '');
+      const verifiedCredentialResult = await privateAPI.post<IVerifyResult>(verifyServiceUrl, verifyCredentialParams);
       showVerifiedCredentialResult(verifiedCredentialResult);
     } catch (error) {
       displayErrorUI();

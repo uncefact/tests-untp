@@ -3,7 +3,8 @@
   "styles": {
     "primaryColor": "rgb(41, 171, 48)",
     "secondaryColor": "black",
-    "tertiaryColor": "black"
+    "tertiaryColor": "black",
+    "menuIconColor": "red"
   },
   "generalFeatures": [
     {
@@ -1303,7 +1304,8 @@
     "title": "Default Verification Service",
     "context": "Default Verification Service",
     "type": "application/json",
-    "href": "https://dlr.example.com/verify",
+    "href": "https://example.com/verify",
+    "apiKey": "",
     "hreflang": ["en"]
   }
 }

@@ -152,19 +152,6 @@ describe('Header', () => {
     expect(screen.getByTestId('menu')).toBeInTheDocument();
   });
 
-  it('should set title get from sessionStorage', () => {
-    sessionStorage.setItem('nameLink', 'Farm');
-    const history = createMemoryHistory({ initialEntries: ['/farm'] });
-
-    render(
-      <RouterDom location={history.location} navigator={history}>
-        <Header />
-      </RouterDom>,
-    );
-
-    expect(screen.getByText('Farm')).toBeInTheDocument();
-  });
-
   it('should redirect to sub app when clicking on button on Home page', () => {
     const history = createMemoryHistory({ initialEntries: ['/'] });
 

@@ -25,4 +25,5 @@ export interface IStyles {
   primaryColor: string;
   secondaryColor: string;
   tertiaryColor: string;
+  menuIconColor?: string;
 }
