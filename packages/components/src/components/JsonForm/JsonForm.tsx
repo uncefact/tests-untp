@@ -9,14 +9,14 @@ import { IComponentFunc } from '../../types';
  * @typedef IRenderJsonSchemaProps
  * @property {Object} schema - The json schema.
  * @property {Object} [uiSchema] - The ui schema.
- * @property {Object} [initialData] - The initial data.
+ * @property {Object} [data] - The initial data.
  * @property {string} [className] - The class name.
  * @property {Function} onChange - The function to be called when the form changes.
  */
 export interface IJsonFormProps extends IComponentFunc {
   schema: JsonSchema;
   uiSchema?: UISchemaElement;
-  initialData?: any;
+  data?: any;
   className?: string;
 }
 
@@ -24,7 +24,7 @@ export interface IJsonFormProps extends IComponentFunc {
  * Receive a json schema and render a form.
  * @returns {React.ReactElement} The rendered component.
  */
-export const JsonForm = ({ schema, uiSchema, initialData, onChange, className, ...props }: IJsonFormProps) => {
+export const JsonForm = ({ schema, uiSchema, data: initialData, onChange, className, ...props }: IJsonFormProps) => {
   const [data, setData] = useState(initialData);
 
   const handleChange = ({ errors, data }: { errors: any[]; data: any }) => {

@@ -50,7 +50,7 @@
 *             },
 *          ],
 *         },
-*         initialData: {},
+*         data: {},
 *         className: '',
 *       },
 *     },
@@ -82,7 +82,13 @@
 import React from 'react';
 import * as services from '@mock-app/services';
 // import * as events from '@mock-app/events';
-import { toastMessage, Status, ComponentType, DynamicComponentRenderer, IDynamicComponentRendererProps } from '@mock-app/components';
+import {
+  toastMessage,
+  Status,
+  ComponentType,
+  DynamicComponentRenderer,
+  IDynamicComponentRendererProps,
+} from '@mock-app/components';
 
 export interface IServiceDefinition {
   name: string;
@@ -140,13 +146,14 @@ export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, ser
             };
             break;
           case ComponentType.Submit:
-            props.onClick = async () => {
+            props.onClick = async (handler: (args: any) => void) => {
               try {
                 const result = await executeServices(services, state);
-                if (!result)  {
-                  return toastMessage({ status: Status.error, message: 'Something went wrong' });  
+                if (!result) {
+                  return toastMessage({ status: Status.error, message: 'Something went wrong' });
                 }
 
+                handler(result);
                 toastMessage({ status: Status.success, message: 'Action Successful' });
               } catch (error: any) {
                 console.log(error.message);

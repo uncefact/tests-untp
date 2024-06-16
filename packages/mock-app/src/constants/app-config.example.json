@@ -379,7 +379,7 @@
                     }
                   }
                 },
-                "initialData": {},
+                "data": {},
                 "className": "json-form",
                 "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
@@ -536,7 +536,7 @@
                     }
                   }
                 },
-                "initialData": {},
+                "data": {},
                 "className": "json-form",
                 "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
@@ -782,7 +782,7 @@
                     }
                   }
                 },
-                "initialData": {},
+                "data": {},
                 "className": "json-form",
                 "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
@@ -939,7 +939,7 @@
                     }
                   }
                 },
-                "initialData": {},
+                "data": {},
                 "className": "json-form",
                 "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
@@ -1050,7 +1050,7 @@
                     }
                   }
                 },
-                "initialData": {},
+                "data": {},
                 "className": "json-form",
                 "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
@@ -1224,7 +1224,7 @@
                   }
                 }
               },
-              "initialData": {},
+              "data": {},
               "className": "json-form",
               "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
             },

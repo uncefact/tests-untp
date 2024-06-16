@@ -55,7 +55,7 @@ describe('render json schema component', () => {
       <JsonForm
         schema={schema}
         uiSchema={uiSchema}
-        initialData={initialData}
+        data={initialData}
         onChange={onChangeJsonSchemaForm}
         className='json-form'
       />,
