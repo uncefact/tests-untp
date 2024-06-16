@@ -1,7 +1,7 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import { issueVC } from '../vckit.service.js';
 import { getStorageServiceLink } from '../storage.service.js';
-import { getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
+import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { IService } from '../types/IService.js';
 import { ITraceabilityEvent, IAggregationEventContext } from './types.js';
 import { generateUUID } from '../utils/helpers.js';
@@ -48,7 +48,7 @@ export const processAggregationEvent: IService = async (
       render: epcisAggregationEvent.renderTemplate,
     },
   });
-  
+
   const aggregationVCLink = await getStorageServiceLink(storage, aggregationVC, `${identifier}/${generateUUID()}`);
 
   await registerLinkResolver(
@@ -56,10 +56,11 @@ export const processAggregationEvent: IService = async (
     epcisAggregationEvent.dlrIdentificationKeyType,
     identifier,
     epcisAggregationEvent.dlrLinkTitle,
+    LinkType.epcisLinkType,
     epcisAggregationEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
-    qualifierPath
+    qualifierPath,
   );
 
   return aggregationVC;

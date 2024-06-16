@@ -3,7 +3,7 @@ import _ from 'lodash';
 
 import { issueVC } from '../vckit.service.js';
 import { getStorageServiceLink } from '../storage.service.js';
-import { getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
+import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { epcisTransformationCrendentialSubject } from '../epcis.service.js';
 import { buildDPPCredentialSubject } from '../dpp.service.js';
 
@@ -27,7 +27,7 @@ import { StorageServiceConfig } from '../types/storage.js';
  * @param context - context for the transformation event
  */
 export const processTransformationEvent: IService = async (data: any, context: ITransformationEvent): Promise<any> => {
-  try {    
+  try {
     const validationResult = validateContextTransformationEvent(context);
     if (!validationResult.ok) throw new Error(validationResult.value);
 
@@ -67,6 +67,7 @@ export const processTransformationEvent: IService = async (data: any, context: I
           epcisTransformationEventContext.dlrIdentificationKeyType,
           identifier,
           epcisTransformationEventContext.dlrLinkTitle,
+          LinkType.epcisLinkType,
           epcisTransformationEventContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,
@@ -88,6 +89,7 @@ export const processTransformationEvent: IService = async (data: any, context: I
           dppContext.dlrIdentificationKeyType,
           identifier,
           dppContext.dlrLinkTitle,
+          LinkType.certificationLinkType,
           dppContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,
@@ -145,7 +147,7 @@ export const issueEpcisTransformationEvent = async (
  * @param storageContext - context for the storage to upload the verifiable credential
  * @returns string - url of the uploaded verifiable credential
  */
-export const uploadVC = async (path: string, vc: VerifiableCredential, storageContext: StorageServiceConfig) => {  
+export const uploadVC = async (path: string, vc: VerifiableCredential, storageContext: StorageServiceConfig) => {
   const result = await getStorageServiceLink(storageContext, vc, path);
   return result;
 };

@@ -5,14 +5,14 @@ import { ITraceabilityEvent, ITransactionEventContext } from './types.js';
 import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { getStorageServiceLink } from '../storage.service.js';
 import { generateUUID } from '../utils/helpers.js';
-import { getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
+import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { validateTransactionEventContext } from './validateContext.js';
 import { EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
 
 export const processTransactionEvent: IService = async (
   transactionEvent: ITraceabilityEvent,
   context: ITransactionEventContext,
-): Promise<VerifiableCredential> => {
+): Promise<any> => {
   const validationResult = validateTransactionEventContext(context);
   if (!validationResult.ok) {
     throw new Error(validationResult.value);
@@ -50,16 +50,18 @@ export const processTransactionEvent: IService = async (
 
   const vcUrl = await getStorageServiceLink(storage, vc, `${identifier}/${generateUUID()}`);
 
-  await registerLinkResolver(
+  const linkResolver = await registerLinkResolver(
     vcUrl,
     epcisTransactionEvent.dlrIdentificationKeyType,
     identifier,
     epcisTransactionEvent.dlrLinkTitle,
+    LinkType.epcisLinkType,
     epcisTransactionEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
-    qualifierPath
+    qualifierPath,
+    LinkType.epcisLinkType,
   );
 
-  return vc;
+  return { vc, linkResolver };
 };

@@ -6,7 +6,7 @@ import { generateUUID } from '../utils/helpers.js';
 
 import { getStorageServiceLink } from '../storage.service.js';
 import { issueVC } from '../vckit.service.js';
-import { getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
+import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { validateContextObjectEvent } from './validateContext.js';
 
 /**
@@ -17,20 +17,21 @@ import { validateContextObjectEvent } from './validateContext.js';
  */
 export const processObjectEvent: IService = async (data: any, context: IContext): Promise<any> => {
   try {
+    const credentialSubject = data.data;
     const validationResult = validateContextObjectEvent(context);
     if (!validationResult.ok) throw new Error(validationResult.value);
 
-    const objectIdentifier = getIdentifierByObjectKeyPaths(data.data, context.identifierKeyPaths);
+    const objectIdentifier = getIdentifierByObjectKeyPaths(credentialSubject, context.identifierKeyPaths);
     if (!objectIdentifier) throw new Error('Identifier not found');
 
     const { identifier, qualifierPath } = getLinkResolverIdentifier(objectIdentifier);
 
     const vckitContext = context.vckit;
     const dppContext = context.dpp;
-    const restOfVC = { render: dppContext?.renderTemplate ?? [] };    
+    const restOfVC = { render: dppContext?.renderTemplate ?? [] };
     const vc: VerifiableCredential = await issueVC({
       context: dppContext.context,
-      credentialSubject: {itemList: [{ itemID: `${context.dlr.dlrAPIUrl}/${context.dpp.dlrIdentificationKeyType}/${identifier}${qualifierPath}` }]},
+      credentialSubject,
       issuer: vckitContext.issuer,
       type: [...dppContext.type],
       vcKitAPIUrl: vckitContext.vckitAPIUrl,
@@ -40,20 +41,21 @@ export const processObjectEvent: IService = async (data: any, context: IContext)
     const storageContext = context.storage;
     const vcUrl = await getStorageServiceLink(storageContext, vc, `${identifier}/${generateUUID()}`);
 
-
     const linkResolverContext = context.dlr;
-    await registerLinkResolver(
+    const linkResolver = await registerLinkResolver(
       vcUrl,
       dppContext.dlrIdentificationKeyType,
       identifier,
       dppContext.dlrLinkTitle,
+      LinkType.certificationLinkType,
       dppContext.dlrVerificationPage,
       linkResolverContext.dlrAPIUrl,
       linkResolverContext.dlrAPIKey,
-      qualifierPath
+      qualifierPath,
+      LinkType.certificationLinkType,
     );
 
-    return vc;
+    return { vc, linkResolver };
   } catch (error: any) {
     throw new Error(error.message ?? 'Error processing object event');
   }
