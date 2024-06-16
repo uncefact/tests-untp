@@ -73,15 +73,15 @@ export function createNestedObject(keys: string[], data: any) {
 }
 
 /**
- * Define the path to access the credential or the link to the credential within the API response
- * @param apiResp API response data
- * @param path Path to the credential or the link to the credential within the API response
- * @returns The credential or the link to the credential within the API response
+ * Define the path to access the value in the nested object
+ * @param data
+ * @param path path to the value in the nested object
+ * @returns the value in the nested object
  */
-export const getStorageUrlByPath = (apiResp: any, path: string) => {
+export const getValueByPath = (data: any, path: string) => {
   if (_.isNil(path)) {
     throw new Error('Invalid result path');
   }
 
-  return JSONPointer.get(apiResp, path);
+  return JSONPointer.get(data, path);
 };

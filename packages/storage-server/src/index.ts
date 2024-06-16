@@ -19,7 +19,7 @@ app.use(express.json());
 
 // Upload JSON data to a file in the uploads directory
 app.post('/upload', (req, res) => {
-  const inputPath: string = req.body.path;
+  const inputPath: string = req.body.filename;
   const data = req.body.data;
   if (!path || !data) {
     return res.status(400).json({ message: 'Both filePath and jsonData are required' });
@@ -35,7 +35,7 @@ app.post('/upload', (req, res) => {
     // Write JSON data to file
     fs.writeFileSync(filePath, JSON.stringify(data));
     res.status(200).json({
-      url: `http://${host}/${req.body.path as string}`,
+      url: `http://${host}/${inputPath}`,
     });
   } catch (error: any) {
     res.status(500).json({ message: `Error storing data: ${error.message as string}` });
