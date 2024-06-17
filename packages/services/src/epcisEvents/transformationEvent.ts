@@ -17,7 +17,6 @@ import {
   IVCKitContext,
 } from './types';
 import { generateUUID, incrementQuality } from '../utils/helpers.js';
-import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { validateContextTransformationEvent } from './validateContext.js';
 import { StorageServiceConfig } from '../types/storage.js';
 
@@ -36,7 +35,6 @@ export const processTransformationEvent: IService = async (data: any, context: I
     const vcKitContext = context.vckit;
     const productTransformation = context.productTransformation;
     const identifierKeyPathsContext = context.identifierKeyPaths;
-    const inputIdentifiers = getIdentifierByObjectKeyPaths(data.data, identifierKeyPathsContext) as string[];
     if (!inputIdentifiers) throw new Error('Input Identifiers not found');
 
     const epcisVc = await issueEpcisTransformationEvent(

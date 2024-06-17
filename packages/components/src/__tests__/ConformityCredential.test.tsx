@@ -2,8 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { act } from 'react-dom/test-utils';
 import { ConformityCredential } from '../components';
 import { FetchOptions } from '../types/conformityCredential.types';
-import { getJsonDataFromConformityAPI, getStorageServiceLink } from '@mock-app/services';
-import { checkStoredCredentialsConfig, getCredentialByPath } from '../components/ConformityCredential/utils';
+import { getJsonDataFromConformityAPI, getStorageServiceLink, getValueByPath } from '@mock-app/services';
+import { checkStoredCredentialsConfig } from '../components/ConformityCredential/utils';
 
 jest.mock('@mock-app/services', () => ({
   getStorageServiceLink: jest.fn(),
@@ -18,7 +18,7 @@ jest.mock('../components/ToastMessage/ToastMessage', () => ({
 }));
 
 jest.mock('../components/ConformityCredential/utils', () => ({
-  getCredentialByPath: jest.fn(),
+  getValueByPath: jest.fn(),
   checkStoredCredentialsConfig: jest.fn(),
 }));
 
@@ -90,7 +90,7 @@ describe('ConformityCredential', () => {
     it('should save credential as string when trigger onClickStorageCredential function', async () => {
       const url = 'https://example.com/credential';
       (getJsonDataFromConformityAPI as jest.Mock).mockResolvedValue(url);
-      (getCredentialByPath as jest.Mock).mockReturnValue(url);
+      (getValueByPath as jest.Mock).mockReturnValue(url);
 
       await act(async () => {
         render(
@@ -133,7 +133,7 @@ describe('ConformityCredential', () => {
       };
 
       (getJsonDataFromConformityAPI as jest.Mock).mockResolvedValue(apiResp);
-      (getCredentialByPath as jest.Mock).mockReturnValue(apiResp);
+      (getValueByPath as jest.Mock).mockReturnValue(apiResp);
       (checkStoredCredentialsConfig as jest.Mock).mockReturnValue({ ok: true, value: '' });
       (getStorageServiceLink as jest.Mock).mockResolvedValue('https://storage.example.com/credential');
 
@@ -190,7 +190,7 @@ describe('ConformityCredential', () => {
 
     it('should throw error when extract the credentials from API response after triggering onClickStorageCredential function', async () => {
       JSON.parse = jest.fn().mockReturnValue('string');
-      (getCredentialByPath as jest.Mock).mockReturnValue(null);
+      (getValueByPath as jest.Mock).mockReturnValue(null);
 
       await act(async () => {
         render(
@@ -231,7 +231,7 @@ describe('ConformityCredential', () => {
       };
 
       (getJsonDataFromConformityAPI as jest.Mock).mockResolvedValue(apiResp);
-      (getCredentialByPath as jest.Mock).mockReturnValue(apiResp);
+      (getValueByPath as jest.Mock).mockReturnValue(apiResp);
       (checkStoredCredentialsConfig as jest.Mock).mockReturnValue({
         ok: false,
         value: 'Invalid upload credential config',
@@ -244,7 +244,7 @@ describe('ConformityCredential', () => {
             storedCredentialsConfig={{
               url: '',
               //@ts-ignore
-              params:{},
+              params: {},
             }}
           />,
         );
@@ -281,7 +281,7 @@ describe('ConformityCredential', () => {
     it('should throw error when data from API is not a url', async () => {
       const url = 'https://';
       (getJsonDataFromConformityAPI as jest.Mock).mockResolvedValue(url);
-      (getCredentialByPath as jest.Mock).mockReturnValue(url);
+      (getValueByPath as jest.Mock).mockReturnValue(url);
 
       await act(async () => {
         render(

@@ -5,10 +5,11 @@ import {
   DynamicComponentRenderer,
   IDynamicComponentRendererProps,
 } from '../DynamicComponentRenderer/DynamicComponentRenderer.js';
+import { getValueByPath } from '@mock-app/services/build/utils/index.js';
 
 export interface IRenderCheckList {
   checkBoxLabel?: string;
-  requiredFields: string[];
+  requiredFieldPath: string;
   nestedComponents: IDynamicComponentRendererProps[];
   onChange: (data: any) => void;
 }
@@ -18,20 +19,8 @@ export enum AllowNestedComponent {
   QRCodeScannerDialogButton = 'QRCodeScannerDialogButton',
 }
 
-export const RenderCheckList = ({ checkBoxLabel, requiredFields, onChange, nestedComponents }: IRenderCheckList) => {
+export const RenderCheckList = ({ checkBoxLabel, requiredFieldPath, onChange, nestedComponents }: IRenderCheckList) => {
   const [checkBoxes, setCheckBoxes] = useState<ICheckBoxes>({});
-
-  const getRequiredFieldValue = (jsonData: any, requiredFields: string[]): string | null => {
-    let requiredFieldValue = jsonData;
-    for (const requiredField of requiredFields) {
-      if (!requiredFieldValue[requiredField]) {
-        return null;
-      }
-      requiredFieldValue = requiredFieldValue[requiredField];
-    }
-
-    return requiredFieldValue;
-  };
 
   const handleOnChange = (data: object | object[]) => {
     if (!Array.isArray(data) && typeof data !== 'object') {
@@ -47,15 +36,15 @@ export const RenderCheckList = ({ checkBoxLabel, requiredFields, onChange, neste
     }
 
     const validItems = uploadedFiles.reduce((acc, item) => {
-      const requiredFieldValue = getRequiredFieldValue(item, requiredFields);
+      const requiredFieldValue = getValueByPath(item, requiredFieldPath);
       if (!requiredFieldValue) {
         return acc;
       }
 
-      return {...acc, [requiredFieldValue]: item};
+      return { ...acc, [requiredFieldValue]: item };
     }, {});
 
-    return setCheckBoxes((prev) => ({...prev, ...validItems}));
+    return setCheckBoxes((prev) => ({ ...prev, ...validItems }));
   };
 
   const renderDynamicComponent = () => {
@@ -63,20 +52,13 @@ export const RenderCheckList = ({ checkBoxLabel, requiredFields, onChange, neste
       if (!(Object.values(AllowNestedComponent) as string[]).includes(component.name)) {
         return null;
       }
-  
+
       const props = {
         ...component.props,
         onChange: component.type === 'EntryData' ? handleOnChange : undefined,
       };
-  
-      return (
-        <DynamicComponentRenderer
-          key={index}
-          name={component.name}
-          type={component.type}
-          props={props}
-        />
-      );
+
+      return <DynamicComponentRenderer key={index} name={component.name} type={component.type} props={props} />;
     });
   };
 
@@ -91,7 +73,6 @@ export const RenderCheckList = ({ checkBoxLabel, requiredFields, onChange, neste
   return (
     <Box
       sx={{
-        paddingTop: '95px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',

@@ -5,9 +5,9 @@ import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../li
 import { IService } from '../types/IService.js';
 import { ITraceabilityEvent, IAggregationEventContext } from './types.js';
 import { generateUUID } from '../utils/helpers.js';
-import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { validateAggregationEventContext } from './validateContext.js';
 import { EPCISBusinessStepCode, EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
+import JSONPointer from 'jsonpointer';
 
 export const processAggregationEvent: IService = async (
   aggregationEvent: ITraceabilityEvent,
@@ -18,8 +18,8 @@ export const processAggregationEvent: IService = async (
     throw new Error(validationResult.value);
   }
 
-  const { vckit, epcisAggregationEvent, dlr, storage, identifierKeyPaths } = context;
-  const parentIdentifier = getIdentifierByObjectKeyPaths(aggregationEvent.data, identifierKeyPaths);
+  const { vckit, epcisAggregationEvent, dlr, storage, identifierKeyPath } = context;
+  const parentIdentifier = JSONPointer.get(aggregationEvent.data, identifierKeyPath);
   if (!parentIdentifier) {
     throw new Error('Identifier not found');
   }

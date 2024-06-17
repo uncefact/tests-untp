@@ -1,13 +1,13 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import { IService } from '../types/index.js';
 import { IContext } from './types.js';
-import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { generateUUID } from '../utils/helpers.js';
 
 import { getStorageServiceLink } from '../storage.service.js';
 import { issueVC } from '../vckit.service.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { validateContextObjectEvent } from './validateContext.js';
+import JSONPointer from 'jsonpointer';
 
 /**
  * Process object event, issue VC, upload to storage and register link resolver
@@ -21,7 +21,7 @@ export const processObjectEvent: IService = async (data: any, context: IContext)
     const validationResult = validateContextObjectEvent(context);
     if (!validationResult.ok) throw new Error(validationResult.value);
 
-    const objectIdentifier = getIdentifierByObjectKeyPaths(credentialSubject, context.identifierKeyPaths);
+    const objectIdentifier = JSONPointer.get(credentialSubject, context.identifierKeyPath);
     if (!objectIdentifier) throw new Error('Identifier not found');
 
     const { identifier, qualifierPath } = getLinkResolverIdentifier(objectIdentifier);

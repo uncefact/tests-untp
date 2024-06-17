@@ -2,12 +2,12 @@ import { VerifiableCredential } from '@vckit/core-types';
 import { IService } from '../types/index.js';
 import { issueVC } from '../vckit.service.js';
 import { ITraceabilityEvent, ITransactionEventContext } from './types.js';
-import { getIdentifierByObjectKeyPaths } from './helpers.js';
 import { getStorageServiceLink } from '../storage.service.js';
 import { generateUUID } from '../utils/helpers.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { validateTransactionEventContext } from './validateContext.js';
 import { EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
+import JSONPointer from 'jsonpointer';
 
 export const processTransactionEvent: IService = async (
   transactionEvent: ITraceabilityEvent,
@@ -18,8 +18,8 @@ export const processTransactionEvent: IService = async (
     throw new Error(validationResult.value);
   }
 
-  const { vckit, epcisTransactionEvent, dlr, storage, identifierKeyPaths } = context;
-  const transactionIdentifier = getIdentifierByObjectKeyPaths(transactionEvent.data, identifierKeyPaths);
+  const { vckit, epcisTransactionEvent, dlr, storage, identifierKeyPath } = context;
+  const transactionIdentifier = JSONPointer.get(transactionEvent.data, identifierKeyPath);
   if (!transactionIdentifier) {
     throw new Error('Identifier not found');
   }
