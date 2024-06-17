@@ -6,7 +6,6 @@ import { getStorageServiceLink } from '../storage.service.js';
 import { generateUUID } from '../utils/helpers.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { validateTransactionEventContext } from './validateContext.js';
-import { EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
 import JSONPointer from 'jsonpointer';
 
 export const processTransactionEvent: IService = async (
@@ -25,20 +24,9 @@ export const processTransactionEvent: IService = async (
   }
 
   const { identifier, qualifierPath } = getLinkResolverIdentifier(transactionIdentifier);
-  transactionEvent.data.transaction.identifier = identifier;
 
-  const credentialSubject = {
-    ...transactionEvent.data,
-    eventID: generateUUID(),
-    eventType: EPCISEventType.Transaction,
-    eventTime: new Date().toISOString(),
-    actionCode: EPCISEventAction.Observe,
-    dispositionCode: EPCISEventDisposition.InTransit,
-    businessStepCode: generateUUID(),
-    readPointId: generateUUID(),
-  };
   const vc: VerifiableCredential = await issueVC({
-    credentialSubject,
+    credentialSubject: transactionEvent.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
     issuer: vckit.issuer,
     context: epcisTransactionEvent.context,

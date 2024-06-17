@@ -3,22 +3,27 @@ import _ from 'lodash';
 
 import { issueVC } from '../vckit.service.js';
 import { getStorageServiceLink } from '../storage.service.js';
-import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
-import { epcisTransformationCrendentialSubject } from '../epcis.service.js';
-import { buildDPPCredentialSubject } from '../dpp.service.js';
+import {
+  IdentificationKeyType,
+  LinkType,
+  getLinkResolverIdentifier,
+  registerLinkResolver,
+} from '../linkResolver.service.js';
 
 import { IService } from '../types/IService.js';
+import { IConfigDLR, ICredential, IEntityIssue, ITransformationEvent, IVCKitContext } from './types';
 import {
-  IConfigDLR,
-  ICredential,
-  IEntityIssue,
-  IProductTransformation,
-  ITransformationEvent,
-  IVCKitContext,
-} from './types';
-import { generateUUID, incrementQuality } from '../utils/helpers.js';
+  IConstructObjectParameters,
+  allowedIndexKeys,
+  constructObject,
+  generateCurrentDatetime,
+  generateUUID,
+  randomIntegerString,
+} from '../utils/helpers.js';
+import { generateLinkResolver } from './helpers.js';
 import { validateContextTransformationEvent } from './validateContext.js';
 import { StorageServiceConfig } from '../types/storage.js';
+import JSONPointer from 'jsonpointer';
 
 /**
  * Process transformation event, issue epcis transformation event and dpp for each identifiers, then upload to storage and register link resolver for each dpp
@@ -33,16 +38,14 @@ export const processTransformationEvent: IService = async (data: any, context: I
     const epcisTransformationEventContext = context.epcisTransformationEvent;
     const dlrContext = context.dlr;
     const vcKitContext = context.vckit;
-    const productTransformation = context.productTransformation;
-    const identifierKeyPathsContext = context.identifierKeyPaths;
-    if (!inputIdentifiers) throw new Error('Input Identifiers not found');
+    const transformationEventCredential = context.transformationEventCredential;
 
     const epcisVc = await issueEpcisTransformationEvent(
       vcKitContext,
       epcisTransformationEventContext,
       dlrContext,
-      productTransformation,
-      inputIdentifiers,
+      transformationEventCredential,
+      data,
     );
 
     const storageContext = context.storage;
@@ -53,34 +56,45 @@ export const processTransformationEvent: IService = async (data: any, context: I
     );
 
     const dppContext = context.dpp;
-    const detailOfOutputProducts = productTransformation.outputItems;
-    if (!detailOfOutputProducts) throw new Error('Output Items not found');
 
+    const dppCredentials = context.dppCredentials;
+    if (!dppCredentials) throw new Error('Output Items not found');
+
+    const identifierPath = context.identifierKeyPath;
+    const pathIndex = identifierPath.split('/').findIndex((key) => allowedIndexKeys.includes(key));
     await Promise.all(
-      detailOfOutputProducts.map(async (outputItem: any) => {
-        const { identifier, qualifierPath } = getLinkResolverIdentifier(outputItem.productID);
+      dppCredentials.map(async (dppCredential, index) => {
+        const headPath = identifierPath.split('/').slice(0, pathIndex).join('/');
+        const tailPath = identifierPath
+          .split('/')
+          .slice(pathIndex + 1)
+          .join('/');
+
+        const productID = JSONPointer.get(epcisVc, `${headPath}/${index}/${tailPath}`);
+        const { identifier: transformationEventIdentifier, qualifierPath: transformationEventQualifierPath } =
+          getLinkResolverIdentifier(`${productID as string}21${randomIntegerString(9)}`);
 
         const transformationEventLinkResolver = await registerLinkResolver(
           transformantionEventLink,
           epcisTransformationEventContext.dlrIdentificationKeyType,
-          identifier,
+          transformationEventIdentifier,
           epcisTransformationEventContext.dlrLinkTitle,
           LinkType.epcisLinkType,
           epcisTransformationEventContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,
-          qualifierPath,
+          transformationEventQualifierPath,
+          LinkType.epcisLinkType,
         );
 
-        const dpp = await issueDPP(
-          vcKitContext,
-          dppContext,
-          inputIdentifiers?.length,
-          transformationEventLinkResolver,
-          data,
-          outputItem,
-        );
-        const DPPLink = await uploadVC(`${outputItem.productID as string}/${generateUUID()}`, dpp, storageContext);
+        const transformationEventData = {
+          vc: epcisVc,
+          linkResolver: transformationEventLinkResolver,
+        };
+
+        const dpp = await issueDPP(vcKitContext, dppContext, dppCredential, transformationEventData);
+        const DPPLink = await uploadVC(`${productID as string}/${generateUUID()}`, dpp, storageContext);
+        const { identifier, qualifierPath } = getLinkResolverIdentifier(productID);
 
         await registerLinkResolver(
           DPPLink,
@@ -115,20 +129,29 @@ export const issueEpcisTransformationEvent = async (
   vcKitContext: IVCKitContext,
   epcisTransformationEvent: IEntityIssue,
   dlrContext: IConfigDLR,
-  productTransformation: IProductTransformation,
-  inputIdentifiers: string[],
+  transformationEventCredential: any,
+  data: any,
 ) => {
   const restOfVC = { render: epcisTransformationEvent.renderTemplate };
+  const values = Object.values(data);
+
+  const credentialSubject: any = values.reduce((acc, item, index) => {
+    return constructObject(acc, item, transformationEventCredential, index, {
+      handlers: {
+        generateLinkResolver: generateLinkResolver(
+          dlrContext.dlrAPIUrl,
+          IdentificationKeyType.gtin,
+          `linkType=${LinkType.certificationLinkType}`,
+        ),
+        generateCurrentDatetime,
+        generateUUID,
+      },
+    });
+  }, {});
 
   const epcisVc: VerifiableCredential = await issueVC({
     context: epcisTransformationEvent.context,
-    credentialSubject: epcisTransformationCrendentialSubject(
-      inputIdentifiers.map((item: any) => item),
-
-      dlrContext.dlrAPIUrl,
-      productTransformation,
-      epcisTransformationEvent.dlrIdentificationKeyType,
-    ),
+    credentialSubject,
     issuer: vcKitContext.issuer,
     type: [...epcisTransformationEvent.type],
     vcKitAPIUrl: vcKitContext.vckitAPIUrl,
@@ -163,23 +186,18 @@ export const uploadVC = async (path: string, vc: VerifiableCredential, storageCo
 export const issueDPP = async (
   vcKitContext: IVCKitContext,
   dppContext: ICredential,
-  numberOfItems: number,
-  linkEpcis: string,
-  data: any,
-  outputItem: any,
+  dppCredential: IConstructObjectParameters,
+  transformationEventData: { vc: VerifiableCredential; linkResolver: string },
 ) => {
   const restOfVC = { render: dppContext.renderTemplate };
 
-  const mappingProductQuality = incrementQuality(outputItem, numberOfItems);
-  const mergeProductItem = _.merge({}, mappingProductQuality, data.data);
-
-  const credentialSubject = buildDPPCredentialSubject({ productItem: mergeProductItem, linkEpcis });
+  const dppCredentialSubject = constructObject({}, transformationEventData, dppCredential);
   const result: VerifiableCredential = await issueVC({
     context: dppContext.context,
     issuer: vcKitContext.issuer,
     type: dppContext.type,
     vcKitAPIUrl: vcKitContext.vckitAPIUrl,
-    credentialSubject,
+    credentialSubject: dppCredentialSubject,
     restOfVC,
   });
 
