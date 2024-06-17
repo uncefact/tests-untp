@@ -7,8 +7,8 @@ import { getValueByPath } from '../utils/helpers.js';
  */
 export const saveToLocalStorage = (data: any, parameters: any) => {
   try {
-    const { key } = parameters;
-    localStorage.setItem(key, JSON.stringify(data));
+    const { storageKey } = parameters;
+    localStorage.setItem(storageKey, JSON.stringify(data));
   } catch (error: any) {
     console.error(error);
     throw new Error(error.message);
