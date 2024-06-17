@@ -122,13 +122,14 @@ export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, ser
   const props: Record<string, any> = {};
 
   const executeServices = async (services: IServiceDefinition[], parameters: any[]) => {
-    return services.reduce(async (previousResult: any[] | Promise<any[]>, currentService) => {
+    const [result] = await services.reduce(async (previousResult: any[] | Promise<any[]>, currentService) => {
       const prevResult = await previousResult;
       const service: any = getService(currentService.name);
       const params = [...prevResult, ...currentService.parameters];
       const result: any = await service(...params);
       return [result];
     }, parameters);
+    return result;
   };
 
   return (
@@ -149,9 +150,6 @@ export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, ser
             props.onClick = async (handler: (args: any) => void) => {
               try {
                 const result = await executeServices(services, state);
-                if (!result) {
-                  return toastMessage({ status: Status.error, message: 'Something went wrong' });
-                }
 
                 handler(result);
                 toastMessage({ status: Status.success, message: 'Action Successful' });
