@@ -4,19 +4,14 @@ import {
   IDynamicComponentRendererProps,
 } from '../DynamicComponentRenderer/DynamicComponentRenderer.js';
 import { Box } from '@mui/material';
-import JSONPointer from 'jsonpointer';
-
-interface IMappingField {
-  sourcePath: string;
-  destinationPath: string;
-}
+import { IConstructObjectParameters, constructObject, genericHandlerFunctions } from '@mock-app/services';
 
 export interface ILocalStorageLoaderProps {
   onChange: (data: any) => void;
   storageKey: string;
   nestedComponents: Array<
     IDynamicComponentRendererProps & {
-      constructData?: IMappingField[];
+      constructData?: IConstructObjectParameters;
     }
   >;
 }
@@ -25,7 +20,6 @@ enum AllowNestedComponent {
   CheckBoxList = 'CheckBoxList',
   JsonForm = 'JsonForm',
 }
-const allowedIndexKeys = ['i', 'index'];
 
 /**
  * LocalStorageLoader component that will load data from local storage and pass it to nested components
@@ -39,23 +33,53 @@ const allowedIndexKeys = ['i', 'index'];
         "name": "JsonForm",
         "type": "EntryData",
         "props": {},
-        "constructData": [
-          {
-            "sourcePath": "/vc/credentialSubject/product/itemIdentifiers/0/identifierValue",
-            "destinationPath": "/itemList/index/name"
-          },
-          {
-            "sourcePath": "/linkResolver",
-            "destinationPath": "/itemList/index/itemID"
-          }
-        ]
+        "constructData": {
+          "mappingFields": [
+            {
+              "sourcePath": "/vc/credentialSubject/product/itemIdentifiers/0/identifierValue",
+              "destinationPath": "/transaction/identifier"
+            },
+            {
+              "sourcePath": "/vc/credentialSubject/product/itemIdentifiers/0/identifierValue",
+              "destinationPath": "/itemList/index/name"
+            },
+            {
+              "sourcePath": "/linkResolver",
+              "destinationPath": "/itemList/index/itemID"
+            }
+          ],
+          "dummyFields": [
+            {
+              "path": "/eventType",
+              "data": "transaction"
+            },
+            {
+              "path": "/actionCode",
+              "data": "observe"
+            }
+          ],
+          "generationFields": [
+            {
+              "path": "/transaction/identifier",
+              "handler": "generateIdWithSerialNumber"
+            },
+            {
+              "path": "/eventTime",
+              "handler": "generateCurrentDatetime"
+            },
+            {
+              "path": "/eventID",
+              "handler": "generateUUID"
+            }
+          ]
+        }
       }
  *  ],
  * 
  * <LocalStorageLoader onChange={onChange} storageKey="key" nestedComponents={nestedComponents} />
  * 
- * With above example, constructData will be used to map the data from local storage to the nested component with the given sourcePath and destinationPath.
- * The result of the mapping will be merge with the props.data of the nested component, and the result of mapping will be {itemList: [{name: 'valueOfIdentifierValue', itemID: 'valueOfLinkResolver'}]
+ * With above example, constructData will be used to map, set and generate the data from local storage to the nested component.
+ * The result of the mapping will be merged with the props.data of the nested component.
  */
 
 export const LocalStorageLoader = ({ onChange, storageKey, nestedComponents }: ILocalStorageLoaderProps) => {
@@ -76,20 +100,10 @@ export const LocalStorageLoader = ({ onChange, storageKey, nestedComponents }: I
       let componentData = component.props.data || {};
 
       const values: any[] = Object.values(data);
-      if (component.constructData && component.constructData.length > 0) {
-        values.forEach((value, index) => {
-          component.constructData?.forEach(({ sourcePath, destinationPath }) => {
-            const destinationIndex = destinationPath.split('/').findIndex((key) => allowedIndexKeys.includes(key));
-            const headDestinationPath = destinationPath.split('/').slice(0, destinationIndex).join('/');
-            const tailDestinationPath = destinationPath
-              .split('/')
-              .slice(destinationIndex + 1)
-              .join('/');
-
-            const sourceValue = JSONPointer.get(value, sourcePath);
-            JSONPointer.set(componentData, `${headDestinationPath}/${index}/${tailDestinationPath}`, sourceValue);
-          });
-        });
+      if (component.constructData) {
+        componentData = values.reduce((acc, value, index) => {
+          return constructObject(acc, value, component.constructData!, index, { handlers: genericHandlerFunctions });
+        }, componentData);
       } else {
         componentData = { ...componentData, ...data };
       }
