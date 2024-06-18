@@ -344,3 +344,13 @@ export const getLinkResolverIdentifier = (elementString: string): { identifier: 
     qualifierPath,
   };
 };
+
+export const buildElementString = (ai: any) => {
+  const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
+  return gs1DigitalLinkToolkit.buildGS1elementStrings(ai);
+};
+
+export const extractFromElementString = (elementString: string) => {
+  const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
+  return gs1DigitalLinkToolkit.extractFromGS1elementStrings(elementString);
+};
