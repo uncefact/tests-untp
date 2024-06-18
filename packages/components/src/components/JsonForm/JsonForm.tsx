@@ -1,20 +1,24 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { ToastContainer, toast } from 'react-toastify';
 import { materialRenderers, materialCells } from '@jsonforms/material-renderers';
 import { JsonForms } from '@jsonforms/react';
 import { JsonSchema, UISchemaElement } from '@jsonforms/core';
+import { CircularProgress } from '@mui/material';
+
 import { IComponentFunc } from '../../types';
+import { createAjv } from '../../utils/ajv.js';
 
 /**
  * The props for the JsonForm component
  * @typedef IRenderJsonSchemaProps
- * @property {Object} schema - The json schema.
+ * @property {JsonSchema | { url: string }} schema - The json schema should be an object or an object with a url property.
  * @property {Object} [uiSchema] - The ui schema.
  * @property {Object} [data] - The initial data.
  * @property {string} [className] - The class name.
  * @property {Function} onChange - The function to be called when the form changes.
  */
 export interface IJsonFormProps extends IComponentFunc {
-  schema: JsonSchema;
+  schema: JsonSchema | { url: string };
   uiSchema?: UISchemaElement;
   data?: any;
   className?: string;
@@ -26,22 +30,62 @@ export interface IJsonFormProps extends IComponentFunc {
  */
 export const JsonForm = ({ schema, uiSchema, data: initialData, onChange, className, ...props }: IJsonFormProps) => {
   const [data, setData] = useState(initialData);
+  const [schemaInfo, setSchemaInfo] = useState<JsonSchema>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const ajv = createAjv();
 
   const handleChange = ({ errors, data }: { errors: any[]; data: any }) => {
     setData(data);
     errors.length > 0 ? onChange({ data, errors }) : onChange({ data });
   };
 
+  /**
+   * Detect the schema and set the schema info, if the schema is an object with a url property, fetch the schema.
+   * @returns {Promise<void>} The detected schema.
+   */
+  const detectSchema = async () => {
+    setIsLoading(true);
+    try {
+      if ((schema as { url: string }).hasOwnProperty('url')) {
+        const response = await fetch((schema as { url: string }).url);
+        const data = await response.json();
+        if (data) {
+          setSchemaInfo(data as JsonSchema);
+        }
+      } else {
+        setSchemaInfo(schema as JsonSchema);
+      }
+    } catch (error) {
+      toast.error('Error setup schema');
+      console.error('Error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    detectSchema();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className={className} {...props}>
-      <JsonForms
-        schema={schema}
-        uischema={uiSchema}
-        data={data}
-        renderers={materialRenderers}
-        cells={materialCells}
-        onChange={handleChange}
-      />
+      {isLoading ? (
+        <section style={{ textAlign: 'center' }}>
+          <CircularProgress />
+        </section>
+      ) : (
+        <JsonForms
+          ajv={ajv}
+          schema={schemaInfo}
+          uischema={uiSchema}
+          data={data}
+          renderers={materialRenderers}
+          cells={materialCells}
+          onChange={handleChange}
+        />
+      )}
+      <ToastContainer />
     </div>
   );
 };
