@@ -492,7 +492,13 @@
             {
               "name": "CustomButton",
               "type": "Submit",
-              "props": {}
+              "props": {
+                "label": "Processor",
+                "btnStyle": {
+                  "backgroundColor": "rgb(255, 207, 7)",
+                  "color": "black"
+                }
+              }
             }
           ],
           "services": [
@@ -1738,7 +1744,7 @@
                     "type": "EntryData",
                     "props": {
                       "label": "Import JSON",
-                      "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
+                      "btnStyle": { "backgroundColor": "#b22166", "color": "#ffffff" }
                     }
                   }
                 ],

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { LoadingButton } from '@mui/lab';
 import { Box, Tooltip } from '@mui/material';
 import { DownloadButton, DownloadFileType } from '../DownloadButton/DownloadButton.js';
+import { BtnStyle } from '../../types/common.types.js';
+import { getBtnThemeStyle } from '../../utils/helpers.js';
 
 type ButtonProps = {
   onClick: (handler: (args: any) => void) => void;
@@ -9,12 +11,15 @@ type ButtonProps = {
   description?: string;
   includeDownload?: boolean;
   downloadFileName?: string;
+  btnStyle?: BtnStyle;
+  downloadBtnStyle?: BtnStyle;
 };
 
 export const CustomButton: React.FC<ButtonProps> = ({
   onClick,
   label = 'Submit',
   includeDownload = false,
+  btnStyle,
   ...props
 }) => {
   const [loading, setLoading] = useState(false);
@@ -35,7 +40,12 @@ export const CustomButton: React.FC<ButtonProps> = ({
     <Box {...props} display='flex' justifyContent='center' p={1}>
       <Box p={1}>
         <Tooltip title={props.description}>
-          <LoadingButton loading={loading} variant='contained' onClick={handleOnClick}>
+          <LoadingButton
+            style={getBtnThemeStyle(btnStyle)}
+            loading={loading}
+            variant='contained'
+            onClick={handleOnClick}
+          >
             {label}
           </LoadingButton>
         </Tooltip>
