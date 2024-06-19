@@ -3,8 +3,7 @@
   "styles": {
     "primaryColor": "rgb(255, 207, 7)",
     "secondaryColor": "black",
-    "tertiaryColor": "black",
-    "menuIconColor": "black"
+    "tertiaryColor": "black"
   },
   "generalFeatures": [
     {

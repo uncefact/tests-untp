@@ -3,8 +3,7 @@
   "styles": {
     "primaryColor": "rgb(255, 207, 7)",
     "secondaryColor": "black",
-    "tertiaryColor": "black",
-    "menuIconColor": "black"
+    "tertiaryColor": "black"
   },
   "generalFeatures": [
     {
@@ -492,13 +491,7 @@
             {
               "name": "CustomButton",
               "type": "Submit",
-              "props": {
-                "label": "Processor",
-                "btnStyle": {
-                  "backgroundColor": "rgb(255, 207, 7)",
-                  "color": "black"
-                }
-              }
+              "props": {}
             }
           ],
           "services": [
@@ -1744,7 +1737,7 @@
                     "type": "EntryData",
                     "props": {
                       "label": "Import JSON",
-                      "btnStyle": { "backgroundColor": "#b22166", "color": "#ffffff" }
+                      "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
                     }
                   }
                 ],
