@@ -107,7 +107,7 @@ export const dataTransformationEvent = {
   },
 };
 /*============================= */
-export const contextObjectEvent = {
+export const contextDPP = {
   vckit: {
     vckitAPIUrl: 'https://vckit.example.com',
     issuer: 'did:web:example.com',
@@ -133,7 +133,7 @@ export const contextObjectEvent = {
   identifierKeyPath: '/herd/identifier',
 };
 
-export const dataObjectEvent = {
+export const dataDPP = {
   data: {
     herd: {
       identifier: '9359502000010',

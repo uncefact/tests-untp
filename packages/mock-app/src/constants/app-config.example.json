@@ -711,7 +711,7 @@
               "parameters": []
             },
             {
-              "name": "processObjectEvent",
+              "name": "processDPP",
               "parameters": [
                 {
                   "vckit": {
@@ -1084,7 +1084,7 @@
               "parameters": []
             },
             {
-              "name": "processObjectEvent",
+              "name": "processDPP",
               "parameters": [
                 {
                   "vckit": {
@@ -1718,7 +1718,7 @@
               "parameters": []
             },
             {
-              "name": "processObjectEvent",
+              "name": "processDPP",
               "parameters": [
                 {
                   "vckit": {

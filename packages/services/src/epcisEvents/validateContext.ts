@@ -22,7 +22,7 @@ export const checkContextProperties = (context: IContext): Result<IContext> => {
  * @param context - event context
  * @returns Result<IContext>
  */
-export const validateContextObjectEvent = (context: IContext): Result<IContext> => {
+export const validateContextDPP = (context: IContext): Result<IContext> => {
   const validationResult = checkContextProperties(context);
   if (!validationResult.ok) return error(validationResult.value);
 

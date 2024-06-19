@@ -1,5 +1,5 @@
-import { validateContextObjectEvent } from '../epcisEvents/validateContext';
-import { contextObjectEvent } from './mocks/constants';
+import { validateContextDPP } from '../epcisEvents/validateContext';
+import { contextDPP } from './mocks/constants';
 
 describe('validateContext', () => {
   describe('successful case', () => {
@@ -8,9 +8,9 @@ describe('validateContext', () => {
     });
 
     it('should return success when context is valid', () => {
-      const result = validateContextObjectEvent(contextObjectEvent as any);
+      const result = validateContextDPP(contextDPP as any);
       expect(result.ok).toBe(true);
-      expect(result.value).toEqual(contextObjectEvent);
+      expect(result.value).toEqual(contextDPP);
     });
   });
 
@@ -21,189 +21,189 @@ describe('validateContext', () => {
 
     it('should return error when vckit context is empty', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         vckit: {},
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
     });
 
     it('should return error when dpp context is empty', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         dpp: {},
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
     });
 
     it('should return error when dlr context is empty', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         dlr: {},
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
     });
 
     it('should return error when storage context is empty', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         storage: {},
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
     });
 
     it('should return error when context is empty identifierKeyPath field', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         identifierKeyPath: '',
       };
 
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
       expect(result.value).toEqual('identifierKeyPath not found');
     });
 
     it('should return error when vckitAPIUrl in vckit context is invalid', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         vckit: {
           vckitAPIUrl: '',
         },
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
       expect(result.value).toEqual('Invalid vckitAPIUrl');
     });
 
     it('should return error when issuer in vckit context is invalid', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         vckit: {
-          ...contextObjectEvent.vckit,
+          ...contextDPP.vckit,
           issuer: '',
         },
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
       expect(result.value).toEqual('Invalid issuer');
     });
 
     it('should return error when context of dpp is invalid', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         dpp: {
-          ...contextObjectEvent.dpp,
+          ...contextDPP.dpp,
           context: [],
         },
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
       expect(result.value).toEqual('Invalid dpp context');
     });
 
     it('should return error when type dpp in context is invalid', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         dpp: {
-          ...contextObjectEvent.dpp,
+          ...contextDPP.dpp,
           type: [],
         },
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
       expect(result.value).toEqual('Invalid type');
     });
 
     it('should return error when dlrLinkTitle in dpp context is invalid', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         dpp: {
-          ...contextObjectEvent.dpp,
+          ...contextDPP.dpp,
           dlrLinkTitle: '',
         },
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
       expect(result.value).toEqual('Invalid dlrLinkTitle');
     });
 
     it('should return error when dlrVerificationPage in dpp context is invalid', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         dpp: {
-          ...contextObjectEvent.dpp,
+          ...contextDPP.dpp,
           dlrVerificationPage: '',
         },
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
       expect(result.value).toEqual('Invalid dlrVerificationPage');
     });
 
     it('should return error when dlrIdentificationKeyType in dpp context is invalid', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         dpp: {
-          ...contextObjectEvent.dpp,
+          ...contextDPP.dpp,
           dlrIdentificationKeyType: '',
         },
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
       expect(result.value).toEqual('Invalid dlrIdentificationKeyType');
     });
 
     it('should return error when storageAPIUrl in storage context is invalid', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         storage: {
-          ...contextObjectEvent.storage,
+          ...contextDPP.storage,
           url: '',
         },
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
       expect(result.value).toEqual('Invalid storage url');
     });
 
     it('should return error when params in storage context is invalid', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         storage: {
-          ...contextObjectEvent.storage,
+          ...contextDPP.storage,
           params: {},
         },
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
       expect(result.value).toEqual('Invalid storage params');
     });
 
     it('should return error when dlrAPIUrl in dlr context is invalid', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         dlr: {
-          ...contextObjectEvent.dlr,
+          ...contextDPP.dlr,
           dlrAPIUrl: '',
         },
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
       expect(result.value).toEqual('Invalid dlrAPIUrl');
     });
 
     it('should return error when dlrAPIKey in dlr context is invalid', () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         dlr: {
-          ...contextObjectEvent.dlr,
+          ...contextDPP.dlr,
           dlrAPIKey: '',
         },
       };
-      const result = validateContextObjectEvent(newContext as any);
+      const result = validateContextDPP(newContext as any);
       expect(result.ok).toBe(false);
       expect(result.value).toEqual('Invalid dlrAPIKey');
     });

@@ -1,24 +1,24 @@
 import { VerifiableCredential } from '@vckit/core-types';
-import { IService } from '../types/index.js';
-import { IContext } from './types.js';
-import { generateUUID } from '../utils/helpers.js';
+import { IService } from './types/index.js';
+import { IContext } from './epcisEvents/types.js';
+import { generateUUID } from './utils/helpers.js';
 
-import { getStorageServiceLink } from '../storage.service.js';
-import { issueVC } from '../vckit.service.js';
-import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
-import { validateContextObjectEvent } from './validateContext.js';
+import { getStorageServiceLink } from './storage.service.js';
+import { issueVC } from './vckit.service.js';
+import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from './linkResolver.service.js';
+import { validateContextDPP } from './epcisEvents/validateContext.js';
 import JSONPointer from 'jsonpointer';
 
 /**
- * Process object event, issue VC, upload to storage and register link resolver
- * @param data - object event data, e.g. { data: { herd: { NLIS: 'NH020188LEJ00012' } } }
- * @param context - object event context
+ * Process DPP, issue VC, upload to storage and register link resolver
+ * @param data - DPP data, e.g. { data: { product: {...} } }
+ * @param context - DPP context
  * @returns
  */
-export const processObjectEvent: IService = async (data: any, context: IContext): Promise<any> => {
+export const processDPP: IService = async (data: any, context: IContext): Promise<any> => {
   try {
     const credentialSubject = data.data;
-    const validationResult = validateContextObjectEvent(context);
+    const validationResult = validateContextDPP(context);
     if (!validationResult.ok) throw new Error(validationResult.value);
 
     const objectIdentifier = JSONPointer.get(credentialSubject, context.identifierKeyPath);
@@ -57,6 +57,6 @@ export const processObjectEvent: IService = async (data: any, context: IContext)
 
     return { vc, linkResolver };
   } catch (error: any) {
-    throw new Error(error.message ?? 'Error processing object event');
+    throw new Error(error.message ?? 'Error processing DPP');
   }
 };
