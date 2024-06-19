@@ -73,6 +73,7 @@ export interface ITraceabilityEvent {
 
 export interface ITransactionEventContext extends IContext {
   epcisTransactionEvent: IEntityIssue;
+  localStorageParams: any;
 }
 
 export interface IAggregationEvent {

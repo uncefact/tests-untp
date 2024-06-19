@@ -148,8 +148,35 @@ export const constructObject = (
           .slice(destinationIndex + 1)
           .join('/');
 
-        const sourceValue = JSONPointer.get(source, `${headSourcePath}/${index}/${tailSourcePath}`);
-        JSONPointer.set(data, `${headDestinationPath}/${index}/${tailDestinationPath}`, sourceValue);
+        const sourceArray = JSONPointer.get(source, headSourcePath);
+        if (!Array.isArray(sourceArray)) {
+          throw new Error('Invalid configuration for mapping fields');
+        }
+
+        let lastExistingDestinationIndex;
+        const destinationArray = JSONPointer.get(data, headDestinationPath);
+        if (!Array.isArray(destinationArray)) {
+          lastExistingDestinationIndex = 0;
+        } else {
+          lastExistingDestinationIndex = destinationArray.findIndex(
+            (value) => JSONPointer.get(value, `/${tailDestinationPath}`) !== undefined,
+          );
+
+          if (lastExistingDestinationIndex === -1) {
+            lastExistingDestinationIndex = 0;
+          } else {
+            lastExistingDestinationIndex += 1;
+          }
+        }
+
+        for (const [idx, sourceObjectValue] of sourceArray.entries()) {
+          const sourceValue = JSONPointer.get(sourceObjectValue, `/${tailSourcePath}`);
+          JSONPointer.set(
+            data,
+            `${headDestinationPath}/${lastExistingDestinationIndex + idx}/${tailDestinationPath}`,
+            sourceValue,
+          );
+        }
       }
     }
   }
@@ -181,10 +208,18 @@ export const constructObject = (
           .split('/')
           .slice(pathIndex + 1)
           .join('/');
-        const currentData = JSONPointer.get(data, `${headPath}/${index}/${tailPath}`);
-        const params = [currentData, ...handlerParameters];
-        const generatedValue = handlerFunction(...params);
-        JSONPointer.set(data, `${headPath}/${index}/${tailPath}`, generatedValue);
+
+        const sourceArray = JSONPointer.get(data, headPath);
+        if (!Array.isArray(sourceArray)) {
+          throw new Error('Invalid configuration for generation fields');
+        }
+
+        for (const [idx, currentObjectValue] of sourceArray.entries()) {
+          const currentData = JSONPointer.get(currentObjectValue, `/${tailPath}`);
+          const params = [currentData, ...handlerParameters];
+          const generatedValue = handlerFunction(...params);
+          JSONPointer.set(data, `${headPath}/${idx}/${tailPath}`, generatedValue);
+        }
       }
     }
   }

@@ -7,6 +7,7 @@ import { generateUUID } from '../utils/helpers.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { validateTransactionEventContext } from './validateContext.js';
 import JSONPointer from 'jsonpointer';
+import { deleteValuesFromLocalStorageByKeyPath } from './helpers.js';
 
 export const processTransactionEvent: IService = async (
   transactionEvent: ITraceabilityEvent,
@@ -17,7 +18,7 @@ export const processTransactionEvent: IService = async (
     throw new Error(validationResult.value);
   }
 
-  const { vckit, epcisTransactionEvent, dlr, storage, identifierKeyPath } = context;
+  const { vckit, epcisTransactionEvent, dlr, storage, identifierKeyPath, localStorageParams } = context;
   const transactionIdentifier = JSONPointer.get(transactionEvent.data, identifierKeyPath);
   if (!transactionIdentifier) {
     throw new Error('Identifier not found');
@@ -49,6 +50,12 @@ export const processTransactionEvent: IService = async (
     dlr.dlrAPIKey,
     qualifierPath,
     LinkType.epcisLinkType,
+  );
+
+  deleteValuesFromLocalStorageByKeyPath(
+    localStorageParams.storageKey,
+    transactionEvent.data,
+    localStorageParams.keyPath,
   );
 
   return { vc, linkResolver };
