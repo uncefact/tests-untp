@@ -51,7 +51,7 @@ function Header() {
   const [styles, setStyles] = useState<IStyles>();
   const [scanningStyles] = useState({
     primaryColor: 'yellow',
-    secondaryColor: 'white',
+    secondaryColor: 'black',
     tertiaryColor: 'black',
   });
 
@@ -74,6 +74,7 @@ function Header() {
     });
 
     setStyles(subAppStyles?.styles ?? appConfig.styles);
+    sessionStorage.setItem('theme_style', JSON.stringify(subAppStyles?.styles));
 
     const defaultHeader = ['/', '/404'];
     if (defaultHeader.includes(path)) {
@@ -103,13 +104,6 @@ function Header() {
           to={route}
           onClick={() => {
             toggleDrawer(false);
-            setStyles(styles);
-            setHeaderBrandInfo({
-              name: app.name,
-              assets: {
-                logo: app.assets?.logo,
-              },
-            });
           }}
         >
           <ListItemIcon>{renderAvatar(app)}</ListItemIcon>
@@ -187,7 +181,7 @@ function Header() {
               aria-haspopup='true'
               onClick={toggleDrawer(true)}
             >
-              <MenuIcon sx={{ color: styles.menuIconColor }} />
+              <MenuIcon sx={{ color: styles.secondaryColor }} />
             </IconButton>
 
             <Drawer open={open} onClose={toggleDrawer(false)}>
@@ -244,7 +238,7 @@ function Header() {
             {!headerBrandInfo.name.includes(appConfig.name) && (
               <Button
                 sx={{
-                  color: appConfig.styles.secondaryColor,
+                  color: styles.secondaryColor,
                 }}
               >
                 Back to Home

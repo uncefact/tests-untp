@@ -41,3 +41,28 @@ export const mergeToLocalStorage = (
     throw new Error(error.message);
   }
 };
+
+/**
+ * Deletes specified keys from local storage.
+ * @param parameters - The parameters for deleting values from local storage.
+ * @param parameters.storageKey - The key of the local storage item.
+ * @param parameters.keys - The keys to be deleted from the local storage item.
+ * @throws {Error} If an error occurs during the deletion process.
+ */
+export const deleteValuesFromLocalStorage = (parameters: { storageKey: string; keys: string[] }) => {
+  try {
+    const { storageKey, keys } = parameters;
+    const existingData = localStorage.getItem(storageKey);
+
+    if (existingData) {
+      const parsedData = JSON.parse(existingData);
+      keys.forEach((key) => {
+        delete parsedData[key];
+      });
+      localStorage.setItem(storageKey, JSON.stringify(parsedData));
+    }
+  } catch (error: any) {
+    console.error(error);
+    throw new Error(error.message);
+  }
+};
