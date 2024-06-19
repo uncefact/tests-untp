@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import Ajv2020 from 'ajv/dist/2020.js';
 import { ToastContainer, toast } from 'react-toastify';
 import { materialRenderers, materialCells } from '@jsonforms/material-renderers';
 import { JsonForms } from '@jsonforms/react';
@@ -6,7 +7,6 @@ import { JsonSchema, UISchemaElement } from '@jsonforms/core';
 import { CircularProgress } from '@mui/material';
 
 import { IComponentFunc } from '../../types';
-import { createAjv } from '../../utils/ajv.js';
 
 /**
  * The props for the JsonForm component
@@ -32,7 +32,9 @@ export const JsonForm = ({ schema, uiSchema, data: initialData, onChange, classN
   const [data, setData] = useState(initialData);
   const [schemaInfo, setSchemaInfo] = useState<JsonSchema>({});
   const [isLoading, setIsLoading] = useState(true);
-  const ajv = createAjv();
+  const ajv = new Ajv2020({
+    strict: false,
+  });
 
   const handleChange = ({ errors, data }: { errors: any[]; data: any }) => {
     setData(data);
