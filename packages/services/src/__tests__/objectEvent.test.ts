@@ -19,7 +19,7 @@ jest.mock('../linkResolver.service', () => ({
     gtin: 'gtin',
     nlisid: 'nlisid',
   },
-  getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' }))
+  getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' })),
 }));
 
 describe('processObjectEvent', () => {
@@ -115,7 +115,7 @@ describe('processObjectEvent', () => {
         dpp: {},
         dlr: {},
         storage: {},
-        identifierKeyPaths: [],
+        identifierKeyPath: '',
       };
       try {
         await processObjectEvent(dataObjectEvent, newContext);
@@ -125,17 +125,17 @@ describe('processObjectEvent', () => {
       }
     });
 
-    it('should throw error when context is empty identifierKeyPaths field', async () => {
+    it('should throw error when context is empty identifierKeyPath field', async () => {
       (issueVC as jest.Mock).mockResolvedValue({});
 
       const newContext = {
         ...contextObjectEvent,
-        identifierKeyPaths: [],
+        identifierKeyPath: '',
       };
       try {
         await processObjectEvent(dataObjectEvent, newContext);
       } catch (error: any) {
-        expect(error.message).toEqual('identifierKeyPaths not found');
+        expect(error.message).toEqual('identifierKeyPath not found');
       }
     });
 

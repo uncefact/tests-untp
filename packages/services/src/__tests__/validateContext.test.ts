@@ -55,15 +55,15 @@ describe('validateContext', () => {
       expect(result.ok).toBe(false);
     });
 
-    it('should return error when context is empty identifierKeyPaths field', () => {
+    it('should return error when context is empty identifierKeyPath field', () => {
       const newContext = {
         ...contextObjectEvent,
-        identifierKeyPaths: [],
+        identifierKeyPath: '',
       };
 
       const result = validateContextObjectEvent(newContext as any);
       expect(result.ok).toBe(false);
-      expect(result.value).toEqual('identifierKeyPaths not found');
+      expect(result.value).toEqual('identifierKeyPath not found');
     });
 
     it('should return error when vckitAPIUrl in vckit context is invalid', () => {

@@ -1,4 +1,10 @@
-import { IdentificationKeyType, createLinkResolver, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service';
+import {
+  IdentificationKeyType,
+  LinkType,
+  createLinkResolver,
+  getLinkResolverIdentifier,
+  registerLinkResolver,
+} from '../linkResolver.service';
 import { privateAPI } from '../utils/httpService';
 
 jest.mock('../utils/httpService', () => ({
@@ -28,6 +34,7 @@ describe('create link resolve service', () => {
       identificationKey: 'gtin-key',
       itemDescription: 'EPCIS transformation event VC',
       verificationPage: 'https://verify.com/dev/verifyCredential',
+      linkType: LinkType.epcisLinkType,
       dlrAPIUrl: 'https://dlr.com',
       dlrAPIKey: 'dlr-key',
       qualifierPath: '',
@@ -38,6 +45,7 @@ describe('create link resolve service', () => {
       mockValue.identificationKeyType,
       mockValue.identificationKey,
       mockValue.itemDescription,
+      mockValue.linkType,
       mockValue.verificationPage,
       mockValue.dlrAPIUrl,
       mockValue.dlrAPIKey,
@@ -104,7 +112,9 @@ describe('getLinkResolverIdentifier', () => {
   });
 
   it('should throw an error when the element string does not contain exactly one primary identification key', () => {
-    expect(() => getLinkResolverIdentifier('10ABCDEF')).toThrow('getLinkResolverIdentifier Error: ===> analyseuri ERROR ===> The element string should contain exactly one primary identification key - it contained 0 []; please check for a syntax error.');
+    expect(() => getLinkResolverIdentifier('10ABCDEF')).toThrow(
+      'getLinkResolverIdentifier Error: ===> analyseuri ERROR ===> The element string should contain exactly one primary identification key - it contained 0 []; please check for a syntax error.',
+    );
   });
 
   it('should throw an error when the element string contains invalid syntax', () => {
@@ -118,7 +128,12 @@ describe('getLinkResolverIdentifier', () => {
     const itipValue = '123456789012315678';
     const elementString = `${gtin}${gtinValue}${itip}${itipValue}`;
 
-    expect(() => getLinkResolverIdentifier(elementString)).toThrow('getLinkResolverIdentifier Error: ===> analyseuri ERROR ===> The element string should contain exactly one primary identification key - '
-    + `it contained 2 [${JSON.stringify({ ai: itip, value: itipValue })},${JSON.stringify({ ai: gtin, value: gtinValue })}]; please check for a syntax error.`);
+    expect(() => getLinkResolverIdentifier(elementString)).toThrow(
+      'getLinkResolverIdentifier Error: ===> analyseuri ERROR ===> The element string should contain exactly one primary identification key - ' +
+        `it contained 2 [${JSON.stringify({ ai: itip, value: itipValue })},${JSON.stringify({
+          ai: gtin,
+          value: gtinValue,
+        })}]; please check for a syntax error.`,
+    );
   });
 });

@@ -7,7 +7,7 @@ jest.mock('../components/ConformityCredential/index.ts', () => ({}));
 
 describe('render RenderCheckList component', () => {
   const checkBoxLabel = 'checkBoxLabel';
-  const requiredFields = ['requiredField1'];
+  const requiredFieldPath = '/requiredField1';
   const nestedComponents = [
     {
       name: 'ImportButton',
@@ -25,7 +25,7 @@ describe('render RenderCheckList component', () => {
       render(
         <RenderCheckList
           checkBoxLabel={checkBoxLabel}
-          requiredFields={requiredFields}
+          requiredFieldPath={requiredFieldPath}
           onChange={onChange}
           nestedComponents={nestedComponents}
         />,
@@ -43,7 +43,7 @@ describe('render RenderCheckList component', () => {
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFields={requiredFields}
+        requiredFieldPath={requiredFieldPath}
         onChange={onChange}
         nestedComponents={nestedComponents}
       />,
@@ -60,7 +60,7 @@ describe('render RenderCheckList component', () => {
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFields={requiredFields}
+        requiredFieldPath={requiredFieldPath}
         onChange={onChange}
         nestedComponents={nestedComponents}
       />,
@@ -84,7 +84,7 @@ describe('render RenderCheckList component', () => {
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFields={requiredFields}
+        requiredFieldPath={requiredFieldPath}
         onChange={onChange}
         nestedComponents={nestedComponents}
       />,
@@ -97,12 +97,14 @@ describe('render RenderCheckList component', () => {
   });
 
   it('Should render the checkbox when the onChange prop of a DynamicComponentRenderer component is called', async () => {
-    const jsonFile = new File([JSON.stringify({ requiredField1: 'label-test-1' })], 'vc.json', {type: 'application/json'});
+    const jsonFile = new File([JSON.stringify({ requiredField1: 'label-test-1' })], 'vc.json', {
+      type: 'application/json',
+    });
 
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFields={requiredFields}
+        requiredFieldPath={requiredFieldPath}
         onChange={onChange}
         nestedComponents={nestedComponents}
       />,
@@ -126,13 +128,15 @@ describe('render RenderCheckList component', () => {
 
   it('Should call the onChange prop with the correct data when the onChange prop of a DynamicComponentRenderer component is called', async () => {
     let checkBoxListData: any = [];
-    const jsonFile = new File([JSON.stringify({ requiredField1: 'label-test-1' })], 'vc.json', { type: 'application/json' });
-    const onChangeCheckBoxList = (data: object) => checkBoxListData = data;
+    const jsonFile = new File([JSON.stringify({ requiredField1: 'label-test-1' })], 'vc.json', {
+      type: 'application/json',
+    });
+    const onChangeCheckBoxList = (data: object) => (checkBoxListData = data);
 
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFields={requiredFields}
+        requiredFieldPath={requiredFieldPath}
         onChange={onChangeCheckBoxList}
         nestedComponents={nestedComponents}
       />,
@@ -163,7 +167,7 @@ describe('render RenderCheckList component', () => {
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFields={requiredFields}
+        requiredFieldPath={requiredFieldPath}
         onChange={onChange}
         nestedComponents={nestedComponents}
       />,
@@ -191,15 +195,17 @@ describe('render RenderCheckList component', () => {
     });
   });
 
-  it('Should call the RenderCheckList\'s onChange function with checked item when a single checkbox is checked', async () => {
+  it("Should call the RenderCheckList's onChange function with checked item when a single checkbox is checked", async () => {
     let checkBoxListData: any = [];
-    const onChangeCheckBoxList = (data: object) => checkBoxListData = data;
-    const importJsonFiles = [new File([JSON.stringify({ requiredField1: 'label-test-1' })], 'vc1.json', { type: 'application/json' })];
+    const onChangeCheckBoxList = (data: object) => (checkBoxListData = data);
+    const importJsonFiles = [
+      new File([JSON.stringify({ requiredField1: 'label-test-1' })], 'vc1.json', { type: 'application/json' }),
+    ];
 
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFields={requiredFields}
+        requiredFieldPath={requiredFieldPath}
         onChange={onChangeCheckBoxList}
         nestedComponents={nestedComponents}
       />,
@@ -226,19 +232,21 @@ describe('render RenderCheckList component', () => {
 
   it('Should update the state correctly when a checked checkbox is unchecked', async () => {
     let checkBoxListData: any = [];
-    const onChangeCheckBoxList = (data: object) => checkBoxListData = data;
-    const importJsonFiles = [new File([JSON.stringify({ requiredField1: 'label-test-1' })], 'vc1.json', { type: 'application/json' })];
+    const onChangeCheckBoxList = (data: object) => (checkBoxListData = data);
+    const importJsonFiles = [
+      new File([JSON.stringify({ requiredField1: 'label-test-1' })], 'vc1.json', { type: 'application/json' }),
+    ];
 
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFields={requiredFields}
+        requiredFieldPath={requiredFieldPath}
         onChange={onChangeCheckBoxList}
         nestedComponents={nestedComponents}
       />,
     );
 
-     // Find the import button and simulate a change event with a JSON file
+    // Find the import button and simulate a change event with a JSON file
     const importButton = screen.getByTestId('file-input');
     act(() => {
       fireEvent.change(importButton, { target: { files: importJsonFiles } });
@@ -258,9 +266,9 @@ describe('render RenderCheckList component', () => {
     });
   });
 
-  it('Should call the RenderCheckList\'s onChange function with checked item when multiple checkbox are checked', async () => {
+  it("Should call the RenderCheckList's onChange function with checked item when multiple checkbox are checked", async () => {
     let checkBoxListData: any = [];
-    const onChangeCheckBoxList = (data: object) => checkBoxListData = data;
+    const onChangeCheckBoxList = (data: object) => (checkBoxListData = data);
     const importJsonFiles = [
       new File([JSON.stringify({ requiredField1: 'label-test-1' })], 'vc1.json', { type: 'application/json' }),
       new File([JSON.stringify({ requiredField1: 'label-test-2' })], 'vc2.json', { type: 'application/json' }),
@@ -270,7 +278,7 @@ describe('render RenderCheckList component', () => {
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFields={requiredFields}
+        requiredFieldPath={requiredFieldPath}
         onChange={onChangeCheckBoxList}
         nestedComponents={nestedComponents}
       />,
@@ -311,17 +319,17 @@ describe('render RenderCheckList component', () => {
 
   it('Should update the state correctly when multiple checked checkbox are unchecked', async () => {
     let checkBoxListData: any = [];
-    const onChangeCheckBoxList = (data: object) => checkBoxListData = data;
+    const onChangeCheckBoxList = (data: object) => (checkBoxListData = data);
     const importJsonFiles = [
       new File([JSON.stringify({ requiredField1: 'label-test-1' })], 'vc1.json', { type: 'application/json' }),
       new File([JSON.stringify({ requiredField1: 'label-test-2' })], 'vc2.json', { type: 'application/json' }),
-      new File([JSON.stringify({ requiredField1: 'label-test-3' })], 'vc3.json', { type: 'application/json' })
+      new File([JSON.stringify({ requiredField1: 'label-test-3' })], 'vc3.json', { type: 'application/json' }),
     ];
 
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFields={requiredFields}
+        requiredFieldPath={requiredFieldPath}
         onChange={onChangeCheckBoxList}
         nestedComponents={nestedComponents}
       />,

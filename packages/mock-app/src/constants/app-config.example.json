@@ -213,173 +213,848 @@
               "name": "JsonForm",
               "type": "EntryData",
               "props": {
-                "formTitle": "Digital Livestock Passport",
                 "schema": {
                   "type": "object",
+                  "additionalProperties": false,
                   "properties": {
-                    "herd": {
+                    "credentialSubject": {
+                      "$ref": "#/$defs/Product",
+                      "description": "A JSON object that carries the content of the verifiable credential - such as a digital product passport."
+                    },
+                    "@context": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "A list of JSON-LD contect URIs that define the seamntic meaning of prperties within the credential. "
+                    },
+                    "id": {
+                      "x-jargon-isKey": true,
+                      "type": "string",
+                      "format": "uri",
+                      "description": "A unique identifier (URI) assigned to the product passport."
+                    },
+                    "issuer": {
+                      "$ref": "#/$defs/Party",
+                      "description": "The Party that issued the verifiable credential."
+                    },
+                    "type": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The credential type.  Must include the string \"VerifiableCredential\" and additionally the specific credential type (eg \"UNTPDigitalProductPassport\")"
+                    },
+                    "validFrom": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "The date and time from which the credential is valid."
+                    },
+                    "validTo": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "The expiry date (if applicable) of this verifiable credential."
+                    },
+                    "credentialStatus": {
+                      "type": "string",
+                      "description": "The status of the verifiable credential - must be an object that conforms to the W3C VCDM 2.0 Status object - https://www.w3.org/TR/vc-data-model-2.0/#status "
+                    }
+                  },
+                  "description": "The ProductPassport is a comprehensive data structure that encapsulates various details pertaining to a product, including its identification details, who issued it, batch information, and different scores relating to sustainability and trustworthines",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$defs": {
+                    "Product": {
                       "type": "object",
-                      "title": "Herd Information",
+                      "additionalProperties": false,
                       "properties": {
-                        "batchId": {
+                        "productIdentifier": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Identifier"
+                          },
+                          "description": "An array of unique identifiers assigned to the product or model. "
+                        },
+                        "batchIdentifier": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Identifier"
+                          },
+                          "description": "Information regarding the specific production batch of the product."
+                        },
+                        "itemIdentifier": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Identifier"
+                          },
+                          "description": "An array of identifiers representing a specific serialised item of the product."
+                        },
+                        "classification": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Classification"
+                          },
+                          "description": "A code representing the product's class, typically using the UN CPC (United Nations Central Product Classification) https://unstats.un.org/unsd/classifications/Econ/cpc"
+                        },
+                        "modelName": {
                           "type": "string",
-                          "title": "Batch ID"
+                          "description": "The model name or number of the product, represented as text."
+                        },
+                        "image": {
+                          "$ref": "#/$defs/BinaryFile",
+                          "description": "A unique identifier (URI) pointing to an image of the product."
+                        },
+                        "description": {
+                          "type": "string",
+                          "description": "A textual description providing details about the product."
+                        },
+                        "furtherInformation": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "A URL pointing to further human readable information about the product."
                         },
                         "manufacturedDate": {
                           "type": "string",
                           "format": "date",
-                          "title": "Manufactured Date"
+                          "description": "The ISO 8601 date on which the product batch was manufactured."
                         },
-                        "manufacturedAt": {
-                          "type": "object",
-                          "title": "Manufactured At",
-                          "properties": {
-                            "name": { "type": "string", "title": "Name" },
-                            "operatedBy": {
-                              "type": "object",
-                              "title": "Operated By",
-                              "properties": {
-                                "name": {
-                                  "type": "string",
-                                  "title": "Name"
-                                }
-                              }
-                            }
-                          }
+                        "dimension": {
+                          "$ref": "#/$defs/Dimension",
+                          "description": "The physical dimensions of the product. Not every dimension is relevant to every products.  For example bulk materials may have wieght and volume but not length, with, or height."
                         },
-                        "identifier": {
-                          "type": "string",
-                          "title": "Identifier (GS1 Barcode)"
-                        },
-                        "batchQrCode": {
-                          "type": "string",
-                          "title": "Batch QR Code"
-                        },
-                        "traceabilityInfo": {
-                          "type": "array",
-                          "title": "Traceability Information",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "EventReference": {
-                                "type": "string",
-                                "title": "Event Reference"
-                              },
-                              "EventType": {
-                                "type": "string",
-                                "title": "Event Type"
-                              }
-                            }
-                          }
-                        },
-                        "sustainabilityInfo": {
-                          "type": "array",
-                          "title": "Sustainability Information",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "Topic": {
-                                "type": "string",
-                                "title": "Topic"
-                              },
-                              "Evidence": {
-                                "type": "string",
-                                "title": "Evidence"
-                              },
-                              "metric": {
-                                "type": "array",
-                                "title": "Metric",
-                                "items": {
-                                  "type": "object",
-                                  "properties": {
-                                    "Metric": {
-                                      "type": "string",
-                                      "title": "Metric"
-                                    },
-                                    "Value": {
-                                      "type": "integer",
-                                      "title": "Value"
-                                    },
-                                    "Unit": {
-                                      "type": "string",
-                                      "title": "Unit"
-                                    }
-                                  }
-                                }
-                              },
-                              "compliance": {
-                                "type": "boolean",
-                                "title": "Compliance"
-                              }
-                            }
-                          }
-                        },
-                        "provenance": {
-                          "type": "array",
-                          "title": "Provenance",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "country": {
-                                "type": "string",
-                                "title": "Country"
-                              },
-                              "percentage": {
-                                "type": "integer",
-                                "title": "Percentage"
-                              }
-                            }
-                          }
-                        }
-                      },
-                      "required": ["identifier"]
-                    },
-                    "breed": {
-                      "type": "object",
-                      "title": "Breed",
-                      "properties": {
-                        "productId": {
-                          "type": "string",
-                          "title": "Product ID"
-                        },
-                        "breed": {
-                          "type": "string",
-                          "title": "Breed"
+                        "characteristic": {
+                          "$ref": "#/$defs/Characteristic",
+                          "description": ""
                         },
                         "manufacturer": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "title": "Name"
-                            }
-                          }
+                          "$ref": "#/$defs/Party",
+                          "description": "The Party entity that manufactured the product."
                         },
-                        "image": {
-                          "type": "string",
-                          "title": "Image"
+                        "manufacturedAt": {
+                          "$ref": "#/$defs/Facility",
+                          "description": "The Facility where the product batch was manufactured."
                         },
-                        "description": {
-                          "type": "string",
-                          "title": "Description"
+                        "materialsProvenance": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Material"
+                          },
+                          "description": "An array of Provenance objects providing details on the origin and mass fraction of components or ingredients of the product batch."
                         },
-                        "productClass": {
+                        "conformityClaim": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Claim"
+                          },
+                          "description": "An array of claim objects representing various product conformity claims about the product / batch.  These can be sustainability claims, circularity claims, or any other claim type within the conformity topic list."
+                        },
+                        "recyclingInstruction": {
                           "type": "string",
-                          "title": "Product Class"
+                          "format": "uri",
+                          "description": "A URI pointing to information regarding the recycling aspects of the product."
+                        },
+                        "traceabilityInformation": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/TraceabilityEvent"
+                          },
+                          "description": "An array of TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch."
                         }
-                      }
+                      },
+                      "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details."
                     },
-                    "sustainabilityScore": {
-                      "type": "integer",
-                      "title": "Sustainability Score"
+                    "Identifier": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "scheme": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "the identifier scheme as defined by the registrar that manages the identifier registry. If the identifier scheme is registered with UNTP then this URI can use used to dicsover the resolution method (to get more data) and the verification method (to prove ownership)."
+                        },
+                        "identiferValue": {
+                          "type": "string",
+                          "description": "The value of the identifier within the scheme"
+                        },
+                        "binding": {
+                          "$ref": "#/$defs/Evidence",
+                          "description": "Link to evidence that attests to the validity and ownership of the identifer. "
+                        }
+                      },
+                      "description": "An identifier of a party, product, or facility that is defined by an identifier scheme and idenfier value and, optinally, verification evidence "
                     },
-                    "trustScore": {
-                      "type": "integer",
-                      "title": "Trust Score"
+                    "Evidence": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["w3c_vc", "iso_mdl", "document", "website", "other"],
+                          "example": "w3c_vc",
+                          "description": "Format of the evidence (verifiable credential, document, website, etc)"
+                        },
+                        "assuranceLevel": {
+                          "type": "string",
+                          "enum": ["Self", "Commercial", "Buyer", "Membership", "Unspecified", "3rdParty"],
+                          "example": "Self",
+                          "description": "The assurance level of the evidence (self declaration, 2nd party, 3rd party, accredited auditor)"
+                        },
+                        "reference": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The URL at which the evidence data can be found.  "
+                        }
+                      },
+                      "description": "Evidence to support a conformity or identity claim. "
+                    },
+                    "Classification": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "scheme": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "Classification scheme  - eg https://unstats.un.org/unsd/classifications/Econ/cpc "
+                        },
+                        "classifierValue": {
+                          "type": "string",
+                          "description": "classifier value within the scheme - eg \"01211\" in UN CPC"
+                        },
+                        "classifierName": {
+                          "type": "string",
+                          "description": "Name of the classifier - eg \"Asparagus\" for code \"01211\" in UNCPC"
+                        },
+                        "classifierURL": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "Linked data URL to a web vocabulary entery for this classificaiton code. When this property is provided, the scheme, value, and name properties of the classifer are not required.  eg https://vocabulary.uncefact.org/unlocode#AUBNE represensign the port of Brisbane in the UN/LOCODE classification scheme."
+                        }
+                      },
+                      "description": "A classification scheme and code / name representing a category value for a product, entity, or facility."
+                    },
+                    "BinaryFile": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "fileHash": {
+                          "x-jargon-isKey": true,
+                          "type": "string",
+                          "description": "The MD5 hash of the file."
+                        },
+                        "fileLocation": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The location of the evidence file."
+                        },
+                        "fileType": {
+                          "type": "string",
+                          "x-external-enumeration": "https://mimetype.io/all-types",
+                          "description": "The type of file, represented as a MIME type.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://mimetype.io/all-types\n    "
+                        }
+                      },
+                      "description": "A file representing a data snapshot that is used to infomr the conformity assessment."
+                    },
+                    "Dimension": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "weight": {
+                          "$ref": "#/$defs/Measure",
+                          "description": "the weight of the product"
+                        },
+                        "length": {
+                          "$ref": "#/$defs/Measure",
+                          "description": "The length of the product or packaging"
+                        },
+                        "width": {
+                          "$ref": "#/$defs/Measure",
+                          "description": "The width of the product or packaging"
+                        },
+                        "height": {
+                          "$ref": "#/$defs/Measure",
+                          "description": "The height of the product or packaging"
+                        },
+                        "volume": {
+                          "$ref": "#/$defs/Measure",
+                          "description": "The displacement volume of the product."
+                        }
+                      },
+                      "description": "Overall (length, width, height) dimensions and weight/volume of an item."
+                    },
+                    "Measure": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "value": {
+                          "type": "number",
+                          "description": "The numeric value of the measure"
+                        },
+                        "unit": {
+                          "type": "string",
+                          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
+                          "description": "Unit of measure drawn from the UNECE rec20 measure code list.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+                        }
+                      },
+                      "description": "The measure class defines a numeric measured value (eg 10) and a coded unit of measure (eg KG)."
+                    },
+                    "Characteristic": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {},
+                      "description": "Product specific characteristics.  This class is an extension point for industry specific product characteristics or performance information such as clothing size or battery capacity."
+                    },
+                    "Party": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The decentralised identifier of the party - must be a W3C DID."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The name of the organization or company, represented as a text string."
+                        },
+                        "identifiers": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Identifier"
+                          },
+                          "description": "A list of unique business identifiers assigned to the party - such as tax registration numbers."
+                        }
+                      },
+                      "description": "The Party class represents an entity such as an organization, or a company that manufactured the product."
+                    },
+                    "Facility": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "identifier": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Identifier"
+                          },
+                          "description": "A unique identifier (URI) assigned to the facility. (Link Resolver - GS1 GLN?)"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The name of the facility, represented as a text string."
+                        },
+                        "location": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": ""
+                        },
+                        "operatedBy": {
+                          "$ref": "#/$defs/Party",
+                          "description": "The Party entity responsible for operating the facility."
+                        }
+                      },
+                      "description": "The physical site (eg farm or factory) where the product or materials was produced."
+                    },
+                    "Material": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "originCountry": {
+                          "type": "string",
+                          "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
+                          "description": "A ISO 3166-1 code representing the country of origin of the component or ingredient.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+                        },
+                        "materialType": {
+                          "$ref": "#/$defs/Classification",
+                          "description": "The type of this material - as a value drawn from a controlled vocabulary eg textileexchange.org/materials/rm01014 - representing organic cotton."
+                        },
+                        "massFraction": {
+                          "type": "number",
+                          "description": "A numeric value representing the mass fraction of the product represented by this material. The sum of all mass fraction values for a given passport should be 100."
+                        },
+                        "recycled": {
+                          "type": "boolean",
+                          "description": "Indicator is true if this material input is from a recycled source."
+                        },
+                        "hazardous": {
+                          "type": "boolean",
+                          "description": "Indicates whether this material is hazardous. If true then "
+                        }
+                      },
+                      "description": "The material class encapsulates details about the origin or source of raw materials in a product, including the country of origin and the mass fraction."
+                    },
+                    "Claim": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "topic": {
+                          "type": "string",
+                          "enum": [
+                            "environment.energy",
+                            "environment.emissions",
+                            "environment.water",
+                            "environment.waste",
+                            "environment.deforestation",
+                            "environment.biodiversity",
+                            "circularity.content",
+                            "circularity.design",
+                            "social.labour",
+                            "social.rights",
+                            "social.community",
+                            "social.safety",
+                            "governance.ethics",
+                            "governance.compliance",
+                            "governance.transparency"
+                          ],
+                          "example": "environment.energy",
+                          "description": "A code representing the topic of the sustainability claim. E.g. environment.deforestation, environment.ghg-emission-intensity, etc..  Drawn from a standard code list.  "
+                        },
+                        "standardOrRegulation": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The standard or regulation against which this conformity claim is made. Expressed as a URI and should match a value in the UN catalogue of reference vocabularies. "
+                        },
+                        "criteriaReference": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "A URI pointing to the specific criteria within the standard or regulation against which this claim is made."
+                        },
+                        "claimedValues": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Metric"
+                          },
+                          "description": "One or more actual measures supporting the claim. For example for GHG emissions there may be a metric for total emissions intensity and also a metric for amount of offsets included."
+                        },
+                        "benchmarkValue": {
+                          "$ref": "#/$defs/Metric",
+                          "description": "A benchmark value against which the claimed value can be assessed. THis could be a value specified by a standard or regulation or could be an industry benchmark."
+                        },
+                        "benchmarkReference": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "A refernce to evidence to support the benchmark value."
+                        },
+                        "conformance": {
+                          "type": "boolean",
+                          "description": "and indicator (boolean) that expresses whether or not this product has achieved compliance against the criteria.  for example, if the topic is environment.deforstation and the criteria is EU.2023.1115 then the product is conformant if it has not touched any facility throughout it's lifecycle that is not deforestation free since dec 2020."
+                        },
+                        "conformityEvidence": {
+                          "$ref": "#/$defs/Evidence",
+                          "description": "A URI pointing to the evidence supporting the claim. Most likely in the form of a verifiable credential."
+                        }
+                      },
+                      "description": "The SustainabilityClaim class represents specific claims regarding the sustainability of a product, providing details about the metrics, thresholds, and evidences supporting the claim."
+                    },
+                    "Metric": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "A human readable name for this metric"
+                        },
+                        "value": {
+                          "$ref": "#/$defs/Measure",
+                          "description": "A numeric value representing the measurement or evaluation outcome for the claim."
+                        },
+                        "accuracy": {
+                          "type": "number",
+                          "description": "A percentage represented as a numeric between 0 and 1 indicating the rage of accuracy of the claimed value (eg 0.05 means that the actual value is within 5% of the claimed value.)"
+                        }
+                      },
+                      "description": "A specific measure of performance against the criteria that governs the claim.  Expressed as an array of metric (ie unit of emasure) / value (ie the actual numeric value) pairs.  "
+                    },
+                    "TraceabilityEvent": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "eventReference": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "A URI pointing to the detailed information about the EPCIS event. Most likely in the form of a verifiable credential."
+                        },
+                        "eventType": {
+                          "type": "string",
+                          "enum": ["aggregation", "transformation", "object", "transaction", "association"],
+                          "example": "aggregation",
+                          "description": "A code representing the type of EPCIS event. ObjectEvent, AggregationEvent, TransactionEvent, TransformationEvent, ObjectEvent."
+                        }
+                      },
+                      "description": "The TraceabilityEvent class represents a specific EPCIS event in the traceability chain of a product, including details about the event type and reference."
                     }
                   }
                 },
                 "initialData": {},
+                "className": "json-form",
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
+              }
+            },
+            {
+              "name": "ConformityCredentialCheckbox",
+              "type": "EntryData"
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "variant": "contained",
+                "style": {
+                  "textAlign": "center",
+                  "color": "white",
+                  "display": "block",
+                  "margin": "0 auto",
+                  "marginTop": "20px"
+                }
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "constructorEntryData",
+              "parameters": []
+            },
+            {
+              "name": "processObjectEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "https://vckit.example.com",
+                    "issuer": "did:web:vckit.example.com"
+                  },
+                  "dpp": {
+                    "context": ["https://dpp.example.com/dppld.json"],
+                    "renderTemplate": [
+                      { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
+                    ],
+                    "type": ["DigitalProductPassport"],
+                    "dlrLinkTitle": "Livestock Passport",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "http://dlr.example.com/verify"
+                  },
+
+                  "dlr": {
+                    "dlrAPIUrl": "http://dlr.example.com",
+                    "dlrAPIKey": "5555555555555"
+                  },
+                  "storage": {
+                    "url": "https://storage.example.com",
+                    "params": {
+                      "resultPath": ""
+                    }
+                  },
+                  "identifierKeyPaths": ["herd", "identifier"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Processing event",
+          "id": "processing_event",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "credentialSubject": {
+                      "$ref": "#/$defs/TransformationEvent",
+                      "description": ""
+                    },
+                    "@context": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "A list of JSON-LD contect URIs that define the seamntic meaning of prperties within the credential. "
+                    },
+                    "id": {
+                      "x-jargon-isKey": true,
+                      "type": "string",
+                      "format": "uri",
+                      "description": "A unique identifier (URI) assigned to the product passport."
+                    },
+                    "issuer": {
+                      "$ref": "#/$defs/Party",
+                      "description": "The Party that issued the verifiable credential."
+                    },
+                    "type": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The credential type.  Must include the string \"VerifiableCredential\" and additionally the specific credential type (eg \"UNTPDigitalProductPassport\")"
+                    },
+                    "validFrom": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "The date and time from which the credential is valid."
+                    },
+                    "validTo": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "The expiry date (if applicable) of this verifiable credential."
+                    },
+                    "credentialStatus": {
+                      "type": "string",
+                      "description": "The status of the verifiable credential - must be an object that conforms to the W3C VCDM 2.0 Status object - https://www.w3.org/TR/vc-data-model-2.0/#status "
+                    }
+                  },
+                  "description": "Transformation Event as a W3C Verifiable Credential",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$defs": {
+                    "TransformationEvent": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "outputEPCList": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Item"
+                          },
+                          "description": "The list of uniquely identified items that are the output of this transformation event - for example a list of individually identified bolts of cloth that are the output of a weaving process."
+                        },
+                        "inputEPCList": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Item"
+                          },
+                          "description": "The list of uniquely identified items that are the input of this transformation event - for example a list of individually identified bobbins of yarn that are the input of a weaving process."
+                        },
+                        "inputQuantityList": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/QuantityElement"
+                          },
+                          "description": "The quantified list of product classes that are the input of this transformation event - used when each item does not have a unique identity.  for example the weight of raw cotton that is the input to a ginning process."
+                        },
+                        "outputQuantityList": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/QuantityElement"
+                          },
+                          "description": "The quantified list of product classes that are the output of this transformation event - used when each item does not have a unique identity.  for example a count of the bales of cleaned cotton that are the output of a ginning process."
+                        },
+                        "processType": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "An industry specific process type code.  "
+                        },
+                        "eventID": {
+                          "x-jargon-isKey": true,
+                          "readOnly": true,
+                          "type": "string",
+                          "description": "The unique identifier of this event - SHOULD be a UUID"
+                        },
+                        "eventTime": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "The ISO-8601 date time when the event occurred."
+                        },
+                        "action": {
+                          "type": "string",
+                          "enum": ["observe", "add", "delete"],
+                          "example": "observe",
+                          "description": "Code describing how an event relates to the lifecycle of the entity impacted by the event."
+                        },
+                        "disposition": {
+                          "type": "string",
+                          "x-external-enumeration": "https://ref.gs1.org/cbv/Disp",
+                          "description": "Disposition code describing the state of the item after the event. \n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/Disp\n    "
+                        },
+                        "bizStep": {
+                          "type": "string",
+                          "x-external-enumeration": "https://ref.gs1.org/cbv/BizStep",
+                          "description": "A business step code drawn from a controlled vocabulary. \n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BizStep\n    "
+                        },
+                        "bizLocation": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an EPCIS event until it is reported to be at a different Business Location by a subsequent EPCIS event. The bizLocation must be a resolvable URI that links to facility information and geolocation data."
+                        },
+                        "sensorElementList": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/SensorElement"
+                          },
+                          "description": "An array (one for each sensor) of sensor device data sets associated with the event. "
+                        }
+                      },
+                      "description": "Transformation represents an event in which input objects are fully or partially consumed and output objects are produced, such that any of the input objects may have contributed to all of the output objects - for example consuming bales of cotton to produce yarn."
+                    },
+                    "Item": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "itemID": {
+                          "x-jargon-isKey": true,
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The globally unique identifier (eg GS1 GTIN or digital link) of the product item.  "
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The name of the product class to which the product item belongs.  "
+                        }
+                      },
+                      "description": "A specific trade item /product code which could be either a product serial number or a consignment identifier "
+                    },
+                    "QuantityElement": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "epcClass": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "THe identifier of a product class (as opposed to a product instance) such as a GTIN code for a manufactured product."
+                        },
+                        "quantity": {
+                          "type": "number",
+                          "description": "The numeric quantity of the product class (eg 100 kg of cotton)"
+                        },
+                        "uom": {
+                          "type": "string",
+                          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
+                          "description": "The unit of measure for the quantity value (eg Kg or meters etc) using the UNECE Rec 20 unit of measure codelist.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+                        }
+                      },
+                      "description": "The quantity element is used to define the quantities (eg 100), units of measure (eg Kg) and product class (eg GTIN or other class identifier) of products that are inputs or outputs or the subject of supply chain events.  ",
+                      "required": ["quantity"]
+                    },
+                    "SensorElement": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "sensorMetadata": {
+                          "$ref": "#/$defs/Sensor",
+                          "description": "Data that describes the physical sensor that recorded the sensor data set."
+                        },
+                        "sensorReport": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/SensorData"
+                          },
+                          "description": "A list of sensor readings from the given sensor relevant to the traceability event context."
+                        },
+                        "sensorIntegrityProof": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "An optional reference to a verifiable credential signed by the sensor device or device manufacturer that contains the digitally signed raw data associated with this sensor report."
+                        }
+                      },
+                      "description": "A SensorElement is used to carry data related to an event that is captured one sensor such as an IoT device. Include one sensor property and an array of sensor data values."
+                    },
+                    "Sensor": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "device": {
+                          "$ref": "#/$defs/Item",
+                          "description": "The device Identifier for the sensor as a URI (typically an EPC)"
+                        },
+                        "dataProcessingMethod": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The data processing method used by the sensor - should reference a documented standard criteria as a URI"
+                        }
+                      },
+                      "description": "A physical sensor that records a sensor data set."
+                    },
+                    "SensorData": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "time": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "the timestamp at which the sensor reading was made."
+                        },
+                        "type": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "the measurement type of the sensor reading, as a URI reference to a measurement method specification."
+                        },
+                        "value": {
+                          "type": "number",
+                          "description": "the sensor reading"
+                        },
+                        "uom": {
+                          "type": "string",
+                          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
+                          "description": "the unit of measure for the sensor reading\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+                        }
+                      },
+                      "description": "A data point read by a sensor."
+                    },
+                    "Party": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The decentralised identifier of the party - must be a W3C DID."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The name of the organization or company, represented as a text string."
+                        },
+                        "identifiers": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Identifier"
+                          },
+                          "description": "A list of unique business identifiers assigned to the party - such as tax registration numbers."
+                        }
+                      },
+                      "description": "The Party class represents an entity such as an organization, or a company that manufactured the product."
+                    },
+                    "Identifier": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "scheme": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "the identifier scheme as defined by the registrar that manages the identifier registry. If the identifier scheme is registered with UNTP then this URI can use used to dicsover the resolution method (to get more data) and the verification method (to prove ownership)."
+                        },
+                        "identiferValue": {
+                          "type": "string",
+                          "description": "The value of the identifier within the scheme"
+                        },
+                        "binding": {
+                          "$ref": "#/$defs/Evidence",
+                          "description": "Link to evidence that attests to the validity and ownership of the identifer. "
+                        }
+                      },
+                      "description": "An identifier of a party, product, or facility that is defined by an identifier scheme and idenfier value and, optinally, verification evidence "
+                    },
+                    "Evidence": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["w3c_vc", "iso_mdl", "document", "website", "other"],
+                          "example": "w3c_vc",
+                          "description": "Format of the evidence (verifiable credential, document, website, etc)"
+                        },
+                        "assuranceLevel": {
+                          "type": "string",
+                          "enum": ["Self", "Commercial", "Buyer", "Membership", "Unspecified", "3rdParty"],
+                          "example": "Self",
+                          "description": "The assurance level of the evidence (self declaration, 2nd party, 3rd party, accredited auditor)"
+                        },
+                        "reference": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The URL at which the evidence data can be found.  "
+                        }
+                      },
+                      "description": "Evidence to support a conformity or identity claim. "
+                    }
+                  }
+                },
+                "data": {},
                 "className": "json-form",
                 "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
@@ -454,89 +1129,320 @@
                 "formTitle": "National Vendor Declaration",
                 "schema": {
                   "type": "object",
+                  "additionalProperties": false,
                   "properties": {
-                    "sourceParty": {
+                    "credentialSubject": {
+                      "$ref": "#/$defs/TransactionEvent",
+                      "description": ""
+                    },
+                    "@context": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "A list of JSON-LD contect URIs that define the seamntic meaning of prperties within the credential. "
+                    },
+                    "id": {
+                      "x-jargon-isKey": true,
+                      "type": "string",
+                      "format": "uri",
+                      "description": "A unique identifier (URI) assigned to the product passport."
+                    },
+                    "issuer": {
+                      "$ref": "#/$defs/Party",
+                      "description": "The Party that issued the verifiable credential."
+                    },
+                    "type": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The credential type.  Must include the string \"VerifiableCredential\" and additionally the specific credential type (eg \"UNTPDigitalProductPassport\")"
+                    },
+                    "validFrom": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "The date and time from which the credential is valid."
+                    },
+                    "validTo": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "The expiry date (if applicable) of this verifiable credential."
+                    },
+                    "credentialStatus": {
+                      "type": "string",
+                      "description": "The status of the verifiable credential - must be an object that conforms to the W3C VCDM 2.0 Status object - https://www.w3.org/TR/vc-data-model-2.0/#status "
+                    }
+                  },
+                  "description": "Transaction Event as a W3C Verifiable Credential",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$defs": {
+                    "TransactionEvent": {
                       "type": "object",
+                      "additionalProperties": false,
                       "properties": {
-                        "partyID": {
+                        "sourceParty": {
+                          "$ref": "#/$defs/Party",
+                          "description": "The source party for this supply chain transaction - typically the seller party"
+                        },
+                        "destinationParty": {
+                          "$ref": "#/$defs/Party",
+                          "description": "The destination party for this supply chain transaction - typically the buyer party."
+                        },
+                        "epcList": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Item"
+                          },
+                          "description": "The list of uniquely identified trade items included in this supply chain transaction."
+                        },
+                        "quantityList": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/QuantityElement"
+                          },
+                          "description": "List of quantified product classes that are included in this transaction.  Used when the trade items do not have unique identifiers (eg 100 reels of yarn)"
+                        },
+                        "referenceDocument": {
+                          "$ref": "#/$defs/TradeDocument",
+                          "description": "The supply chain document reference for this transaction event - eg the invoice, order, or dispatch advice"
+                        },
+                        "eventID": {
+                          "x-jargon-isKey": true,
+                          "readOnly": true,
                           "type": "string",
-                          "enum": ["https://wholesalebeef.com/41161080146.json"]
+                          "description": "The unique identifier of this event - SHOULD be a UUID"
+                        },
+                        "eventTime": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "The ISO-8601 date time when the event occurred."
+                        },
+                        "action": {
+                          "type": "string",
+                          "enum": ["observe", "add", "delete"],
+                          "example": "observe",
+                          "description": "Code describing how an event relates to the lifecycle of the entity impacted by the event."
+                        },
+                        "disposition": {
+                          "type": "string",
+                          "x-external-enumeration": "https://ref.gs1.org/cbv/Disp",
+                          "description": "Disposition code describing the state of the item after the event. \n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/Disp\n    "
+                        },
+                        "bizStep": {
+                          "type": "string",
+                          "x-external-enumeration": "https://ref.gs1.org/cbv/BizStep",
+                          "description": "A business step code drawn from a controlled vocabulary. \n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BizStep\n    "
+                        },
+                        "bizLocation": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an EPCIS event until it is reported to be at a different Business Location by a subsequent EPCIS event. The bizLocation must be a resolvable URI that links to facility information and geolocation data."
+                        },
+                        "sensorElementList": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/SensorElement"
+                          },
+                          "description": "An array (one for each sensor) of sensor device data sets associated with the event. "
+                        }
+                      },
+                      "description": "Transaction represents an event in which one or more objects become associated or disassociated with one or more identified business transactions - such as the purchase / shipment of goods between buyer and seller."
+                    },
+                    "Party": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The decentralised identifier of the party - must be a W3C DID."
                         },
                         "name": {
                           "type": "string",
-                          "enum": ["Wholesale Beef"]
-                        }
-                      }
-                    },
-                    "destinationParty": {
-                      "type": "object",
-                      "properties": {
-                        "partyID": {
-                          "type": "string",
-                          "enum": ["https://primebeef.com/51161080100.json"]
+                          "description": "The name of the organization or company, represented as a text string."
                         },
-                        "name": {
-                          "type": "string",
-                          "enum": ["Prime Beef"]
+                        "identifiers": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Identifier"
+                          },
+                          "description": "A list of unique business identifiers assigned to the party - such as tax registration numbers."
                         }
-                      }
+                      },
+                      "description": "The Party class represents an entity such as an organization, or a company that manufactured the product."
                     },
-                    "transaction": {
+                    "Identifier": {
                       "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "scheme": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "the identifier scheme as defined by the registrar that manages the identifier registry. If the identifier scheme is registered with UNTP then this URI can use used to dicsover the resolution method (to get more data) and the verification method (to prove ownership)."
+                        },
+                        "identiferValue": {
+                          "type": "string",
+                          "description": "The value of the identifier within the scheme"
+                        },
+                        "binding": {
+                          "$ref": "#/$defs/Evidence",
+                          "description": "Link to evidence that attests to the validity and ownership of the identifer. "
+                        }
+                      },
+                      "description": "An identifier of a party, product, or facility that is defined by an identifier scheme and idenfier value and, optinally, verification evidence "
+                    },
+                    "Evidence": {
+                      "type": "object",
+                      "additionalProperties": false,
                       "properties": {
                         "type": {
                           "type": "string",
-                          "enum": ["bol", "cert", "desadv", "inv", "po"]
+                          "enum": ["w3c_vc", "iso_mdl", "document", "website", "other"],
+                          "example": "w3c_vc",
+                          "description": "Format of the evidence (verifiable credential, document, website, etc)"
+                        },
+                        "assuranceLevel": {
+                          "type": "string",
+                          "enum": ["Self", "Commercial", "Buyer", "Membership", "Unspecified", "3rdParty"],
+                          "example": "Self",
+                          "description": "The assurance level of the evidence (self declaration, 2nd party, 3rd party, accredited auditor)"
+                        },
+                        "reference": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The URL at which the evidence data can be found.  "
+                        }
+                      },
+                      "description": "Evidence to support a conformity or identity claim. "
+                    },
+                    "Item": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "itemID": {
+                          "x-jargon-isKey": true,
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The globally unique identifier (eg GS1 GTIN or digital link) of the product item.  "
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The name of the product class to which the product item belongs.  "
+                        }
+                      },
+                      "description": "A specific trade item /product code which could be either a product serial number or a consignment identifier "
+                    },
+                    "QuantityElement": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "epcClass": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "THe identifier of a product class (as opposed to a product instance) such as a GTIN code for a manufactured product."
+                        },
+                        "quantity": {
+                          "type": "number",
+                          "description": "The numeric quantity of the product class (eg 100 kg of cotton)"
+                        },
+                        "uom": {
+                          "type": "string",
+                          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
+                          "description": "The unit of measure for the quantity value (eg Kg or meters etc) using the UNECE Rec 20 unit of measure codelist.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+                        }
+                      },
+                      "description": "The quantity element is used to define the quantities (eg 100), units of measure (eg Kg) and product class (eg GTIN or other class identifier) of products that are inputs or outputs or the subject of supply chain events.  ",
+                      "required": ["quantity"]
+                    },
+                    "TradeDocument": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "x-external-enumeration": "https://ref.gs1.org/cbv/BTT",
+                          "description": "The document type representing the trade transaction drawn from the business transaction type vocabulary.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BTT\n    "
                         },
                         "identifier": {
                           "type": "string",
-                          "title": "Identifier (GS1 Barcode)"
+                          "description": "The identifier of the trade transaction document - eg an invoice number or bill of lading number.  Must be unique for a given source party"
                         },
                         "documentURL": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The URL of the referenced trade document. For integrity reasons, it is recommended (but not required) that the documentURL is a hashlink (https://w3c-ccg.github.io/hashlink/) so that if the document the URL is changed then the hash verification will fail."
                         }
                       },
-                      "required": ["identifier"]
+                      "description": "A trade transaction between two parties such as an invoice, purchase order, or shipping notification."
                     },
-                    "itemList": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "itemID": {
-                            "type": "string"
+                    "SensorElement": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "sensorMetadata": {
+                          "$ref": "#/$defs/Sensor",
+                          "description": "Data that describes the physical sensor that recorded the sensor data set."
+                        },
+                        "sensorReport": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/SensorData"
                           },
-                          "name": {
-                            "type": "string"
-                          }
+                          "description": "A list of sensor readings from the given sensor relevant to the traceability event context."
+                        },
+                        "sensorIntegrityProof": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "An optional reference to a verifiable credential signed by the sensor device or device manufacturer that contains the digitally signed raw data associated with this sensor report."
                         }
-                      }
+                      },
+                      "description": "A SensorElement is used to carry data related to an event that is captured one sensor such as an IoT device. Include one sensor property and an array of sensor data values."
                     },
-                    "quantityList": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "productClass": {
-                            "type": "string"
-                          },
-                          "quantity": {
-                            "type": "string"
-                          },
-                          "uom": {
-                            "type": "string"
-                          }
+                    "Sensor": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "device": {
+                          "$ref": "#/$defs/Item",
+                          "description": "The device Identifier for the sensor as a URI (typically an EPC)"
+                        },
+                        "dataProcessingMethod": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The data processing method used by the sensor - should reference a documented standard criteria as a URI"
                         }
-                      }
+                      },
+                      "description": "A physical sensor that records a sensor data set."
                     },
-                    "locationId": {
-                      "title": "Location ID",
-                      "type": "string",
-                      "enum": ["https://plus.codes/4RRHM6PR+MH"]
+                    "SensorData": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "time": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "the timestamp at which the sensor reading was made."
+                        },
+                        "type": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "the measurement type of the sensor reading, as a URI reference to a measurement method specification."
+                        },
+                        "value": {
+                          "type": "number",
+                          "description": "the sensor reading"
+                        },
+                        "uom": {
+                          "type": "string",
+                          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
+                          "description": "the unit of measure for the sensor reading\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+                        }
+                      },
+                      "description": "A data point read by a sensor."
                     }
                   }
                 },
-                "initialData": {},
+                "data": {},
                 "className": "json-form",
                 "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
@@ -782,7 +1688,7 @@
                     }
                   }
                 },
-                "initialData": {},
+                "data": {},
                 "className": "json-form",
                 "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
@@ -856,90 +1762,9 @@
               "props": {
                 "formTitle": "National Vendor Declaration",
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "sourceParty": {
-                      "type": "object",
-                      "properties": {
-                        "partyID": {
-                          "type": "string",
-                          "enum": ["https://wholesalebeef.com/41161080146.json"]
-                        },
-                        "name": {
-                          "type": "string",
-                          "enum": ["Wholesale Beef"]
-                        }
-                      }
-                    },
-                    "destinationParty": {
-                      "type": "object",
-                      "properties": {
-                        "partyID": {
-                          "type": "string",
-                          "enum": ["https://primebeef.com/51161080100.json"]
-                        },
-                        "name": {
-                          "type": "string",
-                          "enum": ["Prime Beef"]
-                        }
-                      }
-                    },
-                    "transaction": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "enum": ["bol", "cert", "desadv", "inv", "po"]
-                        },
-                        "identifier": {
-                          "type": "string",
-                          "title": "Identifier (GS1 Barcode)"
-                        },
-                        "documentURL": {
-                          "type": "string"
-                        }
-                      },
-                      "required": ["identifier"]
-                    },
-                    "itemList": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "itemID": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    },
-                    "quantityList": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "productClass": {
-                            "type": "string"
-                          },
-                          "quantity": {
-                            "type": "string"
-                          },
-                          "uom": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    },
-                    "locationId": {
-                      "title": "Location ID",
-                      "type": "string",
-                      "enum": ["https://plus.codes/4RRHM6PR+MH"]
-                    }
-                  }
+                  "url": "https://dpp.example.com/transaction-event-ld.json"
                 },
-                "initialData": {},
+                "data": {},
                 "className": "json-form",
                 "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
@@ -1050,7 +1875,7 @@
                     }
                   }
                 },
-                "initialData": {},
+                "data": {},
                 "className": "json-form",
                 "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
               }
@@ -1224,7 +2049,7 @@
                   }
                 }
               },
-              "initialData": {},
+              "data": {},
               "className": "json-form",
               "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
             },

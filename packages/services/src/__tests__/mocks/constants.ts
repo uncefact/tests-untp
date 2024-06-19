@@ -29,7 +29,7 @@ export const contextTransformationEvent = {
     url: 'https://storage.example.com',
     params: {
       resultPath: '',
-    }
+    },
   },
   productTransformation: {
     inputItems: [{ quantity: 1, uom: 'head', productClass: 'cattle' }],
@@ -93,7 +93,7 @@ export const contextTransformationEvent = {
       },
     ],
   },
-  identifierKeyPaths: ['NLIS'],
+  identifierKeyPath: '/NLIS',
 };
 
 export const dataTransformationEvent = {
@@ -130,7 +130,7 @@ export const contextObjectEvent = {
       resultPath: '',
     },
   },
-  identifierKeyPaths: ['herd', 'identifier'],
+  identifierKeyPath: '/herd/identifier',
 };
 
 export const dataObjectEvent = {
@@ -155,17 +155,21 @@ export const transactionEventMock = {
     credentialSubject: {
       sourceParty: { partyID: `https://beef-steak-shop.com/info.json`, name: 'Beef Steak Shop' },
       destinationParty: { partyID: 'https://beef-shop.com/info.json', name: 'Beef Shop' },
-      transaction: { type: 'inv', identifier: 'uuid-123456', documentURL: 'https://transaction-example.com/trans-uuid-1.json'},
+      transaction: {
+        type: 'inv',
+        identifier: 'uuid-123456',
+        documentURL: 'https://transaction-example.com/trans-uuid-1.json',
+      },
       itemList: [{ itemID: 'https://beef-example.com/info-uuid-1.json', name: 'Beef' }],
-      quantityList: [{ productClass: 'Beef', quantity: '50', uom: 'units' }]
+      quantityList: [{ productClass: 'Beef', quantity: '50', uom: 'units' }],
     },
   },
-}
+};
 
 /*============================= */
 
 export const aggregationEventMock = {
-  parentItem: [{ai: '01', value: '09359502000010'}],
+  parentItem: [{ ai: '01', value: '09359502000010' }],
   uploadedAggregationEventLinkMock: `https://s3.ap-southeast-2.amazonaws.com/9988776600000.json`,
   aggregationEventDLRMock: `https://example.com/gtin/9988776600000.json`,
   aggregationVCMock: {
@@ -173,9 +177,12 @@ export const aggregationEventMock = {
     type: ['VerifiableCredential', 'AggregationEventCredential'],
     issuer: 'did:web:example.com',
     credentialSubject: {
-      parentItem: { itemID: `https://example.com/gtin/beef-container-gin-9988776600000.json`, name: 'Beef Variety Container' },
+      parentItem: {
+        itemID: `https://example.com/gtin/beef-container-gin-9988776600000.json`,
+        name: 'Beef Variety Container',
+      },
       childItems: [{ itemID: 'http://example.com/beef-scotch-box.json', name: 'Beef Scotch Fillet Box' }],
-      childQuantityList: [{ productClass: 'Beef', quantity: '50', uom: 'box' }]
+      childQuantityList: [{ productClass: 'Beef', quantity: '50', uom: 'box' }],
     },
   },
-}
+};

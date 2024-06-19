@@ -1,5 +1,5 @@
 import { IGetStorageServiceLink, IStorageService } from './types/storage.js';
-import { getStorageUrlByPath } from './utils/helpers.js';
+import { getValueByPath } from './utils/helpers.js';
 import { publicAPI } from './utils/httpService.js';
 
 export const storageService: IStorageService = async (config) => {
@@ -17,7 +17,7 @@ export const storageService: IStorageService = async (config) => {
         throw new Error(`Unsupported method`);
     }
 
-    const getResultByPath = getStorageUrlByPath(result, params.resultPath);
+    const getResultByPath = getValueByPath(result, params.resultPath);
     return getResultByPath;
   } catch (error: any) {
     console.error(error);
