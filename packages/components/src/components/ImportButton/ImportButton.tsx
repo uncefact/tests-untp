@@ -3,7 +3,6 @@ import { Box } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 import { UploadFile as UploadFileIcon } from '@mui/icons-material';
 import { BtnStyle } from '../../types/index.js';
-import { getBtnThemeStyle } from '../../utils/index.js';
 
 export interface IImportButtonProps {
   onChange: (data: object[]) => void;
@@ -90,7 +89,6 @@ export const ImportButton = ({ label = 'Import', onChange, btnStyle }: IImportBu
           variant='outlined'
           startIcon={<UploadFileIcon />}
           sx={{ margin: '0 5px' }}
-          style={getBtnThemeStyle(btnStyle)}
         >
           {label}
           <input data-testid='file-input' type='file' accept='.json' hidden onChange={handleFileUpload} multiple />

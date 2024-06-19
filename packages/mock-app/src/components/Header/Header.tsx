@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { JSX } from 'react/jsx-runtime';
 import {
   AppBar,
   Toolbar,
@@ -24,7 +25,7 @@ import DialpadIcon from '@mui/icons-material/Dialpad';
 
 import appConfig from '../../constants/app-config.json';
 import { convertPathToString, convertStringToPath } from '../../utils';
-import { IStyles } from '../../types/common.types';
+import { ThemeContext } from '../../hooks/ThemContext';
 
 type ConfigAppType = typeof appConfig;
 
@@ -45,15 +46,10 @@ const iconConfig: { [key: string]: JSX.Element } = {
 function Header() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { toggleTheme } = useContext<any>(ThemeContext);
 
   const [open, setOpen] = useState(false);
   const [headerBrandInfo, setHeaderBrandInfo] = useState(initialHeaderBrandInfo);
-  const [styles, setStyles] = useState<IStyles>();
-  const [scanningStyles] = useState({
-    primaryColor: 'yellow',
-    secondaryColor: 'black',
-    tertiaryColor: 'black',
-  });
 
   const toggleDrawer = (newOpen: boolean) => () => {
     setOpen(newOpen);
@@ -73,18 +69,13 @@ function Header() {
       },
     });
 
-    setStyles(subAppStyles?.styles ?? appConfig.styles);
-    sessionStorage.setItem('theme_style', JSON.stringify(subAppStyles?.styles));
+    toggleTheme(subAppStyles?.styles);
 
     const defaultHeader = ['/', '/404'];
     if (defaultHeader.includes(path)) {
       setHeaderBrandInfo(initialHeaderBrandInfo);
-      setStyles(appConfig.styles);
     }
 
-    if (path === '/scanning') {
-      setStyles(scanningStyles);
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
@@ -96,7 +87,7 @@ function Header() {
     return iconConfig[value.name];
   };
 
-  const SideBarComponent = ({ app, route, styles }: { app: any; route: string; styles: IStyles }) => (
+  const SideBarComponent = ({ app, route }: { app: any; route: string }) => (
     <List>
       <ListItem key={app.name} disablePadding>
         <ListItemButton
@@ -113,18 +104,18 @@ function Header() {
     </List>
   );
 
-  const renderSidebarElements = (configApp: ConfigAppType, scanningRoute: string, scanningStyles: IStyles) => {
+  const renderSidebarElements = (configApp: ConfigAppType, scanningRoute: string) => {
     const menuItems = configApp.apps.map((app: any) => {
       const route = `/${convertStringToPath(app.name)}`;
-      return <SideBarComponent app={app} route={route} styles={app.styles} />;
+      return <SideBarComponent app={app} route={route} />;
     });
 
     // Add Scanning menu item
-    menuItems.push(<SideBarComponent app={{ name: 'Scanning' }} route={scanningRoute} styles={scanningStyles} />);
+    menuItems.push(<SideBarComponent app={{ name: 'Scanning' }} route={scanningRoute} />);
 
-    const menuItemGeneratorFeatures = appConfig.generalFeatures.map((app) => {
+    const menuItemGeneratorFeatures = appConfig.generalFeatures.map((app: any) => {
       const path = `/${convertStringToPath(app.name)}`;
-      return <SideBarComponent app={app} route={path} styles={app.styles} />;
+      return <SideBarComponent app={app} route={path} />;
     });
 
     menuItems.push(...menuItemGeneratorFeatures);
@@ -135,7 +126,7 @@ function Header() {
   const renderSidebar = () => {
     const scanningRoute = '/scanning';
 
-    return renderSidebarElements(appConfig, scanningRoute, scanningStyles);
+    return renderSidebarElements(appConfig, scanningRoute);
   };
 
   const renderHeaderText = (appConfig: ConfigAppType, headerTitle: typeof initialHeaderBrandInfo) => {
@@ -169,8 +160,8 @@ function Header() {
     navigate(path);
   };
 
-  return styles?.primaryColor && styles?.secondaryColor && styles?.tertiaryColor ? (
-    <AppBar component='nav' sx={{ background: styles.primaryColor }}>
+  return (
+    <AppBar component='nav'>
       <Container maxWidth='xl'>
         <Toolbar disableGutters>
           <Box sx={{ flexGrow: 1, display: { xs: 'flex' } }} data-testid='menu'>
@@ -181,7 +172,11 @@ function Header() {
               aria-haspopup='true'
               onClick={toggleDrawer(true)}
             >
-              <MenuIcon sx={{ color: styles.secondaryColor }} />
+              <MenuIcon
+                sx={{
+                  color: 'primary.typography',
+                }}
+              />
             </IconButton>
 
             <Drawer open={open} onClose={toggleDrawer(false)}>
@@ -195,14 +190,7 @@ function Header() {
                     padding: '10px',
                   }}
                 >
-                  <Typography
-                    variant='h5'
-                    sx={{
-                      color: appConfig.styles.secondaryColor,
-                    }}
-                  >
-                    {appConfig.name}
-                  </Typography>
+                  <Typography variant='h5'>{appConfig.name}</Typography>
                 </Stack>
                 <Divider />
                 {renderSidebar()}
@@ -238,7 +226,7 @@ function Header() {
             {!headerBrandInfo.name.includes(appConfig.name) && (
               <Button
                 sx={{
-                  color: styles.secondaryColor,
+                  color: 'primary.typography',
                 }}
               >
                 Back to Home
@@ -248,7 +236,7 @@ function Header() {
         </Toolbar>
       </Container>
     </AppBar>
-  ) : null;
+  );
 }
 
 export default Header;

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Button } from '@mui/material';
 import { BtnStyle } from '../../types/index.js';
-import { getBtnThemeStyle } from '../../utils/index.js';
 
 export enum DownloadFileType {
   json = 'application/json',
@@ -50,7 +49,7 @@ export const DownloadButton = ({
 
   return (
     <>
-      <Button onClick={handleClickDownload} variant='contained' style={getBtnThemeStyle(downloadBtnStyle)}>
+      <Button onClick={handleClickDownload} variant='contained'>
         {label}
       </Button>
     </>

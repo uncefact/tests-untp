@@ -41,7 +41,6 @@ export const CustomButton: React.FC<ButtonProps> = ({
       <Box p={1}>
         <Tooltip title={props.description}>
           <LoadingButton
-            style={getBtnThemeStyle(btnStyle)}
             loading={loading}
             variant='contained'
             onClick={handleOnClick}
