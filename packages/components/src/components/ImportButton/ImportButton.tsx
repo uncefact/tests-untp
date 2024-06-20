@@ -89,7 +89,15 @@ export const ImportButton = ({ label = 'Import', onChange, ...props }: IImportBu
           component='label'
           variant='outlined'
           startIcon={<UploadFileIcon />}
-          sx={{ margin: '0 5px', backgroundColor: props.style?.backgroundColor, color: props.style?.color }}
+          sx={{
+            margin: '0 5px',
+            backgroundColor: props.style?.backgroundColor,
+            color: props.style?.color,
+            '&:hover': {
+              backgroundColor: props.style?.backgroundColor,
+              filter: 'brightness(0.9)',
+            },
+          }}
         >
           {label}
           <input data-testid='file-input' type='file' accept='.json' hidden onChange={handleFileUpload} multiple />
