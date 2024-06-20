@@ -512,37 +512,37 @@
         <div class="header-image">
           <p class="header-image-top-left">PRODUCT PASSPORT</p>
           <div class="header-image-bottom-left">
-            <h1>{{credentialSubject.product.modelName}}</h1>
+            <h1>{{credentialSubject.modelName}}</h1>
           </div>
         </div>
 
         <div class="header-batch">
-          {{#each credentialSubject.product.batchIdentifiers}}
+          {{#each credentialSubject.batchIdentifier}}
           <div class="header-batch-item">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path
                 d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
                 fill="#1F5A95" />
             </svg>
-            <a href="{{identifierURI}}" class="blue-bottom-line">Batch: {{identifierValue}}</a>
+            <a href="{{binding.reference}}" class="blue-bottom-line">Batch: {{identifierValue}}</a>
           </div>
-          {{/each}} {{#each credentialSubject.product.productIdentifiers}}
+          {{/each}} {{#each credentialSubject.productIdentifier}}
           <div class="header-batch-item">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path
                 d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
                 fill="#1F5A95" />
             </svg>
-            <a href="{{identifierURI}}" class="blue-bottom-line">SKU: {{identifierValue}}</a>
+            <a href="{{binding.reference}}" class="blue-bottom-line">SKU: {{identifierValue}}</a>
           </div>
-          {{/each}} {{#each credentialSubject.product.itemIdentifiers}}
+          {{/each}} {{#each credentialSubject.itemIdentifier}}
           <div class="header-batch-item">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path
                 d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
                 fill="#1F5A95" />
             </svg>
-            <a href="{{identifierURI}}" class="blue-bottom-line">GTIN: {{identifierValue}}</a>
+            <a href="{{binding.reference}}" class="blue-bottom-line">GTIN: {{identifierValue}}</a>
           </div>
           {{/each}}
         </div>
@@ -553,42 +553,42 @@
       <div class="passport-box">
         <div class="passport-box-item">
           <h3>Sustainability</h3>
-          <p>{{credentialSubject.sustainabilityScore}}%</p>
+          <p>100%</p>
         </div>
         <div class="passport-box-item">
           <h3>Confidence</h3>
-          <p>{{credentialSubject.trustScore}}%</p>
+          <p>100%</p>
         </div>
       </div>
 
       <div class="passport-issued-by">
         <div class="passport-issued-by-header">
           <p>PASSPORT ISSUED BY</p>
-          <h3>{{credentialSubject.issuedBy.name}}</h3>
+          <h3>{{issuer.name}}</h3>
         </div>
         <div class="passport-info">
           <div class="passport-info-item">
             <div class="passport-info-item-title">Industry</div>
             <!-- TODO review element -->
-            <p>Steel</p>
+            <a href="#">Unknown</a>
           </div>
           <div class="passport-info-item">
             <div class="passport-info-item-title">Business identifier</div>
             <!-- TODO review element -->
-            <a href="#">123</a>
+            <a href="{{issuer.identifiers.0.scheme}}">{{issuer.identifiers.0.identifierValue}}</a>
           </div>
           <div class="passport-info-item">
             <div class="passport-info-item-title">Location</div>
             <!-- TODO review element -->
-            <a href="#">Australia</a>
+            <a href="{{credentialSubject.manufacturedAt.location}}">Unknown</a>
           </div>
           <div class="passport-info-item">
             <div class="passport-info-item-title">Identity verification</div>
             <div class="passport-info-item-vc">
               <!-- TODO: review element -->
-              <a href="{{credentialSubject.issuedBy.identifiers.0.identifierURI}}">Identity verification</a>
+              <a href="{{issuer.identifiers.0.binding.reference}}">Unknown</a>
               <!-- TODO: Should only show if is VC - issuer.identifiers.0.binding.type === w3c_vc -->
-              {{!-- {{#if (eq issuer.identifiers.0.binding.type "w3c_vc")}} --}}
+              {{#if (eq issuer.identifiers.0.binding.type "w3c_vc")}}
                 <div class="tag vc-tag">
                   <div class="vc-tag-text">Verifiable credential</div>
                   <div class="icon">
@@ -606,7 +606,7 @@
                     </svg>
                   </div>
                 </div>
-              {{!-- {{/if}} --}}
+              {{/if}}
             </div>
           </div>
         </div>
@@ -621,7 +621,7 @@
           product ESG performance against credible standards or regulations
         </p>
       </div>
-      {{#each credentialSubject.product.conformityClaims}}
+      {{#each credentialSubject.conformityClaim}}
       <div class="esg-claims-box">
         <div class="conformity-box">
           <p class="conformity-box-title">{{topic}}</p>
@@ -629,21 +629,21 @@
             <div>
               <!-- TODO: Will raise with UNTP -->
               <div class="conformity-claimed-title">
-                {{claimedValues.0.value}}% per {{claimedValues.0.unit}}
+                {{claimedValues.0.value.value}}% per {{claimedValues.0.value.unit}}
               </div>
               <div class="conformity-claimed-description">Claimed</div>
             </div>
             <div>
               <!-- TODO: Will raise with UNTP -->
               <div class="conformity-claimed-title">
-                {{benchmarkValue.value}}% per {{benchmarkValue.unit}}
+                {{benchmarkValue.value.value}}% per {{benchmarkValue.value.unit}}
               </div>
               <div class="conformity-claimed-description">Benchmark</div>
             </div>
           </div>
           <div class="conformity-vc-details">
           <!-- TODO: Should only show if is VC - conformityEvidence.type === w3c_vc -->
-          {{!-- {{#if (eq conformityEvidence.type "w3c_vc")}} --}}
+          {{#if (eq conformityEvidence.type "w3c_vc")}}
             <div class="tag vc-tag">
               <div class="vc-tag-text">Verifiable credential</div>
               <div class="icon">
@@ -661,8 +661,8 @@
                 </svg>
               </div>
             </div>
-          {{!-- {{/if}} --}}
-            <a href="{{criteriaReference}}" class="conformity-view-details">
+          {{/if}}
+            <a href="{{conformityEvidence.reference}}" class="conformity-view-details">
               <p>View details</p>
               <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M1 1.5L7.66667 7.99842M7.66667 7.99842L1 14.5M7.66667 7.99842H7" stroke="#4F95DD"
@@ -685,13 +685,13 @@
       </div>
 
       <div class="composition-box">
-        {{#each credentialSubject.product.materialsProvenance}}
+        {{#each credentialSubject.materialsProvenance}}
         <div class="composition-box-item">
           <div class="composition-box-first-column">
-            <p class="composition-percent">90%</p>
+            <p class="composition-percent">{{massFraction}}%</p>
             <div class="composition-box-second-column">
               <!-- TODO: review elements  -->
-              <p class="composition-id">ID 123456789</p>
+              <p class="composition-id">ID {{materialType.classifierValue}}</p>
               <p class="composition-title">{{materialType.classifierName}}</p>
               <div class="composition-tag">
                 {{#if recycled}}
@@ -726,7 +726,7 @@
       </div>
 
       <div class="traceability-event">
-        {{#each credentialSubject.product.traceabilityInformation}}
+        {{#each credentialSubject.traceabilityInformation}}
         <div class="traceability-event-item">
           <span>{{eventType}}</span>
           <a href="{{eventReference}}">View</a>
@@ -742,32 +742,32 @@
       <div class="product-info">
         <div class="product-info-item">
           <span>Manuf. Date</span>
-          <p>{{credentialSubject.product.manufacturedDate}}</p>
+          <p>{{credentialSubject.manufacturedDate}}</p>
         </div>
         <div class="product-info-item">
           <span>Batch No.</span>
           <!--TODO: check element -->
-          <p>{{credentialSubject.product.batchIdentifiers.0.identifierValue}}</p>
+          <p>{{credentialSubject.batchIdentifier.0.identifierValue}}</p>
         </div>
         <div class="product-info-item">
           <span>Weight</span>
-          <p>{{credentialSubject.product.dimensions.weight.value}}{{credentialSubject.product.dimensions.weight.unit}}</p>
+          <p>{{credentialSubject.dimension.weight.value}}{{credentialSubject.dimension.weight.unit}}</p>
         </div>
         <div class="product-info-item">
           <span>Length</span>
-          <p>{{credentialSubject.product.dimensions.length.value}}{{credentialSubject.product.dimensions.weight.unit}}</p>
+          <p>{{credentialSubject.dimension.length.value}}{{credentialSubject.dimension.weight.unit}}</p>
         </div>
         <div class="product-info-item">
           <span>Width</span>
-          <p>{{credentialSubject.product.dimensions.width.value}}{{credentialSubject.product.dimensions.weight.unit}}</p>
+          <p>{{credentialSubject.dimension.width.value}}{{credentialSubject.dimension.weight.unit}}</p>
         </div>
         <div class="product-info-item">
           <span>Height</span>
-          <p>{{credentialSubject.product.dimensions.height.value}}{{credentialSubject.product.dimensions.weight.unit}}</p>
+          <p>{{credentialSubject.dimension.height.value}}{{credentialSubject.dimension.weight.unit}}</p>
         </div>
         <div class="product-info-item">
           <span>Description</span>
-          <p>{{credentialSubject.product.description}}</p>
+          <p>{{credentialSubject.description}}</p>
         </div>
       </div>
     </section>
