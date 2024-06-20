@@ -46,38 +46,19 @@ const iconConfig: { [key: string]: JSX.Element } = {
 function Header() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { toggleTheme } = useContext<any>(ThemeContext);
+  const { toggleTheme, theme } = useContext<any>(ThemeContext);
 
   const [open, setOpen] = useState(false);
-  const [headerBrandInfo, setHeaderBrandInfo] = useState(initialHeaderBrandInfo);
+  const [headerBrandInfo, setHeaderBrandInfo] = useState({
+    name: '',
+    assets: {
+      logo: '',
+    },
+  });
 
   const toggleDrawer = (newOpen: boolean) => () => {
     setOpen(newOpen);
   };
-
-  useEffect(() => {
-    const path = location.pathname;
-    const nameLink = convertPathToString(path ?? '');
-    const subAppStyles =
-      appConfig.apps.find((app) => app.name.toLocaleLowerCase() === nameLink.toLocaleLowerCase()) ??
-      appConfig.generalFeatures.find((app) => app.name.toLocaleLowerCase() === nameLink.toLocaleLowerCase());
-
-    setHeaderBrandInfo({
-      name: convertPathToString(path ?? ''),
-      assets: {
-        logo: subAppStyles && 'assets' in subAppStyles ? subAppStyles?.assets?.logo : '',
-      },
-    });
-
-    toggleTheme(subAppStyles?.styles);
-
-    const defaultHeader = ['/', '/404'];
-    if (defaultHeader.includes(path)) {
-      setHeaderBrandInfo(initialHeaderBrandInfo);
-    }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
 
   const renderAvatar = (value: any) => {
     if (value?.assets?.logo) {
@@ -130,12 +111,10 @@ function Header() {
   };
 
   const renderHeaderText = (appConfig: ConfigAppType, headerTitle: typeof initialHeaderBrandInfo) => {
-    const app = appConfig.apps.find((app) => app.name === headerTitle.name);
     return (
       <Typography
         variant='h5'
         sx={{
-          color: app ? app.styles.secondaryColor : appConfig.styles.secondaryColor,
           fontSize: {
             xs: '20px',
             md: '24px',
@@ -160,7 +139,32 @@ function Header() {
     navigate(path);
   };
 
-  return (
+  useEffect(() => {
+    const path = location.pathname;
+    const nameLink = convertPathToString(path ?? '');
+    const subAppStyles =
+      appConfig.apps.find((app) => app.name.toLocaleLowerCase() === nameLink.toLocaleLowerCase()) ??
+      appConfig.generalFeatures.find((app) => app.name.toLocaleLowerCase() === nameLink.toLocaleLowerCase());
+
+    setHeaderBrandInfo({
+      name: convertPathToString(path ?? ''),
+      assets: {
+        logo: subAppStyles && 'assets' in subAppStyles ? subAppStyles?.assets?.logo : '',
+      },
+    });
+
+    const defaultHeader = ['/', '/404'];
+    if (defaultHeader.includes(path)) {
+      toggleTheme(appConfig.styles);
+      setHeaderBrandInfo(initialHeaderBrandInfo);
+    } else {
+      toggleTheme(subAppStyles?.styles);
+    }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  return theme?.primaryColor && theme?.secondaryColor && theme?.tertiaryColor ? (
     <AppBar component='nav'>
       <Container maxWidth='xl'>
         <Toolbar disableGutters>
@@ -190,7 +194,7 @@ function Header() {
                     padding: '10px',
                   }}
                 >
-                  <Typography variant='h5'>{appConfig.name}</Typography>
+                  <Typography variant='h5' sx={{color: 'black'}}>{appConfig.name}</Typography>
                 </Stack>
                 <Divider />
                 {renderSidebar()}
@@ -236,7 +240,7 @@ function Header() {
         </Toolbar>
       </Container>
     </AppBar>
-  );
+  ) : null;
 }
 
 export default Header;

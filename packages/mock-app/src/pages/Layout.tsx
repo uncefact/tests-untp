@@ -9,7 +9,7 @@ import { ThemeSettings } from '../utils/theme';
 import { ThemeContext } from '../hooks/ThemContext';
 
 function Layout() {
-  const [theme, setTheme] = useState(appConfig.styles);
+  const [theme, setTheme] = useState();
   const muiTheme = ThemeSettings(theme ?? appConfig.styles);
 
   const toggleTheme = useCallback((newTheme: any) => {

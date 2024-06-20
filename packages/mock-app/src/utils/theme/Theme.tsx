@@ -5,11 +5,12 @@ const ThemeSettings = (styles: any = {}) => {
     palette: {
       primary: {
         main: styles?.primaryColor,
-        typography: styles?.secondaryColor,
+        typography: styles?.tertiaryColor,
+        contrastText: styles?.tertiaryColor, // text color, intended to contrast with main
       },
     },
 
-    typography: styles?.secondaryColor,
+    typography: styles?.tertiaryColor,
   };
 
   const theme = createTheme(baseMode);

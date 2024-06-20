@@ -13,7 +13,6 @@ export interface IDownloadButtonProps {
   fileExtension: string;
   fileType: DownloadFileType;
   label?: string;
-  downloadBtnStyle?: BtnStyle;
 }
 
 export const DownloadButton = ({
@@ -22,7 +21,6 @@ export const DownloadButton = ({
   fileName,
   fileExtension,
   fileType,
-  downloadBtnStyle,
 }: IDownloadButtonProps) => {
   const handleDownloadFile = ({ fileData, fileName, fileExtension, fileType }: IDownloadButtonProps) => {
     const element = document.createElement('a');

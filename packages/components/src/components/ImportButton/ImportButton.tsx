@@ -7,20 +7,21 @@ import { BtnStyle } from '../../types/index.js';
 export interface IImportButtonProps {
   onChange: (data: object[]) => void;
   label?: string;
-  btnStyle?: BtnStyle;
+  style?: BtnStyle;
 }
 
 /**
  * ImportButton component is used to display the footer
  */
-export const ImportButton = ({ label = 'Import', onChange, btnStyle }: IImportButtonProps) => {
+export const ImportButton = ({ label = 'Import', onChange, ...props }: IImportButtonProps) => {
   const [loading, setLoading] = useState<boolean>(false);
 
   const loadJsonFile = (file: File): Promise<object> => {
     const maxFileSizeMB = 5;
 
     return new Promise((resolve) => {
-      if (file.size > maxFileSizeMB * 1024 * 1024) {// 5 MB
+      if (file.size > maxFileSizeMB * 1024 * 1024) {
+        // 5 MB
         throw new Error(`File size exceeds the maximum allowed size of ${maxFileSizeMB} MB.`);
       }
       const fileReader = new FileReader();
@@ -45,7 +46,7 @@ export const ImportButton = ({ label = 'Import', onChange, btnStyle }: IImportBu
 
       fileReader.readAsText(file);
     });
-  }
+  };
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     setLoading(true);
@@ -88,7 +89,7 @@ export const ImportButton = ({ label = 'Import', onChange, btnStyle }: IImportBu
           component='label'
           variant='outlined'
           startIcon={<UploadFileIcon />}
-          sx={{ margin: '0 5px' }}
+          sx={{ margin: '0 5px', backgroundColor: props.style?.backgroundColor, color: props.style?.color }}
         >
           {label}
           <input data-testid='file-input' type='file' accept='.json' hidden onChange={handleFileUpload} multiple />
