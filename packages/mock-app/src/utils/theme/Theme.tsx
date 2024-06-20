@@ -4,9 +4,9 @@ const ThemeSettings = (styles: any = {}) => {
   const baseMode = {
     palette: {
       primary: {
-        main: styles?.primaryColor,
-        typography: styles?.tertiaryColor,
-        contrastText: styles?.tertiaryColor, // text color, intended to contrast with main
+        main: styles?.primaryColor ?? '#ffffff',
+        typography: styles?.tertiaryColor ?? '#ffffff',
+        contrastText: styles?.tertiaryColor ?? '#ffffff', // text color, intended to contrast with main
       },
     },
 

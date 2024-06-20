@@ -3,14 +3,13 @@ import { Container, ThemeProvider } from '@mui/material';
 import { Footer } from '@mock-app/components';
 
 import Header from '../components/Header/Header';
-import appConfig from '../constants/app-config.json';
 import { Router } from '../components/Router';
 import { ThemeSettings } from '../utils/theme';
 import { ThemeContext } from '../hooks/ThemContext';
 
 function Layout() {
   const [theme, setTheme] = useState();
-  const muiTheme = ThemeSettings(theme ?? appConfig.styles);
+  const muiTheme = ThemeSettings(theme);
 
   const toggleTheme = useCallback((newTheme: any) => {
     setTheme(newTheme);
