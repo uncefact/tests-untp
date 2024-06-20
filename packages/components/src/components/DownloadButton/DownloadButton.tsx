@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@mui/material';
 import { BtnStyle } from '../../types/index.js';
+import { getBtnThemeStyle } from '../../utils/index.js';
 
 export enum DownloadFileType {
   json = 'application/json',
@@ -13,6 +14,7 @@ export interface IDownloadButtonProps {
   fileExtension: string;
   fileType: DownloadFileType;
   label?: string;
+  downloadBtnStyle?: BtnStyle;
 }
 
 export const DownloadButton = ({
@@ -21,6 +23,7 @@ export const DownloadButton = ({
   fileName,
   fileExtension,
   fileType,
+  downloadBtnStyle,
 }: IDownloadButtonProps) => {
   const handleDownloadFile = ({ fileData, fileName, fileExtension, fileType }: IDownloadButtonProps) => {
     const element = document.createElement('a');
@@ -47,7 +50,7 @@ export const DownloadButton = ({
 
   return (
     <>
-      <Button onClick={handleClickDownload} variant='contained'>
+      <Button onClick={handleClickDownload} variant='contained' style={getBtnThemeStyle(downloadBtnStyle)}>
         {label}
       </Button>
     </>

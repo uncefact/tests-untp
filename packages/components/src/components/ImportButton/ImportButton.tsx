@@ -3,25 +3,25 @@ import { Box } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 import { UploadFile as UploadFileIcon } from '@mui/icons-material';
 import { BtnStyle } from '../../types/index.js';
+import { getBtnThemeStyle } from '../../utils/index.js';
 
 export interface IImportButtonProps {
   onChange: (data: object[]) => void;
   label?: string;
-  style?: BtnStyle;
+  btnStyle?: BtnStyle;
 }
 
 /**
  * ImportButton component is used to display the footer
  */
-export const ImportButton = ({ label = 'Import', onChange, ...props }: IImportButtonProps) => {
+export const ImportButton = ({ label = 'Import', onChange, btnStyle }: IImportButtonProps) => {
   const [loading, setLoading] = useState<boolean>(false);
 
   const loadJsonFile = (file: File): Promise<object> => {
     const maxFileSizeMB = 5;
 
     return new Promise((resolve) => {
-      if (file.size > maxFileSizeMB * 1024 * 1024) {
-        // 5 MB
+      if (file.size > maxFileSizeMB * 1024 * 1024) {// 5 MB
         throw new Error(`File size exceeds the maximum allowed size of ${maxFileSizeMB} MB.`);
       }
       const fileReader = new FileReader();
@@ -46,7 +46,7 @@ export const ImportButton = ({ label = 'Import', onChange, ...props }: IImportBu
 
       fileReader.readAsText(file);
     });
-  };
+  }
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     setLoading(true);
@@ -84,7 +84,14 @@ export const ImportButton = ({ label = 'Import', onChange, ...props }: IImportBu
           marginBottom: '20px',
         }}
       >
-        <LoadingButton loading={loading} component='label' variant='outlined' startIcon={<UploadFileIcon />}>
+        <LoadingButton
+          loading={loading}
+          component='label'
+          variant='outlined'
+          startIcon={<UploadFileIcon />}
+          sx={{ margin: '0 5px' }}
+          style={getBtnThemeStyle(btnStyle)}
+        >
           {label}
           <input data-testid='file-input' type='file' accept='.json' hidden onChange={handleFileUpload} multiple />
         </LoadingButton>

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useContext, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Box, CircularProgress, Stack } from '@mui/material';
 import { VerifiableCredential } from '@vckit/core-types';
 import { Html5QrcodeResult } from 'html5-qrcode';
@@ -7,9 +7,8 @@ import { toastMessage, Status, ToastMessage } from '@mock-app/components';
 import { getDlrPassport, IdentityProvider, getProviderByType } from '@mock-app/services';
 import { Scanner } from '../components/Scanner';
 import { IScannerRef } from '../types/scanner.types';
-import { CustomDialog } from '../components/CustomDialog';
-import { ThemeContext } from '../hooks/ThemContext';
 import appConfig from '../constants/app-config.json';
+import { CustomDialog } from '../components/CustomDialog';
 
 const Scanning = () => {
   const scannerRef = useRef<IScannerRef | null>(null);
@@ -18,7 +17,6 @@ const Scanning = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [openDialogErrorCode, setOpenDialogErrorCode] = useState<boolean>(false);
   const navigate = useNavigate();
-  const { toggleTheme } = useContext<any>(ThemeContext);
 
   const goVerifyPage = async (identityProvider: IdentityProvider) => {
     try {
@@ -81,14 +79,6 @@ const Scanning = () => {
   const handleCloseDialogErrorFetchProductData = () => {
     setOpenDialogErrorCode(false);
   };
-
-  useEffect(() => {
-    toggleTheme({
-      primaryColor: '#E2D212',
-      secondaryColor: '#000000',
-      tertiaryColor: '#ffffff',
-    });
-  }, [toggleTheme]);
 
   return (
     <Box

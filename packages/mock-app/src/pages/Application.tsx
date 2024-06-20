@@ -9,6 +9,7 @@ export interface IApplication {
 }
 
 const Application = ({ app }: IApplication) => {
+
   const renderFeatures = (app: IApp) => {
     const parentPath = `/${convertStringToPath(app.name)}`;
 
@@ -17,10 +18,12 @@ const Application = ({ app }: IApplication) => {
       return (
         <Button
           sx={{
-            color: 'primary.typography',
+            background: app.styles.primaryColor,
+            color: app.styles.secondaryColor,
             '&:hover': {
+              backgroundColor: app.styles.primaryColor,
               filter: 'brightness(0.9)',
-            },
+            }
           }}
           key={childPath}
           variant='contained'
