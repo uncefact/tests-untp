@@ -38,19 +38,7 @@ export const CustomButton: React.FC<ButtonProps> = ({
     <Box display='flex' justifyContent='center' p={1}>
       <Box p={1}>
         <Tooltip title={props.description}>
-          <LoadingButton
-            sx={{
-              backgroundColor: props.style?.backgroundColor,
-              color: props.style?.color,
-              '&:hover': {
-                backgroundColor: props.style?.backgroundColor,
-                filter: 'brightness(0.9)',
-              },
-            }}
-            loading={loading}
-            variant='contained'
-            onClick={handleOnClick}
-          >
+          <LoadingButton loading={loading} variant='contained' onClick={handleOnClick}>
             {label}
           </LoadingButton>
         </Tooltip>
