@@ -588,7 +588,7 @@
               <!-- TODO: review element -->
               <a href="{{issuer.identifiers.0.binding.reference}}">Unknown</a>
               <!-- TODO: Should only show if is VC - issuer.identifiers.0.binding.type === w3c_vc -->
-              {{#if (eq issuer.identifiers.0.binding.type "w3c_vc")}}
+              {{!-- {{#if (eq issuer.identifiers.0.binding.type "w3c_vc")}} --}}
                 <div class="tag vc-tag">
                   <div class="vc-tag-text">Verifiable credential</div>
                   <div class="icon">
@@ -606,7 +606,7 @@
                     </svg>
                   </div>
                 </div>
-              {{/if}}
+              {{!-- {{/if}} --}}
             </div>
           </div>
         </div>
@@ -643,7 +643,7 @@
           </div>
           <div class="conformity-vc-details">
           <!-- TODO: Should only show if is VC - conformityEvidence.type === w3c_vc -->
-          {{#if (eq conformityEvidence.type "w3c_vc")}}
+          {{!-- {{#if (eq conformityEvidence.type "w3c_vc")}} --}}
             <div class="tag vc-tag">
               <div class="vc-tag-text">Verifiable credential</div>
               <div class="icon">
@@ -661,7 +661,7 @@
                 </svg>
               </div>
             </div>
-          {{/if}}
+          {{!-- {{/if}} --}}
             <a href="{{conformityEvidence.reference}}" class="conformity-view-details">
               <p>View details</p>
               <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
