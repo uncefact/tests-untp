@@ -28,8 +28,9 @@ https://jargon.sh/user/unece/untp-vocab/v/working/artefacts/jsonSchemas/render.j
 
     .container {
       background: #FAFAFA;
-      min-width: 150px;
-      width: 390px;
+      text-align: initial;
+      min-width: 290px;
+      max-width: 390px;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
@@ -438,33 +439,31 @@ https://jargon.sh/user/unece/untp-vocab/v/working/artefacts/jsonSchemas/render.j
       <div class="event-issued-header">
         <div class="event-issued-by">
           <p>EVENT ISSUED BY</p>
-          <!-- FIXME -->
           <h2>{{issuer.name}}</h2>
         </div>
         <div class="event-issued-items">
-          {{#each issuer.identifiers}}
           <div class="event-issued-item">
             <div class="event-issued-item-title">Industry</div>
-            <!-- FIXME -->
-            <div class="event-issued-item-value">Needs to be replaced...</div>
+            <!-- TODO: Hardcode + remove for each -->
+            <div class="event-issued-item-value">Hardcoded value...</div>
           </div>
           <div class="event-issued-item">
             <div class="event-issued-item-title">Business identifier</div>
-            <!-- FIXME -->
-            <a href="#" class="event-issued-item-value blue-bottom-line">Needs to be replaced...</a>
+            <!-- TODO: Review -->
+            <a href="#" class="event-issued-item-value blue-bottom-line">{{issuer.identifiers.0.identifierValue}}</a>
           </div>
           <div class="event-issued-item">
             <div class="event-issued-item-title">Location</div>
             <div class="event-issued-item-values">
-              <!-- FIXME -->
-              <a href="#" class="event-issued-item-value blue-bottom-line">Needs to be replaced...</a>
+              <!-- TODO: Review -->
+              <a href="{{credentialSubject.bizLocation}}" class="event-issued-item-value blue-bottom-line">Hardcoded value...</a>
             </div>
           </div>
           <div class="event-issued-item">
             <div class="event-issued-item-title">Identity verification</div>
             <div class="event-issued-item-values">
-              <!-- FIXME -->
-              <a href="{{scheme}}" class="event-issued-item-value blue-bottom-line">{{identifierValue}}</a>
+              <!-- TODO: Review + conditional tag -->
+              <a href="{{issuer.name}}" class="event-issued-item-value blue-bottom-line">{{issuer.identifiers.0.binding.reference}}</a>
               <div class="event-issued-item-value tag vc-tag">
                 <div>
                   Verifiable credential
@@ -477,7 +476,6 @@ https://jargon.sh/user/unece/untp-vocab/v/working/artefacts/jsonSchemas/render.j
               </div>
             </div>
           </div>
-          {{/each}}
           
         </div>
       </div>
@@ -493,46 +491,46 @@ https://jargon.sh/user/unece/untp-vocab/v/working/artefacts/jsonSchemas/render.j
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Event type</div>
-        <!-- FIXME -->
-        <div class="event-description-item-value">Needs to be replaced...</div>
+        <!-- TODO: review -->
+        <div class="event-description-item-value">{{credentialSubject.action}}</div>
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Description</div>
-        <!-- FIXME -->
-        <div class="event-description-item-value">Needs to be replaced...</div>
+        <!-- TODO: review -->
+        <div class="event-description-item-value">Hardcoded value...</div>
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Time and date</div>
-        <!-- FIXME -->
+        <!-- TODO: review -->
         <div class="event-description-item-value">{{credentialSubject.eventTime}}</div>
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Lifecycle action</div>
-        <!-- FIXME -->
+        <!-- TODO: review -->
         <div class="event-description-item-value">{{credentialSubject.action}}</div>
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Product disposition</div>
-        <!-- FIXME -->
+        <!-- TODO: review -->
         <div class="event-description-item-value">{{credentialSubject.disposition}}</div>
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Business step</div>
-        <!-- FIXME -->
+        <!-- TODO: review -->
         <div class="event-description-item-value">{{credentialSubject.bizStep}}</div>
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Location</div>
         <div class="event-description-item-value">
-          <!-- FIXME -->
-          <a href="{{credentialSubject.bizLocation}}" class="blue-bottom-line">{{credentialSubject.bizLocation}}</a>
+          <!-- TODO: review -->
+          <a href="{{credentialSubject.bizLocation}}" class="blue-bottom-line">Hardcoded value...</a>
         </div>
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Process type</div>
         <div class="event-description-item-value">
-          <!-- FIXME -->
-          <a href="{{credentialSubject.processType}}" class="blue-bottom-line">{{credentialSubject.processType}}</a>
+          <!-- TODO: review -->
+          <a href="{{credentialSubject.processType}}" class="blue-bottom-line">Hardcoded value...</a>
         </div>
       </div>
     </div>
@@ -547,16 +545,16 @@ https://jargon.sh/user/unece/untp-vocab/v/working/artefacts/jsonSchemas/render.j
           <h4>{{name}}</h4>
           <p class="event-item-load-left">OUTPUT</p>
         </div>
-        <!-- FIXME -->
-        <p>123ITEMPRODUCT34ID567</p>
-        <!-- FIXME -->
-        <p>Product class name</p>
+        <!-- TODO: review -->
+        <p>Hardcoded value...</p>
+        <!-- TODO: review -->
+        <p>Hardcoded value...</p>
         <div class="event-item-space-between">
           <div class="sustainability-claims">
-            <!-- FIXME -->
-            <div>Sustainability 0%</div>
-            <!-- FIXME -->
-            <div>Confidence 0%</div>
+            <!-- TODO: review -->
+            <div>Sustainability Hardcoded value...</div>
+            <!-- TODO: review -->
+            <div>Confidence Hardcoded value...</div>
           </div>
           <a href="{{itemID}}" class="event-item-nav">
             <div>View</div>
@@ -567,6 +565,7 @@ https://jargon.sh/user/unece/untp-vocab/v/working/artefacts/jsonSchemas/render.j
         </div>
       </div>
       {{/each}}
+      <!-- TODO: What about Quantity list?? -->
 
       <div class="indicator">
         <div class="indicator-icon">
@@ -583,16 +582,16 @@ https://jargon.sh/user/unece/untp-vocab/v/working/artefacts/jsonSchemas/render.j
           <h4>{{name}}</h4>
           <p class="event-item-load-left">INPUT</p>
         </div>
-        <!-- FIXME -->
-        <p>123ITEMPRODUCT34ID567</p>
-        <!-- FIXME -->
-        <p>Product class name</p>
+        <!-- TODO: review -->
+        <p>Hardcoded value...</p>
+        <!-- TODO: review -->
+        <p>Hardcoded value...</p>
         <div class="event-item-space-between">
           <div class="sustainability-claims">
-            <!-- FIXME -->
-            <div>Sustainability 0%</div>
-            <!-- FIXME -->
-            <div>Confidence 0%</div>
+            <!-- TODO: review -->
+            <div>Sustainability Hardcoded value...</div>
+            <!-- TODO: review -->
+            <div>Confidence Hardcoded value...</div>
           </div>
           <a href="{{itemID}}" class="event-item-nav">
             <div>View</div>
@@ -604,6 +603,7 @@ https://jargon.sh/user/unece/untp-vocab/v/working/artefacts/jsonSchemas/render.j
       </div>
       {{/each}}
     </div>
+    <!-- TODO: What about Quantity list?? -->
     <!-- </Transformation> -->
 
     <!-- <Sensor> -->
@@ -615,12 +615,14 @@ https://jargon.sh/user/unece/untp-vocab/v/working/artefacts/jsonSchemas/render.j
         <div class="sensor-item-value">
           {{#each sensorReport}}
           <p>{{time}}</p>
-          <a href="{{type}}" class="blue-bottom-line">Data type</a>
+          <a href="{{type}}" class="blue-bottom-line">Hardcoded value...</a>
           <p>{{value}} {{uom}}</p>
           {{/each}}
-          <!-- FIXME -->
-          <a href="{{sensorIntegrityProof}}" class="blue-bottom-line">{{sensorIntegrityProof}}</a>
+          <!-- TODO: review -->
+          <a href="{{sensorIntegrityProof}}" class="blue-bottom-line">Integrity Proof</a>
           <div class="event-issued-item-value tag other-evidence-tag">
+          <!-- TODO: Conditionally render tag -->
+
             <div>Other evidence</div>
             <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path
