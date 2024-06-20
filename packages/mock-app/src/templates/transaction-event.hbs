@@ -440,33 +440,35 @@
       <div class="event-issued-header">
         <div class="event-issued-by">
           <p>EVENT ISSUED BY</p>
-          <!-- FIXME -->
-          <h2>3rd Party</h2>
+          <!-- TODO: review -->
+          <h2>{{issuer.name}}</h2>
         </div>
         <div class="event-issued-items">
-          {{!-- {{#each issuer.identifiers}} --}}
+        <!-- TODO: modify based on transformation event updates -->
+
+          {{#each issuer.identifiers}}
           <div class="event-issued-item">
             <div class="event-issued-item-title">Industry</div>
             <!-- FIXME -->
-            <div class="event-issued-item-value">Industry</div>
+            <div class="event-issued-item-value">Needs to be replaced...</div>
           </div>
           <div class="event-issued-item">
             <div class="event-issued-item-title">Business identifier</div>
             <!-- FIXME -->
-            <a href="#" class="event-issued-item-value blue-bottom-line">123</a>
+            <a href="#" class="event-issued-item-value blue-bottom-line">Needs to be replaced...</a>
           </div>
           <div class="event-issued-item">
             <div class="event-issued-item-title">Location</div>
             <div class="event-issued-item-values">
               <!-- FIXME -->
-              <a href="#" class="event-issued-item-value blue-bottom-line">Australia</a>
+              <a href="#" class="event-issued-item-value blue-bottom-line">Needs to be replaced...</a>
             </div>
           </div>
           <div class="event-issued-item">
             <div class="event-issued-item-title">Identity verification</div>
             <div class="event-issued-item-values">
               <!-- FIXME -->
-              <a href="#" class="event-issued-item-value blue-bottom-line">3rd Party</a>
+              <a href="{{scheme}}" class="event-issued-item-value blue-bottom-line">{{identiferValue}}</a>
               <div class="event-issued-item-value tag vc-tag">
                 <div>
                   Verifiable credential
@@ -479,7 +481,7 @@
               </div>
             </div>
           </div>
-          {{!-- {{/each}} --}}
+          {{/each}}
           
         </div>
       </div>
@@ -487,6 +489,8 @@
     <!-- </TRACEABILITY EVENT> -->
 
     <!-- <Event description> -->
+    <!-- TODO: modify based on transformation event updates -->
+
     <div class="event-description">
       <h3>Event description</h3>
       <div class="event-description-item event-description-bottom-line">
@@ -496,47 +500,45 @@
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Event type</div>
         <!-- FIXME -->
-        <div class="event-description-item-value">{{credentialSubject.eventType}}</div>
+        <div class="event-description-item-value">Needs to be replaced...</div>
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Description</div>
         <!-- FIXME -->
-        <div class="event-description-item-value">Description</div>
+        <div class="event-description-item-value">Needs to be replaced...</div>
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Time and date</div>
         <!-- FIXME -->
-        <div class="event-description-item-value">20/06/2024</div>
+        <div class="event-description-item-value">{{credentialSubject.eventTime}}</div>
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Lifecycle action</div>
         <!-- FIXME -->
-        <div class="event-description-item-value">{{credentialSubject.actionCode}}</div>
+        <div class="event-description-item-value">{{credentialSubject.action}}</div>
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Product disposition</div>
         <!-- FIXME -->
-        <div class="event-description-item-value">{{credentialSubject.dispositionCode}}</div>
+        <div class="event-description-item-value">{{credentialSubject.disposition}}</div>
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Business step</div>
         <!-- FIXME -->
-        <div class="event-description-item-value">{{credentialSubject.businessStepCode}}</div>
+        <div class="event-description-item-value">{{credentialSubject.bizStep}}</div>
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Location</div>
         <div class="event-description-item-value">
           <!-- FIXME -->
-          <a href="{{credentialSubject.locationId}}" class="blue-bottom-line">{{credentialSubject.locationId}}</a>
+          <a href="{{credentialSubject.bizLocation}}" class="blue-bottom-line">{{credentialSubject.bizLocation}}</a>
         </div>
       </div>
       <div class="event-description-item event-description-bottom-line">
         <div class="event-description-item-title">Transaction document</div>
         <div class="event-description-item-value">
-          <!-- FIXME -->
-          <div>{{credentialSubject.transaction.identifier}}</div>
-          <!-- FIXME -->
-          <a href="{{credentialSubject.transaction.documentURL}}" class="blue-bottom-line">{{credentialSubject.transaction.documentURL}}</a>
+          <!-- TODO: review. I changed a little from the design -->
+          <a href="{{credentialSubject.referenceDocument.documentURL}}" class="blue-bottom-line">{{credentialSubject.referenceDocument.identifier}}</a>
         </div>
       </div>
     </div>
@@ -545,22 +547,21 @@
     <!-- <Transaction> -->
     <div class="event-list">
       <h3>Transaction</h3>
-      <p>A transaction is when things are bought, sold, or shipped between a buyer and a seller.</p>
       <!-- <Source Party> -->
       <div class="event-item">
         <div class="event-item-space-between">
-          <!-- FIXME -->
+          <!-- TODO: review -->
           <h4>{{credentialSubject.sourceParty.name}}</h4>
-           <!-- FIXME -->
-          <a href="{{credentialSubject.sourceParty.partyID}}" class="event-item-nav event-item-load-left">
+          
+          <a href="{{credentialSubject.sourceParty.identifiers.0.binding.reference}}" class="event-item-nav event-item-load-left">
             <p>SOURCE</p>
             <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M1 1L7.66667 7.49842M7.66667 7.49842L1 14M7.66667 7.49842H7" stroke="#4F95DD" stroke-width="2" />
             </svg>
           </a>
         </div>
-        <!-- FIXME -->
-        <p>123</p>
+        <!-- TODO: review -->
+        <p>{{credentialSubject.sourceParty.identifiers.0.identifierValue}}</p>
       </div>
       <!-- </Source Party> -->
 
@@ -574,6 +575,8 @@
       </div>
 
       <!-- <Destination Party> -->
+      <!-- TODO: same as above -->
+
       <div class="event-item">
         <div class="event-item-space-between">
           <!-- FIXME -->
@@ -587,21 +590,23 @@
           </a>
         </div>
         <!-- FIXME -->
-        <p>456</p>
+        <p>{{credentialSubject.destinationParty.partyID}}</p>
       </div>
     </div>
     <!-- </Destination Party> -->
     <!-- </Transaction> -->
 
     <!-- <Object list> -->
+    <!-- TODO: same as transformation event + add qant list (both should be conditional)-->
+
       <div class="event-list">
         <h3>Object list</h3>
         <!-- FIXME -->
-        {{#each credentialSubject.itemList}}
+        {{#each credentialSubject.epcList}}
         <div class="event-item">
           <h4>{{name}}</h4>
           <!-- FIXME -->
-          <p>123ITEMPRODUCT34ID567</p>
+          <p>{{itemID}}</p>
           <!-- FIXME -->
           <p>Product class name</p>
           <div class="event-item-space-between">
@@ -624,7 +629,9 @@
       <!-- </Object list> -->
 
     <!-- <Sensor> -->
-    {{!-- <div class="sensor">
+    <!-- TODO: same as transformation event )-->
+
+    <div class="sensor">
       <h3>Sensor</h3>
       {{#each credentialSubject.sensorElementList}}
       <div class="sensor-item sensor-bottom-line">
@@ -652,7 +659,7 @@
         </div>
       </div>
       {{/each}}
-    </div> --}}
+    </div>
     <!-- </Sensor> -->
 
     <footer></footer>
