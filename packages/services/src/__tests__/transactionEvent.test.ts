@@ -19,7 +19,7 @@ jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
   createLinkResolver: jest.fn(),
   IdentificationKeyType: jest.fn(),
-  getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' }))
+  getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' })),
 }));
 
 describe('processTransactionEvent', () => {
@@ -53,7 +53,7 @@ describe('processTransactionEvent', () => {
         resultPath: '',
       },
     },
-    identifierKeyPaths: ['transaction', 'identifier'],
+    identifierKeyPath: '/transaction/identifier',
   };
 
   it('should process transaction event', async () => {
@@ -64,7 +64,6 @@ describe('processTransactionEvent', () => {
     jest
       .spyOn(validateContext, 'validateTransactionEventContext')
       .mockReturnValueOnce({ ok: true, value: context } as Result<ITransactionEventContext>);
-    jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(nlisidMock);
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValueOnce(transactionEventDLRMock);
 
     const transactionVC = await processTransactionEvent(transactionEvent, context);
@@ -72,7 +71,6 @@ describe('processTransactionEvent', () => {
     expect(transactionVC).toBe(transactionVCMock);
     expect(getStorageServiceLink).toHaveBeenCalled();
     expect(validateContext.validateTransactionEventContext).toHaveBeenCalled();
-    expect(helpers.getIdentifierByObjectKeyPaths).toHaveBeenCalled();
     expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
   });
 
@@ -80,7 +78,7 @@ describe('processTransactionEvent', () => {
     try {
       const invalidContext = {
         ...context,
-        vckit: { vckitAPIUrl: 'invalid-url', issuer: 'invalid-issuer' }
+        vckit: { vckitAPIUrl: 'invalid-url', issuer: 'invalid-issuer' },
       };
       jest
         .spyOn(validateContext, 'validateTransactionEventContext')
@@ -97,12 +95,11 @@ describe('processTransactionEvent', () => {
     try {
       const invalidIdentifierContext = {
         ...context,
-        identifierKeyPaths: ['invalid-key']
+        identifierKeyPath: 'invalid-key',
       };
       jest
         .spyOn(validateContext, 'validateTransactionEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as Result<ITransactionEventContext>);
-      jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(undefined);
 
       await processTransactionEvent(transactionEvent, invalidIdentifierContext);
     } catch (e) {
@@ -116,12 +113,11 @@ describe('processTransactionEvent', () => {
     try {
       const invalidIssuerContext = {
         ...context,
-        vckit: { ...context.vckit, issuer: 'invalid-issuer' }
+        vckit: { ...context.vckit, issuer: 'invalid-issuer' },
       };
       jest
         .spyOn(validateContext, 'validateTransactionEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as Result<ITransactionEventContext>);
-      jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(nlisidMock);
       jest.spyOn(publicAPI, 'post').mockRejectedValueOnce("Can't issue VC");
 
       await processTransactionEvent(transactionEvent, invalidIssuerContext);
@@ -129,7 +125,6 @@ describe('processTransactionEvent', () => {
       const error = e as Error;
       expect(error.message).toBe("Can't issue VC");
       expect(validateContext.validateTransactionEventContext).toHaveBeenCalled();
-      expect(helpers.getIdentifierByObjectKeyPaths).toHaveBeenCalled();
     }
   });
 
@@ -143,7 +138,6 @@ describe('processTransactionEvent', () => {
       jest
         .spyOn(validateContext, 'validateTransactionEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as Result<ITransactionEventContext>);
-      jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(nlisidMock);
       jest.spyOn(publicAPI, 'post').mockRejectedValueOnce('Invalid storage provider');
 
       await processTransactionEvent(transactionEvent, invalidStorageContext);
@@ -151,7 +145,6 @@ describe('processTransactionEvent', () => {
       const error = e as Error;
       expect(error.message).toBe('Invalid storage provider');
       expect(validateContext.validateTransactionEventContext).toHaveBeenCalled();
-      expect(helpers.getIdentifierByObjectKeyPaths).toHaveBeenCalled();
       expect(vckitService.issueVC).toHaveBeenCalled();
     }
   });
@@ -167,7 +160,6 @@ describe('processTransactionEvent', () => {
       jest
         .spyOn(validateContext, 'validateTransactionEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as Result<ITransactionEventContext>);
-      jest.spyOn(helpers, 'getIdentifierByObjectKeyPaths').mockReturnValueOnce(nlisidMock);
       jest.spyOn(linkResolverService, 'createLinkResolver').mockRejectedValueOnce('Invalid DLR API link resolver url');
 
       await processTransactionEvent(transactionEvent, invalidDLRContext);
@@ -175,7 +167,6 @@ describe('processTransactionEvent', () => {
       const error = e as Error;
       expect(error.message).toBe('Invalid DLR API link resolver url');
       expect(validateContext.validateTransactionEventContext).toHaveBeenCalled();
-      expect(helpers.getIdentifierByObjectKeyPaths).toHaveBeenCalled();
       expect(vckitService.issueVC).toHaveBeenCalled();
       expect(getStorageServiceLink).toHaveBeenCalled();
     }

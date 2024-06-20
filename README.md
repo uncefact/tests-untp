@@ -25,7 +25,7 @@ cp packages/mock-app/src/constants/app-config.example.json packages/mock-app/src
 {
   "services": [
     {
-      "name": "processObjectEvent", // Service name
+      "name": "processDPP", // Service name
       "parameters": [
         {
           "vckit": {
@@ -76,18 +76,24 @@ yarn build
 ```bash
 yarn start
 ```
+
 ## Docker
 
-* Dockerfile
-Build image
+- Dockerfile
+  Build image
+
 ```bash
 docker build --build-arg CONFIG_FILE=./app-config.json -t mock-app:latest .
 ```
+
 Run image
+
 ```bash
 docker run -p 3000:80 mock-app:latest
 ```
-* Docker compose
+
+- Docker compose
+
 ```bash
 docker-compose up
 ```

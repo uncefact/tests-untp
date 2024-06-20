@@ -3,9 +3,9 @@ import _ from 'lodash';
 
 import { LoadingButton } from '@mui/lab';
 import { Table, TableBody, TableCell, TableRow, TableContainer, TableHead, Paper } from '@mui/material';
-import { generateUUID, getJsonDataFromConformityAPI, getStorageServiceLink } from '@mock-app/services';
+import { generateUUID, getJsonDataFromConformityAPI, getStorageServiceLink, getValueByPath } from '@mock-app/services';
 
-import { checkStoredCredentialsConfig, getCredentialByPath } from './utils.js';
+import { checkStoredCredentialsConfig } from './utils.js';
 import { Status, ToastMessage, toastMessage } from '../ToastMessage/ToastMessage.js';
 import {
   IConformityCredentialProps,
@@ -139,7 +139,7 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
       const getJsonData = await getJsonDataFromConformityAPI(credentialRequestConfig);
 
       // Extract the credentials from the JSON data based on the path
-      const extractedCredential = getCredentialByPath(getJsonData, credentialRequestConfig.credentialPath);
+      const extractedCredential = getValueByPath(getJsonData, credentialRequestConfig.credentialPath);
       if (!extractedCredential) {
         showErrorAndStopLoading('Invalid credential data');
         return;

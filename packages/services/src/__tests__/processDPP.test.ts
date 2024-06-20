@@ -1,8 +1,8 @@
-import { processObjectEvent } from '../epcisEvents/objectEvent';
+import { processDPP } from '../processDPP.service';
 import { issueVC, contextDefault } from '../vckit.service';
 import { getStorageServiceLink } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
-import { contextObjectEvent, dataObjectEvent } from './mocks/constants';
+import { contextDPP, dataDPP } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
@@ -19,10 +19,10 @@ jest.mock('../linkResolver.service', () => ({
     gtin: 'gtin',
     nlisid: 'nlisid',
   },
-  getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' }))
+  getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' })),
 }));
 
-describe('processObjectEvent', () => {
+describe('processDPP', () => {
   describe('successful case', () => {
     afterEach(() => {
       jest.clearAllMocks();
@@ -49,7 +49,7 @@ describe('processObjectEvent', () => {
       jest.clearAllMocks();
     });
 
-    it('should call process object event', async () => {
+    it('should call process DPP', async () => {
       (getStorageServiceLink as jest.Mock).mockImplementation(({ url, _data, path }) => {
         return `${url}/${path}`;
       });
@@ -75,22 +75,22 @@ describe('processObjectEvent', () => {
         },
       );
 
-      const vc = await processObjectEvent(dataObjectEvent, contextObjectEvent);
+      const vc = await processDPP(dataDPP, contextDPP);
       expect(vc).toEqual(expectVCResult);
       expect(getStorageServiceLink).toHaveBeenCalled();
       expect(registerLinkResolver).toHaveBeenCalled();
 
-      const dppContext = contextObjectEvent.dpp;
-      const dlrContext = contextObjectEvent.dlr;
+      const dppContext = contextDPP.dpp;
+      const dlrContext = contextDPP.dlr;
       expect(registerLinkResolver).toHaveBeenCalledWith(
         expect.any(String),
         dppContext.dlrIdentificationKeyType,
-        dataObjectEvent.data.herd.identifier,
+        dataDPP.data.herd.identifier,
         dppContext.dlrLinkTitle,
         dppContext.dlrVerificationPage,
         dlrContext.dlrAPIUrl,
         dlrContext.dlrAPIKey,
-        dataObjectEvent.qualifierPath,
+        dataDPP.qualifierPath,
       );
     });
   });
@@ -103,7 +103,7 @@ describe('processObjectEvent', () => {
 
     it('should throw error when data is empty', async () => {
       try {
-        await processObjectEvent({ data: { herd: '' } }, contextObjectEvent);
+        await processDPP({ data: { herd: '' } }, contextDPP);
       } catch (error: any) {
         expect(error.message).toEqual('Identifier not found');
       }
@@ -115,38 +115,38 @@ describe('processObjectEvent', () => {
         dpp: {},
         dlr: {},
         storage: {},
-        identifierKeyPaths: [],
+        identifierKeyPath: '',
       };
       try {
-        await processObjectEvent(dataObjectEvent, newContext);
+        await processDPP(dataDPP, newContext);
       } catch (error: any) {
         console.log(error.message);
         expect(error.message).not.toBeNull();
       }
     });
 
-    it('should throw error when context is empty identifierKeyPaths field', async () => {
+    it('should throw error when context is empty identifierKeyPath field', async () => {
       (issueVC as jest.Mock).mockResolvedValue({});
 
       const newContext = {
-        ...contextObjectEvent,
-        identifierKeyPaths: [],
+        ...contextDPP,
+        identifierKeyPath: '',
       };
       try {
-        await processObjectEvent(dataObjectEvent, newContext);
+        await processDPP(dataDPP, newContext);
       } catch (error: any) {
-        expect(error.message).toEqual('identifierKeyPaths not found');
+        expect(error.message).toEqual('identifierKeyPath not found');
       }
     });
 
     it('should throw error when context is empty vckit field', async () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         vckit: {},
       };
 
       try {
-        await processObjectEvent(dataObjectEvent, newContext);
+        await processDPP(dataDPP, newContext);
       } catch (error: any) {
         expect(error.message).toEqual('Invalid vckit context');
       }
@@ -154,12 +154,12 @@ describe('processObjectEvent', () => {
 
     it('should throw error when context is empty dpp field', async () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         dpp: {},
       };
 
       try {
-        await processObjectEvent(dataObjectEvent, newContext);
+        await processDPP(dataDPP, newContext);
       } catch (error: any) {
         expect(error.message).toEqual('Invalid dpp context');
       }
@@ -167,12 +167,12 @@ describe('processObjectEvent', () => {
 
     it('should throw error when context is empty storage field', async () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         storage: {},
       };
 
       try {
-        await processObjectEvent(dataObjectEvent, newContext);
+        await processDPP(dataDPP, newContext);
       } catch (error: any) {
         expect(error.message).toEqual('Invalid storage context');
       }
@@ -180,11 +180,11 @@ describe('processObjectEvent', () => {
 
     it('should throw error when context is empty dlr field', async () => {
       const newContext = {
-        ...contextObjectEvent,
+        ...contextDPP,
         dlr: {},
       };
       try {
-        await processObjectEvent(dataObjectEvent, newContext);
+        await processDPP(dataDPP, newContext);
       } catch (error: any) {
         expect(error.message).toEqual('Invalid dlr context');
       }

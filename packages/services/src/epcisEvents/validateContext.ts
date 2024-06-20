@@ -12,7 +12,7 @@ export const checkContextProperties = (context: IContext): Result<IContext> => {
   if (_.isEmpty(context.dpp)) return error('Invalid dpp context');
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.dlr)) return error('Invalid dlr context');
-  if (_.isEmpty(context.identifierKeyPaths)) return error('identifierKeyPaths not found');
+  if (_.isEmpty(context.identifierKeyPath)) return error('identifierKeyPath not found');
 
   return { ok: true, value: context };
 };
@@ -22,7 +22,7 @@ export const checkContextProperties = (context: IContext): Result<IContext> => {
  * @param context - event context
  * @returns Result<IContext>
  */
-export const validateContextObjectEvent = (context: IContext): Result<IContext> => {
+export const validateContextDPP = (context: IContext): Result<IContext> => {
   const validationResult = checkContextProperties(context);
   if (!validationResult.ok) return error(validationResult.value);
 
@@ -85,7 +85,7 @@ export const validateTransactionEventContext = (
   if (_.isEmpty(context.epcisTransactionEvent)) return error('Invalid epcisTransactionEvent context');
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.dlr)) return error('Invalid dlr context');
-  if (_.isEmpty(context.identifierKeyPaths)) return error('identifierKeyPaths not found');
+  if (_.isEmpty(context.identifierKeyPath)) return error('identifierKeyPath not found');
 
   if (_.isEmpty(context.vckit.vckitAPIUrl)) return error('Invalid vckitAPIUrl');
   if (_.isEmpty(context.vckit.issuer)) return error('Invalid issuer');
@@ -115,7 +115,7 @@ export const validateAggregationEventContext = (
   if (_.isEmpty(context.epcisAggregationEvent)) return error('Invalid epcisAggregationEvent context');
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.dlr)) return error('Invalid dlr context');
-  if (_.isEmpty(context.identifierKeyPaths)) return error('identifierKeyPaths not found');
+  if (_.isEmpty(context.identifierKeyPath)) return error('identifierKeyPath not found');
 
   if (_.isEmpty(context.vckit.vckitAPIUrl)) return error('Invalid vckitAPIUrl');
   if (_.isEmpty(context.vckit.issuer)) return error('Invalid issuer');

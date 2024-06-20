@@ -11,11 +11,11 @@ export interface ICheckBoxList {
 }
 
 export const CheckBoxList = ({ label = 'CheckBoxList', data, onChange }: ICheckBoxList) => {
-  const [checkList, setCheckList] = useState<{ [key: string]: { value: any, checked: boolean } }>(data);
+  const [checkList, setCheckList] = useState<{ [key: string]: { value: any; checked: boolean } }>(data);
 
   useEffect(() => {
     for (const key in data) {
-      data[key] = { value: data[key] }; 
+      data[key] = { value: data[key] };
     }
 
     setCheckList(data);
@@ -33,25 +33,29 @@ export const CheckBoxList = ({ label = 'CheckBoxList', data, onChange }: ICheckB
     };
 
     setCheckList(checkList);
-    onChange(checkList);
+
+    const selectedItems = Object.keys(checkList)
+      .filter((key) => checkList[key].checked)
+      .reduce((objectItems, key) => ({ ...objectItems, [key]: checkList[key].value }), {});
+    onChange(selectedItems);
   };
 
-  const renderCheckBoxList = () => Object.keys(data).map((key) => {
-    const { value, checked } = data[key];
-    return (
-      <FormGroup key={key}>
-        <FormControlLabel
-          control={<Checkbox checked={checked} onChange={handleChange} name={key} value={value} />}
-          label={key}
-        />
-      </FormGroup>
-    );
-  })
+  const renderCheckBoxList = () =>
+    Object.keys(checkList).map((key) => {
+      const { value, checked } = checkList[key];
+      return (
+        <FormGroup key={key}>
+          <FormControlLabel
+            control={<Checkbox checked={checked} onChange={handleChange} key={key} name={key} value={value} />}
+            label={key}
+          />
+        </FormGroup>
+      );
+    });
 
   return (
     <Box
       sx={{
-        paddingTop: '95px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',

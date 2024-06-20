@@ -144,7 +144,7 @@ Based on the example, you can define the features of the apps in the configurati
           ],
           "services": [
             {
-              "name": "processObjectEvent",
+              "name": "processDPP",
               "parameters": [
                 {
                   "vckit": {

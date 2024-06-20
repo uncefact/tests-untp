@@ -1,5 +1,6 @@
 import { IdentificationKeyType } from '../linkResolver.service';
 import { StorageServiceConfig } from '../types';
+import { IConstructObjectParameters } from '../utils/helpers';
 
 export interface IVCKitContext {
   issuer: string;
@@ -41,7 +42,7 @@ export interface IContext {
   vckit: IVCKitContext;
   dlr: IConfigDLR;
   storage: StorageServiceConfig;
-  identifierKeyPaths: string[];
+  identifierKeyPath: string;
   dpp: IEntityIssue;
 }
 
@@ -56,15 +57,12 @@ export interface IInputItems {
   productClass: string;
 }
 
-export interface IProductTransformation {
-  inputItems: IInputItems[];
-  outputItems: any[];
-}
-
 export interface ITransformationEvent extends IContext {
   identifiers: string[];
   epcisTransformationEvent: IEntityIssue;
-  productTransformation: IProductTransformation;
+  transformationEventCredential: IConstructObjectParameters;
+  dppCredentials: IConstructObjectParameters[];
+  identifierKeyPath: string;
 }
 
 export interface ITraceabilityEvent {
@@ -75,6 +73,7 @@ export interface ITraceabilityEvent {
 
 export interface ITransactionEventContext extends IContext {
   epcisTransactionEvent: IEntityIssue;
+  localStorageParams: any;
 }
 
 export interface IAggregationEvent {

@@ -51,7 +51,7 @@ function Header() {
   const [styles, setStyles] = useState<IStyles>();
   const [scanningStyles] = useState({
     primaryColor: 'yellow',
-    secondaryColor: 'white',
+    secondaryColor: 'black',
     tertiaryColor: 'black',
   });
 
@@ -74,6 +74,7 @@ function Header() {
     });
 
     setStyles(subAppStyles?.styles ?? appConfig.styles);
+    sessionStorage.setItem('theme_style', JSON.stringify(subAppStyles?.styles));
 
     const defaultHeader = ['/', '/404'];
     if (defaultHeader.includes(path)) {

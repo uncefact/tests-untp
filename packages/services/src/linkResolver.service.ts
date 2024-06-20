@@ -107,7 +107,13 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
   try {
     privateAPI.setBearerTokenAuthorizationHeaders(arg.dlrAPIKey || '');
     await privateAPI.post<string>(`${dlrAPIUrl}/resolver`, params);
-    const path = responseLinkType === 'all' ? '?linkType=all' : `${qualifierPath}?linkType=${responseLinkType}`;
+
+    const path =
+      responseLinkType === 'all'
+        ? '?linkType=all'
+        : qualifierPath.includes('?')
+          ? `${qualifierPath}&linkType=${responseLinkType}`
+          : `${qualifierPath}?linkType=${responseLinkType}`;
     return `${dlrAPIUrl}/${linkResolver.identificationKeyType}/${linkResolver.identificationKey}${path}`;
   } catch (error) {
     throw new Error('Error creating link resolver');
@@ -163,10 +169,12 @@ export const registerLinkResolver = async (
   identificationKeyType: IdentificationKeyType,
   identificationKey: string,
   linkTitle: string,
+  linkType: LinkType,
   verificationPage: string,
   dlrAPIUrl: string,
   dlrAPIKey: string,
   qualifierPath?: string,
+  responseLinkType?: string,
 ) => {
   const linkResolver: ILinkResolver = {
     identificationKeyType,
@@ -184,13 +192,13 @@ export const registerLinkResolver = async (
       mimeType: MimeType.textPlain,
     },
     {
-      linkType: LinkType.certificationLinkType,
+      linkType: linkType,
       linkTitle: linkTitle,
       targetUrl: url,
       mimeType: MimeType.applicationJson,
     },
     {
-      linkType: LinkType.certificationLinkType,
+      linkType: linkType,
       linkTitle: linkTitle,
       targetUrl: verificationPassportPage,
       mimeType: MimeType.textHtml,
@@ -207,6 +215,7 @@ export const registerLinkResolver = async (
     queryString,
     dlrAPIKey,
     qualifierPath: qualifierPath ?? '/',
+    responseLinkType,
   });
 };
 /**
@@ -266,7 +275,7 @@ export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
     console.error(error.message);
   }
  */
-export const getLinkResolverIdentifier = (elementString: string): { identifier: string, qualifierPath: string } => {
+export const getLinkResolverIdentifier = (elementString: string): { identifier: string; qualifierPath: string } => {
   // Instantiate GS1DigitalLinkToolkit to utilize its methods
   const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
 
@@ -276,37 +285,44 @@ export const getLinkResolverIdentifier = (elementString: string): { identifier: 
   const dlrAIs = Object.keys(dlrAIValues);
 
   // Initialize arrays to store identifier AIs, qualifier AIs, and query strings
-  const { identifierAIs, qualifierAIs, queryStrings } = dlrAIs.reduce((result, currentAI) => {
-    // Verify syntax and check digit for each AI
-    gs1DigitalLinkToolkit.verifySyntax(currentAI, dlrAIValues[currentAI]);
-    gs1DigitalLinkToolkit.verifyCheckDigit(currentAI, dlrAIValues[currentAI]);
+  const { identifierAIs, qualifierAIs, queryStrings } = dlrAIs.reduce(
+    (result, currentAI) => {
+      // Verify syntax and check digit for each AI
+      gs1DigitalLinkToolkit.verifySyntax(currentAI, dlrAIValues[currentAI]);
+      gs1DigitalLinkToolkit.verifyCheckDigit(currentAI, dlrAIValues[currentAI]);
 
-    // Categorize AIs into identifier AIs, qualifier AIs, and query strings
-    if (gs1DigitalLinkToolkit.aiMaps.identifiers.includes(currentAI)) {
-      result.identifierAIs.push({ ai: currentAI, value: dlrAIValues[currentAI] });
-    } else if (gs1DigitalLinkToolkit.aiMaps.qualifiers.includes(currentAI)) {
-      result.qualifierAIs.push({ ai: currentAI, value: dlrAIValues[currentAI] });
-    } else {
-      const queryString = `${currentAI}=${gs1DigitalLinkToolkit.percentEncode(dlrAIValues[currentAI]) as string}`;
-      result.queryStrings.push(queryString);
-    }
+      // Categorize AIs into identifier AIs, qualifier AIs, and query strings
+      if (gs1DigitalLinkToolkit.aiMaps.identifiers.includes(currentAI)) {
+        result.identifierAIs.push({ ai: currentAI, value: dlrAIValues[currentAI] });
+      } else if (gs1DigitalLinkToolkit.aiMaps.qualifiers.includes(currentAI)) {
+        result.qualifierAIs.push({ ai: currentAI, value: dlrAIValues[currentAI] });
+      } else {
+        const queryString = `${currentAI}=${gs1DigitalLinkToolkit.percentEncode(dlrAIValues[currentAI]) as string}`;
+        result.queryStrings.push(queryString);
+      }
 
-    return result;
-  }, { identifierAIs: [] as IDLRAI[], qualifierAIs: [] as IDLRAI[], queryStrings: [] as string[]});
+      return result;
+    },
+    { identifierAIs: [] as IDLRAI[], qualifierAIs: [] as IDLRAI[], queryStrings: [] as string[] },
+  );
 
   // Ensure that there is exactly one primary identification key
   if (identifierAIs.length !== 1) {
-    throw new Error('getLinkResolverIdentifier Error: ===> analyseuri ERROR ===> ' + 
-    `The element string should contain exactly one primary identification key - it contained ${identifierAIs.length} ${JSON.stringify(identifierAIs)}; please check for a syntax error.`);
+    throw new Error(
+      'getLinkResolverIdentifier Error: ===> analyseuri ERROR ===> ' +
+        `The element string should contain exactly one primary identification key - it contained ${
+          identifierAIs.length
+        } ${JSON.stringify(identifierAIs)}; please check for a syntax error.`,
+    );
   }
 
   // Retrieve the primary identifier AI
   const primaryIdentifierAI = identifierAIs[0];
   // Get the qualifier AIs associated with the primary identifier AI
-  const primaryQualifierAIs = gs1DigitalLinkToolkit.aiQualifiers[primaryIdentifierAI.ai] as string[] || [];
+  const primaryQualifierAIs = (gs1DigitalLinkToolkit.aiQualifiers[primaryIdentifierAI.ai] as string[]) || [];
   // Iterate over primary qualifier AIs to construct the qualifier path
   const path = primaryQualifierAIs.reduce((result, primaryQualifierAI) => {
-    const validQualifierAI = qualifierAIs.find(qualifier => qualifier.ai === primaryQualifierAI) as IDLRAI;
+    const validQualifierAI = qualifierAIs.find((qualifier) => qualifier.ai === primaryQualifierAI) as IDLRAI;
     if (validQualifierAI) {
       result += `/${primaryQualifierAI}/${gs1DigitalLinkToolkit.percentEncode(validQualifierAI.value) as string}`;
     }
@@ -320,11 +336,21 @@ export const getLinkResolverIdentifier = (elementString: string): { identifier: 
 
   // Construct the URI stem using the primary identifier AI and qualifier path
   const uriStem = `/${primaryIdentifierAI.ai}/${primaryIdentifierAI.value}${qualifierPath}`;
-   // Verify the constructed URI stem
+  // Verify the constructed URI stem
   gs1DigitalLinkToolkit.analyseURI(uriStem, true);
 
-  return { 
+  return {
     identifier: primaryIdentifierAI.value,
-    qualifierPath
+    qualifierPath,
   };
+};
+
+export const buildElementString = (ai: any) => {
+  const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
+  return gs1DigitalLinkToolkit.buildGS1elementStrings(ai);
+};
+
+export const extractFromElementString = (elementString: string) => {
+  const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
+  return gs1DigitalLinkToolkit.extractFromGS1elementStrings(elementString);
 };
