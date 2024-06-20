@@ -1,5 +1,4 @@
-import { BtnStyle } from '../types';
-import { detectDevice } from '../utils/helpers'; // adjust the import path as needed
+import { detectDevice } from '../utils/helpers';
 
 describe('detectDevice', () => {
   it('detects mobile devices', () => {
