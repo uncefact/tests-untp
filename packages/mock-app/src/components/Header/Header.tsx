@@ -103,13 +103,6 @@ function Header() {
           to={route}
           onClick={() => {
             toggleDrawer(false);
-            setStyles(styles);
-            setHeaderBrandInfo({
-              name: app.name,
-              assets: {
-                logo: app.assets?.logo,
-              },
-            });
           }}
         >
           <ListItemIcon>{renderAvatar(app)}</ListItemIcon>
@@ -145,12 +138,26 @@ function Header() {
   };
 
   const renderHeaderText = (appConfig: ConfigAppType, headerTitle: typeof initialHeaderBrandInfo) => {
-    const app = appConfig.apps.find((app) => app.name === headerTitle.name);
+    let app: any = appConfig.apps.find((app) => app.name === headerTitle.name);
+
+    if (headerTitle.name === 'Scanning') {
+      app = {
+        name: 'Scanning',
+        styles: scanningStyles,
+      };
+    }
+
+    if (headerTitle.name.includes('General')) {
+      app = {
+        name: 'General features',
+        styles: appConfig.generalFeatures[0].styles,
+      };
+    }
     return (
       <Typography
         variant='h5'
         sx={{
-          color: app ? app.styles.secondaryColor : appConfig.styles.secondaryColor,
+          color: app ? app.styles.tertiaryColor : appConfig.styles.tertiaryColor,
           fontSize: {
             xs: '20px',
             md: '24px',
@@ -187,7 +194,7 @@ function Header() {
               aria-haspopup='true'
               onClick={toggleDrawer(true)}
             >
-              <MenuIcon sx={{ color: styles.menuIconColor }} />
+              <MenuIcon sx={{ color: styles.tertiaryColor }} />
             </IconButton>
 
             <Drawer open={open} onClose={toggleDrawer(false)}>
@@ -204,7 +211,7 @@ function Header() {
                   <Typography
                     variant='h5'
                     sx={{
-                      color: appConfig.styles.secondaryColor,
+                      color: appConfig.styles.tertiaryColor,
                     }}
                   >
                     {appConfig.name}
@@ -244,7 +251,7 @@ function Header() {
             {!headerBrandInfo.name.includes(appConfig.name) && (
               <Button
                 sx={{
-                  color: appConfig.styles.secondaryColor,
+                  color: styles.tertiaryColor,
                 }}
               >
                 Back to Home

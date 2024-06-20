@@ -12,11 +12,11 @@ const Home = () => {
         <Button
           sx={{
             background: appConfig.styles.primaryColor,
-            color: appConfig.styles.secondaryColor,
+            color: appConfig.styles.tertiaryColor,
             '&:hover': {
               backgroundColor: appConfig.styles.primaryColor,
               filter: 'brightness(0.9)',
-            }
+            },
           }}
           key={path}
           variant='contained'
@@ -32,11 +32,11 @@ const Home = () => {
       <Button
         sx={{
           background: appConfig.styles.primaryColor,
-          color: appConfig.styles.secondaryColor,
+          color: appConfig.styles.tertiaryColor,
           '&:hover': {
             backgroundColor: appConfig.styles.primaryColor,
             filter: 'brightness(0.9)',
-          }
+          },
         }}
         key={'/scanning'}
         variant='contained'
@@ -57,11 +57,11 @@ const Home = () => {
         <Button
           sx={{
             background: appConfig.styles.primaryColor,
-            color: appConfig.styles.secondaryColor,
+            color: appConfig.styles.tertiaryColor,
             '&:hover': {
               backgroundColor: appConfig.styles.primaryColor,
               filter: 'brightness(0.9)',
-            }
+            },
           }}
           key={path}
           variant='contained'
