@@ -5,4 +5,6 @@ export interface IComponentFunc {
 export interface BtnStyle {
   color?: string;
   backgroundColor?: string;
+
+  [key: string]: string | undefined;
 }
