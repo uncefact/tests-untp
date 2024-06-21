@@ -85,9 +85,9 @@ const Scanning = () => {
   useEffect(() => {
     if (typeof theme.setSelectedTheme === 'function') {
       theme.setSelectedTheme({
-        primaryColor: '#E2D212',
+        primaryColor: 'rgb(255, 207, 7)',
         secondaryColor: '#000000',
-        tertiaryColor: '#ffffff',
+        tertiaryColor: '#000000',
       });
     }
 
