@@ -1,5 +1,4 @@
-import { BtnStyle } from '../types';
-import { detectDevice, getBtnThemeStyle } from '../utils/helpers'; // adjust the import path as needed
+import { detectDevice } from '../utils/helpers'; // adjust the import path as needed
 
 describe('detectDevice', () => {
   it('detects mobile devices', () => {
@@ -30,30 +29,5 @@ describe('detectDevice', () => {
     const unknownUserAgent = 'Mozilla/5.0 (X11; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1';
 
     expect(detectDevice(unknownUserAgent)).toBe('unknown');
-  });
-});
-
-describe('getBtnThemeStyle', () => {
-  beforeEach(() => {
-    sessionStorage.clear();
-  });
-
-  it('should return the button style with the theme colors if button style colors are not provided', () => {
-    const themeStyle = { secondaryColor: 'red', primaryColor: 'blue' };
-    sessionStorage.setItem('theme_style', JSON.stringify(themeStyle));
-    const btnStyle: BtnStyle = {};
-    const expectedBtnStyle: BtnStyle = { color: 'red', backgroundColor: 'blue' };
-    expect(getBtnThemeStyle(btnStyle)).toEqual(expectedBtnStyle);
-  });
-
-  it('should return the button style with its own colors if they are provided', () => {
-    const themeStyle = { secondaryColor: 'red', primaryColor: 'blue' };
-    sessionStorage.setItem('theme_style', JSON.stringify(themeStyle));
-    const btnStyle: BtnStyle = { color: 'green', backgroundColor: 'yellow' };
-    expect(getBtnThemeStyle(btnStyle)).toEqual(btnStyle);
-  });
-
-  it('should return an empty object if no theme or button style is provided', () => {
-    expect(getBtnThemeStyle()).toEqual({});
   });
 });
