@@ -152,12 +152,11 @@ function Header() {
       },
     });
 
-    const defaultHeader = ['/', '/404'];
-    if (defaultHeader.includes(path)) {
+    if (subAppStyles?.styles) {
+      theme.setSelectedTheme(subAppStyles?.styles);
+    } else {
       theme.setSelectedTheme(appConfig.styles);
       setHeaderBrandInfo(initialHeaderBrandInfo);
-    } else {
-      theme.setSelectedTheme(subAppStyles?.styles);
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
