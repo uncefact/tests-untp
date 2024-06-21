@@ -15,7 +15,7 @@
     }
 
     body {
-      font-family: 'Source Sans 3', sans-serif;
+      font-family: "Source Sans 3", sans-serif;
     }
 
     .container {
@@ -34,7 +34,7 @@
 
     .header-image {
       position: relative;
-      background-image: linear-gradient(to right bottom, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.5)), url('{{credentialSubject.image.fileLocation}}');
+      background-image: linear-gradient(to right bottom, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.5)), url("{{credentialSubject.image.fileLocation}}");
       background-size: cover;
       background-position: center;
       min-height: 215px;
@@ -114,7 +114,6 @@
     .passport-box-item {
       padding: 12px 16px 12px 16px;
       border-radius: 8px;
-      min-width: 150px;
       min-height: 90px;
       background-color: #006eb5;
       color: #ffffff;
@@ -695,7 +694,7 @@
               <p class="composition-title">{{materialType.classifierName}}</p>
               <div class="composition-tag">
                 {{#if recycled}}
-                <!-- HTML content to show if 'recycled' is true -->
+                <!-- HTML content to show if "recycled" is true -->
                 <p class="composition-tag-item">Recycled</p>
                 {{/if}} {{#if hazardous}}
                 <p class="composition-tag-item">Hazard</p>
