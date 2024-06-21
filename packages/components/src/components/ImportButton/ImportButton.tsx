@@ -2,19 +2,16 @@ import React, { ChangeEvent, useState } from 'react';
 import { Box } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 import { UploadFile as UploadFileIcon } from '@mui/icons-material';
-import { BtnStyle } from '../../types/index.js';
-import { getBtnThemeStyle } from '../../utils/index.js';
 
 export interface IImportButtonProps {
   onChange: (data: object[]) => void;
   label?: string;
-  btnStyle?: BtnStyle;
 }
 
 /**
  * ImportButton component is used to display the footer
  */
-export const ImportButton = ({ label = 'Import', onChange, btnStyle }: IImportButtonProps) => {
+export const ImportButton = ({ label = 'Import', onChange}: IImportButtonProps) => {
   const [loading, setLoading] = useState<boolean>(false);
 
   const loadJsonFile = (file: File): Promise<object> => {
@@ -84,14 +81,7 @@ export const ImportButton = ({ label = 'Import', onChange, btnStyle }: IImportBu
           marginBottom: '20px',
         }}
       >
-        <LoadingButton
-          loading={loading}
-          component='label'
-          variant='outlined'
-          startIcon={<UploadFileIcon />}
-          sx={{ margin: '0 5px' }}
-          style={getBtnThemeStyle(btnStyle)}
-        >
+        <LoadingButton loading={loading} component='label' variant='outlined' startIcon={<UploadFileIcon />}>
           {label}
           <input data-testid='file-input' type='file' accept='.json' hidden onChange={handleFileUpload} multiple />
         </LoadingButton>
