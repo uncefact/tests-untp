@@ -88,7 +88,8 @@ const Scanning = () => {
       secondaryColor: '#000000',
       tertiaryColor: '#ffffff',
     });
-  }, [theme]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme.setSelectedTheme]);
 
   return (
     <Box
