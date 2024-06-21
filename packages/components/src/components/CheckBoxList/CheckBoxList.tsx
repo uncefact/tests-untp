@@ -15,7 +15,11 @@ export const CheckBoxList = ({ label = 'CheckBoxList', data, onChange }: ICheckB
 
   useEffect(() => {
     for (const key in data) {
-      data[key] = { value: data[key] };
+      if (!data[key].value) {
+        data[key] = { value: data[key] };
+      } else {
+        data[key] = { value: data[key].value };
+      }
     }
 
     setCheckList(data);
