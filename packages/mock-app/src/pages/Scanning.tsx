@@ -83,11 +83,14 @@ const Scanning = () => {
   };
 
   useEffect(() => {
-    theme.setSelectedTheme({
-      primaryColor: '#E2D212',
-      secondaryColor: '#000000',
-      tertiaryColor: '#ffffff',
-    });
+    if (typeof theme.setSelectedTheme === 'function') {
+      theme.setSelectedTheme({
+        primaryColor: '#E2D212',
+        secondaryColor: '#000000',
+        tertiaryColor: '#ffffff',
+      });
+    }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme.setSelectedTheme]);
 
