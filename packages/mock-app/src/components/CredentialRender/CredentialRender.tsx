@@ -61,6 +61,7 @@ const CredentialRender = ({ credential }: { credential: VerifiableCredential }) 
                   maxWidth: '400px',
                   height: '100%',
                   minHeight: '100vh',
+                  overflow: 'hidden',
                 }}
                 key={i}
                 dangerouslySetInnerHTML={{ __html: doc }}
