@@ -5,26 +5,24 @@ import { Footer } from '@mock-app/components';
 import Header from '../components/Header/Header';
 import { Router } from '../components/Router';
 import { ThemeSettings } from '../utils/theme';
-import { ThemeContext } from '../hooks/ThemContext';
+import { GlobalContext } from '../hooks/GlobalContext';
 
 function Layout() {
-  const [theme, setTheme] = useState();
-  const muiTheme = ThemeSettings(theme);
-
-  const toggleTheme = useCallback((newTheme: any) => {
-    setTheme(newTheme);
-  }, []);
+  const [selectedTheme, setSelectedTheme] = useState();
+  const muiTheme = ThemeSettings(selectedTheme);
 
   const contextValue = useMemo(
     () => ({
-      theme,
-      toggleTheme,
+      theme: {
+        selectedTheme,
+        setSelectedTheme,
+      },
     }),
-    [theme, toggleTheme],
+    [selectedTheme, setSelectedTheme],
   );
 
   return (
-    <ThemeContext.Provider value={contextValue}>
+    <GlobalContext.Provider value={contextValue}>
       <ThemeProvider theme={muiTheme}>
         <Container
           sx={{
@@ -37,7 +35,7 @@ function Layout() {
           <Footer />
         </Container>
       </ThemeProvider>
-    </ThemeContext.Provider>
+    </GlobalContext.Provider>
   );
 }
 

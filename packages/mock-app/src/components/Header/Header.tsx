@@ -1,5 +1,4 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { JSX } from 'react/jsx-runtime';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppBar,
@@ -25,7 +24,7 @@ import DialpadIcon from '@mui/icons-material/Dialpad';
 
 import appConfig from '../../constants/app-config.json';
 import { convertPathToString, convertStringToPath } from '../../utils';
-import { ThemeContext } from '../../hooks/ThemContext';
+import { GlobalContext } from '../../hooks/GlobalContext';
 
 type ConfigAppType = typeof appConfig;
 
@@ -46,7 +45,7 @@ const iconConfig: { [key: string]: JSX.Element } = {
 function Header() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { toggleTheme, theme } = useContext<any>(ThemeContext);
+  const { theme } = useContext<any>(GlobalContext);
 
   const [open, setOpen] = useState(false);
   const [headerBrandInfo, setHeaderBrandInfo] = useState({
@@ -155,16 +154,18 @@ function Header() {
 
     const defaultHeader = ['/', '/404'];
     if (defaultHeader.includes(path)) {
-      toggleTheme(appConfig.styles);
+      theme.setSelectedTheme(appConfig.styles);
       setHeaderBrandInfo(initialHeaderBrandInfo);
     } else {
-      toggleTheme(subAppStyles?.styles);
+      theme.setSelectedTheme(subAppStyles?.styles);
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
-  return theme?.primaryColor && theme?.secondaryColor && theme?.tertiaryColor ? (
+  return theme?.selectedTheme?.primaryColor &&
+    theme?.selectedTheme?.secondaryColor &&
+    theme?.selectedTheme?.tertiaryColor ? (
     <AppBar component='nav'>
       <Container maxWidth='xl'>
         <Toolbar disableGutters>

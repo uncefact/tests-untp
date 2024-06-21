@@ -8,7 +8,7 @@ import { getDlrPassport, IdentityProvider, getProviderByType } from '@mock-app/s
 import { Scanner } from '../components/Scanner';
 import { IScannerRef } from '../types/scanner.types';
 import { CustomDialog } from '../components/CustomDialog';
-import { ThemeContext } from '../hooks/ThemContext';
+import { GlobalContext } from '../hooks/GlobalContext';
 import appConfig from '../constants/app-config.json';
 
 const Scanning = () => {
@@ -18,7 +18,7 @@ const Scanning = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [openDialogErrorCode, setOpenDialogErrorCode] = useState<boolean>(false);
   const navigate = useNavigate();
-  const { toggleTheme } = useContext<any>(ThemeContext);
+  const { theme } = useContext<any>(GlobalContext);
 
   const goVerifyPage = async (identityProvider: IdentityProvider) => {
     try {
@@ -83,12 +83,12 @@ const Scanning = () => {
   };
 
   useEffect(() => {
-    toggleTheme({
+    theme.setSelectedTheme({
       primaryColor: '#E2D212',
       secondaryColor: '#000000',
       tertiaryColor: '#ffffff',
     });
-  }, [toggleTheme]);
+  }, [theme]);
 
   return (
     <Box
