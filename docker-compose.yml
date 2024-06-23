@@ -1,10 +1,20 @@
 version: '3.8'
 services:
   mock-app:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
       args:
         - CONFIG_FILE=./app-config.json
-    ports: 
+    ports:
       - 3000:80
+
+  test_suite:
+    container_name: test_suite
+    build:
+      context: ./packages/untp-test-suite/
+      dockerfile: Dockerfile
+    command: yarn nodemon --watch . --ext js,ts,json --exec "yarn run untp test"
+    volumes:
+      - ./packages/untp-test-suite/:/app
+      - /app/node_modules
