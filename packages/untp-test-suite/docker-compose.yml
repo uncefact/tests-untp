@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  test_suite:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: yarn nodemon --watch . --ext js,ts,json --exec "yarn run untp test"
+    volumes:
+      - .:/app
+      - /app/node_modules
