@@ -7,13 +7,13 @@ UNTP mock implementation is a mock app that presents how the decentralized app w
 - [Node.js](https://nodejs.org/en/) version 20.12.2
 - [yarn](https://yarnpkg.com/) version 1.22.22
 
-## Install dependencies
+### Install dependencies
 
 ```bash
 yarn install
 ```
 
-## Copy the .app-config.example file to .env for the demo explorer
+### Copy the .app-config.example file to .env for the demo explorer
 
 ```bash
 cp packages/mock-app/src/constants/app-config.example.json packages/mock-app/src/constants/app-config.json
@@ -65,16 +65,34 @@ cp packages/mock-app/src/constants/app-config.example.json packages/mock-app/src
 }
 ```
 
-## Build the package
+### Build the package
 
 ```bash
 yarn build
 ```
 
-## Start the project
+### Start the project
 
 ```bash
 yarn start
+```
+
+## Documentation
+
+```
+$ cd documentation
+```
+
+### Installation
+
+```
+$ yarn
+```
+
+### Local Development
+
+```
+$ yarn start
 ```
 
 ## Docker
