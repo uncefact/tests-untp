@@ -37,12 +37,9 @@ const config: Config = {
         },
         blog: false,
         theme: {
-          customCss: [
-            require.resolve('./src/css/custom.scss'),
-            require.resolve('./src/css/index.scss'),
-          ],
+          customCss: [require.resolve('./src/css/custom.scss'), require.resolve('./src/css/index.scss')],
         },
-      } 
+      },
     ],
   ],
 
@@ -51,21 +48,20 @@ const config: Config = {
   themes: ['@docusaurus/theme-mermaid'],
 
   themeConfig: {
-    slackLink:
-    'https://join.slack.com/t/uncefact/shared_invite/zt-1d7hd0js1-sS1Xgk8DawQD9VgRvy1QHQ',
+    slackLink: 'https://join.slack.com/t/uncefact/shared_invite/zt-1d7hd0js1-sS1Xgk8DawQD9VgRvy1QHQ',
     repoLink: 'https://github.com/uncefact/tests-untp',
     colorMode: {
       disableSwitch: true,
     },
-  image: 'img/un-crm-social-card.png',    
-  navbar: {
+    image: 'img/un-crm-social-card.png',
+    navbar: {
       title: 'TP',
       logo: {
         alt: 'UNTP Test Suite Logo',
         src: 'img/logo.svg',
       },
       items: [
-        {to: '/docs/introduction', label: 'Introduction', position: 'right'},
+        { to: '/docs/introduction', label: 'Introduction', position: 'right' },
         {
           to: '/docs/mock-apps/',
           label: 'Getting started',
@@ -76,7 +72,7 @@ const config: Config = {
           label: 'Tools and support',
           position: 'right',
         },
-        {to: 'https://uncefact.github.io/spec-untp/docs/extensions/', label: 'Extensions', position: 'right'},
+        { to: 'https://uncefact.github.io/spec-untp/docs/extensions/', label: 'Extensions', position: 'right' },
         {
           to: 'https://github.com/uncefact/tests-untp',
           label: 'Contribute',
@@ -162,7 +158,7 @@ const config: Config = {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
     },
-  }
+  },
 };
 
 export default config;
