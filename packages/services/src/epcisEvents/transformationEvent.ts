@@ -20,7 +20,7 @@ import {
   generateUUID,
   randomIntegerString,
 } from '../utils/helpers.js';
-import { generateLinkResolver } from './helpers.js';
+import { generateIdWithBatchLot, generateLinkResolver } from './helpers.js';
 import { validateContextTransformationEvent } from './validateContext.js';
 import { StorageServiceConfig } from '../types/storage.js';
 import JSONPointer from 'jsonpointer';
@@ -143,6 +143,7 @@ export const issueEpcisTransformationEvent = async (
           IdentificationKeyType.gtin,
           `linkType=${LinkType.certificationLinkType}`,
         ),
+        generateIdWithBatchLot,
         generateCurrentDatetime,
         generateUUID,
       },

@@ -8,3 +8,4 @@ export * from './DynamicComponentRenderer/index.js';
 export * from './ImportButton/index.js';
 export * from './QRCodeScannerDialogButton/index.js';
 export * from './LocalStorageLoader/index.js';
+export * from './BarcodeGenerator/index.js';

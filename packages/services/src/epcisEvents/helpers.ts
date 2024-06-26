@@ -1,18 +1,18 @@
 import JSONPointer from 'jsonpointer';
 import { deleteValuesFromLocalStorage } from '../features/localStorage.service.js';
 import { buildElementString, extractFromElementString, getLinkResolverIdentifier } from '../linkResolver.service.js';
-import { allowedIndexKeys, randomIntegerString } from '../utils/helpers.js';
+import { ICurrentAndDependencies, allowedIndexKeys, randomIntegerString } from '../utils/helpers.js';
 
 export const generateLinkResolver = (dlrUrl: string, identificationKeyType: string, queryString: string) => {
-  const _generateLinkResolver = (currentData: string, id: string) => {
-    const { identifier, qualifierPath } = getLinkResolverIdentifier(id);
+  const _generateLinkResolver = ({ currentData, dependenciesValues }: ICurrentAndDependencies) => {
+    const { identifier, qualifierPath } = getLinkResolverIdentifier(dependenciesValues![0]);
     const path = qualifierPath.includes('?') ? `${qualifierPath}&${queryString}` : `${qualifierPath}?${queryString}`;
     return `${dlrUrl}/${identificationKeyType}/${identifier}${path}`;
   };
   return _generateLinkResolver;
 };
 
-export const generateIdWithSerialNumber = (currentData: string) => {
+export const generateIdWithSerialNumber = ({ currentData, dependenciesValues }: ICurrentAndDependencies) => {
   if (!currentData) {
     return null;
   }
@@ -23,7 +23,7 @@ export const generateIdWithSerialNumber = (currentData: string) => {
   return buildElementString(aiArray);
 };
 
-export const generateIdWithBatchLot = (currentData: string) => {
+export const generateIdWithBatchLot = ({ currentData, dependenciesValues }: ICurrentAndDependencies) => {
   if (!currentData) {
     return null;
   }

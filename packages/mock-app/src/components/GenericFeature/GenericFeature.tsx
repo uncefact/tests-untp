@@ -119,6 +119,7 @@ const getService = (name: string) => {
  */
 export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, services }: IGenericFeatureProps) => {
   const [state, setState] = React.useState<any[]>([]);
+  const [result, setResult] = React.useState<any>();
   const props: Record<string, any> = {};
 
   const executeServices = async (services: IServiceDefinition[], parameters: any[]) => {
@@ -152,6 +153,7 @@ export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, ser
                 const result = await executeServices(services, state);
 
                 handler(result);
+                setResult(result);
                 toastMessage({ status: Status.success, message: 'Action Successful' });
               } catch (error: any) {
                 console.log(error.message);
@@ -159,10 +161,18 @@ export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, ser
               }
             };
             break;
+          case ComponentType.Result:
+            if (result) {
+              props.data = result;
+            }
+            break;
           default:
             break;
         }
 
+        if (type === ComponentType.Result && !result) {
+          return null;
+        }
         return (
           <DynamicComponentRenderer
             key={index}

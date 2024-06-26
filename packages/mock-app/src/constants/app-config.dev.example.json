@@ -2491,6 +2491,13 @@
               "name": "CustomButton",
               "type": "Submit",
               "props": {}
+            },
+            {
+              "name": "BarcodeGenerator",
+              "type": "Result",
+              "props": {
+                "dataPath": "/credentialSubject/outputEPCList/index/name"
+              }
             }
           ],
           "services": [
@@ -2606,9 +2613,17 @@
                     ],
                     "generationFields": [
                       {
+                        "path": "/outputEPCList/index/name",
+                        "handler": "generateIdWithBatchLot"
+                      },
+                      {
                         "path": "/outputEPCList/index/itemID",
                         "handler": "generateLinkResolver",
-                        "parameters": ["0109359502000034"]
+                        "dependencies": ["/outputEPCList/index/name"]
+                      },
+                      {
+                        "path": "/eventID",
+                        "handler": "generateUUID"
                       },
                       {
                         "path": "/eventTime",
