@@ -5,6 +5,7 @@ export enum ComponentType {
   EntryData = 'EntryData',
   Void = 'Void',
   Submit = 'Submit',
+  Result = 'Result',
 }
 
 /**

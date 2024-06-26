@@ -74,7 +74,8 @@ export interface IConstructObjectParameters {
   generationFields?: {
     path: string;
     handler: string;
-    parameters: any[];
+    dependencies?: string[];
+    parameters?: any[];
   }[];
 }
 
@@ -84,6 +85,11 @@ export const genericHandlerFunctions = {
   generateIdWithSerialNumber,
   generateIdWithBatchLot,
 };
+
+export interface ICurrentAndDependencies {
+  currentData?: any;
+  dependenciesValues?: any[];
+}
 
 export const allowedIndexKeys = ['i', 'index'];
 /**
@@ -190,16 +196,25 @@ export const constructObject = (
 
   // Generate fields
   if (parameters.generationFields && parameters.generationFields.length > 0) {
-    for (const { path, handler, parameters: handlerParameters = [] } of parameters.generationFields) {
+    for (const {
+      path,
+      handler,
+      dependencies = [],
+      parameters: handlerParameters = [],
+    } of parameters.generationFields) {
       const handlerFunction: any = options?.handlers?.[handler];
       if (!handlerFunction) {
         throw new Error(`Handler function ${handler} not found`);
       }
-
+      const dependenciesIndexes = dependencies.map((dependency) =>
+        dependency.split('/').findIndex((key) => allowedIndexKeys.includes(key)),
+      );
       const pathIndex = path.split('/').findIndex((key) => allowedIndexKeys.includes(key));
       if (pathIndex === -1 || index === undefined) {
+        const dependenciesValues = dependencies.map((dependency) => JSONPointer.get(data, dependency));
         const currentData = JSONPointer.get(data, path);
-        const params = [currentData, ...handlerParameters];
+
+        const params = [{ currentData, dependenciesValues }, ...handlerParameters];
         const generatedValue = handlerFunction(...params);
         JSONPointer.set(data, path, generatedValue);
       } else {
@@ -215,8 +230,24 @@ export const constructObject = (
         }
 
         for (const [idx, currentObjectValue] of sourceArray.entries()) {
+          const dependenciesValues = dependenciesIndexes.map((dependencyIndex, i) => {
+            if (dependencyIndex === -1) {
+              return JSONPointer.get(data, dependencies[i]);
+            } else {
+              const headDependencyPath = dependencies[i].split('/').slice(0, dependencyIndex).join('/');
+              const tailDependencyPath = dependencies[i]
+                .split('/')
+                .slice(dependencyIndex + 1)
+                .join('/');
+              const dependencyArray = JSONPointer.get(data, headDependencyPath);
+              if (!Array.isArray(dependencyArray)) {
+                throw new Error('Invalid configuration for generation fields');
+              }
+              return JSONPointer.get(dependencyArray[idx], `/${tailDependencyPath}`);
+            }
+          });
           const currentData = JSONPointer.get(currentObjectValue, `/${tailPath}`);
-          const params = [currentData, ...handlerParameters];
+          const params = [{ currentData, dependenciesValues }, ...handlerParameters];
           const generatedValue = handlerFunction(...params);
           JSONPointer.set(data, `${headPath}/${idx}/${tailPath}`, generatedValue);
         }
