@@ -1,7 +1,7 @@
 {
   "name": "ACRS",
   "styles": {
-    "primaryColor": "rgb(255, 207, 7)",
+    "primaryColor": "rgb(35, 138, 186)",
     "secondaryColor": "black",
     "tertiaryColor": "black"
   },
@@ -10,7 +10,7 @@
       "name": "General features",
       "type": "",
       "styles": {
-        "primaryColor": "rgb(255, 207, 7)",
+        "primaryColor": "rgb(35, 138, 186)",
         "secondaryColor": "black",
         "tertiaryColor": "black"
       },
@@ -563,7 +563,7 @@
                   "productIdentifier": [
                     {
                       "scheme": "https://identifier.example.org/steel",
-                      "identifierValue": "STEEL-12345",
+                      "identifierValue": "0109359502000010",
                       "binding": {
                         "type": "document",
                         "assuranceLevel": "3rdParty",
@@ -1237,13 +1237,13 @@
       "name": "Quality Steel",
       "type": "producer",
       "assets": {
-        "logo": "https://storage.googleapis.com/acrs-assets/logos/Top-Line-Steel-Logo.jpg",
+        "logo": "https://storage.googleapis.com/acrs-assets/logos/Quality-Steel-Logo.png",
         "brandTitle": "Quality Steel",
         "passportVC": "",
         "transactionEventVC": ""
       },
       "styles": {
-        "primaryColor": "#b22166",
+        "primaryColor": "#000000",
         "secondaryColor": "#391561",
         "tertiaryColor": "#ffffff"
       },
@@ -1778,7 +1778,7 @@
                   "productIdentifier": [
                     {
                       "scheme": "https://identifier.example.org/steel",
-                      "identifierValue": "STEEL-67890",
+                      "identifierValue": "0109359502000041",
                       "binding": {
                         "type": "document",
                         "assuranceLevel": "3rdParty",
@@ -2453,13 +2453,13 @@
       "name": "Steel Processor",
       "type": "processor",
       "assets": {
-        "logo": "https://storage.googleapis.com/acrs-assets/logos/Top-Line-Steel-Logo.jpg",
+        "logo": "https://storage.googleapis.com/acrs-assets/logos/Steel-Processor-LogoV1.png",
         "brandTitle": "Steel Processor",
         "passportVC": "",
         "transactionEventVC": ""
       },
       "styles": {
-        "primaryColor": "#b22166",
+        "primaryColor": "#8f2629",
         "secondaryColor": "#391561",
         "tertiaryColor": "#ffffff"
       },
@@ -2739,16 +2739,16 @@
                         {
                           "path": "/manufacturer",
                           "data": {
-                            "id": "did:example:1234567890abcdef",
-                            "name": "Forest Products Inc.",
+                            "id": "did:example:123456789abcdefghi",
+                            "name": "SteelWorks Ltd.",
                             "identifiers": [
                               {
-                                "scheme": "https://identifier.example.org/company",
-                                "identifierValue": "COMP-54321",
+                                "scheme": "https://example.com/company-scheme",
+                                "identifierValue": "SW-001",
                                 "binding": {
                                   "type": "document",
                                   "assuranceLevel": "3rdParty",
-                                  "reference": "https://identifier.example.org/company/54321/binding"
+                                  "reference": "https://example.com/company/001/binding"
                                 }
                               }
                             ]
@@ -2759,28 +2759,28 @@
                           "data": {
                             "identifier": [
                               {
-                                "scheme": "https://identifier.example.org/facility",
-                                "identifierValue": "FAC-9876",
+                                "scheme": "https://example.com/facility-scheme",
+                                "identifierValue": "FAC-002",
                                 "binding": {
                                   "type": "document",
                                   "assuranceLevel": "3rdParty",
-                                  "reference": "https://identifier.example.org/facility/9876/binding"
+                                  "reference": "https://example.com/facility/002/binding"
                                 }
                               }
                             ],
-                            "name": "Timber Processing Plant",
-                            "location": "https://example.org/locations/timber_processing_plant",
+                            "name": "SteelWorks Manufacturing Plant 2",
+                            "location": "https://maps.example.com/location/steelworks-plant-2",
                             "operatedBy": {
-                              "id": "did:example:fedcba0987654321",
-                              "name": "Forest Products Inc.",
+                              "id": "did:example:123456789abcdefghi",
+                              "name": "SteelWorks Ltd.",
                               "identifiers": [
                                 {
-                                  "scheme": "https://identifier.example.org/company",
-                                  "identifierValue": "COMP-54321",
+                                  "scheme": "https://example.com/company-scheme",
+                                  "identifierValue": "SW-001",
                                   "binding": {
                                     "type": "document",
                                     "assuranceLevel": "3rdParty",
-                                    "reference": "https://identifier.example.org/company/54321/binding"
+                                    "reference": "https://example.com/company/001/binding"
                                   }
                                 }
                               ]
@@ -2791,11 +2791,11 @@
                           "path": "/materialsProvenance",
                           "data": [
                             {
-                              "originCountry": "CA",
+                              "originCountry": "CN",
                               "materialType": {
-                                "scheme": "https://textileexchange.org/materials",
-                                "classifierValue": "WOOD",
-                                "classifierName": "Pine Wood"
+                                "scheme": "https://example.com/material-scheme",
+                                "classifierValue": "steel",
+                                "classifierName": "Steel"
                               },
                               "massFraction": 100,
                               "recycled": false,
@@ -2808,11 +2808,11 @@
                           "data": [
                             {
                               "topic": "sustainability.certification",
-                              "standardOrRegulation": "https://example.org/standards/sustainability",
-                              "criteriaReference": "https://example.org/standards/sustainability/criteria",
+                              "standardOrRegulation": "https://steel-industry.org/standards/sustainability",
+                              "criteriaReference": "https://steel-industry.org/standards/sustainability/criteria",
                               "claimedValues": [
                                 {
-                                  "name": "FSC Certification",
+                                  "name": "Green Steel Certification",
                                   "value": {
                                     "value": true,
                                     "unit": "boolean"
@@ -2827,7 +2827,7 @@
                                   "unit": "boolean"
                                 }
                               },
-                              "benchmarkReference": "https://example.org/benchmarks/sustainability",
+                              "benchmarkReference": "https://steel-industry.org/benchmarks/sustainability",
                               "conformance": true,
                               "conformityEvidence": {
                                 "type": "w3c_vc",

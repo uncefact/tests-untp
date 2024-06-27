@@ -1,4 +1,4 @@
-import React, { useState, useRef, useContext, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Box, CircularProgress, Stack } from '@mui/material';
 import { VerifiableCredential } from '@vckit/core-types';
 import { Html5QrcodeResult } from 'html5-qrcode';
@@ -8,7 +8,6 @@ import { getDlrPassport, IdentityProvider, getProviderByType } from '@mock-app/s
 import { Scanner } from '../components/Scanner';
 import { IScannerRef } from '../types/scanner.types';
 import { CustomDialog } from '../components/CustomDialog';
-import { GlobalContext } from '../hooks/GlobalContext';
 import appConfig from '../constants/app-config.json';
 
 const Scanning = () => {
@@ -18,7 +17,6 @@ const Scanning = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [openDialogErrorCode, setOpenDialogErrorCode] = useState<boolean>(false);
   const navigate = useNavigate();
-  const { theme } = useContext<any>(GlobalContext);
 
   const goVerifyPage = async (identityProvider: IdentityProvider) => {
     try {
@@ -81,18 +79,6 @@ const Scanning = () => {
   const handleCloseDialogErrorFetchProductData = () => {
     setOpenDialogErrorCode(false);
   };
-
-  useEffect(() => {
-    if (typeof theme.setSelectedTheme === 'function') {
-      theme.setSelectedTheme({
-        primaryColor: 'rgb(255, 207, 7)',
-        secondaryColor: '#000000',
-        tertiaryColor: '#000000',
-      });
-    }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme.setSelectedTheme]);
 
   return (
     <Box
