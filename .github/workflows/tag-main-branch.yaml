@@ -1,0 +1,92 @@
+name: Tag Main Branch
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Git
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'actions@github.com'
+
+      # - name: Fetch all tags
+      #   run: |
+      #     git fetch --tags
+  
+      # - name: Get latest tag
+      #   id: get_latest_tag
+      #   run: |
+      #     # Get the latest tag
+      #     latest_tag=$(git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null || echo "none")
+      #     echo "Latest tag: $latest_tag"
+      #     echo "latest_tag=$latest_tag" >> $GITHUB_ENV
+
+      # - name: Determine next tag version
+      #   id: get_next_version
+      #   run: |
+      #     latest_tag=${{ env.latest_tag }}
+      #     if [[ "$latest_tag" == "none" ]]; then
+      #       echo "No tags found. Starting with v0.0.1"
+      #       next_tag="v0.0.1"
+      #     elif [[ $latest_tag =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+      #       major=${BASH_REMATCH[1]}
+      #       minor=${BASH_REMATCH[2]}
+      #       patch=${BASH_REMATCH[3]}
+      #       next_patch=$((patch + 1))
+      #       next_tag="v${major}.${minor}.${next_patch}"
+      #     else
+      #       echo "Latest tag format is invalid, cannot determine next version."
+      #       exit 1
+      #     fi
+      #     echo "Next tag version: $next_tag"
+      #     echo "next_tag=$next_tag" >> $GITHUB_ENV
+
+
+      # - name: Create and push new tag
+      #   env:
+      #     TAG_NAME: ${{ env.next_tag }}
+      #   run: |
+      #     git tag $TAG_NAME
+      #     git push origin $TAG_NAME
+      #     echo "done"
+
+      - name: Get version from package.json
+        id: get_version
+        run: |
+          # Read the version from package.json
+          version=$(jq -r .version package.json)
+          if [[ -z "$version" || "$version" == "null" ]]; then
+            echo "No valid version found in package.json."
+            exit 1
+          fi
+          echo "Version from package.json: $version"
+          echo "version=$version" >> $GITHUB_ENV
+
+      - name: Check if tag already exists
+        id: check_tag
+        run: |
+          # Check if the tag already exists
+          tag_exists=$(git tag -l "v${{ env.version }}")
+          if [[ "$tag_exists" == "v${{ env.version }}" ]]; then
+            echo "Tag v${{ env.version }} already exists."
+            exit 0
+          fi
+
+      - name: Create and push new tag
+        env:
+          TAG_NAME: "v${{ env.version }}"
+        run: |
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
