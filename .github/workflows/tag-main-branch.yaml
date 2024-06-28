@@ -3,7 +3,7 @@ name: Tag Main Branch
 on:
   push:
     branches:
-      - chore/auto-tagging
+      - main
   workflow_dispatch:
 
 permissions:
