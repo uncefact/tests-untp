@@ -1,4 +1,4 @@
-name: Tag Main Branch
+name: Automatic Tagging and Release
 
 on:
   push:
