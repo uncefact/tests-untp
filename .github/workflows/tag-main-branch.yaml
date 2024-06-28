@@ -90,7 +90,6 @@ jobs:
         run: |
           git tag $TAG_NAME
           git push origin $TAG_NAME
-          echo "done"
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
