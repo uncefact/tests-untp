@@ -8,10 +8,6 @@ on:
 jobs:
   tagging:
     runs-on: ubuntu-latest
-    env:
-      EXCLUDED_PACKAGE_OA_RENDERERS: '!./packages/vckit-oa-renderers/'
-      EXCLUDED_PACKAGE_CREDENTIAL_OA: '!./packages/credential-oa/'
-      EXCLUDED_PACKAGE_EXPLORER: '!./packages/demo-explorer/'
 
     steps:
     - name: Checkout code
