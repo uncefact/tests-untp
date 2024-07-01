@@ -1,0 +1,34 @@
+{
+  "input":{
+    "credential": {
+      "@context": [
+        "https://www.w3.org/ns/credentials/v2",
+        {
+          "ex": "https://www.w3.org/2018/credentials#renderMethod#",
+          "renderMethod": "https://www.w3.org/2018/credentials#renderMethod",
+          "template": "ex:template",
+          "url": "ex:url"
+        }
+      ],
+      "renderMethod": [
+        {
+          "template": "<div style=\"width:300px; height:300px; border: 2px solid black; text-align:center\">  \n\t<h2>Certificate</h2>\n    <p>Of Completion</p>\n  <div>    This is to certify that  </div>  \n  <strong style=\"font-size: 16px\">   {{credentialSubject.name}}  </strong>\n  <div>has completed the {{credentialSubject.degree.name}}</div>\n  <div>    by {{credentialSubject.degree.degreeSchool}}.  </div>\n</div>",
+          "@type": "RenderTemplate2024",
+          "mediaQuery": "@media (min-width: 1024px) {\n  .title {\n    font-weight: bold;\n    color: #223675;\n  }\n}",
+          "mediaType": "text/html",
+          "url": "",
+          "digestMultibase": "zQmXPqSNrf6ZR2R5VVdYRpPxQREDCW1i3h98NAHLdAwLBxx"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "documents": [
+      {
+        "type": "RenderTemplate2024",
+        "renderedTemplate": "PGRpdiBzdHlsZT0id2lkdGg6MzAwcHg7IGhlaWdodDozMDBweDsgYm9yZGVyOiAycHggc29saWQgYmxhY2s7IHRleHQtYWxpZ246Y2VudGVyIj4gIAoJPGgyPkNlcnRpZmljYXRlPC9oMj4KICAgIDxwPk9mIENvbXBsZXRpb248L3A+CiAgPGRpdj4gICAgVGhpcyBpcyB0byBjZXJ0aWZ5IHRoYXQgIDwvZGl2PiAgCiAgPHN0cm9uZyBzdHlsZT0iZm9udC1zaXplOiAxNnB4Ij4gICAgIDwvc3Ryb25nPgogIDxkaXY+aGFzIGNvbXBsZXRlZCB0aGUgPC9kaXY+CiAgPGRpdj4gICAgYnkgLiAgPC9kaXY+CjwvZGl2Pg=="
+      }
+    ],
+    "statusCode": 200
+  }
+}

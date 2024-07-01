@@ -1,0 +1,16 @@
+{
+  "shortName": "vc-test-suite",
+  "group": "vc",
+  "specStatus": "base",
+  "subtitle": "",
+  "github": "",
+  "edDraftURI": "",
+  "doJsonLd": true,
+  "includePermalinks": false,
+  "otherLinks": [{
+    "key": "Related Specifications",
+    "data": []
+  }],
+  "editors": [],
+  "authors": []
+}

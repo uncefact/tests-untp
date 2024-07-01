@@ -1,0 +1,41 @@
+{
+  "name": "vc-test-suite",
+  "version": "0.0.1",
+  "description": "VC Test suite",
+  "main": "./build/index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "mocha ./src/tests --reporter @digitalbazaar/mocha-w3c-interop-reporter --reporter-options abstract=\"$PWD/abstract.hbs\",reportDir=\"$PWD/reports\",suiteLog='./suite.log',templateData=\"$PWD/reports/index.json\",title=\"VC v2.0 Interoperability Report\" --timeout 15000 --preserve-symlinks"
+  },
+  "keywords": [
+    "verifiable credentials",
+    "test",
+    "suite"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@digitalbazaar/data-integrity": "^1.4.0",
+    "@digitalbazaar/data-integrity-context": "^1.0.0",
+    "@digitalbazaar/ed25519-multikey": "^1.0.1",
+    "@digitalbazaar/eddsa-2022-cryptosuite": "^1.0.0",
+    "@digitalbazaar/mocha-w3c-interop-reporter": "^1.6.0",
+    "@digitalbazaar/vc": "github:digitalbazaar/vc#update-vc-2.0",
+    "bnid": "^3.0.0",
+    "chai": "^4.3.6",
+    "klona": "^2.0.5",
+    "mocha": "^10.0.0",
+    "vc-test-suite-implementations": "github:w3c/vc-test-suite-implementations"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.16",
+    "eslint": "^8.19.0",
+    "eslint-config-digitalbazaar": "^4.0.1",
+    "eslint-plugin-unicorn": "^43.0.0",
+    "typescript": "^5.5.2"
+  }
+}
