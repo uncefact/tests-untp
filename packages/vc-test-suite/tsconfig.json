@@ -19,5 +19,5 @@
     "rootDir": "src"
   },
   "types": ["node", "mocha", "chai"],
-  "include": ["src", "*.json"],
+  "include": ["src", "*.json"]
 }
