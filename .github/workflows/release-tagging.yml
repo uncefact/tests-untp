@@ -13,11 +13,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20'
-
     - name: Get version from package.json
       id: get_version
       run: |
@@ -51,15 +46,10 @@ jobs:
         git push origin "v${{ steps.get_version.outputs.version }}"
     
     - name: Create GitHub Release
-      if: steps.check_tag.outputs.exists == 'false'
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: ncipollo/release-action@v1
       with:
-        tag_name: "v${{ steps.get_version.outputs.version }}"
-        release_name: "Release ${{ steps.get_version.outputs.version }}"
-        body: "Automatically generated release notes for version ${{ steps.get_version.outputs.version }}"
-        draft: false
+        tag: "v${{ steps.get_version.outputs.version }}"
+        name: "Release ${{ steps.get_version.outputs.version }}"
+        generateReleaseNotes: true
         prerelease: false
      
