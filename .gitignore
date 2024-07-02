@@ -75,3 +75,6 @@ packages/services/tsconfig.tsbuildinfo
 packages/mock-app/src/constants/app-config.json
 packages/untp-test-suite/credentials.json
 packages/untp-test-suite/data
+# vc-test-suite
+packages/vc-test-suite/suite.log
+packages/vc-test-suite/reports
