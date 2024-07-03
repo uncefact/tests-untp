@@ -9,6 +9,7 @@ import { publicAPI } from './utils/httpService.js';
 export const getJsonDataFromConformityAPI: IFetchFunction = async (config: RequestConfig) => {
   const { url, params, options = { method: 'POST', headers: [] } } = config;
 
+  console.log('getJsonDataFromConformityAPI', url, params, options);
   try {
     let result;
     switch (options.method) {
