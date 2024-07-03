@@ -18,7 +18,6 @@ export const storageService: IStorageService = async (config) => {
     }
 
     const getResultByPath = getValueByPath(result, params.resultPath);
-    console.log('getResultByPath', getResultByPath);
     return getResultByPath;
   } catch (error: any) {
     console.error(error);
