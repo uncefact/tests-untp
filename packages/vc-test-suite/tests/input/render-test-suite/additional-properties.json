@@ -12,12 +12,12 @@
     ],
     "renderMethod": [
       {
-				"test": "test",
+        "test": "test",
         "template": "<p>{{test}}</p>",
         "@type": "RenderTemplate2024",
         "mediaType": "text/html",
         "mediaQuery": "@media (min-width: 1024px) {.name {font-weight: bold}}",
-				"digestMultibase": "zQma8tmuzPVPcbWhMxdLWPWZdE5LPNoqKoLaDnjcaBopTGq"
+        "digestMultibase": "zQma8tmuzPVPcbWhMxdLWPWZdE5LPNoqKoLaDnjcaBopTGq"
       }
     ],
     "test": "test"
