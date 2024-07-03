@@ -98,7 +98,6 @@ export interface GS1LinkResponse extends ILinkResponse {
 export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<string> => {
   const { dlrAPIUrl, linkResolver, linkResponses, qualifierPath, responseLinkType = 'all' } = arg;
   let registerQualifierPath = qualifierPath;
-  console.log('registerQualifierPath', registerQualifierPath);
   if (arg.queryString) {
     registerQualifierPath = qualifierPath.includes('?')
       ? `${qualifierPath}&${arg.queryString}`
@@ -115,7 +114,6 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
         : qualifierPath.includes('?')
           ? `${qualifierPath}&linkType=${responseLinkType}`
           : `${qualifierPath}?linkType=${responseLinkType}`;
-    console.log('path', path);
     return `${dlrAPIUrl}/${linkResolver.identificationKeyType}/${linkResolver.identificationKey}${path}`;
   } catch (error) {
     throw new Error('Error creating link resolver');
