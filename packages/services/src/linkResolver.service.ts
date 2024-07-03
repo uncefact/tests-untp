@@ -98,6 +98,7 @@ export interface GS1LinkResponse extends ILinkResponse {
 export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<string> => {
   const { dlrAPIUrl, linkResolver, linkResponses, qualifierPath, responseLinkType = 'all' } = arg;
   let registerQualifierPath = qualifierPath;
+  console.log('registerQualifierPath', registerQualifierPath);
   if (arg.queryString) {
     registerQualifierPath = qualifierPath.includes('?')
       ? `${qualifierPath}&${arg.queryString}`

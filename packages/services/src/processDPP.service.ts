@@ -29,6 +29,7 @@ export const processDPP: IService = async (data: any, context: IContext): Promis
     const vckitContext = context.vckit;
     const dppContext = context.dpp;
     const restOfVC = { render: dppContext?.renderTemplate ?? [] };
+    console.log('restOfVC', restOfVC);
     const vc: VerifiableCredential = await issueVC({
       context: dppContext.context,
       credentialSubject,
