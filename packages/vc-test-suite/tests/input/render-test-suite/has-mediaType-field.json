@@ -1,0 +1,20 @@
+{
+  "credential": {
+    "@context": [
+      "https://www.w3.org/ns/credentials/v2",
+      {
+        "ex": "https://www.w3.org/2018/credentials#renderMethod#",
+        "renderMethod": "https://www.w3.org/2018/credentials#renderMethod",
+        "template": "ex:template",
+        "url": "ex:url"
+      }
+    ],
+    "renderMethod": [
+      {
+        "template": "<div style=\"width:300px; height:300px; border: 2px solid black; text-align:center\"> <h2>Certificate</h2> <p>Of Completion</p>  <div>This is to certify that</div>    <strong style=\"font-size: 16px\">   {{credentialSubject.name}}  </strong>  <div>has completed the {{credentialSubject.degree.name}}</div>  <div>    by {{credentialSubject.degree.degreeSchool}}.  </div></div>",
+        "@type": "RenderTemplate2024",
+        "mediaType": "text/html"
+      }
+    ]
+  }
+}
