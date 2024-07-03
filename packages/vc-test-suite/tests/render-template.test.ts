@@ -9,29 +9,9 @@ const renderTemplateEndpoint = 'http://localhost:3332/agent/renderCredential';
 describe('RenderTemplate2024', function () {
   setupMatrix.call(this, 'Result', 'Implementer');
 
-  reportRow('should verify that each item in the documents array has a \'type\' field', 'Result', async () => {
-    // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/has-type-field.json');
-
-    // This sends the input data to the service to get the rendered document response.
-    const result = await request({
-      method: 'POST',       
-      url: renderTemplateEndpoint,
-      data: input,
-    });
-
-    // This is expected to be the array of rendered documents returned by the service.
-    result.documents.forEach(document => {
-      // Check if type field exists
-      document.should.have.property('type');
-      // Check if the type field is exactly set to "RenderTemplate2024"
-      document.type.should.equal('RenderTemplate2024');
-    });
-  });
-
   reportRow('should verify that each item in the documents array has a \'type\' field set to \'RenderTemplate2024\'', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/has-invalid-type-field.json');
+    const input = require('./input/render-test-suite/has-invalid-type-field-ok.json');
   
     // Send the input data to the service to get the rendered document response.
     const result = await request({
@@ -51,7 +31,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow('should verify that each item in the documents array has a \'renderedTemplate\' field', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/has-renderedTemplate-field.json');
+    const input = require('./input/render-test-suite/has-renderedTemplate-field-ok.json');
   
     // Send the input data to the service to get the rendered document response.
     const result = await request({
@@ -71,7 +51,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow('should verify that each item in the documents array has a \'mediaType\' field', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/has-mediaType-field.json');
+    const input = require('./input/render-test-suite/has-mediaType-field-ok.json');
   
     // Send the input data to the service to get the rendered document response.
     const result = await request({
@@ -91,7 +71,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow('should verify that the \'name\' field, if present, is a non-empty string', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/has-name-field.json');
+    const input = require('./input/render-test-suite/has-name-field-ok.json');
   
     // Send the input data to the service to get the rendered document response.
     const result = await request({
@@ -114,7 +94,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow('should verify that the \'documents\' array contains a \'renderedTemplate\' that is Base64 encoded', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/renderedTemplate-base64.json');
+    const input = require('./input/render-test-suite/renderedTemplate-base64-ok.json');
   
     // Send the input data to the service to get the rendered document response.
     const result = await request({
@@ -132,7 +112,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow('should verify that the \'documents\' array contains a valid rendered document after decoding the Base64 string', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/renderedTemplate-base64-decoded.json');
+    const input = require('./input/render-test-suite/renderedTemplate-base64-decoded-ok.json');
   
     // Send the input data to the service to get the rendered document response.
     const result = await request({
@@ -152,7 +132,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow('should verify that document items have a \'style\' tag when \'mediaQuery\' is available and \'mediaType\' is \'html\'', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/mediaQuery-mediaType-provided.json');
+    const input = require('./input/render-test-suite/mediaQuery-mediaType-provided-ok.json');
   
     // Send the input data to the service to get the rendered document response.
     const result = await request({
@@ -174,7 +154,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow('should verify that either the \'template\' field or the \'url\' field is provided', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/has-template-field.json');
+    const input = require('./input/render-test-suite/has-template-field-ok.json');
   
     // Send the input data to the service to get the rendered document response.
     const result = await request({
@@ -194,7 +174,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow('should verify that the \'template\' hash matches the \'digestMultibase\'', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/template-hash-matchs-digestMultibase.json');
+    const input = require('./input/render-test-suite/template-hash-matchs-digestMultibase-ok.json');
   
     // Send the input data to the service to get the rendered document response.
     const result = await request({
@@ -214,7 +194,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow('should verify that the \'style\' tag is not available in document items when \'mediaQuery\' is not provided', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/no-mediaQuery.json');
+    const input = require('./input/render-test-suite/no-mediaQuery-ok.json');
   
     // Send the input data to the service to get the rendered document response.
     const result = await request({
@@ -234,7 +214,7 @@ describe('RenderTemplate2024', function () {
 
   reportRow('should verify that the \'style\' tag is not available in document items when \'mediaQuery\' is not provided in context', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/no-mediaQuery-in-context.json');
+    const input = require('./input/render-test-suite/no-mediaQuery-in-context-ok.json');
   
     // Send the input data to the service to get the rendered document response.
     const result = await request({
@@ -254,7 +234,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow('should verify that the rendered document is not returned when the request payload is missing \'@context\'', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/missing-@context.json');
+    const input = require('./input/render-test-suite/missing-@context-fail.json');
   
     // Send the input data to the service and expect it to fail.
     try {
@@ -273,7 +253,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow('should verify that the rendered document is not returned when the request payload is missing \'renderMethod\'', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/missing-renderMethod.json');
+    const input = require('./input/render-test-suite/missing-renderMethod-fail.json');
   
     // Send the input data to the service and expect it to fail.
     try {
@@ -292,7 +272,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow('should verify that the rendered document is not returned when the request payload contains invalid \'@context\' values', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/invalid-@context.json');
+    const input = require('./input/render-test-suite/invalid-@context-fail.json');
   
     // Send the input data to the service and expect it to fail.
     try {
@@ -311,7 +291,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow('should verify that the rendered document is returned when the request payload contains additional properties', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/additional-properties.json');
+    const input = require('./input/render-test-suite/additional-properties-ok.json');
   
     // Send the input data to the service to get the rendered document response.
     const result = await request({
@@ -331,7 +311,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow('should verify that the rendered document is not returned when the request payload is missing the \'credential\' property', 'Result', async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./input/render-test-suite/missing-credential.json');
+    const input = require('./input/render-test-suite/missing-credential-fail.json');
   
     // Send the input data to the service and expect it to fail.
     try {
