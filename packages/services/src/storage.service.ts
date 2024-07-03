@@ -4,6 +4,7 @@ import { publicAPI } from './utils/httpService.js';
 
 export const storageService: IStorageService = async (config) => {
   const { url, params, options = { method: 'POST', headers: [] } } = config;
+  console.log('storageService', url, params, options);
   try {
     let result;
     switch (options.method) {
