@@ -18,11 +18,13 @@ export const storageService: IStorageService = async (config) => {
     }
 
     const getResultByPath = getValueByPath(result, params.resultPath);
+    console.log('getResultByPath', getResultByPath);
     return getResultByPath;
   } catch (error: any) {
     console.error(error);
     throw new Error(error.message);
   }
+  
 };
 
 export const getStorageServiceLink: IGetStorageServiceLink = async (storage, data, filename) => {
