@@ -1,3 +1,5 @@
+name: release-please
+
 on:
     push:
       branches:
@@ -5,8 +7,6 @@ on:
 permissions:
     contents: write
     pull-requests: write
-  
-name: release-please
   
 jobs:
     release-please:
@@ -16,3 +16,4 @@ jobs:
           with:
             token: ${{ secrets.GITHUB_TOKEN }}
             release-type: node
+            target-branch: main
