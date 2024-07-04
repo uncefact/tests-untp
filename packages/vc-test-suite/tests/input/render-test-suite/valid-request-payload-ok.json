@@ -6,17 +6,22 @@
         "ex": "https://www.w3.org/2018/credentials#renderMethod#",
         "renderMethod": "https://www.w3.org/2018/credentials#renderMethod",
         "template": "ex:template",
-        "url": "ex:url"
+        "url": "ex:url",
+        "mediaQuery": "ex:mediaQuery"
       }
     ],
     "renderMethod": [
       {
-        "template": "<p>{{name}}</p>",
+        "name": "template name",
+        "template": "<p>{{credentialSubject.name}}</p>",
         "@type": "RenderTemplate2024",
         "mediaType": "text/html",
-        "digestMultibase": "zQmfZAtabnhwXWXdzHCgW8hRuYghvpYSFpDbDQFvzdr17vM"
+        "mediaQuery": "@media (min-width: 1024px) {.name {font-weight: bold}}",
+        "digestMultibase": "zQmXF936JrjET6pCRdTfs5czN8Ch65NHfsGqKkAwwLkviHA"
       }
     ],
-    "name": "name"
+    "credentialSubject": {
+      "name": "Jane Doe"
+    }
   }
 }

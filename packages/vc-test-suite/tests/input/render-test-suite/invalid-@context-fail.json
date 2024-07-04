@@ -1,8 +1,6 @@
 {
   "credential": {
-    "@context": [
-      "invalid"
-    ],
+    "@context": "invalid",
     "renderMethod": [
       {
         "template": "<p>{{name}}</p>",

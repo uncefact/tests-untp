@@ -12,14 +12,15 @@
     ],
     "renderMethod": [
       {
-        "test": "test",
-        "template": "<p>{{test}}</p>",
+        "additionalField": "test",
+        "template": "<p>{{credentialSubject.name}}</p>",
         "@type": "RenderTemplate2024",
         "mediaType": "text/html",
-        "mediaQuery": "@media (min-width: 1024px) {.name {font-weight: bold}}",
-        "digestMultibase": "zQma8tmuzPVPcbWhMxdLWPWZdE5LPNoqKoLaDnjcaBopTGq"
+        "mediaQuery": "@media (min-width: 1024px) {.name {font-weight: bold}}"
       }
     ],
-    "test": "test"
+    "credentialSubject": {
+      "name": "Jane Doe"
+    }
   }
 }

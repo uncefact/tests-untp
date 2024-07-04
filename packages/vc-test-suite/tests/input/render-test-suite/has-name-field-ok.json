@@ -11,13 +11,10 @@
     ],
     "renderMethod": [
       {
-        "name": "Test name",
-        "template": "<p>{{name}}</p>",
+        "name": "template name",
+        "template": "<p>{{credentialSubject.name}}</p>",
         "@type": "RenderTemplate2024",
-        "mediaQuery": "@media (min-width: 1024px) {\n  .title {\n    font-weight: bold;\n    color: #223675;\n  }\n}",
-        "mediaType": "text/html",
-        "url": "",
-        "digestMultibase": "zQmfZAtabnhwXWXdzHCgW8hRuYghvpYSFpDbDQFvzdr17vM"
+        "mediaType": "text/html"
       }
     ]
   }

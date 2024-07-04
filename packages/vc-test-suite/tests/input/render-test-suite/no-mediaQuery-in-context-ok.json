@@ -11,10 +11,14 @@
     ],
     "renderMethod": [
       {
-        "template": "<p>{{name}}</p>",
+        "template": "<p>{{credentialSubject.name}}</p>",
         "@type": "RenderTemplate2024",
-        "mediaType": "text/html"
+        "mediaType": "text/html",
+        "mediaQuery": "@media (min-width: 1024px) {.name {font-weight: bold}}"
       }
-    ]
+    ],
+    "credentialSubject": {
+      "name": "Jane Doe"
+    }
   }
 }

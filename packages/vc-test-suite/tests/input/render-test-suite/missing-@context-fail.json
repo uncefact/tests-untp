@@ -2,7 +2,7 @@
   "credential": {
     "renderMethod": [
       {
-        "template": "<p>{{name}}</p>",
+        "template": "<p>{{credentialSubject.name}}</p>",
         "@type": "RenderTemplate2024",
         "mediaType": "text/html"
       }
