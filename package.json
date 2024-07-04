@@ -17,6 +17,7 @@
     "test:services": "cd packages/services && yarn run test",
     "test:mock-app": "cd packages/mock-app && yarn run test",
     "test:untp-test-suite": "cd packages/untp-test-suite && yarn run test",
+    "test:vc-test-suite": "cd packages/vc-test-suite && yarn run test",
     "test:integration:untp-test-suite": "cd packages/untp-test-suite && yarn run test:integration",
     "storybook:components": "cd packages/components && yarn run storybook",
     "storybook:mock-app": "cd packages/mock-app && yarn run storybook",
