@@ -11,7 +11,7 @@ export function reportRow(title, name, fn) {
   });
 }
 
-export function setupMatrix(implemented, columnLabel) {
+export function setupMatrix(implementors: string[], columnLabel: string) {
   const summaries = new Set();
   this.summary = summaries;
   // when the report sees a suite with report true it includes it
@@ -19,7 +19,7 @@ export function setupMatrix(implemented, columnLabel) {
   // this tells the reporter to use the matrix.hbs template to display the results
   this.matrix = true;
   // this gives the names of the implementations that are being tested
-  this.implemented = [implemented];
+  this.implemented = implementors;
   // this gives the names of the implementations that are not being tested
   this.notImplemented = [];
   // this will give the row label in the matrix
