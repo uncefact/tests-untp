@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 import assert from 'assert';
 import chai from 'chai';
-import { reportRow, setupMatrix } from '../helpers';
-import { request } from '../httpService';
-import * as config from '../config';
+import { reportRow, setupMatrix } from '../../helpers';
+import { request } from '../../httpService';
+import * as config from '../../config';
 
 chai.should();
 

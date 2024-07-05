@@ -6,6 +6,12 @@
 yarn install
 ```
 
+## Setup
+
+There are two parts of the test suite: `Render Template 2024` and `QR Link Encryption`. To add your implementation to this test suite You will need to add 2 endpoints to your implementation manifest in `config.ts`:
+- A Render Template 2024 endpoint in the `RenderTemplate2024` property.
+- A QR Link Encrypted endpoint in the `QrLinkEncrypted` property.
+
 ## Usage
 
 Create a folder named reports in the root directory of the test suite project (`vc-test-suite`):
