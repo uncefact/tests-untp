@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 import assert from 'assert';
 import chai from 'chai';
-import { reportRow, setupMatrix } from '../helpers';
-import { request } from '../httpService';
-import * as config from '../config';
+import { reportRow, setupMatrix } from '../../helpers';
+import { request } from '../../httpService';
+import * as config from '../../config';
 
 chai.should();
 
@@ -17,7 +17,7 @@ describe('RenderTemplate2024', function () {
     'should verify that each item in the documents array that is valid', config.default.implementationName,
     async () => {
       // Import the input data for the test from the specified JSON file.
-      const input = require('./RenderTemplate2024/input/valid-request-payload-ok.json');
+      const input = require('./input/valid-request-payload-ok.json');
 
       // Send the input data to the service to get the rendered document response.
       const result = await request({
@@ -43,7 +43,7 @@ describe('RenderTemplate2024', function () {
     config.default.implementationName,
     async () => {
       // Import the input data for the test from the specified JSON file.
-      const input = require('./RenderTemplate2024/input/missing-credential-fail.json');
+      const input = require('./input/missing-credential-fail.json');
 
       // Send the input data to the service and expect it to fail.
       await assert.rejects(request({
@@ -70,7 +70,7 @@ describe('RenderTemplate2024', function () {
   
   reportRow("should verify that the 'name' field, if present, is a non-empty string", config.default.implementationName, async () => {
     // Import the input data for the test from the specified JSON file.
-    const input = require('./RenderTemplate2024/input/name-field-empty-ok.json');
+    const input = require('./input/name-field-empty-ok.json');
 
     // Send the input data to the service to get the rendered document response.
     const result = await request({
@@ -94,7 +94,7 @@ describe('RenderTemplate2024', function () {
     config.default.implementationName,
     async () => {
       // Import the input data for the test from the specified JSON file.
-      const input = require('./RenderTemplate2024/input/no-mediaQuery-in-renderMethod-ok.json');
+      const input = require('./input/no-mediaQuery-in-renderMethod-ok.json');
 
       // Send the input data to the service to get the rendered document response.
       const result = await request({
@@ -119,7 +119,7 @@ describe('RenderTemplate2024', function () {
     config.default.implementationName,
     async () => {
       // Import the input data for the test from the specified JSON file.
-      const input = require('./RenderTemplate2024/input/additional-properties-ok.json');
+      const input = require('./input/additional-properties-ok.json');
 
       // Send the input data to the service to get the rendered document response.
       const result = await request({
@@ -144,7 +144,7 @@ describe('RenderTemplate2024', function () {
     config.default.implementationName,
     async () => {
       // Import the input data for the test from the specified JSON file.
-      const input = require('./RenderTemplate2024/input/missing-@context-fail.json');
+      const input = require('./input/missing-@context-fail.json');
 
       // Send the input data to the service and expect it to fail.
       await assert.rejects(request({
@@ -160,7 +160,7 @@ describe('RenderTemplate2024', function () {
     config.default.implementationName,
     async () => {
       // Import the input data for the test from the specified JSON file.
-      const input = require('./RenderTemplate2024/input/missing-renderMethod-fail.json');
+      const input = require('./input/missing-renderMethod-fail.json');
 
       // Send the input data to the service and expect it to fail.
       await assert.rejects(request({

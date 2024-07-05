@@ -7,6 +7,7 @@
     "strict": true,
     "skipLibCheck": true,
     "noImplicitThis": false,
-    "noImplicitAny": false,
-  }
+    "noImplicitAny": false
+  },
+  "include": ["tests/**/*.ts"]
 }
