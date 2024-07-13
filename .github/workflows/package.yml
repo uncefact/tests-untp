@@ -51,6 +51,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           target: build
           build-args: |
-            - CONFIG_FILE=./app-config.json
+            CONFIG_FILE=./app-config.json
 
       
