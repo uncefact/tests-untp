@@ -49,7 +49,8 @@ jobs:
           push: ${{ startsWith(github.ref, 'refs/tags/')  || github.ref == 'refs/heads/next' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          target: vckit-api
-#          build-args: |
+          target: mock-app
+          build-args: |
+            - CONFIG_FILE=./app-config.json
 
       
