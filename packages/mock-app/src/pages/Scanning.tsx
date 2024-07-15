@@ -50,7 +50,7 @@ const Scanning = () => {
   };
 
   React.useEffect(() => {
-    if (!scannedCode || !identityProvider) {
+    if (!scannedCode || !identityProvider || isLoading) {
       return;
     }
 
