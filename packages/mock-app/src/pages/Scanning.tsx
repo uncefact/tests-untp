@@ -50,7 +50,7 @@ const Scanning = () => {
   };
 
   React.useEffect(() => {
-    if (!scannedCode || !identityProvider) {
+    if (!scannedCode || !identityProvider || isLoading) {
       return;
     }
 
@@ -92,8 +92,10 @@ const Scanning = () => {
       <Scanner
         ref={scannerRef}
         fps={30}
-        qrbox={{ width: 250, height: 150 }}
+        qrbox={{ width: 500, height: 300 }}
         disableFlip={false}
+        useBarCodeDetectorIfSupported={true}
+        focusMode= 'continuous'
         qrCodeSuccessCallback={onScanResult}
         qrCodeErrorCallback={onScanError}
       />
