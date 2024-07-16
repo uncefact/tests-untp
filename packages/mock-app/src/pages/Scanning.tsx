@@ -36,7 +36,7 @@ const Scanning = () => {
       redirectToVerifyPage(dlrPassport.href);
     } catch (error) {
       console.log(error);
-      toastMessage({ status: Status.error, message: 'Failed to verify code' });
+      // toastMessage({ status: Status.error, message: 'Failed to verify code' });
     } finally {
       setIsLoading(false);
     }
@@ -64,7 +64,8 @@ const Scanning = () => {
   const onScanResult = (decodedText: string, result: Html5QrcodeResult) => {
     const formatName = result?.result?.format?.formatName;
     if (!formatName) {
-      return toastMessage({ status: Status.error, message: 'Failed to scanning code' });
+      return;
+      // return toastMessage({ status: Status.error, message: 'Failed to scanning code' });
     }
 
     const providerInstance = getProviderByType(appConfig.identifyProvider.type);
