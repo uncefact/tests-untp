@@ -1,0 +1,47 @@
+name: Build and Test
+
+on:
+  pull_request:
+    branches:
+      - next
+
+jobs:
+  test_and_build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '21'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: |
+          yarn cache clean && yarn install --immutable
+
+      - name: Check linting
+        run: yarn lint
+
+      - name: Run tests
+        run: |
+          yarn jest --changedSince=origin/next --ci --json --coverage --testLocationInResults --outputFile=report.json
+
+      - name: Coverage
+        uses: artiomtr/jest-coverage-report-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          coverage-file: report.json
+          base-coverage-file: report.json
+          threshold: 80
+
+      - name: Build
+        run: yarn build
