@@ -17,6 +17,7 @@ export interface IArgIssueVC {
 }
 export interface IVcKitIssueVC extends CredentialPayload {
   vcKitAPIUrl: string;
+  vcKitAPIKey?: string;
 }
 
 /**
@@ -26,7 +27,8 @@ export interface IVcKitIssueVC extends CredentialPayload {
  * @param issuer - issuer for the vc
  * @param credentialSubject - credential subject for the vc
  * @param restOfVC - rest of the vc
- * @param vcKitAPIUrl - api url for the vc
+ * @param vcKitAPIUrl - api url for the VC service
+ * @param vcKitAPIKey - api key for the VC service
  * @returns VerifiableCredential
  *
  * @example
@@ -35,7 +37,7 @@ export interface IVcKitIssueVC extends CredentialPayload {
  * const issuer = 'did:example:123';
  * const credentialSubject = { id: 'did:example:123', name: 'John Doe' };
  * const restOfVC = { render: {}};
- * const vc = await integrateVckitIssueVC({ context, type, issuer, credentialSubject, restOfVC, vcKitAPIUrl });
+ * const vc = await integrateVckitIssueVC({ context, type, issuer, credentialSubject, restOfVC, vcKitAPIUrl, vcKitAPIKey });
  */
 export const issueVC = async ({
   context,
@@ -44,9 +46,14 @@ export const issueVC = async ({
   credentialSubject,
   restOfVC,
   vcKitAPIUrl,
+  vcKitAPIKey,
 }: IVcKitIssueVC): Promise<VerifiableCredential> => {
   const body = constructCredentialObject({ context, type, issuer, credentialSubject, ...restOfVC });
-  const response = await publicAPI.post<VerifiableCredential>(`${vcKitAPIUrl}/credentials/issue`, body);
+  const response = await publicAPI.post<VerifiableCredential>(`${vcKitAPIUrl}/credentials/issue`, body, {
+    headers: {
+      ...vcKitAPIKey && { "Authorization": `Bearer ${vcKitAPIKey}` }
+    }
+  });
   return response;
 };
 
