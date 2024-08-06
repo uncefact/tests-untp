@@ -113,5 +113,5 @@ docker run -p 3000:80 mock-app:latest
 - Docker compose
 
 ```bash
-docker-compose up
+docker-compose up -d
 ```

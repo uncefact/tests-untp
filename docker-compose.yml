@@ -1,14 +1,5 @@
 version: '3.8'
 services:
-  mock-app:
-    build: 
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - CONFIG_FILE=./app-config.json
-    ports: 
-      - 3000:80
-
   documentation:
     build:
       context: ./documentation
@@ -22,3 +13,28 @@ services:
     volumes:
       - ./documentation:/app
       - /app/node_modules
+
+  vckit-api:
+    image: ghcr.io/uncefact/project-vckit:sha-60d583b@sha256:afa777d13512628e4277566a8abf45be43bdd19cdc8cbcc5383ffc00cc0ba912
+    env_file:
+      - local.env
+    ports:
+      - 3332:3332
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=vckit
+    volumes:
+      - vckit-data:/var/lib/postgresql/data
+    restart: always
+
+
+volumes:
+  vckit-data:
