@@ -1,5 +1,7 @@
 {
   "root": true,
+  // TODO: Enable linting for documentation folder
+  "ignorePatterns": ["documentation"],
   "plugins": [
     "@typescript-eslint",
     "prettier"
