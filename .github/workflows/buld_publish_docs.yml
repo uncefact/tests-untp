@@ -4,6 +4,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
+      - next
       - main
 
 jobs:
@@ -19,8 +20,12 @@ jobs:
 
       - name: Install dependencies
         run: cd documentation && yarn install --frozen-lockfile
+
       - name: Build website
         run: cd documentation && yarn build
+        env:
+          DOCS_BASE_URL: ${{ vars.DOCS_BASE_URL }}
+          DOCS_URL: ${{ vars.DOCS_URL }}
 
       # Popular action to deploy to GitHub Pages:
       # Docs: https://github.com/peaceiris/actions-gh-pages#%EF%B8%8F-docusaurus
