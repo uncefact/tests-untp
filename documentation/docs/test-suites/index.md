@@ -3,7 +3,7 @@ sidebar_position: 1
 title: Test Suites
 ---
 
-import Disclaimer from '../\_disclaimer.mdx';
+import Disclaimer from './../\_disclaimer.mdx';
 
 <Disclaimer />
 
