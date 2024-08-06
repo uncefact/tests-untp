@@ -22,7 +22,7 @@ The Test Suite comprises four primary components:
 This component tests the technical interoperability of implementations based on the UNTP specification. It ensures that the technical aspects of the implementation align with the protocol's requirements.
 
 ## Semantic Interoperability
-The Semantic Interoperability tests focus on verifying that the credentials produced by an implementation are semantically consistent with the UNTP specification. This allows implementors to be conformant with the core specification while allowing for extensions.
+The [Semantic Interoperability test](/docs/test-suites/semantic-interoperability) focus on verifying that the credentials produced by an implementation are semantically consistent with the UNTP specification. This allows implementors to be conformant with the core specification while allowing for extensions.
 
 ## Graph Validation
 This component tests the entire trust graph produced by an implementation against the UNTP specification, ensuring the integrity and validity of the trust relationships within the system.
@@ -35,7 +35,7 @@ The UNTP Test Suite follows a tiered approach, with each tier building upon the 
 
 **Tier 1**: Focuses on technical interoperability.
 
-**Tier 2**: Adds semantic interoperability testing.
+[**Tier 2**](/docs/test-suites/semantic-interoperability): Adds semantic interoperability testing.
 
 **Tier 3**: Incorporates graph validation.
 
