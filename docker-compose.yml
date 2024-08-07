@@ -35,6 +35,17 @@ services:
       - vckit-data:/var/lib/postgresql/data
     restart: always
 
+  storage-service:
+    image: ghcr.io/uncefact/project-identity-resolver:sha-8aed15c@sha256:d768fbb395e39072a4d227ebea651346e5f27a74f0b4938e6676042095599f3b
+    ports:
+      - 3334:3334
+    environment:
+      - API_VERSION=v1
+      - PROTOCOL=http
+      - DOMAIN=localhost
+      - PORT=3334
+      - AVAILABLE_BUCKETS=verifiable-credentials,private-verifiable-credentials,epcis-events
+      - STORAGE_TYPE=local
 
 volumes:
   vckit-data:
