@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 import assert from 'assert';
 import chai from 'chai';
+import * as config from '../../config';
 import { reportRow, setupMatrix } from '../../helpers';
 import { request } from '../../httpService';
-import * as config from '../../config';
 
 chai.should();
 
@@ -14,23 +14,25 @@ describe('RenderTemplate2024', function () {
   setupMatrix.call(this, [config.default.implementationName], 'Implementer');
 
   reportRow(
-    'should verify that each item in the documents array that is valid', config.default.implementationName,
+    'should verify that each item in the documents array that is valid',
+    config.default.implementationName,
     async () => {
       // Import the input data for the test from the specified JSON file.
       const input = require('./input/valid-request-payload-ok.json');
 
       // Send the input data to the service to get the rendered document response.
-      const result = await request({
+      const { data } = await request({
         method,
         url,
         data: input,
       });
 
-      result.should.eql({
+      data.should.eql({
         documents: [
           {
             type: 'RenderTemplate2024',
-            renderedTemplate: 'PHN0eWxlPkBtZWRpYSAobWluLXdpZHRoOiAxMDI0cHgpIHsubmFtZSB7Zm9udC13ZWlnaHQ6IGJvbGR9fTwvc3R5bGU+PHA+SmFuZSBEb2U8L3A+',
+            renderedTemplate:
+              'PHN0eWxlPkBtZWRpYSAobWluLXdpZHRoOiAxMDI0cHgpIHsubmFtZSB7Zm9udC13ZWlnaHQ6IGJvbGR9fTwvc3R5bGU+PHA+SmFuZSBEb2U8L3A+',
             name: 'template name',
           },
         ],
@@ -46,11 +48,13 @@ describe('RenderTemplate2024', function () {
       const input = require('./input/missing-credential-fail.json');
 
       // Send the input data to the service and expect it to fail.
-      await assert.rejects(request({
-        method,
-        url,
-        data: input,
-      }));
+      await assert.rejects(
+        request({
+          method,
+          url,
+          data: input,
+        }),
+      );
     },
   );
 
@@ -59,34 +63,39 @@ describe('RenderTemplate2024', function () {
     config.default.implementationName,
     async () => {
       // Send an empty payload to the service and expect it to fail.
-      await assert.rejects(request({
-        method,
-        url,
-        data: {},
-      }));
+      await assert.rejects(
+        request({
+          method,
+          url,
+          data: {},
+        }),
+      );
     },
   );
 
-  
-  reportRow("should verify that the 'name' field, if present, is a non-empty string", config.default.implementationName, async () => {
-    // Import the input data for the test from the specified JSON file.
-    const input = require('./input/name-field-empty-ok.json');
+  reportRow(
+    "should verify that the 'name' field, if present, is a non-empty string",
+    config.default.implementationName,
+    async () => {
+      // Import the input data for the test from the specified JSON file.
+      const input = require('./input/name-field-empty-ok.json');
 
-    // Send the input data to the service to get the rendered document response.
-    const result = await request({
-      method,
-      url,
-      data: input,
-    });
+      // Send the input data to the service to get the rendered document response.
+      const { data } = await request({
+        method,
+        url,
+        data: input,
+      });
 
-    // Verify each item in the returned documents array.
-    result.documents.forEach((document) => {
-      // Check that the name is a string.
-      document.name.should.be.a('string');
-      // Check that the name is not empty.
-      document.name.trim().should.not.equal('');
-    });
-  });
+      // Verify each item in the returned documents array.
+      data.documents.forEach((document) => {
+        // Check that the name is a string.
+        document.name.should.be.a('string');
+        // Check that the name is not empty.
+        document.name.trim().should.not.equal('');
+      });
+    },
+  );
 
   // TODO check grammar
   reportRow(
@@ -97,13 +106,13 @@ describe('RenderTemplate2024', function () {
       const input = require('./input/no-mediaQuery-in-renderMethod-ok.json');
 
       // Send the input data to the service to get the rendered document response.
-      const result = await request({
+      const { data } = await request({
         method,
         url,
         data: input,
       });
 
-      result.should.eql({
+      data.should.eql({
         documents: [
           {
             type: 'RenderTemplate2024',
@@ -122,19 +131,22 @@ describe('RenderTemplate2024', function () {
       const input = require('./input/additional-properties-ok.json');
 
       // Send the input data to the service to get the rendered document response.
-      const result = await request({
+      const { data } = await request({
         method,
         url,
         data: input,
       });
 
       // Verify each item in the returned documents array.
-      result.documents.forEach((document) => {
+      data.documents.forEach((document) => {
         // Check if the decoded renderedDocument matches the expected HTML with style.
-        JSON.stringify(document).should.equal(JSON.stringify({
-          "type": "RenderTemplate2024",
-          "renderedTemplate": "PHN0eWxlPkBtZWRpYSAobWluLXdpZHRoOiAxMDI0cHgpIHsubmFtZSB7Zm9udC13ZWlnaHQ6IGJvbGR9fTwvc3R5bGU+PHA+SmFuZSBEb2U8L3A+"
-        }));
+        JSON.stringify(document).should.equal(
+          JSON.stringify({
+            type: 'RenderTemplate2024',
+            renderedTemplate:
+              'PHN0eWxlPkBtZWRpYSAobWluLXdpZHRoOiAxMDI0cHgpIHsubmFtZSB7Zm9udC13ZWlnaHQ6IGJvbGR9fTwvc3R5bGU+PHA+SmFuZSBEb2U8L3A+',
+          }),
+        );
       });
     },
   );
@@ -147,11 +159,13 @@ describe('RenderTemplate2024', function () {
       const input = require('./input/missing-@context-fail.json');
 
       // Send the input data to the service and expect it to fail.
-      await assert.rejects(request({
-        method,
-        url,
-        data: input,
-      }));
+      await assert.rejects(
+        request({
+          method,
+          url,
+          data: input,
+        }),
+      );
     },
   );
 
@@ -163,11 +177,13 @@ describe('RenderTemplate2024', function () {
       const input = require('./input/missing-renderMethod-fail.json');
 
       // Send the input data to the service and expect it to fail.
-      await assert.rejects(request({
-        method,
-        url,
-        data: input,
-      }));
+      await assert.rejects(
+        request({
+          method,
+          url,
+          data: input,
+        }),
+      );
     },
   );
 });

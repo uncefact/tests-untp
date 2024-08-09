@@ -1,9 +1,9 @@
-import chai from 'chai';
 import { decryptString } from '@govtechsg/oa-encryption';
-import { isURLEncoded, parseQRLink } from './helper';
-import { request } from '../../httpService';
-import { reportRow, setupMatrix } from '../../helpers';
+import chai from 'chai';
 import * as config from '../../config';
+import { reportRow, setupMatrix } from '../../helpers';
+import { request } from '../../httpService';
+import { isURLEncoded, parseQRLink } from './helper';
 
 const expect = chai.expect;
 
@@ -32,12 +32,12 @@ describe('QR Link Verification', function () {
   });
 
   reportRow('URI MUST be resolvable', config.default.implementationName, async function () {
-    const res = await request({
+    const { data } = await request({
       url: parsedLink.q.payload.uri,
       method,
     });
 
-    res.should.be.an('object');
+    data.should.be.an('object');
   });
 
   reportRow('Hash MUST exist and be a string', config.default.implementationName, function () {
@@ -65,16 +65,19 @@ describe('QR Link Verification', function () {
   });
 
   reportRow('Key MUST decrypt the encrypted credential', config.default.implementationName, async function () {
-    const res = await request({
+    const { data } = await request({
       url: parsedLink.q.payload.uri,
       method,
     });
+
     const stringifyVC = decryptString({
-      ...res.document,
+      ...data.document,
       key: parsedLink.q.payload.key,
       type: 'OPEN-ATTESTATION-TYPE-1',
     });
+
     const vc = JSON.parse(stringifyVC);
+
     expect(vc).to.be.an('object');
     vc.should.have.property('issuer');
     vc.should.have.property('credentialStatus');

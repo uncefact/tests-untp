@@ -13,7 +13,8 @@
     "url": "git+https://github.com/uncefact/tests-untp.git"
   },
   "scripts": {
-    "test": "mocha tests/ --reporter @digitalbazaar/mocha-w3c-interop-reporter --reporter-options reportDir=\"$PWD/reports\",respec=\"$PWD/respecConfig.json\",suiteLog='./suite.log',templateData=\"$PWD/reports/index.json\",title=\"VC test suite\" --timeout 15000 --preserve-symlinks"
+    "test": "mocha tests/ --reporter @digitalbazaar/mocha-w3c-interop-reporter --reporter-options reportDir=\"$PWD/reports\",respec=\"$PWD/respecConfig.json\",suiteLog='./suite.log',templateData=\"$PWD/reports/index.json\",title=\"VC test suite\" --timeout 15000 --preserve-symlinks",
+    "test:package": "jest"
   },
   "bugs": {
     "url": "https://github.com/uncefact/tests-untp/issues"
