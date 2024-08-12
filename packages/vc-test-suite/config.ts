@@ -11,5 +11,12 @@ export default {
       headers: {},
       method: 'POST',
     },
+    Storage: {
+      url: 'http://localhost:3334/v1/documents',
+      encryptionUrl: 'http://localhost:3334/v1/credentials',
+      headers: {},
+      additionalParams: {},
+      additionalPayload: { bucket: 'verifiable-credentials' },
+    },
   },
 };
