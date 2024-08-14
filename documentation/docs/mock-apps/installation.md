@@ -37,13 +37,6 @@ Once you have met the prerequisites, follow these steps to install the dependenc
    yarn install
    ```
 
-3. Copy the example configuration file:
-   ```
-   cp packages/mock-app/src/constants/app-config.example.json packages/mock-app/src/constants/app-config.json
-   ```
-
-This command copies the example configuration file `app-config.example.json` to create the actual configuration file `app-config.json` that will be used by the mock apps.
-
-After completing these steps, you will have all the necessary mock app dependencies installed and the configuration file ready for customisation.
+After completing these steps, you will have all the necessary mock app dependencies installed.
 
 In the next section, we will explore the required services and their documentation to help you understand their role in the mock apps ecosystem.

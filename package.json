@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "start": "cd packages/mock-app && yarn start",
+    "start": "cp app-config.json packages/mock-app/src/constants/app-config.json && cd packages/mock-app && yarn start",
     "build": "yarn build:services && yarn build:components && yarn build:untp-test-suite",
     "build:services": "cd packages/services && yarn run build",
     "build:components": "cd packages/components && yarn run build",
