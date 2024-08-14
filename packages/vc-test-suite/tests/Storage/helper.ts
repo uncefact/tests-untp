@@ -18,13 +18,19 @@ interface EncryptedData {
 /**
  * Decrypts given data using AES-GCM
  * @param {object} encryptedData - Object containing cipherText, IV, and tag
- * @param {string} key - Decryption key
+ * @param {string} key - Decryption key in hexadecimal format
  * @returns {string} - Decrypted data
  */
-export function decryptData({ cipherText, iv, tag }: EncryptedData, key: string) {
-  const decipher = crypto.createDecipheriv('aes-256-gcm', Buffer.from(key, 'hex'), Buffer.from(iv, 'hex'));
-  decipher.setAuthTag(Buffer.from(tag, 'hex'));
-  let decrypted = decipher.update(cipherText, 'hex', 'utf8');
+export function decryptData({ cipherText, iv, tag }: EncryptedData, key: string): string {
+  const decipher = crypto.createDecipheriv('aes-256-gcm', Buffer.from(key, 'hex'), Buffer.from(iv, 'base64'));
+  decipher.setAuthTag(Buffer.from(tag, 'base64'));
+  let decrypted = decipher.update(cipherText, 'base64', 'utf8');
   decrypted += decipher.final('utf8');
-  return decrypted;
+
+  // Try to decode the base64 string, if it fails, return the original string
+  try {
+    return Buffer.from(decrypted, 'base64').toString('utf8');
+  } catch (error) {
+    return decrypted;
+  }
 }
