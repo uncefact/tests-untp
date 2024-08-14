@@ -15,11 +15,11 @@ Key functions of the Identity Resolver Service include:
 - Enabling downstream value chain actors to discover more information about products they have purchased or are considering purchasing.
 - Facilitating the connection between unique identifiers and more information about the product (e.g. [Digital Product Passports](https://uncefact.github.io/spec-untp/docs/specification/DigitalProductPassport), [Traceability Events](https://uncefact.github.io/spec-untp/docs/specification/DigitalTraceabilityEvents) and [Conformity Credentials](https://uncefact.github.io/spec-untp/docs/specification/ConformityCredential)).
 <!-- TODO: Update to UN IDR service once built -->
-For the Mock Apps, we currently recommend and will be using the [GS1 Digital Link Resolver](https://github.com/gs1/GS1_DigitalLink_Resolver_CE).
+For the Mock Apps, we currently recommend and will be using the [GS1 Digital Link Resolver v2.6](https://github.com/gs1/GS1_DigitalLink_Resolver_CE/tree/v2.6).
 
 ### Identity Resolver Service Documentation
 
-Please go through the GS1 Digital Link Resolve documentation available [here](https://github.com/gs1/GS1_DigitalLink_Resolver_CE#fast-start) to understand how to set up and use the Identity Resolver Service.
+Please go through the GS1 Digital Link Resolve documentation available [here](https://github.com/gs1/GS1_DigitalLink_Resolver_CE/tree/v2.6#fast-start) to understand how to set up and use the Identity Resolver Service.
 
 ### Requirements
 

@@ -1,117 +1,65 @@
 # tests-untp
 
-UNTP mock implementation is a mock app that presents how the decentralized app works. There are three main packages in this repository: components, core, and services. The components package contains the UI components, the core package plays the role of the render page by using the components package and interacting with the services package and the services package contains the business logic.
+The UNTP Test Suite is a comprehensive set of tools designed to ensure conformance to the UN Transparency Protocol (UNTP). This repository contains the following key components:
+
+1. Mock Apps: Demonstrating how decentralized applications work within the UNTP ecosystem.
+2. Test Suites: Covering three tiers of testing - technical interoperability, semantic interoperability, and graph validation.
+3. Documentation Site: Providing detailed information on setup, configuration, and usage.
+
+The Mock Apps are structured into three main packages:
+- Components: Contains the UI components.
+- Core: Handles rendering and interaction between components and services.
+- Services: Contains the business logic.
+
+These tools allow implementers to model value chains, test UNTP functionality in real-world scenarios, and ensure their implementations align with the UNTP specification across various aspects of interoperability and validation.
 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/en/) version 20.12.2
 - [yarn](https://yarnpkg.com/) version 1.22.22
+- [Docker](https://www.docker.com/get-started) and [Docker Compose](https://docs.docker.com/compose/install/) (for running services)
 
-### Install dependencies
+## Setup
 
-```bash
-yarn install
-```
+To set up and run the mock app:
 
-### Copy the .app-config.example file to .env for the demo explorer
+1. Install dependencies:
+   ```bash
+   yarn install
+   ```
 
-```bash
-cp packages/mock-app/src/constants/app-config.example.json packages/mock-app/src/constants/app-config.json
-```
+2. Build the package:
+   ```bash
+   yarn build
+   ```
 
-### Update the app-config.json file with the correct values, for example:
+3. Start the project:
+   ```bash
+   yarn start
+   ```
 
-```json
-{
-  "services": [
-    {
-      "name": "processDPP", // Service name
-      "parameters": [
-        {
-          "vckit": {
-            "vckitAPIUrl": "https://vckit.example.com", // URL of the VC API
-            "issuer": "did:web:vckit.example.com" // Issuer DID
-          },
-          "dpp": {
-            "context": ["https://dpp.example.com/dppld.json"], // DPP context, please refer to the DPP documentation, if it is not provided, the error message will be displayed
-            "renderTemplate": [{ "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }],
-            "type": ["DigitalProductPassport"],
-            "dlrLinkTitle": "Livestock Passport",
-            "dlrIdentificationKeyType": "gtin",
-            "dlrVerificationPage": "http://dlr.example.com/verify" // DLR verification page
-          },
+## Docker Compose Configuration
 
-          "dlr": {
-            "dlrAPIUrl": "http://dlr.example.com", // DLR API URL
-            "dlrAPIKey": "5555555555555"
-          },
-          "storage": {
-            "url": "https://storage.example.com", // Storage API URL
-            "params": {
-              "resultPath": "" // Path to access the credential or the link to the credential within the API response
-            },
-            // Optional parameters
-            "options": {
-              "method": "POST",
-              "headers": {
-                "Content-Type": "application/json"
-              }
-            }
-          }
-        }
-      ]
-    }
-  ]
-}
-```
-
-### Build the package
-
-```bash
-yarn build
-```
-
-### Start the project
-
-```bash
-yarn start
-```
-
-## Documentation
-
-```
-$ cd documentation
-```
-
-### Installation
-
-```
-$ yarn
-```
-
-### Local Development
-
-```
-$ yarn start
-```
-
-## Docker
-
-- Dockerfile
-  Build image
-
-```bash
-docker build --build-arg CONFIG_FILE=./app-config.json -t mock-app:latest .
-```
-
-Run image
-
-```bash
-docker run -p 3000:80 mock-app:latest
-```
-
-- Docker compose
+We provide a Docker Compose configuration to easily set up the required services (Verifiable Credential Service, Storage Service, a database for the VC service) and the documentation site. To start these services:
 
 ```bash
 docker-compose up -d
 ```
+
+This will start pre-configured instances of the necessary services and the documentation site. The `app-config.json` mock app config file is pre-configured to work with these Docker services.
+
+## Documentation
+
+For detailed information about the configuration, services, and how to use the mock app, please refer to the documentation site. 
+
+The documentation site is available at [`http://localhost:3002`](http://localhost:3002) after starting the services with Docker Compose.
+
+If you need to run the documentation site manually:
+
+```bash
+cd documentation
+yarn install
+yarn start
+```
+
+Please consult the documentation for comprehensive instructions on setting up and using the mock app, regardless of whether you're using Docker Compose or setting up services manually.
