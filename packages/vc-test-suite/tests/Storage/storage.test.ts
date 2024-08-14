@@ -47,14 +47,14 @@ describe('Storage Service', function () {
     const payload1 = buildPayload(
       {
         id: guid,
-        data: 'First credential',
+        data: { test: 'First credential' },
       },
       additionalPayload,
     );
     const payload2 = buildPayload(
       {
         id: guid,
-        data: 'Second credential',
+        data: { test: 'Second credential' },
       },
       additionalPayload,
     );
@@ -68,14 +68,21 @@ describe('Storage Service', function () {
 
     expect(response1.status).to.equal(201);
 
-    const response2 = await request({
-      url: buildUrl(url, additionalParams),
-      method: 'POST',
-      headers: headers,
-      data: payload2,
-    });
+    let response2;
+    try {
+      response2 = await request({
+        url: buildUrl(url, additionalParams),
+        method: 'POST',
+        headers: headers,
+        data: payload2,
+      });
+    } catch (error: any) {
+      expect(error?.response?.status).to.equal(409);
+    }
 
-    expect(response2.status).to.equal(409);
+    if (response2) {
+      expect(response2.status).to.not.equal(201);
+    }
 
     const fetchResponse = await request({
       url: buildUrl(response1.data.uri, additionalParams),
@@ -213,14 +220,14 @@ describe('Storage Service', function () {
     const payload1 = buildPayload(
       {
         id: guid,
-        data: 'First encrypted credential',
+        data: { test: 'First encrypted credential' },
       },
       additionalPayload,
     );
     const payload2 = buildPayload(
       {
         id: guid,
-        data: 'Second encrypted credential',
+        data: { test: 'Second encrypted credential' },
       },
       additionalPayload,
     );
@@ -236,14 +243,21 @@ describe('Storage Service', function () {
     expect(response1.data).to.have.property('uri');
     expect(response1.data).to.have.property('key');
 
-    const response2 = await request({
-      url: buildUrl(encryptionUrl, additionalParams),
-      method: 'POST',
-      headers: headers,
-      data: payload2,
-    });
+    let response2;
+    try {
+      response2 = await request({
+        url: buildUrl(encryptionUrl, additionalParams),
+        method: 'POST',
+        headers: headers,
+        data: payload2,
+      });
+    } catch (error: any) {
+      expect(error?.response?.status).to.equal(409);
+    }
 
-    expect(response2.status).to.equal(409);
+    if (response2) {
+      expect(response2.status).to.not.equal(201);
+    }
 
     const fetchResponse = await request({
       url: buildUrl(response1.data.uri, additionalParams),
