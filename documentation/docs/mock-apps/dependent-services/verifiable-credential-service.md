@@ -35,7 +35,7 @@ If you're setting up your own instance of the Verifiable Credential Service, ple
 
 ### VCKit Documentation
 
-Please go through the VCKit documentation available [here](https://github.com/uncefact/project-vckit#start-the-documentation-page) to understand how to set up and use VCKit.
+Please go through the VCKit documentation available [here](https://uncefact.github.io/project-vckit/) to understand how to set up and use VCKit.
 
 ### Requirements
 
@@ -51,6 +51,6 @@ Make sure you have these components set up and running, and note the API address
 
 Regardless of which setup option you chose, you'll need to create an identifier (did:web) within the Verifiable Credential Service. This identifier is crucial for the proper functioning of the system.
 
-To create an identifier, you'll need to use the VCKit API. Refer to the [VCKit documentation](https://github.com/uncefact/project-vckit#start-the-documentation-page) for specific instructions on how to create a did:web identifier using their API endpoints.
+To create an identifier, you'll need to use the VCKit API. Refer to the [VCKit documentation](https://uncefact.github.io/project-vckit/docs/get-started/api-server-get-started/basic-operations) for specific instructions on how to create a did:web identifier using their API endpoints.
 
 In the next section, we will discuss the Storage Service and its role in the UNTP ecosystem.
