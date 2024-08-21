@@ -80,12 +80,14 @@ export interface ICreateLinkResolver {
 }
 
 export interface GS1LinkResolver extends ILinkResolver {
+  namespace: string;
   qualifierPath: string;
   active: boolean;
   responses: GS1LinkResponse[];
 }
 
 export interface GS1LinkResponse extends ILinkResponse {
+  title: string;
   ianaLanguage: string;
   context: string;
   active: boolean;
@@ -103,7 +105,7 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
       ? `${qualifierPath}&${arg.queryString}`
       : `${qualifierPath}?${arg.queryString}`;
   }
-  const params: GS1LinkResolver[] = [constructLinkResolver(linkResolver, linkResponses, registerQualifierPath)];
+  const params: GS1LinkResolver = constructLinkResolver(linkResolver, linkResponses, qualifierPath);
   try {
     privateAPI.setBearerTokenAuthorizationHeaders(arg.dlrAPIKey || '');
     await privateAPI.post<string>(`${dlrAPIUrl}/resolver`, params);
@@ -114,7 +116,9 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
         : qualifierPath.includes('?')
           ? `${qualifierPath}&linkType=${responseLinkType}`
           : `${qualifierPath}?linkType=${responseLinkType}`;
-    return `${dlrAPIUrl}/${linkResolver.identificationKeyType}/${linkResolver.identificationKey}${path}`;
+    return `${dlrAPIUrl.replace('api', 'gs1')}/${linkResolver.identificationKeyType}/${
+      linkResolver.identificationKey
+    }${path}`;
   } catch (error) {
     throw new Error('Error creating link resolver');
   }
@@ -126,10 +130,11 @@ export const constructLinkResolver = (
   qualifierPath: string,
 ) => {
   const gs1LinkResolver: GS1LinkResolver = {
+    namespace: 'gs1',
     identificationKeyType: linkResolver.identificationKeyType,
     identificationKey: linkResolver.identificationKey,
     itemDescription: linkResolver.itemDescription,
-    qualifierPath,
+    qualifierPath: qualifierPath ? qualifierPath : '/',
     active: true,
     responses: [],
   };
@@ -144,6 +149,7 @@ export const constructLinkResolver = (
       defaultMimeType: false,
       fwqs: false,
       active: true,
+      title: linkResponse.linkTitle,
       ...linkResponse,
     };
 
@@ -156,6 +162,7 @@ export const constructLinkResolver = (
       defaultMimeType: false,
       fwqs: false,
       active: true,
+      title: linkResponse.linkTitle,
       ...linkResponse,
     };
 

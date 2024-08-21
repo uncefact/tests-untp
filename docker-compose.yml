@@ -47,5 +47,71 @@ services:
       - AVAILABLE_BUCKETS=verifiable-credentials,private-verifiable-credentials,epcis-events
       - STORAGE_TYPE=local
 
+  identity-resolver-service:
+    # Replace with local or deployed image
+    image: app-identity-resolver-1:latest
+    ports:
+      - '3000:3000'
+    environment:
+      - MINIO_ENDPOINT=identity-resolver-service-object-store
+      - MINIO_PORT=9000
+      - MINIO_USE_SSL=false
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=idr-bucket-1
+      - IDENTIFIER_PATH=identifiers
+      - API_KEY=test123
+      - APP_ENDPOINT=http://localhost:3000
+      - APP_NAME=IDR-1
+      - RESOLVER_DOMAIN=http://localhost:3000
+      - LINK_TYPE_VOC_DOMAIN=http://localhost:3000/voc
+    depends_on:
+      - identity-resolver-service-object-store
+
+  identity-resolver-service-object-store:
+    image: quay.io/minio/minio:RELEASE.2024-08-17T01-24-54Z-cpuv1
+    command: server /data --console-address ":9090"
+    ports:
+      - '9000:9000'
+      - '9090:9090'
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - ./minio_data/identity-resolver-service-object-store:/data
+
+  mock-global-gs1-resolver:
+    # Replace with local or deployed image
+    image: app-identity-resolver-1:latest
+    ports:
+      - '3001:3000'
+    environment:
+      - MINIO_ENDPOINT=mock-global-gs1-resolver-object-store
+      - MINIO_PORT=9000
+      - MINIO_USE_SSL=false
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=idr-bucket-2
+      - IDENTIFIER_PATH=identifiers
+      - API_KEY=test456
+      - APP_ENDPOINT=http://localhost:3001
+      - APP_NAME=IDR-2
+      - RESOLVER_DOMAIN=http://localhost:3001
+      - LINK_TYPE_VOC_DOMAIN=http://localhost:3001/voc
+    depends_on:
+      - mock-global-gs1-resolver-object-store
+
+  mock-global-gs1-resolver-object-store:
+    image: quay.io/minio/minio:RELEASE.2024-08-17T01-24-54Z-cpuv1
+    command: server /data --console-address ":9091"
+    ports:
+      - '9001:9000'
+      - '9091:9090'
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - ./minio_data/mock-global-gs1-resolver-object-store:/data
+
 volumes:
   vckit-data:
