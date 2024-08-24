@@ -694,7 +694,7 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:1c04-2406-2d40-4106-2b10-7cb8-a0fb-63f3-d077.ngrok-free.app"
+                    "issuer": "did:web:143f-2406-2d40-4106-2b10-38c6-9732-f2d9-bb1c.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -1110,7 +1110,7 @@
                         {
                           "path": "/sourceParty",
                           "data": {
-                            "id": "did:web:1c04-2406-2d40-4106-2b10-7cb8-a0fb-63f3-d077.ngrok-free.app",
+                            "id": "did:web:143f-2406-2d40-4106-2b10-38c6-9732-f2d9-bb1c.ngrok-free.app",
                             "name": "Truffle Farm",
                             "identifiers": [
                               {
@@ -1128,7 +1128,7 @@
                         {
                           "path": "/destinationParty",
                           "data": {
-                            "id": "did:web:1c04-2406-2d40-4106-2b10-7cb8-a0fb-63f3-d077.ngrok-free.app",
+                            "id": "did:web:143f-2406-2d40-4106-2b10-38c6-9732-f2d9-bb1c.ngrok-free.app",
                             "name": "Truffle Processor",
                             "identifiers": [
                               {
@@ -1175,7 +1175,7 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:1c04-2406-2d40-4106-2b10-7cb8-a0fb-63f3-d077.ngrok-free.app"
+                    "issuer": "did:web:143f-2406-2d40-4106-2b10-38c6-9732-f2d9-bb1c.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],

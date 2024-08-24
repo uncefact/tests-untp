@@ -49,7 +49,7 @@ services:
 
   identity-resolver-service:
     # Replace with local or deployed image
-    image: app-identity-resolver-1:latest
+    image: ghcr.io/pyx-industries/pyx-identity-resolver:latest@sha256:71a02b8b0a2b9c7cc18d33a54060e9af4d543e34bdd6a47c3b3cf4dcadb1711e
     ports:
       - '3000:3000'
     environment:
@@ -82,7 +82,7 @@ services:
 
   mock-global-gs1-resolver:
     # Replace with local or deployed image
-    image: app-identity-resolver-1:latest
+    image: ghcr.io/pyx-industries/pyx-identity-resolver:latest@sha256:71a02b8b0a2b9c7cc18d33a54060e9af4d543e34bdd6a47c3b3cf4dcadb1711e
     ports:
       - '3001:3000'
     environment:
