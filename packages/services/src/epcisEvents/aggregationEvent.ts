@@ -53,6 +53,7 @@ export const processAggregationEvent: IService = async (
 
   await registerLinkResolver(
     aggregationVCLink,
+    epcisAggregationEvent.dlrIdentificationKeyNamespace,
     epcisAggregationEvent.dlrIdentificationKeyType,
     identifier,
     epcisAggregationEvent.dlrLinkTitle,
@@ -60,6 +61,7 @@ export const processAggregationEvent: IService = async (
     epcisAggregationEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
+    dlr.namespace,
     qualifierPath,
   );
 

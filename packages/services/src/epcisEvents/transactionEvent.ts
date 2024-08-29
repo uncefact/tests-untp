@@ -41,6 +41,7 @@ export const processTransactionEvent: IService = async (
 
   const linkResolver = await registerLinkResolver(
     vcUrl,
+    epcisTransactionEvent.dlrIdentificationKeyNamespace,
     epcisTransactionEvent.dlrIdentificationKeyType,
     identifier,
     epcisTransactionEvent.dlrLinkTitle,
@@ -48,6 +49,7 @@ export const processTransactionEvent: IService = async (
     epcisTransactionEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
+    dlr.namespace,
     qualifierPath,
     LinkType.epcisLinkType,
   );

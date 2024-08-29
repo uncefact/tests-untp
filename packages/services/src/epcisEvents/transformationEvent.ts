@@ -76,6 +76,7 @@ export const processTransformationEvent: IService = async (data: any, context: I
 
         const transformationEventLinkResolver = await registerLinkResolver(
           transformantionEventLink,
+          epcisTransformationEventContext.dlrIdentificationKeyNamespace,
           epcisTransformationEventContext.dlrIdentificationKeyType,
           transformationEventIdentifier,
           epcisTransformationEventContext.dlrLinkTitle,
@@ -83,6 +84,7 @@ export const processTransformationEvent: IService = async (data: any, context: I
           epcisTransformationEventContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,
+          dlrContext.namespace,
           transformationEventQualifierPath,
           LinkType.epcisLinkType,
         );
@@ -98,6 +100,7 @@ export const processTransformationEvent: IService = async (data: any, context: I
 
         await registerLinkResolver(
           DPPLink,
+          dppContext.dlrIdentificationKeyNamespace,
           dppContext.dlrIdentificationKeyType,
           identifier,
           dppContext.dlrLinkTitle,
@@ -105,6 +108,7 @@ export const processTransformationEvent: IService = async (data: any, context: I
           dppContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,
+          dlrContext.namespace,
           qualifierPath,
         );
       }),
@@ -140,6 +144,7 @@ export const issueEpcisTransformationEvent = async (
       handlers: {
         generateLinkResolver: generateLinkResolver(
           dlrContext.dlrAPIUrl,
+          epcisTransformationEvent.dlrIdentificationKeyNamespace,
           IdentificationKeyType.gtin,
           `linkType=${LinkType.certificationLinkType}`,
         ),

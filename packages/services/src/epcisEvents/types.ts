@@ -14,6 +14,7 @@ export interface ICredential {
 }
 
 export interface ILinkResolverContext {
+  dlrIdentificationKeyNamespace: string;
   dlrIdentificationKeyType: IdentificationKeyType;
   dlrLinkTitle: string;
   dlrVerificationPage: string;
@@ -32,6 +33,7 @@ export interface IDLRAI {
 export interface IConfigDLR {
   dlrAPIUrl: string;
   dlrAPIKey: string;
+  namespace: string;
 }
 
 export interface IStorageContext {

@@ -3,9 +3,9 @@ import { publicAPI } from '../utils/httpService.js';
 import { IdentityProviderStrategy } from './IdentityProvider.js';
 
 export enum GS1ServiceEnum {
-  certificationInfo = 'http://localhost:3000/voc/certificationInfo',
-  verificationService = 'http://localhost:3000/voc/verificationService',
-  serviceInfo = 'http://localhost:3001/voc/serviceInfo',
+  certificationInfo = 'voc/certificationInfo',
+  verificationService = 'voc/verificationService',
+  serviceInfo = 'voc/serviceInfo',
 }
 
 export class GS1Provider implements IdentityProviderStrategy {
@@ -13,7 +13,7 @@ export class GS1Provider implements IdentityProviderStrategy {
    * Function to retrieve the DLR URL based on the GTIN code and identification provider URL.
    * @returns The DLR (Digital Link Resolver) URL corresponding to the provided GTIN code, or null if not found.
    */
-  async getDlrUrl(code: string, providerUrl: string): Promise<string | null> {
+  async getDlrUrl(code: string, providerUrl: string, namespace: string): Promise<string | null> {
     const parseGS1Payload = (payload: any) => {
       const aiRegex = /\((\d+)\)([^(]+)/g;
       const parsed = Array.from(payload.matchAll(aiRegex), (match) => [(match as any)[1], (match as any)[2]]);
@@ -38,14 +38,14 @@ export class GS1Provider implements IdentityProviderStrategy {
         throw new Error('GTIN not found in the GS1 payload');
       }
 
-      const { linkset }: any = await publicAPI.get(`${providerUrl}/${gtin}?linkType=all`);
+      const { linkset }: any = await publicAPI.get(`${providerUrl}/${namespace}/${gtin}?linkType=all`);
 
       if (!linkset || !linkset.length) {
         return null;
       }
 
       // Extract the GS1 service host from the fetched products data
-      const gs1ServiceHost: string = linkset[0]?.[GS1ServiceEnum.serviceInfo]?.[0]?.href;
+      const gs1ServiceHost: string = linkset[0]?.[`${providerUrl}/${GS1ServiceEnum.serviceInfo}`]?.[0]?.href;
       if (!gs1ServiceHost) {
         return null;
       }

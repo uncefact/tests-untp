@@ -3,6 +3,7 @@ import { IDLRAI } from './epcisEvents/types.js';
 import { GS1ServiceEnum } from './identityProviders/GS1Provider.js';
 import { MimeTypeEnum } from './types/types.js';
 import { privateAPI } from './utils/httpService.js';
+import { extractDomain } from './utils/helpers.js';
 /**
  * Generates a link resolver URL based on the provided linkResolver and linkResponse objects.
  *
@@ -52,6 +53,7 @@ export enum IdentificationKeyType {
 }
 
 export interface ILinkResolver {
+  identificationKeyNamespace: string;
   identificationKeyType: IdentificationKeyType;
   identificationKey: string;
   itemDescription: string;
@@ -74,12 +76,13 @@ export interface ICreateLinkResolver {
   qualifierPath: string;
   dlrAPIUrl: string;
   dlrAPIKey: string;
+  namespace: string;
 
   responseLinkType?: string;
   queryString?: string | null;
 }
 
-export interface GS1LinkResolver extends ILinkResolver {
+export interface GS1LinkResolver extends Omit<ILinkResolver, 'identificationKeyNamespace'> {
   namespace: string;
   qualifierPath: string;
   active: boolean;
@@ -98,7 +101,7 @@ export interface GS1LinkResponse extends ILinkResponse {
 }
 
 export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<string> => {
-  const { dlrAPIUrl, linkResolver, linkResponses, qualifierPath, responseLinkType = 'all' } = arg;
+  const { dlrAPIUrl, namespace, linkResolver, linkResponses, qualifierPath, responseLinkType = 'all' } = arg;
   let registerQualifierPath = qualifierPath;
   if (arg.queryString) {
     registerQualifierPath = qualifierPath.includes('?')
@@ -108,7 +111,7 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
   const params: GS1LinkResolver = constructLinkResolver(linkResolver, linkResponses, qualifierPath);
   try {
     privateAPI.setBearerTokenAuthorizationHeaders(arg.dlrAPIKey || '');
-    await privateAPI.post<string>(`${dlrAPIUrl}/resolver`, params);
+    await privateAPI.post<string>(`${dlrAPIUrl}/api/resolver`, params);
 
     const path =
       responseLinkType === 'all'
@@ -116,9 +119,7 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
         : qualifierPath.includes('?')
           ? `${qualifierPath}&linkType=${responseLinkType}`
           : `${qualifierPath}?linkType=${responseLinkType}`;
-    return `${dlrAPIUrl.replace('api', 'gs1')}/${linkResolver.identificationKeyType}/${
-      linkResolver.identificationKey
-    }${path}`;
+    return `${dlrAPIUrl}/${namespace}/${linkResolver.identificationKeyType}/${linkResolver.identificationKey}${path}`;
   } catch (error) {
     throw new Error('Error creating link resolver');
   }
@@ -130,7 +131,7 @@ export const constructLinkResolver = (
   qualifierPath: string,
 ) => {
   const gs1LinkResolver: GS1LinkResolver = {
-    namespace: 'gs1',
+    namespace: linkResolver.identificationKeyNamespace,
     identificationKeyType: linkResolver.identificationKeyType,
     identificationKey: linkResolver.identificationKey,
     itemDescription: linkResolver.itemDescription,
@@ -173,6 +174,7 @@ export const constructLinkResolver = (
 
 export const registerLinkResolver = async (
   url: string,
+  identificationKeyNamespace: string,
   identificationKeyType: IdentificationKeyType,
   identificationKey: string,
   linkTitle: string,
@@ -180,10 +182,12 @@ export const registerLinkResolver = async (
   verificationPage: string,
   dlrAPIUrl: string,
   dlrAPIKey: string,
+  namespace: string,
   qualifierPath?: string,
   responseLinkType?: string,
 ) => {
   const linkResolver: ILinkResolver = {
+    identificationKeyNamespace,
     identificationKeyType,
     identificationKey: identificationKey,
     itemDescription: linkTitle,
@@ -217,6 +221,7 @@ export const registerLinkResolver = async (
 
   return await createLinkResolver({
     dlrAPIUrl,
+    namespace,
     linkResolver,
     linkResponses,
     queryString,
@@ -231,6 +236,8 @@ export const registerLinkResolver = async (
  * @returns The DLR passport data if found, otherwise returns null.
  */
 export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
+  const rootDlrDomain = extractDomain(dlrUrl);
+
   // Fetch DLR data from the provided DLR URL
   const dlrData = await privateAPI.get(dlrUrl);
   if (!dlrData) {
@@ -239,14 +246,14 @@ export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
 
   // Find certificate passports in the DLR data
   const certificatePassports = dlrData?.linkset?.find(
-    (linkSetItem: any) => linkSetItem[GS1ServiceEnum.certificationInfo],
+    (linkSetItem: any) => linkSetItem[`${rootDlrDomain}/${GS1ServiceEnum.certificationInfo}`],
   );
   if (!certificatePassports) {
     return null;
   }
 
   // Extract passport infos from certificate passports
-  const dlrPassports = certificatePassports[GS1ServiceEnum.certificationInfo];
+  const dlrPassports = certificatePassports[`${rootDlrDomain}/${GS1ServiceEnum.certificationInfo}`];
   if (!dlrPassports) {
     return null;
   }

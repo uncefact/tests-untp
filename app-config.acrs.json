@@ -723,12 +723,14 @@
                     ],
                     "type": ["VerifiableCredential", "DigitalProductPassport"],
                     "dlrLinkTitle": "Steel Passport",
+                    "dlrIdentificationKeyNamespace": "gs1",
                     "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000/api",
-                    "dlrAPIKey": "test123"
+                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIKey": "test123",
+                    "namespace": "gs1"
                   },
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
@@ -1204,12 +1206,14 @@
                     ],
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Transaction Event",
+                    "dlrIdentificationKeyNamespace": "gs1",
                     "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000/api",
-                    "dlrAPIKey": "test123"
+                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIKey": "test123",
+                    "namespace": "gs1"
                   },
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
@@ -1938,13 +1942,15 @@
                     ],
                     "type": ["VerifiableCredential", "DigitalProductPassport"],
                     "dlrLinkTitle": "Steel Passport",
+                    "dlrIdentificationKeyNamespace": "gs1",
                     "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
 
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000/api",
-                    "dlrAPIKey": "test123"
+                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIKey": "test123",
+                    "namespace": "gs1"
                   },
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
@@ -2420,12 +2426,14 @@
                     ],
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Transaction Event",
+                    "dlrIdentificationKeyNamespace": "gs1",
                     "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000/api",
-                    "dlrAPIKey": "test123"
+                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIKey": "test123",
+                    "namespace": "gs1"
                   },
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
@@ -2516,6 +2524,7 @@
                     "type": ["TransformationEventCredential"],
                     "dlrIdentificationKeyType": "gtin",
                     "dlrLinkTitle": "EPCIS transformation event VC",
+                    "dlrIdentificationKeyNamespace": "gs1",
                     "dlrVerificationPage": "http://localhost:3003/verify",
                     "dlrQualifierPath": ""
                   },
@@ -2530,6 +2539,7 @@
                     "type": ["DigitalProductPassport"],
                     "dlrIdentificationKeyType": "gtin",
                     "dlrLinkTitle": "Digital Product Passport",
+                    "dlrIdentificationKeyNamespace": "gs1",
                     "dlrVerificationPage": "http://localhost:3003/verify",
                     "dlrQualifierPath": ""
                   },
@@ -2538,8 +2548,9 @@
                     "issuer": "did:web:143f-2406-2d40-4106-2b10-38c6-9732-f2d9-bb1c.ngrok-free.app"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000/api",
-                    "dlrAPIKey": "test123"
+                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIKey": "test123",
+                    "namespace": "gs1"
                   },
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
@@ -2841,7 +2852,7 @@
   ],
   "identifyProvider": {
     "type": "gs1",
-    "url": "http://localhost:3001/gs1"
+    "url": "http://localhost:3001"
   },
   "defaultVerificationServiceLink": {
     "title": "Default Verification Service",
