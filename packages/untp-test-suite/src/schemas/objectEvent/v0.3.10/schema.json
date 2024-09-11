@@ -2,6 +2,25 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "render": {
+      "type": "array",
+      "items": {
+        "template": {
+          "example": "<!DOCTYPE html> <html lang='en'> <head> <meta charset='UTF-8' /> <meta name='viewport' content='width=device-width,initial-scale=1' /> <link href='https://fonts.googleapis.com/css2?family=Source+Sans 3:ital,wght@0,200..900;1,200..900&display=swap' rel='stylesheet' /> <title>Digital Product Passport</title> <style> * { margin: 0; padding: 0; box-sizing: border-box; } body { font-family: 'Source Sans 3', sans-serif; background-color: #f4f7fa; color: #333; } .container { text-align: initial; min-width: 290px; max-width: 390px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px; background-color: #ffffff; border-radius: 12px; border: 4px solid #6ec72f; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); padding: 16px; position: relative; } .top-logo { width: 80px; margin: 0 auto; display: block; } .title { text-align: center; font-size: 24px; font-weight: 700; color: #6ec72f; margin-top: 10px; } .header { background-color: #6ec72f; color: #ffffff; padding: 16px; border-radius: 12px 12px 0 0; position: relative; } .header-image { position: relative; background-image: linear-gradient(to right bottom, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.5)), url({{{credentialSubject.productImage.linkURL}}}); background-size: cover; background-position: center; min-height: 215px; border-radius: 12px 12px 0 0; } .product-name { text-align: center; font-size: 24px; font-weight: 700; color: #6ec72f; margin-top: 16px; position: relative; } .product-name:before, .product-name:after { content: ''; position: absolute; width: 2px; background-color: #6ec72f; top: 0; bottom: -16px; } .product-name:before { left: -20px; } .product-name:after { right: -20px; } .header-image-top-left { position: absolute; top: 25px; left: 15px; font-weight: 500; font-size: 16px; line-height: 22px; color: #fff; } .header-info { padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 12px; background-color: #6ec72f; border-radius: 0 0 12px 12px; color: #fff; } .info-item { display: flex; align-items: center; gap: 6px; } .info-item a { padding: 0 2px; font-size: 14px; font-weight: 600; line-height: 15.25px; color: #ffffff; text-decoration: none; } .passport-box { display: flex; flex-direction: column; gap: 24px; margin-top: 16px; } .passport-section { padding: 16px; border: 1px solid #6ec72f; border-radius: 8px; background-color: #ffffff; } .section-title { font-size: 18px; font-weight: 700; line-height: 19.62px; color: #6ec72f; margin-bottom: 12px; } .section-content { font-size: 16px; line-height: 18.88px; color: #333; } .material-list { display: flex; flex-direction: column; gap: 12px; } .material-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #d4d6d8; background-color: #f4f7fa; border-radius: 6px; } .material-item span { font-size: 16px; font-weight: 400; } .scorecard { display: flex; justify-content: space-between; padding: 10px; border-top: 1px solid #d4d6d8; border-bottom: 1px solid #d4d6d8; background-color: #f9fbfd; border-radius: 8px; } .scorecard-title { font-size: 14px; font-weight: 600; color: #6ec72f; } .scorecard-value { font-size: 16px; font-weight: 400; } .footer { text-align: center; padding: 16px; font-size: 14px; color: #777; position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; } .footer-logo { width: 120px; margin-bottom: 10px; } </style> </head> <body> <div class='container'> <img src='https://media.licdn.com/dms/image/v2/C560BAQE-clv2_H3hvA/company-logo_200_200/company-logo_200_200/0/1630587175948/freshchain_logo?e=1733356800&v=beta&t=vzhGuhlr_P6sBPa0afFn5Q6xaq662bwizGBN3PZv5d4' alt='FreshChain Logo' class='top-logo' /> <div class='title'>Digital Product Passport</div> <header class='header'> <div class='header-image'> </div> </header> <div class='product-name'>{{credentialSubject.name}}</div> <div class='header-info'> <div class='info-item'> <strong>Batch:</strong> <a href='#'>{{credentialSubject.batchNumber}}</a> </div> <div class='info-item'> <strong>Serial:</strong> <a href='#'>{{credentialSubject.serialNumber}}</a> </div> </div> <section class='passport-box'> <div class='passport-section'> <h2 class='section-title'>Product Details</h2> <div class='section-content'> <p><strong>ID:</strong> {{credentialSubject.id}}</p> <p><strong>Description:</strong> {{credentialSubject.description}}</p> <p><strong>Category:</strong> {{#each credentialSubject.productCategory}} {{name}} {{/each}}</p> <p><strong>Dimensions:</strong> {{credentialSubject.dimensions.length.value}} x {{credentialSubject.dimensions.width.value}} x {{credentialSubject.dimensions.height.value}} {{credentialSubject.dimensions.length.unit}}</p> <p><strong>Weight:</strong> {{credentialSubject.dimensions.weight.value}} {{credentialSubject.dimensions.weight.unit}}</p> <p><strong>Country of Production:</strong> {{credentialSubject.countryOfProduction}}</p> </div> </div> <div class='passport-section'> <h2 class='section-title'>Materials Provenance</h2> <div class='material-list'> {{#each credentialSubject.materialsProvenance}} <div class='material-item'> <span>{{name}}</span> <span>{{originCountry}}</span> <span>{{materialType.name}}</span> <span>{{massFraction}}</span> </div> {{/each}} </div> </div> <div class='passport-section'> <h2 class='section-title'>Conformity Declarations</h2> <div class='section-content'> {{#each credentialSubject.conformityDeclarations}} <p><strong>{{referenceStandard.name}}</strong> - {{referenceRegulation.name}}</p> {{/each}} </div> </div> <div class='passport-section'> <h2 class='section-title'>Circularity and Emissions</h2> <div class='scorecard'> <div class='scorecard-item'> <span class='scorecard-title'>Circularity Score:</span> <span class='scorecard-value'>{{credentialSubject.circularityScorecard.materialCircularityIndicator}}</span> </div> <div class='scorecard-item'> <span class='scorecard-title'>Carbon Footprint:</span> <span class='scorecard-value'>{{credentialSubject.emissionsScorecard.carbonFootprint}}</span> </div> </div> </div> </section> <footer class='footer'> <img src='https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTwBQMyRnESCkZwiYcha0bEdcgwR5taehphbg&s' alt='FreshChain Logo' class='footer-logo' /> Example Company Pty Ltd - Digital Product Passport © 2024 </footer> </div> </body> </html>",
+          "type": "string",
+          "description": "A template that renders the Verifiable Credential to HTML"
+        },
+        "@type": {
+          "type": "string",
+          "enum": [
+            "WebRenderingTemplate2022"
+          ],
+          "example": "WebRenderingTemplate2022",
+          "description": "Defines the rendering type."
+        }
+      },
+      "description": "Defines a template to be used to render the Verifiable Credential."
+    },
     "type": {
       "type": "array",
       "readOnly": true,
@@ -34,18 +53,21 @@
         "type": "string",
         "enum": [
           "https://www.w3.org/ns/credentials/v2",
-          "https://vocabulary.uncefact.org/untp/dte/0.3.10"
+          "https://test.uncefact.org/vocabulary/untp/dte/0.3.10",
+          "https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json"
         ]
       },
       "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
       "readOnly": true,
       "const": [
         "https://www.w3.org/ns/credentials/v2",
-        "https://vocabulary.uncefact.org/untp/dte/0.3.10"
+        "https://test.uncefact.org/vocabulary/untp/dte/0.3.10",
+        "https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json"
       ],
       "default": [
         "https://www.w3.org/ns/credentials/v2",
-        "https://vocabulary.uncefact.org/untp/dte/0.3.10"
+        "https://test.uncefact.org/vocabulary/untp/dte/0.3.10",
+        "https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json"
       ]
     },
     "issuer": {
