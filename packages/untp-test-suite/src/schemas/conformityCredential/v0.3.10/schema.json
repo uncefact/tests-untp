@@ -6,47 +6,47 @@
       "type": "array",
       "readOnly": true,
       "const": [
-        "DigitalTraceabilityEvent",
+        "DigitalConformityCredential",
         "VerifiableCredential"
       ],
       "default": [
-        "DigitalTraceabilityEvent",
+        "DigitalConformityCredential",
         "VerifiableCredential"
       ],
       "items": {
         "type": "string",
         "enum": [
-          "DigitalTraceabilityEvent",
+          "DigitalConformityCredential",
           "VerifiableCredential"
         ]
       }
     },
-    "id": {
-      "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
-      "type": "string",
-      "format": "uri",
-      "description": "A unique identifier (URI) assigned to the product passport. May be a UUID"
-    },
     "@context": {
-      "example": "https://test.uncefact.org/vocabulary/untp/dcc/dcc-context.jsonld",
+      "example": "https://test.uncefact.org/vocabulary/untp/dpp/dpp-context.jsonld",
       "type": "array",
       "items": {
         "type": "string",
         "enum": [
           "https://www.w3.org/ns/credentials/v2",
-          "https://vocabulary.uncefact.org/untp/dte/0.3.10"
+          "https://vocabulary.uncefact.org/untp/dcc/0.3.10/"
         ]
       },
       "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
       "readOnly": true,
       "const": [
         "https://www.w3.org/ns/credentials/v2",
-        "https://vocabulary.uncefact.org/untp/dte/0.3.10"
+        "https://vocabulary.uncefact.org/untp/dcc/0.3.10/"
       ],
       "default": [
         "https://www.w3.org/ns/credentials/v2",
-        "https://vocabulary.uncefact.org/untp/dte/0.3.10"
+        "https://vocabulary.uncefact.org/untp/dcc/0.3.10/"
       ]
+    },
+    "id": {
+      "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
+      "type": "string",
+      "format": "uri",
+      "description": "A unique identifier (URI) assigned to the product passport. May be a UUID"
     },
     "issuer": {
       "$ref": "#/$defs/CredentialIssuer",
@@ -58,18 +58,21 @@
       "format": "date-time",
       "description": "The date and time from which the credential is valid."
     },
+    "validUntil": {
+      "example": "2034-03-15T12:00:00",
+      "type": "string",
+      "format": "date-time",
+      "description": "The expiry date (if applicable) of this verifiable credential."
+    },
     "credentialSubject": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/Event"
-      },
-      "description": "VC subject is the transaction event structure"
+      "$ref": "#/$defs/ConformityAttestation",
+      "description": "The conformity attestion is the subject of the verifiable credential. "
     }
   },
-  "description": "Traceability Event as a VC",
+  "description": "A conformity attestation issued by a competent body that defines one or more assessments (eg carbon intensity) about a product (eg batttery) against a specification (eg LCA method) defined in a standard or regulation. ",
   "required": [
-    "id",
     "@context",
+    "id",
     "issuer"
   ],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -200,7 +203,7 @@
       },
       "description": "An identifier registration scheme for products, facilities, or organisations. Typically operated by a state, national or gloabl authority."
     },
-    "TransformationEvent": {
+    "ConformityAttestation": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -208,105 +211,118 @@
           "type": "array",
           "readOnly": true,
           "const": [
-            "TransformationEvent",
-            "Event"
+            "ConformityAttestation",
+            "Attestation"
           ],
           "default": [
-            "TransformationEvent",
-            "Event"
+            "ConformityAttestation",
+            "Attestation"
           ],
           "items": {
             "type": "string",
             "enum": [
-              "TransformationEvent",
-              "Event"
+              "ConformityAttestation",
+              "Attestation"
             ]
           }
         },
         "id": {
-          "readOnly": true,
-          "example": "https://events.sample.com/b681df10-c682-454a-b11b-d0b9374c01bd",
+          "example": "https://exampleCAB.com/38f73303-a39e-45a7-b8b7-e73517548f27",
           "type": "string",
           "format": "uri",
-          "description": "The unique identifier of this event - SHOULD be a UUID"
+          "description": "The globally unique ID of this conformity attestation."
         },
-        "eventTime": {
-          "example": "2024-09-01T12:00:00",
+        "name": {
+          "example": "Carbon Lifecycle assessment 12345567",
           "type": "string",
-          "format": "date-time",
-          "description": "The ISO-8601 date time when the event occurred."
+          "description": "Product GHG Footprint certificate in accordance with GBA Rulebook."
         },
-        "action": {
+        "assessorLevel": {
           "type": "string",
           "enum": [
-            "observe",
-            "add",
-            "delete"
+            "Self",
+            "Commercial",
+            "Buyer",
+            "Membership",
+            "Unspecified",
+            "3rdParty"
           ],
-          "example": "observe",
-          "description": "Code describing how an event relates to the lifecycle of the entity impacted by the event."
+          "example": "Self",
+          "description": "Assurance code pertaining to assessor (relation to the object under assessment)"
         },
-        "disposition": {
+        "assessmentLevel": {
           "type": "string",
-          "x-external-enumeration": "https://ref.gs1.org/cbv/Disp",
-          "description": "Disposition code describing the state of the item after the event. \n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/Disp\n    "
+          "enum": [
+            "GovtApproval",
+            "GlobalMRA",
+            "Accredited",
+            "Verified",
+            "Validated",
+            "Unspecified"
+          ],
+          "example": "GovtApproval",
+          "description": "Assurance pertaining to assessment (any authority or support for the assessment process)"
         },
-        "bizStep": {
+        "attestationType": {
           "type": "string",
-          "x-external-enumeration": "https://ref.gs1.org/cbv/BizStep",
-          "description": "A business step code drawn from a controlled vocabulary.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BizStep\n    "
+          "enum": [
+            "certification",
+            "declaration",
+            "inspection",
+            "testing",
+            "verification",
+            "validation",
+            "calibration"
+          ],
+          "example": "certification",
+          "description": "The type of criterion (optional or mandatory)."
         },
-        "bizLocation": {
-          "example": "https://id.gs1.org/414/9520123456788",
+        "attestationDescription": {
+          "example": "Assessment of battery products against the GHG Protocol.",
           "type": "string",
-          "format": "uri",
-          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an EPCIS event until it is reported to be at a different Business Location by a subsequent EPCIS event. The bizLocation must be a resolvable URI that links to facility information and geolocation data."
+          "description": "SampleCAB Inc attests that the product class LiFePO4 EV batteries manufactured at Sample battery facility have reported GHG foorptint that conform to the GBA rulebook version 1.5. "
         },
-        "sensorElementList": {
+        "issuedToParty": {
+          "$ref": "#/$defs/Entity",
+          "description": "The party to whom the conformity attestation was issued."
+        },
+        "authorisations": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/SensorElement"
+            "$ref": "#/$defs/Endorsement"
           },
-          "description": "An array (one for each sensor) of sensor device data sets associated with the event. "
+          "description": "The authority under which a conformity claim is issued.  For example a national accrediation authority may accredit a test lab to issue test certificates about a product against a standard. "
         },
-        "outputEPCList": {
+        "conformityCertificate": {
+          "$ref": "#/$defs/SecureLink",
+          "description": "A reference to the human / printable version of this conformity attestation - typically represented as a PDF document. The document may have more details than are represented in the digital attestation."
+        },
+        "auditableEvidence": {
+          "$ref": "#/$defs/SecureLink",
+          "description": "Auditable evidence supporting this assessment such as raw measurements, supporting documents. This is usally private data and would normally be encrypted."
+        },
+        "scope": {
+          "$ref": "#/$defs/ConformityAssessmentScheme",
+          "description": "A list of relevant standards and/or regulations against which apply to this attestation (eg AS1163:2016). "
+        },
+        "assessments": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/Item"
+            "$ref": "#/$defs/ConformityAssessment"
           },
-          "description": "The list of uniquely identified items that are the output of this transformation event - for example a list of individually identified bolts of cloth that are the output of a weaving process."
-        },
-        "inputEPCList": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Item"
-          },
-          "description": "The list of uniquely identified items that are the input of this transformation event - for example a list of individually identified bobbins of yarn that are the input of a weaving process."
-        },
-        "inputQuantityList": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/QuantityElement"
-          },
-          "description": "The quantified list of product classes that are the input of this transformation event - used when each item does not have a unique identity.  for example the weight of raw cotton that is the input to a ginning process."
-        },
-        "outputQuantityList": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/QuantityElement"
-          },
-          "description": "The quantified list of product classes that are the output of this transformation event - used when each item does not have a unique identity.  for example a count of the bales of cleaned cotton that are the output of a ginning process."
-        },
-        "processType": {
-          "example": "https://textileIndustry.org/spinning",
-          "type": "string",
-          "format": "uri",
-          "description": "An industry specific process type code.  "
+          "description": "The list of specific assessments made within this conformity attestation."
         }
       },
-      "description": "Transformation represents an event in which input objects are fully or partially consumed and output objects are produced, such that any of the input objects may have contributed to all of the output objects - for example consuming bales of cotton to produce yarn."
+      "description": "A conformity attestation issued by a competent body that defines one or more assessments (eg carbon intensity) about a product (eg batttery) against a specification (eg LCA method) defined in a standard or regulation.",
+      "required": [
+        "id",
+        "assessorLevel",
+        "assessmentLevel",
+        "attestationType",
+        "issuedToParty"
+      ]
     },
-    "SensorElement": {
+    "Endorsement": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -314,38 +330,50 @@
           "type": "array",
           "readOnly": true,
           "const": [
-            "SensorElement"
+            "Endorsement"
           ],
           "default": [
-            "SensorElement"
+            "Endorsement"
           ],
           "items": {
             "type": "string",
             "enum": [
-              "SensorElement"
+              "Endorsement"
             ]
           }
         },
-        "sensorMetadata": {
-          "$ref": "#/$defs/Sensor",
-          "description": "Data that describes the physical sensor that recorded the sensor data set."
-        },
-        "sensorReport": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/SensorData"
-          },
-          "description": "A list of sensor readings from the given sensor relevant to the traceability event context."
-        },
-        "sensorIntegrityProof": {
+        "id": {
+          "example": "https://authority.gov/schemeABC/123456789",
           "type": "string",
           "format": "uri",
-          "description": "An optional reference to a verifiable credential signed by the sensor device or device manufacturer that contains the digitally signed raw data associated with this sensor report."
+          "description": "Globally unique identifier of an accreditation or authority issued to a confomrity assessment body by a regulator or national accreditation authority."
+        },
+        "name": {
+          "example": "Accreditation of certifiers.com under the Australian National Greenhouse and Energy Reporting scheme (NGER).",
+          "type": "string",
+          "description": "The name of the accreditation."
+        },
+        "trustmark": {
+          "$ref": "#/$defs/BinaryFile",
+          "description": "The trust mark image awarded by the AB to the CAB to indicate accrediation."
+        },
+        "issuingAuthority": {
+          "$ref": "#/$defs/Entity",
+          "description": "The competent authority that issued the accreditation."
+        },
+        "accreditationCertificate": {
+          "$ref": "#/$defs/Link",
+          "description": "The evidence that supports the authroty under which the attestation is issued - eg an accreditation certificate."
         }
       },
-      "description": "A SensorElement is used to carry data related to an event that is captured one sensor such as an IoT device. Include one sensor property and an array of sensor data values."
+      "description": "The authority under which a conformity claim is issued.  For example a national accrediation authority may accredit a test lab to issue test certificates about a product against a standard. ",
+      "required": [
+        "id",
+        "name",
+        "issuingAuthority"
+      ]
     },
-    "Sensor": {
+    "BinaryFile": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -353,32 +381,38 @@
           "type": "array",
           "readOnly": true,
           "const": [
-            "Sensor"
+            "BinaryFile"
           ],
           "default": [
-            "Sensor"
+            "BinaryFile"
           ],
           "items": {
             "type": "string",
             "enum": [
-              "Sensor"
+              "BinaryFile"
             ]
           }
         },
-        "device": {
-          "$ref": "#/$defs/Item",
-          "description": "The device Identifier for the sensor as a URI (typically an EPC)"
-        },
-        "dataProcessingMethod": {
-          "example": "https://standards.org/sensorMethod#1234",
+        "fileName": {
+          "example": "GHG protocol trust mark",
           "type": "string",
-          "format": "uri",
-          "description": "The data processing method used by the sensor - should reference a documented standard criteria as a URI"
+          "description": "A name for referenced binary file"
+        },
+        "fileType": {
+          "type": "string",
+          "x-external-enumeration": "https://mimetype.io/all-types",
+          "description": "The type of file, represented as a MIME type.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://mimetype.io/all-types\n    "
+        },
+        "file": {
+          "example": "iVBORw0KGgoAAAANSUhEUgAAADkAAAA2CAYAAAB9TjFQAAAABGdBTUEAAi/9H3pWy6vI9uFdAAAAAElFTkSuQmCC",
+          "type": "string",
+          "format": "byte",
+          "description": "The binary file data encoded as Base64 string."
         }
       },
-      "description": "A physical sensor that records a sensor data set."
+      "description": "A binary file reference including name and filetype"
     },
-    "Item": {
+    "Link": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -386,17 +420,497 @@
           "type": "array",
           "readOnly": true,
           "const": [
-            "Item",
+            "Link"
+          ],
+          "default": [
+            "Link"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "Link"
+            ]
+          }
+        },
+        "linkURL": {
+          "example": "https://files.example-certifier.com/1234567.json",
+          "type": "string",
+          "format": "uri",
+          "description": "The URL of the target resource. "
+        },
+        "linkName": {
+          "example": "GBA rule book conformity certificate",
+          "type": "string",
+          "description": "A display name for the target resource "
+        },
+        "linkType": {
+          "example": "https://test.uncefact.org/vocabulary/linkTypes/dcc",
+          "type": "string",
+          "description": "The type of the target resource - drawn from a controlled vocabulary "
+        }
+      },
+      "description": "A structure to provide a URL link plus metadata associated with the link."
+    },
+    "SecureLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": [
+            "SecureLink",
+            "Link"
+          ],
+          "default": [
+            "SecureLink",
+            "Link"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "SecureLink",
+              "Link"
+            ]
+          }
+        },
+        "linkURL": {
+          "example": "https://files.example-certifier.com/1234567.json",
+          "type": "string",
+          "format": "uri",
+          "description": "The URL of the target resource. "
+        },
+        "linkName": {
+          "example": "GBA rule book conformity certificate",
+          "type": "string",
+          "description": "A display name for the target resource "
+        },
+        "linkType": {
+          "example": "https://test.uncefact.org/vocabulary/linkTypes/dcc",
+          "type": "string",
+          "description": "The type of the target resource - drawn from a controlled vocabulary "
+        },
+        "hashDigest": {
+          "example": "6239119dda5bd4c8a6ffb832fe16feaa5c27b7dba154d24c53d4470a2c69adc2",
+          "type": "string",
+          "description": "The hash of the file."
+        },
+        "hashMethod": {
+          "type": "string",
+          "enum": [
+            "SHA-256",
+            "SHA-1"
+          ],
+          "example": "SHA-256",
+          "description": "The hashing algorithm used to create the target hash.  SHA-265 is the recommedned standard"
+        },
+        "encryptionMethod": {
+          "type": "string",
+          "enum": [
+            "none",
+            "AES"
+          ],
+          "example": "none",
+          "description": "The symmetric encryption algorithm used to encrypt the link target.  AES is the recommended standard. Decryption keys are expected to be passed out of bounds."
+        }
+      },
+      "description": "A binary file that is hashed ()for tamper evidence) and optionally encrypted (for confidentiality)."
+    },
+    "ConformityAssessmentScheme": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": [
+            "ConformityAssessmentScheme",
+            "Standard"
+          ],
+          "default": [
+            "ConformityAssessmentScheme",
+            "Standard"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "ConformityAssessmentScheme",
+              "Standard"
+            ]
+          }
+        },
+        "id": {
+          "example": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf",
+          "type": "string",
+          "format": "uri",
+          "description": "A unique identifier for the standard (eg https://www.iso.org/standard/60857.html)."
+        },
+        "name": {
+          "example": "GBA Battery Passport Greenhouse Gas Rulebook - V.2.0",
+          "type": "string",
+          "description": "The name of the standard"
+        },
+        "issuingParty": {
+          "$ref": "#/$defs/Entity",
+          "description": "The party that issued the standard "
+        },
+        "issueDate": {
+          "example": "2023-12-05",
+          "type": "string",
+          "format": "date",
+          "description": "The date when the standard was issued."
+        },
+        "trustmark": {
+          "$ref": "#/$defs/BinaryFile",
+          "description": "The trust mark that represents the conformity assessment scheme."
+        }
+      },
+      "description": "A formal governance scheme under which this attestation is issued (eg ACRS structural steel certification) ",
+      "required": [
+        "issuingParty"
+      ]
+    },
+    "ConformityAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": [
+            "ConformityAssessment",
+            "Declaration"
+          ],
+          "default": [
+            "ConformityAssessment",
+            "Declaration"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "ConformityAssessment",
+              "Declaration"
+            ]
+          }
+        },
+        "id": {
+          "example": "https://exampleCAB.com/38f73303-a39e-45a7-b8b7-e73517548f27/01",
+          "type": "string",
+          "format": "uri",
+          "description": "A unique identifier for the delcaration. Often this will be an extension of the product.id or attestation.id. But could be a UUID."
+        },
+        "referenceStandard": {
+          "$ref": "#/$defs/Standard",
+          "description": "The reference to the standard that defines the specification / criteria"
+        },
+        "referenceRegulation": {
+          "$ref": "#/$defs/Regulation",
+          "description": "The reference to the regulation that defines the assessment criteria"
+        },
+        "assessmentCriteria": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Criterion"
+          },
+          "description": "The specification against which the assessment is made."
+        },
+        "declaredValues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Metric"
+          },
+          "description": "The list of specific values measured as part of this assessment (eg tensile strength)"
+        },
+        "compliance": {
+          "example": "true",
+          "type": "boolean",
+          "description": "An indicator of whether or not the assessment meets the specification."
+        },
+        "conformityTopic": {
+          "type": "string",
+          "enum": [
+            "environment.energy",
+            "environment.emissions",
+            "environment.water",
+            "environment.waste",
+            "environment.deforestation",
+            "environment.biodiversity",
+            "circularity.content",
+            "circularity.design",
+            "social.labour",
+            "social.rights",
+            "social.community",
+            "social.safety",
+            "governance.ethics",
+            "governance.compliance",
+            "governance.transparency"
+          ],
+          "example": "environment.energy",
+          "description": "The conformity topic category for this assessment (eg vocabulary.uncefact.org/sustainability/emissions)"
+        },
+        "assessedProducts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Product"
+          },
+          "description": "The list of products that are the subject of this conformity assessment"
+        },
+        "assessedFacilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Facility"
+          },
+          "description": "The list of facilities that are the subject of this conformity assessment."
+        }
+      },
+      "description": "A specific assessment about the product or facility against a specific specification.  Eg the carbon intensity of a given product or batch.",
+      "required": [
+        "id",
+        "compliance",
+        "conformityTopic"
+      ]
+    },
+    "Standard": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": [
+            "Standard"
+          ],
+          "default": [
+            "Standard"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "Standard"
+            ]
+          }
+        },
+        "id": {
+          "example": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf",
+          "type": "string",
+          "format": "uri",
+          "description": "A unique identifier for the standard (eg https://www.iso.org/standard/60857.html)."
+        },
+        "name": {
+          "example": "GBA Battery Passport Greenhouse Gas Rulebook - V.2.0",
+          "type": "string",
+          "description": "The name of the standard"
+        },
+        "issuingParty": {
+          "$ref": "#/$defs/Entity",
+          "description": "The party that issued the standard "
+        },
+        "issueDate": {
+          "example": "2023-12-05",
+          "type": "string",
+          "format": "date",
+          "description": "The date when the standard was issued."
+        }
+      },
+      "description": "A standard (eg ISO 14000) that specifies the criteria for conformance.",
+      "required": [
+        "issuingParty"
+      ]
+    },
+    "Regulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": [
+            "Regulation"
+          ],
+          "default": [
+            "Regulation"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "Regulation"
+            ]
+          }
+        },
+        "id": {
+          "example": "https://www.legislation.gov.au/F2008L02309/latest/versions",
+          "type": "string",
+          "format": "uri",
+          "description": "The globally unique identifier of this regulation. "
+        },
+        "name": {
+          "example": "NNational Greenhouse and Energy Reporting (Measurement) Determination",
+          "type": "string",
+          "description": "The name of the regulation or act."
+        },
+        "jurisdictionCountry": {
+          "type": "string",
+          "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
+          "description": "The legal jurisdiction (country) under which the regulation is issued.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+        },
+        "administeredBy": {
+          "$ref": "#/$defs/Entity",
+          "description": "the issuing body of the regulation. For example Australin Goernment Department of Climate Change, Energy, the Environment and Water"
+        },
+        "effectiveDate": {
+          "example": "2024-03-20",
+          "type": "string",
+          "format": "date",
+          "description": "the date at which the regulation came into effect."
+        }
+      },
+      "description": "A regulation (eg EU deforestation regulation) that defines the criteria for assessment.",
+      "required": [
+        "administeredBy"
+      ]
+    },
+    "Criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": [
+            "Criterion"
+          ],
+          "default": [
+            "Criterion"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "Criterion"
+            ]
+          }
+        },
+        "id": {
+          "example": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf#BatteryAssembly",
+          "type": "string",
+          "format": "uri",
+          "description": "A unique identifier for the criteria within the standard  or regulation. For example CO2 emissions calaculations for liquid fule combusion."
+        },
+        "name": {
+          "example": "GBA Battery rule book v2.0 battery assembly guidelines.",
+          "type": "string",
+          "description": "A name that describes this criteria."
+        },
+        "thresholdValues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Metric"
+          },
+          "description": "A conformity threshold defined by the specification (eg minimum compressive strength) "
+        }
+      },
+      "description": "A specific rule or criterion within a standard or regulation. eg a carbon intensity calculation rule within an emissions standard.",
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "Metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": [
+            "Metric"
+          ],
+          "default": [
+            "Metric"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "Metric"
+            ]
+          }
+        },
+        "metricName": {
+          "example": "GHG emissions intensity",
+          "type": "string",
+          "description": "A human readable name for this metric (for example \"Tensile strength\")"
+        },
+        "metricValue": {
+          "$ref": "#/$defs/Measure",
+          "description": "A numeric value and unit of measure for this metric. Could be a measured value or a specified threshold. Eg {\"value\":400, \"unit\":\"MPA\"} as tensile strenght of structural steel"
+        },
+        "accuracy": {
+          "example": 0.05,
+          "type": "number",
+          "description": "A percentage represented as a numeric between 0 and 1 indicating the rage of accuracy of the claimed value (eg 0.05 means that the actual value is within 5% of the claimed value.)"
+        }
+      },
+      "description": "A specific measure of performance against the criteria that governs the claim.  Expressed as an array of metric (ie unit of emasure) / value (ie the actual numeric value) pairs.  ",
+      "required": [
+        "metricName",
+        "metricValue"
+      ]
+    },
+    "Measure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": [
+            "Measure"
+          ],
+          "default": [
+            "Measure"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "Measure"
+            ]
+          }
+        },
+        "value": {
+          "example": 10,
+          "type": "number",
+          "description": "The numeric value of the measure"
+        },
+        "unit": {
+          "type": "string",
+          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
+          "description": "Unit of measure drawn from the UNECE rec20 measure code list.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+        }
+      },
+      "description": "The measure class defines a numeric measured value (eg 10) and a coded unit of measure (eg KG).",
+      "required": [
+        "value",
+        "unit"
+      ]
+    },
+    "Product": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": [
+            "Product",
             "Entity"
           ],
           "default": [
-            "Item",
+            "Product",
             "Entity"
           ],
           "items": {
             "type": "string",
             "enum": [
-              "Item",
+              "Product",
               "Entity"
             ]
           }
@@ -410,7 +924,7 @@
         "name": {
           "example": "EV battery 300Ah.",
           "type": "string",
-          "description": "The name of the product class to which the product item belongs.  "
+          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
         },
         "registeredId": {
           "example": "90664869327",
@@ -420,15 +934,20 @@
         "idScheme": {
           "$ref": "#/$defs/IdentifierScheme",
           "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+        },
+        "IDverifiedByCAB": {
+          "example": "true",
+          "type": "boolean",
+          "description": "Indicates whether the conformity assessment body has verified the identity product that is the subject of the assessment."
         }
       },
-      "description": "A specific serilaised trade item which is a type of a more generic product. Typically an SGTIN",
+      "description": "The product which is the subject of this conformity assessment",
       "required": [
         "id",
         "name"
       ]
     },
-    "SensorData": {
+    "Facility": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -436,469 +955,52 @@
           "type": "array",
           "readOnly": true,
           "const": [
-            "SensorData"
+            "Facility",
+            "Entity"
           ],
           "default": [
-            "SensorData"
+            "Facility",
+            "Entity"
           ],
           "items": {
             "type": "string",
             "enum": [
-              "SensorData"
+              "Facility",
+              "Entity"
             ]
           }
         },
-        "time": {
-          "example": "2024-07-24T12:00:00",
-          "type": "string",
-          "format": "date-time",
-          "description": "the timestamp at which the sensor reading was made."
-        },
-        "sensorType": {
-          "example": "https://samplesensors.com/model1234",
+        "id": {
+          "example": "https://id.gs1.org/01/09520123456788/21/12345",
           "type": "string",
           "format": "uri",
-          "description": "the measurement type of the sensor reading, as a URI reference to a measurement method specification."
+          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
         },
-        "value": {
-          "example": 25,
-          "type": "number",
-          "description": "the sensor reading"
-        },
-        "uom": {
+        "name": {
+          "example": "EV battery 300Ah.",
           "type": "string",
-          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
-          "description": "the unit of measure for the sensor reading, drawn from UNECE rec20 code list.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
+        },
+        "registeredId": {
+          "example": "90664869327",
+          "type": "string",
+          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+        },
+        "idScheme": {
+          "$ref": "#/$defs/IdentifierScheme",
+          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+        },
+        "IDverifiedByCAB": {
+          "example": "true",
+          "type": "boolean",
+          "description": "Indicates whether the conformity assessment body has verified the identity of the facility which is the subject of the assement."
         }
       },
-      "description": "A data point read by a sensor."
-    },
-    "QuantityElement": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": [
-            "QuantityElement"
-          ],
-          "default": [
-            "QuantityElement"
-          ],
-          "items": {
-            "type": "string",
-            "enum": [
-              "QuantityElement"
-            ]
-          }
-        },
-        "product": {
-          "$ref": "#/$defs/Entity",
-          "description": "THe identifier of a product class (as opposed to a product instance) such as a GTIN code for a manufactured product."
-        },
-        "quantity": {
-          "example": 20,
-          "type": "number",
-          "description": "The numeric quantity of the product class (eg 100 kg of cotton)"
-        },
-        "uom": {
-          "type": "string",
-          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
-          "description": "The unit of measure for the quantity value (eg Kg or meters etc) using the UNECE Rec 20 unit of measure codelist.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
-        }
-      },
-      "description": "The quantity element is used to define the quantities (eg 100), units of measure (eg Kg) and product class (eg GTIN or other class identifier) of products that are inputs or outputs or the subject of supply chain events.  ",
+      "description": "The facility which is the subject of this conformity assessment",
       "required": [
-        "product",
-        "quantity"
+        "id",
+        "name"
       ]
-    },
-    "ObjectEvent": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": [
-            "ObjectEvent",
-            "Event"
-          ],
-          "default": [
-            "ObjectEvent",
-            "Event"
-          ],
-          "items": {
-            "type": "string",
-            "enum": [
-              "ObjectEvent",
-              "Event"
-            ]
-          }
-        },
-        "id": {
-          "readOnly": true,
-          "example": "https://events.sample.com/b681df10-c682-454a-b11b-d0b9374c01bd",
-          "type": "string",
-          "format": "uri",
-          "description": "The unique identifier of this event - SHOULD be a UUID"
-        },
-        "eventTime": {
-          "example": "2024-09-01T12:00:00",
-          "type": "string",
-          "format": "date-time",
-          "description": "The ISO-8601 date time when the event occurred."
-        },
-        "action": {
-          "type": "string",
-          "enum": [
-            "observe",
-            "add",
-            "delete"
-          ],
-          "example": "observe",
-          "description": "Code describing how an event relates to the lifecycle of the entity impacted by the event."
-        },
-        "disposition": {
-          "type": "string",
-          "x-external-enumeration": "https://ref.gs1.org/cbv/Disp",
-          "description": "Disposition code describing the state of the item after the event. \n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/Disp\n    "
-        },
-        "bizStep": {
-          "type": "string",
-          "x-external-enumeration": "https://ref.gs1.org/cbv/BizStep",
-          "description": "A business step code drawn from a controlled vocabulary.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BizStep\n    "
-        },
-        "bizLocation": {
-          "example": "https://id.gs1.org/414/9520123456788",
-          "type": "string",
-          "format": "uri",
-          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an EPCIS event until it is reported to be at a different Business Location by a subsequent EPCIS event. The bizLocation must be a resolvable URI that links to facility information and geolocation data."
-        },
-        "sensorElementList": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/SensorElement"
-          },
-          "description": "An array (one for each sensor) of sensor device data sets associated with the event. "
-        },
-        "epcList": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Item"
-          },
-          "description": "A list of uniquely identified items (eg specific items serial numbers or tagged shipments / packages) that are the focus of this object event.  "
-        },
-        "quantityList": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/QuantityElement"
-          },
-          "description": "A quantified list of product classes (eg GS1 GTINs) that are the focus of this object event"
-        }
-      },
-      "description": "Object represents an event that happened to one or more physical or digital objects - such as an inspection or certification of a product or shipment. The physical objects may be identified either as specific items (eg a unique consignment number) or as a quantified amount of a product class (eg 100Kg of cotton yarn)"
-    },
-    "AggregationEvent": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": [
-            "AggregationEvent",
-            "Event"
-          ],
-          "default": [
-            "AggregationEvent",
-            "Event"
-          ],
-          "items": {
-            "type": "string",
-            "enum": [
-              "AggregationEvent",
-              "Event"
-            ]
-          }
-        },
-        "id": {
-          "readOnly": true,
-          "example": "https://events.sample.com/b681df10-c682-454a-b11b-d0b9374c01bd",
-          "type": "string",
-          "format": "uri",
-          "description": "The unique identifier of this event - SHOULD be a UUID"
-        },
-        "eventTime": {
-          "example": "2024-09-01T12:00:00",
-          "type": "string",
-          "format": "date-time",
-          "description": "The ISO-8601 date time when the event occurred."
-        },
-        "action": {
-          "type": "string",
-          "enum": [
-            "observe",
-            "add",
-            "delete"
-          ],
-          "example": "observe",
-          "description": "Code describing how an event relates to the lifecycle of the entity impacted by the event."
-        },
-        "disposition": {
-          "type": "string",
-          "x-external-enumeration": "https://ref.gs1.org/cbv/Disp",
-          "description": "Disposition code describing the state of the item after the event. \n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/Disp\n    "
-        },
-        "bizStep": {
-          "type": "string",
-          "x-external-enumeration": "https://ref.gs1.org/cbv/BizStep",
-          "description": "A business step code drawn from a controlled vocabulary.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BizStep\n    "
-        },
-        "bizLocation": {
-          "example": "https://id.gs1.org/414/9520123456788",
-          "type": "string",
-          "format": "uri",
-          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an EPCIS event until it is reported to be at a different Business Location by a subsequent EPCIS event. The bizLocation must be a resolvable URI that links to facility information and geolocation data."
-        },
-        "sensorElementList": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/SensorElement"
-          },
-          "description": "An array (one for each sensor) of sensor device data sets associated with the event. "
-        },
-        "parentEPC": {
-          "$ref": "#/$defs/Item",
-          "description": "The unique item identifier that is the result of this aggregation. Typically a packaging ID used in shipments that represents a box/ pallet / container of contained items."
-        },
-        "childEPCs": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Item"
-          },
-          "description": "The list of child items that have been aggregated into the parent (or dis-aggregated from the parent). Maybe a list of package references (eg boxes on a pallet) or may be individual items (eg products in a box)."
-        },
-        "childQuantityList": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/QuantityElement"
-          },
-          "description": "List of quantified product classes that have been aggregated into the parent.  Used whwn the child items do not have unique identifiers (eg 100 Kg of cotton bales)"
-        }
-      },
-      "description": "Aggregation represents an event that happened to one or more objects that are physically aggregated together (physically constrained to be in the same place at the same time, as when cases are aggregated to a pallet).  This event is also used to represent de-aggregation (eg unpacking) when businessStepCode is unpacking."
-    },
-    "TransactionEvent": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": [
-            "TransactionEvent",
-            "Event"
-          ],
-          "default": [
-            "TransactionEvent",
-            "Event"
-          ],
-          "items": {
-            "type": "string",
-            "enum": [
-              "TransactionEvent",
-              "Event"
-            ]
-          }
-        },
-        "id": {
-          "readOnly": true,
-          "example": "https://events.sample.com/b681df10-c682-454a-b11b-d0b9374c01bd",
-          "type": "string",
-          "format": "uri",
-          "description": "The unique identifier of this event - SHOULD be a UUID"
-        },
-        "eventTime": {
-          "example": "2024-09-01T12:00:00",
-          "type": "string",
-          "format": "date-time",
-          "description": "The ISO-8601 date time when the event occurred."
-        },
-        "action": {
-          "type": "string",
-          "enum": [
-            "observe",
-            "add",
-            "delete"
-          ],
-          "example": "observe",
-          "description": "Code describing how an event relates to the lifecycle of the entity impacted by the event."
-        },
-        "disposition": {
-          "type": "string",
-          "x-external-enumeration": "https://ref.gs1.org/cbv/Disp",
-          "description": "Disposition code describing the state of the item after the event. \n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/Disp\n    "
-        },
-        "bizStep": {
-          "type": "string",
-          "x-external-enumeration": "https://ref.gs1.org/cbv/BizStep",
-          "description": "A business step code drawn from a controlled vocabulary.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BizStep\n    "
-        },
-        "bizLocation": {
-          "example": "https://id.gs1.org/414/9520123456788",
-          "type": "string",
-          "format": "uri",
-          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an EPCIS event until it is reported to be at a different Business Location by a subsequent EPCIS event. The bizLocation must be a resolvable URI that links to facility information and geolocation data."
-        },
-        "sensorElementList": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/SensorElement"
-          },
-          "description": "An array (one for each sensor) of sensor device data sets associated with the event. "
-        },
-        "sourceParty": {
-          "$ref": "#/$defs/Entity",
-          "description": "The source party for this supply chain transaction - typically the seller party"
-        },
-        "destinationParty": {
-          "$ref": "#/$defs/Entity",
-          "description": "The destination party for this supply chain transaction - typically the buyer party."
-        },
-        "bizTransaction": {
-          "type": "string",
-          "x-external-enumeration": "https://ref.gs1.org/cbv/BTT",
-          "description": "The document type representing the trade transaction drawn from the business transaction type vocabulary.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BTT\n    "
-        },
-        "epcList": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Item"
-          },
-          "description": "The list of uniquely identified trade items included in this supply chain transaction."
-        },
-        "quantityList": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/QuantityElement"
-          },
-          "description": "List of quantified product classes that are included in this transaction.  Used when the trade items do not have unique identifiers (eg 100 reels of yarn)"
-        }
-      },
-      "description": "Transaction represents an event in which one or more objects become associated or disassociated with one or more identified business transactions - such as the purchase / shipment of goods between buyer and seller."
-    },
-    "AssociationEvent": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": [
-            "AssociationEvent",
-            "Event"
-          ],
-          "default": [
-            "AssociationEvent",
-            "Event"
-          ],
-          "items": {
-            "type": "string",
-            "enum": [
-              "AssociationEvent",
-              "Event"
-            ]
-          }
-        },
-        "id": {
-          "readOnly": true,
-          "example": "https://events.sample.com/b681df10-c682-454a-b11b-d0b9374c01bd",
-          "type": "string",
-          "format": "uri",
-          "description": "The unique identifier of this event - SHOULD be a UUID"
-        },
-        "eventTime": {
-          "example": "2024-09-01T12:00:00",
-          "type": "string",
-          "format": "date-time",
-          "description": "The ISO-8601 date time when the event occurred."
-        },
-        "action": {
-          "type": "string",
-          "enum": [
-            "observe",
-            "add",
-            "delete"
-          ],
-          "example": "observe",
-          "description": "Code describing how an event relates to the lifecycle of the entity impacted by the event."
-        },
-        "disposition": {
-          "type": "string",
-          "x-external-enumeration": "https://ref.gs1.org/cbv/Disp",
-          "description": "Disposition code describing the state of the item after the event. \n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/Disp\n    "
-        },
-        "bizStep": {
-          "type": "string",
-          "x-external-enumeration": "https://ref.gs1.org/cbv/BizStep",
-          "description": "A business step code drawn from a controlled vocabulary.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BizStep\n    "
-        },
-        "bizLocation": {
-          "example": "https://id.gs1.org/414/9520123456788",
-          "type": "string",
-          "format": "uri",
-          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an EPCIS event until it is reported to be at a different Business Location by a subsequent EPCIS event. The bizLocation must be a resolvable URI that links to facility information and geolocation data."
-        },
-        "sensorElementList": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/SensorElement"
-          },
-          "description": "An array (one for each sensor) of sensor device data sets associated with the event. "
-        },
-        "parentEPC": {
-          "$ref": "#/$defs/Item",
-          "description": "The unique item identifier that is the parent of this association. Typically an assembled product ID such as a desktop computer that is built from the associated child components."
-        },
-        "childEPCs": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Item"
-          },
-          "description": "The list of child items that have been assembled to create the parent - for example the power supply or hard drive components of a desktop computer."
-        },
-        "childQuantityList": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/QuantityElement"
-          },
-          "description": "List of quantified product classes that have been assembled into the parent.  Used when the child items do not have unique identifiers (eg brackets and screws used in the assembly of a desktop computer)"
-        }
-      },
-      "description": "The association event represents the assembly of child sub-components to create a parent assembled item. For example a desktop computer assembled from power supply, hard drive, and motherboard.  The association event is very similar in structure to the aggregation event but is used for physical assembly. An association event may represent a bill of materials used to assemble a  product whilst an aggregation event may represent a packing list or items for transport. "
-    },
-    "Event": {
-      "type": "object",
-      "oneOf": [
-        {
-          "$ref": "#/$defs/TransformationEvent"
-        },
-        {
-          "$ref": "#/$defs/ObjectEvent"
-        },
-        {
-          "$ref": "#/$defs/AggregationEvent"
-        },
-        {
-          "$ref": "#/$defs/TransactionEvent"
-        },
-        {
-          "$ref": "#/$defs/AssociationEvent"
-        }
-      ],
-      "description": "This abstract event structure provides a common language to describe supply chain events such as shipments, inspections, manufacturing processes, etc. There are four types of EPCIS event but this is an abstract class representing all common properties of an EPCIS event.  "
     }
   }
 }
