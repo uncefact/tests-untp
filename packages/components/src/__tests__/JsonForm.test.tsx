@@ -133,7 +133,7 @@ describe('render json schema component', () => {
   });
 
   it('should fetch and render schema with data from url', async () => {
-    const dataUrl = 'https://example.io/schema.json';
+    const dataUrl = 'https://example.io/data.json';
     fetchMock.mockResponseOnce(JSON.stringify(initialData));
 
     await act(async () => {
@@ -154,7 +154,7 @@ describe('render json schema component', () => {
   });
 
   it('should show error message when fetch schema failed', async () => {
-    const schemaUrl = 'https://jsonforms.io/schema.json';
+    const schemaUrl = 'https://example.io/schema.json';
     fetchMock.mockReject(new Error('Failed to fetch schema'));
 
     await act(async () => {
@@ -169,7 +169,7 @@ describe('render json schema component', () => {
   });
 
   it('should show error message when fetch data failed', async () => {
-    const dataUrl = 'https://jsonforms.io/data.json';
+    const dataUrl = 'https://example.io/data.json';
     fetchMock.mockReject(new Error('Failed to fetch data'));
 
     await act(async () => {
