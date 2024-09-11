@@ -42,7 +42,7 @@ export interface IContext {
   vckit: IVCKitContext;
   dlr: IConfigDLR;
   storage: StorageServiceConfig;
-  identifierKeyPath: string;
+  identifierKeyPath: string | any;
   dpp: IEntityIssue;
 }
 
