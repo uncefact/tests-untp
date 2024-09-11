@@ -21,7 +21,6 @@ export const processDPP: IService = async (data: any, context: IContext): Promis
     const validationResult = validateContextDPP(context);
     if (!validationResult.ok) throw new Error(validationResult.value);
 
-    // const objectIdentifier = JSONPointer.get(credentialSubject, context.identifierKeyPath);
     const objectIdentifier = constructIdentifierString(credentialSubject, context.identifierKeyPath);
     if (!objectIdentifier) throw new Error('Identifier not found');
 
@@ -58,7 +57,6 @@ export const processDPP: IService = async (data: any, context: IContext): Promis
 
     return { vc, linkResolver };
   } catch (error: any) {
-    console.error(error);
     throw new Error(error.message ?? 'Error processing DPP');
   }
 };
