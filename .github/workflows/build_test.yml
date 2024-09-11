@@ -33,7 +33,7 @@ jobs:
 
       - name: Run tests
         run: |
-          yarn jest --ci --json --coverage --testLocationInResults --outputFile=report.json
+          yarn run test --changedSince=origin/next --ci --json --coverage --testLocationInResults --outputFile=report.json
 
       - name: Coverage
         uses: artiomtr/jest-coverage-report-action@v2
