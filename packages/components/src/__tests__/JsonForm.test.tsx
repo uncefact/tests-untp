@@ -106,7 +106,7 @@ describe('render json schema component', () => {
   });
 
   it('should fetch and render schema from url', async () => {
-    const schemaUrl = 'https://jsonforms.io/schema.json';
+    const schemaUrl = 'https://example.io/schema.json';
     // Mock the fetch response
     fetchMock.mockResponseOnce(JSON.stringify(schema));
 
@@ -133,17 +133,17 @@ describe('render json schema component', () => {
   });
 
   it('should fetch and render schema with data from url', async () => {
-    const schemaUrl = 'https://jsonforms.io/schema.json';
+    const dataUrl = 'https://example.io/schema.json';
     fetchMock.mockResponseOnce(JSON.stringify(initialData));
 
     await act(async () => {
       render(
-        <JsonForm schema={schema} data={{ url: schemaUrl }} onChange={onChangeJsonSchemaForm} className='json-form' />,
+        <JsonForm schema={schema} data={{ url: dataUrl }} onChange={onChangeJsonSchemaForm} className='json-form' />,
       );
     });
 
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(schemaUrl);
+    expect(fetch).toHaveBeenCalledWith(dataUrl);
 
     const getStringField = screen.getByLabelText('Name');
     expect(getStringField).toHaveValue(initialData.name);
