@@ -1,9 +1,13 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, act } from '@testing-library/react';
+import fetchMock from 'jest-fetch-mock';
 import { JsonForms } from '@jsonforms/react';
 
 import { schema, initialData, uiSchema } from './mocks/JsonForm.mock';
 import { JsonForm } from '../components/JsonForm/JsonForm';
+
+// Enable fetch mocks
+fetchMock.enableMocks();
 
 describe('render json schema component', () => {
   beforeEach(() => {
@@ -99,5 +103,85 @@ describe('render json schema component', () => {
     const button = screen.getByText('Click me');
     fireEvent.click(button);
     expect(onChange).toHaveBeenCalledWith({ data: { name: 'Dwight D. Terry' }, errors: [] });
+  });
+
+  it('should fetch and render schema from url', async () => {
+    const schemaUrl = 'https://jsonforms.io/schema.json';
+    // Mock the fetch response
+    fetchMock.mockResponseOnce(JSON.stringify(schema));
+
+    // Wrap the rendering inside act(...)
+    await act(async () => {
+      render(
+        <JsonForm
+          schema={{ url: schemaUrl }}
+          data={initialData}
+          onChange={onChangeJsonSchemaForm}
+          className='json-form'
+        />,
+      );
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(schemaUrl);
+
+    const getStringField = screen.getByLabelText('Name');
+    expect(getStringField).toHaveValue(initialData.name);
+
+    const getBooleanField = screen.getByLabelText('Vegetarian');
+    expect(getBooleanField).toBeChecked();
+  });
+
+  it('should fetch and render schema with data from url', async () => {
+    const schemaUrl = 'https://jsonforms.io/schema.json';
+    fetchMock.mockResponseOnce(JSON.stringify(initialData));
+
+    await act(async () => {
+      render(
+        <JsonForm schema={schema} data={{ url: schemaUrl }} onChange={onChangeJsonSchemaForm} className='json-form' />,
+      );
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(schemaUrl);
+
+    const getStringField = screen.getByLabelText('Name');
+    expect(getStringField).toHaveValue(initialData.name);
+    expect(getStringField).toHaveValue('James A. Fernandes');
+
+    const getBooleanField = screen.getByLabelText('Vegetarian');
+    expect(getBooleanField).toBeChecked();
+  });
+
+  it('should show error message when fetch schema failed', async () => {
+    const schemaUrl = 'https://jsonforms.io/schema.json';
+    fetchMock.mockReject(new Error('Failed to fetch schema'));
+
+    await act(async () => {
+      render(<JsonForm schema={{ url: schemaUrl }} onChange={onChangeJsonSchemaForm} className='json-form' />);
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(schemaUrl);
+
+    const errorElement = screen.getByText('Error setup schema');
+    expect(errorElement).toBeInTheDocument();
+  });
+
+  it('should show error message when fetch data failed', async () => {
+    const dataUrl = 'https://jsonforms.io/data.json';
+    fetchMock.mockReject(new Error('Failed to fetch data'));
+
+    await act(async () => {
+      render(
+        <JsonForm schema={schema} data={{ url: dataUrl }} onChange={onChangeJsonSchemaForm} className='json-form' />,
+      );
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(dataUrl);
+
+    const errorElement = screen.getByText('Error setup data');
+    expect(errorElement).toBeInTheDocument();
   });
 });
