@@ -21,8 +21,12 @@ describe('Gs1Provider', () => {
 
   describe('getDlrUrl', () => {
     it('should return null if code is not set', async () => {
-      const dlrUrl = await gs1Provider.getDlrUrl('', providerUrl);
+      const code = '';
+      jest.spyOn(publicAPI, 'post').mockResolvedValueOnce([]);
+      // Act
+      const dlrUrl = await gs1Provider.getDlrUrl(code, providerUrl);
 
+      // Assert
       expect(dlrUrl).toBeNull();
     });
 
