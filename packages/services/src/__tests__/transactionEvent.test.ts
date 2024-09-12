@@ -20,7 +20,17 @@ jest.mock('../linkResolver.service', () => ({
   createLinkResolver: jest.fn(),
   IdentificationKeyType: jest.fn(),
   getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' })),
+  LinkType: {
+    verificationLinkType : 'gs1:verificationService',
+    certificationLinkType : 'gs1:certificationInfo',
+    epcisLinkType : 'gs1:epcis',
+  }
 }));
+
+jest.mock('../epcisEvents/helpers', () => ({
+  deleteValuesFromLocalStorageByKeyPath: jest.fn(),
+}));
+
 
 describe('processTransactionEvent', () => {
   const { nlisidMock, transactionEventDLRMock, transactionVCMock } = transactionEventMock;
@@ -54,6 +64,7 @@ describe('processTransactionEvent', () => {
       },
     },
     identifierKeyPath: '/transaction/identifier',
+    localStorageParams: { "storageKey": "transaction", "keyPath": "/transaction/type" }
   };
 
   it('should process transaction event', async () => {
@@ -67,8 +78,11 @@ describe('processTransactionEvent', () => {
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValueOnce(transactionEventDLRMock);
 
     const transactionVC = await processTransactionEvent(transactionEvent, context);
-
-    expect(transactionVC).toBe(transactionVCMock);
+    
+    expect(transactionVC).toEqual({
+      vc: transactionVCMock,
+      linkResolver: transactionEventDLRMock,
+    });
     expect(getStorageServiceLink).toHaveBeenCalled();
     expect(validateContext.validateTransactionEventContext).toHaveBeenCalled();
     expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
@@ -95,7 +109,7 @@ describe('processTransactionEvent', () => {
     try {
       const invalidIdentifierContext = {
         ...context,
-        identifierKeyPath: 'invalid-key',
+        identifierKeyPath: '/invalid-key',
       };
       jest
         .spyOn(validateContext, 'validateTransactionEventContext')
