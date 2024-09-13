@@ -8,6 +8,7 @@ import { issueVC } from './vckit.service.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from './linkResolver.service.js';
 import { validateContextDPP } from './epcisEvents/validateContext.js';
 import JSONPointer from 'jsonpointer';
+import { deleteItemFromLocalStorage } from './features/localStorage.service.js';
 
 /**
  * Process DPP, issue VC, upload to storage and register link resolver
@@ -54,6 +55,10 @@ export const processDPP: IService = async (data: any, context: IContext): Promis
       qualifierPath,
       LinkType.certificationLinkType,
     );
+
+    if (context.localStorageParams && context.localStorageParams.storageKey) {
+      deleteItemFromLocalStorage(context.localStorageParams);
+    }
 
     return { vc, linkResolver };
   } catch (error: any) {

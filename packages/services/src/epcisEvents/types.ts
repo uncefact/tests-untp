@@ -44,6 +44,7 @@ export interface IContext {
   storage: StorageServiceConfig;
   identifierKeyPath: string | any;
   dpp: IEntityIssue;
+  localStorageParams?: any;
 }
 
 export interface IRenderer {
@@ -73,7 +74,6 @@ export interface ITraceabilityEvent {
 
 export interface ITransactionEventContext extends IContext {
   epcisTransactionEvent: IEntityIssue;
-  localStorageParams: any;
 }
 
 export interface IAggregationEvent {

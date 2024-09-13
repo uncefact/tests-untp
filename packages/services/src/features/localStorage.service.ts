@@ -66,3 +66,17 @@ export const deleteValuesFromLocalStorage = (parameters: { storageKey: string; k
     throw new Error(error.message);
   }
 };
+
+/**
+ * This function is used to delete the data from the local storage by storageKey
+ * @param parameters key: string
+ */
+export const deleteItemFromLocalStorage = (parameters: { storageKey: string }) => {
+  try {
+    const { storageKey } = parameters;
+    localStorage.removeItem(storageKey);
+  } catch (error: any) {
+    console.error(error);
+    throw new Error(error.message);
+  }
+};
