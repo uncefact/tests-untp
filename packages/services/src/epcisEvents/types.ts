@@ -14,7 +14,6 @@ export interface ICredential {
 }
 
 export interface ILinkResolverContext {
-  dlrIdentificationKeyNamespace: string;
   dlrIdentificationKeyType: IdentificationKeyType;
   dlrLinkTitle: string;
   dlrVerificationPage: string;

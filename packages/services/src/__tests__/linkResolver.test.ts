@@ -30,7 +30,6 @@ describe('create link resolve service', () => {
 
     const mockValue = {
       eventLink: 'https://localhost/epcis-transformation-event/1234',
-      identificationKeyNamespace: 'gtin',
       identificationKeyType: IdentificationKeyType.nlisid,
       identificationKey: 'gtin-key',
       itemDescription: 'EPCIS transformation event VC',
@@ -44,7 +43,6 @@ describe('create link resolve service', () => {
 
     const resolverUrl = await registerLinkResolver(
       mockValue.eventLink,
-      mockValue.namespace,
       mockValue.identificationKeyType,
       mockValue.identificationKey,
       mockValue.itemDescription,
@@ -71,7 +69,6 @@ describe('create link resolve service', () => {
       privateAPI.post = jest.fn().mockRejectedValueOnce(new Error(errorMessage));
       await createLinkResolver({
         linkResolver: {
-          identificationKeyNamespace: 'gtin',
           identificationKeyType: IdentificationKeyType.nlisid,
           identificationKey: 'gtin-key',
           itemDescription: 'EPCIS transformation event VC',

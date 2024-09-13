@@ -44,7 +44,6 @@ export const processDPP: IService = async (data: any, context: IContext): Promis
     const linkResolverContext = context.dlr;
     const linkResolver = await registerLinkResolver(
       vcUrl,
-      dppContext.dlrIdentificationKeyNamespace,
       dppContext.dlrIdentificationKeyType,
       identifier,
       dppContext.dlrLinkTitle,

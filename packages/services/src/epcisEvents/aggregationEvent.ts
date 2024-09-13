@@ -53,7 +53,6 @@ export const processAggregationEvent: IService = async (
 
   await registerLinkResolver(
     aggregationVCLink,
-    epcisAggregationEvent.dlrIdentificationKeyNamespace,
     epcisAggregationEvent.dlrIdentificationKeyType,
     identifier,
     epcisAggregationEvent.dlrLinkTitle,
