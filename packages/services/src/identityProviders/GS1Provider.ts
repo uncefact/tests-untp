@@ -13,7 +13,7 @@ export class GS1Provider implements IdentityProviderStrategy {
    * Function to retrieve the DLR URL based on the GTIN code and identification provider URL.
    * @returns The DLR (Digital Link Resolver) URL corresponding to the provided GTIN code, or null if not found.
    */
-  async getDlrUrl(code: string, providerUrl: string, namespace: string): Promise<string | null> {
+  async getDlrUrl(code: string, providerUrl: string, namespace?: string): Promise<string | null> {
     const parseGS1Payload = (payload: any) => {
       const aiRegex = /\((\d+)\)([^(]+)/g;
       const parsed = Array.from(payload.matchAll(aiRegex), (match) => [(match as any)[1], (match as any)[2]]);
@@ -38,7 +38,9 @@ export class GS1Provider implements IdentityProviderStrategy {
         throw new Error('GTIN not found in the GS1 payload');
       }
 
-      const { linkset }: any = await publicAPI.get(`${providerUrl}/${namespace}/${gtin}?linkType=all`);
+      const { linkset }: any = await publicAPI.get(
+        namespace ? `${providerUrl}/${namespace}/${gtin}?linkType=all` : `${providerUrl}/${gtin}?linkType=all`,
+      );
 
       if (!linkset || !linkset.length) {
         return null;
