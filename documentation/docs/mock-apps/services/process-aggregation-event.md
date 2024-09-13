@@ -3,7 +3,7 @@ sidebar_position: 26
 title: Process Aggregation Event
 ---
 
-import Disclaimer from '../../_disclaimer.mdx';
+import Disclaimer from '../../\_disclaimer.mdx';
 
 <Disclaimer />
 
@@ -74,10 +74,10 @@ P-->>C: Return VC and resolver URL
 
 ## Definitions
 
-| Property | Required | Description | Type |
-|----------|----------|-------------|------|
-| vckit | Yes | Configuration for the VCKit service | [VCKit](/docs/mock-apps/common/vckit) |
-| epcisAggregationEvent | Yes | Configuration for the EPCIS Aggregation Event | [Credential](/docs/mock-apps/common/credential) |
-| storage | Yes | Configuration for storage service | [Storage](/docs/mock-apps/common/storage) |
-| dlr | Yes | Configuration for the Digital Link Resolver | [IDR](/docs/mock-apps/common/idr) |
-| identifierKeyPath | Yes | JSON path to the identifier in the credential subject | String |
+| Property              | Required | Description                                                                                                                         | Type                                                            |
+| --------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| vckit                 | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/mock-apps/common/vckit)                           |
+| epcisAggregationEvent | Yes      | Configuration for the EPCIS Aggregation Event                                                                                       | [Credential](/docs/mock-apps/common/credential)                 |
+| storage               | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/mock-apps/common/storage)                       |
+| dlr                   | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/mock-apps/common/idr)                               |
+| identifierKeyPath     | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/mock-apps/common/identifier-key-path) |
