@@ -13,7 +13,9 @@ The `IDR` object contains configuration for the [Identity Resolver Service](/doc
 
 ## Definition
 
-| Property | Required | Description | Type |
-|----------|----------|-------------|------|
-| dlrAPIUrl | Yes | URL for the Identity Resolver API | String |
-| dlrAPIKey | No | API key for the Identity Resolver | String |
+| Property         | Required | Description                         | Type   |
+| ---------------- | -------- | ----------------------------------- | ------ |
+| dlrAPIUrl        | Yes      | URL for the Identity Resolver API   | String |
+| dlrAPIKey        | No       | API key for the Identity Resolver   | String |
+| namespace        | Yes      | Namespace for the Identity Resolver | String |
+| linkRegisterPath | No       | Path to register a link             | String |

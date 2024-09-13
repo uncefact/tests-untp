@@ -3,7 +3,7 @@ sidebar_position: 23
 title: Process DPP
 ---
 
-import Disclaimer from '../../_disclaimer.mdx';
+import Disclaimer from '../../\_disclaimer.mdx';
 
 <Disclaimer />
 
@@ -75,7 +75,9 @@ P-->>C: Return VC and resolver URL
       },
       "dlr": {
         "dlrAPIUrl": "https://dlr.example.com",
-        "dlrAPIKey": "5555555555555"
+        "dlrAPIKey": "5555555555555",
+        "namespace": "gs1",
+        "linkRegisterPath": "/api/resolver"
       },
       "storage": {
         "url": "https://storage.example.com/v1/documents",
@@ -98,11 +100,10 @@ P-->>C: Return VC and resolver URL
 
 ## Definitions
 
-| Property | Required | Description | Type |
-|----------|----------|-------------|------|
-| vckit | Yes | Configuration for the VCKit service | [VCKit](/docs/mock-apps/common/vckit) |
-| dpp | Yes | Configuration for the Digital Product Passport | [DPP](/docs/mock-apps/common/credential) |
-| dlr | Yes | Configuration for the Digital Link Resolver | [IDR](/docs/mock-apps/common/idr) |
-| storage | Yes | Configuration for storage service | [Storage](/docs/mock-apps/common/storage) |
-| identifierKeyPath | Yes | JSON path to the identifier in the credential subject | String |
-
+| Property          | Required | Description                                           | Type                                      |
+| ----------------- | -------- | ----------------------------------------------------- | ----------------------------------------- |
+| vckit             | Yes      | Configuration for the VCKit service                   | [VCKit](/docs/mock-apps/common/vckit)     |
+| dpp               | Yes      | Configuration for the Digital Product Passport        | [DPP](/docs/mock-apps/common/credential)  |
+| dlr               | Yes      | Configuration for the Digital Link Resolver           | [IDR](/docs/mock-apps/common/idr)         |
+| storage           | Yes      | Configuration for storage service                     | [Storage](/docs/mock-apps/common/storage) |
+| identifierKeyPath | Yes      | JSON path to the identifier in the credential subject | String                                    |

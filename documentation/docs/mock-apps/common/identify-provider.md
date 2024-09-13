@@ -8,7 +8,8 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 <Disclaimer />
 
 ## Description
-The `Identify Provider` object is a key component in the Mock App system that links scanned identifiers to their corresponding [Identity Resolver Service](/docs/mock-apps/dependent-services/identity-resolution-service), understands how to communicate with such services and encapsulates logic to interpret data retrieved from data carriers. 
+
+The `Identify Provider` object is a key component in the Mock App system that links scanned identifiers to their corresponding [Identity Resolver Service](/docs/mock-apps/dependent-services/identity-resolution-service), understands how to communicate with such services and encapsulates logic to interpret data retrieved from data carriers.
 
 It serves three main functions:
 
@@ -26,27 +27,29 @@ For instance, when dealing with a Global Trade Item Number (GTIN) from GS1:
 The Mock App system can use multiple identify providers, each tailored to a specific identity registrar and service. This modular approach allows the system to work with a variety of identification standards and services.
 
 ## Example
+
 ```json
 {
   "identifyProvider": {
     "type": "gs1",
-    "url": "http://localhost:3333/products"
+    "url": "http://localhost:3333",
+    "namespace": "gs1"
   }
 }
 ```
 
 ## Definitions
 
-| Property | Required | Description | Type |
-|----------|:--------:|-------------|------|
-| type | Yes | The type of identify provider, e.g., "gs1" for GS1 standards. | [ProviderType](/docs/mock-apps/common/identify-provider#provider-types) |
-| url | Yes | The URL endpoint for the identify provider service. | String |
-
+| Property  | Required | Description                                                   | Type                                                                    |
+| --------- | :------: | ------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| type      |   Yes    | The type of identify provider, e.g., "gs1" for GS1 standards. | [ProviderType](/docs/mock-apps/common/identify-provider#provider-types) |
+| url       |   Yes    | The URL endpoint for the identify provider service.           | String                                                                  |
+| namespace |   Yes    | The namespace for the identify provider.                      | String                                                                  |
 
 ## Provider Types
 
-| Type | Description |
-|------|-------------|
-| gs1 | Used for resolving (using the Mock Verified By GS1 Service)/understanding GS1-based identifiers (e.g., GTINs). |
+| Type | Description                                                                                                    |
+| ---- | -------------------------------------------------------------------------------------------------------------- |
+| gs1  | Used for resolving (using the Mock Verified By GS1 Service)/understanding GS1-based identifiers (e.g., GTINs). |
 
 **Note**: The available types may be extended in the future to support additional identity providers.
