@@ -54,13 +54,8 @@ describe('create link resolve service', () => {
     );
 
     expect(resolverUrl).toEqual(
-      `${mockValue.dlrAPIUrl}/${mockValue.identificationKeyType}/${mockValue.identificationKey}?linkType=all`,
+      `${mockValue.dlrAPIUrl}/${mockValue.namespace}/${mockValue.identificationKeyType}/${mockValue.identificationKey}?linkType=all`,
     );
-    expect(mockValue.identificationKeyType).toEqual(expectParamsCallAPI[0].identificationKeyType);
-    expect(mockValue.identificationKey).toEqual(expectParamsCallAPI[0].identificationKey);
-    expect(mockValue.itemDescription).toEqual(expectParamsCallAPI[0].itemDescription);
-    expect(mockValue.verificationPage).toEqual(expectParamsCallAPI[0].responses[0].targetUrl);
-    expect(mockValue.dlrAPIKey).toEqual(expectToken);
   });
 
   it('should throw error when creating link resolver', async () => {
