@@ -11,6 +11,8 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 The JsonForm component renders a dynamic form based on a provided JSON schema. It allows for flexible form creation and data entry, supporting various field types and structures defined in the schema. The component can be initialised with default data and customised with CSS classes and styles. It also supports advanced features like data construction rules and external schema references, making it suitable for complex form scenarios.
 
+As a developer using the mock app system, you can now provide a remote schema URI to the JsonForm component or manually specify a local schema. This allows for the dynamic rendering of forms based on externally hosted schemas or custom local schemas, making the system more flexible and adaptable.
+
 ## Definitions
 
 | Property | Required | Description | Type |
@@ -23,13 +25,15 @@ The JsonForm component renders a dynamic form based on a provided JSON schema. I
 
 | Property | Required | Description | Type |
 |----------|----------|-------------|------|
-| schema | Yes | The JSON schema that defines the structure of the form | Object or `{ url: string }` |
+| schema | Yes | The JSON schema that defines the structure of the form. It can either be a local object or an object with a URL property pointing to an external schema. | Object or `{ url: string }` |
 | constructData | No | Defines the schema for constructing event data, including field mappings, default values, and data generation rules. | [ConstructData](/docs/mock-apps/common/construct-data) |
 | data | No | The initial data for the form | Object |
 | className | No | CSS class name for styling the form | String |
 | style | No | CSS styles to apply to the form | Object |
 
 ## Example
+
+### Manual schema input:
 
 ```json
 {
@@ -436,5 +440,20 @@ The JsonForm component renders a dynamic form based on a provided JSON schema. I
         }
         ]
     }
+}
+```
+
+### Remote schema URL
+
+```json
+{
+        "name": "JsonForm",
+        "type": "EntryData",
+        "props": {
+            "schema": {
+                "url": "https://jargon.sh/user/unece/DigitalProductPassport/v/0.0.1/artefacts/jsonSchemas/render.json?class=ProductPassport"
+            }
+        }
+        ...
 }
 ```
