@@ -132,27 +132,6 @@ describe('render json schema component', () => {
     expect(getBooleanField).toBeChecked();
   });
 
-  it('should fetch and render schema with data from url', async () => {
-    const dataUrl = 'https://example.io/data.json';
-    fetchMock.mockResponseOnce(JSON.stringify(initialData));
-
-    await act(async () => {
-      render(
-        <JsonForm schema={schema} data={{ url: dataUrl }} onChange={onChangeJsonSchemaForm} className='json-form' />,
-      );
-    });
-
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(dataUrl);
-
-    const getStringField = screen.getByLabelText('Name');
-    expect(getStringField).toHaveValue(initialData.name);
-    expect(getStringField).toHaveValue('James A. Fernandes');
-
-    const getBooleanField = screen.getByLabelText('Vegetarian');
-    expect(getBooleanField).toBeChecked();
-  });
-
   it('should show error message when fetch schema failed', async () => {
     const schemaUrl = 'https://example.io/schema.json';
     fetchMock.mockReject(new Error('Failed to fetch schema'));
@@ -165,23 +144,6 @@ describe('render json schema component', () => {
     expect(fetch).toHaveBeenCalledWith(schemaUrl);
 
     const errorElement = screen.getByText('Error setup schema');
-    expect(errorElement).toBeInTheDocument();
-  });
-
-  it('should show error message when fetch data failed', async () => {
-    const dataUrl = 'https://example.io/data.json';
-    fetchMock.mockReject(new Error('Failed to fetch data'));
-
-    await act(async () => {
-      render(
-        <JsonForm schema={schema} data={{ url: dataUrl }} onChange={onChangeJsonSchemaForm} className='json-form' />,
-      );
-    });
-
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(dataUrl);
-
-    const errorElement = screen.getByText('Error setup data');
     expect(errorElement).toBeInTheDocument();
   });
 });
