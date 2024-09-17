@@ -13,6 +13,9 @@ const schemaVersionMock = 'v0.0.3';
 
 describe('getLastestVersionFolder', () => {
   it('should return the latest version folder name', async () => {
+    const readdirSpy = jest.spyOn(fs, 'readdir') as unknown as jest.SpyInstance<Promise<string[]>>;
+    readdirSpy.mockResolvedValueOnce(['aggregationEvent']);
+
     jest.spyOn(semver, 'maxSatisfying').mockReturnValueOnce(schemaVersionMock);
     const eventType = 'aggregationEvent';
 
