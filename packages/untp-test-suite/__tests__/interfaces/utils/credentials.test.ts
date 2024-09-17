@@ -12,7 +12,6 @@ const schemasPath = 'src/schemas';
 const schemaVersionMock = 'v0.0.3';
 
 describe('getLastestVersionFolder', () => {
-
   it('should return the latest version folder name', async () => {
     jest.spyOn(semver, 'maxSatisfying').mockReturnValueOnce(schemaVersionMock);
     const eventType = 'aggregationEvent';
@@ -36,19 +35,21 @@ describe('getLastestVersionFolder', () => {
 });
 
 describe('getLatestCredentialVersions', () => {
-
   it('should retrieve latest credential versions successfully for each event type folder', async () => {
-    const readdirSpy = (jest.spyOn(fs, 'readdir')) as unknown as jest.SpyInstance<Promise<string[]>>;
+    const readdirSpy = jest.spyOn(fs, 'readdir') as unknown as jest.SpyInstance<Promise<string[]>>;
     readdirSpy.mockResolvedValueOnce(['aggregationEvent']);
     jest.spyOn(credentials, 'getLastestVersionFolder').mockResolvedValueOnce('v0.0.3');
 
     const latestCredentialVersions = await credentials.getLatestCredentialVersions(schemasPath);
 
-    expect(latestCredentialVersions).toEqual([{
-      type: 'aggregationEvent',
-      version: 'v0.0.3',
-      dataPath: '',
-    }]);
+    expect(latestCredentialVersions).toEqual([
+      {
+        type: 'aggregationEvent',
+        version: 'v0.0.3',
+        dataPath: '',
+        url: '',
+      },
+    ]);
   });
 
   it('should throw an error when invalid schemas path', async () => {
@@ -67,9 +68,11 @@ describe('getLatestCredentialVersions', () => {
     const invalidEventType = 'invalid-event-type';
 
     try {
-      const readdirSpy = (jest.spyOn(fs, 'readdir')) as unknown as jest.SpyInstance<Promise<string[]>>;
+      const readdirSpy = jest.spyOn(fs, 'readdir') as unknown as jest.SpyInstance<Promise<string[]>>;
       readdirSpy.mockResolvedValueOnce([invalidEventType]);
-      jest.spyOn(credentials, 'getLastestVersionFolder').mockRejectedValueOnce(`Invalid event type: ${invalidEventType}`);
+      jest
+        .spyOn(credentials, 'getLastestVersionFolder')
+        .mockRejectedValueOnce(`Invalid event type: ${invalidEventType}`);
 
       await credentials.getLatestCredentialVersions(invalidSchemasPath);
     } catch (error) {
@@ -82,21 +85,26 @@ describe('generateCredentialFile', () => {
   const storePath = './test/credentials.json';
 
   it('should generate latest credential file successfully', async () => {
-    const latestCredentialVersions = [{ type: 'aggregationEvent', version: 'v0.0.3', dataPath: '' }];
+    const latestCredentialVersions = [{ type: 'aggregationEvent', version: 'v0.0.3', dataPath: '', url: '' }];
     jest.spyOn(path, 'resolve').mockReturnValueOnce('../../../src/schemas');
     jest.spyOn(credentials, 'getLatestCredentialVersions').mockResolvedValueOnce(latestCredentialVersions);
     jest.spyOn(fs, 'writeFile').mockResolvedValueOnce();
 
     const credentialFileData = await credentials.generateCredentialFile(storePath);
 
-    expect(fs.writeFile).toHaveBeenCalledWith(storePath, JSON.stringify({ credentials: latestCredentialVersions }, null, 2));
+    expect(fs.writeFile).toHaveBeenCalledWith(
+      storePath,
+      JSON.stringify({ credentials: latestCredentialVersions }, null, 2),
+    );
     expect(credentialFileData).toEqual({ credentials: latestCredentialVersions });
   });
 
   it('should throw an error when invalid store path', async () => {
     try {
       jest.spyOn(path, 'resolve').mockReturnValueOnce('../../../src/schemas');
-      jest.spyOn(credentials, 'getLatestCredentialVersions').mockResolvedValueOnce([{ type: 'aggregationEvent', version: 'v0.0.3', dataPath: '' }]);
+      jest
+        .spyOn(credentials, 'getLatestCredentialVersions')
+        .mockResolvedValueOnce([{ type: 'aggregationEvent', version: 'v0.0.3', dataPath: '', url: '' }]);
       jest.spyOn(fs, 'writeFile').mockRejectedValueOnce('invalid store path');
       const invalidStorePath = 'invalid-store-path';
 
@@ -116,5 +124,4 @@ describe('generateCredentialFile', () => {
       expect(error).toContain('invalid schemas path');
     }
   });
-
 });
