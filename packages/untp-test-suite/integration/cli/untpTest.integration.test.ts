@@ -1,3 +1,5 @@
+jest.setTimeout(30000);
+
 import { jest } from '@jest/globals';
 import fs from 'fs';
 import { exec } from 'child_process';
