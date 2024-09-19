@@ -1,9 +1,9 @@
 ---
-sidebar_position: 6  
+sidebar_position: 6
 title: Usage
 ---
 
-import Disclaimer from './../../../_disclaimer.mdx';
+import Disclaimer from './../../../\_disclaimer.mdx';
 
 <Disclaimer />
 
@@ -19,7 +19,7 @@ yarn run untp test
 
 To use a specific configuration file:
 
-```bash 
+```bash
 yarn run untp test --config path/to/credentials.json
 ```
 
@@ -29,9 +29,18 @@ The test suite validates each credential against its corresponding schema and pr
 
 ### Result Overview
 
-For each tested credential, you will see:
-- Credential type
-- Version tested
+For each tested credential, if you input a local schema file you will see:
+
+- Credential type (Required)
+- Version tested (Required)
+- URL (Optional)
+- Test result status
+
+or if you input a remote schema URL you will see:
+
+- Credential type (Optional)
+- Version tested (Optional)
+- URL of the remote schema (Required)
 - Test result status
 
 ### Result Categories
