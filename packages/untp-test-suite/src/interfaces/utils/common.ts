@@ -10,3 +10,13 @@ export async function readJsonFile<T>(filePath: string): Promise<T | null> {
     return null;
   }
 }
+
+// Utility function to truncate strings
+export const truncateString = (str: string | undefined, maxLength: number) => {
+  if (!str) return;
+
+  if (str.length <= maxLength) {
+    return str;
+  }
+  return str.slice(0, maxLength) + '...';
+};

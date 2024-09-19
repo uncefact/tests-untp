@@ -38,6 +38,12 @@ jest.mock(
 
 jest.mock('../../../src/utils/common', () => ({
   getPackageVersion: () => '0.0.1',
+  truncateString: jest.fn((str: string, maxLength: number) => {
+    if (str.length <= maxLength) {
+      return str;
+    }
+    return `${str.slice(0, maxLength)}...`;
+  }),
 }));
 
 const errorTestSuite = {
