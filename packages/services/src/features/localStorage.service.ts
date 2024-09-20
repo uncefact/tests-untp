@@ -5,7 +5,7 @@ import { getValueByPath } from '../utils/helpers.js';
  * @param data
  * @param parameters key: string
  */
-export const saveToLocalStorage = (data: any, parameters: any) => {
+export const saveToLocalStorage = (data: any, parameters: { storageKey: string }) => {
   try {
     const { storageKey } = parameters;
     localStorage.setItem(storageKey, JSON.stringify(data));
