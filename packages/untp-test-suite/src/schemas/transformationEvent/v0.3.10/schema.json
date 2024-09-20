@@ -97,9 +97,14 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "type": "string",
-          "default": "Entity",
-          "enum": ["Entity"]
+          "type": "array",
+          "readOnly": true,
+          "const": ["Entity"],
+          "default": ["Entity"],
+          "items": {
+            "type": "string",
+            "enum": ["Entity"]
+          }
         },
         "id": {
           "example": "https://id.gs1.org/01/09520123456788/21/12345",
@@ -130,9 +135,14 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "type": "string",
-          "default": "IdentifierScheme",
-          "enum": ["IdentifierScheme"]
+          "type": "array",
+          "readOnly": true,
+          "const": ["IdentifierScheme"],
+          "default": ["IdentifierScheme"],
+          "items": {
+            "type": "string",
+            "enum": ["IdentifierScheme"]
+          }
         },
         "id": {
           "example": "https://id.gs1.org/01/",

@@ -85,76 +85,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Transaction represents an event in which one or more objects become associated or disassociated with one or more identified business transactions - such as the purchase / shipment of goods between buyer and seller.",
   "$defs": {
-    "Item": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": ["Item", "Entity"],
-          "default": ["Item", "Entity"],
-          "items": {
-            "type": "string",
-            "enum": ["Item", "Entity"]
-          }
-        },
-        "id": {
-          "example": "https://id.gs1.org/01/09520123456788/21/12345",
-          "type": "string",
-          "format": "uri",
-          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
-        },
-        "name": {
-          "example": "EV battery 300Ah.",
-          "type": "string",
-          "description": "The name of the product class to which the product item belongs.  "
-        },
-        "registeredId": {
-          "example": "90664869327",
-          "type": "string",
-          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
-        },
-        "idScheme": {
-          "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
-        }
-      },
-      "description": "A specific serilaised trade item which is a type of a more generic product. Typically an SGTIN",
-      "required": ["id", "name"]
-    },
-    "QuantityElement": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": ["QuantityElement"],
-          "default": ["QuantityElement"],
-          "items": {
-            "type": "string",
-            "enum": ["QuantityElement"]
-          }
-        },
-        "product": {
-          "$ref": "#/$defs/Entity",
-          "description": "THe identifier of a product class (as opposed to a product instance) such as a GTIN code for a manufactured product."
-        },
-        "quantity": {
-          "example": 20,
-          "type": "number",
-          "description": "The numeric quantity of the product class (eg 100 kg of cotton)"
-        },
-        "uom": {
-          "type": "string",
-          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
-          "description": "The unit of measure for the quantity value (eg Kg or meters etc) using the UNECE Rec 20 unit of measure codelist.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
-        }
-      },
-      "description": "The quantity element is used to define the quantities (eg 100), units of measure (eg Kg) and product class (eg GTIN or other class identifier) of products that are inputs or outputs or the subject of supply chain events.  ",
-      "required": ["product", "quantity"]
-    },
     "Entity": {
       "type": "object",
       "additionalProperties": false,
@@ -281,6 +211,44 @@
       },
       "description": "A physical sensor that records a sensor data set."
     },
+    "Item": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Item", "Entity"],
+          "default": ["Item", "Entity"],
+          "items": {
+            "type": "string",
+            "enum": ["Item", "Entity"]
+          }
+        },
+        "id": {
+          "example": "https://id.gs1.org/01/09520123456788/21/12345",
+          "type": "string",
+          "format": "uri",
+          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+        },
+        "name": {
+          "example": "EV battery 300Ah.",
+          "type": "string",
+          "description": "The name of the product class to which the product item belongs.  "
+        },
+        "registeredId": {
+          "example": "90664869327",
+          "type": "string",
+          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+        },
+        "idScheme": {
+          "$ref": "#/$defs/IdentifierScheme",
+          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+        }
+      },
+      "description": "A specific serilaised trade item which is a type of a more generic product. Typically an SGTIN",
+      "required": ["id", "name"]
+    },
     "SensorData": {
       "type": "object",
       "additionalProperties": false,
@@ -319,6 +287,38 @@
         }
       },
       "description": "A data point read by a sensor."
+    },
+    "QuantityElement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["QuantityElement"],
+          "default": ["QuantityElement"],
+          "items": {
+            "type": "string",
+            "enum": ["QuantityElement"]
+          }
+        },
+        "product": {
+          "$ref": "#/$defs/Entity",
+          "description": "THe identifier of a product class (as opposed to a product instance) such as a GTIN code for a manufactured product."
+        },
+        "quantity": {
+          "example": 20,
+          "type": "number",
+          "description": "The numeric quantity of the product class (eg 100 kg of cotton)"
+        },
+        "uom": {
+          "type": "string",
+          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
+          "description": "The unit of measure for the quantity value (eg Kg or meters etc) using the UNECE Rec 20 unit of measure codelist.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+        }
+      },
+      "description": "The quantity element is used to define the quantities (eg 100), units of measure (eg Kg) and product class (eg GTIN or other class identifier) of products that are inputs or outputs or the subject of supply chain events.  ",
+      "required": ["product", "quantity"]
     }
   }
 }
