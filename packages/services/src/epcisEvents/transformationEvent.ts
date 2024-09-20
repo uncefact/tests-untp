@@ -1,17 +1,17 @@
 import { VerifiableCredential } from '@vckit/core-types';
-import _ from 'lodash';
 
-import { issueVC } from '../vckit.service.js';
-import { getStorageServiceLink } from '../storage.service.js';
 import {
   IdentificationKeyType,
   LinkType,
   getLinkResolverIdentifier,
   registerLinkResolver,
 } from '../linkResolver.service.js';
+import { getStorageServiceLink } from '../storage.service.js';
+import { issueVC } from '../vckit.service.js';
 
+import JSONPointer from 'jsonpointer';
 import { IService } from '../types/IService.js';
-import { IConfigDLR, ICredential, IEntityIssue, ITransformationEvent, IVCKitContext } from './types';
+import { StorageServiceConfig } from '../types/storage.js';
 import {
   IConstructObjectParameters,
   allowedIndexKeys,
@@ -21,9 +21,8 @@ import {
   randomIntegerString,
 } from '../utils/helpers.js';
 import { generateIdWithBatchLot, generateLinkResolver } from './helpers.js';
+import { IConfigDLR, ICredential, IEntityIssue, ITransformationEvent, IVCKitContext } from './types';
 import { validateContextTransformationEvent } from './validateContext.js';
-import { StorageServiceConfig } from '../types/storage.js';
-import JSONPointer from 'jsonpointer';
 
 /**
  * Process transformation event, issue epcis transformation event and dpp for each identifiers, then upload to storage and register link resolver for each dpp
@@ -156,6 +155,7 @@ export const issueEpcisTransformationEvent = async (
     issuer: vcKitContext.issuer,
     type: [...epcisTransformationEvent.type],
     vcKitAPIUrl: vcKitContext.vckitAPIUrl,
+    vcKitAPIKey: vcKitContext?.vckitAPIKey,
     restOfVC,
   });
 
@@ -198,6 +198,7 @@ export const issueDPP = async (
     issuer: vcKitContext.issuer,
     type: dppContext.type,
     vcKitAPIUrl: vcKitContext.vckitAPIUrl,
+    vcKitAPIKey: vcKitContext?.vckitAPIKey,
     credentialSubject: dppCredentialSubject,
     restOfVC,
   });

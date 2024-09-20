@@ -1,13 +1,13 @@
 import { VerifiableCredential } from '@vckit/core-types';
-import { IService } from './types/index.js';
 import { IContext } from './epcisEvents/types.js';
+import { IService } from './types/index.js';
 import { generateUUID } from './utils/helpers.js';
 
+import JSONPointer from 'jsonpointer';
+import { validateContextDPP } from './epcisEvents/validateContext.js';
+import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from './linkResolver.service.js';
 import { getStorageServiceLink } from './storage.service.js';
 import { issueVC } from './vckit.service.js';
-import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from './linkResolver.service.js';
-import { validateContextDPP } from './epcisEvents/validateContext.js';
-import JSONPointer from 'jsonpointer';
 
 /**
  * Process DPP, issue VC, upload to storage and register link resolver
@@ -35,6 +35,7 @@ export const processDPP: IService = async (data: any, context: IContext): Promis
       issuer: vckitContext.issuer,
       type: [...dppContext.type],
       vcKitAPIUrl: vckitContext.vckitAPIUrl,
+      vcKitAPIKey: vckitContext?.vckitAPIKey,
       restOfVC,
     });
 

@@ -5,6 +5,7 @@ import { IConstructObjectParameters } from '../utils/helpers';
 export interface IVCKitContext {
   issuer: string;
   vckitAPIUrl: string;
+  vckitAPIKey?: string;
 }
 
 export interface ICredential {

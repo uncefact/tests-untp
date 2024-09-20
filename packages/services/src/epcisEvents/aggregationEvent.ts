@@ -1,13 +1,13 @@
 import { VerifiableCredential } from '@vckit/core-types';
-import { issueVC } from '../vckit.service.js';
-import { getStorageServiceLink } from '../storage.service.js';
-import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
-import { IService } from '../types/IService.js';
-import { ITraceabilityEvent, IAggregationEventContext } from './types.js';
-import { generateUUID } from '../utils/helpers.js';
-import { validateAggregationEventContext } from './validateContext.js';
-import { EPCISBusinessStepCode, EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
 import JSONPointer from 'jsonpointer';
+import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
+import { getStorageServiceLink } from '../storage.service.js';
+import { EPCISBusinessStepCode, EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
+import { IService } from '../types/IService.js';
+import { generateUUID } from '../utils/helpers.js';
+import { issueVC } from '../vckit.service.js';
+import { IAggregationEventContext, ITraceabilityEvent } from './types.js';
+import { validateAggregationEventContext } from './validateContext.js';
 
 export const processAggregationEvent: IService = async (
   aggregationEvent: ITraceabilityEvent,
@@ -41,6 +41,7 @@ export const processAggregationEvent: IService = async (
   const aggregationVC = await issueVC({
     credentialSubject,
     vcKitAPIUrl: vckit.vckitAPIUrl,
+    vcKitAPIKey: vckit?.vckitAPIKey,
     issuer: vckit.issuer,
     context: epcisAggregationEvent.context,
     type: epcisAggregationEvent.type,

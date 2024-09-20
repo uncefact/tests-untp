@@ -1,13 +1,13 @@
 import { VerifiableCredential } from '@vckit/core-types';
-import { IService } from '../types/index.js';
-import { issueVC } from '../vckit.service.js';
-import { ITraceabilityEvent, ITransactionEventContext } from './types.js';
-import { getStorageServiceLink } from '../storage.service.js';
-import { generateUUID } from '../utils/helpers.js';
-import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
-import { validateTransactionEventContext } from './validateContext.js';
 import JSONPointer from 'jsonpointer';
+import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
+import { getStorageServiceLink } from '../storage.service.js';
+import { IService } from '../types/index.js';
+import { generateUUID } from '../utils/helpers.js';
+import { issueVC } from '../vckit.service.js';
 import { deleteValuesFromLocalStorageByKeyPath } from './helpers.js';
+import { ITraceabilityEvent, ITransactionEventContext } from './types.js';
+import { validateTransactionEventContext } from './validateContext.js';
 
 export const processTransactionEvent: IService = async (
   transactionEvent: ITraceabilityEvent,
@@ -29,6 +29,7 @@ export const processTransactionEvent: IService = async (
   const vc: VerifiableCredential = await issueVC({
     credentialSubject: transactionEvent.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
+    vcKitAPIKey: vckit?.vckitAPIKey,
     issuer: vckit.issuer,
     context: epcisTransactionEvent.context,
     type: epcisTransactionEvent.type,
