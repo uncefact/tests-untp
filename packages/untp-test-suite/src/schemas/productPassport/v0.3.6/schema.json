@@ -17,12 +17,12 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/{{version}}/"]
+        "enum": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dpp/"]
       },
       "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
       "readOnly": true,
-      "const": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/{{version}}/"],
-      "default": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/{{version}}/"]
+      "const": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dpp/"],
+      "default": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dpp/"]
     },
     "id": {
       "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
@@ -80,7 +80,7 @@
           "items": {
             "$ref": "#/$defs/Entity"
           },
-          "description": "An optional list of other registered identifiers for this credential issuer "
+          "description": "An optional list of other registered identifiers for this credential issuer"
         }
       },
       "description": "The issuer party ()person or orgnaition) of a verifiable credential.",
@@ -262,7 +262,7 @@
           "description": "An array of secure links to TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch. SHOULD be provided for any product passport issued at batch or item level. Links should include the hash of the target and may point to encrypted targets."
         }
       },
-      "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details.  ",
+      "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details. ",
       "required": ["id", "name"]
     },
     "Link": {
@@ -723,8 +723,8 @@
         },
         "operationalScope": {
           "type": "string",
-          "enum": ["None", "CradleToGate", "CradleToGrave"],
-          "example": "None",
+          "enum": ["Scope12", "Scope123toGate", "Scope123toGrave"],
+          "example": "Scope12",
           "description": "The operational scope of the emissions performance. Only scope 1 & 2, or inlcuing upstream scope 3 (cradle to gate) or upstream and downstream scope 3 (cradle to grave)."
         },
         "primarySourcedRatio": {

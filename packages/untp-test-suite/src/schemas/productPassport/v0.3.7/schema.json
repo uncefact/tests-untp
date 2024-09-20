@@ -17,12 +17,12 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/{{version}}/"]
+        "enum": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dpp/"]
       },
       "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
       "readOnly": true,
-      "const": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/{{version}}/"],
-      "default": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/{{version}}/"]
+      "const": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dpp/"],
+      "default": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dpp/"]
     },
     "id": {
       "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
@@ -723,8 +723,8 @@
         },
         "operationalScope": {
           "type": "string",
-          "enum": ["None", "CradleToGate", "CradleToGrave"],
-          "example": "None",
+          "enum": ["Scope12", "Scope123toGate", "Scope123toGrave"],
+          "example": "Scope12",
           "description": "The operational scope of the emissions performance. Only scope 1 & 2, or inlcuing upstream scope 3 (cradle to gate) or upstream and downstream scope 3 (cradle to grave)."
         },
         "primarySourcedRatio": {

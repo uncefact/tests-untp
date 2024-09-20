@@ -151,14 +151,9 @@
             "$ref": "#/$defs/SensorData"
           },
           "description": "A list of sensor readings from the given sensor relevant to the traceability event context."
-        },
-        "sensorIntegrityProof": {
-          "type": "string",
-          "format": "uri",
-          "description": "An optional reference to a verifiable credential signed by the sensor device or device manufacturer that contains the digitally signed raw data associated with this sensor report."
         }
       },
-      "description": "A SensorElement is used to carry data related to an event that is captured one sensor such as an IoT device. Include one sensor property and an array of sensor data values."
+      "description": "A SensorElement carries data related to an event that is captured by one sensor (e.g., an IoT device)."
     },
     "Sensor": {
       "type": "object",
@@ -166,12 +161,12 @@
       "properties": {
         "device": {
           "$ref": "#/$defs/Item",
-          "description": "The device Identifier for the sensor as a URI (typically an EPC)"
+          "description": "The device Identifier for the sensor as a URI (typically an EPC)."
         },
         "dataProcessingMethod": {
           "type": "string",
           "format": "uri",
-          "description": "The data processing method used by the sensor - should reference a documented standard criteria as a URI"
+          "description": "The data processing method used by the sensor, referencing a documented standard as a URI."
         }
       },
       "description": "A physical sensor that records a sensor data set."
@@ -191,27 +186,17 @@
           }
         },
         "id": {
-          "example": "https://id.gs1.org/01/09520123456788/21/12345",
           "type": "string",
           "format": "uri",
-          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+          "example": "https://id.gs1.org/01/09520123456788/21/12345",
+          "description": "The globally unique ID of the entity as a resolvable URL."
         },
         "name": {
+          "type": "string",
           "example": "EV battery 300Ah.",
-          "type": "string",
-          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
-        },
-        "registeredId": {
-          "example": "90664869327",
-          "type": "string",
-          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
-        },
-        "idScheme": {
-          "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+          "description": "The registered name of the entity within the identifier scheme."
         }
       },
-      "description": "A specific serilaised trade item which is a type of a more generic product. Typically an SGTIN",
       "required": ["id", "name"]
     },
     "SensorData": {
@@ -245,20 +230,19 @@
       "additionalProperties": false,
       "properties": {
         "product": {
-          "$ref": "#/$defs/Entity",
-          "description": "THe identifier of a product class (as opposed to a product instance) such as a GTIN code for a manufactured product."
+          "$ref": "#/$defs/Item",
+          "description": "The identifier of a product class, such as a GTIN code."
         },
         "quantity": {
           "type": "number",
-          "description": "The numeric quantity of the product class (eg 100 kg of cotton)"
+          "description": "The numeric quantity of the product class (e.g., 100 kg of cotton)."
         },
         "uom": {
           "type": "string",
           "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
-          "description": "The unit of measure for the quantity value (eg Kg or meters etc) using the UNECE Rec 20 unit of measure codelist.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+          "description": "The unit of measure for the quantity value, such as kg or meters."
         }
       },
-      "description": "The quantity element is used to define the quantities (eg 100), units of measure (eg Kg) and product class (eg GTIN or other class identifier) of products that are inputs or outputs or the subject of supply chain events.  ",
       "required": ["quantity"]
     },
     "TradeDocument": {

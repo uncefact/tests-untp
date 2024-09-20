@@ -17,12 +17,12 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/{{version}}/"]
+        "enum": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dcc/"]
       },
       "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
       "readOnly": true,
-      "const": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/{{version}}/"],
-      "default": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/{{version}}/"]
+      "const": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dcc/"],
+      "default": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dcc/"]
     },
     "id": {
       "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
@@ -80,7 +80,7 @@
           "items": {
             "$ref": "#/$defs/Entity"
           },
-          "description": "An optional list of other registered identifiers for this credential issuer "
+          "description": "An optional list of other registered identifiers for this credential issuer"
         }
       },
       "description": "The issuer party ()person or orgnaition) of a verifiable credential.",
@@ -175,7 +175,7 @@
         },
         "assessmentLevel": {
           "type": "string",
-          "enum": ["GovtApproval", "GlobalMRA", "Accredited", "Verified", "Validated", "Unspecified"],
+          "enum": ["GovtApproval", "GlobalMLA", "Accredited", "Verified", "Validated", "Unspecified"],
           "example": "GovtApproval",
           "description": "Assurance pertaining to assessment (any authority or support for the assessment process)"
         },
@@ -219,7 +219,7 @@
         },
         "scope": {
           "$ref": "#/$defs/ConformityAssessmentScheme",
-          "description": "A list of relevant standards and/or regulations against which apply to this attestation (eg AS1163:2016). "
+          "description": "A list of relevant standards and/or regulations against which apply to this attestation (eg AS1163:2016)."
         },
         "assessments": {
           "type": "array",

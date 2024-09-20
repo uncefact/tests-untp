@@ -17,15 +17,15 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/{{version}}/"]
+        "enum": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dcc/"]
       },
       "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
       "readOnly": true,
-      "const": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/{{version}}/"],
-      "default": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/{{version}}/"]
+      "const": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dcc/"],
+      "default": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dcc/"]
     },
     "id": {
-      "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
+      "example": "acme.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
       "type": "string",
       "format": "uri",
       "description": "A unique identifier (URI) assigned to the product passport. May be a UUID"
@@ -35,13 +35,13 @@
       "description": "The organisation that is the isuer of this VC. Note that the \"id\" property MUST be a W3C DID.  Other identifiers such as tax registration numbers can be listed in the \"otherIdentifiers\" property."
     },
     "validFrom": {
-      "example": "2024-03-15",
+      "example": "2024.03.15",
       "type": "string",
       "format": "date-time",
       "description": "The date and time from which the credential is valid."
     },
     "validUntil": {
-      "example": "2034-03-15",
+      "example": "2034.03.15",
       "type": "string",
       "format": "date-time",
       "description": "The expiry date (if applicable) of this verifiable credential."
@@ -65,13 +65,13 @@
           "enum": ["CredentialIssuer"]
         },
         "id": {
-          "example": "did:web:identifiers.example-company.com:12345",
+          "example": "did:web:identifiers.acme.com:12345",
           "type": "string",
           "format": "uri",
           "description": "The W3C DID of the issuer - should be a did:web or did:tdw"
         },
         "name": {
-          "example": "Example Company Pty Ltd",
+          "example": "Acme Pty Ltd",
           "type": "string",
           "description": "The name of the issuer person or organisation"
         },
@@ -80,7 +80,7 @@
           "items": {
             "$ref": "#/$defs/Entity"
           },
-          "description": "An optional list of other registered identifiers for this credential issuer "
+          "description": "An optional list of other registered identifiers for this credential issuer"
         }
       },
       "description": "The issuer party ()person or orgnaition) of a verifiable credential.",
@@ -96,51 +96,35 @@
           "enum": ["Entity"]
         },
         "id": {
-          "example": "https://id.gs1.org/01/09520123456788/21/12345",
+          "example": "id.gs1.org/01/09520123456788/21/12345",
           "type": "string",
           "format": "uri",
-          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+          "description": "The globally unique ID of the entity. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.acme.com:123. "
         },
         "name": {
-          "example": "EV battery 300Ah.",
+          "example": "Baked beans, tinned, 500g.",
           "type": "string",
-          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
+          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - baked beans, tinned, 500g. party - Pyx Industries Pty Ltd. facility - Greenacres canning factory"
         },
-        "registeredId": {
-          "example": "90664869327",
+        "idValue": {
+          "example": "09520123.456788",
           "type": "string",
-          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+          "description": "The value of the identifier within the scheme. Examplesproduct - 09520123.456788party - 90664869327. facility - 123. "
         },
         "idScheme": {
-          "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
-        }
-      },
-      "description": "The ID and Name of an identified entity such qs a product, facility, party, standard, etc.  If the identifier is a W3C DID then the corresponding DID document SHOULD include a serviceEndpoint of type \"IdentityResolver\". If the identifier is not a W3C DID then the id peroperty SHOULD be an identity resolver URL.",
-      "required": ["id", "name"]
-    },
-    "IdentifierScheme": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "string",
-          "default": "IdentifierScheme",
-          "enum": ["IdentifierScheme"]
-        },
-        "id": {
-          "example": "https://id.gs1.org/01/",
+          "example": "id.gs1.org/01.",
           "type": "string",
           "format": "uri",
-          "description": "The globally unique identifier of the registration scheme. The scheme should be registered and discoverable from vocabulary.uncefact.org/identifierSchemes"
+          "description": "The identifier scheme ID.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
         },
-        "name": {
-          "example": "Global Trade Identification Number (GTIN)",
+        "idSchemeName": {
+          "example": "GS1 SGTIN",
           "type": "string",
-          "description": "The name of the identifier scheme. "
+          "description": "The name of the identifier scheme - examples product - GS1 SGTIN. party - ABN. facility - ACME  "
         }
       },
-      "description": "An identifier registration scheme for products, facilities, or organisations. Typically operated by a state, national or gloabl authority."
+      "description": "The ID and Name of an identified entity such qs a product, facility, party, standard, etc",
+      "required": ["id", "name"]
     },
     "ConformityAttestation": {
       "type": "object",
@@ -157,15 +141,15 @@
           }
         },
         "id": {
-          "example": "https://exampleCAB.com/38f73303-a39e-45a7-b8b7-e73517548f27",
+          "example": "certifiers.com/attestations/12345",
           "type": "string",
           "format": "uri",
           "description": "The globally unique ID of this conformity attestation."
         },
         "name": {
-          "example": "Carbon Lifecycle assessment 12345567",
+          "example": "ACRS conformity attestation 12345567",
           "type": "string",
-          "description": "Product GHG Footprint certificate in accordance with GBA Rulebook."
+          "description": "A name of this confomrity attestation"
         },
         "assessorLevel": {
           "type": "string",
@@ -175,7 +159,7 @@
         },
         "assessmentLevel": {
           "type": "string",
-          "enum": ["GovtApproval", "GlobalMRA", "Accredited", "Verified", "Validated", "Unspecified"],
+          "enum": ["GovtApproval", "GlobalMLA", "Accredited", "Verified", "Validated", "Unspecified"],
           "example": "GovtApproval",
           "description": "Assurance pertaining to assessment (any authority or support for the assessment process)"
         },
@@ -194,20 +178,20 @@
           "description": "The type of criterion (optional or mandatory)."
         },
         "attestationDescription": {
-          "example": "Assessment of battery products against the GHG Protocol.",
+          "example": "Conformance of ACME structural steel products.",
           "type": "string",
-          "description": "SampleCAB Inc attests that the product class LiFePO4 EV batteries manufactured at Sample battery facility have reported GHG foorptint that conform to the GBA rulebook version 1.5. "
+          "description": "A textual description of the scope or purpose of this confomrity attestation"
         },
         "issuedToParty": {
           "$ref": "#/$defs/Entity",
           "description": "The party to whom the conformity attestation was issued."
         },
-        "authorisations": {
+        "authorisation": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/Endorsement"
           },
-          "description": "The authority under which a conformity claim is issued.  For example a national accrediation authority may accredit a test lab to issue test certificates about a product against a standard. "
+          "description": "The accreditation from a competent authority (ag NATA) that confirms the issuers authorised scope of assessments. "
         },
         "conformityCertificate": {
           "$ref": "#/$defs/SecureLink",
@@ -219,7 +203,7 @@
         },
         "scope": {
           "$ref": "#/$defs/ConformityAssessmentScheme",
-          "description": "A list of relevant standards and/or regulations against which apply to this attestation (eg AS1163:2016). "
+          "description": "A list of relevant standards and/or regulations against which apply to this attestation (eg AS1163:2016)."
         },
         "assessments": {
           "type": "array",
@@ -242,13 +226,13 @@
           "enum": ["Endorsement"]
         },
         "id": {
-          "example": "https://authority.gov/schemeABC/123456789",
+          "example": "authority.gov/schemeABC/123456789",
           "type": "string",
           "format": "uri",
           "description": "Globally unique identifier of an accreditation or authority issued to a confomrity assessment body by a regulator or national accreditation authority."
         },
         "name": {
-          "example": "Accreditation of certifiers.com under the Australian National Greenhouse and Energy Reporting scheme (NGER).",
+          "example": "Accreditation of certifiers.com under the national structural steel conofmrity framework.",
           "type": "string",
           "description": "The name of the accreditation."
         },
@@ -261,7 +245,9 @@
           "description": "The competent authority that issued the accreditation."
         },
         "accreditationCertificate": {
-          "$ref": "#/$defs/Link",
+          "example": "authority.gov/files/daf9d952-0e8b-4ec0-905f-474a5ea50400",
+          "type": "string",
+          "format": "uri",
           "description": "The evidence that supports the authroty under which the attestation is issued - eg an accreditation certificate."
         }
       },
@@ -273,7 +259,7 @@
       "additionalProperties": false,
       "properties": {
         "fileName": {
-          "example": "GHG protocol trust mark",
+          "example": "tensile test certificate",
           "type": "string",
           "description": "A name for referenced binary file"
         },
@@ -283,36 +269,12 @@
           "description": "The type of file, represented as a MIME type.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://mimetype.io/all-types\n    "
         },
         "file": {
-          "example": "iVBORw0KGgoAAAANSUhEUgAAADkAAAA2CAYAAAB9TjFQAAAABGdBTUEAAi/9H3pWy6vI9uFdAAAAAElFTkSuQmCC",
           "type": "string",
           "format": "byte",
           "description": "The binary file data encoded as Base64 string."
         }
       },
       "description": "A binary file reference including name and filetype"
-    },
-    "Link": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "linkURL": {
-          "example": "https://files.example-certifier.com/1234567.json",
-          "type": "string",
-          "format": "uri",
-          "description": "The URL of the target resource. "
-        },
-        "linkName": {
-          "example": "GBA rule book conformity certificate",
-          "type": "string",
-          "description": "A display name for the target resource "
-        },
-        "linkType": {
-          "example": "https://test.uncefact.org/vocabulary/linkTypes/dcc",
-          "type": "string",
-          "description": "The type of the target resource - drawn from a controlled vocabulary "
-        }
-      },
-      "description": "A structure to provide a URL link plus metadata associated with the link."
     },
     "SecureLink": {
       "type": "object",
@@ -329,25 +291,30 @@
           }
         },
         "linkURL": {
-          "example": "https://files.example-certifier.com/1234567.json",
+          "example": "files.certifier.com/1234567.json",
           "type": "string",
           "format": "uri",
           "description": "The URL of the target resource. "
         },
         "linkName": {
-          "example": "GBA rule book conformity certificate",
+          "example": "Deforestation Certificate",
           "type": "string",
           "description": "A display name for the target resource "
         },
         "linkType": {
-          "example": "https://test.uncefact.org/vocabulary/linkTypes/dcc",
+          "example": "untp.dcc",
           "type": "string",
           "description": "The type of the target resource - drawn from a controlled vocabulary "
         },
-        "hashDigest": {
+        "targetType": {
+          "type": "string",
+          "x-external-enumeration": "https://mimetype.io/all-types",
+          "description": "The MIME type of the target ressource.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://mimetype.io/all-types\n    "
+        },
+        "targetHash": {
           "example": "6239119dda5bd4c8a6ffb832fe16feaa5c27b7dba154d24c53d4470a2c69adc2",
           "type": "string",
-          "description": "The hash of the file."
+          "description": "The hash of the file "
         },
         "hashMethod": {
           "type": "string",
@@ -379,13 +346,13 @@
           }
         },
         "id": {
-          "example": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf",
+          "example": "www.iso.org/standard/60857.html",
           "type": "string",
           "format": "uri",
           "description": "A unique identifier for the standard (eg https://www.iso.org/standard/60857.html)."
         },
         "name": {
-          "example": "GBA Battery Passport Greenhouse Gas Rulebook - V.2.0",
+          "example": "ISO 14001:2015 Environmental management systems",
           "type": "string",
           "description": "The name of the standard"
         },
@@ -394,7 +361,7 @@
           "description": "The party that issued the standard "
         },
         "issueDate": {
-          "example": "2023-12-05",
+          "example": "2015-09-01",
           "type": "string",
           "format": "date",
           "description": "The date when the standard was issued."
@@ -404,7 +371,7 @@
           "description": "The trust mark that represents the conformity assessment scheme."
         }
       },
-      "description": "A formal governance scheme under which this attestation is issued (eg ACRS structural steel certification) ",
+      "description": "A formal governance scheme under which this attestation is issued (eg ACRS structural steel certification)",
       "required": ["issuingParty"]
     },
     "ConformityAssessment": {
@@ -422,7 +389,7 @@
           }
         },
         "id": {
-          "example": "https://exampleCAB.com/38f73303-a39e-45a7-b8b7-e73517548f27/01",
+          "example": "products.acme.com/09520123456788/declarations/12345",
           "type": "string",
           "format": "uri",
           "description": "A unique identifier for the delcaration. Often this will be an extension of the product.id or attestation.id. But could be a UUID."
@@ -435,10 +402,10 @@
           "$ref": "#/$defs/Regulation",
           "description": "The reference to the regulation that defines the assessment criteria"
         },
-        "assessmentCriteria": {
+        "assessmentCriterion": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/Criterion"
+            "$ref": "#/$defs/Criteria"
           },
           "description": "The specification against which the assessment is made."
         },
@@ -492,7 +459,7 @@
         }
       },
       "description": "A specific assessment about the product or facility against a specific specification.  Eg the carbon intensity of a given product or batch.",
-      "required": ["id", "compliance", "conformityTopic"]
+      "required": ["id", "conformityTopic"]
     },
     "Standard": {
       "type": "object",
@@ -504,13 +471,13 @@
           "enum": ["Standard"]
         },
         "id": {
-          "example": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf",
+          "example": "www.iso.org/standard/60857.html",
           "type": "string",
           "format": "uri",
           "description": "A unique identifier for the standard (eg https://www.iso.org/standard/60857.html)."
         },
         "name": {
-          "example": "GBA Battery Passport Greenhouse Gas Rulebook - V.2.0",
+          "example": "ISO 14001:2015 Environmental management systems",
           "type": "string",
           "description": "The name of the standard"
         },
@@ -519,7 +486,7 @@
           "description": "The party that issued the standard "
         },
         "issueDate": {
-          "example": "2023-12-05",
+          "example": "2015-09-01",
           "type": "string",
           "format": "date",
           "description": "The date when the standard was issued."
@@ -558,7 +525,7 @@
           "description": "the issuing body of the regulation. For example Australin Goernment Department of Climate Change, Energy, the Environment and Water"
         },
         "effectiveDate": {
-          "example": "2024-03-20",
+          "example": "2024.03.20",
           "type": "string",
           "format": "date",
           "description": "the date at which the regulation came into effect."
@@ -567,23 +534,23 @@
       "description": "A regulation (eg EU deforestation regulation) that defines the criteria for assessment.",
       "required": ["administeredBy"]
     },
-    "Criterion": {
+    "Criteria": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "type": {
           "type": "string",
-          "default": "Criterion",
-          "enum": ["Criterion"]
+          "default": "Criteria",
+          "enum": ["Criteria"]
         },
         "id": {
-          "example": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf#BatteryAssembly",
+          "example": "https://www.legislation.gov.au/F2008L02309/2023-09-21/2023-09-21/text/1/epub/OEBPS/document_1/document_1.html#_Toc147580632",
           "type": "string",
           "format": "uri",
           "description": "A unique identifier for the criteria within the standard  or regulation. For example CO2 emissions calaculations for liquid fule combusion."
         },
         "name": {
-          "example": "GBA Battery rule book v2.0 battery assembly guidelines.",
+          "example": "Division 2.4.2—Method 1—emissions of carbon dioxide, methane and nitrous oxide from liquid fuels other than petroleum based oils or greases",
           "type": "string",
           "description": "A name that describes this criteria."
         },
@@ -603,7 +570,7 @@
       "additionalProperties": false,
       "properties": {
         "metricName": {
-          "example": "GHG emissions intensity",
+          "example": "tensile strength",
           "type": "string",
           "description": "A human readable name for this metric (for example \"Tensile strength\")"
         },
@@ -653,26 +620,33 @@
           }
         },
         "id": {
-          "example": "https://id.gs1.org/01/09520123456788/21/12345",
+          "example": "id.gs1.org/01/09520123456788/21/12345",
           "type": "string",
           "format": "uri",
-          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+          "description": "The globally unique ID of the entity. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.acme.com:123. "
         },
         "name": {
-          "example": "EV battery 300Ah.",
+          "example": "Baked beans, tinned, 500g.",
           "type": "string",
-          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
+          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - baked beans, tinned, 500g. party - Pyx Industries Pty Ltd. facility - Greenacres canning factory"
         },
-        "registeredId": {
-          "example": "90664869327",
+        "idValue": {
+          "example": "09520123.456788",
           "type": "string",
-          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+          "description": "The value of the identifier within the scheme. Examplesproduct - 09520123.456788party - 90664869327. facility - 123. "
         },
         "idScheme": {
-          "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+          "example": "id.gs1.org/01.",
+          "type": "string",
+          "format": "uri",
+          "description": "The identifier scheme ID.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
         },
-        "IDverifiedByCAB": {
+        "idSchemeName": {
+          "example": "GS1 SGTIN",
+          "type": "string",
+          "description": "The name of the identifier scheme - examples product - GS1 SGTIN. party - ABN. facility - ACME  "
+        },
+        "verfifiedByCAB": {
           "example": "true",
           "type": "boolean",
           "description": "Indicates whether the conformity assessment body has verified the identity product that is the subject of the assessment."
@@ -696,26 +670,33 @@
           }
         },
         "id": {
-          "example": "https://id.gs1.org/01/09520123456788/21/12345",
+          "example": "id.gs1.org/01/09520123456788/21/12345",
           "type": "string",
           "format": "uri",
-          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+          "description": "The globally unique ID of the entity. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.acme.com:123. "
         },
         "name": {
-          "example": "EV battery 300Ah.",
+          "example": "Baked beans, tinned, 500g.",
           "type": "string",
-          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
+          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - baked beans, tinned, 500g. party - Pyx Industries Pty Ltd. facility - Greenacres canning factory"
         },
-        "registeredId": {
-          "example": "90664869327",
+        "idValue": {
+          "example": "09520123.456788",
           "type": "string",
-          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+          "description": "The value of the identifier within the scheme. Examplesproduct - 09520123.456788party - 90664869327. facility - 123. "
         },
         "idScheme": {
-          "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+          "example": "id.gs1.org/01.",
+          "type": "string",
+          "format": "uri",
+          "description": "The identifier scheme ID.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
         },
-        "IDverifiedByCAB": {
+        "idSchemeName": {
+          "example": "GS1 SGTIN",
+          "type": "string",
+          "description": "The name of the identifier scheme - examples product - GS1 SGTIN. party - ABN. facility - ACME  "
+        },
+        "verfifiedByCAB": {
           "example": "true",
           "type": "boolean",
           "description": "Indicates whether the conformity assessment body has verified the identity of the facility which is the subject of the assement."

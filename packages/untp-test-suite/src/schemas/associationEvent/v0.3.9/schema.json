@@ -5,11 +5,11 @@
     "type": {
       "type": "array",
       "readOnly": true,
-      "const": ["TransactionEvent", "Event"],
-      "default": ["TransactionEvent", "Event"],
+      "const": ["AssociationEvent", "Event"],
+      "default": ["AssociationEvent", "Event"],
       "items": {
         "type": "string",
-        "enum": ["TransactionEvent", "Event"]
+        "enum": ["AssociationEvent", "Event"]
       }
     },
     "id": {
@@ -51,35 +51,27 @@
       },
       "description": "An array (one for each sensor) of sensor device data sets associated with the event. "
     },
-    "sourceParty": {
-      "$ref": "#/$defs/Entity",
-      "description": "The source party for this supply chain transaction - typically the seller party"
+    "parentEPC": {
+      "$ref": "#/$defs/Item",
+      "description": "The unique item identifier that is the parent of this association. Typically an assembled product ID such as a desktop computer that is built from the associated child components."
     },
-    "destinationParty": {
-      "$ref": "#/$defs/Entity",
-      "description": "The destination party for this supply chain transaction - typically the buyer party."
-    },
-    "epcList": {
+    "childEPCs": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/Item"
       },
-      "description": "The list of uniquely identified trade items included in this supply chain transaction."
+      "description": "The list of child items that have been assembled to create the parent - for example the power supply or hard drive components of a desktop computer."
     },
-    "quantityList": {
+    "childQuantityList": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/QuantityElement"
       },
-      "description": "List of quantified product classes that are included in this transaction.  Used when the trade items do not have unique identifiers (eg 100 reels of yarn)"
-    },
-    "referenceDocument": {
-      "$ref": "#/$defs/TradeDocument",
-      "description": "The supply chain document reference for this transaction event - eg the invoice, order, or dispatch advice"
+      "description": "List of quantified product classes that have been assembled into the parent.  Used when the child items do not have unique identifiers (eg brackets and screws used in the assembly of a desktop computer)"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Transaction represents an event in which one or more objects become associated or disassociated with one or more identified business transactions - such as the purchase / shipment of goods between buyer and seller.",
+  "description": "The association event represents the assembly of child sub-components to create a parent assembled item. For example a desktop computer assembled from power supply, hard drive, and motherboard.  The association event is very similar in structure to the aggregation event but is used for physical assembly. An association event may represent a bill of materials used to assemble a  product whilst an aggregation event may represent a packing list or items for transport. ",
   "$defs": {
     "Entity": {
       "type": "object",
@@ -260,27 +252,6 @@
       },
       "description": "The quantity element is used to define the quantities (eg 100), units of measure (eg Kg) and product class (eg GTIN or other class identifier) of products that are inputs or outputs or the subject of supply chain events.  ",
       "required": ["quantity"]
-    },
-    "TradeDocument": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "documentType": {
-          "type": "string",
-          "x-external-enumeration": "https://ref.gs1.org/cbv/BTT",
-          "description": "The document type representing the trade transaction drawn from the business transaction type vocabulary.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BTT\n    "
-        },
-        "identifier": {
-          "type": "string",
-          "description": "The identifier of the trade transaction document - eg an invoice number or bill of lading number.  Must be unique for a given source party"
-        },
-        "documentURL": {
-          "type": "string",
-          "format": "uri",
-          "description": "The URL of the referenced trade document. For integrity reasons, it is recommended (but not required) that the documentURL is a hashlink (https://w3c-ccg.github.io/hashlink/) so that if the document the URL is changed then the hash verification will fail."
-        }
-      },
-      "description": "A trade transaction between two parties such as an invoice, purchase order, or shipping notification."
     }
   }
 }

@@ -14,11 +14,13 @@
     },
     "id": {
       "readOnly": true,
+      "example": "https://events.sample.com/b681df10-c682-454a-b11b-d0b9374c01bd",
       "type": "string",
       "format": "uri",
       "description": "The unique identifier of this event - SHOULD be a UUID"
     },
     "eventTime": {
+      "example": "2024-09-01T12:00:00",
       "type": "string",
       "format": "date-time",
       "description": "The ISO-8601 date time when the event occurred."
@@ -37,9 +39,10 @@
     "bizStep": {
       "type": "string",
       "x-external-enumeration": "https://ref.gs1.org/cbv/BizStep",
-      "description": "A business step code drawn from a controlled vocabulary. \n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BizStep\n    "
+      "description": "A business step code drawn from a controlled vocabulary.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BizStep\n    "
     },
     "bizLocation": {
+      "example": "https://id.gs1.org/414/9520123456788",
       "type": "string",
       "format": "uri",
       "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an EPCIS event until it is reported to be at a different Business Location by a subsequent EPCIS event. The bizLocation must be a resolvable URI that links to facility information and geolocation data."
@@ -59,6 +62,11 @@
       "$ref": "#/$defs/Entity",
       "description": "The destination party for this supply chain transaction - typically the buyer party."
     },
+    "bizTransaction": {
+      "type": "string",
+      "x-external-enumeration": "https://ref.gs1.org/cbv/BTT",
+      "description": "The document type representing the trade transaction drawn from the business transaction type vocabulary.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BTT\n    "
+    },
     "epcList": {
       "type": "array",
       "items": {
@@ -72,23 +80,94 @@
         "$ref": "#/$defs/QuantityElement"
       },
       "description": "List of quantified product classes that are included in this transaction.  Used when the trade items do not have unique identifiers (eg 100 reels of yarn)"
-    },
-    "referenceDocument": {
-      "$ref": "#/$defs/TradeDocument",
-      "description": "The supply chain document reference for this transaction event - eg the invoice, order, or dispatch advice"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Transaction represents an event in which one or more objects become associated or disassociated with one or more identified business transactions - such as the purchase / shipment of goods between buyer and seller.",
   "$defs": {
+    "Item": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Item", "Entity"],
+          "default": ["Item", "Entity"],
+          "items": {
+            "type": "string",
+            "enum": ["Item", "Entity"]
+          }
+        },
+        "id": {
+          "example": "https://id.gs1.org/01/09520123456788/21/12345",
+          "type": "string",
+          "format": "uri",
+          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+        },
+        "name": {
+          "example": "EV battery 300Ah.",
+          "type": "string",
+          "description": "The name of the product class to which the product item belongs.  "
+        },
+        "registeredId": {
+          "example": "90664869327",
+          "type": "string",
+          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+        },
+        "idScheme": {
+          "$ref": "#/$defs/IdentifierScheme",
+          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+        }
+      },
+      "description": "A specific serilaised trade item which is a type of a more generic product. Typically an SGTIN",
+      "required": ["id", "name"]
+    },
+    "QuantityElement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["QuantityElement"],
+          "default": ["QuantityElement"],
+          "items": {
+            "type": "string",
+            "enum": ["QuantityElement"]
+          }
+        },
+        "product": {
+          "$ref": "#/$defs/Entity",
+          "description": "THe identifier of a product class (as opposed to a product instance) such as a GTIN code for a manufactured product."
+        },
+        "quantity": {
+          "example": 20,
+          "type": "number",
+          "description": "The numeric quantity of the product class (eg 100 kg of cotton)"
+        },
+        "uom": {
+          "type": "string",
+          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
+          "description": "The unit of measure for the quantity value (eg Kg or meters etc) using the UNECE Rec 20 unit of measure codelist.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+        }
+      },
+      "description": "The quantity element is used to define the quantities (eg 100), units of measure (eg Kg) and product class (eg GTIN or other class identifier) of products that are inputs or outputs or the subject of supply chain events.  ",
+      "required": ["product", "quantity"]
+    },
     "Entity": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "type": {
-          "type": "string",
-          "default": "Entity",
-          "enum": ["Entity"]
+          "type": "array",
+          "readOnly": true,
+          "const": ["Entity"],
+          "default": ["Entity"],
+          "items": {
+            "type": "string",
+            "enum": ["Entity"]
+          }
         },
         "id": {
           "example": "https://id.gs1.org/01/09520123456788/21/12345",
@@ -119,9 +198,14 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "type": "string",
-          "default": "IdentifierScheme",
-          "enum": ["IdentifierScheme"]
+          "type": "array",
+          "readOnly": true,
+          "const": ["IdentifierScheme"],
+          "default": ["IdentifierScheme"],
+          "items": {
+            "type": "string",
+            "enum": ["IdentifierScheme"]
+          }
         },
         "id": {
           "example": "https://id.gs1.org/01/",
@@ -141,6 +225,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["SensorElement"],
+          "default": ["SensorElement"],
+          "items": {
+            "type": "string",
+            "enum": ["SensorElement"]
+          }
+        },
         "sensorMetadata": {
           "$ref": "#/$defs/Sensor",
           "description": "Data that describes the physical sensor that recorded the sensor data set."
@@ -164,11 +258,22 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Sensor"],
+          "default": ["Sensor"],
+          "items": {
+            "type": "string",
+            "enum": ["Sensor"]
+          }
+        },
         "device": {
           "$ref": "#/$defs/Item",
           "description": "The device Identifier for the sensor as a URI (typically an EPC)"
         },
         "dataProcessingMethod": {
+          "example": "https://standards.org/sensorMethod#1234",
           "type": "string",
           "format": "uri",
           "description": "The data processing method used by the sensor - should reference a documented standard criteria as a URI"
@@ -176,111 +281,44 @@
       },
       "description": "A physical sensor that records a sensor data set."
     },
-    "Item": {
+    "SensorData": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": ["Item", "Entity"],
-          "default": ["Item", "Entity"],
+          "const": ["SensorData"],
+          "default": ["SensorData"],
           "items": {
             "type": "string",
-            "enum": ["Item", "Entity"]
+            "enum": ["SensorData"]
           }
         },
-        "id": {
-          "example": "https://id.gs1.org/01/09520123456788/21/12345",
-          "type": "string",
-          "format": "uri",
-          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
-        },
-        "name": {
-          "example": "EV battery 300Ah.",
-          "type": "string",
-          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
-        },
-        "registeredId": {
-          "example": "90664869327",
-          "type": "string",
-          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
-        },
-        "idScheme": {
-          "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
-        }
-      },
-      "description": "A specific serilaised trade item which is a type of a more generic product. Typically an SGTIN",
-      "required": ["id", "name"]
-    },
-    "SensorData": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
         "time": {
+          "example": "2024-07-24T12:00:00",
           "type": "string",
           "format": "date-time",
           "description": "the timestamp at which the sensor reading was made."
         },
         "sensorType": {
+          "example": "https://samplesensors.com/model1234",
           "type": "string",
           "format": "uri",
           "description": "the measurement type of the sensor reading, as a URI reference to a measurement method specification."
         },
         "value": {
+          "example": 25,
           "type": "number",
           "description": "the sensor reading"
         },
         "uom": {
           "type": "string",
           "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
-          "description": "the unit of measure for the sensor reading\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+          "description": "the unit of measure for the sensor reading, drawn from UNECE rec20 code list.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
         }
       },
       "description": "A data point read by a sensor."
-    },
-    "QuantityElement": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "product": {
-          "$ref": "#/$defs/Entity",
-          "description": "THe identifier of a product class (as opposed to a product instance) such as a GTIN code for a manufactured product."
-        },
-        "quantity": {
-          "type": "number",
-          "description": "The numeric quantity of the product class (eg 100 kg of cotton)"
-        },
-        "uom": {
-          "type": "string",
-          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
-          "description": "The unit of measure for the quantity value (eg Kg or meters etc) using the UNECE Rec 20 unit of measure codelist.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
-        }
-      },
-      "description": "The quantity element is used to define the quantities (eg 100), units of measure (eg Kg) and product class (eg GTIN or other class identifier) of products that are inputs or outputs or the subject of supply chain events.  ",
-      "required": ["quantity"]
-    },
-    "TradeDocument": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "documentType": {
-          "type": "string",
-          "x-external-enumeration": "https://ref.gs1.org/cbv/BTT",
-          "description": "The document type representing the trade transaction drawn from the business transaction type vocabulary.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BTT\n    "
-        },
-        "identifier": {
-          "type": "string",
-          "description": "The identifier of the trade transaction document - eg an invoice number or bill of lading number.  Must be unique for a given source party"
-        },
-        "documentURL": {
-          "type": "string",
-          "format": "uri",
-          "description": "The URL of the referenced trade document. For integrity reasons, it is recommended (but not required) that the documentURL is a hashlink (https://w3c-ccg.github.io/hashlink/) so that if the document the URL is changed then the hash verification will fail."
-        }
-      },
-      "description": "A trade transaction between two parties such as an invoice, purchase order, or shipping notification."
     }
   }
 }

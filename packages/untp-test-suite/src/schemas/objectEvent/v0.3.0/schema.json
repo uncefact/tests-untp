@@ -5,23 +5,23 @@
     "type": {
       "type": "array",
       "readOnly": true,
-      "const": ["TransactionEvent", "Event"],
-      "default": ["TransactionEvent", "Event"],
+      "const": ["ObjectEvent", "Event"],
+      "default": ["ObjectEvent", "Event"],
       "items": {
         "type": "string",
-        "enum": ["TransactionEvent", "Event"]
+        "enum": ["ObjectEvent", "Event"]
       }
     },
     "id": {
-      "readOnly": true,
       "type": "string",
       "format": "uri",
-      "description": "The unique identifier of this event - SHOULD be a UUID"
+      "readOnly": true,
+      "description": "The unique identifier of this event - SHOULD be a UUID."
     },
     "eventTime": {
       "type": "string",
       "format": "date-time",
-      "description": "The ISO-8601 date time when the event occurred."
+      "description": "The ISO-8601 date-time when the event occurred."
     },
     "action": {
       "type": "string",
@@ -32,54 +32,42 @@
     "disposition": {
       "type": "string",
       "x-external-enumeration": "https://ref.gs1.org/cbv/Disp",
-      "description": "Disposition code describing the state of the item after the event. \n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/Disp\n    "
+      "description": "Disposition code describing the state of the item after the event. Check the external GS1 enumeration for possible values."
     },
     "bizStep": {
       "type": "string",
       "x-external-enumeration": "https://ref.gs1.org/cbv/BizStep",
-      "description": "A business step code drawn from a controlled vocabulary. \n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BizStep\n    "
+      "description": "A business step code drawn from a controlled vocabulary provided by GS1."
     },
     "bizLocation": {
       "type": "string",
       "format": "uri",
-      "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an EPCIS event until it is reported to be at a different Business Location by a subsequent EPCIS event. The bizLocation must be a resolvable URI that links to facility information and geolocation data."
+      "description": "A Business Location is a uniquely identified geospatial location. This URI should point to facility information and geolocation data."
     },
     "sensorElementList": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/SensorElement"
       },
-      "description": "An array (one for each sensor) of sensor device data sets associated with the event. "
-    },
-    "sourceParty": {
-      "$ref": "#/$defs/Entity",
-      "description": "The source party for this supply chain transaction - typically the seller party"
-    },
-    "destinationParty": {
-      "$ref": "#/$defs/Entity",
-      "description": "The destination party for this supply chain transaction - typically the buyer party."
+      "description": "An array of sensor device data sets associated with the event."
     },
     "epcList": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/Item"
       },
-      "description": "The list of uniquely identified trade items included in this supply chain transaction."
+      "description": "A list of uniquely identified items (e.g., specific item serial numbers or tagged shipments/packages) that are the focus of this object event."
     },
     "quantityList": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/QuantityElement"
       },
-      "description": "List of quantified product classes that are included in this transaction.  Used when the trade items do not have unique identifiers (eg 100 reels of yarn)"
-    },
-    "referenceDocument": {
-      "$ref": "#/$defs/TradeDocument",
-      "description": "The supply chain document reference for this transaction event - eg the invoice, order, or dispatch advice"
+      "description": "A quantified list of product classes (e.g., GS1 GTINs) that are the focus of this object event."
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Transaction represents an event in which one or more objects become associated or disassociated with one or more identified business transactions - such as the purchase / shipment of goods between buyer and seller.",
+  "description": "Object represents an event that happened to one or more physical or digital objects - such as an inspection or certification of a product or shipment. The physical objects may be identified either as specific items (eg a unique consignment number) or as a quantified amount of a product class (eg 100Kg of cotton yarn)",
   "$defs": {
     "Entity": {
       "type": "object",
@@ -150,15 +138,10 @@
           "items": {
             "$ref": "#/$defs/SensorData"
           },
-          "description": "A list of sensor readings from the given sensor relevant to the traceability event context."
-        },
-        "sensorIntegrityProof": {
-          "type": "string",
-          "format": "uri",
-          "description": "An optional reference to a verifiable credential signed by the sensor device or device manufacturer that contains the digitally signed raw data associated with this sensor report."
+          "description": "A list of sensor readings from the given sensor relevant to the aggregation event."
         }
       },
-      "description": "A SensorElement is used to carry data related to an event that is captured one sensor such as an IoT device. Include one sensor property and an array of sensor data values."
+      "description": "A SensorElement carries data related to an event that is captured by one sensor (e.g., an IoT device)."
     },
     "Sensor": {
       "type": "object",
@@ -166,12 +149,12 @@
       "properties": {
         "device": {
           "$ref": "#/$defs/Item",
-          "description": "The device Identifier for the sensor as a URI (typically an EPC)"
+          "description": "The device Identifier for the sensor as a URI (typically an EPC)."
         },
         "dataProcessingMethod": {
           "type": "string",
           "format": "uri",
-          "description": "The data processing method used by the sensor - should reference a documented standard criteria as a URI"
+          "description": "The data processing method used by the sensor, referencing a documented standard as a URI."
         }
       },
       "description": "A physical sensor that records a sensor data set."
@@ -191,27 +174,17 @@
           }
         },
         "id": {
-          "example": "https://id.gs1.org/01/09520123456788/21/12345",
           "type": "string",
           "format": "uri",
-          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+          "example": "https://id.gs1.org/01/09520123456788/21/12345",
+          "description": "The globally unique ID of the entity as a resolvable URL."
         },
         "name": {
+          "type": "string",
           "example": "EV battery 300Ah.",
-          "type": "string",
-          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
-        },
-        "registeredId": {
-          "example": "90664869327",
-          "type": "string",
-          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
-        },
-        "idScheme": {
-          "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+          "description": "The registered name of the entity within the identifier scheme."
         }
       },
-      "description": "A specific serilaised trade item which is a type of a more generic product. Typically an SGTIN",
       "required": ["id", "name"]
     },
     "SensorData": {
@@ -245,42 +218,20 @@
       "additionalProperties": false,
       "properties": {
         "product": {
-          "$ref": "#/$defs/Entity",
-          "description": "THe identifier of a product class (as opposed to a product instance) such as a GTIN code for a manufactured product."
+          "$ref": "#/$defs/Item",
+          "description": "The identifier of a product class, such as a GTIN code."
         },
         "quantity": {
           "type": "number",
-          "description": "The numeric quantity of the product class (eg 100 kg of cotton)"
+          "description": "The numeric quantity of the product class (e.g., 100 kg of cotton)."
         },
         "uom": {
           "type": "string",
           "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
-          "description": "The unit of measure for the quantity value (eg Kg or meters etc) using the UNECE Rec 20 unit of measure codelist.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+          "description": "The unit of measure for the quantity value, such as kg or meters."
         }
       },
-      "description": "The quantity element is used to define the quantities (eg 100), units of measure (eg Kg) and product class (eg GTIN or other class identifier) of products that are inputs or outputs or the subject of supply chain events.  ",
       "required": ["quantity"]
-    },
-    "TradeDocument": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "documentType": {
-          "type": "string",
-          "x-external-enumeration": "https://ref.gs1.org/cbv/BTT",
-          "description": "The document type representing the trade transaction drawn from the business transaction type vocabulary.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://ref.gs1.org/cbv/BTT\n    "
-        },
-        "identifier": {
-          "type": "string",
-          "description": "The identifier of the trade transaction document - eg an invoice number or bill of lading number.  Must be unique for a given source party"
-        },
-        "documentURL": {
-          "type": "string",
-          "format": "uri",
-          "description": "The URL of the referenced trade document. For integrity reasons, it is recommended (but not required) that the documentURL is a hashlink (https://w3c-ccg.github.io/hashlink/) so that if the document the URL is changed then the hash verification will fail."
-        }
-      },
-      "description": "A trade transaction between two parties such as an invoice, purchase order, or shipping notification."
     }
   }
 }
