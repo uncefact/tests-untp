@@ -91,7 +91,17 @@ export const concatService = (data: any, ...args: ConcatArgument[]): string => {
     if (arg.type === ConcatArgumentType.TEXT) {
       return acc.concat(arg.value);
     } else if (arg.type === ConcatArgumentType.PATH) {
-      return acc.concat(JSONPointer.get(data, arg.value));
+      if (typeof data !== 'object') {
+        throw new Error('Invalid data object');
+      }
+      try {
+        const value = JSONPointer.get(data, arg.value);
+        if (value) {
+          return acc.concat(value);
+        }
+      } catch (error) {
+        throw new Error('Error concatenating values');
+      }
     }
     return acc;
   }, '');
@@ -295,8 +305,20 @@ export const constructIdentifierString = (
   data: any,
   identifierKeyPath: string | { function: string; args: any },
 ): string => {
+  if (typeof data !== 'object') {
+    throw new Error('Invalid data object');
+  }
+
   if (typeof identifierKeyPath === 'string') {
-    return JSONPointer.get(data, identifierKeyPath);
+    try {
+      const value = JSONPointer.get(data, identifierKeyPath);
+      if (value) {
+        return value;
+      }
+      return '';
+    } catch (error) {
+      throw new Error('Error constructing identifier string');
+    }
   } else {
     try {
       const handlerFunction: any = supportedHandlerFunctions[identifierKeyPath.function];
@@ -305,7 +327,6 @@ export const constructIdentifierString = (
       }
       return handlerFunction(data, ...identifierKeyPath.args);
     } catch (error: any) {
-      console.log(error);
       throw new Error('Error constructing identifier string using handler function');
     }
   }

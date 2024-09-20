@@ -92,6 +92,31 @@ describe('concatService', () => {
     const result = concatService(data, ...args);
     expect(result).toBe('(01)05012345678900(10)2024001(21)TRF240001');
   });
+
+  it('should return an empty string if the path does not exist', () => {
+    const data = {
+      test: 'test',
+    };
+    const args: any = [{ type: 'path', value: '/something' }];
+    const result = concatService(data, ...args);
+    expect(result).toBe('');
+  });
+
+  it('should throw an error if the path is invalid', () => {
+    const data = {
+      test: 'test',
+    };
+    const args: any = [{ type: 'path', value: 'invalid' }];
+
+    expect(() => concatService(data, ...args)).toThrow('Error concatenating values');
+  });
+
+  it('should throw an error if the data is not an object', () => {
+    const data = 'test';
+    const args: any = [{ type: 'path', value: '/test' }];
+
+    expect(() => concatService(data, ...args)).toThrow('Invalid data object');
+  });
 });
 
 describe('constructIdentifierString', () => {
@@ -185,5 +210,30 @@ describe('constructIdentifierString', () => {
     const identifierKeyPath = '/productIdentifier/0/identifierValue';
     const result = constructIdentifierString(data, identifierKeyPath);
     expect(result).toBe('05012345678900');
+  });
+
+  it('should return an empty string if the path does not exist', () => {
+    const data = {
+      test: 'test',
+    };
+    const identifierKeyPath = '/something';
+    const result = constructIdentifierString(data, identifierKeyPath);
+    expect(result).toBe('');
+  });
+
+  it('should throw an error if the path is invalid', () => {
+    const data = {
+      test: 'test',
+    };
+    const identifierKeyPath = 'invalid';
+
+    expect(() => constructIdentifierString(data, identifierKeyPath)).toThrow('Error constructing identifier string');
+  });
+
+  it('should throw an error if the data is not an object', () => {
+    const data = 'test';
+    const identifierKeyPath = '/test';
+
+    expect(() => constructIdentifierString(data, identifierKeyPath)).toThrow('Invalid data object');
   });
 });
