@@ -332,13 +332,15 @@ describe('processTestSuiteForConfigPath with remote schema URL', () => {
       },
     ]);
 
-    jest.spyOn(testRunner, 'processCheckDataBySchema').mockReturnValueOnce({
-      type: '',
-      version: '',
-      dataPath: 'data/productPassport.json',
-      url: 'https://example.com/product-passport/schema.json',
-      errors: [],
-    });
+    jest.spyOn(testRunner, 'processCheckDataBySchema').mockReturnValueOnce(
+      Promise.resolve({
+        type: '',
+        version: '',
+        dataPath: 'data/productPassport.json',
+        url: 'https://example.com/product-passport/schema.json',
+        errors: [],
+      }),
+    );
 
     jest.spyOn(templateUtils, 'constructCredentialTestResults').mockResolvedValueOnce([
       {
@@ -383,13 +385,15 @@ describe('processTestSuiteForConfigPath with remote schema URL', () => {
       },
     ]);
 
-    jest.spyOn(testRunner, 'processCheckDataBySchema').mockReturnValueOnce({
-      type: 'productPassport',
-      version: 'v0.0.1',
-      dataPath: 'data/productPassport.json',
-      url: 'https://example.com/product-passport/schema.json',
-      errors: [],
-    });
+    jest.spyOn(testRunner, 'processCheckDataBySchema').mockReturnValueOnce(
+      Promise.resolve({
+        type: 'productPassport',
+        version: 'v0.0.1',
+        dataPath: 'data/productPassport.json',
+        url: 'https://example.com/product-passport/schema.json',
+        errors: [],
+      }),
+    );
 
     jest.spyOn(templateUtils, 'constructCredentialTestResults').mockResolvedValueOnce([
       {
