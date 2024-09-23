@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc --build --clean && tsc",
     "watch": "tsc -b --watch",
-    "test": "jest --ci --env=jest-environment-node",
+    "test": "jest --ci",
     "test:coverage": "jest --coverage"
   },
   "type": "module",
@@ -34,6 +34,7 @@
     "typescript": "^5.3.3"
   },
   "jest": {
+    "testEnvironment": "jsdom",
     "testPathIgnorePatterns": [
       "/node_modules/",
       "/build/",

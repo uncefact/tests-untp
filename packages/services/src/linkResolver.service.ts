@@ -367,6 +367,15 @@ export const buildElementString = (ai: any) => {
 };
 
 export const extractFromElementString = (elementString: string) => {
+  let preparedElementString = elementString;
+  if (!preparedElementString) {
+    return {};
+  }
+
+  if (!preparedElementString.startsWith('01') && !preparedElementString.startsWith('(01)')) {
+    preparedElementString = `(01)${preparedElementString}`;
+  }
+
   const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
-  return gs1DigitalLinkToolkit.extractFromGS1elementStrings(elementString);
+  return gs1DigitalLinkToolkit.extractFromGS1elementStrings(preparedElementString);
 };

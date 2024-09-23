@@ -3,7 +3,7 @@ import { IService } from '../types/index.js';
 import { issueVC } from '../vckit.service.js';
 import { ITraceabilityEvent, ITransactionEventContext } from './types.js';
 import { getStorageServiceLink } from '../storage.service.js';
-import { generateUUID } from '../utils/helpers.js';
+import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { validateTransactionEventContext } from './validateContext.js';
 import JSONPointer from 'jsonpointer';
@@ -19,7 +19,7 @@ export const processTransactionEvent: IService = async (
   }
 
   const { vckit, epcisTransactionEvent, dlr, storage, identifierKeyPath, localStorageParams } = context;
-  const transactionIdentifier = JSONPointer.get(transactionEvent.data, identifierKeyPath);
+  const transactionIdentifier = constructIdentifierString(transactionEvent.data, identifierKeyPath);
   if (!transactionIdentifier) {
     throw new Error('Identifier not found');
   }

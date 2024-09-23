@@ -5,7 +5,7 @@ import { getValueByPath } from '../utils/helpers.js';
  * @param data
  * @param parameters key: string
  */
-export const saveToLocalStorage = (data: any, parameters: any) => {
+export const saveToLocalStorage = (data: any, parameters: { storageKey: string }) => {
   try {
     const { storageKey } = parameters;
     localStorage.setItem(storageKey, JSON.stringify(data));
@@ -61,6 +61,20 @@ export const deleteValuesFromLocalStorage = (parameters: { storageKey: string; k
       });
       localStorage.setItem(storageKey, JSON.stringify(parsedData));
     }
+  } catch (error: any) {
+    console.error(error);
+    throw new Error(error.message);
+  }
+};
+
+/**
+ * This function is used to delete the data from the local storage by storageKey
+ * @param parameters key: string
+ */
+export const deleteItemFromLocalStorage = (parameters: { storageKey: string }) => {
+  try {
+    const { storageKey } = parameters;
+    localStorage.removeItem(storageKey);
   } catch (error: any) {
     console.error(error);
     throw new Error(error.message);
