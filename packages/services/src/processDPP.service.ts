@@ -1,13 +1,14 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import { IService } from './types/index.js';
 import { IContext } from './epcisEvents/types.js';
-import { generateUUID } from './utils/helpers.js';
+import { constructIdentifierString, generateUUID } from './utils/helpers.js';
 
 import { getStorageServiceLink } from './storage.service.js';
 import { issueVC } from './vckit.service.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from './linkResolver.service.js';
 import { validateContextDPP } from './epcisEvents/validateContext.js';
 import JSONPointer from 'jsonpointer';
+import { deleteItemFromLocalStorage } from './features/localStorage.service.js';
 
 /**
  * Process DPP, issue VC, upload to storage and register link resolver
@@ -21,7 +22,7 @@ export const processDPP: IService = async (data: any, context: IContext): Promis
     const validationResult = validateContextDPP(context);
     if (!validationResult.ok) throw new Error(validationResult.value);
 
-    const objectIdentifier = JSONPointer.get(credentialSubject, context.identifierKeyPath);
+    const objectIdentifier = constructIdentifierString(credentialSubject, context.identifierKeyPath);
     if (!objectIdentifier) throw new Error('Identifier not found');
 
     const { identifier, qualifierPath } = getLinkResolverIdentifier(objectIdentifier);
@@ -54,6 +55,10 @@ export const processDPP: IService = async (data: any, context: IContext): Promis
       qualifierPath,
       LinkType.certificationLinkType,
     );
+
+    if (context.localStorageParams && context.localStorageParams.storageKey) {
+      deleteItemFromLocalStorage(context.localStorageParams);
+    }
 
     return { vc, linkResolver };
   } catch (error: any) {
