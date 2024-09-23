@@ -17,20 +17,38 @@ describe('loadingSchema.service', () => {
   });
 
   it('should throw an error when schema is empty', async () => {
-    await expect(dynamicLoadingSchemaService('', version)).rejects.toThrow('Schema not found');
+    const result = await dynamicLoadingSchemaService('', version, '', '/path/to/schema');
+    expect(result).toEqual({
+      dataPath: '/path/to/schema',
+      instancePath: 'schema',
+      keyword: 'schemaLoadingError',
+      message: 'Schema not found',
+    });
   });
 
   const schema = 'event';
   it('should throw an error when version is empty', async () => {
     (checkSchemaExists as jest.Mock).mockResolvedValue(true);
-    await expect(dynamicLoadingSchemaService(schema, '')).rejects.toThrow('Version not found for schema ' + schema);
+    const result = await dynamicLoadingSchemaService(schema, '', '', '/path/to/schema');
+    expect(result).toEqual({
+      dataPath: '/path/to/schema',
+      instancePath: 'schema',
+      keyword: 'schemaLoadingError',
+      message: 'Version not found for schema event',
+    });
   });
 
   const version = 'v1.0.0';
   it('should throw an error if the schema is not found', async () => {
     (checkSchemaExists as jest.Mock).mockResolvedValue(false);
 
-    await expect(dynamicLoadingSchemaService(schema, version)).rejects.toThrow('Schema not found');
+    const result = await dynamicLoadingSchemaService(schema, version, '', '/path/to/schema');
+    expect(result).toEqual({
+      dataPath: '/path/to/schema',
+      instancePath: 'schema',
+      keyword: 'schemaLoadingError',
+      message: 'Schema not found',
+    });
     expect(checkSchemaExists).toHaveBeenCalledTimes(1);
     expect(checkSchemaVersionExists).toHaveBeenCalledTimes(0);
   });
@@ -39,9 +57,13 @@ describe('loadingSchema.service', () => {
     (checkSchemaExists as jest.Mock).mockResolvedValue(true);
     (checkSchemaVersionExists as jest.Mock).mockResolvedValue(false);
 
-    await expect(dynamicLoadingSchemaService(schema, version)).rejects.toThrow(
-      `Version not found for schema ${schema}`,
-    );
+    const result = await dynamicLoadingSchemaService(schema, version, '', '/path/to/schema');
+    expect(result).toEqual({
+      dataPath: '/path/to/schema',
+      instancePath: 'schema',
+      keyword: 'schemaLoadingError',
+      message: 'Version not found for schema event',
+    });
     expect(checkSchemaExists).toHaveBeenCalledTimes(1);
     expect(checkSchemaVersionExists).toHaveBeenCalledTimes(1);
   });
@@ -51,7 +73,13 @@ describe('loadingSchema.service', () => {
     (checkSchemaVersionExists as jest.Mock).mockResolvedValue(true);
     (getSchemaContent as jest.Mock).mockResolvedValue('');
 
-    await expect(dynamicLoadingSchemaService(schema, version)).rejects.toThrow(`Content in ${schema} schema not found`);
+    const result = await dynamicLoadingSchemaService(schema, version, '', '/path/to/schema');
+    expect(result).toEqual({
+      dataPath: '/path/to/schema',
+      instancePath: 'schema',
+      keyword: 'schemaLoadingError',
+      message: 'Content in event schema not found',
+    });
     expect(checkSchemaExists).toHaveBeenCalledTimes(1);
     expect(checkSchemaVersionExists).toHaveBeenCalledTimes(1);
     expect(getSchemaContent).toHaveBeenCalledTimes(1);
@@ -61,7 +89,14 @@ describe('loadingSchema.service', () => {
     const expectedError = new Error('Schema not found');
     (checkSchemaExists as jest.Mock).mockRejectedValue(expectedError);
 
-    await expect(dynamicLoadingSchemaService(schema, version)).rejects.toThrow(expectedError);
+    // await expect(dynamicLoadingSchemaService(schema, version)).rejects.toThrow(expectedError);
+    const result = await dynamicLoadingSchemaService(schema, version, '', '/path/to/schema');
+    expect(result).toEqual({
+      dataPath: '/path/to/schema',
+      instancePath: 'schema',
+      keyword: 'schemaLoadingError',
+      message: 'Schema not found',
+    });
     expect(checkSchemaExists).toHaveBeenCalledTimes(1);
     expect(checkSchemaVersionExists).toHaveBeenCalledTimes(0);
   });
