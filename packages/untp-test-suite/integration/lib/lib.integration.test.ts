@@ -63,15 +63,21 @@ describe('lib.integration.test.ts', () => {
     };
 
     it('should throw an error when the credential is contain version empty', async () => {
-      await expect(
-        testCredentialHandler(
-          {
-            type: 'objectEvent',
-            version: '',
-          },
-          testDataMock,
-        ),
-      ).rejects.toThrow('ENOENT: no such file or directory');
+      const result = await testCredentialHandler(
+        {
+          type: 'objectEvent',
+          version: '',
+        },
+        testDataMock,
+      );
+
+      expect(result.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            message: expect.stringContaining('ENOENT: no such file or directory'),
+          }),
+        ]),
+      );
     });
   });
 

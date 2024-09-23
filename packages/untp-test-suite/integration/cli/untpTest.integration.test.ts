@@ -279,7 +279,7 @@ describe("CLI 'untp test' Commands with remote schema", () => {
     it('should show FAIL in the report when data invalidate', () => {
       expect(stdout).toMatch(/FAIL/);
       expect(stdout).toMatch(/Your credentials are not UNTP compliant/);
-      expect(stdout).toContain('url field Failed to fetch data ');
+      expect(stdout).toContain('schema field Failed to fetch data ');
       expect(stdout).toContain(`field must have required property 'id'.`);
       expect(stdout).toContain(`url field The URL 'in-valid-url' is not a valid URL..`);
       expect(stdout).toContain(`url field The URL 'abc://example.com' must use http or https protocol..`);
@@ -338,7 +338,7 @@ describe("CLI 'untp test' Commands with remote schema", () => {
       expect(stdout).toMatch(/FAIL/);
       expect(stdout).toMatch(/Your credentials are not UNTP compliant/);
       expect(stdout).toContain('Additional property found');
-      expect(stdout).toContain('url field Failed to fetch data from the URL');
+      expect(stdout).toContain('schema field Failed to fetch data from the URL');
     });
   });
 });
