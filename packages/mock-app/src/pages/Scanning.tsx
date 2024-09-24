@@ -22,7 +22,7 @@ const Scanning = () => {
     try {
       setIsLoading(true);
 
-      const dlrUrl = await identityProvider.getDlrUrl(scannedCode);
+      const dlrUrl = await identityProvider.getDlrUrl(scannedCode, appConfig.identifyProvider.namespace);
       if (!dlrUrl) {
         return toastMessage({ status: Status.error, message: 'There no DLR url' });
       }
@@ -96,7 +96,7 @@ const Scanning = () => {
         qrbox={{ width: 500, height: 300 }}
         disableFlip={false}
         useBarCodeDetectorIfSupported={true}
-        focusMode= 'continuous'
+        focusMode='continuous'
         qrCodeSuccessCallback={onScanResult}
         qrCodeErrorCallback={onScanError}
       />

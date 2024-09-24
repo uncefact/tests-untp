@@ -5,6 +5,7 @@ import {
   incrementQuality,
   concatService,
   constructIdentifierString,
+  extractDomain,
 } from '../utils/helpers';
 
 describe('helpers', () => {
@@ -41,6 +42,21 @@ describe('helpers', () => {
     const obj = { quantity: 2 };
     const result = incrementQuality(obj, 1);
     expect(result.quantity).toBe(2);
+  });
+});
+
+describe('extractDomain', () => {
+  it('should return the domain of a url', () => {
+    const url = 'https://example.com/test';
+    const result = extractDomain(url);
+    expect(result).toBe('https://example.com');
+  });
+
+  it('should return an empty string if the url is invalid', () => {
+    const url = 'invalid';
+    expect(() => {
+      extractDomain(url);
+    }).toThrow('Invalid URL');
   });
 });
 

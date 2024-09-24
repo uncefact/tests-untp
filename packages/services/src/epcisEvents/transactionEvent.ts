@@ -48,6 +48,7 @@ export const processTransactionEvent: IService = async (
     epcisTransactionEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
+    dlr.namespace,
     qualifierPath,
     LinkType.epcisLinkType,
   );

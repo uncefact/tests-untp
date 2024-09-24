@@ -64,7 +64,9 @@ P-->>C: Return VC and resolver URL
       },
       "dlr": {
         "dlrAPIUrl": "https://dlr.example.com/api",
-        "dlrAPIKey": "dlr-api-key-12345"
+        "dlrAPIKey": "dlr-api-key-12345",
+        "namespace": "gs1",
+        "linkRegisterPath": "/api/resolver"
       },
       "identifierKeyPath": "/parentItem/epc"
     }

@@ -52,6 +52,7 @@ export const processDPP: IService = async (data: any, context: IContext): Promis
       dppContext.dlrVerificationPage,
       linkResolverContext.dlrAPIUrl,
       linkResolverContext.dlrAPIKey,
+      linkResolverContext.namespace,
       qualifierPath,
       LinkType.certificationLinkType,
     );

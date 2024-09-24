@@ -301,6 +301,11 @@ export const constructObject = (
   return data;
 };
 
+export const extractDomain = (url: string): string => {
+  const parsedUrl = new URL(url);
+  return `${parsedUrl.protocol}//${parsedUrl.host}`;
+};
+
 export const constructIdentifierString = (
   data: any,
   identifierKeyPath: string | { function: string; args: any },

@@ -32,6 +32,7 @@ export interface IDLRAI {
 export interface IConfigDLR {
   dlrAPIUrl: string;
   dlrAPIKey: string;
+  namespace: string;
 }
 
 export interface IStorageContext {
