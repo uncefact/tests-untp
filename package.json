@@ -25,7 +25,7 @@
     "upgrade:packages": "yarn -r --stream upgrade --latest",
     "version": "lerna version",
     "prepare": "husky install",
-    "lint": " yarn eslint ."
+    "lint": " yarn eslint packages"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",

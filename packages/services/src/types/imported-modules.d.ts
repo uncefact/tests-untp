@@ -1,1 +1,1 @@
-declare module 'GS1_DigitalLink_Resolver_CE/digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js'
+declare module 'digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js';
