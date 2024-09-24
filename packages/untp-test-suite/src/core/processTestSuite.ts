@@ -4,9 +4,8 @@ import {
   ICredentialTestResult,
   IValidatedCredentials,
   ITestSuiteResult,
-  ICredentialConfigError,
 } from './types/index.js';
-import { readJsonFile, validateCredentialConfigs } from './utils/common.js';
+import { createInvalidFieldError, readJsonFile, validateCredentialConfigs } from './utils/common.js';
 import { dynamicLoadingSchemaService } from './services/dynamic-loading-schemas/loadingSchema.service.js';
 import { hasErrors } from './services/json-schema/validator.service.js';
 import {
@@ -26,7 +25,7 @@ export const processCheckDataBySchema = async (
   credentialConfig: IConfigContent,
   data?: object,
 ): Promise<IValidatedCredentials> => {
-  const { type, version, dataPath, url } = credentialConfig;
+  const { dataPath } = credentialConfig;
   let _data;
 
   if (!data && !dataPath) {
@@ -41,12 +40,16 @@ export const processCheckDataBySchema = async (
     _data = { ...data };
   }
 
-  const schema = await dynamicLoadingSchemaService(type, version, url, dataPath);
+  const schema = await dynamicLoadingSchemaService(credentialConfig);
 
-  // Validate data by schema
-  const errors: any = hasErrors(schema, _data) ?? [];
-  if (Object.prototype.hasOwnProperty.call(schema, 'keyword')) {
-    errors.push(schema as ICredentialConfigError);
+  const errors: any = [];
+  if (typeof schema === 'string') {
+    errors.push(createInvalidFieldError('schema', dataPath, schema));
+  } else {
+    const validationErrors = hasErrors(schema, _data);
+    if (validationErrors) {
+      errors.push(...validationErrors);
+    }
   }
 
   return {

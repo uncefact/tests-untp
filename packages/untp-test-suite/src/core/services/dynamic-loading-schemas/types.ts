@@ -1,5 +1,5 @@
-import { ICredentialConfigError } from '../../types';
+import { IConfigContent } from '../../types';
 
 export interface IDynamicLoadingSchemaService {
-  (schema: string, version: string, url?: string, dataPath?: any): Promise<JSON> | ICredentialConfigError;
+  (credentialConfig: IConfigContent): Promise<JSON> | string;
 }
