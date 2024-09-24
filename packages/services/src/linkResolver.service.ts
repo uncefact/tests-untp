@@ -134,7 +134,7 @@ export const constructLinkResolver = (
   linkResponses: ILinkResponse[],
   qualifierPath: string,
 ) => {
-  const LinkResolver: LinkResolver = {
+  const constructedLinkResolver: LinkResolver = {
     namespace: namespace,
     identificationKeyType: linkResolver.identificationKeyType,
     identificationKey: linkResolver.identificationKey,
@@ -171,9 +171,9 @@ export const constructLinkResolver = (
       ...linkResponse,
     };
 
-    LinkResolver.responses.push(LinkResponseForUS, LinkResponseForAU);
+    constructedLinkResolver.responses.push(LinkResponseForUS, LinkResponseForAU);
   });
-  return LinkResolver;
+  return constructedLinkResolver;
 };
 
 export const registerLinkResolver = async (

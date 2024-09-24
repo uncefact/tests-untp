@@ -562,7 +562,7 @@
                   "productIdentifier": [
                     {
                       "scheme": "https://id.gs1.org/gtin",
-                      "identifierValue": "0105012345678900",
+                      "identifierValue": "05012345678900",
                       "binding": {
                         "type": "document",
                         "assuranceLevel": "3rdParty",
@@ -741,6 +741,7 @@
                   "identifierKeyPath": {
                     "function": "concatService",
                     "args": [
+                      { "type": "text", "value": "(01)" },
                       { "type": "path", "value": "/productIdentifier/0/identifierValue" },
                       { "type": "text", "value": "(10)" },
                       { "type": "path", "value": "/batchIdentifier/0/identifierValue" },
