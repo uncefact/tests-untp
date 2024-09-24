@@ -20,3 +20,10 @@ export const truncateString = (str: string | undefined, maxLength: number) => {
   }
   return str.slice(0, maxLength) + '...';
 };
+
+// Function to generate a clickable URL in terminal
+export const createClickableUrl = (fullUrl: string, displayText: string) => {
+  if (!fullUrl) return '';
+  const fixedUrl = fullUrl.replace('&#x3D;', '=');
+  return `\u001b]8;;${fixedUrl}\u0007${displayText}\u001b]8;;\u0007`;
+};
