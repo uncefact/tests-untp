@@ -117,5 +117,30 @@ services:
     volumes:
       - ./minio_data/mock-global-gs1-resolver-object-store:/data
 
+  seeding-data:
+    image: curlimages/curl:8.10.1
+    working_dir: /scripts
+    environment:
+      - IDR_SERVICE_HOST=identity-resolver-service
+      - IDR_SERVICE_PORT=3000
+      - IDR_SERVICE_API_KEY=test123
+      - IDR_SERVICE_DOMAIN=http://localhost:3000
+
+      - MOCK_GS1_SERVICE_HOST=mock-global-gs1-resolver
+      - MOCK_GS1_SERVICE_PORT=3001
+      - MOCK_GS1_SERVICE_API_KEY=test456
+    command:
+      - /bin/sh
+      - -c
+      - |
+        ./seeding-idr-data.sh
+        ./seeding-mock-gs1-data.sh
+    volumes:
+      - ./seeding-idr-data.sh:/scripts/seeding-idr-data.sh
+      - ./seeding-mock-gs1-data.sh:/scripts/seeding-mock-gs1-data.sh
+    depends_on:
+      - identity-resolver-service
+      - mock-global-gs1-resolver
+
 volumes:
   vckit-data:
