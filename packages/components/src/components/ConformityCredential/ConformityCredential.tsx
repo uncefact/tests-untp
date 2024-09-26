@@ -5,7 +5,7 @@ import { LoadingButton } from '@mui/lab';
 import { Table, TableBody, TableCell, TableRow, TableContainer, TableHead, Paper } from '@mui/material';
 import { generateUUID, getJsonDataFromConformityAPI, getStorageServiceLink, getValueByPath } from '@mock-app/services';
 
-import { checkStoredCredentialsConfig } from './utils.js';
+import { checkStoredCredentialsConfig, detectValueFromStorage } from './utils.js';
 import { Status, ToastMessage, toastMessage } from '../ToastMessage/ToastMessage.js';
 import {
   IConformityCredentialProps,
@@ -167,8 +167,8 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
       }
 
       const vcUrl = await getStorageServiceLink(storedCredentialsConfig, extractedCredential, generateUUID());
-
-      saveConformityCredentials(credentialRequestConfig.credentialName, vcUrl, credentialRequestConfig.appOnly);
+      const verifyURL = detectValueFromStorage(vcUrl);
+      saveConformityCredentials(credentialRequestConfig.credentialName, verifyURL, credentialRequestConfig.appOnly);
 
       return;
     } catch (error) {

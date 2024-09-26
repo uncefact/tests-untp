@@ -19,5 +19,5 @@ export interface IStorageService {
 }
 
 export interface IGetStorageServiceLink {
-  (storage: StorageServiceConfig, data: any, filename: string): Promise<string>;
+  (storage: StorageServiceConfig, data: any, filename: string): Promise<any>;
 }

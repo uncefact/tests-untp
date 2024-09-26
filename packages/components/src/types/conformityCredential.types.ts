@@ -1,4 +1,4 @@
-import { StorageServiceConfig } from "@mock-app/services/build/types";
+import { StorageServiceConfig } from '@mock-app/services/build/types';
 
 export type FetchOptions = {
   method: 'POST' | 'GET';
@@ -23,4 +23,10 @@ export interface IConformityCredential {
   name: string;
   url: string;
   app: string;
+}
+
+export interface IVerifyURLPayload {
+  uri: string;
+  key?: string;
+  hash?: string;
 }
