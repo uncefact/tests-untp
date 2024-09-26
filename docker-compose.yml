@@ -121,11 +121,13 @@ services:
     image: curlimages/curl:8.10.1
     working_dir: /scripts
     environment:
+      # IDR service environment variables
       - IDR_SERVICE_HOST=identity-resolver-service
       - IDR_SERVICE_PORT=3000
       - IDR_SERVICE_API_KEY=test123
-      - IDR_SERVICE_DOMAIN=http://localhost:3000
 
+      # Mock GS1 service environment variables
+      - IDR_SERVICE_DOMAIN=http://localhost:3000
       - MOCK_GS1_SERVICE_HOST=mock-global-gs1-resolver
       - MOCK_GS1_SERVICE_PORT=3001
       - MOCK_GS1_SERVICE_API_KEY=test456
