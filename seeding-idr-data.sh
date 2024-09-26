@@ -30,7 +30,7 @@ while true; do
   sleep 5  # Wait for 5 seconds before checking again
 done
 
-echo "${SERVICE_NAME} service is up, seeding data..."
+echo "${SERVICE_NAME} service is seeding data…"
 
 # Execute create identifier request
 curl -X POST \

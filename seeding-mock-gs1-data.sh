@@ -30,9 +30,9 @@ while true; do
   sleep 5  # Wait for 5 seconds before checking again
 done
 
-echo "${SERVICE_NAME} service is up, seeding data..."
+echo "${SERVICE_NAME} service is seeding data…"
 
-# Execute the POST request
+# Execute create identifier request
 curl -X POST \
   http://${MOCK_GS1_SERVICE_HOST}:${MOCK_GS1_SERVICE_PORT}/api/identifiers \
   -H 'accept: application/json' \
@@ -105,4 +105,4 @@ curl -X POST \
   ]
 }'
 
-printf "\nSeeding ${SERVICE_NAME} Service data complete!\n\n"
+printf "\nSeeding ${SERVICE_NAME} service data complete!\n\n"
