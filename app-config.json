@@ -703,8 +703,9 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:0b35-103-69-79-17.ngrok-free.app",
+                    "proofFormat": "EnvelopingProofJose"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -720,13 +721,13 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIUrl": "http://localhost:3005",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
                     "linkRegisterPath": "/api/resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/v1/documents",
+                    "url": "http://localhost:3333/v1/documents",
                     "params": {
                       "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
@@ -805,7 +806,6 @@
                           },
                           "eventID": {
                             "x-jargon-isKey": true,
-                            "readOnly": true,
                             "type": "string",
                             "description": "The unique identifier of this event - SHOULD be a UUID"
                           },
@@ -1196,8 +1196,9 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:0b35-103-69-79-17.ngrok-free.app",
+                    "proofFormat": "EnvelopingProofJose"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -1213,7 +1214,7 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIUrl": "http://localhost:3005",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
                     "linkRegisterPath": "/api/resolver"

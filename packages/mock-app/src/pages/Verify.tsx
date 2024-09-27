@@ -5,6 +5,7 @@ import { useLocation } from 'react-router-dom';
 import { computeEntryHash } from '@veramo/utils';
 import { Status } from '@mock-app/components';
 import { publicAPI, privateAPI } from '@mock-app/services';
+import * as jose from 'jose';
 import { MessageText } from '../components/MessageText';
 import { LoadingWithText } from '../components/LoadingWithText';
 import { BackButton } from '../components/BackButton';
@@ -55,8 +56,12 @@ const Verify = () => {
       const { payload } = JSON.parse(payloadQuery);
       const { uri, key, hash } = payload;
       const encryptedCredential = await publicAPI.get(uri);
-      if (encryptedCredential?.credentialSubject || 'jwt' in encryptedCredential) {
+      if (encryptedCredential?.credentialSubject) {
         return setCredential(encryptedCredential);
+      }
+
+      if ('jwt' in encryptedCredential) {
+        return setCredential(encryptedCredential.jwt);
       }
 
       const credentialJsonString = decryptString({
@@ -139,9 +144,18 @@ const Verify = () => {
           return null;
         }
 
+        let customCredential = null;
+        if (typeof credential === 'string') {
+          try {
+            customCredential = jose.decodeJwt(credential);
+          } catch (error) {
+            displayErrorUI();
+          }
+        }
+
         return (
           <BackButton>
-            <Credential credential={credential} />
+            <Credential credential={customCredential ?? credential} />
           </BackButton>
         );
       default:
