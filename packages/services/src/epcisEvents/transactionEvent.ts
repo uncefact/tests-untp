@@ -32,6 +32,7 @@ export const processTransactionEvent: IService = async (
     issuer: vckit.issuer,
     context: epcisTransactionEvent.context,
     type: epcisTransactionEvent.type,
+    proofFormat: vckit.proofFormat,
     restOfVC: {
       render: epcisTransactionEvent.renderTemplate,
     },

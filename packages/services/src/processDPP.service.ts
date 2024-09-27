@@ -1,4 +1,4 @@
-import { VerifiableCredential } from '@vckit/core-types';
+import { W3CVerifiableCredential } from '@vckit/core-types';
 import { IService } from './types/index.js';
 import { IContext } from './epcisEvents/types.js';
 import { constructIdentifierString, generateUUID } from './utils/helpers.js';
@@ -7,7 +7,6 @@ import { getStorageServiceLink } from './storage.service.js';
 import { issueVC } from './vckit.service.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from './linkResolver.service.js';
 import { validateContextDPP } from './epcisEvents/validateContext.js';
-import JSONPointer from 'jsonpointer';
 import { deleteItemFromLocalStorage } from './features/localStorage.service.js';
 
 /**
@@ -30,12 +29,13 @@ export const processDPP: IService = async (data: any, context: IContext): Promis
     const vckitContext = context.vckit;
     const dppContext = context.dpp;
     const restOfVC = { render: dppContext?.renderTemplate ?? [] };
-    const vc: VerifiableCredential = await issueVC({
+    const vc: W3CVerifiableCredential = await issueVC({
       context: dppContext.context,
       credentialSubject,
       issuer: vckitContext.issuer,
       type: [...dppContext.type],
       vcKitAPIUrl: vckitContext.vckitAPIUrl,
+      proofFormat: vckitContext.proofFormat,
       restOfVC,
     });
 

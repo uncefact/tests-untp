@@ -55,7 +55,7 @@ const Verify = () => {
       const { payload } = JSON.parse(payloadQuery);
       const { uri, key, hash } = payload;
       const encryptedCredential = await publicAPI.get(uri);
-      if (encryptedCredential?.credentialSubject) {
+      if (encryptedCredential?.credentialSubject || 'jwt' in encryptedCredential) {
         return setCredential(encryptedCredential);
       }
 

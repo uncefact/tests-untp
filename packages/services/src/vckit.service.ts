@@ -1,5 +1,6 @@
 import { CredentialPayload, CredentialSubject, VerifiableCredential } from '@vckit/core-types';
-import { publicAPI } from './utils/httpService.js';
+import { privateAPI } from './utils/httpService.js';
+import appConfig from '../../mock-app/src/constants/app-config.json';
 
 export const contextDefault = [
   'https://www.w3.org/2018/credentials/v1',
@@ -44,13 +45,22 @@ export const issueVC = async ({
   credentialSubject,
   restOfVC,
   vcKitAPIUrl,
+  proofFormat,
 }: IVcKitIssueVC): Promise<VerifiableCredential> => {
-  const body = constructCredentialObject({ context, type, issuer, credentialSubject, ...restOfVC });
-  const response = await publicAPI.post<VerifiableCredential>(`${vcKitAPIUrl}/credentials/issue`, body);
+  const body = constructCredentialObject({ context, type, issuer, credentialSubject, proofFormat, ...restOfVC });
+  privateAPI.setBearerTokenAuthorizationHeaders(appConfig.defaultVerificationServiceLink.apiKey ?? '');
+  const response = await privateAPI.post<VerifiableCredential>(`${vcKitAPIUrl}/credentials/issue`, body);
   return response;
 };
 
-const constructCredentialObject = ({ context, type, issuer, credentialSubject, ...restOfVC }: CredentialPayload) => {
+const constructCredentialObject = ({
+  context,
+  type,
+  issuer,
+  credentialSubject,
+  proofFormat,
+  ...restOfVC
+}: CredentialPayload) => {
   return {
     credential: {
       '@context': [...contextDefault, ...(context || [])],
@@ -60,6 +70,9 @@ const constructCredentialObject = ({ context, type, issuer, credentialSubject, .
       },
       credentialSubject,
       ...restOfVC,
+    },
+    options: {
+      proofFormat,
     },
   };
 };

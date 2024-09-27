@@ -26,11 +26,13 @@ export const storageService: IStorageService = async (config) => {
 };
 
 export const getStorageServiceLink: IGetStorageServiceLink = async (storage, data, filename) => {
+  const payloadData = typeof data === 'string' ? { jwt: data } : data;
+
   return await storageService({
     url: storage.url,
     params: {
       ...storage.params,
-      data,
+      data: payloadData,
       filename,
     },
     options: storage.options,
