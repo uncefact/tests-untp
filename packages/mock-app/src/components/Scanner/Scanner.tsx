@@ -19,6 +19,8 @@ const Scanner = forwardRef((props: IHtml5QrcodePluginProps, ref: ForwardedRef<IS
     fps: props.fps || 10,
     qrbox: props.qrbox || { width: 250, height: 150 },
     disableFlip: props.disableFlip || false,
+    useBarCodeDetectorIfSupported: props.useBarCodeDetectorIfSupported || true,
+    focusMode: props.focusMode || 'continuous'
   }), [props.fps, props.qrbox, props.disableFlip]);
 
   /**

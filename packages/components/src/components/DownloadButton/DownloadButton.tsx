@@ -7,15 +7,20 @@ export enum DownloadFileType {
 }
 
 export interface IDownloadButtonProps {
-  label?: string,
   fileData: object | string;
   fileName: string;
   fileExtension: string;
   fileType: DownloadFileType;
+  label?: string;
 }
 
-export const DownloadButton = ({ label = 'Download', fileData, fileName, fileExtension, fileType }: IDownloadButtonProps) => {
-
+export const DownloadButton = ({
+  label = 'Download',
+  fileData,
+  fileName,
+  fileExtension,
+  fileType,
+}: IDownloadButtonProps) => {
   const handleDownloadFile = ({ fileData, fileName, fileExtension, fileType }: IDownloadButtonProps) => {
     const element = document.createElement('a');
     const file = new Blob([fileData as string], {
@@ -28,7 +33,7 @@ export const DownloadButton = ({ label = 'Download', fileData, fileName, fileExt
     element.click();
 
     return element;
-  }
+  };
 
   const handleClickDownload = () => {
     let data = fileData;
@@ -47,4 +52,3 @@ export const DownloadButton = ({ label = 'Download', fileData, fileName, fileExt
     </>
   );
 };
-

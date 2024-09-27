@@ -1,0 +1,24 @@
+{
+  "credential": {
+    "@context": [
+      "https://www.w3.org/ns/credentials/v2",
+      {
+        "ex": "https://www.w3.org/2018/credentials#renderMethod#",
+        "renderMethod": "https://www.w3.org/2018/credentials#renderMethod",
+        "template": "ex:template",
+        "url": "ex:url",
+        "mediaQuery": "ex:mediaQuery"
+      }
+    ],
+    "renderMethod": [
+      {
+        "template": "<p>{{credentialSubject.name}}</p>",
+        "@type": "RenderTemplate2024",
+        "mediaType": "text/html"
+      }
+    ],
+    "credentialSubject": {
+      "name": "Jane Doe"
+    }
+  }
+}

@@ -6,20 +6,22 @@
     "packages/*"
   ],
   "scripts": {
-    "start": "cd packages/mock-app && yarn start",
-    "build": "yarn run build-clean && yarn build:components && yarn build:services",
-    "build:components": "cd packages/components && yarn run build",
+    "start": "cp app-config.json packages/mock-app/src/constants/app-config.json && cd packages/mock-app && yarn start",
+    "build": "yarn build:services && yarn build:components && yarn build:untp-test-suite",
     "build:services": "cd packages/services && yarn run build",
+    "build:components": "cd packages/components && yarn run build",
     "build:untp-test-suite": "cd packages/untp-test-suite && yarn run build",
-    "build-clean": "rimraf --glob ./packages/*/tsconfig.tsbuildinfo",
-    "test": "yarn run test:components && yarn run test:services && yarn run test:mock-app",
+    "build-clean": "rimraf --glob ./yarn.lock ./node_modules ./packages/*/tsconfig.tsbuildinfo ./packages/*/build ./packages/*/node_modules",
+    "test": "yarn run test:services && yarn run test:components && yarn run test:mock-app",
     "test:components": "cd packages/components && yarn run test",
     "test:services": "cd packages/services && yarn run test",
     "test:mock-app": "cd packages/mock-app && yarn run test",
     "test:untp-test-suite": "cd packages/untp-test-suite && yarn run test",
+    "test:vc-test-suite": "cd packages/vc-test-suite && yarn run test",
+    "test:integration:untp-test-suite": "cd packages/untp-test-suite && yarn run test:integration",
     "storybook:components": "cd packages/components && yarn run storybook",
     "storybook:mock-app": "cd packages/mock-app && yarn run storybook",
-    "create:config-test-suite": "cd packages/untp-test-suite && yarn run create:config",
+    "untp": "node ./packages/untp-test-suite/build/interfaces/cli/cli.js",
     "upgrade:packages": "yarn -r --stream upgrade --latest",
     "version": "lerna version",
     "prepare": "husky install",
@@ -50,10 +52,11 @@
     "access": "public"
   },
   "resolutions": {
-    "@types/eslint": "^8.4.6"
+    "@types/eslint": "^8.4.6",
+    "strip-ansi": "6.0.0"
   },
   "engines": {
-    "node": ">= 18.0.0"
+    "node": ">= 20.12.2"
   },
   "dependencies": {
     "rimraf": "^5.0.5"

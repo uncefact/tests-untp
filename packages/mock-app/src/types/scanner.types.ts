@@ -9,6 +9,8 @@ export interface IHtml5QrcodePluginProps {
   qrbox?: { width: number; height: number };
   aspectRatio?: number;
   disableFlip?: boolean;
+  useBarCodeDetectorIfSupported?: boolean;
+  focusMode?: string;
   qrCodeSuccessCallback: (decodedText: string, result: Html5QrcodeResult) => void;
   qrCodeErrorCallback?: (error: unknown) => void;
 };

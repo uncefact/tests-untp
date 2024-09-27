@@ -50,7 +50,7 @@
 *             },
 *          ],
 *         },
-*         initialData: {},
+*         data: {},
 *         className: '',
 *       },
 *     },
@@ -82,7 +82,13 @@
 import React from 'react';
 import * as services from '@mock-app/services';
 // import * as events from '@mock-app/events';
-import { ComponentType, DynamicComponentRenderer, IDynamicComponentRendererProps } from './DynamicComponentRenderer';
+import {
+  toastMessage,
+  Status,
+  ComponentType,
+  DynamicComponentRenderer,
+  IDynamicComponentRendererProps,
+} from '@mock-app/components';
 
 export interface IServiceDefinition {
   name: string;
@@ -113,16 +119,18 @@ const getService = (name: string) => {
  */
 export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, services }: IGenericFeatureProps) => {
   const [state, setState] = React.useState<any[]>([]);
+  const [result, setResult] = React.useState<any>();
   const props: Record<string, any> = {};
 
   const executeServices = async (services: IServiceDefinition[], parameters: any[]) => {
-    return services.reduce(async (previousResult: any[] | Promise<any[]>, currentService) => {
+    const [result] = await services.reduce(async (previousResult: any[] | Promise<any[]>, currentService) => {
       const prevResult = await previousResult;
       const service: any = getService(currentService.name);
       const params = [...prevResult, ...currentService.parameters];
-      const result: any = service(...params);
+      const result: any = await service(...params);
       return [result];
     }, parameters);
+    return result;
   };
 
   return (
@@ -140,14 +148,31 @@ export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, ser
             };
             break;
           case ComponentType.Submit:
-            props.onClick = async () => {
-              await executeServices(services, state);
+            props.onClick = async (handler: (args: any) => void) => {
+              try {
+                const result = await executeServices(services, state);
+
+                handler(result);
+                setResult(result);
+                toastMessage({ status: Status.success, message: 'Action Successful' });
+              } catch (error: any) {
+                console.log(error.message);
+                toastMessage({ status: Status.error, message: 'Something went wrong' });
+              }
             };
+            break;
+          case ComponentType.Result:
+            if (result) {
+              props.data = result;
+            }
             break;
           default:
             break;
         }
 
+        if (type === ComponentType.Result && !result) {
+          return null;
+        }
         return (
           <DynamicComponentRenderer
             key={index}

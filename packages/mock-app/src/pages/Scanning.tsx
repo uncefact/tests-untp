@@ -7,8 +7,8 @@ import { toastMessage, Status, ToastMessage } from '@mock-app/components';
 import { getDlrPassport, IdentityProvider, getProviderByType } from '@mock-app/services';
 import { Scanner } from '../components/Scanner';
 import { IScannerRef } from '../types/scanner.types';
-import appConfig from '../constants/app-config.json';
 import { CustomDialog } from '../components/CustomDialog';
+import appConfig from '../constants/app-config.json';
 
 const Scanning = () => {
   const scannerRef = useRef<IScannerRef | null>(null);
@@ -22,7 +22,7 @@ const Scanning = () => {
     try {
       setIsLoading(true);
 
-      const dlrUrl = await identityProvider.getDlrUrl(scannedCode);
+      const dlrUrl = await identityProvider.getDlrUrl(scannedCode, appConfig.identifyProvider.namespace);
       if (!dlrUrl) {
         return toastMessage({ status: Status.error, message: 'There no DLR url' });
       }
@@ -36,7 +36,7 @@ const Scanning = () => {
       redirectToVerifyPage(dlrPassport.href);
     } catch (error) {
       console.log(error);
-      toastMessage({ status: Status.error, message: 'Failed to verify code' });
+      // toastMessage({ status: Status.error, message: 'Failed to verify code' });
     } finally {
       setIsLoading(false);
     }
@@ -50,7 +50,7 @@ const Scanning = () => {
   };
 
   React.useEffect(() => {
-    if (!scannedCode || !identityProvider) {
+    if (!scannedCode || !identityProvider || isLoading) {
       return;
     }
 
@@ -64,12 +64,12 @@ const Scanning = () => {
   const onScanResult = (decodedText: string, result: Html5QrcodeResult) => {
     const formatName = result?.result?.format?.formatName;
     if (!formatName) {
-      return toastMessage({ status: Status.error, message: 'Failed to scanning code' });
+      return;
+      // return toastMessage({ status: Status.error, message: 'Failed to scanning code' });
     }
 
-    const { type: providerType, url: providerUrl } = appConfig.identifyProvider;
-    const providerInstance = getProviderByType(providerType);
-    const identityProvider = new IdentityProvider(providerInstance, providerUrl);
+    const providerInstance = getProviderByType(appConfig.identifyProvider.type);
+    const identityProvider = new IdentityProvider(providerInstance, appConfig.identifyProvider.url);
 
     const scannedCodeResult = providerInstance.getCode(decodedText, formatName);
     setScannedCode(scannedCodeResult);
@@ -92,9 +92,11 @@ const Scanning = () => {
     >
       <Scanner
         ref={scannerRef}
-        fps={10}
-        qrbox={{ width: 250, height: 150 }}
+        fps={30}
+        qrbox={{ width: 500, height: 300 }}
         disableFlip={false}
+        useBarCodeDetectorIfSupported={true}
+        focusMode='continuous'
         qrCodeSuccessCallback={onScanResult}
         qrCodeErrorCallback={onScanError}
       />

@@ -1,219 +1,248 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { AppBar, Toolbar, Typography, Container, Box, IconButton, Menu, MenuItem, Button, Stack } from '@mui/material';
+import React, { useContext, useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Container,
+  Box,
+  IconButton,
+  Stack,
+  Avatar,
+  Divider,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Drawer,
+  ListItemIcon,
+  Button,
+} from '@mui/material';
 import { Menu as MenuIcon } from '@mui/icons-material';
+import SearchIcon from '@mui/icons-material/Search';
+import DialpadIcon from '@mui/icons-material/Dialpad';
+
 import appConfig from '../../constants/app-config.json';
-import { convertStringToPath } from '../../utils';
-import { IStyles } from '../../types/common.types';
+import { convertPathToString, convertStringToPath } from '../../utils';
+import { GlobalContext } from '../../hooks/GlobalContext';
+
+type ConfigAppType = typeof appConfig;
+
+const initialHeaderBrandInfo = {
+  name: appConfig.name,
+  assets: {
+    logo: '',
+  },
+};
+
+const ICON_SIZE = '30px';
+
+const iconConfig: { [key: string]: JSX.Element } = {
+  Scanning: <SearchIcon sx={{ fontSize: ICON_SIZE }} />,
+  'General features': <DialpadIcon sx={{ fontSize: ICON_SIZE }} />,
+};
 
 function Header() {
-  const [anchorElNav, setAnchorElNav] = useState<null | HTMLElement>(null);
-  const [styles, setStyles] = useState<IStyles>({
-    primaryColor: appConfig.styles.primaryColor,
-    secondaryColor: appConfig.styles.secondaryColor,
-    tertiaryColor: appConfig.styles.tertiaryColor,
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { theme } = useContext<any>(GlobalContext);
+
+  const [open, setOpen] = useState(false);
+  const [headerBrandInfo, setHeaderBrandInfo] = useState({
+    name: '',
+    assets: {
+      logo: '',
+    },
   });
 
-  const handleChangeStyles = (styles: IStyles): void => {
-    setStyles(styles);
+  const toggleDrawer = (newOpen: boolean) => () => {
+    setOpen(newOpen);
   };
 
-  /**
-   * open nav menu on mobile.
-   */
-  const handleOpenMobileNavMenu = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorElNav(event.currentTarget);
-  };
-
-  /**
-   * close nav menu on mobile.
-   */
-  const handleCloseMobileNavMenu = () => {
-    setAnchorElNav(null);
-  };
-
-  const renderMobileMenuItems = (apps: any[], scanningRoute: string, scanningStyles: IStyles) => {
-    const menuItems = apps.map((app: any) => {
-      const route = `/${convertStringToPath(app.name)}`;
-
-      return (
-        <MenuItem
-          key={route}
-          onClick={() => {
-            handleCloseMobileNavMenu();
-            handleChangeStyles(app.styles);
-          }}
-        >
-          <Typography
-            textAlign='center'
-            component={Link}
-            to={route}
-            sx={{ textDecoration: 'none', color: app.styles.tertiaryColor }}
-          >
-            {app.name}
-          </Typography>
-        </MenuItem>
-      );
-    });
-
-    // Add Scanning menu item
-    menuItems.push(
-      <MenuItem
-        key={scanningRoute}
-        onClick={() => {
-          handleCloseMobileNavMenu();
-          handleChangeStyles(scanningStyles);
-        }}
-      >
-        <Typography
-          textAlign='center'
-          component={Link}
-          to={scanningRoute}
-          sx={{ textDecoration: 'none', color: scanningStyles.tertiaryColor }}
-        >
-          Scanning
-        </Typography>
-      </MenuItem>,
-    );
-
-    return menuItems;
-  };
-
-  const renderDesktopMenuItems = (apps: any[], scanningRoute: string, scanningStyles: IStyles) => {
-    const menuItems = apps.map((app: any) => {
-      const route = `/${convertStringToPath(app.name)}`;
-
-      return (
-        <Button
-          onClick={() => handleChangeStyles(app.styles)}
-          key={route}
-          component={Link}
-          to={route}
-          sx={{ color: app.styles.secondaryColor, display: 'block' }}
-        >
-          {app.name}
-        </Button>
-      );
-    });
-
-    // Add Scanning menu item
-    menuItems.push(
-      <Button
-        onClick={() => handleChangeStyles(scanningStyles)}
-        key={scanningRoute}
-        component={Link}
-        to={scanningRoute}
-        sx={{ color: scanningStyles.secondaryColor, display: 'block' }}
-      >
-        Scanning
-      </Button>,
-    );
-
-    return menuItems;
-  };
-
-  const renderMenuByScreenType = (screenType: string) => {
-    const scanningRoute = '/scanning';
-    const scanningStyles: IStyles = {
-      primaryColor: 'rgb(41, 171, 48)',
-      secondaryColor: 'white',
-      tertiaryColor: 'black'
-    };
-
-    if (screenType === 'mobile') {
-      return renderMobileMenuItems(appConfig.apps, scanningRoute, scanningStyles);
+  const renderAvatar = (value: any) => {
+    if (value?.assets?.logo) {
+      return <Avatar sx={{ marginRight: '10px' }} alt='Company logo' src={value.assets.logo} />;
     }
 
-    return renderDesktopMenuItems(appConfig.apps, scanningRoute, scanningStyles);
+    return iconConfig[value.name];
   };
 
-  return (
-    <AppBar sx={{ background: styles.primaryColor }}>
+  const SideBarComponent = ({ app, route }: { app: any; route: string }) => (
+    <List>
+      <ListItem key={app.name} disablePadding>
+        <ListItemButton
+          component={Link}
+          to={route}
+          onClick={() => {
+            toggleDrawer(false);
+          }}
+        >
+          <ListItemIcon>{renderAvatar(app)}</ListItemIcon>
+          <ListItemText primary={app.name} />
+        </ListItemButton>
+      </ListItem>
+    </List>
+  );
+
+  const renderSidebarElements = (configApp: ConfigAppType, scanningRoute: string) => {
+    const menuItems = configApp.apps.map((app: any) => {
+      const route = `/${convertStringToPath(app.name)}`;
+      return <SideBarComponent app={app} route={route} />;
+    });
+
+    // Add Scanning menu item
+    menuItems.push(<SideBarComponent app={{ name: 'Scanning' }} route={scanningRoute} />);
+
+    const menuItemGeneratorFeatures = appConfig.generalFeatures.map((app: any) => {
+      const path = `/${convertStringToPath(app.name)}`;
+      return <SideBarComponent app={app} route={path} />;
+    });
+
+    menuItems.push(...menuItemGeneratorFeatures);
+
+    return menuItems;
+  };
+
+  const renderSidebar = () => {
+    const scanningRoute = '/scanning';
+
+    return renderSidebarElements(appConfig, scanningRoute);
+  };
+
+  const renderHeaderText = (appConfig: ConfigAppType) => {
+    return (
+      <Typography
+        variant='h5'
+        sx={{
+          fontSize: {
+            xs: '20px',
+            md: '24px',
+            lg: '24px',
+          },
+          cursor: 'pointer',
+        }}
+        onClick={() => handleClickHeaderText(headerBrandInfo.name ?? appConfig.name)}
+      >
+        {headerBrandInfo.name ?? appConfig.name}
+      </Typography>
+    );
+  };
+
+  const handleClickHeaderText = (title: string) => {
+    if (title === appConfig.name) {
+      navigate('/');
+      return;
+    }
+
+    const path = `/${convertStringToPath(title)}`;
+    navigate(path);
+  };
+
+  useEffect(() => {
+    const path = location.pathname;
+    const nameLink = convertPathToString(path ?? '');
+    const subAppStyles =
+      appConfig.apps.find((app) => app.name.toLocaleLowerCase() === nameLink.toLocaleLowerCase()) ??
+      appConfig.generalFeatures.find((app) => app.name.toLocaleLowerCase() === nameLink.toLocaleLowerCase());
+
+    setHeaderBrandInfo({
+      name: convertPathToString(path ?? ''),
+      assets: {
+        logo: subAppStyles && 'assets' in subAppStyles ? subAppStyles?.assets?.logo : '',
+      },
+    });
+
+    if (subAppStyles?.styles) {
+      theme.setSelectedTheme(subAppStyles?.styles);
+    } else {
+      theme.setSelectedTheme(appConfig.styles);
+      setHeaderBrandInfo(initialHeaderBrandInfo);
+    }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  return theme?.selectedTheme?.primaryColor &&
+    theme?.selectedTheme?.secondaryColor &&
+    theme?.selectedTheme?.tertiaryColor ? (
+    <AppBar component='nav'>
       <Container maxWidth='xl'>
         <Toolbar disableGutters>
-          {/* Logo on desktop or tablet */}
-          <Stack
-            component={Link}
-            to='/'
-            sx={{
-              textDecoration: 'none',
-              display: { xs: 'none', md: 'flex' },
-              alignItems: 'center',
-              flexDirection: 'row',
-              mr: 5,
-            }}
-          >
-            <Typography
-              variant='h5'
-              sx={{
-                color: appConfig.styles.secondaryColor,
-              }}
-            >
-              {appConfig.name}
-            </Typography>
-          </Stack>
-          {/* Menu on mobile */}
-          <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }} data-testid='menu'>
+          <Box sx={{ flexGrow: 1, display: { xs: 'flex' } }} data-testid='menu'>
             <IconButton
               data-testid='icon-button'
               size='small'
               aria-controls='menu-appbar'
               aria-haspopup='true'
-              onClick={handleOpenMobileNavMenu}
+              onClick={toggleDrawer(true)}
             >
-              <MenuIcon sx={{ color: styles.secondaryColor }} />
+              <MenuIcon
+                sx={{
+                  color: 'primary.typography',
+                }}
+              />
             </IconButton>
-            <Menu
-              data-testid='menu-appbar'
-              id='menu-appbar'
-              anchorEl={anchorElNav}
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'left',
-              }}
-              keepMounted
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'left',
-              }}
-              open={Boolean(anchorElNav)}
-              onClose={handleCloseMobileNavMenu}
+
+            <Drawer open={open} onClose={toggleDrawer(false)}>
+              <Box sx={{ width: 250 }} role='presentation' onClick={toggleDrawer(!open)}>
+                <Stack
+                  component={Link}
+                  to='/'
+                  sx={{
+                    textDecoration: 'none',
+                    textAlign: 'center',
+                    padding: '10px',
+                  }}
+                >
+                  <Typography variant='h5' sx={{ color: 'black' }}>
+                    {appConfig.name}
+                  </Typography>
+                </Stack>
+                <Divider />
+                {renderSidebar()}
+              </Box>
+            </Drawer>
+
+            <Stack
               sx={{
-                display: { xs: 'block', md: 'none' },
+                textDecoration: 'none',
+                alignItems: 'center',
+                flexDirection: 'row',
+                margin: '2px',
               }}
             >
-              {renderMenuByScreenType('mobile')}
-            </Menu>
+              {/* Render avatar */}
+              {headerBrandInfo.assets?.logo && (
+                <Avatar sx={{ marginRight: '10px' }} alt='Company logo' src={headerBrandInfo.assets.logo} />
+              )}
+              {renderHeaderText(appConfig)}
+            </Stack>
           </Box>
-          {/* Logo on mobile */}
+
           <Stack
             component={Link}
             to='/'
             sx={{
-              flexGrow: 1,
               textDecoration: 'none',
-              display: { xs: 'flex', md: 'none' },
+              alignItems: 'end',
               flexDirection: 'row',
-              margin: 'auto',
+              margin: '2px',
             }}
           >
-            <Typography
-              variant='h5'
-              sx={{
-                color: appConfig.styles.secondaryColor,
-              }}
-            >
-              {appConfig.name}
-            </Typography>
+            {!headerBrandInfo.name.includes(appConfig.name) && (
+              <Button
+                sx={{
+                  color: 'primary.typography',
+                }}
+              >
+                Back to Home
+              </Button>
+            )}
           </Stack>
-          {/* Menu item on  desktop or tablet */}
-          <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }} data-testid='menu-desktop'>
-            {renderMenuByScreenType('desktop')}
-          </Box>
         </Toolbar>
       </Container>
     </AppBar>
-  );
+  ) : null;
 }
 
 export default Header;

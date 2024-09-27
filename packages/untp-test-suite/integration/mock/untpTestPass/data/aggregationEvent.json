@@ -1,0 +1,52 @@
+{
+  "parentItem": {
+    "itemID": "https://example.com/product/12345",
+    "name": "Product A"
+  },
+  "childItems": [
+    {
+      "itemID": "https://example.com/product/67890",
+      "name": "Product B"
+    },
+    {
+      "itemID": "https://example.com/product/54321",
+      "name": "Product C"
+    }
+  ],
+  "childQuantityList": [
+    {
+      "productClass": "https://example.com/class/98765",
+      "quantity": "100",
+      "uom": "Kg"
+    },
+    {
+      "productClass": "https://example.com/class/87654",
+      "quantity": "50",
+      "uom": "L"
+    }
+  ],
+  "eventID": "6d9f8c26-06d7-4c9c-b9d1-07ef02d9789d",
+  "eventType": "aggregation",
+  "eventTime": "2024-03-08T12:00:00Z",
+  "actionCode": "add",
+  "dispositionCode": "active",
+  "businessStepCode": "shipping",
+  "readPointId": "https://example.com/readpoint/123",
+  "locationId": "https://maps.google.com/pluscodes/ABCDE",
+  "certification": [
+    {
+      "certificateID": "https://example.com/certificate/12345",
+      "referenceStandard": "https://example.com/standard/abc",
+      "evidenceURL": "https://example.com/certificate/evidence",
+      "criteriaList": [
+        "https://example.com/criteria/xyz",
+        "https://example.com/criteria/123"
+      ],
+      "assessmentLevel": "self-assessed",
+      "responsibleAgency": {
+        "partyID": "https://example.com/party/67890",
+        "name": "Certification Authority X"
+      }
+    }
+  ]
+}

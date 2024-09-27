@@ -9,7 +9,6 @@ export interface IApplication {
 }
 
 const Application = ({ app }: IApplication) => {
-
   const renderFeatures = (app: IApp) => {
     const parentPath = `/${convertStringToPath(app.name)}`;
 
@@ -17,7 +16,12 @@ const Application = ({ app }: IApplication) => {
       const childPath = `${parentPath}/${convertStringToPath(feature.name)}`;
       return (
         <Button
-          sx={{ background: app.styles.primaryColor }}
+          sx={{
+            color: 'primary.typography',
+            '&:hover': {
+              filter: 'brightness(0.9)',
+            },
+          }}
           key={childPath}
           variant='contained'
           component={Link}
@@ -32,14 +36,17 @@ const Application = ({ app }: IApplication) => {
   return (
     <Box
       sx={{
-        marginTop: '64px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'column',
-        height: '50vh',
+
+        height: '100%',
         width: '100%',
         gap: '24px',
+
+        paddingTop: '50px',
+        marginTop: '64px',
       }}
     >
       {renderFeatures(app)}

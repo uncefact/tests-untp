@@ -2,7 +2,6 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Router as RouterDom } from 'react-router-dom';
 import { createMemoryHistory } from 'history';
-import { Header } from '../components/Header';
 import { Router } from '../components/Router';
 
 // Mock the appConfig to provide test data
@@ -15,6 +14,53 @@ jest.mock(
       secondaryColor: 'white',
       tertiaryColor: 'black',
     },
+    generalFeatures: [
+      {
+        name: 'General features',
+        type: '',
+        styles: {
+          primaryColor: 'rgb(255, 207, 7)',
+          secondaryColor: 'black',
+          tertiaryColor: 'black',
+        },
+        features: [
+          {
+            name: 'Conformity Credential',
+            id: 'conformity_credential',
+            components: [
+              {
+                name: 'ConformityCredential',
+                type: '',
+                props: {
+                  credentialRequestConfigs: [
+                    {
+                      url: 'http://example.com/deforestation-free-assessment',
+                      params: {},
+                      options: {
+                        headers: [],
+                        method: 'POST',
+                      },
+                      credentialName: 'Deforestation Free Assessment',
+                      credentialPath: '/body/credentil',
+                      appOnly: 'Farm',
+                    },
+                  ],
+                  storedCredentialsConfig: {
+                    url: 'https://storage.example.com',
+                    params: {},
+                    options: {
+                      bucket: 'bucket-stored-example',
+                    },
+                    type: 's3',
+                  },
+                },
+              },
+            ],
+            services: [],
+          },
+        ],
+      },
+    ],
     apps: [
       {
         name: 'Farm',
@@ -126,23 +172,6 @@ describe('Router Component', () => {
     expect(farmButton).not.toBeNull();
     expect(feedlotButton).not.toBeNull();
     expect(processorButton).not.toBeNull();
-  });
-
-  // Test case to check if clicking on a link in the Header navigates to the correct route
-  it('should renders header and navigato to Farm component correctly', () => {
-    // Create a memory history object with an initial entry of the home route ('/')
-    const history = createMemoryHistory({ initialEntries: ['/'] });
-    // Render the Header component with the provided history
-    render(
-      <RouterDom location={history.location} navigator={history}>
-        <Header />
-      </RouterDom>,
-    );
-
-    // Simulate a click on a link in the Header (Farm)
-    fireEvent.click(screen.getByRole('link', { name: /Farm/i }));
-    // Expect the Router to navigate to the '/farm' route
-    expect(history.location.pathname).toBe('/farm');
   });
 
   // Test case to check if clicking on a feature in the Router navigates to the correct subpath

@@ -1,9 +1,8 @@
 {
   "root": true,
-  "plugins": [
-    "@typescript-eslint",
-    "prettier"
-  ],
+  // TODO: Enable linting for documentation folder
+  "ignorePatterns": ["documentation"],
+  "plugins": ["@typescript-eslint", "prettier"],
   "parser": "@typescript-eslint/parser",
   "extends": [
     "eslint:recommended",
@@ -13,11 +12,13 @@
   "parserOptions": {
     "project": [
       "./packages/tsconfig.settings.json",
-      "./packages/*/tsconfig.json"
-    ]
+       "./packages/*/tsconfig.json"
+      ]
   },
   "rules": {
     "no-console": "warn",
+    "prefer-rest-params": "warn",
+    "@typescript-eslint/ban-ts-comment": "warn",
     // Off for now, but we should enable this in the future
     "@typescript-eslint/no-unsafe-call": "off",
     "@typescript-eslint/no-unsafe-member-access": "off",
@@ -25,13 +26,12 @@
     "@typescript-eslint/no-var-requires": "off",
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/no-unsafe-return": "off",
-    "@typescript-eslint/no-unsafe-argument": "off"
+    "@typescript-eslint/no-unsafe-argument": "off",
+    "@typescript-eslint/no-non-null-assertion": "off"
   },
   "overrides": [
     {
-      "files": [
-        "*.js"
-      ],
+      "files": ["*.js"],
       "rules": {
         "@typescript-eslint/no-var-requires": "off"
       }

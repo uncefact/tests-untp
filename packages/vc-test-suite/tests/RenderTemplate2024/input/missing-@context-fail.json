@@ -1,0 +1,11 @@
+{
+  "credential": {
+    "renderMethod": [
+      {
+        "template": "<p>{{credentialSubject.name}}</p>",
+        "@type": "RenderTemplate2024",
+        "mediaType": "text/html"
+      }
+    ]
+  }
+}

@@ -4,32 +4,32 @@ import { LoadingButton } from '@mui/lab';
 import { UploadFile as UploadFileIcon } from '@mui/icons-material';
 
 export interface IImportButtonProps {
-  label?: string;
   onChange: (data: object[]) => void;
+  label?: string;
 }
 
 /**
  * ImportButton component is used to display the footer
  */
-export const ImportButton = ({ label = 'Import', onChange }: IImportButtonProps) => {
+export const ImportButton = ({ label = 'Import', onChange}: IImportButtonProps) => {
   const [loading, setLoading] = useState<boolean>(false);
 
   const loadJsonFile = (file: File): Promise<object> => {
     const maxFileSizeMB = 5;
 
     return new Promise((resolve) => {
-      if (file.size > maxFileSizeMB * 1024 * 1024) { // 5 MB
+      if (file.size > maxFileSizeMB * 1024 * 1024) {// 5 MB
         throw new Error(`File size exceeds the maximum allowed size of ${maxFileSizeMB} MB.`);
       }
       const fileReader = new FileReader();
-  
+
       fileReader.onload = (event) => {
         const fileContent = event?.target?.result;
         try {
           if (!fileContent) {
             throw new Error('File content is empty! Please select a valid file.');
           }
-  
+
           const fileContentObject = JSON.parse(fileContent as string);
           resolve(fileContentObject);
         } catch (error: any) {
@@ -40,7 +40,7 @@ export const ImportButton = ({ label = 'Import', onChange }: IImportButtonProps)
       fileReader.onerror = () => {
         throw new Error('Error reading the file! Please try again.');
       };
-  
+
       fileReader.readAsText(file);
     });
   }
@@ -56,7 +56,7 @@ export const ImportButton = ({ label = 'Import', onChange }: IImportButtonProps)
 
       const fileArray = Array.from(files);
       const fileContents = await Promise.all(fileArray.map((file: File) => loadJsonFile(file)));
-      
+
       onChange(fileContents);
     } catch (error: any) {
       throw new Error(error);
@@ -68,7 +68,7 @@ export const ImportButton = ({ label = 'Import', onChange }: IImportButtonProps)
   return (
     <Box
       sx={{
-        paddingTop: '40px',
+        paddingTop: '60px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -81,15 +81,9 @@ export const ImportButton = ({ label = 'Import', onChange }: IImportButtonProps)
           marginBottom: '20px',
         }}
       >
-        <LoadingButton
-          loading={loading}
-          component='label'
-          variant='outlined'
-          startIcon={<UploadFileIcon />}
-          sx={{ margin: '0 5px' }}
-        >
+        <LoadingButton loading={loading} component='label' variant='outlined' startIcon={<UploadFileIcon />}>
           {label}
-          <input data-testid="file-input" type='file' accept='.json' hidden onChange={handleFileUpload} multiple />
+          <input data-testid='file-input' type='file' accept='.json' hidden onChange={handleFileUpload} multiple />
         </LoadingButton>
       </Box>
     </Box>

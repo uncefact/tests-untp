@@ -1,4 +1,22 @@
 export const contextTransformationEvent = {
+  transformationEventCredential: {
+    mappingFields: [
+      {
+        "sourcePath": "/",
+        "destinationPath": "/"
+      }
+    ]
+  },
+  dppCredentials: [
+    {
+      "mappingFields": [
+        {
+          "sourcePath": "/",
+          "destinationPath": "/"
+        }
+      ]
+    }
+  ],
   epcisTransformationEvent: {
     context: ['https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transformation-event-ld.json'],
     renderTemplate: [{ template: '<p>Render epcis template</p>', '@type': 'WebRenderingTemplate2022' }],
@@ -26,14 +44,25 @@ export const contextTransformationEvent = {
     dlrAPIKey: '5555555555555',
   },
   storage: {
-    storageAPIUrl: 'https://storage.agtrace.showthething.com',
-    bucket: 'agtrace-test-verifiable-credentials',
+    url: 'https://storage.example.com',
+    params: {
+      resultPath: '',
+    },
   },
   productTransformation: {
     inputItems: [{ quantity: 1, uom: 'head', productClass: 'cattle' }],
     outputItems: [
       {
-        productID: '9359502000041',
+        productID: [
+          {
+            ai: '01',
+            value: '9359502000041',
+          },
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
         productClass: 'Beef Silverside',
         quantity: 500,
         weight: 500,
@@ -43,7 +72,16 @@ export const contextTransformationEvent = {
         description: 'Deforestation-free Beef Silverside',
       },
       {
-        productID: '9359502000034',
+        productID: [
+          {
+            ai: '01',
+            value: '9359502000034',
+          },
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
         productClass: 'Beef Scotch Fillet',
         quantity: 300,
         weight: 300,
@@ -53,7 +91,16 @@ export const contextTransformationEvent = {
         description: 'Deforestation-free Beef Scotch Fillet',
       },
       {
-        productID: '9359502000010',
+        productID: [
+          {
+            ai: '01',
+            value: '9359502000010',
+          },
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
         productClass: 'Beef Rump Steak',
         quantity: 250,
         weight: 250,
@@ -64,7 +111,7 @@ export const contextTransformationEvent = {
       },
     ],
   },
-  identifierKeyPaths: ['NLIS'],
+  identifierKeyPath: '/NLIS',
 };
 
 export const dataTransformationEvent = {
@@ -78,7 +125,7 @@ export const dataTransformationEvent = {
   },
 };
 /*============================= */
-export const contextObjectEvent = {
+export const contextDPP = {
   vckit: {
     vckitAPIUrl: 'https://vckit.example.com',
     issuer: 'did:web:example.com',
@@ -96,18 +143,64 @@ export const contextObjectEvent = {
     dlrAPIKey: '1234',
   },
   storage: {
-    storageAPIUrl: 'https://storage.example.com',
-    bucket: 'test-verifiable-credentials',
+    url: 'https://storage.example.com',
+    params: {
+      resultPath: '',
+    },
   },
-  identifierKeyPaths: ['herd', 'NLIS'],
+  identifierKeyPath: '/herd/identifier',
 };
 
-export const dataObjectEvent = {
+export const dataDPP = {
   data: {
     herd: {
-      NLIS: 'NH020188LEJ00012',
+      identifier: '9359502000010',
+    },
+  },
+  qualifierPath: '/10/ABC123',
+};
+
+/*============================= */
+
+export const transactionEventMock = {
+  nlisidMock: '9988776600000',
+  uploadedTransactionEventLinkMock: `https://s3.ap-southeast-2.amazonaws.com/9988776600000-mock.json`,
+  transactionEventDLRMock: `https://example-dlr.com/nlisid/9988776600000?linkType=all`,
+  transactionVCMock: {
+    '@context': ['https://example.sh/TransactionEvent.jsonld'],
+    type: ['VerifiableCredential', 'TransactionEventCredential'],
+    issuer: 'did:web:example.com',
+    credentialSubject: {
+      sourceParty: { partyID: `https://beef-steak-shop.com/info.json`, name: 'Beef Steak Shop' },
+      destinationParty: { partyID: 'https://beef-shop.com/info.json', name: 'Beef Shop' },
+      transaction: {
+        type: 'inv',
+        identifier: 'uuid-123456',
+        documentURL: 'https://transaction-example.com/trans-uuid-1.json',
+      },
+      itemList: [{ itemID: 'https://beef-example.com/info-uuid-1.json', name: 'Beef' }],
+      quantityList: [{ productClass: 'Beef', quantity: '50', uom: 'units' }],
     },
   },
 };
 
 /*============================= */
+
+export const aggregationEventMock = {
+  parentItem: [{ ai: '01', value: '09359502000010' }],
+  uploadedAggregationEventLinkMock: `https://s3.ap-southeast-2.amazonaws.com/9988776600000.json`,
+  aggregationEventDLRMock: `https://example.com/gtin/9988776600000.json`,
+  aggregationVCMock: {
+    '@context': ['https://example.sh/AggregationEvent.jsonld'],
+    type: ['VerifiableCredential', 'AggregationEventCredential'],
+    issuer: 'did:web:example.com',
+    credentialSubject: {
+      parentItem: {
+        itemID: `https://example.com/gtin/beef-container-gin-9988776600000.json`,
+        name: 'Beef Variety Container',
+      },
+      childItems: [{ itemID: 'http://example.com/beef-scotch-box.json', name: 'Beef Scotch Fillet Box' }],
+      childQuantityList: [{ productClass: 'Beef', quantity: '50', uom: 'box' }],
+    },
+  },
+};

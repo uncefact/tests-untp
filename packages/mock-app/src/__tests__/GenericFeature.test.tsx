@@ -60,7 +60,7 @@ describe('GenericFeature', () => {
             },
           ],
         },
-        initialData: {},
+        data: {},
         className: '',
       },
     },

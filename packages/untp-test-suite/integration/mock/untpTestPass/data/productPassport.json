@@ -1,0 +1,84 @@
+{
+  "id": "https://example.com/product-passport/123456",
+  "issuedBy": {
+    "id": "https://example.com/parties/acme-ltd",
+    "name": "ACME Ltd"
+  },
+  "product": {
+    "productId": "https://example.com/products/78901234",
+    "model": "XYZ123",
+    "productClass": "33512200",
+    "image": "https://example.com/images/xyz123.jpg",
+    "description": "This is a description of the product.",
+    "recyclingInfo": "https://example.com/recycling-info/xyz123",
+    "manufacturer": {
+      "id": "https://example.com/parties/acme-ltd",
+      "name": "ACME Ltd"
+    }
+  },
+  "batch": {
+    "batchId": "https://example.com/batches/567890",
+    "serialNumber": ["12345678", "23456789"],
+    "manufacturedAt": {
+      "id": "https://example.com/facilities/factory-1",
+      "name": "Factory 1",
+      "operatedBy": {
+        "id": "https://example.com/parties/acme-ltd",
+        "name": "ACME Ltd"
+      }
+    },
+    "manufacturedDate": "2023-06-15",
+    "provenance": [
+      {
+        "country": "US",
+        "percentage": 80,
+        "guaranteeOfOriginCredential": "https://example.com/credentials/123"
+      },
+      {
+        "country": "CA",
+        "percentage": 20,
+        "guaranteeOfOriginCredential": "https://example.com/credentials/456"
+      }
+    ],
+    "sustainabilityInfo": [
+      {
+        "topic": "environment.emissions",
+        "criteria": "https://example.com/standards/env-001",
+        "sustainabilityCredential": "https://example.com/credentials/789",
+        "metric": [
+          {
+            "metric": "https://example.com/metrics/co2-intensity",
+            "unit": "Kg CO2e / unit",
+            "value": 25.6
+          }
+        ],
+        "compliance": true
+      },
+      {
+        "topic": "social.employment",
+        "criteria": "https://example.com/standards/soc-001",
+        "sustainabilityCredential": "https://example.com/credentials/012",
+        "metric": [
+          {
+            "metric": "https://example.com/metrics/employment-rate",
+            "unit": "%",
+            "value": 95
+          }
+        ],
+        "compliance": true
+      }
+    ],
+    "traceabilityInfo": [
+      {
+        "eventReference": "https://example.com/traceability-events/123",
+        "eventType": "aggregation"
+      },
+      {
+        "eventReference": "https://example.com/traceability-events/456",
+        "eventType": "transformation"
+      }
+    ]
+  },
+  "sustainabilityScore": 85.5,
+  "trustScore": 90.2
+}
