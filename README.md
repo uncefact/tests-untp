@@ -48,6 +48,16 @@ docker-compose up -d
 
 This will start pre-configured instances of the necessary services and the documentation site. The `app-config.json` mock app config file is pre-configured to work with these Docker services.
 
+### Docker Compose with Seeding Data
+
+If you want to run the Docker Compose along with seeding data, you can use the following command:
+
+```bash
+SEEDING=true docker-compose up -d
+```
+
+The `SEEDING` environment variable acts as a flag to seed the Identity Resolver and Mock Global GS1 Resolver services with the necessary data.
+
 ## Documentation
 
 For detailed information about the configuration, services, and how to use the mock app, please refer to the documentation site. 

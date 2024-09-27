@@ -136,8 +136,10 @@ services:
       - /bin/sh
       - -c
       - |
-        ./seeding-idr-data.sh
-        ./seeding-mock-gs1-data.sh
+        if [ "$SEEDING" == "true" ]; then
+          ./seeding-idr-data.sh
+          ./seeding-mock-gs1-data.sh
+        fi
     volumes:
       - ./seeding-idr-data.sh:/scripts/seeding-idr-data.sh
       - ./seeding-mock-gs1-data.sh:/scripts/seeding-mock-gs1-data.sh
