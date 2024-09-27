@@ -176,7 +176,8 @@ Open the `credentials.json` file and update it with the following structure, inc
 {
   "type": "aggregationEvent", // Example event schema type
   "version": "v0.0.1", // Example event schema version
-  "dataPath": "/path/to/your/data/file" // Example test data path
+  "dataPath": "/path/to/your/data/file", // Example test data path
+  "url": "" // If you want to use a remote schema, provide the URL here, the type and version fields will be ignored
 }
 ```
 
@@ -205,6 +206,7 @@ testCredentialsHandler({
       type: 'aggregationEvent',
       version: 'v0.0.1',
       dataPath: '/data/aggregationEvent.json',
+      url: '',
     },
     // Add more credentials as needed...
   ],
@@ -221,11 +223,35 @@ testCredentialsHandler({
 
 You can run the UNTP test with a credentials object, where the first argument is the credential schema and the second is a test data object.
 
+With local schema:
+
 ```js
 testCredentialHandler(
   {
     type: 'aggregationEvent',
     version: 'v0.0.1',
+  },
+  {
+    exampleField: 'example data',
+    // Add more fields as needed...
+  },
+)
+  .then((results) => {
+    // Handle the test results here
+  })
+  .catch((error) => {
+    // Handle any errors here
+  });
+```
+
+With remote schema:
+
+```js
+testCredentialHandler(
+  {
+    type: '',
+    version: '',
+    url: 'https://jargon.sh/user/unece/traceabilityEvents/v/working/artefacts/jsonSchemas/render.json?class=AggregationEvent',
   },
   {
     exampleField: 'example data',
