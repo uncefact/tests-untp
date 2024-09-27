@@ -5,54 +5,79 @@
     "type": {
       "type": "array",
       "readOnly": true,
-      "const": ["DigitalFacilityRecord", "VerifiableCredential"],
-      "default": ["DigitalFacilityRecord", "VerifiableCredential"],
+      "const": ["Facility", "Entity"],
+      "default": ["Facility", "Entity"],
       "items": {
         "type": "string",
-        "enum": ["DigitalFacilityRecord", "VerifiableCredential"]
+        "enum": ["Facility", "Entity"]
       }
     },
-    "@context": {
-      "example": "https://test.uncefact.org/vocabulary/untp/dpp/dpp-context.jsonld",
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dfr/{{version}}"]
-      },
-      "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
-      "readOnly": true,
-      "const": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dfr/{{version}}"],
-      "default": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dfr/{{version}}"]
-    },
     "id": {
-      "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
+      "example": "https://id.gs1.org/gln/0614141123452",
       "type": "string",
       "format": "uri",
-      "description": "A unique identifier (URI) assigned to the product passport. May be a UUID"
+      "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
     },
-    "issuer": {
-      "$ref": "#/$defs/CredentialIssuer",
-      "description": "The organisation that is the isuer of this VC. Note that the \"id\" property MUST be a W3C DID.  Other identifiers such as tax registration numbers can be listed in the \"otherIdentifiers\" property."
-    },
-    "validFrom": {
-      "example": "2024-03-15",
+    "registeredId": {
+      "example": "0614141123452",
       "type": "string",
-      "format": "date-time",
-      "description": "The date and time from which the credential is valid."
+      "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
     },
-    "validUntil": {
-      "example": "2034-03-15",
+    "description": {
+      "example": "LiFePO4 Battery plant number 7",
       "type": "string",
-      "format": "date-time",
-      "description": "The expiry date (if applicable) of this verifiable credential."
+      "description": "An optional short description of the facility"
     },
-    "credentialSubject": {
-      "$ref": "#/$defs/Facility",
-      "description": "The subject of a digitial facility record is a Facility "
+    "name": {
+      "example": "Example facility 7",
+      "type": "string",
+      "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
+    },
+    "idScheme": {
+      "$ref": "#/$defs/IdentifierScheme",
+      "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+    },
+    "countryOfOperation": {
+      "type": "string",
+      "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
+      "description": "The country in which this facility is operating.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+    },
+    "processCategories": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Classification"
+      },
+      "description": "The idustrial or production processes performed by this facility.    id:unstats.un.org/isic/1030  code:1030  name:Processing and preserving of fruit and vegetables  schemeID:unstats.un.org/unsd/classifications/Econ/isic  schemeName:ISIC"
+    },
+    "operatedByParty": {
+      "$ref": "#/$defs/Entity",
+      "description": "The Party entity responsible for operating the facility.An object structure that uniquely identifies the party within a known party identifiaction scheme. "
+    },
+    "otherIdentifiers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Entity"
+      },
+      "description": "An optional list of other registered identifiers for this facility - eg GLNs or other schemes."
+    },
+    "address": {
+      "$ref": "#/$defs/Address",
+      "description": "The Postal address of the location."
+    },
+    "locationInformation": {
+      "$ref": "#/$defs/Location",
+      "description": "Physical location details"
+    },
+    "conformityDeclarations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Declaration"
+      },
+      "description": "A list of conformity declarations agains specific criterai from recognised standards or regulations. "
     }
   },
-  "description": "A digital verifiable credential hodling faiclity performance inofmration.",
-  "required": ["@context", "id", "issuer"],
+  "description": "A facility sustainabiloty performacne record.",
+  "required": ["id", "name"],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
     "CredentialIssuer": {
@@ -80,7 +105,7 @@
           "items": {
             "$ref": "#/$defs/Entity"
           },
-          "description": "An optional list of other registered identifiers for this credential issuer "
+          "description": "An optional list of other registered identifiers for this credential issuer"
         }
       },
       "description": "The issuer party ()person or orgnaition) of a verifiable credential.",
@@ -141,87 +166,6 @@
         }
       },
       "description": "An identifier registration scheme for products, facilities, or organisations. Typically operated by a state, national or gloabl authority."
-    },
-    "Facility": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": ["Facility", "Entity"],
-          "default": ["Facility", "Entity"],
-          "items": {
-            "type": "string",
-            "enum": ["Facility", "Entity"]
-          }
-        },
-        "id": {
-          "example": "https://id.gs1.org/gln/0614141123452",
-          "type": "string",
-          "format": "uri",
-          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
-        },
-        "registeredId": {
-          "example": "0614141123452",
-          "type": "string",
-          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
-        },
-        "description": {
-          "example": "LiFePO4 Battery plant number 7",
-          "type": "string",
-          "description": "An optional short description of the facility"
-        },
-        "name": {
-          "example": "Example facility 7",
-          "type": "string",
-          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
-        },
-        "idScheme": {
-          "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
-        },
-        "countryOfOperation": {
-          "type": "string",
-          "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
-          "description": "The country in which this facility is operating.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
-        },
-        "processCategories": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Classification"
-          },
-          "description": "The idustrial or production processes performed by this facility.    id:unstats.un.org/isic/1030  code:1030  name:Processing and preserving of fruit and vegetables  schemeID:unstats.un.org/unsd/classifications/Econ/isic  schemeName:ISIC"
-        },
-        "operatedByParty": {
-          "$ref": "#/$defs/Entity",
-          "description": "The Party entity responsible for operating the facility.An object structure that uniquely identifies the party within a known party identifiaction scheme. "
-        },
-        "otherIdentifiers": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Entity"
-          },
-          "description": "An optional list of other registered identifiers for this facility - eg GLNs or other schemes."
-        },
-        "address": {
-          "$ref": "#/$defs/Address",
-          "description": "The Postal address of the location."
-        },
-        "locationInformation": {
-          "$ref": "#/$defs/Location",
-          "description": "Physical location details"
-        },
-        "conformityDeclarations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Declaration"
-          },
-          "description": "A list of conformity declarations agains specific criterai from recognised standards or regulations. "
-        }
-      },
-      "description": "A facility sustainabiloty performacne record.",
-      "required": ["id", "name"]
     },
     "Classification": {
       "type": "object",

@@ -5,32 +5,32 @@
     "type": {
       "type": "array",
       "readOnly": true,
-      "const": ["Product", "Entity"],
-      "default": ["Product", "Entity"],
+      "const": ["Product"],
+      "default": ["Product"],
       "items": {
         "type": "string",
-        "enum": ["Product", "Entity"]
+        "enum": ["Product"]
       }
     },
     "id": {
       "example": "https://id.gs1.org/01/09520123456788/21/12345",
       "type": "string",
       "format": "uri",
-      "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+      "description": "The globally unique ID of the product as a URI. Ideall as a resolvable URL according to ISO 18975. "
     },
     "name": {
       "example": "EV battery 300Ah.",
       "type": "string",
-      "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
+      "description": "The registered name of the product within the identifier scheme. "
     },
     "registeredId": {
-      "example": "90664869327",
+      "example": "09520123456788.21.12345",
       "type": "string",
       "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
     },
     "idScheme": {
       "$ref": "#/$defs/IdentifierScheme",
-      "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+      "description": "The identifier scheme for this product.  Eg a GS1 GTIn or an AU Livestock NLIS, or similar. If self issued then use the party ID of the issuer.  "
     },
     "serialNumber": {
       "example": "12345678",
@@ -66,11 +66,11 @@
       "description": "A URL pointing to further human readable information about the product."
     },
     "producedByParty": {
-      "$ref": "#/$defs/Entity",
+      "$ref": "#/$defs/Identifier",
       "description": "The Party entity that manufactured the product."
     },
     "producedAtFacility": {
-      "$ref": "#/$defs/Entity",
+      "$ref": "#/$defs/Identifier",
       "description": "The Facility where the product batch was produced / manufactured."
     },
     "dimensions": {
@@ -88,6 +88,10 @@
       "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
       "description": "The country in which this item was produced / manufactured.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
     },
+    "dueDiligenceDeclaration": {
+      "$ref": "#/$defs/Link",
+      "description": "The due diligence declaration that conforms with the regulations of the market into which the product is sold."
+    },
     "materialsProvenance": {
       "type": "array",
       "items": {
@@ -95,10 +99,10 @@
       },
       "description": "An array of Provenance objects providing details on the origin and mass fraction of components or ingredients of the product batch. "
     },
-    "conformityDeclarations": {
+    "conformityClaims": {
       "type": "array",
       "items": {
-        "$ref": "#/$defs/Declaration"
+        "$ref": "#/$defs/Claim"
       },
       "description": "An array of claim objects representing various product conformity claims about the product / batch.  These can be sustainability claims, circularity claims, or any other claim type within the conformity topic list."
     },
@@ -111,10 +115,7 @@
       "description": "An emissions performacne scorecard"
     },
     "traceabilityInformation": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/SecureLink"
-      },
+      "$ref": "#/$defs/TraceabilityPerformance",
       "description": "An array of secure links to TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch. SHOULD be provided for any product passport issued at batch or item level. Links should include the hash of the target and may point to encrypted targets."
     }
   },
@@ -122,44 +123,6 @@
   "required": ["id", "name"],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
-    "Entity": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": ["Entity"],
-          "default": ["Entity"],
-          "items": {
-            "type": "string",
-            "enum": ["Entity"]
-          }
-        },
-        "id": {
-          "example": "https://id.gs1.org/01/09520123456788/21/12345",
-          "type": "string",
-          "format": "uri",
-          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
-        },
-        "name": {
-          "example": "EV battery 300Ah.",
-          "type": "string",
-          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
-        },
-        "registeredId": {
-          "example": "90664869327",
-          "type": "string",
-          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
-        },
-        "idScheme": {
-          "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
-        }
-      },
-      "description": "The ID and Name of an identified entity such qs a product, facility, party, standard, etc.  If the identifier is a W3C DID then the corresponding DID document SHOULD include a serviceEndpoint of type \"IdentityResolver\". If the identifier is not a W3C DID then the id peroperty SHOULD be an identity resolver URL.",
-      "required": ["id", "name"]
-    },
     "IdentifierScheme": {
       "type": "object",
       "additionalProperties": false,
@@ -266,6 +229,44 @@
       "description": "A classification scheme and code / name representing a category value for a product, entity, or facility.",
       "required": ["id", "name"]
     },
+    "Identifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Identifier"],
+          "default": ["Identifier"],
+          "items": {
+            "type": "string",
+            "enum": ["Identifier"]
+          }
+        },
+        "id": {
+          "example": "https://id.gs1.org/01/09520123456788/21/12345",
+          "type": "string",
+          "format": "uri",
+          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+        },
+        "name": {
+          "example": "EV battery 300Ah.",
+          "type": "string",
+          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
+        },
+        "registeredId": {
+          "example": "90664869327",
+          "type": "string",
+          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+        },
+        "idScheme": {
+          "$ref": "#/$defs/IdentifierScheme",
+          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+        }
+      },
+      "description": "The ID and Name of an identified entity such qs a product, facility, party, standard, etc.  If the identifier is a W3C DID then the corresponding DID document SHOULD include a serviceEndpoint of type \"IdentityResolver\". If the identifier is not a W3C DID then the id peroperty SHOULD be an identity resolver URL.",
+      "required": ["id", "name"]
+    },
     "Dimension": {
       "type": "object",
       "additionalProperties": false,
@@ -364,6 +365,10 @@
           "type": "number",
           "description": "The mass fraction of the product represented by this material. The sum of all mass fraction values for a given passport should be 1."
         },
+        "massAmount": {
+          "$ref": "#/$defs/Measure",
+          "description": "The mass of the material component."
+        },
         "recycledAmount": {
           "example": 0.5,
           "type": "number",
@@ -374,6 +379,11 @@
           "type": "boolean",
           "description": "Indicates whether this material is hazardous. If true then the materialSafetyInformation proerty must be present"
         },
+        "symbol": {
+          "type": "string",
+          "format": "binary",
+          "description": "Based 64 encoded binary used to represent a visual symbol for a given material. "
+        },
         "materialSafetyInformation": {
           "$ref": "#/$defs/Link",
           "description": "Refernece to further information obout safe handling of this hazardous material (for example a link to a material safety data sheet)"
@@ -382,19 +392,25 @@
       "description": "The material class encapsulates details about the origin or source of raw materials in a product, including the country of origin and the mass fraction.",
       "required": ["name"]
     },
-    "Declaration": {
+    "Claim": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": ["Declaration"],
-          "default": ["Declaration"],
+          "const": ["Claim", "Declaration"],
+          "default": ["Claim", "Declaration"],
           "items": {
             "type": "string",
-            "enum": ["Declaration"]
+            "enum": ["Claim", "Declaration"]
           }
+        },
+        "assessmentDate": {
+          "example": "2024-03-15",
+          "type": "string",
+          "format": "date",
+          "description": "The date on which this assessment was made. "
         },
         "id": {
           "example": "https://products.example-company.com/09520123456788/declarations/12345",
@@ -485,7 +501,7 @@
           "description": "The name of the standard"
         },
         "issuingParty": {
-          "$ref": "#/$defs/Entity",
+          "$ref": "#/$defs/Identifier",
           "description": "The party that issued the standard "
         },
         "issueDate": {
@@ -529,7 +545,7 @@
           "description": "The legal jurisdiction (country) under which the regulation is issued.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
         },
         "administeredBy": {
-          "$ref": "#/$defs/Entity",
+          "$ref": "#/$defs/Identifier",
           "description": "the issuing body of the regulation. For example Australin Goernment Department of Climate Change, Energy, the Environment and Water"
         },
         "effectiveDate": {
@@ -600,6 +616,11 @@
         "metricValue": {
           "$ref": "#/$defs/Measure",
           "description": "A numeric value and unit of measure for this metric. Could be a measured value or a specified threshold. Eg {\"value\":400, \"unit\":\"MPA\"} as tensile strenght of structural steel"
+        },
+        "score": {
+          "example": "BB",
+          "type": "string",
+          "description": "A score or rank associated with this measured metric."
         },
         "accuracy": {
           "example": 0.05,
@@ -753,6 +774,40 @@
       },
       "description": "Product specific characteristics.  This class is an extension point for industry specific product characteristics or performance information such as clothing size or battery capacity.",
       "required": ["carbonFootprint", "declaredUnit", "operationalScope", "primarySourcedRatio"]
+    },
+    "TraceabilityPerformance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["TraceabilityPerformance"],
+          "default": ["TraceabilityPerformance"],
+          "items": {
+            "type": "string",
+            "enum": ["TraceabilityPerformance"]
+          }
+        },
+        "valueChainProcess": {
+          "example": "Spinning",
+          "type": "string",
+          "description": "Hman readable name for the industry specific value chain process representing this traceability data set."
+        },
+        "verifiedRatio": {
+          "example": 0.5,
+          "type": "number",
+          "description": "The proportion (0 to 1) of materials in this value chain process that have been  traced using verifiable traceability event."
+        },
+        "traceabilityEvents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SecureLink"
+          },
+          "description": "A list of secure links to digital traceability events that support this traceability performance statement. May be encrypted for confidentiality purposes. "
+        }
+      },
+      "description": ""
     }
   }
 }

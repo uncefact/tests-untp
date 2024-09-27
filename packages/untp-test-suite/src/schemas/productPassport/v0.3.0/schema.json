@@ -3,161 +3,115 @@
   "additionalProperties": false,
   "properties": {
     "type": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "The credential type.  Must include the string \"VerifiableCredential\" and additionally the specific credential type (eg \"UNTPDigitalProductPassport\")"
-    },
-    "@context": {
       "type": "string",
-      "description": "A list of JSON-LD contect URIs that define the seamntic meaning of prperties within the credential. "
+      "default": "Product",
+      "enum": ["Product"]
     },
     "id": {
       "type": "string",
       "format": "uri",
-      "description": "A unique identifier (URI) assigned to the product passport."
+      "description": "A linked data URL for the entity (product, facility, or organisation) that is identified by this identifier - eg https://abr.business.gov.au/ABN/View?abn=90664869327"
     },
-    "issuer": {
+    "idScheme": {
       "type": "string",
       "format": "uri",
-      "description": "The W3C DID of the Party that issued the verifiable credential."
+      "description": "the identifier scheme as defined by the registrar that manages the identifier registry. Eg abr.busines.gov.au If the identifier scheme is registered with UNTP then this URI can use used to dicsover the resolution method (to get more data) and the verification method (to prove ownership)."
     },
-    "validFrom": {
+    "idSchemeName": {
       "type": "string",
-      "format": "date-time",
-      "description": "The date and time from which the credential is valid."
+      "description": "The identifier scheme name (eg Australian Business Number or GS1 Global Trade Item Number))"
     },
-    "validUntil": {
+    "idValue": {
       "type": "string",
-      "format": "date-time",
-      "description": "The expiry date (if applicable) of this verifiable credential."
+      "description": "The value of the identifier within the scheme (eg 90664869327)"
     },
-    "credentialStatus": {
+    "productName": {
       "type": "string",
-      "description": "The status of the verifiable credential - must be an object that conforms to the W3C VCDM 2.0 Status object - https://www.w3.org/TR/vc-data-model-2.0/#status "
+      "description": "The model name or number of the product, represented as text."
     },
-    "credentialSubject": {
-      "$ref": "#/$defs/Product",
-      "description": "The subject of a digital product passport credential is the identified product."
+    "productImage": {
+      "$ref": "#/$defs/BinaryFile",
+      "description": "A unique identifier (URI) pointing to an image of the product."
+    },
+    "description": {
+      "type": "string",
+      "description": "A textual description providing details about the product."
+    },
+    "productCategory": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Classification"
+      },
+      "description": "A code representing the product's class, typically using the UN CPC (United Nations Central Product Classification) https://unstats.un.org/unsd/classifications/Econ/cpc"
+    },
+    "furtherInformation": {
+      "type": "string",
+      "format": "uri",
+      "description": "A URL pointing to further human readable information about the product."
+    },
+    "producedBy": {
+      "$ref": "#/$defs/Organisation",
+      "description": "The Party entity that manufactured the product."
+    },
+    "serialNumber": {
+      "type": "string",
+      "description": "An array of identifiers representing a specific serialised item of the product."
+    },
+    "batchNumber": {
+      "type": "string",
+      "description": "Information regarding the specific production batch of the product."
+    },
+    "productionDate": {
+      "type": "string",
+      "format": "date",
+      "description": "The ISO 8601 date on which the product batch was manufactured."
+    },
+    "countryOfProduction": {
+      "type": "string",
+      "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
+      "description": "The country in which this item was produced / manufactured.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+    },
+    "dimensions": {
+      "$ref": "#/$defs/Dimension",
+      "description": "The physical dimensions of the product. Not every dimension is relevant to every products.  For example bulk materials may have wieght and volume but not length, with, or height."
+    },
+    "characteristics": {
+      "$ref": "#/$defs/Characteristic",
+      "description": "Product specific characteristics.  This class is an extension point for industry specific product characteristics or performance information such as clothing size or battery capacity."
+    },
+    "manufacturedAt": {
+      "$ref": "#/$defs/Facility",
+      "description": "The Facility where the product batch was manufactured."
+    },
+    "materialsProvenance": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Material"
+      },
+      "description": "An array of Provenance objects providing details on the origin and mass fraction of components or ingredients of the product batch."
+    },
+    "conformityInformation": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Claim"
+      },
+      "description": "An array of claim objects representing various product conformity claims about the product / batch.  These can be sustainability claims, circularity claims, or any other claim type within the conformity topic list."
+    },
+    "circularityInformation": {
+      "$ref": "#/$defs/Circularity",
+      "description": "A URI pointing to information regarding the recycling aspects of the product."
+    },
+    "traceabilityInformation": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TraceabilityEvent"
+      },
+      "description": "An array of TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch. SHOULD be provided for any product passport issued at batch or item level."
     }
   },
-  "description": "The ProductPassport is a comprehensive data structure that encapsulates various details pertaining to a product, including its identification details, who issued it, batch information, provernance information, circularity information and a set of verifable product confomrity & sistainability claims.  ",
+  "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details.",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
-    "Product": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "string",
-          "default": "Product",
-          "enum": ["Product"]
-        },
-        "id": {
-          "type": "string",
-          "format": "uri",
-          "description": "A linked data URL for the entity (product, facility, or organisation) that is identified by this identifier - eg https://abr.business.gov.au/ABN/View?abn=90664869327"
-        },
-        "idScheme": {
-          "type": "string",
-          "format": "uri",
-          "description": "the identifier scheme as defined by the registrar that manages the identifier registry. Eg abr.busines.gov.au If the identifier scheme is registered with UNTP then this URI can use used to dicsover the resolution method (to get more data) and the verification method (to prove ownership)."
-        },
-        "idSchemeName": {
-          "type": "string",
-          "description": "The identifier scheme name (eg Australian Business Number or GS1 Global Trade Item Number))"
-        },
-        "idValue": {
-          "type": "string",
-          "description": "The value of the identifier within the scheme (eg 90664869327)"
-        },
-        "productName": {
-          "type": "string",
-          "description": "The model name or number of the product, represented as text."
-        },
-        "productImage": {
-          "$ref": "#/$defs/BinaryFile",
-          "description": "A unique identifier (URI) pointing to an image of the product."
-        },
-        "description": {
-          "type": "string",
-          "description": "A textual description providing details about the product."
-        },
-        "productCategory": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Classification"
-          },
-          "description": "A code representing the product's class, typically using the UN CPC (United Nations Central Product Classification) https://unstats.un.org/unsd/classifications/Econ/cpc"
-        },
-        "furtherInformation": {
-          "type": "string",
-          "format": "uri",
-          "description": "A URL pointing to further human readable information about the product."
-        },
-        "producedBy": {
-          "$ref": "#/$defs/Organisation",
-          "description": "The Party entity that manufactured the product."
-        },
-        "serialNumber": {
-          "type": "string",
-          "description": "An array of identifiers representing a specific serialised item of the product."
-        },
-        "batchNumber": {
-          "type": "string",
-          "description": "Information regarding the specific production batch of the product."
-        },
-        "productionDate": {
-          "type": "string",
-          "format": "date",
-          "description": "The ISO 8601 date on which the product batch was manufactured."
-        },
-        "countryOfProduction": {
-          "type": "string",
-          "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
-          "description": "The country in which this item was produced / manufactured.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
-        },
-        "dimensions": {
-          "$ref": "#/$defs/Dimension",
-          "description": "The physical dimensions of the product. Not every dimension is relevant to every products.  For example bulk materials may have wieght and volume but not length, with, or height."
-        },
-        "characteristics": {
-          "$ref": "#/$defs/Characteristic",
-          "description": "Product specific characteristics.  This class is an extension point for industry specific product characteristics or performance information such as clothing size or battery capacity."
-        },
-        "manufacturedAt": {
-          "$ref": "#/$defs/Facility",
-          "description": "The Facility where the product batch was manufactured."
-        },
-        "materialsProvenance": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Material"
-          },
-          "description": "An array of Provenance objects providing details on the origin and mass fraction of components or ingredients of the product batch."
-        },
-        "conformityInformation": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Claim"
-          },
-          "description": "An array of claim objects representing various product conformity claims about the product / batch.  These can be sustainability claims, circularity claims, or any other claim type within the conformity topic list."
-        },
-        "circularityInformation": {
-          "$ref": "#/$defs/Circularity",
-          "description": "A URI pointing to information regarding the recycling aspects of the product."
-        },
-        "traceabilityInformation": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/TraceabilityEvent"
-          },
-          "description": "An array of TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch. SHOULD be provided for any product passport issued at batch or item level."
-        }
-      },
-      "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details."
-    },
     "BinaryFile": {
       "type": "object",
       "additionalProperties": false,

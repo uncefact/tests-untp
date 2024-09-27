@@ -5,54 +5,80 @@
     "type": {
       "type": "array",
       "readOnly": true,
-      "const": ["DigitalConformityCredential", "VerifiableCredential"],
-      "default": ["DigitalConformityCredential", "VerifiableCredential"],
+      "const": ["ConformityAttestation", "Attestation"],
+      "default": ["ConformityAttestation", "Attestation"],
       "items": {
         "type": "string",
-        "enum": ["DigitalConformityCredential", "VerifiableCredential"]
+        "enum": ["ConformityAttestation", "Attestation"]
       }
     },
-    "@context": {
-      "example": "https://test.uncefact.org/vocabulary/untp/dpp/dpp-context.jsonld",
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/{{version}}/"]
-      },
-      "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
-      "readOnly": true,
-      "const": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/{{version}}/"],
-      "default": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/{{version}}/"]
-    },
     "id": {
-      "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
+      "example": "https://exampleCAB.com/38f73303-a39e-45a7-b8b7-e73517548f27",
       "type": "string",
       "format": "uri",
-      "description": "A unique identifier (URI) assigned to the product passport. May be a UUID"
+      "description": "The globally unique ID of this conformity attestation."
     },
-    "issuer": {
-      "$ref": "#/$defs/CredentialIssuer",
-      "description": "The organisation that is the isuer of this VC. Note that the \"id\" property MUST be a W3C DID.  Other identifiers such as tax registration numbers can be listed in the \"otherIdentifiers\" property."
-    },
-    "validFrom": {
-      "example": "2024-03-15",
+    "name": {
+      "example": "Carbon Lifecycle assessment 12345567",
       "type": "string",
-      "format": "date-time",
-      "description": "The date and time from which the credential is valid."
+      "description": "Product GHG Footprint certificate in accordance with GBA Rulebook."
     },
-    "validUntil": {
-      "example": "2034-03-15",
+    "assessorLevel": {
       "type": "string",
-      "format": "date-time",
-      "description": "The expiry date (if applicable) of this verifiable credential."
+      "enum": ["Self", "Commercial", "Buyer", "Membership", "Unspecified", "3rdParty"],
+      "example": "Self",
+      "description": "Assurance code pertaining to assessor (relation to the object under assessment)"
     },
-    "credentialSubject": {
-      "$ref": "#/$defs/ConformityAttestation",
-      "description": "The conformity attestion is the subject of the verifiable credential. "
+    "assessmentLevel": {
+      "type": "string",
+      "enum": ["GovtApproval", "GlobalMRA", "Accredited", "Verified", "Validated", "Unspecified"],
+      "example": "GovtApproval",
+      "description": "Assurance pertaining to assessment (any authority or support for the assessment process)"
+    },
+    "attestationType": {
+      "type": "string",
+      "enum": ["certification", "declaration", "inspection", "testing", "verification", "validation", "calibration"],
+      "example": "certification",
+      "description": "The type of criterion (optional or mandatory)."
+    },
+    "attestationDescription": {
+      "example": "Assessment of battery products against the GHG Protocol.",
+      "type": "string",
+      "description": "SampleCAB Inc attests that the product class LiFePO4 EV batteries manufactured at Sample battery facility have reported GHG foorptint that conform to the GBA rulebook version 1.5. "
+    },
+    "issuedToParty": {
+      "$ref": "#/$defs/Entity",
+      "description": "The party to whom the conformity attestation was issued."
+    },
+    "authorisations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Endorsement"
+      },
+      "description": "The authority under which a conformity claim is issued.  For example a national accrediation authority may accredit a test lab to issue test certificates about a product against a standard. "
+    },
+    "conformityCertificate": {
+      "$ref": "#/$defs/SecureLink",
+      "description": "A reference to the human / printable version of this conformity attestation - typically represented as a PDF document. The document may have more details than are represented in the digital attestation."
+    },
+    "auditableEvidence": {
+      "$ref": "#/$defs/SecureLink",
+      "description": "Auditable evidence supporting this assessment such as raw measurements, supporting documents. This is usally private data and would normally be encrypted."
+    },
+    "scope": {
+      "$ref": "#/$defs/ConformityAssessmentScheme",
+      "description": "A list of relevant standards and/or regulations against which apply to this attestation (eg AS1163:2016). "
+    },
+    "assessments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ConformityAssessment"
+      },
+      "description": "The list of specific assessments made within this conformity attestation."
     }
   },
-  "description": "A conformity attestation issued by a competent body that defines one or more assessments (eg carbon intensity) about a product (eg batttery) against a specification (eg LCA method) defined in a standard or regulation. ",
-  "required": ["@context", "id", "issuer"],
+  "description": "A conformity attestation issued by a competent body that defines one or more assessments (eg carbon intensity) about a product (eg batttery) against a specification (eg LCA method) defined in a standard or regulation.",
+  "required": ["id", "assessorLevel", "assessmentLevel", "attestationType", "issuedToParty"],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
     "CredentialIssuer": {
@@ -141,96 +167,6 @@
         }
       },
       "description": "An identifier registration scheme for products, facilities, or organisations. Typically operated by a state, national or gloabl authority."
-    },
-    "ConformityAttestation": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": ["ConformityAttestation", "Attestation"],
-          "default": ["ConformityAttestation", "Attestation"],
-          "items": {
-            "type": "string",
-            "enum": ["ConformityAttestation", "Attestation"]
-          }
-        },
-        "id": {
-          "example": "https://exampleCAB.com/38f73303-a39e-45a7-b8b7-e73517548f27",
-          "type": "string",
-          "format": "uri",
-          "description": "The globally unique ID of this conformity attestation."
-        },
-        "name": {
-          "example": "Carbon Lifecycle assessment 12345567",
-          "type": "string",
-          "description": "Product GHG Footprint certificate in accordance with GBA Rulebook."
-        },
-        "assessorLevel": {
-          "type": "string",
-          "enum": ["Self", "Commercial", "Buyer", "Membership", "Unspecified", "3rdParty"],
-          "example": "Self",
-          "description": "Assurance code pertaining to assessor (relation to the object under assessment)"
-        },
-        "assessmentLevel": {
-          "type": "string",
-          "enum": ["GovtApproval", "GlobalMRA", "Accredited", "Verified", "Validated", "Unspecified"],
-          "example": "GovtApproval",
-          "description": "Assurance pertaining to assessment (any authority or support for the assessment process)"
-        },
-        "attestationType": {
-          "type": "string",
-          "enum": [
-            "certification",
-            "declaration",
-            "inspection",
-            "testing",
-            "verification",
-            "validation",
-            "calibration"
-          ],
-          "example": "certification",
-          "description": "The type of criterion (optional or mandatory)."
-        },
-        "attestationDescription": {
-          "example": "Assessment of battery products against the GHG Protocol.",
-          "type": "string",
-          "description": "SampleCAB Inc attests that the product class LiFePO4 EV batteries manufactured at Sample battery facility have reported GHG foorptint that conform to the GBA rulebook version 1.5. "
-        },
-        "issuedToParty": {
-          "$ref": "#/$defs/Entity",
-          "description": "The party to whom the conformity attestation was issued."
-        },
-        "authorisations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Endorsement"
-          },
-          "description": "The authority under which a conformity claim is issued.  For example a national accrediation authority may accredit a test lab to issue test certificates about a product against a standard. "
-        },
-        "conformityCertificate": {
-          "$ref": "#/$defs/SecureLink",
-          "description": "A reference to the human / printable version of this conformity attestation - typically represented as a PDF document. The document may have more details than are represented in the digital attestation."
-        },
-        "auditableEvidence": {
-          "$ref": "#/$defs/SecureLink",
-          "description": "Auditable evidence supporting this assessment such as raw measurements, supporting documents. This is usally private data and would normally be encrypted."
-        },
-        "scope": {
-          "$ref": "#/$defs/ConformityAssessmentScheme",
-          "description": "A list of relevant standards and/or regulations against which apply to this attestation (eg AS1163:2016). "
-        },
-        "assessments": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ConformityAssessment"
-          },
-          "description": "The list of specific assessments made within this conformity attestation."
-        }
-      },
-      "description": "A conformity attestation issued by a competent body that defines one or more assessments (eg carbon intensity) about a product (eg batttery) against a specification (eg LCA method) defined in a standard or regulation.",
-      "required": ["id", "assessorLevel", "assessmentLevel", "attestationType", "issuedToParty"]
     },
     "Endorsement": {
       "type": "object",

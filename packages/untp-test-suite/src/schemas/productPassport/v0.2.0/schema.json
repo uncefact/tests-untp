@@ -2,35 +2,101 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "id": {
-      "x-jargon-isKey": true,
+    "productIdentifier": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Identifier"
+      },
+      "description": "An array of unique identifiers assigned to the product or model. "
+    },
+    "batchIdentifier": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Identifier"
+      },
+      "description": "Information regarding the specific production batch of the product."
+    },
+    "itemIdentifier": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Identifier"
+      },
+      "description": "An array of identifiers representing a specific serialised item of the product."
+    },
+    "classification": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Classification"
+      },
+      "description": "A code representing the product's class, typically using the UN CPC (United Nations Central Product Classification) https://unstats.un.org/unsd/classifications/Econ/cpc"
+    },
+    "modelName": {
+      "type": "string",
+      "description": "The model name or number of the product, represented as text."
+    },
+    "image": {
       "type": "string",
       "format": "uri",
-      "description": "A unique identifier (URI) assigned to the product passport."
+      "description": "A unique identifier (URI) pointing to an image of the product."
     },
-    "issuedBy": {
+    "description": {
+      "type": "string",
+      "description": "A textual description providing details about the product."
+    },
+    "furtherInformation": {
+      "type": "string",
+      "format": "uri",
+      "description": "A URL pointing to further human readable information about the product."
+    },
+    "manufacturedDate": {
+      "type": "string",
+      "format": "date",
+      "description": "The ISO 8601 date on which the product batch was manufactured."
+    },
+    "dimension": {
+      "$ref": "#/$defs/Dimension",
+      "description": "The physical dimensions of the product. Not every dimension is relevant to every products.  For example bulk materials may have wieght and volume but not length, with, or height."
+    },
+    "characteristic": {
+      "$ref": "#/$defs/Characteristic",
+      "description": ""
+    },
+    "manufacturer": {
       "$ref": "#/$defs/Party",
-      "description": "The Party that issued the product passport."
+      "description": "The Party entity that manufactured the product."
     },
-    "product": {
-      "$ref": "#/$defs/Product",
-      "description": "Detailed information about the product encapsulated in a ProductInformation object."
+    "manufacturedAt": {
+      "$ref": "#/$defs/Facility",
+      "description": "The Facility where the product batch was manufactured."
     },
-    "guaranteeOfOriginCredential": {
+    "materialsProvenance": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Material"
+      },
+      "description": "An array of Provenance objects providing details on the origin and mass fraction of components or ingredients of the product batch."
+    },
+    "conformityClaim": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Claim"
+      },
+      "description": "An array of claim objects representing various product conformity claims about the product / batch.  These can be sustainability claims, circularity claims, or any other claim type within the conformity topic list."
+    },
+    "recyclingInstruction": {
       "type": "string",
       "format": "uri",
-      "description": "A conformity credential issued by a trusted authority that confirms some or all of the claims made in this product passport"
+      "description": "A URI pointing to information regarding the recycling aspects of the product."
     },
-    "trustScore": {
-      "type": "number",
-      "description": "An aggregate numeric metric that represents the level of trustworthiness associated with the product. This score is derived based on the credibility and reliability of the issuing bodies that substantiate the claims being made about the product. The calculation rules are defined in the UNTP trust graph specification."
-    },
-    "sustainabilityScore": {
-      "type": "number",
-      "description": "An aggregate numeric metric calculated based on the various sustainability claims vs benchmarks associated with the product. It amalgamates scores assigned to individual sustainability claims, which are validated by various issuing bodies. The score provides a comprehensive view of the product's overall sustainability performance, giving users a quantifiable measure of the product's environmental and social impacts."
+    "traceabilityInformation": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TraceabilityEvent"
+      },
+      "description": "An array of TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch."
     }
   },
-  "description": "The ProductPassport is a comprehensive data structure that encapsulates various details pertaining to a product, including its identification details, who issued it, batch information, and different scores relating to sustainability and trustworthiness.",
+  "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details.",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
     "Party": {
@@ -99,106 +165,6 @@
         }
       },
       "description": "Evidence to support a conformity or identity claim. "
-    },
-    "Product": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "productIdentifier": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Identifier"
-          },
-          "description": "An array of unique identifiers assigned to the product or model. "
-        },
-        "batchIdentifier": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Identifier"
-          },
-          "description": "Information regarding the specific production batch of the product."
-        },
-        "itemIdentifier": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Identifier"
-          },
-          "description": "An array of identifiers representing a specific serialised item of the product."
-        },
-        "classification": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Classification"
-          },
-          "description": "A code representing the product's class, typically using the UN CPC (United Nations Central Product Classification) https://unstats.un.org/unsd/classifications/Econ/cpc"
-        },
-        "modelName": {
-          "type": "string",
-          "description": "The model name or number of the product, represented as text."
-        },
-        "image": {
-          "type": "string",
-          "format": "uri",
-          "description": "A unique identifier (URI) pointing to an image of the product."
-        },
-        "description": {
-          "type": "string",
-          "description": "A textual description providing details about the product."
-        },
-        "furtherInformation": {
-          "type": "string",
-          "format": "uri",
-          "description": "A URL pointing to further human readable information about the product."
-        },
-        "manufacturedDate": {
-          "type": "string",
-          "format": "date",
-          "description": "The ISO 8601 date on which the product batch was manufactured."
-        },
-        "dimension": {
-          "$ref": "#/$defs/Dimension",
-          "description": "The physical dimensions of the product. Not every dimension is relevant to every products.  For example bulk materials may have wieght and volume but not length, with, or height."
-        },
-        "characteristic": {
-          "$ref": "#/$defs/Characteristic",
-          "description": ""
-        },
-        "manufacturer": {
-          "$ref": "#/$defs/Party",
-          "description": "The Party entity that manufactured the product."
-        },
-        "manufacturedAt": {
-          "$ref": "#/$defs/Facility",
-          "description": "The Facility where the product batch was manufactured."
-        },
-        "materialsProvenance": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Material"
-          },
-          "description": "An array of Provenance objects providing details on the origin and mass fraction of components or ingredients of the product batch."
-        },
-        "conformityClaim": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Claim"
-          },
-          "description": "An array of claim objects representing various product conformity claims about the product / batch.  These can be sustainability claims, circularity claims, or any other claim type within the conformity topic list."
-        },
-        "recyclingInstruction": {
-          "type": "string",
-          "format": "uri",
-          "description": "A URI pointing to information regarding the recycling aspects of the product."
-        },
-        "traceabilityInformation": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/TraceabilityEvent"
-          },
-          "description": "An array of TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch."
-        }
-      },
-      "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details."
     },
     "Classification": {
       "type": "object",

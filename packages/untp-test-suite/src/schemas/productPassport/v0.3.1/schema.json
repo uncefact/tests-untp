@@ -5,54 +5,128 @@
     "type": {
       "type": "array",
       "readOnly": true,
-      "const": ["DigitalProductPassport", "VerifiableCredential"],
-      "default": ["DigitalProductPassport", "VerifiableCredential"],
+      "const": ["Product", "Entity"],
+      "default": ["Product", "Entity"],
       "items": {
         "type": "string",
-        "enum": ["DigitalProductPassport", "VerifiableCredential"]
+        "enum": ["Product", "Entity"]
       }
     },
-    "@context": {
-      "example": "https://test.uncefact.org/vocabulary/untp/dpp/dpp-context.jsonld",
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dpp/"]
-      },
-      "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
-      "readOnly": true,
-      "const": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dpp/"],
-      "default": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dpp/"]
-    },
     "id": {
-      "example": "acme.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
+      "example": "id.gs1.org/01/09520123456788/21/12345",
       "type": "string",
       "format": "uri",
-      "description": "A unique identifier (URI) assigned to the product passport. May be a UUID"
+      "description": "The globally unique ID of the entity. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.acme.com:123. "
     },
-    "issuer": {
-      "$ref": "#/$defs/CredentialIssuer",
-      "description": "The organisation that is the isuer of this VC. Note that the \"id\" property MUST be a W3C DID.  Other identifiers such as tax registration numbers can be listed in the \"otherIdentifiers\" property."
-    },
-    "validFrom": {
-      "example": "2024.03.15",
+    "name": {
+      "example": "Baked beans, tinned, 500g.",
       "type": "string",
-      "format": "date-time",
-      "description": "The date and time from which the credential is valid."
+      "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - baked beans, tinned, 500g. party - Pyx Industries Pty Ltd. facility - Greenacres canning factory"
     },
-    "validUntil": {
-      "example": "2034.03.15",
+    "idValue": {
+      "example": "09520123.456788",
       "type": "string",
-      "format": "date-time",
-      "description": "The expiry date (if applicable) of this verifiable credential."
+      "description": "The value of the identifier within the scheme. Examplesproduct - 09520123.456788party - 90664869327. facility - 123. "
     },
-    "credentialSubject": {
-      "$ref": "#/$defs/Product",
-      "description": "The subject of a digital product passport credential is the identified product. "
+    "idScheme": {
+      "example": "id.gs1.org/01.",
+      "type": "string",
+      "format": "uri",
+      "description": "The identifier scheme ID.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+    },
+    "idSchemeName": {
+      "example": "GS1 SGTIN",
+      "type": "string",
+      "description": "The name of the identifier scheme - examples product - GS1 SGTIN. party - ABN. facility - ACME  "
+    },
+    "serialNumber": {
+      "example": "12345",
+      "type": "string",
+      "description": "A number or code representing a specific serialised item of the product. Unique within product class."
+    },
+    "batchNumber": {
+      "example": "6789",
+      "type": "string",
+      "description": "Identifier of the specific production batch of the product.  Unique within the product class."
+    },
+    "productImage": {
+      "$ref": "#/$defs/Link",
+      "description": "Reference information (location, type, name) of an image of the product."
+    },
+    "description": {
+      "example": "Big and tender Great Northen Beans in tasty tomato sauce. These beans are rich in fiber and low in fat. Fiber rich food helps to maintain a healthier digestive system & reduces cholesterol.",
+      "type": "string",
+      "description": "A textual description providing details about the product."
+    },
+    "productCategory": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Classification"
+      },
+      "description": "A code representing the product's class, typically using the UN CPC (United Nations Central Product Classification) https://unstats.un.org/unsd/classifications/Econ/cpc"
+    },
+    "furtherInformation": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Link"
+      },
+      "description": "A URL pointing to further human readable information about the product."
+    },
+    "producedByParty": {
+      "$ref": "#/$defs/Entity",
+      "description": "The Party entity that manufactured the product."
+    },
+    "producedAtFacility": {
+      "$ref": "#/$defs/Entity",
+      "description": "The Facility where the product batch was produced / manufactured."
+    },
+    "dimensions": {
+      "$ref": "#/$defs/Dimension",
+      "description": "The physical dimensions of the product. Not every dimension is relevant to every products.  For example bulk materials may have wieght and volume but not length, with, or height.\"weight\":{\"value\":10, \"unit\":\"KGM\"}"
+    },
+    "productionDate": {
+      "example": "2024.04.25",
+      "type": "string",
+      "format": "date",
+      "description": "The ISO 8601 date on which the product batch was manufactured."
+    },
+    "countryOfProduction": {
+      "type": "string",
+      "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
+      "description": "The country in which this item was produced / manufactured.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+    },
+    "characteristics": {
+      "$ref": "#/$defs/Characteristic",
+      "description": "Product specific characteristics.  This class is an extension point for industry specific product characteristics or performance information such as clothing size or battery capacity."
+    },
+    "materialsProvenance": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Material"
+      },
+      "description": "An array of Provenance objects providing details on the origin and mass fraction of components or ingredients of the product batch. "
+    },
+    "conformityInformation": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Claim"
+      },
+      "description": "An array of claim objects representing various product conformity claims about the product / batch.  These can be sustainability claims, circularity claims, or any other claim type within the conformity topic list."
+    },
+    "circularityInformation": {
+      "$ref": "#/$defs/Circularity",
+      "description": "A URI pointing to information regarding the recycling aspects of the product."
+    },
+    "traceabilityInformation": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TraceabilityEvent"
+      },
+      "description": "An array of TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch. SHOULD be provided for any product passport issued at batch or item level. "
     }
   },
-  "description": "The ProductPassport is a comprehensive data structure that encapsulates various details pertaining to a product, including its identification details, who issued it, batch information, provernance information, circularity information and a set of verifable product confomrity & sistainability claims.  ",
-  "required": ["@context", "id", "issuer"],
+  "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details. ",
+  "required": ["id", "name"],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
     "CredentialIssuer": {
@@ -124,136 +198,6 @@
         }
       },
       "description": "The ID and Name of an identified entity such qs a product, facility, party, standard, etc",
-      "required": ["id", "name"]
-    },
-    "Product": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": ["Product", "Entity"],
-          "default": ["Product", "Entity"],
-          "items": {
-            "type": "string",
-            "enum": ["Product", "Entity"]
-          }
-        },
-        "id": {
-          "example": "id.gs1.org/01/09520123456788/21/12345",
-          "type": "string",
-          "format": "uri",
-          "description": "The globally unique ID of the entity. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.acme.com:123. "
-        },
-        "name": {
-          "example": "Baked beans, tinned, 500g.",
-          "type": "string",
-          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - baked beans, tinned, 500g. party - Pyx Industries Pty Ltd. facility - Greenacres canning factory"
-        },
-        "idValue": {
-          "example": "09520123.456788",
-          "type": "string",
-          "description": "The value of the identifier within the scheme. Examplesproduct - 09520123.456788party - 90664869327. facility - 123. "
-        },
-        "idScheme": {
-          "example": "id.gs1.org/01.",
-          "type": "string",
-          "format": "uri",
-          "description": "The identifier scheme ID.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
-        },
-        "idSchemeName": {
-          "example": "GS1 SGTIN",
-          "type": "string",
-          "description": "The name of the identifier scheme - examples product - GS1 SGTIN. party - ABN. facility - ACME  "
-        },
-        "serialNumber": {
-          "example": "12345",
-          "type": "string",
-          "description": "A number or code representing a specific serialised item of the product. Unique within product class."
-        },
-        "batchNumber": {
-          "example": "6789",
-          "type": "string",
-          "description": "Identifier of the specific production batch of the product.  Unique within the product class."
-        },
-        "productImage": {
-          "$ref": "#/$defs/Link",
-          "description": "Reference information (location, type, name) of an image of the product."
-        },
-        "description": {
-          "example": "Big and tender Great Northen Beans in tasty tomato sauce. These beans are rich in fiber and low in fat. Fiber rich food helps to maintain a healthier digestive system & reduces cholesterol.",
-          "type": "string",
-          "description": "A textual description providing details about the product."
-        },
-        "productCategory": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Classification"
-          },
-          "description": "A code representing the product's class, typically using the UN CPC (United Nations Central Product Classification) https://unstats.un.org/unsd/classifications/Econ/cpc"
-        },
-        "furtherInformation": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Link"
-          },
-          "description": "A URL pointing to further human readable information about the product."
-        },
-        "producedByParty": {
-          "$ref": "#/$defs/Entity",
-          "description": "The Party entity that manufactured the product."
-        },
-        "producedAtFacility": {
-          "$ref": "#/$defs/Entity",
-          "description": "The Facility where the product batch was produced / manufactured."
-        },
-        "dimensions": {
-          "$ref": "#/$defs/Dimension",
-          "description": "The physical dimensions of the product. Not every dimension is relevant to every products.  For example bulk materials may have wieght and volume but not length, with, or height.\"weight\":{\"value\":10, \"unit\":\"KGM\"}"
-        },
-        "productionDate": {
-          "example": "2024.04.25",
-          "type": "string",
-          "format": "date",
-          "description": "The ISO 8601 date on which the product batch was manufactured."
-        },
-        "countryOfProduction": {
-          "type": "string",
-          "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
-          "description": "The country in which this item was produced / manufactured.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
-        },
-        "characteristics": {
-          "$ref": "#/$defs/Characteristic",
-          "description": "Product specific characteristics.  This class is an extension point for industry specific product characteristics or performance information such as clothing size or battery capacity."
-        },
-        "materialsProvenance": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Material"
-          },
-          "description": "An array of Provenance objects providing details on the origin and mass fraction of components or ingredients of the product batch. "
-        },
-        "conformityInformation": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Claim"
-          },
-          "description": "An array of claim objects representing various product conformity claims about the product / batch.  These can be sustainability claims, circularity claims, or any other claim type within the conformity topic list."
-        },
-        "circularityInformation": {
-          "$ref": "#/$defs/Circularity",
-          "description": "A URI pointing to information regarding the recycling aspects of the product."
-        },
-        "traceabilityInformation": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/TraceabilityEvent"
-          },
-          "description": "An array of TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch. SHOULD be provided for any product passport issued at batch or item level. "
-        }
-      },
-      "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details. ",
       "required": ["id", "name"]
     },
     "Link": {
