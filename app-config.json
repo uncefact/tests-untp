@@ -704,7 +704,7 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:0b35-103-69-79-17.ngrok-free.app",
+                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app",
                     "proofFormat": "EnvelopingProofJose"
                   },
                   "dpp": {
@@ -721,13 +721,13 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3005",
+                    "dlrAPIUrl": "http://localhost:3000",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
                     "linkRegisterPath": "/api/resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3333/v1/documents",
+                    "url": "http://localhost:3334/v1/documents",
                     "params": {
                       "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
@@ -1197,7 +1197,7 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:0b35-103-69-79-17.ngrok-free.app",
+                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app",
                     "proofFormat": "EnvelopingProofJose"
                   },
                   "epcisTransactionEvent": {
@@ -1214,7 +1214,7 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3005",
+                    "dlrAPIUrl": "http://localhost:3000",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
                     "linkRegisterPath": "/api/resolver"
