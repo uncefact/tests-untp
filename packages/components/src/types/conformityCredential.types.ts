@@ -24,9 +24,3 @@ export interface IConformityCredential {
   url: string;
   app: string;
 }
-
-export interface IVerifyURLPayload {
-  uri: string;
-  key?: string;
-  hash?: string;
-}
