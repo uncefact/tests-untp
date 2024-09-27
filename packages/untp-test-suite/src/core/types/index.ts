@@ -8,6 +8,7 @@ export interface IConfigContent {
   type: string;
   version: string;
   dataPath?: string;
+  url?: string;
 }
 
 export interface ICredentialConfigError {
@@ -27,6 +28,7 @@ export interface ICredentialTestResult {
   credentialType: string;
   version: string;
   path?: string;
+  url?: string;
   result: TestSuiteResultEnum;
   warnings?: IWarning[];
   errors?: IError[];

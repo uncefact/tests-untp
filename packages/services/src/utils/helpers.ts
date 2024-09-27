@@ -68,6 +68,45 @@ export const getValueByPath = (data: any, path: string) => {
   return JSONPointer.get(data, path);
 };
 
+enum ConcatArgumentType {
+  TEXT = 'text',
+  PATH = 'path',
+}
+type ConcatArgument = {
+  type: ConcatArgumentType;
+  value: string;
+};
+
+/**
+ * This function concatenates the values of the arguments passed to it.
+ * The arguments can be either a string or a path to a value in the data object.
+ * If the argument is a path, the value at that path in the data object is used.
+ *
+ * @param data - data object
+ * @param args - arguments to concatenate
+ * @returns
+ */
+export const concatService = (data: any, ...args: ConcatArgument[]): string => {
+  return args.reduce((acc, arg) => {
+    if (arg.type === ConcatArgumentType.TEXT) {
+      return acc.concat(arg.value);
+    } else if (arg.type === ConcatArgumentType.PATH) {
+      if (typeof data !== 'object') {
+        throw new Error('Invalid data object');
+      }
+      try {
+        const value = JSONPointer.get(data, arg.value);
+        if (value) {
+          return acc.concat(value);
+        }
+      } catch (error) {
+        throw new Error('Error concatenating values');
+      }
+    }
+    return acc;
+  }, '');
+};
+
 export interface IConstructObjectParameters {
   mappingFields?: { sourcePath: string; destinationPath: string }[];
   dummyFields?: { path: string; data: any }[];
@@ -84,6 +123,10 @@ export const genericHandlerFunctions = {
   generateCurrentDatetime,
   generateIdWithSerialNumber,
   generateIdWithBatchLot,
+};
+
+export const supportedHandlerFunctions: { [key: string]: any } = {
+  concatService,
 };
 
 export interface ICurrentAndDependencies {
@@ -256,4 +299,40 @@ export const constructObject = (
   }
 
   return data;
+};
+
+export const extractDomain = (url: string): string => {
+  const parsedUrl = new URL(url);
+  return `${parsedUrl.protocol}//${parsedUrl.host}`;
+};
+
+export const constructIdentifierString = (
+  data: any,
+  identifierKeyPath: string | { function: string; args: any },
+): string => {
+  if (typeof data !== 'object') {
+    throw new Error('Invalid data object');
+  }
+
+  if (typeof identifierKeyPath === 'string') {
+    try {
+      const value = JSONPointer.get(data, identifierKeyPath);
+      if (value) {
+        return value;
+      }
+      return '';
+    } catch (error) {
+      throw new Error('Error constructing identifier string');
+    }
+  } else {
+    try {
+      const handlerFunction: any = supportedHandlerFunctions[identifierKeyPath.function];
+      if (!handlerFunction) {
+        throw new Error(`Handler function ${identifierKeyPath.function} not found`);
+      }
+      return handlerFunction(data, ...identifierKeyPath.args);
+    } catch (error: any) {
+      throw new Error('Error constructing identifier string using handler function');
+    }
+  }
 };

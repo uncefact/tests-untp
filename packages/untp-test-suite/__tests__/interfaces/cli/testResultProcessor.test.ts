@@ -38,6 +38,12 @@ jest.mock(
 
 jest.mock('../../../src/utils/common', () => ({
   getPackageVersion: () => '0.0.1',
+  truncateString: jest.fn((str: string, maxLength: number) => {
+    if (str.length <= maxLength) {
+      return str;
+    }
+    return `${str.slice(0, maxLength)}...`;
+  }),
 }));
 
 const errorTestSuite = {
@@ -215,8 +221,8 @@ describe('getFinalReport', () => {
       JSON.stringify([
         [{ colSpan: 3, content: 'UNTP Core Test Suite', hAlign: 'center' }],
         [{ colSpan: 3, content: 'Runner version 0.0.1', hAlign: 'center' }],
-        ['Credential Type', 'Version', 'Status'],
-        ['aggregationEvent', 'v0.0.1', 'FAIL'],
+        ['Credential Type', 'Version', 'URL', 'Status'],
+        ['aggregationEvent', 'v0.0.1', '', 'FAIL'],
         [
           {
             colSpan: 3,

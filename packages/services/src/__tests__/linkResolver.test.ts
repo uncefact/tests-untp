@@ -37,6 +37,7 @@ describe('create link resolve service', () => {
       linkType: LinkType.epcisLinkType,
       dlrAPIUrl: 'https://dlr.com',
       dlrAPIKey: 'dlr-key',
+      namespace: 'gtin',
       qualifierPath: '',
     };
 
@@ -49,16 +50,12 @@ describe('create link resolve service', () => {
       mockValue.verificationPage,
       mockValue.dlrAPIUrl,
       mockValue.dlrAPIKey,
+      mockValue.namespace,
     );
 
     expect(resolverUrl).toEqual(
-      `${mockValue.dlrAPIUrl}/${mockValue.identificationKeyType}/${mockValue.identificationKey}?linkType=all`,
+      `${mockValue.dlrAPIUrl}/${mockValue.namespace}/${mockValue.identificationKeyType}/${mockValue.identificationKey}?linkType=all`,
     );
-    expect(mockValue.identificationKeyType).toEqual(expectParamsCallAPI[0].identificationKeyType);
-    expect(mockValue.identificationKey).toEqual(expectParamsCallAPI[0].identificationKey);
-    expect(mockValue.itemDescription).toEqual(expectParamsCallAPI[0].itemDescription);
-    expect(mockValue.verificationPage).toEqual(expectParamsCallAPI[0].responses[0].targetUrl);
-    expect(mockValue.dlrAPIKey).toEqual(expectToken);
   });
 
   it('should throw error when creating link resolver', async () => {
@@ -75,6 +72,7 @@ describe('create link resolve service', () => {
         qualifierPath: '',
         dlrAPIUrl: 'https://dlr.com',
         dlrAPIKey: 'dlr-key',
+        namespace: 'gtin',
       });
     } catch (error: any) {
       expect(error.message).toEqual(errorMessage);

@@ -3,7 +3,7 @@ sidebar_position: 25
 title: Process Transformation Event
 ---
 
-import Disclaimer from '../../_disclaimer.mdx';
+import Disclaimer from '../../\_disclaimer.mdx';
 
 <Disclaimer />
 <!-- TODO: Confirm the system does delete the transaction events from local storage. If so, update diagram. -->
@@ -65,7 +65,9 @@ P-->>C: Return EPCIS VC
       },
       "dlr": {
         "dlrAPIUrl": "https://dlr.example.com/api",
-        "dlrAPIKey": "dlr-api-key-12345"
+        "dlrAPIKey": "dlr-api-key-12345",
+        "namespace": "gs1",
+        "linkRegisterPath": "/api/resolver"
       },
       "storage": {
         "url": "https://storage.example.com/upload",
@@ -126,13 +128,13 @@ P-->>C: Return EPCIS VC
 
 ## Definitions
 
-| Property | Required | Description | Type |
-|----------|----------|-------------|------|
-| vckit | Yes | Configuration for the VCKit service | [VCKit](/docs/mock-apps/common/vckit) |
-| epcisTransformationEvent | Yes | Configuration for the EPCIS Transformation Event | [Credential](/docs/mock-apps/common/credential) |
-| dlr | Yes | Configuration for the Digital Link Resolver | [IDR](/docs/mock-apps/common/idr) |
-| storage | Yes | Configuration for storage service | [Storage](/docs/mock-apps/common/storage) |
-| dpp | Yes | Configuration for the Digital Product Passport | [Credential](/docs/mock-apps/common/credential) |
-| dppCredentials | Yes | Mapping configuration for DPP credentials | [Construct Data](/docs/mock-apps/common/construct-data)[] |
-| identifierKeyPath | Yes | JSON path to the identifier in the credential subject | String |
-| transformationEventCredential | Yes | Mapping and generation configuration for the transformation event credential | [Construct Data](/docs/mock-apps/common/construct-data) |
+| Property                      | Required | Description                                                                                                                         | Type                                                            |
+| ----------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| vckit                         | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/mock-apps/common/vckit)                           |
+| epcisTransformationEvent      | Yes      | Configuration for the EPCIS Transformation Event                                                                                    | [Credential](/docs/mock-apps/common/credential)                 |
+| dlr                           | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/mock-apps/common/idr)                               |
+| storage                       | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/mock-apps/common/storage)                       |
+| dpp                           | Yes      | Configuration for the Digital Product Passport                                                                                      | [Credential](/docs/mock-apps/common/credential)                 |
+| dppCredentials                | Yes      | Mapping configuration for DPP credentials                                                                                           | [Construct Data](/docs/mock-apps/common/construct-data)[]       |
+| identifierKeyPath             | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/mock-apps/common/identifier-key-path) |
+| transformationEventCredential | Yes      | Mapping and generation configuration for the transformation event credential                                                        | [Construct Data](/docs/mock-apps/common/construct-data)         |

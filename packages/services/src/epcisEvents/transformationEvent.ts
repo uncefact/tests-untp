@@ -83,6 +83,7 @@ export const processTransformationEvent: IService = async (data: any, context: I
           epcisTransformationEventContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,
+          dlrContext.namespace,
           transformationEventQualifierPath,
           LinkType.epcisLinkType,
         );
@@ -105,6 +106,7 @@ export const processTransformationEvent: IService = async (data: any, context: I
           dppContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,
+          dlrContext.namespace,
           qualifierPath,
         );
       }),
@@ -140,6 +142,7 @@ export const issueEpcisTransformationEvent = async (
       handlers: {
         generateLinkResolver: generateLinkResolver(
           dlrContext.dlrAPIUrl,
+          dlrContext.namespace,
           IdentificationKeyType.gtin,
           `linkType=${LinkType.certificationLinkType}`,
         ),

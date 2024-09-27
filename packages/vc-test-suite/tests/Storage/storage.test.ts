@@ -153,17 +153,15 @@ describe('Storage Service', function () {
     expect(fetchResponse.data).to.have.property('iv');
     expect(fetchResponse.data).to.have.property('tag');
     expect(fetchResponse.data).to.have.property('type');
-    expect(fetchResponse.data.type).to.equal('AES-GCM');
+    expect(fetchResponse.data.type).to.equal('aes-256-gcm');
 
-    const decryptedData = JSON.parse(
-      decryptData(
-        {
-          cipherText: fetchResponse.data.cipherText,
-          iv: fetchResponse.data.iv,
-          tag: fetchResponse.data.tag,
-        },
-        response.data.key,
-      ),
+    const decryptedData = decryptData(
+      {
+        cipherText: fetchResponse.data.cipherText,
+        iv: fetchResponse.data.iv,
+        tag: fetchResponse.data.tag,
+      },
+      response.data.key,
     );
 
     expect(decryptedData).to.deep.equal(payload.data);
@@ -199,17 +197,15 @@ describe('Storage Service', function () {
     expect(fetchResponse.data).to.have.property('iv');
     expect(fetchResponse.data).to.have.property('tag');
     expect(fetchResponse.data).to.have.property('type');
-    expect(fetchResponse.data.type).to.equal('AES-GCM');
+    expect(fetchResponse.data.type).to.equal('aes-256-gcm');
 
-    const decryptedData = JSON.parse(
-      decryptData(
-        {
-          cipherText: fetchResponse.data.cipherText,
-          iv: fetchResponse.data.iv,
-          tag: fetchResponse.data.tag,
-        },
-        storeResponse.data.key,
-      ),
+    const decryptedData = decryptData(
+      {
+        cipherText: fetchResponse.data.cipherText,
+        iv: fetchResponse.data.iv,
+        tag: fetchResponse.data.tag,
+      },
+      storeResponse.data.key,
     );
 
     expect(decryptedData).to.deep.equal(payload.data);
@@ -270,17 +266,15 @@ describe('Storage Service', function () {
     expect(fetchResponse.data).to.have.property('iv');
     expect(fetchResponse.data).to.have.property('tag');
     expect(fetchResponse.data).to.have.property('type');
-    expect(fetchResponse.data.type).to.equal('AES-GCM');
+    expect(fetchResponse.data.type).to.equal('aes-256-gcm');
 
-    const decryptedData = JSON.parse(
-      decryptData(
-        {
-          cipherText: fetchResponse.data.cipherText,
-          iv: fetchResponse.data.iv,
-          tag: fetchResponse.data.tag,
-        },
-        response1.data.key,
-      ),
+    const decryptedData = decryptData(
+      {
+        cipherText: fetchResponse.data.cipherText,
+        iv: fetchResponse.data.iv,
+        tag: fetchResponse.data.tag,
+      },
+      response1.data.key,
     );
 
     expect(decryptedData).to.deep.equal(payload1.data);

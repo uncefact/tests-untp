@@ -3,11 +3,16 @@ import { deleteValuesFromLocalStorage } from '../features/localStorage.service.j
 import { buildElementString, extractFromElementString, getLinkResolverIdentifier } from '../linkResolver.service.js';
 import { ICurrentAndDependencies, allowedIndexKeys, randomIntegerString } from '../utils/helpers.js';
 
-export const generateLinkResolver = (dlrUrl: string, identificationKeyType: string, queryString: string) => {
+export const generateLinkResolver = (
+  dlrUrl: string,
+  namespace: string,
+  identificationKeyType: string,
+  queryString: string,
+) => {
   const _generateLinkResolver = ({ currentData, dependenciesValues }: ICurrentAndDependencies) => {
     const { identifier, qualifierPath } = getLinkResolverIdentifier(dependenciesValues![0]);
     const path = qualifierPath.includes('?') ? `${qualifierPath}&${queryString}` : `${qualifierPath}?${queryString}`;
-    return `${dlrUrl}/${identificationKeyType}/${identifier}${path}`;
+    return `${dlrUrl}/${namespace}/${identificationKeyType}/${identifier}${path}`;
   };
   return _generateLinkResolver;
 };

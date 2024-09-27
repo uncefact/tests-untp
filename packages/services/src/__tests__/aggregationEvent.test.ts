@@ -20,6 +20,11 @@ jest.mock('../linkResolver.service', () => ({
   createLinkResolver: jest.fn(),
   IdentificationKeyType: jest.fn(),
   getLinkResolverIdentifier: jest.fn(),
+  LinkType: {
+    verificationLinkType : 'gs1:verificationService',
+    certificationLinkType : 'gs1:certificationInfo',
+    epcisLinkType : 'gs1:epcis',
+  }
 }));
 
 describe('processAggregationEvent', () => {
@@ -88,7 +93,7 @@ describe('processAggregationEvent', () => {
     try {
       const invalidIdentifierContent = {
         ...context,
-        identifierKeyPath: 'invalid',
+        identifierKeyPath: '/invalid',
       };
       jest
         .spyOn(validateContext, 'validateAggregationEventContext')

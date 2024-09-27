@@ -23,8 +23,9 @@ describe('decryptData', () => {
     tag: 'mockTag',
   };
   const mockKey = 'mockKey';
-  const mockDecryptedBase64 = 'ZGVjcnlwdGVkIGRhdGE='; // base64 for "decrypted data"
-  const mockDecrypted = 'decrypted data';
+  const mockDecryptedJSON = '{"key": "value"}';
+  const mockDecryptedObject = { key: 'value' };
+  const mockDecryptedNonJSON = 'non-JSON string';
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -34,15 +35,26 @@ describe('decryptData', () => {
     jest.restoreAllMocks();
   });
 
-  it('should return decrypted data when given valid input', () => {
+  it('should return parsed JSON object when decrypted data is valid JSON', () => {
     (crypto.createDecipheriv as jest.Mock).mockReturnValue({
       setAuthTag: jest.fn(),
-      update: jest.fn().mockReturnValue(mockDecryptedBase64),
+      update: jest.fn().mockReturnValue(mockDecryptedJSON),
       final: jest.fn().mockReturnValue(''),
     });
 
     const result = decryptData(mockEncryptedData, mockKey);
-    expect(result).toBe(mockDecrypted);
+    expect(result).toEqual(mockDecryptedObject);
+  });
+
+  it('should return decrypted string when decrypted data is not valid JSON', () => {
+    (crypto.createDecipheriv as jest.Mock).mockReturnValue({
+      setAuthTag: jest.fn(),
+      update: jest.fn().mockReturnValue(mockDecryptedNonJSON),
+      final: jest.fn().mockReturnValue(''),
+    });
+
+    const result = decryptData(mockEncryptedData, mockKey);
+    expect(result).toBe(mockDecryptedNonJSON);
   });
 
   it('should throw an error if decryption fails', () => {
@@ -55,27 +67,5 @@ describe('decryptData', () => {
     });
 
     expect(() => decryptData(mockEncryptedData, mockKey)).toThrow('Decryption failed');
-  });
-
-  it('should return the original string for non-base64 decryption result', () => {
-    const nonBase64String = 'not a base64 string';
-    (crypto.createDecipheriv as jest.Mock).mockReturnValue({
-      setAuthTag: jest.fn(),
-      update: jest.fn().mockReturnValue(nonBase64String),
-      final: jest.fn().mockReturnValue(''),
-    });
-
-    const originalBufferFrom = Buffer.from;
-    jest.spyOn(Buffer, 'from').mockImplementation((input: any, encoding?: string) => {
-      if (input === nonBase64String && encoding === 'base64') {
-        throw new Error('Invalid base64 string');
-      }
-      return originalBufferFrom(input);
-    });
-
-    const result = decryptData(mockEncryptedData, mockKey);
-
-    expect(result).toBe(nonBase64String);
-    expect(Buffer.from).toHaveBeenCalledWith(nonBase64String, 'base64');
   });
 });

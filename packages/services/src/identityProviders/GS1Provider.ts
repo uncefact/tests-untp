@@ -1,11 +1,11 @@
 import GS1DigitalLinkToolkit from 'GS1_DigitalLink_Resolver_CE/digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js';
-import { IdentityProviderStrategy } from './IdentityProvider.js';
 import { publicAPI } from '../utils/httpService.js';
+import { IdentityProviderStrategy } from './IdentityProvider.js';
 
 export enum GS1ServiceEnum {
-  certificationInfo = 'https://gs1.org/voc/certificationInfo',
-  verificationService = 'https://gs1.org/voc/verificationService',
-  serviceInfo = 'https://gs1.org/voc/serviceInfo',
+  certificationInfo = 'voc/certificationInfo',
+  verificationService = 'voc/verificationService',
+  serviceInfo = 'voc/serviceInfo',
 }
 
 export class GS1Provider implements IdentityProviderStrategy {
@@ -13,20 +13,45 @@ export class GS1Provider implements IdentityProviderStrategy {
    * Function to retrieve the DLR URL based on the GTIN code and identification provider URL.
    * @returns The DLR (Digital Link Resolver) URL corresponding to the provided GTIN code, or null if not found.
    */
-  async getDlrUrl(code: string, providerUrl: string): Promise<string | null> {
+  async getDlrUrl(code: string, providerUrl: string, namespace?: string): Promise<string | null> {
+    const parseGS1Payload = (payload: any) => {
+      const aiRegex = /\((\d+)\)([^(]+)/g;
+      const parsed = Array.from(payload.matchAll(aiRegex), (match) => [(match as any)[1], (match as any)[2]]);
+      return parsed.flat().join('/');
+    };
+
     try {
-      const fetchProductPayload = { keys: [code] };
-      const products: any[] = await publicAPI.post(providerUrl, fetchProductPayload);
-      if (!products || !products.length) {
+      const fetchProductPayload = parseGS1Payload(code);
+
+      const extractGTIN = (gs1String: string): string | null => {
+        const parts = gs1String.split('/');
+        for (let i = 0; i < parts.length; i += 2) {
+          if (parts[i] === '01' && i + 1 < parts.length) {
+            return `01/${parts[i + 1]}`;
+          }
+        }
+        return null;
+      };
+
+      const gtin = extractGTIN(fetchProductPayload);
+      if (gtin === null) {
+        throw new Error('GTIN not found in the GS1 payload');
+      }
+
+      const { linkset }: any = await publicAPI.get(
+        namespace ? `${providerUrl}/${namespace}/${gtin}?linkType=all` : `${providerUrl}/${gtin}?linkType=all`,
+      );
+
+      if (!linkset || !linkset.length) {
         return null;
       }
 
       // Extract the GS1 service host from the fetched products data
-      const gs1ServiceHost: string = products[0]?.linkset?.[GS1ServiceEnum.serviceInfo]?.[0]?.href;
+      const gs1ServiceHost: string = linkset[0]?.[`${providerUrl}/${GS1ServiceEnum.serviceInfo}`]?.[0]?.href;
       if (!gs1ServiceHost) {
         return null;
       }
-      
+
       const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
       const gs1DigitalLink = gs1DigitalLinkToolkit.gs1ElementStringsToGS1DigitalLink(code, true, gs1ServiceHost);
 

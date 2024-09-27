@@ -4,7 +4,7 @@ import { getStorageServiceLink } from '../storage.service.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { IService } from '../types/IService.js';
 import { ITraceabilityEvent, IAggregationEventContext } from './types.js';
-import { generateUUID } from '../utils/helpers.js';
+import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
 import { validateAggregationEventContext } from './validateContext.js';
 import { EPCISBusinessStepCode, EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
 import JSONPointer from 'jsonpointer';
@@ -19,7 +19,7 @@ export const processAggregationEvent: IService = async (
   }
 
   const { vckit, epcisAggregationEvent, dlr, storage, identifierKeyPath } = context;
-  const parentIdentifier = JSONPointer.get(aggregationEvent.data, identifierKeyPath);
+  const parentIdentifier = constructIdentifierString(aggregationEvent.data, identifierKeyPath);
   if (!parentIdentifier) {
     throw new Error('Identifier not found');
   }
@@ -60,6 +60,7 @@ export const processAggregationEvent: IService = async (
     epcisAggregationEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
+    dlr.namespace,
     qualifierPath,
   );
 

@@ -8,6 +8,7 @@ export interface ICredentialFileData {
     type: string;
     version: string | null;
     dataPath: string;
+    url?: string | null
   }[];
 }
 
@@ -28,6 +29,7 @@ export const getLatestCredentialVersions = async (schemasPath: string) => {
       type: eventType,
       version: latestVersion,
       dataPath: '',
+      url: ''
     };
   });
 

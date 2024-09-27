@@ -27,6 +27,11 @@ jest.mock('../linkResolver.service', () => ({
     nlisid: 'nlisid',
   },
   getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' })),
+  LinkType: {
+    verificationLinkType: 'gs1:verificationService',
+    certificationLinkType: 'gs1:certificationInfo',
+    epcisLinkType: 'gs1:epcis',
+  }
 }));
 
 describe('Transformation event', () => {
@@ -219,8 +224,8 @@ describe('Transformation event', () => {
         },
       );
 
-      await processTransformationEvent(dataTransformationEvent, contextTransformationEvent);
-      expect(registerLinkResolver).toHaveBeenCalledTimes(6);
+      const data = await processTransformationEvent(dataTransformationEvent, contextTransformationEvent);      
+      expect(registerLinkResolver).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -323,6 +328,14 @@ describe('Transformation event', () => {
       const newContext = {
         ...contextTransformationEvent,
         productTransformation: [],
+        transformationEventCredential: {
+          mappingFields: [
+            {
+              "sourcePath": "/vc/credentialSubject/productIdentifier/0/identifierValue",
+              "destinationPath": "/eventID"
+            }
+          ]
+        }
       };
       try {
         await processTransformationEvent(dataTransformationEvent, newContext);

@@ -8,6 +8,7 @@ import {
   ITestSuiteResult,
   TestSuiteResultEnum,
 } from '../../core/types/index.js';
+import { createClickableUrl, truncateString } from '../utils/common.js';
 
 export function getLogStatus(credentialTestResults: ICredentialTestResult[]) {
   let resultMessage = '';
@@ -36,16 +37,21 @@ export function getFinalReport(testSuiteResult: ITestSuiteResult) {
 
   const packageVersion = getPackageVersion();
   const table = new Table({ colWidths: [40] });
+  const credentialStatuses = credentialTestResults.map((credentialTestResult) => {
+    const truncatedUrl = truncateString(credentialTestResult.url, 50);
+    const clickableUrl = createClickableUrl(credentialTestResult.url as string, truncatedUrl);
 
-  const credentialStatuses = credentialTestResults.map((credentialTestResult) => [
-    credentialTestResult.credentialType,
-    credentialTestResult.version,
-    getMessageWithColorByResult(credentialTestResult.result, credentialTestResult.result),
-  ]);
+    return [
+      credentialTestResult.credentialType,
+      credentialTestResult.version,
+      clickableUrl,
+      getMessageWithColorByResult(credentialTestResult.result, credentialTestResult.result),
+    ];
+  });
 
   table.push([{ colSpan: 3, content: chalk.blue.bold('UNTP Core Test Suite'), hAlign: 'center' }]);
   table.push([{ colSpan: 3, content: chalk.blue.bold(`Runner version ${packageVersion}`), hAlign: 'center' }]);
-  table.push(['Credential Type', 'Version', 'Status']);
+  table.push(['Credential Type', 'Version', 'URL', 'Status']);
   table.push(...credentialStatuses);
   table.push([
     {

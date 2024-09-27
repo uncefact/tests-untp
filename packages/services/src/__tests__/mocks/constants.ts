@@ -1,4 +1,22 @@
 export const contextTransformationEvent = {
+  transformationEventCredential: {
+    mappingFields: [
+      {
+        "sourcePath": "/",
+        "destinationPath": "/"
+      }
+    ]
+  },
+  dppCredentials: [
+    {
+      "mappingFields": [
+        {
+          "sourcePath": "/",
+          "destinationPath": "/"
+        }
+      ]
+    }
+  ],
   epcisTransformationEvent: {
     context: ['https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transformation-event-ld.json'],
     renderTemplate: [{ template: '<p>Render epcis template</p>', '@type': 'WebRenderingTemplate2022' }],
