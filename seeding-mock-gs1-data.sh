@@ -76,9 +76,11 @@ printf "\n"
 
 # Execute create link resolver requests
 
-# MOCK_GS1_IDENTIFICATION_KEYS env can accept multiple keys separated by whitespace. E.g: 09359502000034 09359502000035 09359502000036
+# MOCK_GS1_IDENTIFICATION_KEYS env can accept multiple keys separated by comma. E.g: 09359502000034,09359502000035,09359502000036
 IDENTIFICATION_KEYS=${MOCK_GS1_IDENTIFICATION_KEYS:-''}
-set -- $IDENTIFICATION_KEYS
+# Spliting the IDENTIFICATION_KEYS into an array by comma, others ENVs are not affected
+IFS=','; set -- $IDENTIFICATION_KEYS
+# Loop through the positional parameters
 while [ -n "$1" ]; do
   # Make the curl request using the current ID
   curl -X POST \
@@ -113,5 +115,8 @@ while [ -n "$1" ]; do
   printf "\n"
   shift
 done
+
+# reset IFS back to its default
+unset IFS
 
 printf "\nSeeding ${SERVICE_NAME} service data complete!\n\n"

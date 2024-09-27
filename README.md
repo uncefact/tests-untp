@@ -63,3 +63,24 @@ yarn start
 ```
 
 Please consult the documentation for comprehensive instructions on setting up and using the mock app, regardless of whether you're using Docker Compose or setting up services manually.
+
+## Seed Data for Identity Resolver and Mock Global GS1 Resolver services
+
+The Identity Resolver and Mock Global GS1 Resolver services require seed data to function correctly. The seed data scripts are provided in the `seeding-idr-data.sh` and `seeding-mock-gs1-data.sh`. To seed the data, run the following commands:
+
+```bash
+# Set environment variables
+export IDR_SERVICE_HOST=localhost # IDR service host
+export IDR_SERVICE_PORT=3000 # IDR service port
+export IDR_SERVICE_API_KEY=test123 # IDR service API key
+export IDR_SERVICE_DOMAIN=http://localhost:3000 # IDR service domain
+
+export MOCK_GS1_SERVICE_HOST=localhost # Mock GS1 service host
+export MOCK_GS1_SERVICE_PORT=3001 # Mock GS1 service port
+export MOCK_GS1_SERVICE_API_KEY=test456 # Mock GS1 service API key
+export MOCK_GS1_IDENTIFICATION_KEYS=09359502000034 # Mock GS1 service identification keys
+
+# Run seeding scripts
+./seeding-idr-data.sh
+./seeding-mock-gs1-data.sh
+```
