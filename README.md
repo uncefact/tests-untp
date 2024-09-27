@@ -78,7 +78,7 @@ export IDR_SERVICE_DOMAIN=http://localhost:3000 # IDR service domain
 export MOCK_GS1_SERVICE_HOST=localhost # Mock GS1 service host
 export MOCK_GS1_SERVICE_PORT=3001 # Mock GS1 service port
 export MOCK_GS1_SERVICE_API_KEY=test456 # Mock GS1 service API key
-export MOCK_GS1_IDENTIFICATION_KEYS=09359502000034 # Mock GS1 service identification keys
+export MOCK_GS1_IDENTIFICATION_KEYS=09359502000034,09359502000035 # Mock GS1 service identification keys
 
 # Run seeding scripts
 ./seeding-idr-data.sh
