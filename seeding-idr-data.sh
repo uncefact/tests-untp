@@ -42,7 +42,7 @@ curl -X POST \
   "namespace": "gs1",
   "applicationIdentifiers": [
     {
-      "title": "Global Trade Item Number (GTIN)1",
+      "title": "Global Trade Item Number (GTIN)",
       "label": "GTIN",
       "shortcode": "gtin",
       "ai": "01",

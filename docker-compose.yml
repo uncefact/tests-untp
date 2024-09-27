@@ -131,6 +131,7 @@ services:
       - MOCK_GS1_SERVICE_HOST=mock-global-gs1-resolver
       - MOCK_GS1_SERVICE_PORT=3001
       - MOCK_GS1_SERVICE_API_KEY=test456
+      - MOCK_GS1_IDENTIFICATION_KEYS=09359502000034 # This ENV can accept multiple keys separated by whitespace. E.g: 09359502000034 09359502000035
     command:
       - /bin/sh
       - -c

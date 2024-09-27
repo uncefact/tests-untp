@@ -42,7 +42,7 @@ curl -X POST \
   "namespace": "gs1",
   "applicationIdentifiers": [
     {
-      "title": "Global Trade Item Number (GTIN)2",
+      "title": "Global Trade Item Number (GTIN)",
       "label": "GTIN",
       "shortcode": "gtin",
       "ai": "01",
@@ -74,35 +74,44 @@ curl -X POST \
 
 printf "\n"
 
-# Execute create link resolver request
-curl -X POST \
-  http://${MOCK_GS1_SERVICE_HOST}:${MOCK_GS1_SERVICE_PORT}/api/resolver \
-  -H 'accept: application/json' \
-  -H "Authorization: Bearer ${MOCK_GS1_SERVICE_API_KEY}" \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "namespace": "gs1",
-  "identificationKeyType": "gtin",
-  "identificationKey": "09359502000034",
-  "qualifierPath": "/",
-  "itemDescription": "DPP",
-  "active": true,
-  "responses": [
-    {
-      "defaultLinkType": true,
-      "defaultIanaLanguage": true,
-      "defaultContext": true,
-      "defaultMimeType": true,
-      "fwqs": false,
+# Execute create link resolver requests
+
+# MOCK_GS1_IDENTIFICATION_KEYS env can accept multiple keys separated by whitespace. E.g: 09359502000034 09359502000035 09359502000036
+IDENTIFICATION_KEYS=${MOCK_GS1_IDENTIFICATION_KEYS:-''}
+set -- $IDENTIFICATION_KEYS
+while [ -n "$1" ]; do
+  # Make the curl request using the current ID
+  curl -X POST \
+    "http://${MOCK_GS1_SERVICE_HOST}:${MOCK_GS1_SERVICE_PORT}/api/resolver" \
+    -H 'accept: application/json' \
+    -H "Authorization: Bearer ${MOCK_GS1_SERVICE_API_KEY}" \
+    -H 'Content-Type: application/json' \
+    -d '{
+      "namespace": "gs1",
+      "identificationKeyType": "gtin",
+      "identificationKey": "'"$1"'",
+      "qualifierPath": "/",
+      "itemDescription": "DPP",
       "active": true,
-      "linkType": "gs1:serviceInfo",
-      "ianaLanguage": "en",
-      "context": "us",
-      "title": "Digital Identity Resolver Service",
-      "targetUrl": "'"${IDR_SERVICE_DOMAIN}"'/gs1",
-      "mimeType": "text/plain"
-    }
-  ]
-}'
+      "responses": [
+        {
+          "defaultLinkType": true,
+          "defaultIanaLanguage": true,
+          "defaultContext": true,
+          "defaultMimeType": true,
+          "fwqs": false,
+          "active": true,
+          "linkType": "gs1:serviceInfo",
+          "ianaLanguage": "en",
+          "context": "us",
+          "title": "Digital Identity Resolver Service",
+          "targetUrl": "'"${IDR_SERVICE_DOMAIN}"'/gs1",
+          "mimeType": "text/plain"
+        }
+      ]
+    }'
+  printf "\n"
+  shift
+done
 
 printf "\nSeeding ${SERVICE_NAME} service data complete!\n\n"
