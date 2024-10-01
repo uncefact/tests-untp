@@ -1,4 +1,4 @@
-import GS1DigitalLinkToolkit from 'GS1_DigitalLink_Resolver_CE/digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js';
+import GS1DigitalLinkToolkit from 'digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js';
 import { IDLRAI } from './epcisEvents/types.js';
 import { GS1ServiceEnum } from './identityProviders/GS1Provider.js';
 import { MimeTypeEnum } from './types/types.js';

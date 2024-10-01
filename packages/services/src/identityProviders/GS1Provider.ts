@@ -1,4 +1,4 @@
-import GS1DigitalLinkToolkit from 'GS1_DigitalLink_Resolver_CE/digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js';
+import GS1DigitalLinkToolkit from 'digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js';
 import { publicAPI } from '../utils/httpService.js';
 import { IdentityProviderStrategy } from './IdentityProvider.js';
 
