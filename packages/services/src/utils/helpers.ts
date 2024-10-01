@@ -2,6 +2,7 @@ import _ from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 import JSONPointer from 'jsonpointer';
 import { generateIdWithSerialNumber, generateIdWithBatchLot } from '../epcisEvents/helpers.js';
+import { IVerifyURLPayload } from '../types/types.js';
 
 export function generateUUID() {
   return uuidv4();
@@ -335,4 +336,45 @@ export const constructIdentifierString = (
       throw new Error('Error constructing identifier string using handler function');
     }
   }
+};
+
+export const constructVerifyURL = ({ uri, key, hash }: IVerifyURLPayload) => {
+  if (!uri) {
+    throw new Error('URI is required');
+  }
+
+  const url = new URL(window.location.href);
+  const baseUrl = `${url.protocol}//${url.host}`;
+
+  const payload: IVerifyURLPayload = { uri };
+  if (key) {
+    payload.key = key;
+  }
+  if (hash) {
+    payload.hash = hash;
+  }
+
+  const queryString = `q=${encodeURIComponent(JSON.stringify({ payload }))}`;
+  const verifyURL = `${baseUrl}/verify?${queryString}`;
+
+  return verifyURL;
+};
+
+export const validateAndConstructVerifyURL = (value: any) => {
+  if (_.isEmpty(value) || _.isNumber(value)) {
+    throw new Error('Invalid data');
+  }
+
+  // Handle string value as URI
+  if (_.isString(value)) {
+    return constructVerifyURL({ uri: value });
+  }
+
+  // Handle object with 'uri' key
+  if (_.isPlainObject(value) && 'uri' in value) {
+    const { uri, key, hash } = value;
+    return constructVerifyURL({ uri, key, hash });
+  }
+
+  throw new Error('Unsupported value type');
 };
