@@ -4,7 +4,7 @@ import _ from 'lodash';
 import { LoadingButton } from '@mui/lab';
 import { Table, TableBody, TableCell, TableRow, TableContainer, TableHead, Paper } from '@mui/material';
 import {
-  detectValueFromStorage,
+  validateAndConstructVerifyURL,
   generateUUID,
   getJsonDataFromConformityAPI,
   getStorageServiceLink,
@@ -173,7 +173,7 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
       }
 
       const vcUrl = await getStorageServiceLink(storedCredentialsConfig, extractedCredential, generateUUID());
-      const verifyURL = detectValueFromStorage(vcUrl);
+      const verifyURL = validateAndConstructVerifyURL(vcUrl);
       saveConformityCredentials(credentialRequestConfig.credentialName, verifyURL, credentialRequestConfig.appOnly);
 
       return;

@@ -360,7 +360,7 @@ export const constructVerifyURL = ({ uri, key, hash }: IVerifyURLPayload) => {
   return verifyURL;
 };
 
-export const detectValueFromStorage = (value: any) => {
+export const validateAndConstructVerifyURL = (value: any) => {
   if (_.isEmpty(value) || _.isNumber(value)) {
     throw new Error('Invalid data');
   }

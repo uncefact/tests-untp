@@ -6,7 +6,7 @@ import {
   concatService,
   constructIdentifierString,
   extractDomain,
-  detectValueFromStorage,
+  validateAndConstructVerifyURL,
   constructVerifyURL,
 } from '../utils/helpers';
 
@@ -288,18 +288,18 @@ describe('constructVerifyURL', () => {
   });
 });
 
-describe('detectValueFromStorage', () => {
+describe('validateAndConstructVerifyURL', () => {
   it('should throw an error if the value is empty', () => {
-    expect(() => detectValueFromStorage(null)).toThrow('Invalid data');
-    expect(() => detectValueFromStorage('')).toThrow('Invalid data');
-    expect(() => detectValueFromStorage(undefined)).toThrow('Invalid data');
+    expect(() => validateAndConstructVerifyURL(null)).toThrow('Invalid data');
+    expect(() => validateAndConstructVerifyURL('')).toThrow('Invalid data');
+    expect(() => validateAndConstructVerifyURL(undefined)).toThrow('Invalid data');
   });
 
   it('should return the verify URL when value is a string', () => {
     const value = 'http://example.com/credential';
     const expectedURL =
       'http://localhost:3000/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%7D%7D';
-    const result = detectValueFromStorage(value);
+    const result = validateAndConstructVerifyURL(value);
 
     expect(result).toBe(expectedURL);
   });
@@ -312,13 +312,15 @@ describe('detectValueFromStorage', () => {
     };
     const expectedURL =
       'http://localhost:3000/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22key%22%3A%22someKey%22%2C%22hash%22%3A%22someHash%22%7D%7D';
-    const result = detectValueFromStorage(value);
+    const result = validateAndConstructVerifyURL(value);
 
     expect(result).toBe(expectedURL);
   });
 
   it('should throw an error if the value is not a string or object', () => {
-    expect(() => detectValueFromStorage(123)).toThrow('Invalid data');
-    expect(() => detectValueFromStorage({ notUri: 'http://example.com/credential' })).toThrow('Unsupported value type');
+    expect(() => validateAndConstructVerifyURL(123)).toThrow('Invalid data');
+    expect(() => validateAndConstructVerifyURL({ notUri: 'http://example.com/credential' })).toThrow(
+      'Unsupported value type',
+    );
   });
 });
