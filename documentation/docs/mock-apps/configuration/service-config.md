@@ -11,12 +11,12 @@ Services are units of business logic that perform specific operations or interac
 
 ## Diagram
 
-```mermaid
+``` mermaid
 graph TD
     A[Service]
     A --> B[Name]
     A --> C[Parameters]
-
+    
     C --> C1[Parameter 1]
     C --> C2[Parameter 2]
 
@@ -29,61 +29,66 @@ graph TD
 
 ## Config
 
-| Property   | Required | Description                                                              | Type                                 |
-| ---------- | -------- | ------------------------------------------------------------------------ | ------------------------------------ |
-| name       | Yes      | The name of the service (depends on service used)                        | [Service](/docs/mock-apps/services/) |
-| parameters | Yes      | An array of parameter objects for the services (depends on service used) | [Service](/docs/mock-apps/services/) |
+| Property | Required | Description | Type |
+|----------|----------|-------------|------|
+| name | Yes | The name of the service (depends on service used)| [Service](/docs/mock-apps/services/) |
+| parameters | Yes | An array of parameter objects for the services (depends on service used)| [Service](/docs/mock-apps/services/) |
 
 ## Example
 
-```json
+``` json
 {
-  "services": [
-    {
-      "name": "processObjectEvent",
-      "parameters": [
+    "services": [
         {
-          "vckit": {
-            "vckitAPIUrl": "http://localhost:3332/v2",
-            "issuer": "did:web:agtrace-passports.s3.ap-southeast-2.amazonaws.com"
-          },
-          "dpp": {
-            "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
-            "renderTemplate": [],
-            "type": ["VerifiableCredential", " DigitalProductPassport"],
-            "dlrLinkTitle": "Steel Passport",
-            "dlrIdentificationKeyType": "gtin",
-            "dlrVerificationPage": "http://localhost:3000/verify"
-          },
-          "dlr": {
-            "dlrAPIUrl": "http://localhost:8080",
-            "dlrAPIKey": "5555555555555"
-          },
-          "storage": {
-            "url": "http://localhost:3001/upload",
-            "params": {
-              "resultPath": "/url"
-            },
-            "options": {
-              "method": "POST",
-              "headers": {
-                "Content-Type": "application/json"
-              }
-            }
-          },
-          "identifierKeyPath": "/product/itemIdentifiers/0/identifierValue"
-        }
-      ]
-    },
-    {
-      "name": "mergeToLocalStorage",
-      "parameters": [
+            "name": "processObjectEvent",
+            "parameters": [
+                {
+                    "vckit": {
+                        "vckitAPIUrl": "http://localhost:3332/v2",
+                        "issuer": "did:web:agtrace-passports.s3.ap-southeast-2.amazonaws.com"
+                    },
+                    "dpp": {
+                        "context": [
+                            "https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"
+                        ],
+                        "renderTemplate": [],
+                        "type": [
+                            "VerifiableCredential",
+                            " DigitalProductPassport"
+                        ],
+                        "dlrLinkTitle": "Steel Passport",
+                        "dlrIdentificationKeyType": "gtin",
+                        "dlrVerificationPage": "http://localhost:3000/verify"
+                    },
+                    "dlr": {
+                        "dlrAPIUrl": "http://localhost:8080",
+                        "dlrAPIKey": "5555555555555"
+                    },
+                    "storage": {
+                        "url": "http://localhost:3001/upload",
+                        "params": {
+                            "resultPath": "/url"
+                        },
+                        "options": {
+                            "method": "POST",
+                            "headers": {
+                                "Content-Type": "application/json"
+                            }
+                        }
+                    },
+                    "identifierKeyPath": "/product/itemIdentifiers/0/identifierValue"
+                }
+            ]
+        },
         {
-          "storageKey": "Steel_Mill_1_dpps",
-          "objectKeyPath": "/vc/credentialSubject/product/itemIdentifiers/0/identifierValue"
+            "name": "mergeToLocalStorage",
+            "parameters": [
+                {
+                    "storageKey": "Steel_Mill_1_dpps",
+                    "objectKeyPath": "/vc/credentialSubject/product/itemIdentifiers/0/identifierValue"
+                }
+            ]
         }
-      ]
-    }
-  ]
+    ]
 }
 ```
