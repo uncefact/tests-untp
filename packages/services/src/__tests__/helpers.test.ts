@@ -8,6 +8,7 @@ import {
   extractDomain,
   validateAndConstructVerifyURL,
   constructVerifyURL,
+  isValidUrl,
 } from '../utils/helpers';
 
 describe('helpers', () => {
@@ -239,6 +240,25 @@ describe('constructIdentifierString', () => {
     expect(result).toBe('');
   });
 
+  it('should return the identifier string, when the identifier data is an URL', () => {
+    const data = {
+      productIdentifier: [
+        {
+          scheme: 'https://id.gs1.org/gtin',
+          identifierValue: 'https://example.com/01/05012345678900',
+          binding: {
+            type: 'document',
+            assuranceLevel: '3rdParty',
+            reference: 'https://id.gs1.org/gtin/05012345678900/binding',
+          },
+        },
+      ],
+    };
+    const identifierKeyPath = '/productIdentifier/0/identifierValue';
+    const result = constructIdentifierString(data, identifierKeyPath);
+    expect(result).toBe('(01)05012345678900');
+  });
+
   it('should throw an error if the path is invalid', () => {
     const data = {
       test: 'test',
@@ -322,5 +342,19 @@ describe('validateAndConstructVerifyURL', () => {
     expect(() => validateAndConstructVerifyURL({ notUri: 'http://example.com/credential' })).toThrow(
       'Unsupported value type',
     );
+  });
+});
+
+describe('isValidUrl', () => {
+  it('should return true if the url is valid', () => {
+    const url = 'https://example.com';
+    const result = isValidUrl(url);
+    expect(result).toBe(true);
+  });
+
+  it('should return false if the url is invalid', () => {
+    const url = 'invalid';
+    const result = isValidUrl(url);
+    expect(result).toBe(false);
   });
 });

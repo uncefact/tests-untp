@@ -39,7 +39,7 @@ export const processDPP: IService = async (data: any, context: IContext): Promis
     });
 
     const storageContext = context.storage;
-    const vcUrl = await getStorageServiceLink(storageContext, vc, `${identifier}/${generateUUID()}`);
+    const vcUrl = await getStorageServiceLink(storageContext, vc, `${identifier}/${qualifierPath}`);
 
     const linkResolverContext = context.dlr;
     const linkResolver = await registerLinkResolver(

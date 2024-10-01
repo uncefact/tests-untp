@@ -2,20 +2,20 @@ export const contextTransformationEvent = {
   transformationEventCredential: {
     mappingFields: [
       {
-        "sourcePath": "/",
-        "destinationPath": "/"
-      }
-    ]
+        sourcePath: '/',
+        destinationPath: '/',
+      },
+    ],
   },
   dppCredentials: [
     {
-      "mappingFields": [
+      mappingFields: [
         {
-          "sourcePath": "/",
-          "destinationPath": "/"
-        }
-      ]
-    }
+          sourcePath: '/',
+          destinationPath: '/',
+        },
+      ],
+    },
   ],
   epcisTransformationEvent: {
     context: ['https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transformation-event-ld.json'],
@@ -202,5 +202,57 @@ export const aggregationEventMock = {
       childItems: [{ itemID: 'http://example.com/beef-scotch-box.json', name: 'Beef Scotch Fillet Box' }],
       childQuantityList: [{ productClass: 'Beef', quantity: '50', uom: 'box' }],
     },
+  },
+};
+
+export const objectEventContext = {
+  vckit: {
+    vckitAPIUrl: 'https://api.vckit.example.com',
+    issuer: 'did:example:123456789abcdefghi',
+  },
+  epcisObjectEvent: {
+    context: ['https://www.w3.org/2018/credentials/v1', 'https://gs1.org/voc/'],
+    type: ['VerifiableCredential', 'ObjectEventCredential'],
+    renderTemplate: [
+      {
+        template: '<div><h2>Object Event</h2></div>',
+        '@type': 'WebRenderingTemplate2022',
+      },
+    ],
+    dlrIdentificationKeyType: 'gtin',
+    dlrLinkTitle: 'Object Event',
+    dlrVerificationPage: 'https://verify.example.com',
+  },
+  storage: {
+    url: 'https://storage.example.com/upload',
+    params: {
+      resultPath: '/url',
+    },
+  },
+  dlr: {
+    dlrAPIUrl: 'https://dlr.example.com/api',
+    dlrAPIKey: 'dlr-api-key-12345',
+    namespace: 'gs1',
+    linkRegisterPath: '/api/resolver',
+  },
+  identifierKeyPath: '/id',
+  dpp: {
+    dlrIdentificationKeyType: 'gtin',
+    dlrLinkTitle: 'Product DPP',
+    dlrVerificationPage: 'https://verify.example.com',
+  },
+  dppCredential: {
+    mappingFields: [
+      {
+        sourcePath: '/linkResolver',
+        destinationPath: '/traceabilityInformation/0/eventReference',
+      },
+    ],
+    dummyFields: [
+      {
+        path: '/traceabilityInformation/0/eventType',
+        data: 'object',
+      },
+    ],
   },
 };

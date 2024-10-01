@@ -120,8 +120,8 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
       responseLinkType === 'all'
         ? '?linkType=all'
         : qualifierPath.includes('?')
-          ? `${qualifierPath}&linkType=${responseLinkType}`
-          : `${qualifierPath}?linkType=${responseLinkType}`;
+          ? `${qualifierPath}&linkType=${namespace}:${responseLinkType}`
+          : `${qualifierPath}?linkType=${namespace}:${responseLinkType}`;
     return `${dlrAPIUrl}/${namespace}/${linkResolver.identificationKeyType}/${linkResolver.identificationKey}${path}`;
   } catch (error) {
     throw new Error('Error creating link resolver');
@@ -359,6 +359,32 @@ export const getLinkResolverIdentifier = (elementString: string): { identifier: 
     identifier: primaryIdentifierAI.value,
     qualifierPath,
   };
+};
+
+/**
+ * Retrieves the identifier and qualifier path from a URI.
+ * 
+ * @param {string} uri - The URI.
+ * @returns {{ identifier: string, qualifierPath: string }} - An object containing the identifier and qualifier path.
+ * 
+ * How to use:
+  try {
+    const uri = 'https://idr.com/gs1/01/09359502000010/10/ABC123';
+    const { identifier, qualifierPath, elementString } = getLinkResolverIdentifierFromURI(uri);
+
+    console.log('Identifier:', identifier); // 09359502000010
+    console.log('Qualifier Path:', qualifierPath); // /10/ABC123
+    console.log('Element String:', elementString); // (01)09359502000010(10)ABC123
+  } catch (error) {
+    console.error(error.message);
+  }
+ */
+export const getLinkResolverIdentifierFromURI = (
+  uri: string,
+): { identifier: string; qualifierPath: string; elementString: string } => {
+  const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
+  const elementString = gs1DigitalLinkToolkit.gs1digitalLinkToGS1elementStrings(uri, true);
+  return { elementString, ...getLinkResolverIdentifier(elementString) };
 };
 
 export const buildElementString = (ai: any) => {
