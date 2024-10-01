@@ -134,6 +134,10 @@
             "$ref": "#/$defs/TraceabilityEvent"
           },
           "description": "An array of TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch."
+        },
+        "batchQrCode": {
+          "type": "string",
+          "description": "A base64-encoded string that represents a QR code, directing to the batch-level link resolver URI."
         }
       },
       "description": "The ProductBatch class holds information related to a specific batch of products, including manufacturing details, sustainability claims and provenance information."
@@ -171,11 +175,6 @@
         "percentage": {
           "type": "number",
           "description": "A numeric value representing the percentage composition of the component or ingredient in the product."
-        },
-        "guaranteeOfOriginCredential": {
-          "type": "string",
-          "format": "uri",
-          "description": ""
         }
       },
       "description": "The Provenance class encapsulates details about the origin or source of components or ingredients in a product, including the country of origin and the percentage composition."
@@ -184,7 +183,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "topic": {
+        "Topic": {
           "type": "string",
           "enum": [
             "environment.emissions",
@@ -200,12 +199,12 @@
           "example": "environment.emissions",
           "description": "A code representing the topic of the sustainability claim. E.g. environment.deforestation, environment.ghg-emission-intensity, etc..  Drawn from a standard code list.  "
         },
-        "criteria": {
+        "Criteria": {
           "type": "string",
           "format": "uri",
           "description": "A URI pointing to the regulation or standard governing the claim."
         },
-        "sustainabilityCredential": {
+        "Evidence": {
           "type": "string",
           "format": "uri",
           "description": "A URI pointing to the evidence supporting the claim. Most likely in the form of a verifiable credential."
@@ -228,16 +227,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "metric": {
+        "Metric": {
           "type": "string",
           "format": "uri",
           "description": "A URI pointing to an entry in a web vocabulary that defines the specific metric unit of measure and how it's calculated."
         },
-        "unit": {
+        "Unit": {
           "type": "string",
           "description": "The unit of measure. for example, energy generaiton intensity in Kg Co2e per kWh produced. Or Kg Co2e per Kg of livestock gross weight.  "
         },
-        "value": {
+        "Value": {
           "type": "number",
           "description": "A numeric value representing the measurement or evaluation outcome for the claim."
         }
@@ -248,15 +247,15 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "eventReference": {
+        "EventReference": {
           "type": "string",
           "format": "uri",
           "description": "A URI pointing to the detailed information about the EPCIS event. Most likely in the form of a verifiable credential."
         },
-        "eventType": {
+        "EventType": {
           "type": "string",
-          "enum": ["aggregation", "transformation", "object", "transaction"],
-          "example": "aggregation",
+          "enum": ["Aggregation", "Transformation", "Object", "Transaction"],
+          "example": "Aggregation",
           "description": "A code representing the type of EPCIS event. ObjectEvent, AggregationEvent, TransactionEvent, TransformationEvent, ObjectEvent."
         }
       },

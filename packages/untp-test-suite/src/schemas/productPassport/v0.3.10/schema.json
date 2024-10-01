@@ -2,148 +2,126 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "render": {
-      "type": "array",
-      "items": {
-        "template": {
-          "example": "<!DOCTYPE html> <html lang='en'> <head> <meta charset='UTF-8' /> <meta name='viewport' content='width=device-width,initial-scale=1' /> <link href='https://fonts.googleapis.com/css2?family=Source+Sans 3:ital,wght@0,200..900;1,200..900&display=swap' rel='stylesheet' /> <title>Digital Product Passport</title> <style> * { margin: 0; padding: 0; box-sizing: border-box; } body { font-family: 'Source Sans 3', sans-serif; background-color: #f4f7fa; color: #333; } .container { text-align: initial; min-width: 290px; max-width: 390px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px; background-color: #ffffff; border-radius: 12px; border: 4px solid #6ec72f; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); padding: 16px; position: relative; } .top-logo { width: 80px; margin: 0 auto; display: block; } .title { text-align: center; font-size: 24px; font-weight: 700; color: #6ec72f; margin-top: 10px; } .header { background-color: #6ec72f; color: #ffffff; padding: 16px; border-radius: 12px 12px 0 0; position: relative; } .header-image { position: relative; background-image: linear-gradient(to right bottom, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.5)), url({{{credentialSubject.productImage.linkURL}}}); background-size: cover; background-position: center; min-height: 215px; border-radius: 12px 12px 0 0; } .product-name { text-align: center; font-size: 24px; font-weight: 700; color: #6ec72f; margin-top: 16px; position: relative; } .product-name:before, .product-name:after { content: ''; position: absolute; width: 2px; background-color: #6ec72f; top: 0; bottom: -16px; } .product-name:before { left: -20px; } .product-name:after { right: -20px; } .header-image-top-left { position: absolute; top: 25px; left: 15px; font-weight: 500; font-size: 16px; line-height: 22px; color: #fff; } .header-info { padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 12px; background-color: #6ec72f; border-radius: 0 0 12px 12px; color: #fff; } .info-item { display: flex; align-items: center; gap: 6px; } .info-item a { padding: 0 2px; font-size: 14px; font-weight: 600; line-height: 15.25px; color: #ffffff; text-decoration: none; } .passport-box { display: flex; flex-direction: column; gap: 24px; margin-top: 16px; } .passport-section { padding: 16px; border: 1px solid #6ec72f; border-radius: 8px; background-color: #ffffff; } .section-title { font-size: 18px; font-weight: 700; line-height: 19.62px; color: #6ec72f; margin-bottom: 12px; } .section-content { font-size: 16px; line-height: 18.88px; color: #333; } .material-list { display: flex; flex-direction: column; gap: 12px; } .material-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #d4d6d8; background-color: #f4f7fa; border-radius: 6px; } .material-item span { font-size: 16px; font-weight: 400; } .scorecard { display: flex; justify-content: space-between; padding: 10px; border-top: 1px solid #d4d6d8; border-bottom: 1px solid #d4d6d8; background-color: #f9fbfd; border-radius: 8px; } .scorecard-title { font-size: 14px; font-weight: 600; color: #6ec72f; } .scorecard-value { font-size: 16px; font-weight: 400; } .footer { text-align: center; padding: 16px; font-size: 14px; color: #777; position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; } .footer-logo { width: 120px; margin-bottom: 10px; } </style> </head> <body> <div class='container'> <img src='https://media.licdn.com/dms/image/v2/C560BAQE-clv2_H3hvA/company-logo_200_200/company-logo_200_200/0/1630587175948/freshchain_logo?e=1733356800&v=beta&t=vzhGuhlr_P6sBPa0afFn5Q6xaq662bwizGBN3PZv5d4' alt='FreshChain Logo' class='top-logo' /> <div class='title'>Digital Product Passport</div> <header class='header'> <div class='header-image'> </div> </header> <div class='product-name'>{{credentialSubject.name}}</div> <div class='header-info'> <div class='info-item'> <strong>Batch:</strong> <a href='#'>{{credentialSubject.batchNumber}}</a> </div> <div class='info-item'> <strong>Serial:</strong> <a href='#'>{{credentialSubject.serialNumber}}</a> </div> </div> <section class='passport-box'> <div class='passport-section'> <h2 class='section-title'>Product Details</h2> <div class='section-content'> <p><strong>ID:</strong> {{credentialSubject.id}}</p> <p><strong>Description:</strong> {{credentialSubject.description}}</p> <p><strong>Category:</strong> {{#each credentialSubject.productCategory}} {{name}} {{/each}}</p> <p><strong>Dimensions:</strong> {{credentialSubject.dimensions.length.value}} x {{credentialSubject.dimensions.width.value}} x {{credentialSubject.dimensions.height.value}} {{credentialSubject.dimensions.length.unit}}</p> <p><strong>Weight:</strong> {{credentialSubject.dimensions.weight.value}} {{credentialSubject.dimensions.weight.unit}}</p> <p><strong>Country of Production:</strong> {{credentialSubject.countryOfProduction}}</p> </div> </div> <div class='passport-section'> <h2 class='section-title'>Materials Provenance</h2> <div class='material-list'> {{#each credentialSubject.materialsProvenance}} <div class='material-item'> <span>{{name}}</span> <span>{{originCountry}}</span> <span>{{materialType.name}}</span> <span>{{massFraction}}</span> </div> {{/each}} </div> </div> <div class='passport-section'> <h2 class='section-title'>Conformity Declarations</h2> <div class='section-content'> {{#each credentialSubject.conformityDeclarations}} <p><strong>{{referenceStandard.name}}</strong> - {{referenceRegulation.name}}</p> {{/each}} </div> </div> <div class='passport-section'> <h2 class='section-title'>Circularity and Emissions</h2> <div class='scorecard'> <div class='scorecard-item'> <span class='scorecard-title'>Circularity Score:</span> <span class='scorecard-value'>{{credentialSubject.circularityScorecard.materialCircularityIndicator}}</span> </div> <div class='scorecard-item'> <span class='scorecard-title'>Carbon Footprint:</span> <span class='scorecard-value'>{{credentialSubject.emissionsScorecard.carbonFootprint}}</span> </div> </div> </div> </section> <footer class='footer'> <img src='https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTwBQMyRnESCkZwiYcha0bEdcgwR5taehphbg&s' alt='FreshChain Logo' class='footer-logo' /> Example Company Pty Ltd - Digital Product Passport © 2024 </footer> </div> </body> </html>",
-          "type": "string",
-          "description": "A template that renders the Verifiable Credential to HTML"
-        },
-        "@type": {
-          "type": "string",
-          "enum": [
-            "WebRenderingTemplate2022"
-          ],
-          "example": "WebRenderingTemplate2022",
-          "description": "Defines the rendering type."
-        }
-      },
-      "description": "Defines a template to be used to render the Verifiable Credential."
-    },
     "type": {
       "type": "array",
       "readOnly": true,
-      "const": [
-        "DigitalProductPassport",
-        "VerifiableCredential"
-      ],
-      "default": [
-        "DigitalProductPassport",
-        "VerifiableCredential"
-      ],
+      "const": ["Product", "Entity"],
+      "default": ["Product", "Entity"],
       "items": {
         "type": "string",
-        "enum": [
-          "DigitalProductPassport",
-          "VerifiableCredential"
-        ]
+        "enum": ["Product", "Entity"]
       }
     },
-    "@context": {
-      "example": "https://test.uncefact.org/vocabulary/untp/dpp/dpp-context.jsonld",
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": [
-          "https://www.w3.org/ns/credentials/v2",
-          "https://test.uncefact.org/vocabulary/untp/dpp/0.3.10/",
-          "https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json"
-        ]
-      },
-      "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
-      "readOnly": true,
-      "const": [
-        "https://www.w3.org/ns/credentials/v2",
-        "https://test.uncefact.org/vocabulary/untp/dpp/0.3.10/",
-        "https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json"
-      ],
-      "default": [
-        "https://www.w3.org/ns/credentials/v2",
-        "https://test.uncefact.org/vocabulary/untp/dpp/0.3.10/",
-        "https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json"
-      ]
-    },
     "id": {
-      "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
+      "example": "https://id.gs1.org/01/09520123456788/21/12345",
       "type": "string",
       "format": "uri",
-      "description": "A unique identifier (URI) assigned to the product passport. May be a UUID"
+      "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
     },
-    "issuer": {
-      "$ref": "#/$defs/CredentialIssuer",
-      "description": "The organisation that is the isuer of this VC. Note that the \"id\" property MUST be a W3C DID.  Other identifiers such as tax registration numbers can be listed in the \"otherIdentifiers\" property."
-    },
-    "validFrom": {
-      "example": "2024-03-15T12:00:00",
+    "name": {
+      "example": "EV battery 300Ah.",
       "type": "string",
-      "format": "date-time",
-      "description": "The date and time from which the credential is valid."
+      "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
     },
-    "validUntil": {
-      "example": "2034-03-15T12:00:00",
+    "registeredId": {
+      "example": "90664869327",
       "type": "string",
-      "format": "date-time",
-      "description": "The expiry date (if applicable) of this verifiable credential."
+      "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
     },
-    "credentialSubject": {
-      "$ref": "#/$defs/Product",
-      "description": "The subject of a digital product passport credential is the identified product. "
+    "idScheme": {
+      "$ref": "#/$defs/IdentifierScheme",
+      "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+    },
+    "serialNumber": {
+      "example": "12345678",
+      "type": "string",
+      "description": "A number or code representing a specific serialised item of the product. Unique within product class."
+    },
+    "batchNumber": {
+      "example": "6789",
+      "type": "string",
+      "description": "Identifier of the specific production batch of the product.  Unique within the product class."
+    },
+    "productImage": {
+      "$ref": "#/$defs/Link",
+      "description": "Reference information (location, type, name) of an image of the product."
+    },
+    "description": {
+      "example": "400Ah 24v LiFePO4 battery",
+      "type": "string",
+      "description": "A textual description providing details about the product."
+    },
+    "productCategory": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Classification"
+      },
+      "description": "A code representing the product's class, typically using the UN CPC (United Nations Central Product Classification) https://unstats.un.org/unsd/classifications/Econ/cpc"
+    },
+    "furtherInformation": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Link"
+      },
+      "description": "A URL pointing to further human readable information about the product."
+    },
+    "producedByParty": {
+      "$ref": "#/$defs/Entity",
+      "description": "The Party entity that manufactured the product."
+    },
+    "producedAtFacility": {
+      "$ref": "#/$defs/Entity",
+      "description": "The Facility where the product batch was produced / manufactured."
+    },
+    "dimensions": {
+      "$ref": "#/$defs/Dimension",
+      "description": "The physical dimensions of the product. Not every dimension is relevant to every products.  For example bulk materials may have wieght and volume but not length, with, or height.\"weight\":{\"value\":10, \"unit\":\"KGM\"}"
+    },
+    "productionDate": {
+      "example": "2024-04-25",
+      "type": "string",
+      "format": "date",
+      "description": "The ISO 8601 date on which the product batch was manufactured."
+    },
+    "countryOfProduction": {
+      "type": "string",
+      "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
+      "description": "The country in which this item was produced / manufactured.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+    },
+    "materialsProvenance": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Material"
+      },
+      "description": "An array of Provenance objects providing details on the origin and mass fraction of components or ingredients of the product batch. "
+    },
+    "conformityDeclarations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Declaration"
+      },
+      "description": "An array of claim objects representing various product conformity claims about the product / batch.  These can be sustainability claims, circularity claims, or any other claim type within the conformity topic list."
+    },
+    "circularityScorecard": {
+      "$ref": "#/$defs/CircularityPerformance",
+      "description": "A circularity performance scorecard"
+    },
+    "emissionsScorecard": {
+      "$ref": "#/$defs/EmissionsPerformance",
+      "description": "An emissions performacne scorecard"
+    },
+    "traceabilityInformation": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SecureLink"
+      },
+      "description": "An array of secure links to TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch. SHOULD be provided for any product passport issued at batch or item level. Links should include the hash of the target and may point to encrypted targets."
     }
   },
-  "description": "The ProductPassport is a comprehensive data structure that encapsulates various details pertaining to a product, including its identification details, who issued it, batch information, provernance information, circularity information and a set of verifable product confomrity & sistainability claims.",
-  "required": [
-    "@context",
-    "id",
-    "issuer"
-  ],
+  "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details.  ",
+  "required": ["id", "name"],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
-    "CredentialIssuer": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": [
-            "CredentialIssuer"
-          ],
-          "default": [
-            "CredentialIssuer"
-          ],
-          "items": {
-            "type": "string",
-            "enum": [
-              "CredentialIssuer"
-            ]
-          }
-        },
-        "id": {
-          "example": "did:web:identifiers.example-company.com:12345",
-          "type": "string",
-          "format": "uri",
-          "description": "The W3C DID of the issuer - should be a did:web or did:tdw"
-        },
-        "name": {
-          "example": "Example Company Pty Ltd",
-          "type": "string",
-          "description": "The name of the issuer person or organisation"
-        },
-        "otherIdentifiers": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Entity"
-          },
-          "description": "An optional list of other registered identifiers for this credential issuer "
-        }
-      },
-      "description": "The issuer party ()person or orgnaition) of a verifiable credential.",
-      "required": [
-        "id",
-        "name"
-      ]
-    },
     "Entity": {
       "type": "object",
       "additionalProperties": false,
@@ -151,17 +129,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Entity"
-          ],
-          "default": [
-            "Entity"
-          ],
+          "const": ["Entity"],
+          "default": ["Entity"],
           "items": {
             "type": "string",
-            "enum": [
-              "Entity"
-            ]
+            "enum": ["Entity"]
           }
         },
         "id": {
@@ -186,10 +158,7 @@
         }
       },
       "description": "The ID and Name of an identified entity such qs a product, facility, party, standard, etc.  If the identifier is a W3C DID then the corresponding DID document SHOULD include a serviceEndpoint of type \"IdentityResolver\". If the identifier is not a W3C DID then the id peroperty SHOULD be an identity resolver URL.",
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["id", "name"]
     },
     "IdentifierScheme": {
       "type": "object",
@@ -198,17 +167,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "IdentifierScheme"
-          ],
-          "default": [
-            "IdentifierScheme"
-          ],
+          "const": ["IdentifierScheme"],
+          "default": ["IdentifierScheme"],
           "items": {
             "type": "string",
-            "enum": [
-              "IdentifierScheme"
-            ]
+            "enum": ["IdentifierScheme"]
           }
         },
         "id": {
@@ -225,141 +188,6 @@
       },
       "description": "An identifier registration scheme for products, facilities, or organisations. Typically operated by a state, national or gloabl authority."
     },
-    "Product": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": [
-            "Product",
-            "Entity"
-          ],
-          "default": [
-            "Product",
-            "Entity"
-          ],
-          "items": {
-            "type": "string",
-            "enum": [
-              "Product",
-              "Entity"
-            ]
-          }
-        },
-        "id": {
-          "example": "https://id.gs1.org/01/09520123456788/21/12345",
-          "type": "string",
-          "format": "uri",
-          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
-        },
-        "name": {
-          "example": "EV battery 300Ah.",
-          "type": "string",
-          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
-        },
-        "registeredId": {
-          "example": "90664869327",
-          "type": "string",
-          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
-        },
-        "idScheme": {
-          "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
-        },
-        "serialNumber": {
-          "example": "12345678",
-          "type": "string",
-          "description": "A number or code representing a specific serialised item of the product. Unique within product class."
-        },
-        "batchNumber": {
-          "example": "6789",
-          "type": "string",
-          "description": "Identifier of the specific production batch of the product.  Unique within the product class."
-        },
-        "productImage": {
-          "$ref": "#/$defs/Link",
-          "description": "Reference information (location, type, name) of an image of the product."
-        },
-        "description": {
-          "example": "400Ah 24v LiFePO4 battery",
-          "type": "string",
-          "description": "A textual description providing details about the product."
-        },
-        "productCategory": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Classification"
-          },
-          "description": "A code representing the product's class, typically using the UN CPC (United Nations Central Product Classification) https://unstats.un.org/unsd/classifications/Econ/cpc"
-        },
-        "furtherInformation": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Link"
-          },
-          "description": "A URL pointing to further human readable information about the product."
-        },
-        "producedByParty": {
-          "$ref": "#/$defs/Entity",
-          "description": "The Party entity that manufactured the product."
-        },
-        "producedAtFacility": {
-          "$ref": "#/$defs/Entity",
-          "description": "The Facility where the product batch was produced / manufactured."
-        },
-        "dimensions": {
-          "$ref": "#/$defs/Dimension",
-          "description": "The physical dimensions of the product. Not every dimension is relevant to every products.  For example bulk materials may have wieght and volume but not length, with, or height.\"weight\":{\"value\":10, \"unit\":\"KGM\"}"
-        },
-        "productionDate": {
-          "example": "2024-04-25",
-          "type": "string",
-          "format": "date",
-          "description": "The ISO 8601 date on which the product batch was manufactured."
-        },
-        "countryOfProduction": {
-          "type": "string",
-          "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
-          "description": "The country in which this item was produced / manufactured.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
-        },
-        "materialsProvenance": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Material"
-          },
-          "description": "An array of Provenance objects providing details on the origin and mass fraction of components or ingredients of the product batch. "
-        },
-        "conformityDeclarations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Declaration"
-          },
-          "description": "An array of claim objects representing various product conformity claims about the product / batch.  These can be sustainability claims, circularity claims, or any other claim type within the conformity topic list."
-        },
-        "circularityScorecard": {
-          "$ref": "#/$defs/CircularityPerformance",
-          "description": "A circularity performance scorecard"
-        },
-        "emissionsScorecard": {
-          "$ref": "#/$defs/EmissionsPerformance",
-          "description": "An emissions performacne scorecard"
-        },
-        "traceabilityInformation": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/SecureLink"
-          },
-          "description": "An array of secure links to TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch. SHOULD be provided for any product passport issued at batch or item level. Links should include the hash of the target and may point to encrypted targets."
-        }
-      },
-      "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details.  ",
-      "required": [
-        "id",
-        "name"
-      ]
-    },
     "Link": {
       "type": "object",
       "additionalProperties": false,
@@ -367,17 +195,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Link"
-          ],
-          "default": [
-            "Link"
-          ],
+          "const": ["Link"],
+          "default": ["Link"],
           "items": {
             "type": "string",
-            "enum": [
-              "Link"
-            ]
+            "enum": ["Link"]
           }
         },
         "linkURL": {
@@ -406,17 +228,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Classification"
-          ],
-          "default": [
-            "Classification"
-          ],
+          "const": ["Classification"],
+          "default": ["Classification"],
           "items": {
             "type": "string",
-            "enum": [
-              "Classification"
-            ]
+            "enum": ["Classification"]
           }
         },
         "id": {
@@ -448,10 +264,7 @@
         }
       },
       "description": "A classification scheme and code / name representing a category value for a product, entity, or facility.",
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["id", "name"]
     },
     "Dimension": {
       "type": "object",
@@ -460,17 +273,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Dimension"
-          ],
-          "default": [
-            "Dimension"
-          ],
+          "const": ["Dimension"],
+          "default": ["Dimension"],
           "items": {
             "type": "string",
-            "enum": [
-              "Dimension"
-            ]
+            "enum": ["Dimension"]
           }
         },
         "weight": {
@@ -503,17 +310,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Measure"
-          ],
-          "default": [
-            "Measure"
-          ],
+          "const": ["Measure"],
+          "default": ["Measure"],
           "items": {
             "type": "string",
-            "enum": [
-              "Measure"
-            ]
+            "enum": ["Measure"]
           }
         },
         "value": {
@@ -528,10 +329,7 @@
         }
       },
       "description": "The measure class defines a numeric measured value (eg 10) and a coded unit of measure (eg KG).",
-      "required": [
-        "value",
-        "unit"
-      ]
+      "required": ["value", "unit"]
     },
     "Material": {
       "type": "object",
@@ -540,17 +338,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Material"
-          ],
-          "default": [
-            "Material"
-          ],
+          "const": ["Material"],
+          "default": ["Material"],
           "items": {
             "type": "string",
-            "enum": [
-              "Material"
-            ]
+            "enum": ["Material"]
           }
         },
         "name": {
@@ -588,9 +380,7 @@
         }
       },
       "description": "The material class encapsulates details about the origin or source of raw materials in a product, including the country of origin and the mass fraction.",
-      "required": [
-        "name"
-      ]
+      "required": ["name"]
     },
     "Declaration": {
       "type": "object",
@@ -599,17 +389,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Declaration"
-          ],
-          "default": [
-            "Declaration"
-          ],
+          "const": ["Declaration"],
+          "default": ["Declaration"],
           "items": {
             "type": "string",
-            "enum": [
-              "Declaration"
-            ]
+            "enum": ["Declaration"]
           }
         },
         "id": {
@@ -673,11 +457,7 @@
         }
       },
       "description": "A declaration of conformance with one or more criteria from a specific standard or regulation.  ",
-      "required": [
-        "id",
-        "compliance",
-        "conformityTopic"
-      ]
+      "required": ["id", "compliance", "conformityTopic"]
     },
     "Standard": {
       "type": "object",
@@ -686,17 +466,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Standard"
-          ],
-          "default": [
-            "Standard"
-          ],
+          "const": ["Standard"],
+          "default": ["Standard"],
           "items": {
             "type": "string",
-            "enum": [
-              "Standard"
-            ]
+            "enum": ["Standard"]
           }
         },
         "id": {
@@ -722,9 +496,7 @@
         }
       },
       "description": "A standard (eg ISO 14000) that specifies the criteria for conformance.",
-      "required": [
-        "issuingParty"
-      ]
+      "required": ["issuingParty"]
     },
     "Regulation": {
       "type": "object",
@@ -733,17 +505,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Regulation"
-          ],
-          "default": [
-            "Regulation"
-          ],
+          "const": ["Regulation"],
+          "default": ["Regulation"],
           "items": {
             "type": "string",
-            "enum": [
-              "Regulation"
-            ]
+            "enum": ["Regulation"]
           }
         },
         "id": {
@@ -774,9 +540,7 @@
         }
       },
       "description": "A regulation (eg EU deforestation regulation) that defines the criteria for assessment.",
-      "required": [
-        "administeredBy"
-      ]
+      "required": ["administeredBy"]
     },
     "Criterion": {
       "type": "object",
@@ -785,17 +549,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Criterion"
-          ],
-          "default": [
-            "Criterion"
-          ],
+          "const": ["Criterion"],
+          "default": ["Criterion"],
           "items": {
             "type": "string",
-            "enum": [
-              "Criterion"
-            ]
+            "enum": ["Criterion"]
           }
         },
         "id": {
@@ -818,10 +576,7 @@
         }
       },
       "description": "A specific rule or criterion within a standard or regulation. eg a carbon intensity calculation rule within an emissions standard.",
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["id", "name"]
     },
     "Metric": {
       "type": "object",
@@ -830,17 +585,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Metric"
-          ],
-          "default": [
-            "Metric"
-          ],
+          "const": ["Metric"],
+          "default": ["Metric"],
           "items": {
             "type": "string",
-            "enum": [
-              "Metric"
-            ]
+            "enum": ["Metric"]
           }
         },
         "metricName": {
@@ -859,10 +608,7 @@
         }
       },
       "description": "A specific measure of performance against the criteria that governs the claim.  Expressed as an array of metric (ie unit of emasure) / value (ie the actual numeric value) pairs.  ",
-      "required": [
-        "metricName",
-        "metricValue"
-      ]
+      "required": ["metricName", "metricValue"]
     },
     "SecureLink": {
       "type": "object",
@@ -871,20 +617,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "SecureLink",
-            "Link"
-          ],
-          "default": [
-            "SecureLink",
-            "Link"
-          ],
+          "const": ["SecureLink", "Link"],
+          "default": ["SecureLink", "Link"],
           "items": {
             "type": "string",
-            "enum": [
-              "SecureLink",
-              "Link"
-            ]
+            "enum": ["SecureLink", "Link"]
           }
         },
         "linkURL": {
@@ -910,19 +647,13 @@
         },
         "hashMethod": {
           "type": "string",
-          "enum": [
-            "SHA-256",
-            "SHA-1"
-          ],
+          "enum": ["SHA-256", "SHA-1"],
           "example": "SHA-256",
           "description": "The hashing algorithm used to create the target hash.  SHA-265 is the recommedned standard"
         },
         "encryptionMethod": {
           "type": "string",
-          "enum": [
-            "none",
-            "AES"
-          ],
+          "enum": ["none", "AES"],
           "example": "none",
           "description": "The symmetric encryption algorithm used to encrypt the link target.  AES is the recommended standard. Decryption keys are expected to be passed out of bounds."
         }
@@ -936,17 +667,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "CircularityPerformance"
-          ],
-          "default": [
-            "CircularityPerformance"
-          ],
+          "const": ["CircularityPerformance"],
+          "default": ["CircularityPerformance"],
           "items": {
             "type": "string",
-            "enum": [
-              "CircularityPerformance"
-            ]
+            "enum": ["CircularityPerformance"]
           }
         },
         "recyclingInformation": {
@@ -991,17 +716,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "EmissionsPerformance"
-          ],
-          "default": [
-            "EmissionsPerformance"
-          ],
+          "const": ["EmissionsPerformance"],
+          "default": ["EmissionsPerformance"],
           "items": {
             "type": "string",
-            "enum": [
-              "EmissionsPerformance"
-            ]
+            "enum": ["EmissionsPerformance"]
           }
         },
         "carbonFootprint": {
@@ -1017,11 +736,7 @@
         },
         "operationalScope": {
           "type": "string",
-          "enum": [
-            "None",
-            "CradleToGate",
-            "CradleToGrave"
-          ],
+          "enum": ["None", "CradleToGate", "CradleToGrave"],
           "example": "None",
           "description": "The operational scope of the emissions performance. Only scope 1 & 2, or inlcuing upstream scope 3 (cradle to gate) or upstream and downstream scope 3 (cradle to grave)."
         },
@@ -1037,12 +752,7 @@
         }
       },
       "description": "Product specific characteristics.  This class is an extension point for industry specific product characteristics or performance information such as clothing size or battery capacity.",
-      "required": [
-        "carbonFootprint",
-        "declaredUnit",
-        "operationalScope",
-        "primarySourcedRatio"
-      ]
+      "required": ["carbonFootprint", "declaredUnit", "operationalScope", "primarySourcedRatio"]
     }
   }
 }
