@@ -44,7 +44,6 @@ export const processAggregationEvent: IService = async (
     issuer: vckit.issuer,
     context: epcisAggregationEvent.context,
     type: epcisAggregationEvent.type,
-    proofFormat: vckit.proofFormat,
     restOfVC: {
       render: epcisAggregationEvent.renderTemplate,
     },

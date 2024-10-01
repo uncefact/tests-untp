@@ -121,8 +121,7 @@ The enveloping proof secures the original credential by encapsulating the origin
     {
       "vckit": {
         "vckitAPIUrl": "http://localhost:3332/v2",
-        "issuer": "did:web:example.com",
-        "proofFormat": "EnvelopingProofJose" // required for enveloping proof
+        "issuer": "did:web:example.com"
       },
       "dpp": {
         "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],

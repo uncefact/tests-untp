@@ -12,6 +12,8 @@ export const contextDefault = [
 
 export const typeDefault = ['VerifiableCredential'];
 
+export const PROOF_FORMAT = 'EnvelopingProofJose';
+
 export interface IArgIssueVC {
   credentialSubject: CredentialSubject;
   type?: string;
@@ -45,22 +47,14 @@ export const issueVC = async ({
   credentialSubject,
   restOfVC,
   vcKitAPIUrl,
-  proofFormat,
 }: IVcKitIssueVC): Promise<VerifiableCredential> => {
-  const body = constructCredentialObject({ context, type, issuer, credentialSubject, proofFormat, ...restOfVC });
+  const body = constructCredentialObject({ context, type, issuer, credentialSubject, ...restOfVC });
   privateAPI.setBearerTokenAuthorizationHeaders(appConfig.defaultVerificationServiceLink.apiKey ?? '');
   const response = await privateAPI.post<VerifiableCredential>(`${vcKitAPIUrl}/credentials/issue`, body);
   return response;
 };
 
-const constructCredentialObject = ({
-  context,
-  type,
-  issuer,
-  credentialSubject,
-  proofFormat,
-  ...restOfVC
-}: CredentialPayload) => {
+const constructCredentialObject = ({ context, type, issuer, credentialSubject, ...restOfVC }: CredentialPayload) => {
   return {
     credential: {
       '@context': [...contextDefault, ...(context || [])],
@@ -72,7 +66,7 @@ const constructCredentialObject = ({
       ...restOfVC,
     },
     options: {
-      proofFormat,
+      proofFormat: PROOF_FORMAT,
     },
   };
 };

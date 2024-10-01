@@ -35,7 +35,6 @@ export const processDPP: IService = async (data: any, context: IContext): Promis
       issuer: vckitContext.issuer,
       type: [...dppContext.type],
       vcKitAPIUrl: vckitContext.vckitAPIUrl,
-      proofFormat: vckitContext.proofFormat,
       restOfVC,
     });
 

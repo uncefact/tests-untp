@@ -45,8 +45,7 @@ graph TD
         {
           "vckit": {
             "vckitAPIUrl": "http://localhost:3332/v2",
-            "issuer": "did:web:agtrace-passports.s3.ap-southeast-2.amazonaws.com",
-            "proofFormat": "EnvelopingProofJose" // Optional, only used when issuing Envloping Proof format
+            "issuer": "did:web:agtrace-passports.s3.ap-southeast-2.amazonaws.com"
           },
           "dpp": {
             "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
