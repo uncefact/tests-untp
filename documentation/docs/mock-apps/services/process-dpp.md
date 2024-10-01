@@ -107,3 +107,62 @@ P-->>C: Return VC and resolver URL
 | dlr               | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/mock-apps/common/idr)                               |
 | storage           | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/mock-apps/common/storage)                       |
 | identifierKeyPath | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/mock-apps/common/identifier-key-path) |
+
+### Issue with Enveloping Proofs (JOSE)
+
+The enveloping proof secures the original credential by encapsulating the original data in a digital signature envelope, resulting in a verifiable credential that can be processed using tooling that understands the JOSE format.
+
+**Setup in processDPP for issue with Enveloping Proof**
+
+```json
+{
+  "name": "processDPP",
+  "parameters": [
+    {
+      "vckit": {
+        "vckitAPIUrl": "http://localhost:3332/v2",
+        "issuer": "did:web:example.com",
+        "proofFormat": "EnvelopingProofJose" // required for enveloping proof
+      },
+      "dpp": {
+        "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+        "renderTemplate": [
+          {
+            "template": "<!DOCTYPE html>...",
+            "@type": "WebRenderingTemplate2022"
+          }
+        ],
+        "type": ["VerifiableCredential", "DigitalProductPassport"],
+        "dlrLinkTitle": "Product Passport",
+        "dlrIdentificationKeyType": "gtin",
+        "dlrVerificationPage": "http://localhost:3003/verify"
+      },
+      "dlr": {
+        "dlrAPIUrl": "http://localhost:3000",
+        "dlrAPIKey": "test123",
+        "namespace": "gs1",
+        "linkRegisterPath": "/api/resolver"
+      },
+      "storage": {
+        "url": "http://localhost:3334/v1/documents",
+        "params": {
+          "resultPath": "/uri",
+          "bucket": "verifiable-credentials"
+        },
+        "options": {
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        }
+      },
+      "identifierKeyPath": {
+        "function": "concatService",
+        "args": [
+          { "type": "text", "value": "(01)" }
+        ]
+      }
+    }
+  ]
+},
+```
