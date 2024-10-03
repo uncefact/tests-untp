@@ -11,6 +11,7 @@ import { LoadingWithText } from '../components/LoadingWithText';
 import { BackButton } from '../components/BackButton';
 import Credential from '../components/Credential/Credential';
 import appConfig from '../constants/app-config.json';
+import { VerifyPageContext } from '../hooks/VerifyPageContext';
 
 enum PassportStatus {
   'LOADING_FETCHING_PASSPORT' = 'LOADING_FETCHING_PASSPORT',
@@ -154,9 +155,11 @@ const Verify = () => {
         }
 
         return (
-          <BackButton>
-            <Credential credential={customCredential ?? credential} />
-          </BackButton>
+          <VerifyPageContext.Provider value={{ verifiableCredential: credential }}>
+            <BackButton>
+              <Credential credential={customCredential ?? credential} />
+            </BackButton>
+          </VerifyPageContext.Provider>
         );
       default:
         return (
