@@ -15,7 +15,7 @@ services:
       - /app/node_modules
 
   vckit-api:
-    image: ghcr.io/uncefact/project-vckit:sha-7424f86@sha256:a29f887d02595844612d6904db7150e1f82c9906ed59a62af376eb4b60c78431
+    image: ghcr.io/uncefact/project-vckit:sha-a21556a@sha256:f75ef2de34ce587b0d54c9a7cd8d63f9d6c9cacbce191c893537dadd588ee368
     env_file:
       - local.env
     ports:
