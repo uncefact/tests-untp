@@ -703,8 +703,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:49ee-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -888,22 +888,12 @@
           ],
           "services": [
             {
-              "name": "getValueFromLocalStorage",
-              "parameters": [
-                {
-                  "storageKey": "CherriesFarm_dpps",
-                  "key": "",
-                  "stateKey": "dppCredentialsAndLinkResolvers"
-                }
-              ]
-            },
-            {
               "name": "processObjectEvent",
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:49ee-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "epcisObjectEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -937,35 +927,7 @@
                       }
                     }
                   },
-                  "identifierKeyPath": "/id",
-                  "dpp": {
-                    "dlrIdentificationKeyType": "gtin",
-                    "dlrLinkTitle": "Product DPP",
-                    "dlrVerificationPage": "https://verify.example.com"
-                  },
-                  "dppCredential": {
-                    "mappingFields": [
-                      {
-                        "sourcePath": "/linkResolver",
-                        "destinationPath": "/traceabilityInformation/0/eventReference"
-                      }
-                    ],
-                    "dummyFields": [
-                      {
-                        "path": "/traceabilityInformation/0/eventType",
-                        "data": "object"
-                      }
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "name": "mergeToLocalStorage",
-              "parameters": [
-                {
-                  "storageKey": "CherriesFarm_dpps",
-                  "objectValuePath": "/dpps"
+                  "identifierKeyPath": "/id"
                 }
               ]
             }
@@ -1403,8 +1365,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:49ee-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -2155,8 +2117,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:49ee-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -2638,8 +2600,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:49ee-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -3390,8 +3352,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:49ee-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -3873,8 +3835,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:49ee-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -4625,8 +4587,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:49ee-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -5108,8 +5070,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:49ee-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],

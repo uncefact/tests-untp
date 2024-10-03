@@ -65,10 +65,6 @@ export interface ITraceabilityEvent {
   };
 }
 
-export interface IObjectEvent extends ITraceabilityEvent {
-  dppCredentialsAndLinkResolvers: { [key: string]: { vc: any; linkResolver: string } };
-}
-
 export interface ITransformationEventContext extends IContext {
   identifiers: string[];
   epcisTransformationEvent: IEntityIssue;
@@ -87,5 +83,4 @@ export interface IAggregationEventContext extends IContext {
 
 export interface IObjectEventContext extends IContext {
   epcisObjectEvent: IEntityIssue;
-  dppCredential: IConstructObjectParameters;
 }

@@ -29,14 +29,6 @@ P->>S: Upload VC
 S-->>P: Return VC URL
 P->>D: Register link resolver
 D-->>P: Return resolver URL
-loop For each item
-P->>V: Issue DPP VC linked object resolver URL
-V-->>P: Return DPP VC
-P->>S: Upload DPP VC
-S-->>P: Return DPP VC URL
-P->>D: Register DPP link resolver
-D-->>P: Return DPP resolver URL
-end
 P-->>C: Return object event VC and resolver URL
 ```
 
@@ -76,26 +68,7 @@ P-->>C: Return object event VC and resolver URL
         "namespace": "gs1",
         "linkRegisterPath": "/api/resolver"
       },
-      "identifierKeyPath": "/parentItem/epc",
-      "dpp": {
-        "dlrIdentificationKeyType": "gtin",
-        "dlrLinkTitle": "Product DPP",
-        "dlrVerificationPage": "https://verify.example.com"
-      },
-      "dppCredential": {
-        "mappingFields": [
-          {
-            "sourcePath": "/linkResolver",
-            "destinationPath": "/traceabilityInformation/0/eventReference"
-          }
-        ],
-        "dummyFields": [
-          {
-            "path": "/traceabilityInformation/0/eventType",
-            "data": "object"
-          }
-        ]
-      }
+      "identifierKeyPath": "/parentItem/epc"
     }
   ]
 }
@@ -110,5 +83,3 @@ P-->>C: Return object event VC and resolver URL
 | storage           | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/mock-apps/common/storage)                       |
 | dlr               | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/mock-apps/common/idr)                               |
 | identifierKeyPath | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/mock-apps/common/identifier-key-path) |
-| dpp               | Yes      | Configuration for the DPP that configuration will be used to issue new DPPs event                                                   | [Credential](/docs/mock-apps/common/credential)                 |
-| dppCredential     | Yes      | Configuration for the DPP credential to add the object event                                                                        | [Construct Data](/docs/mock-apps/common/construct-data)         |

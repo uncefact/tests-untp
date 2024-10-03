@@ -152,7 +152,6 @@ export const validateObjectEventContext = (context: IObjectEventContext): Result
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.dlr)) return error('Invalid dlr context');
   if (_.isEmpty(context.identifierKeyPath)) return error('identifierKeyPath not found');
-  if (_.isEmpty(context.dppCredential)) return error('Invalid dppCredential context');
 
   if (_.isEmpty(context.vckit.vckitAPIUrl)) return error('Invalid vckitAPIUrl');
   if (_.isEmpty(context.vckit.issuer)) return error('Invalid issuer');

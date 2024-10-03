@@ -1,25 +1,20 @@
 import { VerifiableCredential } from '@vckit/core-types';
-import {
-  registerLinkResolver,
-  LinkType,
-  getLinkResolverIdentifier,
-  getLinkResolverIdentifierFromURI,
-} from '../linkResolver.service.js';
+import { registerLinkResolver, LinkType, getLinkResolverIdentifier } from '../linkResolver.service.js';
 import { getStorageServiceLink } from '../storage.service.js';
 import { IService } from '../types/IService.js';
-import { constructIdentifierString, constructObject, generateUUID } from '../utils/helpers.js';
+import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
 import { issueVC } from '../vckit.service.js';
-import { IObjectEvent, IObjectEventContext } from './types';
+import { ITraceabilityEvent, IObjectEventContext } from './types';
 import { validateObjectEventContext } from './validateContext.js';
 
 /**
- * Processes an object event by issuing a verifiable credential, storing it in a storage service and registering a link resolver. After that it will update the DPPs to attach the object event to the VC.
- * @param objectEvent The object event to process, containing the object event data, which is set the action for the VC, and the DPPs which will be linked with the object event
+ * Processes an object event by issuing a verifiable credential, storing it in a storage service and registering a link resolver.
+ * @param objectEvent The object event to process, containing the object event data
  * @param context The context to use for processing the object event
  * @returns The result of processing the object event
  */
 export const processObjectEvent: IService = async (
-  objectEvent: IObjectEvent,
+  objectEvent: ITraceabilityEvent,
   context: IObjectEventContext,
 ): Promise<any> => {
   const validationResult = validateObjectEventContext(context);
@@ -28,19 +23,16 @@ export const processObjectEvent: IService = async (
   if (!objectEvent.data) {
     throw new Error('Object event data not found');
   }
-  if (!objectEvent.dppCredentialsAndLinkResolvers) {
-    throw new Error('DPP credentials and link resolvers not found');
-  }
 
-  const { vckit, epcisObjectEvent, dlr, storage, identifierKeyPath, dpp, dppCredential } = context;
+  const { vckit, epcisObjectEvent, dlr, storage, identifierKeyPath } = context;
 
-  const transactionIdentifier = constructIdentifierString(objectEvent.data, identifierKeyPath);
-  if (!transactionIdentifier) {
+  const objectIdentifier = constructIdentifierString(objectEvent.data, identifierKeyPath);
+  if (!objectIdentifier) {
     throw new Error('Identifier not found');
   }
 
   const { identifier: objectEventIdentifier, qualifierPath: objectEventQualifierPath } =
-    getLinkResolverIdentifier(transactionIdentifier);
+    getLinkResolverIdentifier(objectIdentifier);
 
   const objectEventVc: VerifiableCredential = await issueVC({
     credentialSubject: objectEvent.data,
@@ -72,60 +64,6 @@ export const processObjectEvent: IService = async (
     objectEventQualifierPath,
     LinkType.epcisLinkType,
   );
-  const dppCredentialsAndLinkResolvers = Object.values(objectEvent.dppCredentialsAndLinkResolvers);
-  const dppIdentifiers = Object.keys(objectEvent.dppCredentialsAndLinkResolvers);
 
-  const objectEventVcData = {
-    vc: objectEventVc,
-    linkResolver: objectEventLinkResolver,
-  };
-
-  const newDppCredentialsAndLinkResolvers = await Promise.all(
-    dppCredentialsAndLinkResolvers.map(async ({ vc: currentDppVC, linkResolver }) => {
-      const _currentDppVC = { ...currentDppVC };
-      delete _currentDppVC.issuer;
-
-      const dppCredentialSubject = constructObject(_currentDppVC.credentialSubject, objectEventVcData, dppCredential);
-
-      const createdDppVc: VerifiableCredential = await issueVC({
-        credentialSubject: dppCredentialSubject,
-        vcKitAPIUrl: vckit.vckitAPIUrl,
-        issuer: vckit.issuer,
-        context: _currentDppVC.context,
-        type: _currentDppVC.type,
-        restOfVC: { ..._currentDppVC },
-      });
-
-      const { identifier: dppIdentifier, qualifierPath: dppQualifierPath } =
-        getLinkResolverIdentifierFromURI(linkResolver);
-
-      const dppVcUrl = await getStorageServiceLink(storage, createdDppVc, `${dppIdentifier}/${dppQualifierPath}`);
-
-      const dppLinkResolver = await registerLinkResolver(
-        dppVcUrl,
-        dpp.dlrIdentificationKeyType,
-        dppIdentifier,
-        dpp.dlrLinkTitle,
-        LinkType.certificationLinkType,
-        dpp.dlrVerificationPage,
-        dlr.dlrAPIUrl,
-        dlr.dlrAPIKey,
-        dlr.namespace,
-        dppQualifierPath,
-        LinkType.certificationLinkType,
-      );
-
-      return { vc: createdDppVc, linkResolver: dppLinkResolver };
-    }),
-  );
-
-  const dpps = dppIdentifiers.reduce(
-    (dppsMap, dppIdentifier, index) => {
-      dppsMap[dppIdentifier] = newDppCredentialsAndLinkResolvers[index];
-      return dppsMap;
-    },
-    {} as { [key: string]: { vc: any; linkResolver: string } },
-  );
-
-  return { vc: objectEventVc, linkResolver: objectEventLinkResolver, dpps };
+  return { vc: objectEventVc, linkResolver: objectEventLinkResolver };
 };

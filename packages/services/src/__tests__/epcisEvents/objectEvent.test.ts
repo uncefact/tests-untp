@@ -1,4 +1,4 @@
-import { IObjectEvent, processObjectEvent } from '../../epcisEvents';
+import { ITraceabilityEvent, processObjectEvent } from '../../epcisEvents';
 import * as vckitService from '../../vckit.service';
 import { getStorageServiceLink } from '../../storage.service';
 import * as linkResolverService from '../../linkResolver.service';
@@ -27,7 +27,7 @@ jest.mock('../../linkResolver.service', () => ({
 }));
 
 describe('processObjectEvent', () => {
-  const objectEvent: IObjectEvent = {
+  const objectEvent: ITraceabilityEvent = {
     data: {
       id: '010501234567890021951350380',
       type: 'urn:epcglobal:cbv:mda',
@@ -52,41 +52,6 @@ describe('processObjectEvent', () => {
           quantity: 1,
         },
       ],
-    },
-    dppCredentialsAndLinkResolvers: {
-      '05012345678900': {
-        vc: {
-          '@context': ['https://www.w3.org/2018/credentials/v1'],
-          type: ['VerifiableCredential'],
-          credentialSubject: {
-            id: 'urn:uuid:60a76c80-d399-11eb-8d0a-0242ac130003',
-            type: 'urn:epcglobal:cbv:mda',
-            action: 'OBSERVE',
-            bizStep: 'urn:epcglobal:cbv:bizstep:receiving',
-            disposition: 'urn:epcglobal:cbv:disp:in_progress',
-            readPoint: {
-              id: 'urn:uuid:60a76c80-d399-11eb-8d0a-0242ac130003',
-            },
-            bizLocation: {
-              id: 'urn:uuid:60a76c80-d399-11eb-8d0a-0242ac130003',
-            },
-            bizTransactionList: [
-              {
-                type: 'urn:epcglobal:cbv:btt:po',
-                bizTransaction: 'http://transaction.acme.com/po/12345678',
-              },
-            ],
-            epcList: [
-              {
-                epc: 'urn:epc:id:sgtin:0614141.107346.2021',
-                quantity: 1,
-              },
-            ],
-          },
-          issuer: 'did:example:123',
-        },
-        linkResolver: 'https://example.com/link-resolver',
-      },
     },
   };
 
@@ -113,12 +78,6 @@ describe('processObjectEvent', () => {
 
     expect(result.vc).toEqual({ credentialSubject: { id: 'https://example.com/123' } });
     expect(result.linkResolver).toEqual('https://example.com/link-resolver');
-    expect(result.dpps).toEqual({
-      '05012345678900': {
-        vc: { credentialSubject: { id: 'https://example.com/123' } },
-        linkResolver: 'https://example.com/link-resolver',
-      },
-    });
   });
 
   it('should throw error when context validation false', async () => {
@@ -159,21 +118,6 @@ describe('processObjectEvent', () => {
 
     expect(async () => await processObjectEvent(invalidObjectEvent, context)).rejects.toThrow(
       'Object event data not found',
-    );
-  });
-
-  it('should throw error when DPP credentials and link resolvers not found', async () => {
-    const invalidObjectEvent = {
-      ...objectEvent,
-      dppCredentialsAndLinkResolvers: undefined,
-    };
-
-    jest
-      .spyOn(validateContext, 'validateObjectEventContext')
-      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<IObjectEventContext>);
-
-    expect(async () => await processObjectEvent(invalidObjectEvent, context)).rejects.toThrow(
-      'DPP credentials and link resolvers not found',
     );
   });
 });
