@@ -60,8 +60,13 @@ const Verify = () => {
         return setCredential(encryptedCredential);
       }
 
-      if ('jwt' in encryptedCredential) {
-        return setCredential(encryptedCredential.jwt);
+      if (encryptedCredential?.type === 'EnvelopedVerifiableCredential' && 'id' in encryptedCredential) {
+        if (encryptedCredential.id.startsWith('data:application/')) {
+          const encodedCredential = encryptedCredential.id.split(',')[1];
+          return setCredential(encodedCredential);
+        } else {
+          return displayErrorUI();
+        }
       }
 
       const credentialJsonString = decryptString({
