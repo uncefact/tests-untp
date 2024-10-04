@@ -7,8 +7,9 @@ SERVICE_NAME="Mock Global GS1 Resolver"
 MAX_RETRIES=3
 RETRY_COUNT=0
 
-# Path to the JSON data files
+# Path to the Mock GS1 identifier JSON file
 IDENTIFIER_FILE="./seeding/mock-gs1-identifier.json"
+# Path to the Mock GS1 link resolver JSON file
 IDENTIFICATIONS_FILE="./seeding/mock-gs1-link-resolver.json"
 
 # Wait for the service to be available
