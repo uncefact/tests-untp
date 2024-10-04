@@ -44,4 +44,4 @@ jobs:
           threshold: 80
 
       - name: Build
-        run: yarn build
+        run: cp app-config.json packages/mock-app/src/constants/app-config.json && yarn build
