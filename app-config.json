@@ -703,7 +703,7 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
+                    "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
                   },
                   "dpp": {
@@ -805,7 +805,6 @@
                           },
                           "eventID": {
                             "x-jargon-isKey": true,
-                            "readOnly": true,
                             "type": "string",
                             "description": "The unique identifier of this event - SHOULD be a UUID"
                           },
@@ -1196,7 +1195,7 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
+                    "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {

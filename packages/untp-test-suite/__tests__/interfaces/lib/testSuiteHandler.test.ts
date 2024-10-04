@@ -129,4 +129,27 @@ describe('testCredentialHandler', () => {
       result: TestSuiteResultEnum.PASS,
     });
   });
+
+  it('should return a PASS result when URL and valid test data are provided', async () => {
+    jest.spyOn(testSuiteCore, 'processTestSuiteForCredential').mockResolvedValueOnce({
+      credentialType: '',
+      version: '',
+      url: 'https://example.com/schema/aggregationEvent/v0.0.1',
+      result: TestSuiteResultEnum.PASS,
+    });
+
+    const payload = {
+      type: '',
+      version: '',
+      url: 'https://example.com/schema/aggregationEvent/v0.0.1',
+    };
+    const result = await testCredentialHandler(payload, testData);
+
+    expect(result).toEqual({
+      credentialType: '',
+      version: '',
+      url: 'https://example.com/schema/aggregationEvent/v0.0.1',
+      result: TestSuiteResultEnum.PASS,
+    });
+  });
 });

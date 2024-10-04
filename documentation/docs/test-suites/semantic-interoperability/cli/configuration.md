@@ -29,32 +29,38 @@ The generated configuration file will have the following structure:
     {
       "type": "aggregationEvent",
       "version": "v0.0.1",
-      "dataPath": ""
+      "dataPath": "",
+      "url": ""
     },
     {
       "type": "conformityCredential",
       "version": "v0.0.1",
-      "dataPath": ""
+      "dataPath": "",
+      "url": ""
     },
     {
       "type": "objectEvent",
       "version": "v0.0.1",
-      "dataPath": ""
+      "dataPath": "",
+      "url": ""
     },
     {
       "type": "productPassport",
       "version": "v0.0.1",
-      "dataPath": ""
+      "dataPath": "",
+      "url": ""
     },
     {
       "type": "transactionEvent",
       "version": "v0.0.1",
-      "dataPath": ""
+      "dataPath": "",
+      "url": ""
     },
     {
       "type": "transformationEvent",
       "version": "v0.0.1",
-      "dataPath": ""
+      "dataPath": "",
+      "url": ""
     }
   ]
 }
@@ -102,6 +108,10 @@ The `version` property value corresponds to the folder name within the respectiv
 
 The `dataPath` value is the relative location of the credential you want to test against the schema type and version.
 
+### URL
+
+The `url` value is the URL of the remote schema you want to test against. If you provide a URL, the `type` and `version` fields will be ignored.
+
 ## Adding test credentials
 
 To test credentials developed or produced by a UNTP implementation against the core UNTP data model:
@@ -135,32 +145,38 @@ packages/
     {
       "type": "aggregationEvent",
       "version": "v0.0.1",
-      "dataPath": "credentials/aggregationEvent-sample.json"
+      "dataPath": "credentials/aggregationEvent-sample.json",
+      "url": ""
     },
     {
       "type": "conformityCredential",
       "version": "v0.0.1",
-      "dataPath": "credentials/conformityCredential-sample.json"
+      "dataPath": "credentials/conformityCredential-sample.json",
+      "url": ""
     },
     {
       "type": "objectEvent",
       "version": "v0.0.1",
-      "dataPath": "credentials/objectEvent-sample.json"
+      "dataPath": "credentials/objectEvent-sample.json",
+      "url": ""
     },
     {
       "type": "productPassport",
       "version": "v0.0.1",
-      "dataPath": "credentials/productPassport-sample.json"
+      "dataPath": "credentials/productPassport-sample.json",
+      "url": ""
     },
     {
       "type": "transactionEvent",
       "version": "v0.0.1",
-      "dataPath": "credentials/transactionEvent-sample.json"
+      "dataPath": "credentials/transactionEvent-sample.json",
+      "url": ""
     },
     {
       "type": "transformationEvent",
       "version": "v0.0.1",
-      "dataPath": "credentials/transformationEvent-sample.json"
+      "dataPath": "credentials/transformationEvent-sample.json",
+      "url": ""
     }
   ]
 }

@@ -8,7 +8,7 @@ export interface IssueEvent {
 }
 
 export interface IImportedData {
-  [key: string]: { value: any, checked: boolean };
+  [key: string]: { value: any; checked: boolean };
 }
 
 export enum MimeTypeEnum {
@@ -19,4 +19,10 @@ export enum MimeTypeEnum {
 
 export enum SupportedProviderTypesEnum {
   gs1 = 'gs1',
+}
+
+export interface IVerifyURLPayload {
+  uri: string;
+  key?: string;
+  hash?: string;
 }

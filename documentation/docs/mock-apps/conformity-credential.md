@@ -11,12 +11,12 @@ import Disclaimer from '.././\_disclaimer.mdx';
 
 This section outlines three methods for creating and using [Conformity Credentials](https://uncefact.github.io/spec-untp/docs/specification/ConformityCredential) within the Mock App system. Each method offers different levels of automation and integration with external services.
 
-
 ### Manually Import Conformity Credential
 
 This method involves manually creating and importing a Conformity Credential.
 
 Steps:
+
 1. Craft the Conformity Credential payload based on the [desired schema](https://uncefact.github.io/spec-untp/docs/specification/ConformityCredential#versions).
 2. Sign the credential using the [Verifiable Credential service](/docs/mock-apps/dependent-services/verifiable-credential-service).
 3. Store the credential in an external or [Local Storage service](/docs/mock-apps/dependent-services/storage-service).
@@ -127,19 +127,20 @@ Steps:
 }
 ```
 
-
 ### Create Conformity Credential Within Mock App System
 
 **To Be Implemented**
 
 This method involves creating the conformity credential within the Mock App system by using a [feature](/docs/mock-apps/configuration/feature-config) that is composed of the [JsonForm component](/docs/mock-apps/components/json-form) and storing it in local storage or by using the Storage service.
 
-
 ### Request Conformity Credential from External Service
+
 <!-- TODO: Confirm with Nam about this flow -->
+
 This method uses the [ConformityCredential component](/docs/mock-apps/components/conformity-credential) to request a conformity credential from an external service, store it, and manage the received credentials.
 
 Steps:
+
 1. Configure the [ConformityCredential component](/docs/mock-apps/components/conformity-credential) in the [app config](/docs/mock-apps/configuration/) to specify the external service details and [storage options](/docs/mock-apps/common/storage).
 2. Use the [ConformityCredential component](/docs/mock-apps/components/conformity-credential) to send a request to the external service for a Conformity Credential.
 3. Receive the credential from the external service.
@@ -204,8 +205,8 @@ To use the stored Conformity Credentials in the DPP issuance process, you have t
 1. Using the [Conformity Credential Checkbox component](/docs/mock-apps/components/conformity-credential-checkbox)
 2. Using the [Local Storage Loader component](/docs/mock-apps/components/local-storage-loader)
 
-
 #### Option 1: Using the Conformity Credential Checkbox component
+
 <!-- TODO: Confirm with Nam about the order of components -->
 
 The [Conformity Credential Checkbox component](/docs/mock-apps/components/conformity-credential-checkbox) allows users to select one or more Conformity Credentials from a list of checkboxes. The component is added to the issue DPP [feature](/docs/mock-apps/configuration/feature-config). Here's how you can incorporate it into your DPP issuance process:
@@ -262,6 +263,7 @@ The [Conformity Credential Checkbox component](/docs/mock-apps/components/confor
 #### Option 2: Using the Local Storage Loader component
 
 <!-- TODO: Confirm with Nam about the mapping from local storage for CC -->
+
 The [Local Storage Loader component](/docs/mock-apps/components/local-storage-loader) loads data from local storage and provides it to nested components. Here's how you can use it to load and incorporate Conformity Credentials:
 
 ```json
@@ -317,3 +319,13 @@ The [Local Storage Loader component](/docs/mock-apps/components/local-storage-lo
   ]
 }
 ```
+
+### Credential Import Process: Verify URL Construction
+
+In the mock app system, credentials imported from the local storage service return a URI, and optionally, a hash and key if encrypted. This URI is now used to construct the verify URL with the following format:
+
+```bash
+{verify_app_address}?q={payload:{uri:{uri_of_credential}, key:{decryption_key}, hash:{hash_of_credential}}}
+```
+
+The verify URL should include the URI, and if encryption exists, the hash and key. The verify URL directs to the "verify" page of the mock app.
