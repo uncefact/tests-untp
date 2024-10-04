@@ -17,6 +17,9 @@ Components are reusable UI elements that make up the visual and interactive part
 - [Local Storage Loader](./local-storage-loader)
 - [Conformity Credential](./conformity-credential)
 - [Conformity Credential Checkbox](./conformity-credential-checkbox)
+- [Render Check List](./render-check-list)
+- [Import Button](./import-button)
+- [QR Code Scanner Dialog Button](./qr-code-scanner-dialog-button)
 
 ## Diagram
 
@@ -30,22 +33,22 @@ graph TD
 
 ## Config
 
-| Property | Required | Description | Type |
-|----------|----------|-------------|------|
-| name | Yes | The name of the component (depends on component used)| [Component](#available-components) |
-| type | Yes | The type of the component (depends on component used) | [ComponentType](/docs/mock-apps/common/component-type) |
-| props | Yes | Properties passed to the component (depends on component used)| [Component](#available-components) |
+| Property | Required | Description                                                    | Type                                                   |
+| -------- | -------- | -------------------------------------------------------------- | ------------------------------------------------------ |
+| name     | Yes      | The name of the component (depends on component used)          | [Component](#available-components)                     |
+| type     | Yes      | The type of the component (depends on component used)          | [ComponentType](/docs/mock-apps/common/component-type) |
+| props    | Yes      | Properties passed to the component (depends on component used) | [Component](#available-components)                     |
 
 ## Example
 
 ```json
 {
-    "name": "CustomButton",
-    "type": "Submit",
-    "props": {
-        "label": "Submit",
-        "description": "Click to submit the form"
-    }
+  "name": "CustomButton",
+  "type": "Submit",
+  "props": {
+    "label": "Submit",
+    "description": "Click to submit the form"
+  }
 }
 ```
 
