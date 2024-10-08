@@ -60,14 +60,11 @@ const Verify = () => {
         return setCredential(encryptedCredential);
       }
 
-      const vc = encryptedCredential?.verifiableCredential;
-
-      if (vc?.credentialSubject) {
-        return setCredential(vc);
-      }
-
-      if (vc?.type?.includes('EnvelopedVerifiableCredential') && vc?.id?.startsWith('data:application/')) {
-        return setCredential(vc);
+      if (
+        encryptedCredential?.type?.includes('EnvelopedVerifiableCredential') &&
+        encryptedCredential?.id?.startsWith('data:application/')
+      ) {
+        return setCredential(encryptedCredential);
       }
 
       const credentialJsonString = decryptString({
