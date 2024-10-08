@@ -60,10 +60,16 @@ const Verify = () => {
         return setCredential(encryptedCredential);
       }
 
-      if (encryptedCredential?.type === 'EnvelopedVerifiableCredential' && 'id' in encryptedCredential) {
-        if (encryptedCredential.id.startsWith('data:application/')) {
-          const encodedCredential = encryptedCredential.id.split(',')[1];
-          return setCredential(encodedCredential);
+      if (encryptedCredential?.verifiableCredential?.credentialSubject) {
+        return setCredential(encryptedCredential.verifiableCredential);
+      }
+
+      if (
+        encryptedCredential?.verifiableCredential?.type.includes('EnvelopedVerifiableCredential') &&
+        'id' in encryptedCredential?.verifiableCredential
+      ) {
+        if (encryptedCredential.verifiableCredential.id.startsWith('data:application/')) {
+          return setCredential(encryptedCredential.verifiableCredential);
         } else {
           return displayErrorUI();
         }
@@ -150,9 +156,11 @@ const Verify = () => {
         }
 
         let customCredential = null;
-        if (typeof credential === 'string') {
+
+        if (credential?.type?.includes('EnvelopedVerifiableCredential')) {
           try {
-            customCredential = jose.decodeJwt(credential);
+            const encodedCredential = credential?.id?.split(',')[1];
+            customCredential = jose.decodeJwt(encodedCredential as string) as VerifiableCredential;
           } catch (error) {
             displayErrorUI();
           }
