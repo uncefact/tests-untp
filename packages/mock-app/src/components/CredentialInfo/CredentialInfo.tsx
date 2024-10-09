@@ -10,7 +10,7 @@ const CredentialInfo = ({ credential }: { credential: VerifiableCredential }) =>
     }
 
     const types = credential?.type as string[];
-    const type = types.find((item) => item !== 'VerifiableCredential');
+    const type = types?.find((item) => item !== 'VerifiableCredential');
     if (type) {
       return type;
     }

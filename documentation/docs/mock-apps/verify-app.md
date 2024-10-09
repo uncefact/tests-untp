@@ -29,3 +29,8 @@ sequenceDiagram
     V->>V: Render Verified Credential
     V->>U: Display Verification Result and Credential
 ```
+
+## Rendering Verified Credential
+The UI of this page includes these information fields: Type, Issued by and Issue date. Besides, the page also contains the tab panel for HTML template and JSON data.
+
+In JSON data tab, there is a button to download the JSON data or JWT data if the credential is JWT.

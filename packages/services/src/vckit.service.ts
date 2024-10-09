@@ -50,8 +50,11 @@ export const issueVC = async ({
 }: IVcKitIssueVC): Promise<VerifiableCredential> => {
   const body = constructCredentialObject({ context, type, issuer, credentialSubject, ...restOfVC });
   privateAPI.setBearerTokenAuthorizationHeaders(appConfig.defaultVerificationServiceLink.apiKey ?? '');
-  const response = await privateAPI.post<VerifiableCredential>(`${vcKitAPIUrl}/credentials/issue`, body);
-  return response;
+  const { verifiableCredential } = await privateAPI.post<VerifiableCredential>(
+    `${vcKitAPIUrl}/credentials/issue`,
+    body,
+  );
+  return verifiableCredential;
 };
 
 const constructCredentialObject = ({ context, type, issuer, credentialSubject, ...restOfVC }: CredentialPayload) => {

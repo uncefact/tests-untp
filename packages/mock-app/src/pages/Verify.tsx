@@ -11,6 +11,7 @@ import { LoadingWithText } from '../components/LoadingWithText';
 import { BackButton } from '../components/BackButton';
 import Credential from '../components/Credential/Credential';
 import appConfig from '../constants/app-config.json';
+import { VerifyPageContext } from '../hooks/VerifyPageContext';
 
 enum PassportStatus {
   'LOADING_FETCHING_PASSPORT' = 'LOADING_FETCHING_PASSPORT',
@@ -60,8 +61,15 @@ const Verify = () => {
         return setCredential(encryptedCredential);
       }
 
-      if ('jwt' in encryptedCredential) {
-        return setCredential(encryptedCredential.jwt);
+      if (
+        encryptedCredential?.verifiableCredential?.type.includes('EnvelopedVerifiableCredential') &&
+        'id' in encryptedCredential?.verifiableCredential
+      ) {
+        if (encryptedCredential.verifiableCredential.id.startsWith('data:application/')) {
+          return setCredential(encryptedCredential);
+        } else {
+          return displayErrorUI();
+        }
       }
 
       const credentialJsonString = decryptString({
@@ -145,18 +153,22 @@ const Verify = () => {
         }
 
         let customCredential = null;
-        if (typeof credential === 'string') {
+
+        if (credential?.verifiableCredential?.type?.includes('EnvelopedVerifiableCredential')) {
           try {
-            customCredential = jose.decodeJwt(credential);
+            const encodedCredential = credential.verifiableCredential.id.split(',')[1];
+            customCredential = jose.decodeJwt(encodedCredential);
           } catch (error) {
             displayErrorUI();
           }
         }
 
         return (
-          <BackButton>
-            <Credential credential={customCredential ?? credential} />
-          </BackButton>
+          <VerifyPageContext.Provider value={{ vc: credential }}>
+            <BackButton>
+              <Credential credential={customCredential ?? credential} />
+            </BackButton>
+          </VerifyPageContext.Provider>
         );
       default:
         return (
