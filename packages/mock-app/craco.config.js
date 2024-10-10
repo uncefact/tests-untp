@@ -44,4 +44,28 @@ module.exports = {
       return babelLoaderOptions;
     },
   },
+  webpack: {
+    configure: (webpackConfig, { env, paths }) => {
+      // TODO: Remove what is not needed
+      // Existing fallbacks
+      webpackConfig.resolve.fallback = {
+        ...webpackConfig.resolve.fallback,
+        crypto: 'crypto-browserify',
+        stream: 'stream-browserify',
+        buffer: 'buffer',
+        process: 'process/browser',
+      };
+
+      // TODO: Remove what is not needed
+      // Add plugins
+      webpackConfig.plugins.push(
+        new webpack.ProvidePlugin({
+          process: 'process/browser',
+          Buffer: ['buffer', 'Buffer'],
+        }),
+      );
+
+      return webpackConfig;
+    },
+  },
 };

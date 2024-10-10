@@ -6,7 +6,6 @@ import { getStorageServiceLink } from '../storage.service.js';
 import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { validateTransactionEventContext } from './validateContext.js';
-import JSONPointer from 'jsonpointer';
 import { deleteValuesFromLocalStorageByKeyPath } from './helpers.js';
 
 export const processTransactionEvent: IService = async (
@@ -37,7 +36,7 @@ export const processTransactionEvent: IService = async (
     },
   });
 
-  const vcUrl = await getStorageServiceLink(storage, vc, `${identifier}/${generateUUID()}`);
+  const vcUrl = await getStorageServiceLink(storage, vc, generateUUID());
 
   const linkResolver = await registerLinkResolver(
     vcUrl,

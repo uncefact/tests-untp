@@ -25,13 +25,13 @@ export const storageService: IStorageService = async (config) => {
   }
 };
 
-export const getStorageServiceLink: IGetStorageServiceLink = async (storage, data, filename) => {
+export const getStorageServiceLink: IGetStorageServiceLink = async (storage, data, id) => {
   return await storageService({
     url: storage.url,
     params: {
       ...storage.params,
       data,
-      filename,
+      id,
     },
     options: storage.options,
   });

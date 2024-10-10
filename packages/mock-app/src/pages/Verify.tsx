@@ -1,10 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { decryptString } from '@govtechsg/oa-encryption';
 import { IVerifyResult, VerifiableCredential } from '@vckit/core-types';
 import { useLocation } from 'react-router-dom';
-import { computeEntryHash } from '@veramo/utils';
 import { Status } from '@mock-app/components';
-import { publicAPI, privateAPI } from '@mock-app/services';
+import { privateAPI, publicAPI, decryptCredential, computeHash } from '@mock-app/services';
 import { MessageText } from '../components/MessageText';
 import { LoadingWithText } from '../components/LoadingWithText';
 import { BackButton } from '../components/BackButton';
@@ -59,14 +57,18 @@ const Verify = () => {
         return setCredential(encryptedCredential);
       }
 
-      const credentialJsonString = decryptString({
-        ...encryptedCredential,
+      const { cipherText, iv, tag, type } = encryptedCredential;
+
+      const credentialJsonString = decryptCredential({
+        cipherText,
         key,
-        type: 'OPEN-ATTESTATION-TYPE-1',
+        iv,
+        tag,
+        type,
       });
 
       const credentialObject = JSON.parse(credentialJsonString);
-      const credentialHash = computeEntryHash(credentialObject);
+      const credentialHash = computeHash(credentialObject);
       if (credentialHash !== hash) {
         return displayErrorUI();
       }

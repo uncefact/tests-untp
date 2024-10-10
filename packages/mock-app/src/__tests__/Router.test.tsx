@@ -126,10 +126,6 @@ jest.mock('@mock-app/services', () => ({
   services: jest.fn(),
 }));
 
-jest.mock('@veramo/utils', () => ({
-  computeEntryHash: jest.fn(),
-}));
-
 jest.mock('@vckit/renderer', () => ({
   Renderer: jest.fn(),
   WebRenderingTemplate2022: jest.fn(),

@@ -7,7 +7,6 @@ import { getStorageServiceLink } from './storage.service.js';
 import { issueVC } from './vckit.service.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from './linkResolver.service.js';
 import { validateContextDPP } from './epcisEvents/validateContext.js';
-import JSONPointer from 'jsonpointer';
 import { deleteItemFromLocalStorage } from './features/localStorage.service.js';
 
 /**
@@ -40,7 +39,7 @@ export const processDPP: IService = async (data: any, context: IContext): Promis
     });
 
     const storageContext = context.storage;
-    const vcUrl = await getStorageServiceLink(storageContext, vc, `${identifier}/${generateUUID()}`);
+    const vcUrl = await getStorageServiceLink(storageContext, vc, generateUUID());
 
     const linkResolverContext = context.dlr;
     const linkResolver = await registerLinkResolver(
