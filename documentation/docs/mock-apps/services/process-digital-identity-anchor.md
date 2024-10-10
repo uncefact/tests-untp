@@ -57,10 +57,16 @@ P-->>C: Return digital identity anchor VC and resolver URL
         "dlrVerificationPage": "https://verify.example.com"
       },
       "storage": {
-        "url": "https://storage.example.com/upload",
+        "url": "http://localhost:3334/v1/documents",
         "params": {
-          "bucket": "bucket-name",
-          "resultPath": "/url"
+          "resultPath": "/uri",
+          "bucket": "verifiable-credentials"
+        },
+        "options": {
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          }
         }
       },
       "dlr": {

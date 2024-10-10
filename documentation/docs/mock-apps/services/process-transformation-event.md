@@ -70,9 +70,16 @@ P-->>C: Return EPCIS VC
         "linkRegisterPath": "/api/resolver"
       },
       "storage": {
-        "url": "https://storage.example.com/upload",
+        "url": "http://localhost:3334/v1/documents",
         "params": {
-          "resultPath": "/url"
+          "resultPath": "/uri",
+          "bucket": "verifiable-credentials"
+        },
+        "options": {
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          }
         }
       },
       "dpp": {

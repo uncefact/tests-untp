@@ -45,7 +45,7 @@ export const processObjectEvent: IService = async (
     },
   });
 
-  const objectEventVcUrl = await uploadData(storage, objectEventVc, `${objectEventIdentifier}/${generateUUID()}`);
+  const objectEventVcUrl = await uploadData(storage, objectEventVc, generateUUID());
 
   const objectEventLinkResolver = await registerLinkResolver(
     objectEventVcUrl,

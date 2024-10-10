@@ -1,12 +1,12 @@
 import { W3CVerifiableCredential } from '@vckit/core-types';
-import { IService, IDppContext } from './types/index.js';
+import { IDppContext, IService } from './types/index.js';
 import { constructIdentifierString, generateUUID } from './utils/helpers.js';
 
 import { uploadData } from './storage.service.js';
 import { issueVC } from './vckit.service.js';
-import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from './linkResolver.service.js';
 import { validateContextDPP } from './validateContext.js';
 import { deleteItemFromLocalStorage } from './features/localStorage.service.js';
+import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from './linkResolver.service.js';
 
 /**
  * Process DPP, issue VC, upload to storage and register link resolver
@@ -38,7 +38,7 @@ export const processDPP: IService = async (data: any, context: IDppContext): Pro
     });
 
     const storageContext = context.storage;
-    const vcUrl = await uploadData(storageContext, vc, `${identifier}/${qualifierPath}`);
+    const vcUrl = await uploadData(storageContext, vc, generateUUID());
 
     const linkResolverContext = context.dlr;
     const linkResolver = await registerLinkResolver(

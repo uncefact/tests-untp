@@ -28,11 +28,7 @@ jest.mock('@mock-app/services', () => ({
 jest.mock('@mock-app/components', () => ({
   Status: 'success',
   toastMessage: jest.fn(),
-  ToastMessage: jest.fn()
-}));
-
-jest.mock('@veramo/utils', () => ({
-  computeEntryHash: jest.fn(),
+  ToastMessage: jest.fn(),
 }));
 
 jest.mock('@vckit/renderer', () => ({

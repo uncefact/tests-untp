@@ -44,7 +44,7 @@ export const processDigitalFacilityRecord: IService = async (
     },
   });
 
-  const vcUrl = await uploadData(storage, vc, `${identifier}/${generateUUID()}`);
+  const vcUrl = await uploadData(storage, vc, generateUUID());
 
   const linkResolver = await registerLinkResolver(
     vcUrl,

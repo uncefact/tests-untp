@@ -1,4 +1,4 @@
-import { isPlainObject } from 'lodash';
+import _ from 'lodash';
 
 export function reportRow(title: string, name: string, fn: any) {
   it(title, async function () {
@@ -71,7 +71,7 @@ export const buildUrl = (baseUrl: string, additionalParams: Record<string, any>)
   }
 
   // Validate additionalParams
-  if (!isPlainObject(additionalParams)) {
+  if (!_.isPlainObject(additionalParams)) {
     throw new Error('additionalParams must be a plain object.');
   }
 
@@ -100,11 +100,11 @@ export const buildPayload = (
   basePayload: Record<string, any>,
   additionalPayload: Record<string, any>,
 ): Record<string, any> => {
-  if (!isPlainObject(basePayload) || basePayload === null) {
+  if (!_.isPlainObject(basePayload) || basePayload === null) {
     throw new Error('basePayload must be a plain object and cannot be null.');
   }
 
-  if (!isPlainObject(additionalPayload) || additionalPayload === null) {
+  if (!_.isPlainObject(additionalPayload) || additionalPayload === null) {
     throw new Error('additionalPayload must be a plain object and cannot be null.');
   }
 

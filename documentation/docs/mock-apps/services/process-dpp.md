@@ -80,10 +80,10 @@ P-->>C: Return VC and resolver URL
         "linkRegisterPath": "/api/resolver"
       },
       "storage": {
-        "url": "https://storage.example.com/v1/documents",
+        "url": "http://localhost:3334/v1/documents",
         "params": {
-          "bucket": "verifiable-credentials",
-          "resultPath": "/uri"
+          "resultPath": "/uri",
+          "bucket": "verifiable-credentials"
         },
         "options": {
           "method": "POST",

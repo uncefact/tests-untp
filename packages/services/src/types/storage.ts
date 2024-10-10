@@ -19,5 +19,5 @@ export interface IStorageService {
 }
 
 export interface IUploadData {
-  (storage: StorageServiceConfig, data: any, filename: string): Promise<any>;
+  (storage: StorageServiceConfig, data: any, id: string): Promise<any>;
 }
