@@ -903,7 +903,7 @@
                         "@type": "WebRenderingTemplate2022"
                       }
                     ],
-                    "type": ["VerifiableCredential", "ObjectEventCredential"],
+                    "type": ["VerifiableCredential", "DigitalTraceabilityEvent"],
                     "dlrLinkTitle": "Object Event",
                     "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
