@@ -59,6 +59,7 @@ P-->>C: Return object event VC and resolver URL
       "storage": {
         "url": "https://storage.example.com/upload",
         "params": {
+          "bucket": "bucket-name",
           "resultPath": "/url"
         }
       },
@@ -68,7 +69,7 @@ P-->>C: Return object event VC and resolver URL
         "namespace": "gs1",
         "linkRegisterPath": "/api/resolver"
       },
-      "identifierKeyPath": "/parentItem/epc"
+      "identifierKeyPath": "/id"
     }
   ]
 }
