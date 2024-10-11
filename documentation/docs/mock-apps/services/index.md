@@ -56,7 +56,7 @@ graph TD
         {
           "vckit": {
             "vckitAPIUrl": "http://localhost:3332/v2",
-            "issuer": "did:web:agtrace-passports.s3.ap-southeast-2.amazonaws.com"
+            "issuer": "did:web:example.com"
           },
           "dpp": {
             "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
