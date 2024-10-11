@@ -8,7 +8,7 @@ import { issueVC, contextDefault } from '../vckit.service';
 import { getStorageServiceLink } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
 import { fillArray } from '../utils/helpers';
-import { IEntityIssue, IInputItems } from '../epcisEvents/types';
+import { IEntityIssue, IInputItems } from '../types';
 import { contextTransformationEvent, dataTransformationEvent } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
@@ -31,7 +31,7 @@ jest.mock('../linkResolver.service', () => ({
     verificationLinkType: 'gs1:verificationService',
     certificationLinkType: 'gs1:certificationInfo',
     epcisLinkType: 'gs1:epcis',
-  }
+  },
 }));
 
 describe('Transformation event', () => {
@@ -224,7 +224,7 @@ describe('Transformation event', () => {
         },
       );
 
-      const data = await processTransformationEvent(dataTransformationEvent, contextTransformationEvent);      
+      const data = await processTransformationEvent(dataTransformationEvent, contextTransformationEvent);
       expect(registerLinkResolver).toHaveBeenCalledTimes(2);
     });
   });
@@ -331,11 +331,11 @@ describe('Transformation event', () => {
         transformationEventCredential: {
           mappingFields: [
             {
-              "sourcePath": "/vc/credentialSubject/productIdentifier/0/identifierValue",
-              "destinationPath": "/eventID"
-            }
-          ]
-        }
+              sourcePath: '/vc/credentialSubject/productIdentifier/0/identifierValue',
+              destinationPath: '/eventID',
+            },
+          ],
+        },
       };
       try {
         await processTransformationEvent(dataTransformationEvent, newContext);

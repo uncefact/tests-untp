@@ -2,7 +2,7 @@ import _ from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 import JSONPointer from 'jsonpointer';
 import { generateIdWithSerialNumber, generateIdWithBatchLot } from '../epcisEvents/helpers.js';
-import { IVerifyURLPayload } from '../types/types.js';
+import { IVerifyURLPayload } from '../types/index.js';
 
 export function generateUUID() {
   return uuidv4();

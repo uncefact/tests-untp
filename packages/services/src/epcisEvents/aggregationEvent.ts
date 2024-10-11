@@ -3,9 +3,9 @@ import { issueVC } from '../vckit.service.js';
 import { getStorageServiceLink } from '../storage.service.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { IService } from '../types/IService.js';
-import { ITraceabilityEvent, IAggregationEventContext } from './types.js';
+import { ITraceabilityEvent, IAggregationEventContext } from '../types';
 import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
-import { validateAggregationEventContext } from './validateContext.js';
+import { validateAggregationEventContext } from '../validateContext.js';
 import { EPCISBusinessStepCode, EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
 import JSONPointer from 'jsonpointer';
 

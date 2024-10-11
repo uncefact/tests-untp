@@ -11,7 +11,7 @@ import {
 } from '../linkResolver.service.js';
 
 import { IService } from '../types/IService.js';
-import { IConfigDLR, ICredential, IEntityIssue, ITransformationEvent, IVCKitContext } from './types';
+import { IConfigDLR, ICredential, IEntityIssue, ITransformationEvent, IVCKitContext } from '../types';
 import {
   IConstructObjectParameters,
   allowedIndexKeys,
@@ -21,7 +21,7 @@ import {
   randomIntegerString,
 } from '../utils/helpers.js';
 import { generateIdWithBatchLot, generateLinkResolver } from './helpers.js';
-import { validateContextTransformationEvent } from './validateContext.js';
+import { validateContextTransformationEvent } from '../validateContext.js';
 import { StorageServiceConfig } from '../types/storage.js';
 import JSONPointer from 'jsonpointer';
 

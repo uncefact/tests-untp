@@ -1,6 +1,13 @@
 import _ from 'lodash';
-import { Result } from '../types/validateContext';
-import { IContext, ITransactionEventContext, ITransformationEvent, IAggregationEventContext } from './types';
+import { Result } from './types/validateContext.js';
+import {
+  IContext,
+  ITransactionEventContext,
+  ITransformationEvent,
+  IAggregationEventContext,
+  IDppContext,
+  IDigitalIdentityAnchorContext,
+} from './types/index.js';
 
 export const error: <T>(message: string) => Result<T> = (message) => ({
   ok: false,
@@ -9,7 +16,6 @@ export const error: <T>(message: string) => Result<T> = (message) => ({
 
 export const checkContextProperties = (context: IContext): Result<IContext> => {
   if (_.isEmpty(context.vckit)) return error('Invalid vckit context');
-  if (_.isEmpty(context.dpp)) return error('Invalid dpp context');
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.dlr)) return error('Invalid dlr context');
   if (_.isEmpty(context.identifierKeyPath)) return error('identifierKeyPath not found');
@@ -22,13 +28,14 @@ export const checkContextProperties = (context: IContext): Result<IContext> => {
  * @param context - event context
  * @returns Result<IContext>
  */
-export const validateContextDPP = (context: IContext): Result<IContext> => {
+export const validateContextDPP = (context: IDppContext): Result<IContext> => {
   const validationResult = checkContextProperties(context);
   if (!validationResult.ok) return error(validationResult.value);
 
   if (_.isEmpty(context.vckit.vckitAPIUrl)) return error('Invalid vckitAPIUrl');
   if (_.isEmpty(context.vckit.issuer)) return error('Invalid issuer');
 
+  if (_.isEmpty(context.dpp)) return error('Invalid dpp context');
   if (_.isEmpty(context.dpp.context)) return error('Invalid dpp context');
   if (_.isEmpty(context.dpp.type)) return error('Invalid type');
   if (_.isEmpty(context.dpp.dlrLinkTitle)) return error('Invalid dlrLinkTitle');
@@ -52,6 +59,7 @@ export const validateContextTransformationEvent = (context: ITransformationEvent
   if (_.isEmpty(context.vckit.vckitAPIUrl)) return error('Invalid vckitAPIUrl');
   if (_.isEmpty(context.vckit.issuer)) return error('Invalid issuer');
 
+  if (_.isEmpty(context.dpp)) return error('Invalid dpp context');
   if (_.isEmpty(context.dpp.context)) return error('Invalid dpp context');
   if (_.isEmpty(context.dpp.type)) return error('Invalid dpp type');
   if (_.isEmpty(context.dpp.dlrLinkTitle)) return error('Invalid dpp dlrLinkTitle');
@@ -127,6 +135,33 @@ export const validateAggregationEventContext = (
     return error('Invalid epcisAggregationEvent dlrVerificationPage');
   if (_.isEmpty(context.epcisAggregationEvent.dlrIdentificationKeyType))
     return error('Invalid epcisAggregationEvent dlrIdentificationKeyType');
+
+  if (_.isEmpty(context.storage)) return error('Invalid storage context');
+  if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
+  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
+
+  if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
+  if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
+
+  return { ok: true, value: context };
+};
+
+export const validateDigitalIdentityAnchorContext = (
+  context: IDigitalIdentityAnchorContext,
+): Result<IDigitalIdentityAnchorContext> => {
+  const validationResult = checkContextProperties(context);
+  if (!validationResult.ok) return error(validationResult.value);
+
+  if (_.isEmpty(context.vckit.vckitAPIUrl)) return error('Invalid vckitAPIUrl');
+  if (_.isEmpty(context.vckit.issuer)) return error('Invalid issuer');
+
+  if (_.isEmpty(context.digitalIdentityAnchor)) return error('Invalid digitalIdentityAnchor context');
+  if (_.isEmpty(context.digitalIdentityAnchor.context)) return error('Invalid digitalIdentityAnchor context');
+  if (_.isEmpty(context.digitalIdentityAnchor.type)) return error('Invalid type');
+  if (_.isEmpty(context.digitalIdentityAnchor.dlrLinkTitle)) return error('Invalid dlrLinkTitle');
+  if (_.isEmpty(context.digitalIdentityAnchor.dlrVerificationPage)) return error('Invalid dlrVerificationPage');
+  if (_.isEmpty(context.digitalIdentityAnchor.dlrIdentificationKeyType))
+    return error('Invalid dlrIdentificationKeyType');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
