@@ -95,7 +95,7 @@ describe('Verify', () => {
 
   it('should render failure screen due to no matching proofs', async () => {
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockEncryptedCredential);
-    // Simulate the response of a verify VC request failing due to the revoked status.
+    // Simulate the response of a verify VC request failing due to no matching proofs.
     jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({
       verified: false,
       error: {
@@ -174,7 +174,7 @@ describe('Verify', () => {
     });
 
     await waitFor(() => {
-      // Expect the rendered credential: <h1>John Doe</h1>
+      // Expect the rendered credential: <h1>John Doe</h1> for render template '<h1>{{name}}</h1>'
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('John Doe');
     });
   });

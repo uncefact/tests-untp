@@ -45,6 +45,7 @@ describe('issueVC', () => {
   });
 
   it('should throw error when apiKey is invalid', async () => {
+    privateAPI.setBearerTokenAuthorizationHeaders('invalid-api'); // invalid api key
     jest.spyOn(privateAPI, 'post').mockRejectedValue(new Error('invalid_argument: apiKey is invalid'));
 
     try {
@@ -128,6 +129,22 @@ describe('issueCredentialStatus', () => {
       });
     } catch (error: any) {
       expect(error.message).toEqual('Agent not available');
+    }
+  });
+
+  it('should throw error when apiKey is invalid', async () => {
+    privateAPI.setBearerTokenAuthorizationHeaders('invalid-api'); // invalid api key
+    jest.spyOn(privateAPI, 'post').mockRejectedValue(new Error('invalid_argument: apiKey is invalid'));
+
+    try {
+      await issueCredentialStatus({
+        host: 'https://api.vc.example.com',
+        apiKey: 'test123',
+        statusPurpose: 'revocation',
+        bitstringStatusIssuer: 'did:example:123',
+      });
+    } catch (error: any) {
+      expect(error.message).toEqual('invalid_argument: apiKey is invalid');
     }
   });
 });
