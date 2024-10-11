@@ -1,6 +1,7 @@
 import {
   deleteItemFromLocalStorage,
   deleteValuesFromLocalStorage,
+  getValueFromLocalStorage,
   mergeToLocalStorage,
   saveToLocalStorage,
 } from '../../features/localStorage.service';
@@ -53,6 +54,26 @@ describe('mergeToLocalStorage', () => {
     spyGetItem.mockReturnValueOnce(JSON.stringify({ 2: { a: 2 } }));
     mergeToLocalStorage(data, parameters);
     expect(spySetItem).toHaveBeenCalledWith('key', JSON.stringify({ 2: { a: 2 }, 1: { a: 1 } }));
+  });
+
+  it('should merge the data to local storage when not existing data and objectKeyPath parameter is not provided', () => {
+    const spyGetItem = jest.spyOn(Storage.prototype, 'getItem');
+    const spySetItem = jest.spyOn(Storage.prototype, 'setItem');
+    const data = { a: 1 };
+    const parameters = { storageKey: 'key' };
+    spyGetItem.mockReturnValueOnce(JSON.stringify(null));
+    mergeToLocalStorage(data, parameters);
+    expect(spySetItem).toHaveBeenCalledWith('key', JSON.stringify({ a: 1 }));
+  });
+
+  it('should merge the data to local storage when existing data and objectKeyPath parameter is not provided', () => {
+    const spyGetItem = jest.spyOn(Storage.prototype, 'getItem');
+    const spySetItem = jest.spyOn(Storage.prototype, 'setItem');
+    const data = { a: 1 };
+    const parameters = { storageKey: 'key' };
+    spyGetItem.mockReturnValueOnce(JSON.stringify({ a: 3, b: 2 }));
+    mergeToLocalStorage(data, parameters);
+    expect(spySetItem).toHaveBeenCalledWith('key', JSON.stringify({ a: 1, b: 2 }));
   });
 
   it('should throw error when invalid objectKeyPath is provided', () => {
@@ -135,5 +156,57 @@ describe('deleteItemFromLocalStorage', () => {
       throw error;
     });
     expect(() => deleteItemFromLocalStorage(parameters)).toThrow(error);
+  });
+});
+
+describe('getValueFromLocalStorage', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('should get the value from local storage', () => {
+    const spyGetItem = jest.spyOn(Storage.prototype, 'getItem');
+    const data = { a: 1 };
+    const parameters = { storageKey: 'key', key: 'a' };
+    spyGetItem.mockReturnValueOnce(JSON.stringify(data));
+    const result = getValueFromLocalStorage({}, parameters);
+    expect(result).toEqual(1);
+  });
+
+  it('should get the value from local storage when key is not provided', () => {
+    const spyGetItem = jest.spyOn(Storage.prototype, 'getItem');
+    const data = { a: 1 };
+    const parameters = { storageKey: 'key' };
+    spyGetItem.mockReturnValueOnce(JSON.stringify(data));
+    const result = getValueFromLocalStorage({}, parameters);
+    expect(result).toEqual({ a: 1 });
+  });
+
+  it('should get the value from local storage when stateKey is provided', () => {
+    const spyGetItem = jest.spyOn(Storage.prototype, 'getItem');
+    const data = { a: 1 };
+    const parameters = { storageKey: 'key', key: 'a', stateKey: 'state' };
+    spyGetItem.mockReturnValueOnce(JSON.stringify(data));
+    const result = getValueFromLocalStorage({}, parameters);
+    expect(result).toEqual({ state: 1 });
+  });
+
+  it('should get the value from local storage when key is not provided and stateKey is provided', () => {
+    const spyGetItem = jest.spyOn(Storage.prototype, 'getItem');
+    const data = { a: 1 };
+    const parameters = { storageKey: 'key', stateKey: 'state' };
+    spyGetItem.mockReturnValueOnce(JSON.stringify(data));
+    const result = getValueFromLocalStorage({}, parameters);
+    expect(result).toEqual({ state: { a: 1 } });
+  });
+
+  it('should throw an error if an error occurs', () => {
+    const spyGetItem = jest.spyOn(Storage.prototype, 'getItem');
+    const parameters = { storageKey: 'key', key: 'a' };
+    const error = new Error('An error occurred');
+    spyGetItem.mockImplementationOnce(() => {
+      throw error;
+    });
+    expect(() => getValueFromLocalStorage({}, parameters)).toThrow(error);
   });
 });

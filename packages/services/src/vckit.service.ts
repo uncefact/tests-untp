@@ -107,9 +107,7 @@ const constructCredentialObject = ({ context, type, issuer, credentialSubject, .
     credential: {
       '@context': [...contextDefault, ...(context || [])],
       type: [...typeDefault, ...(type || [])],
-      issuer: {
-        id: issuer,
-      },
+      issuer: issuer,
       credentialSubject,
       ...restOfVC,
     },
