@@ -55,6 +55,26 @@ describe('mergeToLocalStorage', () => {
     expect(spySetItem).toHaveBeenCalledWith('key', JSON.stringify({ 2: { a: 2 }, 1: { a: 1 } }));
   });
 
+  it('should merge the data to local storage when not existing data and objectKeyPath parameter is not provided', () => {
+    const spyGetItem = jest.spyOn(Storage.prototype, 'getItem');
+    const spySetItem = jest.spyOn(Storage.prototype, 'setItem');
+    const data = { a: 1 };
+    const parameters = { storageKey: 'key' };
+    spyGetItem.mockReturnValueOnce(JSON.stringify(null));
+    mergeToLocalStorage(data, parameters);
+    expect(spySetItem).toHaveBeenCalledWith('key', JSON.stringify({ a: 1 }));
+  });
+
+  it('should merge the data to local storage when existing data and objectKeyPath parameter is not provided', () => {
+    const spyGetItem = jest.spyOn(Storage.prototype, 'getItem');
+    const spySetItem = jest.spyOn(Storage.prototype, 'setItem');
+    const data = { a: 1 };
+    const parameters = { storageKey: 'key' };
+    spyGetItem.mockReturnValueOnce(JSON.stringify({ a: 3, b: 2 }));
+    mergeToLocalStorage(data, parameters);
+    expect(spySetItem).toHaveBeenCalledWith('key', JSON.stringify({ a: 1, b: 2 }));
+  });
+
   it('should throw error when invalid objectKeyPath is provided', () => {
     const spyGetItem = jest.spyOn(Storage.prototype, 'getItem');
     const data = { a: 1 };

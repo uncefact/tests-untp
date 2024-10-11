@@ -115,13 +115,11 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
   try {
     privateAPI.setBearerTokenAuthorizationHeaders(arg.dlrAPIKey || '');
     await privateAPI.post<string>(`${dlrAPIUrl}${linkRegisterPath}`, params);
+    const linkTypeQuery = responseLinkType === 'all' ? 'all' : `${namespace}:${responseLinkType}`;
 
-    const path =
-      responseLinkType === 'all'
-        ? '?linkType=all'
-        : qualifierPath.includes('?')
-          ? `${qualifierPath}&linkType=${namespace}:${responseLinkType}`
-          : `${qualifierPath}?linkType=${namespace}:${responseLinkType}`;
+    const path = qualifierPath.includes('?')
+      ? `${qualifierPath}&linkType=${linkTypeQuery}`
+      : `${qualifierPath}?linkType=${linkTypeQuery}`;
     return `${dlrAPIUrl}/${namespace}/${linkResolver.identificationKeyType}/${linkResolver.identificationKey}${path}`;
   } catch (error) {
     throw new Error('Error creating link resolver');
