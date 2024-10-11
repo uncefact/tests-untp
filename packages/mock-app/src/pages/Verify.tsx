@@ -89,7 +89,7 @@ const Verify = () => {
     setErrorMessages(errorMessages);
     setCurrentScreen(screen);
   };
-
+  // TODO: Move this function to the vckit service
   const verifyCredential = async (verifiableCredential: VerifiableCredential) => {
     try {
       const verifyCredentialParams = {
