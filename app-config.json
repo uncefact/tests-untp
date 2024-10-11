@@ -704,7 +704,7 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -758,6 +758,176 @@
                 {
                   "storageKey": "CherriesFarm_dpps",
                   "objectKeyPath": "/vc/credentialSubject/productIdentifier/0/identifierValue"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Issue Object Event",
+          "id": "issue_object_event",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "url": "https://jargon.sh/user/unece/traceabilityEvents/v/0.4.0/artefacts/jsonSchemas/ObjectEvent.json?class=ObjectEvent"
+                },
+                "data": {
+                  "type": "transformation",
+                  "id": "https://events.sample.com/01/05012345678900/21/951350380",
+                  "processType": "Weaving",
+                  "eventTime": "2024-09-01T12:00:00",
+                  "action": "Add",
+                  "disposition": "010501234567890021951350380",
+                  "bizStep": "https://ref.gs1.org/cbv/BizStep-commissioning",
+                  "bizLocation": "https://id.gs1.org/414/9520123456788",
+                  "sensorElementList": [
+                    {
+                      "sensorMetadata": {
+                        "device": {
+                          "type": ["Item"],
+                          "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                          "name": "EV battery 300Ah."
+                        },
+                        "dataProcessingMethod": "https://standards.org/sensorMethod#1234"
+                      },
+                      "sensorReport": [
+                        {
+                          "time": "2024-07-24T12:00:00",
+                          "sensorType": "https://samplesensors.com/model1234",
+                          "value": 25,
+                          "uom": "KGM"
+                        },
+                        {
+                          "time": "2024-07-24T12:00:00",
+                          "sensorType": "https://samplesensors.com/model1234",
+                          "value": 25,
+                          "uom": "KGM"
+                        }
+                      ],
+                      "sensorIntegrityProof": "https://jargon.sh"
+                    },
+                    {
+                      "sensorMetadata": {
+                        "device": {
+                          "type": ["Item"],
+                          "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                          "name": "EV battery 300Ah."
+                        },
+                        "dataProcessingMethod": "https://standards.org/sensorMethod#1234"
+                      },
+                      "sensorReport": [
+                        {
+                          "time": "2024-07-24T12:00:00",
+                          "sensorType": "https://samplesensors.com/model1234",
+                          "value": 25,
+                          "uom": "KGM"
+                        },
+                        {
+                          "time": "2024-07-24T12:00:00",
+                          "sensorType": "https://samplesensors.com/model1234",
+                          "value": 25,
+                          "uom": "KGM"
+                        }
+                      ],
+                      "sensorIntegrityProof": "https://jargon.sh"
+                    }
+                  ],
+                  "epcList": [
+                    {
+                      "type": ["Item"],
+                      "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                      "name": "EV battery 300Ah."
+                    },
+                    {
+                      "type": ["Item"],
+                      "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                      "name": "EV battery 300Ah."
+                    }
+                  ],
+                  "quantityList": [
+                    {
+                      "productId": "https://id.gs1.org/01/09520123456788/21/12345",
+                      "productName": "EV battery 300Ah.",
+                      "quantity": 20,
+                      "uom": "KGM"
+                    },
+                    {
+                      "productId": "https://id.gs1.org/01/09520123456788/21/12345",
+                      "productName": "EV battery 300Ah.",
+                      "quantity": 20,
+                      "uom": "KGM"
+                    }
+                  ]
+                },
+                "constructData": {
+                  "mappingFields": [],
+                  "dummyFields": [],
+                  "generationFields": [
+                    {
+                      "path": "/eventID",
+                      "handler": "generateIdWithSerialNumber"
+                    }
+                  ]
+                },
+                "className": "json-form",
+                "style": {
+                  "margin": "40px auto",
+                  "paddingTop": "40px",
+                  "width": "80%"
+                }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {}
+            }
+          ],
+          "services": [
+            {
+              "name": "processObjectEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
+                  },
+                  "epcisObjectEvent": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      {
+                        "template": "<div><h2>Object Event</h2></div>",
+                        "@type": "WebRenderingTemplate2022"
+                      }
+                    ],
+                    "type": ["VerifiableCredential", "DigitalTraceabilityEvent"],
+                    "dlrLinkTitle": "Object Event",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "http://localhost:3003/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIKey": "test123",
+                    "namespace": "gs1",
+                    "linkRegisterPath": "/api/resolver"
+                  },
+                  "storage": {
+                    "url": "http://localhost:3334/v1/documents",
+                    "params": {
+                      "resultPath": "/uri",
+                      "bucket": "verifiable-credentials"
+                    },
+                    "options": {
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
+                    }
+                  },
+                  "identifierKeyPath": "/id"
                 }
               ]
             }
@@ -1196,7 +1366,7 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -1947,8 +2117,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -2430,8 +2600,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -3182,8 +3352,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -3665,8 +3835,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -4417,8 +4587,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -4900,8 +5070,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],

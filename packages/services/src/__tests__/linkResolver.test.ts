@@ -54,7 +54,96 @@ describe('create link resolve service', () => {
     );
 
     expect(resolverUrl).toEqual(
-      `${mockValue.dlrAPIUrl}/${mockValue.namespace}/${mockValue.identificationKeyType}/${mockValue.identificationKey}?linkType=all`,
+      `${mockValue.dlrAPIUrl}/${mockValue.namespace}/${mockValue.identificationKeyType}/${mockValue.identificationKey}/?linkType=all`,
+    );
+  });
+
+  it('should return url when creating link resolver with qualifier path', async () => {
+    let expectParamsCallAPI: any;
+    jest.spyOn(privateAPI, 'post').mockImplementation((value, params) => {
+      expectParamsCallAPI = params;
+      return Promise.resolve({});
+    });
+
+    let expectToken = '';
+    jest.spyOn(privateAPI, 'setBearerTokenAuthorizationHeaders' as any).mockImplementation((token) => {
+      expectToken = token as string;
+      return Promise.resolve({});
+    });
+
+    const mockValue = {
+      eventLink: 'https://localhost/epcis-transformation-event/1234',
+      identificationKeyType: IdentificationKeyType.nlisid,
+      identificationKey: 'gtin-key',
+      itemDescription: 'EPCIS transformation event VC',
+      verificationPage: 'https://verify.com/dev/verifyCredential',
+      linkType: LinkType.epcisLinkType,
+      dlrAPIUrl: 'https://dlr.com',
+      dlrAPIKey: 'dlr-key',
+      namespace: 'gtin',
+      qualifierPath: '/10/ABC123',
+    };
+
+    const resolverUrl = await registerLinkResolver(
+      mockValue.eventLink,
+      mockValue.identificationKeyType,
+      mockValue.identificationKey,
+      mockValue.itemDescription,
+      mockValue.linkType,
+      mockValue.verificationPage,
+      mockValue.dlrAPIUrl,
+      mockValue.dlrAPIKey,
+      mockValue.namespace,
+      mockValue.qualifierPath,
+    );
+
+    expect(resolverUrl).toEqual(
+      `${mockValue.dlrAPIUrl}/${mockValue.namespace}/${mockValue.identificationKeyType}/${mockValue.identificationKey}${mockValue.qualifierPath}?linkType=all`,
+    );
+  });
+
+  it('should return url when creating link resolver with qualifier path and specific provided linkType', async () => {
+    let expectParamsCallAPI: any;
+    jest.spyOn(privateAPI, 'post').mockImplementation((value, params) => {
+      expectParamsCallAPI = params;
+      return Promise.resolve({});
+    });
+
+    let expectToken = '';
+    jest.spyOn(privateAPI, 'setBearerTokenAuthorizationHeaders' as any).mockImplementation((token) => {
+      expectToken = token as string;
+      return Promise.resolve({});
+    });
+
+    const mockValue = {
+      eventLink: 'https://localhost/epcis-transformation-event/1234',
+      identificationKeyType: IdentificationKeyType.nlisid,
+      identificationKey: 'gtin-key',
+      itemDescription: 'EPCIS transformation event VC',
+      verificationPage: 'https://verify.com/dev/verifyCredential',
+      linkType: LinkType.epcisLinkType,
+      dlrAPIUrl: 'https://dlr.com',
+      dlrAPIKey: 'dlr-key',
+      namespace: 'gtin',
+      qualifierPath: '/10/ABC123',
+    };
+
+    const resolverUrl = await registerLinkResolver(
+      mockValue.eventLink,
+      mockValue.identificationKeyType,
+      mockValue.identificationKey,
+      mockValue.itemDescription,
+      mockValue.linkType,
+      mockValue.verificationPage,
+      mockValue.dlrAPIUrl,
+      mockValue.dlrAPIKey,
+      mockValue.namespace,
+      mockValue.qualifierPath,
+      mockValue.linkType,
+    );
+
+    expect(resolverUrl).toEqual(
+      `${mockValue.dlrAPIUrl}/${mockValue.namespace}/${mockValue.identificationKeyType}/${mockValue.identificationKey}${mockValue.qualifierPath}?linkType=${mockValue.namespace}:${mockValue.linkType}`,
     );
   });
 
