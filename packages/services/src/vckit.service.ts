@@ -1,4 +1,4 @@
-import { CredentialPayload, CredentialSubject, VerifiableCredential } from '@vckit/core-types';
+import { CredentialPayload, CredentialSubject, VerifiableCredential, CredentialStatusReference } from '@vckit/core-types';
 import { privateAPI } from './utils/httpService.js';
 import appConfig from '../../mock-app/src/constants/app-config.json';
 
@@ -20,6 +20,13 @@ export interface IArgIssueVC {
 }
 export interface IVcKitIssueVC extends CredentialPayload {
   vcKitAPIUrl: string;
+}
+
+export interface IArgIssueCredentialStatus {
+  host: string;
+  statusPurpose?: string;
+
+  [x: string]: any
 }
 
 /**
@@ -48,9 +55,42 @@ export const issueVC = async ({
   restOfVC,
   vcKitAPIUrl,
 }: IVcKitIssueVC): Promise<VerifiableCredential> => {
-  const body = constructCredentialObject({ context, type, issuer, credentialSubject, ...restOfVC });
-  privateAPI.setBearerTokenAuthorizationHeaders(appConfig.defaultVerificationServiceLink.apiKey ?? '');
+  const apiKey = appConfig.defaultVerificationServiceLink.apiKey ?? '';
+
+  // issue credential status
+  const credentialStatus = await issueCredentialStatus({
+    host: new URL(vcKitAPIUrl).origin,
+    apiKey,
+    statusPurpose: 'revocation',
+    bitstringStatusIssuer: issuer,
+  });
+
+  // issue vc
+  const body = constructCredentialObject({ context, type, issuer, credentialSubject, credentialStatus, ...restOfVC });
+  privateAPI.setBearerTokenAuthorizationHeaders(apiKey);
   const response = await privateAPI.post<VerifiableCredential>(`${vcKitAPIUrl}/credentials/issue`, body);
+  return response;
+};
+
+/**
+ * Issue credential status for the vc
+ * @param host - host for issuing the credential status
+ * @param apiKey - api key for issuing the credential status
+ * @param statusPurpose - purpose for the credential status
+ * @param bitstringStatusIssuer - issuer for the credential status
+ * @returns CredentialStatusReference
+ * 
+ * @example
+ * const host = 'https://api.vc.example.com';
+ * const apiKey = 'api-key';
+ * const statusPurpose = 'revocation';
+ * const bitstringStatusIssuer = 'did:example:123';
+ * const credentialStatus = await issueCredentialStatus({ host, statusPurpose, bitstringStatusIssuer });
+ */
+export const issueCredentialStatus = async (args: IArgIssueCredentialStatus): Promise<CredentialStatusReference> => {
+  const { host, apiKey, ...body } = args;
+  privateAPI.setBearerTokenAuthorizationHeaders(apiKey);
+  const response = await privateAPI.post<CredentialStatusReference>(`${host}/agent/issueBitstringStatusList`, body);
   return response;
 };
 
