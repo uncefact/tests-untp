@@ -8,10 +8,10 @@ import { ITraceabilityEvent, IDigitalIdentityAnchorContext } from './types/index
 import { validateDigitalIdentityAnchorContext } from './validateContext.js';
 
 /**
- * Processes an object event by issuing a verifiable credential, storing it in a storage service and registering a link resolver.
- * @param objectEvent The object event to process, containing the object event data
- * @param context The context to use for processing the object event
- * @returns The result of processing the object event
+ * Processes a digital identity anchor by issuing a verifiable credential, storing it in a storage service and registering a link resolver.
+ * @param digitalIdentityAnchorData The digital identity anchor to process, containing the digital identity anchor data
+ * @param context The context to use for processing the digital identity anchor
+ * @returns The result of processing the digital identity anchor
  */
 export const processDigitalIdentityAnchor: IService = async (
   digitalIdentityAnchorData: ITraceabilityEvent,

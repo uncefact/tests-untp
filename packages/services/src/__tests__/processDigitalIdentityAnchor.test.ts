@@ -84,7 +84,7 @@ describe('processDigitalIdentityAnchor', () => {
     ).rejects.toThrow('Identifier not found');
   });
 
-  it('should throw error when ObjectEvent data not found', async () => {
+  it('should throw error when DigitalIdentityAnchor data not found', async () => {
     const invalidDigitalIdentityAnchorData = {
       ...digitalIdentityAnchorData,
       data: undefined,
