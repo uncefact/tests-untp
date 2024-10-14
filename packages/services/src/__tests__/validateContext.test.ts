@@ -1,5 +1,5 @@
-import { validateContextDPP } from '../validateContext';
-import { contextDPP } from './mocks/constants';
+import { validateContextDPP, validateObjectEventContext } from '../validateContext';
+import { contextDPP, objectEventContext } from './mocks/constants';
 
 describe('validateContext', () => {
   describe('successful case', () => {
@@ -207,5 +207,206 @@ describe('validateContext', () => {
       expect(result.ok).toBe(false);
       expect(result.value).toEqual('Invalid dlrAPIKey');
     });
+  });
+});
+
+describe('validateObjectEventContext', () => {
+  it('should return success when context is valid', () => {
+    const result = validateObjectEventContext(objectEventContext as any);
+    expect(result.ok).toBe(true);
+    expect(result.value).toEqual(objectEventContext);
+  });
+
+  it('should return error when context is empty', () => {
+    const result = validateObjectEventContext({} as any);
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error when vckit context is empty', () => {
+    const newContext = {
+      ...objectEventContext,
+      vckit: {},
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error when epcisObjectEvent context is empty', () => {
+    const newContext = {
+      ...objectEventContext,
+      epcisObjectEvent: {},
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error when storage context is empty', () => {
+    const newContext = {
+      ...objectEventContext,
+      storage: {},
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error when dlr context is empty', () => {
+    const newContext = {
+      ...objectEventContext,
+      dlr: {},
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+  });
+
+  it('should return error when identifierKeyPath in context is empty', () => {
+    const newContext = {
+      ...objectEventContext,
+      identifierKeyPath: '',
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+    expect(result.value).toEqual('identifierKeyPath not found');
+  });
+
+  it('should return error when vckitAPIUrl in vckit context is invalid', () => {
+    const newContext = {
+      ...objectEventContext,
+      vckit: {
+        vckitAPIUrl: '',
+      },
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+    expect(result.value).toEqual('Invalid vckitAPIUrl');
+  });
+
+  it('should return error when issuer in vckit context is invalid', () => {
+    const newContext = {
+      ...objectEventContext,
+      vckit: {
+        ...objectEventContext.vckit,
+        issuer: '',
+      },
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+    expect(result.value).toEqual('Invalid issuer');
+  });
+
+  it('should return error when context in epcisObjectEvent is invalid', () => {
+    const newContext = {
+      ...objectEventContext,
+      epcisObjectEvent: {
+        ...objectEventContext.epcisObjectEvent,
+        context: [],
+      },
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+    expect(result.value).toEqual('Invalid epcisObjectEvent context');
+  });
+
+  it('should return error when type in epcisObjectEvent is invalid', () => {
+    const newContext = {
+      ...objectEventContext,
+      epcisObjectEvent: {
+        ...objectEventContext.epcisObjectEvent,
+        type: [],
+      },
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+    expect(result.value).toEqual('Invalid epcisObjectEvent type');
+  });
+
+  it('should return error when dlrLinkTitle in epcisObjectEvent is invalid', () => {
+    const newContext = {
+      ...objectEventContext,
+      epcisObjectEvent: {
+        ...objectEventContext.epcisObjectEvent,
+        dlrLinkTitle: '',
+      },
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+    expect(result.value).toEqual('Invalid epcisObjectEvent dlrLinkTitle');
+  });
+
+  it('should return error when dlrVerificationPage in epcisObjectEvent is invalid', () => {
+    const newContext = {
+      ...objectEventContext,
+      epcisObjectEvent: {
+        ...objectEventContext.epcisObjectEvent,
+        dlrVerificationPage: '',
+      },
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+    expect(result.value).toEqual('Invalid epcisObjectEvent dlrVerificationPage');
+  });
+
+  it('should return error when dlrIdentificationKeyType in epcisObjectEvent is invalid', () => {
+    const newContext = {
+      ...objectEventContext,
+      epcisObjectEvent: {
+        ...objectEventContext.epcisObjectEvent,
+        dlrIdentificationKeyType: '',
+      },
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+    expect(result.value).toEqual('Invalid epcisObjectEvent dlrIdentificationKeyType');
+  });
+
+  it('should return error when storageAPIUrl in storage context is invalid', () => {
+    const newContext = {
+      ...objectEventContext,
+      storage: {
+        ...objectEventContext.storage,
+        url: '',
+      },
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+    expect(result.value).toEqual('Invalid storage url');
+  });
+
+  it('should return error when params in storage context is invalid', () => {
+    const newContext = {
+      ...objectEventContext,
+      storage: {
+        ...objectEventContext.storage,
+        params: {},
+      },
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+    expect(result.value).toEqual('Invalid storage params');
+  });
+
+  it('should return error when dlrAPIUrl in dlr context is invalid', () => {
+    const newContext = {
+      ...objectEventContext,
+      dlr: {
+        ...objectEventContext.dlr,
+        dlrAPIUrl: '',
+      },
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+    expect(result.value).toEqual('Invalid dlrAPIUrl');
+  });
+
+  it('should return error when dlrAPIKey in dlr context is invalid', () => {
+    const newContext = {
+      ...objectEventContext,
+      dlr: {
+        ...objectEventContext.dlr,
+        dlrAPIKey: '',
+      },
+    };
+    const result = validateObjectEventContext(newContext as any);
+    expect(result.ok).toBe(false);
+    expect(result.value).toEqual('Invalid dlrAPIKey');
   });
 });

@@ -11,7 +11,7 @@ import {
 } from '../linkResolver.service.js';
 
 import { IService } from '../types/IService.js';
-import { IConfigDLR, ICredential, IEntityIssue, ITransformationEvent, IVCKitContext } from '../types';
+import { IConfigDLR, ICredential, IEntityIssue, ITransformationEventContext, IVCKitContext } from '../types';
 import {
   IConstructObjectParameters,
   allowedIndexKeys,
@@ -30,7 +30,10 @@ import JSONPointer from 'jsonpointer';
  * @param data - data for the transformation event, which nlsids are selected
  * @param context - context for the transformation event
  */
-export const processTransformationEvent: IService = async (data: any, context: ITransformationEvent): Promise<any> => {
+export const processTransformationEvent: IService = async (
+  data: any,
+  context: ITransformationEventContext,
+): Promise<any> => {
   try {
     const validationResult = validateContextTransformationEvent(context);
     if (!validationResult.ok) throw new Error(validationResult.value);

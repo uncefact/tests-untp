@@ -704,7 +704,7 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -758,6 +758,393 @@
                 {
                   "storageKey": "CherriesFarm_dpps",
                   "objectKeyPath": "/vc/credentialSubject/productIdentifier/0/identifierValue"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Issue Object Event",
+          "id": "issue_object_event",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "url": "https://jargon.sh/user/unece/traceabilityEvents/v/0.4.0/artefacts/jsonSchemas/ObjectEvent.json?class=ObjectEvent"
+                },
+                "data": {
+                  "type": "transformation",
+                  "id": "https://events.sample.com/01/05012345678900/21/951350380",
+                  "processType": "Weaving",
+                  "eventTime": "2024-09-01T12:00:00",
+                  "action": "Add",
+                  "disposition": "010501234567890021951350380",
+                  "bizStep": "https://ref.gs1.org/cbv/BizStep-commissioning",
+                  "bizLocation": "https://id.gs1.org/414/9520123456788",
+                  "sensorElementList": [
+                    {
+                      "sensorMetadata": {
+                        "device": {
+                          "type": ["Item"],
+                          "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                          "name": "EV battery 300Ah."
+                        },
+                        "dataProcessingMethod": "https://standards.org/sensorMethod#1234"
+                      },
+                      "sensorReport": [
+                        {
+                          "time": "2024-07-24T12:00:00",
+                          "sensorType": "https://samplesensors.com/model1234",
+                          "value": 25,
+                          "uom": "KGM"
+                        },
+                        {
+                          "time": "2024-07-24T12:00:00",
+                          "sensorType": "https://samplesensors.com/model1234",
+                          "value": 25,
+                          "uom": "KGM"
+                        }
+                      ],
+                      "sensorIntegrityProof": "https://jargon.sh"
+                    },
+                    {
+                      "sensorMetadata": {
+                        "device": {
+                          "type": ["Item"],
+                          "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                          "name": "EV battery 300Ah."
+                        },
+                        "dataProcessingMethod": "https://standards.org/sensorMethod#1234"
+                      },
+                      "sensorReport": [
+                        {
+                          "time": "2024-07-24T12:00:00",
+                          "sensorType": "https://samplesensors.com/model1234",
+                          "value": 25,
+                          "uom": "KGM"
+                        },
+                        {
+                          "time": "2024-07-24T12:00:00",
+                          "sensorType": "https://samplesensors.com/model1234",
+                          "value": 25,
+                          "uom": "KGM"
+                        }
+                      ],
+                      "sensorIntegrityProof": "https://jargon.sh"
+                    }
+                  ],
+                  "epcList": [
+                    {
+                      "type": ["Item"],
+                      "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                      "name": "EV battery 300Ah."
+                    },
+                    {
+                      "type": ["Item"],
+                      "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                      "name": "EV battery 300Ah."
+                    }
+                  ],
+                  "quantityList": [
+                    {
+                      "productId": "https://id.gs1.org/01/09520123456788/21/12345",
+                      "productName": "EV battery 300Ah.",
+                      "quantity": 20,
+                      "uom": "KGM"
+                    },
+                    {
+                      "productId": "https://id.gs1.org/01/09520123456788/21/12345",
+                      "productName": "EV battery 300Ah.",
+                      "quantity": 20,
+                      "uom": "KGM"
+                    }
+                  ]
+                },
+                "constructData": {
+                  "mappingFields": [],
+                  "dummyFields": [],
+                  "generationFields": [
+                    {
+                      "path": "/eventID",
+                      "handler": "generateIdWithSerialNumber"
+                    }
+                  ]
+                },
+                "className": "json-form",
+                "style": {
+                  "margin": "40px auto",
+                  "paddingTop": "40px",
+                  "width": "80%"
+                }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {}
+            }
+          ],
+          "services": [
+            {
+              "name": "processObjectEvent",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
+                  },
+                  "epcisObjectEvent": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      {
+                        "template": "<div><h2>Object Event</h2></div>",
+                        "@type": "WebRenderingTemplate2022"
+                      }
+                    ],
+                    "type": ["VerifiableCredential", "DigitalTraceabilityEvent"],
+                    "dlrLinkTitle": "Object Event",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "http://localhost:3003/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIKey": "test123",
+                    "namespace": "gs1",
+                    "linkRegisterPath": "/api/resolver"
+                  },
+                  "storage": {
+                    "url": "http://localhost:3334/v1/documents",
+                    "params": {
+                      "resultPath": "/uri",
+                      "bucket": "verifiable-credentials"
+                    },
+                    "options": {
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
+                    }
+                  },
+                  "identifierKeyPath": "/id"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Issue DIA",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "default": "Entity",
+                      "enum": ["Entity"]
+                    },
+                    "id": {
+                      "example": "https://id.gs1.org/01/09520123456788/21/12345",
+                      "type": "string",
+                      "format": "uri",
+                      "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+                    },
+                    "name": {
+                      "example": "EV battery 300Ah.",
+                      "type": "string",
+                      "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
+                    },
+                    "registeredId": {
+                      "example": "90664869327",
+                      "type": "string",
+                      "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+                    },
+                    "idScheme": {
+                      "$ref": "#/$defs/IdentifierScheme",
+                      "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+                    }
+                  },
+                  "description": "The ID and Name of an identified entity such qs a product, facility, party, standard, etc.  If the identifier is a W3C DID then the corresponding DID document SHOULD include a serviceEndpoint of type \"IdentityResolver\". If the identifier is not a W3C DID then the id peroperty SHOULD be an identity resolver URL.",
+                  "required": ["id", "name"],
+                  "$defs": {
+                    "CredentialIssuer": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "default": "CredentialIssuer",
+                          "enum": ["CredentialIssuer"]
+                        },
+                        "id": {
+                          "example": "did:web:identifiers.example-company.com:12345",
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The W3C DID of the issuer - should be a did:web or did:tdw"
+                        },
+                        "name": {
+                          "example": "Example Company Pty Ltd",
+                          "type": "string",
+                          "description": "The name of the issuer person or organisation"
+                        },
+                        "otherIdentifiers": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Entity"
+                          },
+                          "description": "An optional list of other registered identifiers for this credential issuer "
+                        }
+                      },
+                      "description": "The issuer party ()person or orgnaition) of a verifiable credential.",
+                      "required": ["id", "name"]
+                    },
+                    "Entity": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "default": "Entity",
+                          "enum": ["Entity"]
+                        },
+                        "id": {
+                          "example": "https://id.gs1.org/01/09520123456788/21/12345",
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+                        },
+                        "name": {
+                          "example": "EV battery 300Ah.",
+                          "type": "string",
+                          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
+                        },
+                        "registeredId": {
+                          "example": "90664869327",
+                          "type": "string",
+                          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+                        },
+                        "idScheme": {
+                          "$ref": "#/$defs/IdentifierScheme",
+                          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+                        }
+                      },
+                      "description": "The ID and Name of an identified entity such qs a product, facility, party, standard, etc.  If the identifier is a W3C DID then the corresponding DID document SHOULD include a serviceEndpoint of type \"IdentityResolver\". If the identifier is not a W3C DID then the id peroperty SHOULD be an identity resolver URL.",
+                      "required": ["id", "name"]
+                    },
+                    "IdentifierScheme": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "default": "IdentifierScheme",
+                          "enum": ["IdentifierScheme"]
+                        },
+                        "id": {
+                          "example": "https://id.gs1.org/01/",
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The globally unique identifier of the registration scheme. The scheme should be registered and discoverable from vocabulary.uncefact.org/identifierSchemes"
+                        },
+                        "name": {
+                          "example": "Global Trade Identification Number (GTIN)",
+                          "type": "string",
+                          "description": "The name of the identifier scheme. "
+                        }
+                      },
+                      "description": "An identifier registration scheme for products, facilities, or organisations. Typically operated by a state, national or gloabl authority."
+                    }
+                  }
+                },
+                "data": {
+                  "type": ["Entity"],
+                  "id": "0105012345678900",
+                  "registeredId": "123456789",
+                  "name": "Sample business Ltd",
+                  "idScheme": {
+                    "type": ["IdentifierScheme"],
+                    "id": "https://id.gs1.org/01/",
+                    "name": "Global Trade Identification Number (GTIN)"
+                  },
+                  "verifiedDIDList": ["did:web:samplebusiness.com:key7", "did:web:samplebusiness.com:key7"],
+                  "registrationScopeList": [
+                    "https://abr.business.gov.au/Help/EntityTypeDescription?Id=19",
+                    "https://abr.business.gov.au/Help/EntityTypeDescription?Id=19"
+                  ]
+                },
+                "constructData": {
+                  "mappingFields": [],
+                  "dummyFields": [],
+                  "generationFields": [
+                    {
+                      "path": "/eventID",
+                      "handler": "generateIdWithSerialNumber"
+                    }
+                  ]
+                },
+                "className": "json-form",
+                "style": {
+                  "margin": "40px auto",
+                  "paddingTop": "40px",
+                  "width": "80%"
+                }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {}
+            }
+          ],
+          "services": [
+            {
+              "name": "processDigitalIdentityAnchor",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:9f91-58-187-62-179.ngrok-free.app"
+                  },
+                  "digitalIdentityAnchor": {
+                    "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
+                    "renderTemplate": [
+                      {
+                        "template": "<div>Digital Identity Anchor</div>",
+                        "@type": "WebRenderingTemplate2022"
+                      }
+                    ],
+                    "type": ["VerifiableCredential", "DigitalIdentityAnchor"],
+                    "dlrLinkTitle": "DigitalIdentityAnchor",
+                    "dlrIdentificationKeyType": "gtin",
+                    "dlrVerificationPage": "http://localhost:3003/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIKey": "test123",
+                    "namespace": "gs1",
+                    "linkRegisterPath": "/api/resolver"
+                  },
+                  "storage": {
+                    "url": "http://localhost:3334/v1/documents",
+                    "params": {
+                      "resultPath": "/uri",
+                      "bucket": "verifiable-credentials"
+                    },
+                    "options": {
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
+                    }
+                  },
+                  "identifierKeyPath": "/id"
                 }
               ]
             }
@@ -1196,7 +1583,7 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -1947,8 +2334,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -2430,8 +2817,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -3182,8 +3569,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -3665,8 +4052,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -4417,8 +4804,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -4900,8 +5287,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],

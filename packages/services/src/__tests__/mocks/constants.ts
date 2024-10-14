@@ -205,6 +205,58 @@ export const aggregationEventMock = {
   },
 };
 
+export const objectEventContext = {
+  vckit: {
+    vckitAPIUrl: 'https://api.vckit.example.com',
+    issuer: 'did:example:123456789abcdefghi',
+  },
+  epcisObjectEvent: {
+    context: ['https://www.w3.org/2018/credentials/v1', 'https://gs1.org/voc/'],
+    type: ['VerifiableCredential', 'ObjectEventCredential'],
+    renderTemplate: [
+      {
+        template: '<div><h2>Object Event</h2></div>',
+        '@type': 'WebRenderingTemplate2022',
+      },
+    ],
+    dlrIdentificationKeyType: 'gtin',
+    dlrLinkTitle: 'Object Event',
+    dlrVerificationPage: 'https://verify.example.com',
+  },
+  storage: {
+    url: 'https://storage.example.com/upload',
+    params: {
+      resultPath: '/url',
+    },
+  },
+  dlr: {
+    dlrAPIUrl: 'https://dlr.example.com/api',
+    dlrAPIKey: 'dlr-api-key-12345',
+    namespace: 'gs1',
+    linkRegisterPath: '/api/resolver',
+  },
+  identifierKeyPath: '/id',
+  dpp: {
+    dlrIdentificationKeyType: 'gtin',
+    dlrLinkTitle: 'Product DPP',
+    dlrVerificationPage: 'https://verify.example.com',
+  },
+  dppCredential: {
+    mappingFields: [
+      {
+        sourcePath: '/linkResolver',
+        destinationPath: '/traceabilityInformation/0/eventReference',
+      },
+    ],
+    dummyFields: [
+      {
+        path: '/traceabilityInformation/0/eventType',
+        data: 'object',
+      },
+    ],
+  },
+};
+
 export const digitalIdentityAnchorContext = {
   vckit: {
     vckitAPIUrl: 'https://vckit.example.com',

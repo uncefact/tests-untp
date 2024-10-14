@@ -2,7 +2,8 @@ import _ from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 import JSONPointer from 'jsonpointer';
 import { generateIdWithSerialNumber, generateIdWithBatchLot } from '../epcisEvents/helpers.js';
-import { IVerifyURLPayload } from '../types/index.js';
+import { IVerifyURLPayload } from '../types/types.js';
+import { getLinkResolverIdentifierFromURI } from '../linkResolver.service.js';
 
 export function generateUUID() {
   return uuidv4();
@@ -315,13 +316,13 @@ export const constructIdentifierString = (
     throw new Error('Invalid data object');
   }
 
+  let identifierString = '';
   if (typeof identifierKeyPath === 'string') {
     try {
       const value = JSONPointer.get(data, identifierKeyPath);
       if (value) {
-        return value;
+        identifierString = value;
       }
-      return '';
     } catch (error) {
       throw new Error('Error constructing identifier string');
     }
@@ -331,10 +332,25 @@ export const constructIdentifierString = (
       if (!handlerFunction) {
         throw new Error(`Handler function ${identifierKeyPath.function} not found`);
       }
-      return handlerFunction(data, ...identifierKeyPath.args);
+      identifierString = handlerFunction(data, ...identifierKeyPath.args);
     } catch (error: any) {
       throw new Error('Error constructing identifier string using handler function');
     }
+  }
+
+  if (isValidUrl(identifierString)) {
+    const { elementString } = getLinkResolverIdentifierFromURI(identifierString);
+    return elementString;
+  }
+  return identifierString;
+};
+
+export const isValidUrl = (url: string): boolean => {
+  try {
+    new URL(url);
+    return true;
+  } catch (error) {
+    return false;
   }
 };
 

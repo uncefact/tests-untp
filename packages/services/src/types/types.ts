@@ -90,7 +90,7 @@ export interface IInputItems {
   productClass: string;
 }
 
-export interface ITransformationEvent extends IContext {
+export interface ITransformationEventContext extends IContext {
   identifiers: string[];
   epcisTransformationEvent: IEntityIssue;
   transformationEventCredential: IConstructObjectParameters;
@@ -121,4 +121,8 @@ export interface IAggregationEventContext extends IContext {
 
 export interface IDigitalIdentityAnchorContext extends IContext {
   digitalIdentityAnchor: IEntityIssue;
+}
+
+export interface IObjectEventContext extends IContext {
+  epcisObjectEvent: IEntityIssue;
 }
