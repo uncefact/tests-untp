@@ -62,7 +62,7 @@ The request payload for updating the status of a VC should look like this:
 
 To manage the status of a VC, you will need to retrieve the status information from the VC. Here's how you can do that:
 
-1.	Verify the VC: In the mock app, go to the Verify page and scan the barcode associated with the VC.
+1.	Verify the VC: In the mock app, go to the Scanning page (/scanning) and scan the barcode associated with the VC.
 2.	View VC JSON: Once the VC is verified, you will see the VC JSON tab. Click on it to view the JSON data.
 3.	Locate Credential Status: Find the `credentialStatus` object within the VC JSON tab. It might look something like this:
 
