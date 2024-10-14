@@ -1,0 +1,50 @@
+[
+  {
+    "namespace": "gs1",
+    "identificationKeyType": "gtin",
+    "identificationKey": "09359502000034",
+    "qualifierPath": "/",
+    "itemDescription": "DPP",
+    "active": true,
+    "responses": [
+      {
+        "defaultLinkType": true,
+        "defaultIanaLanguage": true,
+        "defaultContext": true,
+        "defaultMimeType": true,
+        "fwqs": false,
+        "active": true,
+        "linkType": "gs1:serviceInfo",
+        "ianaLanguage": "en",
+        "context": "us",
+        "title": "Digital Identity Resolver Service",
+        "targetUrl": "http://localhost:3000/gs1",
+        "mimeType": "text/plain"
+      }
+    ]
+  },
+  {
+    "namespace": "gs1",
+    "identificationKeyType": "gtin",
+    "identificationKey": "09359502000035",
+    "qualifierPath": "/",
+    "itemDescription": "DPP",
+    "active": true,
+    "responses": [
+      {
+        "defaultLinkType": true,
+        "defaultIanaLanguage": true,
+        "defaultContext": true,
+        "defaultMimeType": true,
+        "fwqs": false,
+        "active": true,
+        "linkType": "gs1:serviceInfo",
+        "ianaLanguage": "en",
+        "context": "us",
+        "title": "Digital Identity Resolver Service",
+        "targetUrl": "http://localhost:3000/gs1",
+        "mimeType": "text/plain"
+      }
+    ]
+  }
+]

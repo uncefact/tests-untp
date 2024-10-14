@@ -36,7 +36,7 @@ services:
     restart: always
 
   storage-service:
-    image: ghcr.io/uncefact/project-identity-resolver:sha-8aed15c@sha256:d768fbb395e39072a4d227ebea651346e5f27a74f0b4938e6676042095599f3b
+    image: ghcr.io/uncefact/project-identity-resolver:sha-40264dd@sha256:aa3edd2f142f0edabfa9c7b1e16b6a69835913cc1fc345f3e478c7801c0eb060
     ports:
       - 3334:3334
     environment:
@@ -118,8 +118,7 @@ services:
       - ./minio_data/mock-global-gs1-resolver-object-store:/data
 
   seeding-data:
-    image: curlimages/curl:8.10.1
-    working_dir: /scripts
+    image: alpine:3.20.3
     environment:
       # IDR service environment variables
       - IDR_SERVICE_HOST=identity-resolver-service
@@ -131,18 +130,17 @@ services:
       - MOCK_GS1_SERVICE_HOST=mock-global-gs1-resolver
       - MOCK_GS1_SERVICE_PORT=3001
       - MOCK_GS1_SERVICE_API_KEY=test456
-      - MOCK_GS1_IDENTIFICATION_KEYS=09359502000034,09359502000035 # This ENV can accept multiple keys separated by comma. E.g: 09359502000034,09359502000035,09359502000036
     command:
       - /bin/sh
       - -c
       - |
-        if [ "$SEEDING" == "true" ]; then
-          ./seeding-idr-data.sh
-          ./seeding-mock-gs1-data.sh
+        if [ "$SEEDING" = "true" ]; then
+          apk add curl jq && \
+          ./seeding/idr-data.sh
+          ./seeding/mock-gs1-data.sh
         fi
     volumes:
-      - ./seeding-idr-data.sh:/scripts/seeding-idr-data.sh
-      - ./seeding-mock-gs1-data.sh:/scripts/seeding-mock-gs1-data.sh
+      - ./seeding:/seeding
     depends_on:
       - identity-resolver-service
       - mock-global-gs1-resolver

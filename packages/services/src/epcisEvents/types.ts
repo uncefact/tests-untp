@@ -59,7 +59,13 @@ export interface IInputItems {
   productClass: string;
 }
 
-export interface ITransformationEvent extends IContext {
+export interface ITraceabilityEvent {
+  data: {
+    [key: string]: any;
+  };
+}
+
+export interface ITransformationEventContext extends IContext {
   identifiers: string[];
   epcisTransformationEvent: IEntityIssue;
   transformationEventCredential: IConstructObjectParameters;
@@ -67,22 +73,14 @@ export interface ITransformationEvent extends IContext {
   identifierKeyPath: string;
 }
 
-export interface ITraceabilityEvent {
-  data: {
-    [key: string]: any;
-  };
-}
-
 export interface ITransactionEventContext extends IContext {
   epcisTransactionEvent: IEntityIssue;
 }
 
-export interface IAggregationEvent {
-  data: {
-    [key: string]: any;
-  };
-}
-
 export interface IAggregationEventContext extends IContext {
   epcisAggregationEvent: IEntityIssue;
+}
+
+export interface IObjectEventContext extends IContext {
+  epcisObjectEvent: IEntityIssue;
 }
