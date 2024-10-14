@@ -86,6 +86,8 @@ export const validateContextTransformationEvent = (
   if (_.isEmpty(context.epcisTransformationEvent.dlrIdentificationKeyType))
     return error('Invalid epcisTransformationEvent dlrIdentificationKeyType');
 
+  if (_.isEmpty(context.dppCredentials)) return error('dppCredentials not found');
+
   return { ok: true, value: context };
 };
 
