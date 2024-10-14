@@ -26,6 +26,7 @@ export const storageService: IStorageService = async (config) => {
 };
 
 export const getStorageServiceLink: IGetStorageServiceLink = async (storage, data, filename) => {
+  // TODO: remove jwt check in the future
   const payloadData = typeof data === 'string' ? { jwt: data } : data;
 
   return await storageService({
