@@ -704,7 +704,7 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
+                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -1583,7 +1583,7 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
+                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -2334,8 +2334,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v1",
+                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -2817,8 +2817,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v1",
+                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -3569,8 +3569,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v1",
+                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -4052,8 +4052,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v1",
+                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -4804,8 +4804,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v1",
+                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -5287,8 +5287,8 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:7598-183-80-124-255.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v1",
+                    "issuer": "did:web:450e-103-69-79-17.ngrok-free.app"
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
