@@ -3,11 +3,9 @@ import { privateAPI } from './utils/httpService.js';
 import appConfig from '../../mock-app/src/constants/app-config.json';
 
 export const contextDefault = [
-  'https://www.w3.org/2018/credentials/v1',
-  'https://w3id.org/vc-revocation-list-2020/v1',
-  'https://w3id.org/security/suites/jws-2020/v1',
+  'https://www.w3.org/ns/credentials/v2',
+  'https://www.w3.org/ns/credentials/examples/v2',
   'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
-  'https://w3id.org/security/suites/jws-2020/v1',
 ];
 
 export const typeDefault = ['VerifiableCredential'];
@@ -73,8 +71,11 @@ export const issueVC = async ({
   // issue vc
   const body = constructCredentialObject({ context, type, issuer, credentialSubject, credentialStatus: _credentialStatus, ...restOfVC });
   privateAPI.setBearerTokenAuthorizationHeaders(apiKey);
-  const response = await privateAPI.post<VerifiableCredential>(`${vcKitAPIUrl}/credentials/issue`, body);
-  return response;
+  const { verifiableCredential } = await privateAPI.post<VerifiableCredential>(
+    `${vcKitAPIUrl}/credentials/issue`,
+    body,
+  );
+  return verifiableCredential;
 };
 
 /**

@@ -1,9 +1,9 @@
 import * as vckitService from '../vckit.service';
 import { getStorageServiceLink } from '../storage.service';
 import * as linkResolverService from '../linkResolver.service';
-import { IAggregationEventContext } from '../epcisEvents/types';
+import { IAggregationEventContext } from '../types/types';
 import { Result } from '../types/validateContext';
-import * as validateContext from '../epcisEvents/validateContext';
+import * as validateContext from '../validateContext';
 import * as helpers from '../epcisEvents/helpers';
 import { processAggregationEvent } from '../epcisEvents';
 import { publicAPI } from '../utils/httpService';
@@ -21,10 +21,10 @@ jest.mock('../linkResolver.service', () => ({
   IdentificationKeyType: jest.fn(),
   getLinkResolverIdentifier: jest.fn(),
   LinkType: {
-    verificationLinkType : 'gs1:verificationService',
-    certificationLinkType : 'gs1:certificationInfo',
-    epcisLinkType : 'gs1:epcis',
-  }
+    verificationLinkType: 'gs1:verificationService',
+    certificationLinkType: 'gs1:certificationInfo',
+    epcisLinkType: 'gs1:epcis',
+  },
 }));
 
 describe('processAggregationEvent', () => {

@@ -60,8 +60,11 @@ const Verify = () => {
         return setCredential(encryptedCredential);
       }
 
-      if ('jwt' in encryptedCredential) {
-        return setCredential(encryptedCredential.jwt);
+      if (
+        encryptedCredential?.type?.includes('EnvelopedVerifiableCredential') &&
+        encryptedCredential?.id?.startsWith('data:application/')
+      ) {
+        return setCredential(encryptedCredential);
       }
 
       const credentialJsonString = decryptString({
@@ -145,9 +148,11 @@ const Verify = () => {
         }
 
         let customCredential = null;
-        if (typeof credential === 'string') {
+
+        if (credential?.type?.includes('EnvelopedVerifiableCredential')) {
           try {
-            customCredential = jose.decodeJwt(credential);
+            const encodedCredential = credential?.id?.split(',')[1];
+            customCredential = jose.decodeJwt(encodedCredential as string) as VerifiableCredential;
           } catch (error) {
             displayErrorUI();
           }

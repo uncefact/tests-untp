@@ -1,11 +1,11 @@
 import * as vckitService from '../vckit.service';
 import * as linkResolverService from '../linkResolver.service';
 import * as helpers from '../epcisEvents/helpers';
-import * as validateContext from '../epcisEvents/validateContext';
+import * as validateContext from '../validateContext';
 import { processTransactionEvent } from '../epcisEvents/transactionEvent';
 import { getStorageServiceLink } from '../storage.service';
 import { Result } from '../types/validateContext';
-import { ITransactionEventContext } from '../epcisEvents/types';
+import { ITransactionEventContext } from '../types/types';
 import { publicAPI } from '../utils/httpService';
 import { transactionEventMock } from './mocks/constants';
 
@@ -21,16 +21,15 @@ jest.mock('../linkResolver.service', () => ({
   IdentificationKeyType: jest.fn(),
   getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' })),
   LinkType: {
-    verificationLinkType : 'gs1:verificationService',
-    certificationLinkType : 'gs1:certificationInfo',
-    epcisLinkType : 'gs1:epcis',
-  }
+    verificationLinkType: 'gs1:verificationService',
+    certificationLinkType: 'gs1:certificationInfo',
+    epcisLinkType: 'gs1:epcis',
+  },
 }));
 
 jest.mock('../epcisEvents/helpers', () => ({
   deleteValuesFromLocalStorageByKeyPath: jest.fn(),
 }));
-
 
 describe('processTransactionEvent', () => {
   const { nlisidMock, transactionEventDLRMock, transactionVCMock } = transactionEventMock;
@@ -64,7 +63,7 @@ describe('processTransactionEvent', () => {
       },
     },
     identifierKeyPath: '/transaction/identifier',
-    localStorageParams: { "storageKey": "transaction", "keyPath": "/transaction/type" }
+    localStorageParams: { storageKey: 'transaction', keyPath: '/transaction/type' },
   };
 
   it('should process transaction event', async () => {
@@ -78,7 +77,7 @@ describe('processTransactionEvent', () => {
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValueOnce(transactionEventDLRMock);
 
     const transactionVC = await processTransactionEvent(transactionEvent, context);
-    
+
     expect(transactionVC).toEqual({
       vc: transactionVCMock,
       linkResolver: transactionEventDLRMock,

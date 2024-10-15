@@ -1,4 +1,4 @@
-import { validateContextDPP, validateObjectEventContext } from '../epcisEvents/validateContext';
+import { validateContextDPP, validateObjectEventContext } from '../validateContext';
 import { contextDPP, objectEventContext } from './mocks/constants';
 
 describe('validateContext', () => {

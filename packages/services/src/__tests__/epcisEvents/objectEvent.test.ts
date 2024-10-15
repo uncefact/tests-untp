@@ -1,10 +1,11 @@
-import { ITraceabilityEvent, processObjectEvent } from '../../epcisEvents';
+import { ITraceabilityEvent } from '../../types';
+import { processObjectEvent } from '../../epcisEvents/objectEvent';
 import * as vckitService from '../../vckit.service';
 import { getStorageServiceLink } from '../../storage.service';
 import * as linkResolverService from '../../linkResolver.service';
-import { IAggregationEventContext, IObjectEventContext } from '../../epcisEvents/types';
+import { IAggregationEventContext, IObjectEventContext } from '../../types';
 import { Result } from '../../types/validateContext';
-import * as validateContext from '../../epcisEvents/validateContext';
+import * as validateContext from '../../validateContext';
 import { objectEventContext as context } from '../mocks/constants';
 
 jest.mock('../../vckit.service', () => ({
