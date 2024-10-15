@@ -1,4 +1,9 @@
-import { CredentialPayload, CredentialSubject, VerifiableCredential, CredentialStatusReference } from '@vckit/core-types';
+import {
+  CredentialPayload,
+  CredentialSubject,
+  VerifiableCredential,
+  CredentialStatusReference,
+} from '@vckit/core-types';
 import { privateAPI } from './utils/httpService.js';
 import appConfig from '../../mock-app/src/constants/app-config.json';
 
@@ -24,7 +29,7 @@ export interface IArgIssueCredentialStatus {
   host: string;
   statusPurpose?: string;
 
-  [x: string]: any
+  [x: string]: any;
 }
 
 /**
@@ -94,6 +99,16 @@ export const issueVC = async ({
  * const credentialStatus = await issueCredentialStatus({ host, statusPurpose, bitstringStatusIssuer });
  */
 export const issueCredentialStatus = async (args: IArgIssueCredentialStatus): Promise<CredentialStatusReference> => {
+  if (!args.host) {
+    throw new Error('Error issuing credential status: Host is required');
+  }
+  if (!args.apiKey) {
+    throw new Error('Error issuing credential status: API Key is required');
+  }
+  if (!args.bitstringStatusIssuer) {
+    throw new Error('Error issuing credential status: Bitstring Status Issuer is required');
+  }
+
   const { host, apiKey, statusPurpose = 'revocation', ...rest } = args;
   const body = { statusPurpose, ...rest };
 
