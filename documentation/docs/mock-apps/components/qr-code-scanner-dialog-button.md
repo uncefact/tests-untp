@@ -24,11 +24,11 @@ The QRCodeScannerDialogButton component is responsible for rendering a button th
 
 ## Definitions
 
-| Property | Required | Description                                            | Type                                                                    |
-| -------- | -------- | ------------------------------------------------------ | ----------------------------------------------------------------------- |
-| name     | Yes      | The name of the component(should be "RenderCheckList") | String                                                                  |
-| type     | Yes      | The type of the component (should be "EntryData")      | [ComponentType](/docs/mock-apps/common/component-type)                  |
-| props    | Yes      | The properties for the QRCodeScannerDialogButton       | [Props](/docs/mock-apps/components/qr-code-scanner-dialog-button#props) |
+| Property | Required | Description                                                      | Type                                                                    |
+| -------- | -------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| name     | Yes      | The name of the component(should be "QRCodeScannerDialogButton") | String                                                                  |
+| type     | Yes      | The type of the component (should be "EntryData")                | [ComponentType](/docs/mock-apps/common/component-type)                  |
+| props    | Yes      | The properties for the QRCodeScannerDialogButton                 | [Props](/docs/mock-apps/components/qr-code-scanner-dialog-button#props) |
 
 ### Props
 

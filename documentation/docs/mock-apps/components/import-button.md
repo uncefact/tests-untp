@@ -25,11 +25,11 @@ The ImportButton component is responsible for rendering a button that allows the
 
 ## Definitions
 
-| Property | Required | Description                                            | Type                                                    |
-| -------- | -------- | ------------------------------------------------------ | ------------------------------------------------------- |
-| name     | Yes      | The name of the component(should be "RenderCheckList") | String                                                  |
-| type     | Yes      | The type of the component (should be "EntryData")      | [ComponentType](/docs/mock-apps/common/component-type)  |
-| props    | Yes      | The properties for the ImportButton                    | [Props](/docs/mock-apps/components/import-button#props) |
+| Property | Required | Description                                         | Type                                                    |
+| -------- | -------- | --------------------------------------------------- | ------------------------------------------------------- |
+| name     | Yes      | The name of the component(should be "ImportButton") | String                                                  |
+| type     | Yes      | The type of the component (should be "EntryData")   | [ComponentType](/docs/mock-apps/common/component-type)  |
+| props    | Yes      | The properties for the ImportButton                 | [Props](/docs/mock-apps/components/import-button#props) |
 
 ### Props
 
