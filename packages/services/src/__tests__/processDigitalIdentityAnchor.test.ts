@@ -1,5 +1,5 @@
 import * as vckitService from '../vckit.service';
-import { getStorageServiceLink } from '../storage.service';
+import { uploadData } from '../storage.service';
 import * as linkResolverService from '../linkResolver.service';
 import { Result } from '../types/validateContext';
 import * as validateContext from '../validateContext';
@@ -11,7 +11,7 @@ jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
 }));
 jest.mock('../storage.service', () => ({
-  getStorageServiceLink: jest.fn(),
+  uploadData: jest.fn(),
 }));
 jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
@@ -40,7 +40,7 @@ describe('processDigitalIdentityAnchor', () => {
     (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
       credentialSubject: { id: 'https://example.com/123' },
     }));
-    (getStorageServiceLink as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
+    (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
 
     jest
       .spyOn(validateContext, 'validateDigitalIdentityAnchorContext')

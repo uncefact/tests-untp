@@ -1,7 +1,7 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import { IService, ITraceabilityEvent, ITransactionEventContext } from '../types/index.js';
 import { issueVC } from '../vckit.service.js';
-import { getStorageServiceLink } from '../storage.service.js';
+import { uploadData } from '../storage.service.js';
 import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { validateTransactionEventContext } from '../validateContext.js';
@@ -36,7 +36,7 @@ export const processTransactionEvent: IService = async (
     },
   });
 
-  const vcUrl = await getStorageServiceLink(storage, vc, `${identifier}/${generateUUID()}`);
+  const vcUrl = await uploadData(storage, vc, `${identifier}/${generateUUID()}`);
 
   const linkResolver = await registerLinkResolver(
     vcUrl,

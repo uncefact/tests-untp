@@ -1,6 +1,6 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import { registerLinkResolver, LinkType, getLinkResolverIdentifier } from './linkResolver.service.js';
-import { getStorageServiceLink } from './storage.service.js';
+import { uploadData } from './storage.service.js';
 import { IService } from './types/IService.js';
 import { constructIdentifierString, generateUUID } from './utils/helpers.js';
 import { issueVC } from './vckit.service.js';
@@ -44,7 +44,7 @@ export const processDigitalFacilityRecord: IService = async (
     },
   });
 
-  const vcUrl = await getStorageServiceLink(storage, vc, `${identifier}/${generateUUID()}`);
+  const vcUrl = await uploadData(storage, vc, `${identifier}/${generateUUID()}`);
 
   const linkResolver = await registerLinkResolver(
     vcUrl,

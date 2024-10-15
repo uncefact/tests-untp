@@ -1,6 +1,6 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import { issueVC } from '../vckit.service.js';
-import { getStorageServiceLink } from '../storage.service.js';
+import { uploadData } from '../storage.service.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { IService } from '../types/IService.js';
 import { ITraceabilityEvent, IAggregationEventContext } from '../types';
@@ -49,7 +49,7 @@ export const processAggregationEvent: IService = async (
     },
   });
 
-  const aggregationVCLink = await getStorageServiceLink(storage, aggregationVC, `${identifier}/${generateUUID()}`);
+  const aggregationVCLink = await uploadData(storage, aggregationVC, `${identifier}/${generateUUID()}`);
 
   await registerLinkResolver(
     aggregationVCLink,
