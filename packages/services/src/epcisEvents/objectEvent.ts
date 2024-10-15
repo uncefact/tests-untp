@@ -4,8 +4,8 @@ import { getStorageServiceLink } from '../storage.service.js';
 import { IService } from '../types/IService.js';
 import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
 import { issueVC } from '../vckit.service.js';
-import { ITraceabilityEvent, IObjectEventContext } from './types';
-import { validateObjectEventContext } from './validateContext.js';
+import { ITraceabilityEvent, IObjectEventContext } from '../types/index.js';
+import { validateObjectEventContext } from '../validateContext.js';
 
 /**
  * Processes an object event by issuing a verifiable credential, storing it in a storage service and registering a link resolver.

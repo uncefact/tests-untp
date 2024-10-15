@@ -1,6 +1,7 @@
 export * from './types/types.js';
 export * from './epcisEvents/index.js';
 export * from './processDPP.service.js';
+export * from './processDigitalIdentityAnchor.service.js';
 export * from './vckit.service.js';
 export * from './linkResolver.service.js';
 export * from './storage.service.js';
