@@ -295,7 +295,7 @@ export const digitalFacilityRecordContext = {
     renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
     type: ['DigitalFacilityRecord'],
     dlrLinkTitle: 'DigitalFacilityRecord',
-    dlrIdentificationKeyType: 'gtin',
+    dlrIdentificationKeyType: 'gln',
     dlrVerificationPage: 'https://web.example.com/verify',
   },
   dlr: {

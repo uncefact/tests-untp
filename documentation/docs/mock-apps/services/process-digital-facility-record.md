@@ -52,7 +52,7 @@ P-->>C: Return digital facility record VC and resolver URL
             "@type": "WebRenderingTemplate2022"
           }
         ],
-        "dlrIdentificationKeyType": "gtin",
+        "dlrIdentificationKeyType": "gln",
         "dlrLinkTitle": "DigitalFacilityRecord",
         "dlrVerificationPage": "https://verify.example.com"
       },
@@ -80,7 +80,7 @@ P-->>C: Return digital facility record VC and resolver URL
 | Property              | Required | Description                                                                                                                         | Type                                                            |
 | --------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | vckit                 | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/mock-apps/common/vckit)                           |
-| digitalFacilityRecord | Yes      | Configuration for the Digital Identity Anchor Event                                                                                 | [Credential](/docs/mock-apps/common/credential)                 |
+| digitalFacilityRecord | Yes      | Configuration for the Digital Facility Record                                                                                       | [Credential](/docs/mock-apps/common/credential)                 |
 | storage               | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/mock-apps/common/storage)                       |
 | dlr                   | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/mock-apps/common/idr)                               |
 | identifierKeyPath     | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/mock-apps/common/identifier-key-path) |
