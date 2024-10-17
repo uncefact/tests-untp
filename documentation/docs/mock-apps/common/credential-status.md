@@ -62,5 +62,5 @@ MA-->>C: Return VC and resolver URL
 
 ## Managing the status of a Verifiable Credential
 
-To manage the status of a Verifiable Credential ([activate](https://uncefact.github.io/project-vckit/docs/get-started/api-server-get-started/basic-operations#activate-a-vc) or [revoke](https://uncefact.github.io/project-vckit/docs/get-started/api-server-get-started/basic-operations#revoke-a-vc)), you can refer to the [VCkit](https://uncefact.github.io/project-vckit/docs/) documentation.
+To manage the status of a Verifiable Credential ([activate](https://uncefact.github.io/project-vckit/docs/get-started/api-server-get-started/basic-operations#activating-a-vc) or [revoke](https://uncefact.github.io/project-vckit/docs/get-started/api-server-get-started/basic-operations#revoking-a-vc)), you can refer to the [VCkit](https://uncefact.github.io/project-vckit/docs/) documentation.
 
