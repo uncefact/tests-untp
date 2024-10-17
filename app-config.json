@@ -2316,7 +2316,7 @@
                     ],
                     "type": ["VerifiableCredential", "DigitalFacilityRecord"],
                     "dlrLinkTitle": "DigitalFacilityRecord",
-                    "dlrIdentificationKeyType": "gtin",
+                    "dlrIdentificationKeyType": "gln",
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {

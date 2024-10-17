@@ -7,10 +7,7 @@
       "shortcode": "gtin",
       "ai": "01",
       "type": "I",
-      "qualifiers": [
-        "10",
-        "21"
-      ],
+      "qualifiers": ["10", "21"],
       "regex": "(\\d{12,14}|\\d{8})"
     },
     {
@@ -28,6 +25,14 @@
       "ai": "21",
       "type": "Q",
       "regex": "(.{0,20})"
+    },
+    {
+      "title": "Identification of a physical location - Global Location Number",
+      "label": "LOC No",
+      "shortcode": "gln",
+      "ai": "414",
+      "type": "I",
+      "regex": "(\\d{13})"
     }
   ]
 }
