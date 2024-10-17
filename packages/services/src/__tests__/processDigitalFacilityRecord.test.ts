@@ -3,9 +3,9 @@ import { uploadData } from '../storage.service';
 import * as linkResolverService from '../linkResolver.service';
 import { Result } from '../types/validateContext';
 import * as validateContext from '../validateContext';
-import { IDigitalIdentityAnchorContext } from '../types';
-import { processDigitalIdentityAnchor } from '../processDigitalIdentityAnchor.service';
-import { digitalIdentityAnchorContext as context } from './mocks/constants';
+import { IDigitalFacilityRecordContext } from '../types';
+import { processDigitalFacilityRecord } from '../processDigitalFacilityRecord.service';
+import { digitalFacilityRecordContext as context } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
@@ -26,31 +26,31 @@ jest.mock('../linkResolver.service', () => ({
   },
 }));
 
-describe('processDigitalIdentityAnchor', () => {
-  const digitalIdentityAnchorData = {
+describe('processDigitalFacilityRecord', () => {
+  const digitalFacilityRecordData = {
     data: {
-      type: 'DigitalIdentityAnchor',
+      type: 'DigitalFacilityRecord',
       id: '0123456789',
-      name: 'Digital Identity Anchor',
+      name: 'Digital Facility Record',
       registeredId: '9220664869327',
     },
   };
 
-  it('should process digital identity anchor successfully', async () => {
+  it('should process digital facility record successfully', async () => {
     (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
       credentialSubject: { id: 'https://example.com/123' },
     }));
     (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
 
     jest
-      .spyOn(validateContext, 'validateDigitalIdentityAnchorContext')
-      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<IDigitalIdentityAnchorContext>);
+      .spyOn(validateContext, 'validateDigitalFacilityRecordContext')
+      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<IDigitalFacilityRecordContext>);
     jest
       .spyOn(linkResolverService, 'getLinkResolverIdentifier')
       .mockReturnValue({ identifier: '0123456789', qualifierPath: '/' });
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValue('https://example.com/link-resolver');
 
-    const result = await processDigitalIdentityAnchor(digitalIdentityAnchorData, context);
+    const result = await processDigitalFacilityRecord(digitalFacilityRecordData, context);
 
     expect(result.vc).toEqual({ credentialSubject: { id: 'https://example.com/123' } });
     expect(result.linkResolver).toEqual('https://example.com/link-resolver');
@@ -58,13 +58,13 @@ describe('processDigitalIdentityAnchor', () => {
 
   it('should throw error when context validation false', async () => {
     const invalidContext: any = { ...context };
-    delete invalidContext.digitalIdentityAnchor;
+    delete invalidContext.digitalFacilityRecord;
 
     jest
-      .spyOn(validateContext, 'validateDigitalIdentityAnchorContext')
+      .spyOn(validateContext, 'validateDigitalFacilityRecordContext')
       .mockReturnValueOnce({ ok: false, value: 'Invalid context' });
 
-    expect(async () => await processDigitalIdentityAnchor(digitalIdentityAnchorData, invalidContext)).rejects.toThrow(
+    expect(async () => await processDigitalFacilityRecord(digitalFacilityRecordData, invalidContext)).rejects.toThrow(
       'Invalid context',
     );
   });
@@ -76,26 +76,26 @@ describe('processDigitalIdentityAnchor', () => {
     };
 
     jest
-      .spyOn(validateContext, 'validateDigitalIdentityAnchorContext')
-      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<IDigitalIdentityAnchorContext>);
+      .spyOn(validateContext, 'validateDigitalFacilityRecordContext')
+      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<IDigitalFacilityRecordContext>);
 
     expect(
-      async () => await processDigitalIdentityAnchor(digitalIdentityAnchorData, invalidIdentifierContent),
+      async () => await processDigitalFacilityRecord(digitalFacilityRecordData, invalidIdentifierContent),
     ).rejects.toThrow('Identifier not found');
   });
 
-  it('should throw error when DigitalIdentityAnchor data not found', async () => {
-    const invalidDigitalIdentityAnchorData = {
-      ...digitalIdentityAnchorData,
+  it('should throw error when DigitalFacilityRecord data not found', async () => {
+    const invalidDigitalFacilityRecordData = {
+      ...digitalFacilityRecordData,
       data: undefined,
     };
 
     jest
-      .spyOn(validateContext, 'validateDigitalIdentityAnchorContext')
-      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<IDigitalIdentityAnchorContext>);
+      .spyOn(validateContext, 'validateDigitalFacilityRecordContext')
+      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<IDigitalFacilityRecordContext>);
 
-    expect(async () => await processDigitalIdentityAnchor(invalidDigitalIdentityAnchorData, context)).rejects.toThrow(
-      'digitalIdentityAnchor data not found',
+    expect(async () => await processDigitalFacilityRecord(invalidDigitalFacilityRecordData, context)).rejects.toThrow(
+      'digitalFacilityRecord data not found',
     );
   });
 });

@@ -9,7 +9,6 @@ jest.mock('../utils/httpService', () => ({
   },
 }));
 
-
 describe('storage service', () => {
   afterEach(() => {
     jest.resetAllMocks();
@@ -42,7 +41,6 @@ describe('storage service', () => {
     });
     expect(url).toEqual({
       url: `https://dev-verifiable-credentials.com/${path}`,
-    
     });
   });
 
@@ -64,7 +62,7 @@ describe('storage service', () => {
         headers: [],
       },
     });
-    expect(url).toEqual(`https://dev-verifiable-credentials.com/${path}`);
+    expect(url).toEqual({ url: `https://dev-verifiable-credentials.com/${path}` });
   });
 
   // error cases

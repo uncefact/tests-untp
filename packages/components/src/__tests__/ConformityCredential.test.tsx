@@ -2,11 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { act } from 'react-dom/test-utils';
 import { ConformityCredential } from '../components';
 import { FetchOptions } from '../types/conformityCredential.types';
-import { getJsonDataFromConformityAPI, getStorageServiceLink, getValueByPath } from '@mock-app/services';
+import { getJsonDataFromConformityAPI, uploadData, getValueByPath } from '@mock-app/services';
 import { checkStoredCredentialsConfig } from '../components/ConformityCredential/utils';
 
 jest.mock('@mock-app/services', () => ({
-  getStorageServiceLink: jest.fn(),
+  uploadData: jest.fn(),
   generateUUID: jest.fn(),
   getJsonDataFromConformityAPI: jest.fn(),
 }));
@@ -135,7 +135,7 @@ describe('ConformityCredential', () => {
       (getJsonDataFromConformityAPI as jest.Mock).mockResolvedValue(apiResp);
       (getValueByPath as jest.Mock).mockReturnValue(apiResp);
       (checkStoredCredentialsConfig as jest.Mock).mockReturnValue({ ok: true, value: '' });
-      (getStorageServiceLink as jest.Mock).mockResolvedValue('https://storage.example.com/credential');
+      (uploadData as jest.Mock).mockResolvedValue('https://storage.example.com/credential');
 
       await act(async () => {
         render(

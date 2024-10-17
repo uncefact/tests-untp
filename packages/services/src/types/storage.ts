@@ -18,6 +18,6 @@ export interface IStorageService {
   (config: StorageServiceConfig): Promise<string>;
 }
 
-export interface IGetStorageServiceLink {
+export interface IUploadData {
   (storage: StorageServiceConfig, data: any, filename: string): Promise<any>;
 }

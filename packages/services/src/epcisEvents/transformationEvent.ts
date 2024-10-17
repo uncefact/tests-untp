@@ -2,7 +2,7 @@ import { VerifiableCredential } from '@vckit/core-types';
 import _ from 'lodash';
 
 import { issueVC } from '../vckit.service.js';
-import { getStorageServiceLink } from '../storage.service.js';
+import { uploadData } from '../storage.service.js';
 import {
   IdentificationKeyType,
   LinkType,
@@ -176,7 +176,7 @@ export const issueEpcisTransformationEvent = async (
  * @returns string - url of the uploaded verifiable credential
  */
 export const uploadVC = async (path: string, vc: VerifiableCredential, storageContext: StorageServiceConfig) => {
-  const result = await getStorageServiceLink(storageContext, vc, path);
+  const result = await uploadData(storageContext, vc, path);
   return result;
 };
 

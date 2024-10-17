@@ -141,6 +141,8 @@ export const contextDPP = {
   dlr: {
     dlrAPIUrl: 'http://dlr.example.com',
     dlrAPIKey: '1234',
+    namespace: 'gs1',
+    linkRegisterPath: '/api/resolver',
   },
   storage: {
     url: 'https://storage.example.com',
@@ -268,6 +270,32 @@ export const digitalIdentityAnchorContext = {
     type: ['DigitalIdentityAnchor'],
     dlrLinkTitle: 'DigitalIdentityAnchor',
     dlrIdentificationKeyType: 'gtin',
+    dlrVerificationPage: 'https://web.example.com/verify',
+  },
+  dlr: {
+    dlrAPIUrl: 'http://dlr.example.com',
+    dlrAPIKey: '1234',
+  },
+  storage: {
+    url: 'https://storage.example.com',
+    params: {
+      resultPath: '',
+    },
+  },
+  identifierKeyPath: '/id',
+};
+
+export const digitalFacilityRecordContext = {
+  vckit: {
+    vckitAPIUrl: 'https://vckit.example.com',
+    issuer: 'did:web:example.com',
+  },
+  digitalFacilityRecord: {
+    context: ['https://www.w3.org/2018/credentials/v1'],
+    renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
+    type: ['DigitalFacilityRecord'],
+    dlrLinkTitle: 'DigitalFacilityRecord',
+    dlrIdentificationKeyType: 'gln',
     dlrVerificationPage: 'https://web.example.com/verify',
   },
   dlr: {

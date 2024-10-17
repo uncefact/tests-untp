@@ -1,4 +1,4 @@
-import { IGetStorageServiceLink, IStorageService } from './types/storage.js';
+import { IStorageService, IUploadData } from './types/storage.js';
 import { getValueByPath } from './utils/helpers.js';
 import { publicAPI } from './utils/httpService.js';
 
@@ -17,19 +17,18 @@ export const storageService: IStorageService = async (config) => {
         throw new Error(`Unsupported method`);
     }
 
-    const getResultByPath = getValueByPath(result, params.resultPath);
-    return getResultByPath;
+    return result;
   } catch (error: any) {
     console.error(error);
     throw new Error(error.message);
   }
 };
 
-export const getStorageServiceLink: IGetStorageServiceLink = async (storage, data, filename) => {
+export const uploadData: IUploadData = async (storage, data, filename) => {
   // TODO: remove jwt check in the future
   const payloadData = typeof data === 'string' ? { jwt: data } : data;
 
-  return await storageService({
+  const result = await storageService({
     url: storage.url,
     params: {
       ...storage.params,
@@ -38,4 +37,6 @@ export const getStorageServiceLink: IGetStorageServiceLink = async (storage, dat
     },
     options: storage.options,
   });
+
+  return getValueByPath(result, storage.params.resultPath);
 };
