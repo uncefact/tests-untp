@@ -1,6 +1,6 @@
 {
   "type": "object",
-  "additionalProperties": false,
+  "additionalProperties": true,
   "properties": {
     "type": {
       "type": "array",
@@ -28,18 +28,18 @@
         "type": "string",
         "enum": [
           "https://www.w3.org/ns/credentials/v2",
-          "https://vocabulary.uncefact.org/untp/dpp/0.4.0/"
+          "https://vocabulary.uncefact.org/untp/dpp/0.4.1/"
         ]
       },
       "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
       "readOnly": true,
       "const": [
         "https://www.w3.org/ns/credentials/v2",
-        "https://vocabulary.uncefact.org/untp/dpp/0.4.0/"
+        "https://vocabulary.uncefact.org/untp/dpp/0.4.1/"
       ],
       "default": [
         "https://www.w3.org/ns/credentials/v2",
-        "https://vocabulary.uncefact.org/untp/dpp/0.4.0/"
+        "https://vocabulary.uncefact.org/untp/dpp/0.4.1/"
       ]
     },
     "id": {
@@ -66,7 +66,7 @@
     },
     "credentialSubject": {
       "$ref": "#/$defs/Product",
-      "description": "The subject of a digital product passport credential is the identified product. "
+      "description": "The subject of a digital product passport credential is the identified product.  "
     }
   },
   "description": "The ProductPassport is a comprehensive data structure that encapsulates various details pertaining to a product, including its identification details, who issued it, batch information, provernance information, circularity information and a set of verifable product confomrity & sistainability claims.",
@@ -108,7 +108,7 @@
           "type": "string",
           "description": "The name of the issuer person or organisation"
         },
-        "otherIdentifiers": {
+        "otherIdentifier": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/Identifier"
@@ -205,7 +205,7 @@
     },
     "Product": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "array",
@@ -292,12 +292,22 @@
           "example": "2024-04-25",
           "type": "string",
           "format": "date",
-          "description": "The ISO 8601 date on which the product batch was manufactured."
+          "description": "The ISO 8601 date on which the product batch or individual serialised item was manufactured."
         },
         "countryOfProduction": {
           "type": "string",
           "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
           "description": "The country in which this item was produced / manufactured.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+        },
+        "granularityLevel": {
+          "type": "string",
+          "enum": [
+            "item",
+            "batch",
+            "model"
+          ],
+          "example": "item",
+          "description": "Code to indicate the granularity of this digital product passport - item level, batch level or product class level."
         },
         "dueDiligenceDeclaration": {
           "$ref": "#/$defs/Link",
@@ -310,7 +320,7 @@
           },
           "description": "An array of Provenance objects providing details on the origin and mass fraction of components or ingredients of the product batch. "
         },
-        "conformityClaims": {
+        "conformityClaim": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/Claim"
@@ -327,7 +337,7 @@
         },
         "traceabilityInformation": {
           "$ref": "#/$defs/TraceabilityPerformance",
-          "description": "An array of secure links to TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch. SHOULD be provided for any product passport issued at batch or item level. Links should include the hash of the target and may point to encrypted targets."
+          "description": "An array of traceability events grouped by value chain process.  Where actual traceability events are unavailable or carry sensitive information, passport publishers may specify the extent to which the traceability information has been independently verified. "
         }
       },
       "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details.  ",
@@ -431,7 +441,7 @@
     },
     "Dimension": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "array",
@@ -511,7 +521,7 @@
     },
     "Material": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "array",
@@ -579,7 +589,7 @@
     },
     "Claim": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "array",
@@ -605,6 +615,13 @@
           "type": "string",
           "format": "date",
           "description": "The date on which this assessment was made. "
+        },
+        "declaredValue": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Metric"
+          },
+          "description": "The list of specific values measured as part of this assessment (eg tensile strength)"
         },
         "id": {
           "example": "https://products.example-company.com/09520123456788/declarations/12345",
@@ -671,6 +688,52 @@
         "id",
         "compliance",
         "conformityTopic"
+      ]
+    },
+    "Metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": [
+            "Metric"
+          ],
+          "default": [
+            "Metric"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "Metric"
+            ]
+          }
+        },
+        "metricName": {
+          "example": "GHG emissions intensity",
+          "type": "string",
+          "description": "A human readable name for this metric (for example \"Tensile strength\")"
+        },
+        "metricValue": {
+          "$ref": "#/$defs/Measure",
+          "description": "A numeric value and unit of measure for this metric. Could be a measured value or a specified threshold. Eg {\"value\":400, \"unit\":\"MPA\"} as tensile strenght of structural steel"
+        },
+        "score": {
+          "example": "BB",
+          "type": "string",
+          "description": "A score or rank associated with this measured metric."
+        },
+        "accuracy": {
+          "example": 0.05,
+          "type": "number",
+          "description": "A percentage represented as a numeric between 0 and 1 indicating the rage of accuracy of the claimed value (eg 0.05 means that the actual value is within 5% of the claimed value.)"
+        }
+      },
+      "description": "A specific measure of performance against the criteria that governs the claim.  Expressed as an array of metric (ie unit of emasure) / value (ie the actual numeric value) pairs.  ",
+      "required": [
+        "metricName",
+        "metricValue"
       ]
     },
     "Standard": {
@@ -817,52 +880,6 @@
         "name"
       ]
     },
-    "Metric": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": [
-            "Metric"
-          ],
-          "default": [
-            "Metric"
-          ],
-          "items": {
-            "type": "string",
-            "enum": [
-              "Metric"
-            ]
-          }
-        },
-        "metricName": {
-          "example": "GHG emissions intensity",
-          "type": "string",
-          "description": "A human readable name for this metric (for example \"Tensile strength\")"
-        },
-        "metricValue": {
-          "$ref": "#/$defs/Measure",
-          "description": "A numeric value and unit of measure for this metric. Could be a measured value or a specified threshold. Eg {\"value\":400, \"unit\":\"MPA\"} as tensile strenght of structural steel"
-        },
-        "score": {
-          "example": "BB",
-          "type": "string",
-          "description": "A score or rank associated with this measured metric."
-        },
-        "accuracy": {
-          "example": 0.05,
-          "type": "number",
-          "description": "A percentage represented as a numeric between 0 and 1 indicating the rage of accuracy of the claimed value (eg 0.05 means that the actual value is within 5% of the claimed value.)"
-        }
-      },
-      "description": "A specific measure of performance against the criteria that governs the claim.  Expressed as an array of metric (ie unit of emasure) / value (ie the actual numeric value) pairs.  ",
-      "required": [
-        "metricName",
-        "metricValue"
-      ]
-    },
     "SecureLink": {
       "type": "object",
       "additionalProperties": false,
@@ -930,7 +947,7 @@
     },
     "CircularityPerformance": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "array",
@@ -962,7 +979,7 @@
           "format": "float",
           "description": "The fraction of the this product (my mass) that has been designed to be recyclable / re-usable. This will be be the total fraction that can avoid waste / landfill."
         },
-        "recyecledContent": {
+        "recycledContent": {
           "example": 0.3,
           "type": "number",
           "format": "float",
@@ -985,7 +1002,7 @@
     },
     "EmissionsPerformance": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "array",
@@ -1045,7 +1062,7 @@
     },
     "TraceabilityPerformance": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "array",
@@ -1073,7 +1090,7 @@
           "type": "number",
           "description": "The proportion (0 to 1) of materials in this value chain process that have been  traced using verifiable traceability event."
         },
-        "traceabilityEvents": {
+        "traceabilityEvent": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/SecureLink"
@@ -1081,7 +1098,7 @@
           "description": "A list of secure links to digital traceability events that support this traceability performance statement. May be encrypted for confidentiality purposes. "
         }
       },
-      "description": ""
+      "description": "An array of secure links to TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch. Events are grouped by value chain process (eg \"Weaving\" in textiles supply chain)."
     }
   }
 }
