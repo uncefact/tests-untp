@@ -1,6 +1,6 @@
 {
   "type": "object",
-  "additionalProperties": false,
+  "additionalProperties": true,
   "properties": {
     "type": {
       "type": "array",
@@ -17,12 +17,12 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/0.4.0/"]
+        "enum": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/0.4.2/"]
       },
-      "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
+      "description": "A list of JSON-LD context URIs that define the semantic meaning of properties within the credential. ",
       "readOnly": true,
-      "const": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/0.4.0/"],
-      "default": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/0.4.0/"]
+      "const": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/0.4.2/"],
+      "default": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/0.4.2/"]
     },
     "id": {
       "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
@@ -32,7 +32,7 @@
     },
     "issuer": {
       "$ref": "#/$defs/CredentialIssuer",
-      "description": "The organisation that is the isuer of this VC. Note that the \"id\" property MUST be a W3C DID.  Other identifiers such as tax registration numbers can be listed in the \"otherIdentifiers\" property."
+      "description": "The organisation that is the issuer of this VC. Note that the \"id\" property MUST be a W3C DID.  Other identifiers such as tax registration numbers can be listed in the \"otherIdentifiers\" property."
     },
     "validFrom": {
       "example": "2024-03-15T12:00:00",
@@ -48,10 +48,10 @@
     },
     "credentialSubject": {
       "$ref": "#/$defs/Product",
-      "description": "The subject of a digital product passport credential is the identified product. "
+      "description": "The subject of a digital product passport credential is the identified product.  "
     }
   },
-  "description": "The ProductPassport is a comprehensive data structure that encapsulates various details pertaining to a product, including its identification details, who issued it, batch information, provernance information, circularity information and a set of verifable product confomrity & sistainability claims.",
+  "description": "The Product Passport is a comprehensive data structure that encapsulates various details pertaining to a product, including its identification details, who issued it, batch information, provenance information, circularity information and a set of verifiable product conformity & sustainability claims.",
   "required": ["@context", "id", "issuer"],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
@@ -80,7 +80,7 @@
           "type": "string",
           "description": "The name of the issuer person or organisation"
         },
-        "otherIdentifiers": {
+        "otherIdentifier": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/Identifier"
@@ -88,7 +88,7 @@
           "description": "An optional list of other registered identifiers for this credential issuer "
         }
       },
-      "description": "The issuer party ()person or orgnaition) of a verifiable credential.",
+      "description": "The issuer party (person or organisation) of a verifiable credential.",
       "required": ["id", "name"]
     },
     "Identifier": {
@@ -114,7 +114,7 @@
         "name": {
           "example": "EV battery 300Ah.",
           "type": "string",
-          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
+          "description": "The registered name of the entity within the identifier scheme.  Examples: product - EV battery 300Ah, Party - Sample Company Pty Ltd,  Facility - Green Acres battery factory"
         },
         "registeredId": {
           "example": "90664869327",
@@ -123,10 +123,10 @@
         },
         "idScheme": {
           "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+          "description": "The identifier scheme.  Examples : Product - id.gs1.org/01,  Party - business.gov.au/abn,  Facility - did:web:facilities.acme.com. "
         }
       },
-      "description": "The ID and Name of an identified entity such qs a product, facility, party, standard, etc.  If the identifier is a W3C DID then the corresponding DID document SHOULD include a serviceEndpoint of type \"IdentityResolver\". If the identifier is not a W3C DID then the id peroperty SHOULD be an identity resolver URL.",
+      "description": "The ID and Name of an identified entity such as a product, facility, party, standard, etc.  If the identifier is a W3C DID then the corresponding DID document SHOULD include a serviceEndpoint of type \"IdentityResolver\". If the identifier is not a W3C DID then the id property SHOULD be an identity resolver URL.",
       "required": ["id", "name"]
     },
     "IdentifierScheme": {
@@ -155,11 +155,11 @@
           "description": "The name of the identifier scheme. "
         }
       },
-      "description": "An identifier registration scheme for products, facilities, or organisations. Typically operated by a state, national or gloabl authority."
+      "description": "An identifier registration scheme for products, facilities, or organisations. Typically operated by a state, national or global authority."
     },
     "Product": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "array",
@@ -175,7 +175,7 @@
           "example": "https://id.gs1.org/01/09520123456788/21/12345",
           "type": "string",
           "format": "uri",
-          "description": "The globally unique ID of the product as a URI. Ideall as a resolvable URL according to ISO 18975. "
+          "description": "The globally unique ID of the product as a URI. Ideally as a resolvable URL according to ISO 18975. "
         },
         "name": {
           "example": "EV battery 300Ah.",
@@ -189,7 +189,7 @@
         },
         "idScheme": {
           "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme for this product.  Eg a GS1 GTIn or an AU Livestock NLIS, or similar. If self issued then use the party ID of the issuer.  "
+          "description": "The identifier scheme for this product.  Eg a GS1 GTIN or an AU Livestock NLIS, or similar. If self issued then use the party ID of the issuer.  "
         },
         "serialNumber": {
           "example": "12345678",
@@ -234,18 +234,24 @@
         },
         "dimensions": {
           "$ref": "#/$defs/Dimension",
-          "description": "The physical dimensions of the product. Not every dimension is relevant to every products.  For example bulk materials may have wieght and volume but not length, with, or height.\"weight\":{\"value\":10, \"unit\":\"KGM\"}"
+          "description": "The physical dimensions of the product. Not every dimension is relevant to every products.  For example bulk materials may have weight and volume but not length, with, or height.\"weight\":{\"value\":10, \"unit\":\"KGM\"}"
         },
         "productionDate": {
           "example": "2024-04-25",
           "type": "string",
           "format": "date",
-          "description": "The ISO 8601 date on which the product batch was manufactured."
+          "description": "The ISO 8601 date on which the product batch or individual serialised item was manufactured."
         },
         "countryOfProduction": {
           "type": "string",
           "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
           "description": "The country in which this item was produced / manufactured.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+        },
+        "granularityLevel": {
+          "type": "string",
+          "enum": ["item", "batch", "model"],
+          "example": "item",
+          "description": "Code to indicate the granularity of this digital product passport - item level, batch level or product class level."
         },
         "dueDiligenceDeclaration": {
           "$ref": "#/$defs/Link",
@@ -258,7 +264,7 @@
           },
           "description": "An array of Provenance objects providing details on the origin and mass fraction of components or ingredients of the product batch. "
         },
-        "conformityClaims": {
+        "conformityClaim": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/Claim"
@@ -271,11 +277,11 @@
         },
         "emissionsScorecard": {
           "$ref": "#/$defs/EmissionsPerformance",
-          "description": "An emissions performacne scorecard"
+          "description": "An emissions performance scorecard"
         },
         "traceabilityInformation": {
           "$ref": "#/$defs/TraceabilityPerformance",
-          "description": "An array of secure links to TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch. SHOULD be provided for any product passport issued at batch or item level. Links should include the hash of the target and may point to encrypted targets."
+          "description": "An array of traceability events grouped by value chain process.  Where actual traceability events are unavailable or carry sensitive information, passport publishers may specify the extent to which the traceability information has been independently verified. "
         }
       },
       "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details.  ",
@@ -361,7 +367,7 @@
     },
     "Dimension": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "array",
@@ -418,7 +424,7 @@
         "unit": {
           "type": "string",
           "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
-          "description": "Unit of measure drawn from the UNECE rec20 measure code list.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+          "description": "Unit of measure drawn from the UNECE Rec20 measure code list.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
         }
       },
       "description": "The measure class defines a numeric measured value (eg 10) and a coded unit of measure (eg KG).",
@@ -426,7 +432,7 @@
     },
     "Material": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "array",
@@ -469,7 +475,7 @@
         "hazardous": {
           "example": "false",
           "type": "boolean",
-          "description": "Indicates whether this material is hazardous. If true then the materialSafetyInformation proerty must be present"
+          "description": "Indicates whether this material is hazardous. If true then the materialSafetyInformation property must be present"
         },
         "symbol": {
           "type": "string",
@@ -478,7 +484,7 @@
         },
         "materialSafetyInformation": {
           "$ref": "#/$defs/Link",
-          "description": "Refernece to further information obout safe handling of this hazardous material (for example a link to a material safety data sheet)"
+          "description": "Reference to further information about safe handling of this hazardous material (for example a link to a material safety data sheet)"
         }
       },
       "description": "The material class encapsulates details about the origin or source of raw materials in a product, including the country of origin and the mass fraction.",
@@ -486,7 +492,7 @@
     },
     "Claim": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "array",
@@ -504,11 +510,18 @@
           "format": "date",
           "description": "The date on which this assessment was made. "
         },
+        "declaredValue": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Metric"
+          },
+          "description": "The list of specific values measured as part of this assessment (eg tensile strength)"
+        },
         "id": {
           "example": "https://products.example-company.com/09520123456788/declarations/12345",
           "type": "string",
           "format": "uri",
-          "description": "A unique identifier for the delcaration. Often this will be an extension of the product.id or attestation.id. But could be a UUID."
+          "description": "A unique identifier for the declaration. Often this will be an extension of the product.id or attestation.id. But could be a UUID."
         },
         "referenceStandard": {
           "$ref": "#/$defs/Standard",
@@ -561,11 +574,48 @@
         },
         "conformityEvidence": {
           "$ref": "#/$defs/SecureLink",
-          "description": "A URI pointing to the evidence supporting the claim. SHOULD be a URL to a UNTP Digital COnformity Credential (DCC)"
+          "description": "A URI pointing to the evidence supporting the claim. SHOULD be a URL to a UNTP Digital Conformity Credential (DCC)"
         }
       },
       "description": "A declaration of conformance with one or more criteria from a specific standard or regulation.  ",
       "required": ["id", "compliance", "conformityTopic"]
+    },
+    "Metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Metric"],
+          "default": ["Metric"],
+          "items": {
+            "type": "string",
+            "enum": ["Metric"]
+          }
+        },
+        "metricName": {
+          "example": "GHG emissions intensity",
+          "type": "string",
+          "description": "A human readable name for this metric (for example \"Tensile strength\")"
+        },
+        "metricValue": {
+          "$ref": "#/$defs/Measure",
+          "description": "A numeric value and unit of measure for this metric. Could be a measured value or a specified threshold. Eg {\"value\":400, \"unit\":\"MPA\"} as tensile strength of structural steel"
+        },
+        "score": {
+          "example": "BB",
+          "type": "string",
+          "description": "A score or rank associated with this measured metric."
+        },
+        "accuracy": {
+          "example": 0.05,
+          "type": "number",
+          "description": "A percentage represented as a numeric between 0 and 1 indicating the rage of accuracy of the claimed value (eg 0.05 means that the actual value is within 5% of the claimed value.)"
+        }
+      },
+      "description": "A specific measure of performance against the criteria that governs the claim.  Expressed as an array of metric (ie unit of measure) / value (ie the actual numeric value) pairs.  ",
+      "required": ["metricName", "metricValue"]
     },
     "Standard": {
       "type": "object",
@@ -638,7 +688,7 @@
         },
         "administeredBy": {
           "$ref": "#/$defs/Identifier",
-          "description": "the issuing body of the regulation. For example Australin Goernment Department of Climate Change, Energy, the Environment and Water"
+          "description": "the issuing body of the regulation. For example Australian Government Department of Climate Change, Energy, the Environment and Water"
         },
         "effectiveDate": {
           "example": "2024-03-20",
@@ -668,7 +718,7 @@
           "example": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf#BatteryAssembly",
           "type": "string",
           "format": "uri",
-          "description": "A unique identifier for the criteria within the standard  or regulation. For example CO2 emissions calaculations for liquid fule combusion."
+          "description": "A unique identifier for the criterion within the standard  or regulation. For example CO2 emissions calculations for liquid fuel combustion."
         },
         "name": {
           "example": "GBA Battery rule book v2.0 battery assembly guidelines.",
@@ -685,43 +735,6 @@
       },
       "description": "A specific rule or criterion within a standard or regulation. eg a carbon intensity calculation rule within an emissions standard.",
       "required": ["id", "name"]
-    },
-    "Metric": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": ["Metric"],
-          "default": ["Metric"],
-          "items": {
-            "type": "string",
-            "enum": ["Metric"]
-          }
-        },
-        "metricName": {
-          "example": "GHG emissions intensity",
-          "type": "string",
-          "description": "A human readable name for this metric (for example \"Tensile strength\")"
-        },
-        "metricValue": {
-          "$ref": "#/$defs/Measure",
-          "description": "A numeric value and unit of measure for this metric. Could be a measured value or a specified threshold. Eg {\"value\":400, \"unit\":\"MPA\"} as tensile strenght of structural steel"
-        },
-        "score": {
-          "example": "BB",
-          "type": "string",
-          "description": "A score or rank associated with this measured metric."
-        },
-        "accuracy": {
-          "example": 0.05,
-          "type": "number",
-          "description": "A percentage represented as a numeric between 0 and 1 indicating the rage of accuracy of the claimed value (eg 0.05 means that the actual value is within 5% of the claimed value.)"
-        }
-      },
-      "description": "A specific measure of performance against the criteria that governs the claim.  Expressed as an array of metric (ie unit of emasure) / value (ie the actual numeric value) pairs.  ",
-      "required": ["metricName", "metricValue"]
     },
     "SecureLink": {
       "type": "object",
@@ -762,7 +775,7 @@
           "type": "string",
           "enum": ["SHA-256", "SHA-1"],
           "example": "SHA-256",
-          "description": "The hashing algorithm used to create the target hash.  SHA-265 is the recommedned standard"
+          "description": "The hashing algorithm used to create the target hash.  SHA-265 is the recommended standard"
         },
         "encryptionMethod": {
           "type": "string",
@@ -775,7 +788,7 @@
     },
     "CircularityPerformance": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "array",
@@ -801,7 +814,7 @@
           "format": "float",
           "description": "The fraction of the this product (my mass) that has been designed to be recyclable / re-usable. This will be be the total fraction that can avoid waste / landfill."
         },
-        "recyecledContent": {
+        "recycledContent": {
           "example": 0.3,
           "type": "number",
           "format": "float",
@@ -820,11 +833,11 @@
           "description": "The overall circularity performance indicator for this product. Calculated as 1 - (V+W)/2D where - V = Virgin material proportion by mass (will be 1- recycled content) - W = Waste leakage proportion by mass (will be 1 - recyclableContent)  - D = Utility factor (set to 1 if unknown).  "
         }
       },
-      "description": "High level corcularity information about this product.  Note that this doens not substitute for detailed product circularity data sheet (PCDS) criteria which would be represented as a set of conformity claims against individual ISO PCDS criteria."
+      "description": "High level circularity information about this product.  Note that this does not substitute for detailed product circularity data sheet (PCDS) criteria which would be represented as a self-issued UNTP Digital Conformity Credential as a set of assessments against individual ISO PCDS criteria."
     },
     "EmissionsPerformance": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "array",
@@ -851,7 +864,7 @@
           "type": "string",
           "enum": ["None", "CradleToGate", "CradleToGrave"],
           "example": "None",
-          "description": "The operational scope of the emissions performance. Only scope 1 & 2, or inlcuing upstream scope 3 (cradle to gate) or upstream and downstream scope 3 (cradle to grave)."
+          "description": "The operational scope of the emissions performance. Only scope 1 & 2, or including upstream scope 3 (cradle to gate) or upstream and downstream scope 3 (cradle to grave)."
         },
         "primarySourcedRatio": {
           "example": 0.3,
@@ -869,7 +882,7 @@
     },
     "TraceabilityPerformance": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "array",
@@ -884,14 +897,14 @@
         "valueChainProcess": {
           "example": "Spinning",
           "type": "string",
-          "description": "Hman readable name for the industry specific value chain process representing this traceability data set."
+          "description": "Human readable name for the industry specific value chain process representing this traceability data set."
         },
         "verifiedRatio": {
           "example": 0.5,
           "type": "number",
           "description": "The proportion (0 to 1) of materials in this value chain process that have been  traced using verifiable traceability event."
         },
-        "traceabilityEvents": {
+        "traceabilityEvent": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/SecureLink"
@@ -899,7 +912,7 @@
           "description": "A list of secure links to digital traceability events that support this traceability performance statement. May be encrypted for confidentiality purposes. "
         }
       },
-      "description": ""
+      "description": "An array of secure links to TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch. Events are grouped by value chain process (eg \"Weaving\" in textiles supply chain)."
     }
   }
 }
