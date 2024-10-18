@@ -1,6 +1,6 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import { registerLinkResolver, LinkType, getLinkResolverIdentifier } from '../linkResolver.service.js';
-import { getStorageServiceLink } from '../storage.service.js';
+import { uploadData } from '../storage.service.js';
 import { IService } from '../types/IService.js';
 import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
 import { issueVC } from '../vckit.service.js';
@@ -45,11 +45,7 @@ export const processObjectEvent: IService = async (
     },
   });
 
-  const objectEventVcUrl = await getStorageServiceLink(
-    storage,
-    objectEventVc,
-    `${objectEventIdentifier}/${generateUUID()}`,
-  );
+  const objectEventVcUrl = await uploadData(storage, objectEventVc, `${objectEventIdentifier}/${generateUUID()}`);
 
   const objectEventLinkResolver = await registerLinkResolver(
     objectEventVcUrl,

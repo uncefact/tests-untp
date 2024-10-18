@@ -1,7 +1,7 @@
 import { ITraceabilityEvent } from '../../types';
 import { processObjectEvent } from '../../epcisEvents/objectEvent';
 import * as vckitService from '../../vckit.service';
-import { getStorageServiceLink } from '../../storage.service';
+import { uploadData } from '../../storage.service';
 import * as linkResolverService from '../../linkResolver.service';
 import { IAggregationEventContext, IObjectEventContext } from '../../types';
 import { Result } from '../../types/validateContext';
@@ -12,7 +12,7 @@ jest.mock('../../vckit.service', () => ({
   issueVC: jest.fn(),
 }));
 jest.mock('../../storage.service', () => ({
-  getStorageServiceLink: jest.fn(),
+  uploadData: jest.fn(),
 }));
 jest.mock('../../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
@@ -60,7 +60,7 @@ describe('processObjectEvent', () => {
     (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
       credentialSubject: { id: 'https://example.com/123' },
     }));
-    (getStorageServiceLink as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
+    (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
 
     jest
       .spyOn(validateContext, 'validateObjectEventContext')

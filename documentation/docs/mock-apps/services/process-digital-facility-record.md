@@ -1,6 +1,6 @@
 ---
-sidebar_position: 43
-title: Process Digital Identity Anchor
+sidebar_position: 42
+title: Process Digital Facility Record
 ---
 
 import Disclaimer from '../../\_disclaimer.mdx';
@@ -9,18 +9,18 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The `processDigitalIdentityAnchor` service is responsible for processing a digital identity anchor, issuing a [Verifiable Credential (VC)](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials), uploading it to the [Storage service](/docs/mock-apps/dependent-services/storage-service), registering the link to the stored digital identity anchor with the [Identity Resolver service](/docs/mock-apps/dependent-services/identity-resolution-service). It handles the entire lifecycle of creating and managing a digital identity anchor, from data input to storage and resolution.
+The `processDigitalFacilityRecord` service is responsible for processing a digital facility record, issuing a [Verifiable Credential (VC)](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials), uploading it to the [Storage service](/docs/mock-apps/dependent-services/storage-service), registering the link to the stored digital identity anchor with the [Identity Resolver service](/docs/mock-apps/dependent-services/identity-resolution-service). It handles the entire lifecycle of creating and managing a digital facility record, from data input to storage and resolution.
 
 ## Diagram
 
 ```mermaid
 sequenceDiagram
 participant C as Client
-participant P as processDigitalIdentityAnchor
+participant P as processDigitalFacilityRecord
 participant V as VCKit
 participant S as Storage
 participant D as DLR
-C->>P: Call processDigitalIdentityAnchor(digitalIdentityAnchor, context)
+C->>P: Call processDigitalFacilityRecord(digitalFacilityRecord, context)
 P->>P: Validate context
 P->>P: Extract identifier
 P->>V: Issue VC
@@ -29,31 +29,31 @@ P->>S: Upload VC
 S-->>P: Return VC URL
 P->>D: Register link resolver
 D-->>P: Return resolver URL
-P-->>C: Return digital identity anchor VC and resolver URL
+P-->>C: Return digital facility record VC and resolver URL
 ```
 
 ## Example
 
 ```json
 {
-  "name": "processDigitalIdentityAnchor",
+  "name": "processDigitalFacilityRecord",
   "parameters": [
     {
       "vckit": {
         "vckitAPIUrl": "https://api.vckit.example.com",
         "issuer": "did:example:123456789abcdefghi"
       },
-      "digitalIdentityAnchor": {
+      "digitalFacilityRecord": {
         "context": ["https://www.w3.org/2018/credentials/v1", "https://gs1.org/voc/"],
-        "type": ["VerifiableCredential", "DigitalIdentityAnchor"],
+        "type": ["VerifiableCredential", "DigitalFacilityRecord"],
         "renderTemplate": [
           {
-            "template": "<div><h2>DigitalIdentityAnchor</h2></div>",
+            "template": "<div><h2>DigitalFacilityRecord</h2></div>",
             "@type": "WebRenderingTemplate2022"
           }
         ],
-        "dlrIdentificationKeyType": "gtin",
-        "dlrLinkTitle": "DigitalIdentityAnchor",
+        "dlrIdentificationKeyType": "gln",
+        "dlrLinkTitle": "DigitalFacilityRecord",
         "dlrVerificationPage": "https://verify.example.com"
       },
       "storage": {
@@ -80,7 +80,7 @@ P-->>C: Return digital identity anchor VC and resolver URL
 | Property              | Required | Description                                                                                                                         | Type                                                            |
 | --------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | vckit                 | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/mock-apps/common/vckit)                           |
-| digitalIdentityAnchor | Yes      | Configuration for the Digital Identity Anchor                                                                                       | [Credential](/docs/mock-apps/common/credential)                 |
+| digitalFacilityRecord | Yes      | Configuration for the Digital Facility Record                                                                                       | [Credential](/docs/mock-apps/common/credential)                 |
 | storage               | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/mock-apps/common/storage)                       |
 | dlr                   | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/mock-apps/common/idr)                               |
 | identifierKeyPath     | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/mock-apps/common/identifier-key-path) |

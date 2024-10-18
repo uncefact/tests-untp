@@ -126,3 +126,7 @@ export interface IDigitalIdentityAnchorContext extends IContext {
 export interface IObjectEventContext extends IContext {
   epcisObjectEvent: IEntityIssue;
 }
+
+export interface IDigitalFacilityRecordContext extends IContext {
+  digitalFacilityRecord: IEntityIssue;
+}

@@ -1,6 +1,6 @@
 import { processDPP } from '../processDPP.service';
 import { issueVC, contextDefault } from '../vckit.service';
-import { getStorageServiceLink } from '../storage.service';
+import { uploadData } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType, LinkType } from '../linkResolver.service';
 import { contextDPP, dataDPP } from './mocks/constants';
 
@@ -10,7 +10,7 @@ jest.mock('../vckit.service', () => ({
 }));
 
 jest.mock('../storage.service', () => ({
-  getStorageServiceLink: jest.fn(),
+  uploadData: jest.fn(),
 }));
 
 jest.mock('../linkResolver.service', () => ({
@@ -24,9 +24,8 @@ jest.mock('../linkResolver.service', () => ({
     verificationLinkType: 'gs1:verificationService',
     certificationLinkType: 'gs1:certificationInfo',
     epcisLinkType: 'gs1:epcis',
-  }
+  },
 }));
-
 
 describe('processDPP', () => {
   describe('successful case', () => {
@@ -56,7 +55,7 @@ describe('processDPP', () => {
     });
 
     it('should call process DPP', async () => {
-      (getStorageServiceLink as jest.Mock).mockImplementation(({ url, _data, path }) => {
+      (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
         return `${url}/${dataDPP.data.herd.identifier}`;
       });
 
@@ -75,7 +74,7 @@ describe('processDPP', () => {
             linkTitle,
             verificationPage,
             dlrAPIKey,
-            identificationKey
+            identificationKey,
           });
           return `${dlrAPIUrl}/${identificationKeyType}/${identificationKey}?linkType=all`;
         },
@@ -84,9 +83,15 @@ describe('processDPP', () => {
       const vc = await processDPP(dataDPP, contextDPP);
       expect(vc).toEqual({
         vc: expectVCResult,
-        linkResolver: contextDPP.dpp.dlrVerificationPage + '/' + contextDPP.dpp.dlrIdentificationKeyType + '/' + dataDPP.data.herd.identifier + '?linkType=all',
+        linkResolver:
+          contextDPP.dpp.dlrVerificationPage +
+          '/' +
+          contextDPP.dpp.dlrIdentificationKeyType +
+          '/' +
+          dataDPP.data.herd.identifier +
+          '?linkType=all',
       });
-      expect(getStorageServiceLink).toHaveBeenCalled();
+      expect(uploadData).toHaveBeenCalled();
       expect(registerLinkResolver).toHaveBeenCalled();
 
       const dppContext = contextDPP.dpp;
@@ -100,6 +105,7 @@ describe('processDPP', () => {
         dppContext.dlrVerificationPage,
         dlrContext.dlrAPIUrl,
         dlrContext.dlrAPIKey,
+        dlrContext.namespace,
         dataDPP.qualifierPath,
         LinkType.certificationLinkType,
       );

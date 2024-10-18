@@ -3,7 +3,7 @@ import * as linkResolverService from '../linkResolver.service';
 import * as helpers from '../epcisEvents/helpers';
 import * as validateContext from '../validateContext';
 import { processTransactionEvent } from '../epcisEvents/transactionEvent';
-import { getStorageServiceLink } from '../storage.service';
+import { uploadData } from '../storage.service';
 import { Result } from '../types/validateContext';
 import { ITransactionEventContext } from '../types/types';
 import { publicAPI } from '../utils/httpService';
@@ -13,7 +13,7 @@ jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
 }));
 jest.mock('../storage.service', () => ({
-  getStorageServiceLink: jest.fn(),
+  uploadData: jest.fn(),
 }));
 jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
@@ -68,7 +68,7 @@ describe('processTransactionEvent', () => {
 
   it('should process transaction event', async () => {
     (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
-    (getStorageServiceLink as jest.Mock).mockImplementation(({ url, _data, path }) => {
+    (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
       return `${url}/${path}`;
     });
     jest
@@ -82,7 +82,7 @@ describe('processTransactionEvent', () => {
       vc: transactionVCMock,
       linkResolver: transactionEventDLRMock,
     });
-    expect(getStorageServiceLink).toHaveBeenCalled();
+    expect(uploadData).toHaveBeenCalled();
     expect(validateContext.validateTransactionEventContext).toHaveBeenCalled();
     expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
   });
@@ -169,7 +169,7 @@ describe('processTransactionEvent', () => {
         dlr: { ...context.dlr, dlrAPIUrl: 'http://invalid-dlr.com' },
       };
       (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
-      (getStorageServiceLink as jest.Mock).mockResolvedValueOnce('https://storage.com/vc.json');
+      (uploadData as jest.Mock).mockResolvedValueOnce('https://storage.com/vc.json');
       jest
         .spyOn(validateContext, 'validateTransactionEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as Result<ITransactionEventContext>);
@@ -181,7 +181,7 @@ describe('processTransactionEvent', () => {
       expect(error.message).toBe('Invalid DLR API link resolver url');
       expect(validateContext.validateTransactionEventContext).toHaveBeenCalled();
       expect(vckitService.issueVC).toHaveBeenCalled();
-      expect(getStorageServiceLink).toHaveBeenCalled();
+      expect(uploadData).toHaveBeenCalled();
     }
   });
 });
