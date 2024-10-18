@@ -1,6 +1,6 @@
 ---
 sidebar_position: 41
-title: Credential Status
+title: Issuing Credential
 ---
 
 import Disclaimer from '../../\_disclaimer.mdx';
@@ -9,11 +9,11 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The Credential Status is being injected into the Verifiable Credential (VC) to manage the status of the VC. The status can be used to activate or revoke the VC. The status is managed by the issuer of the VC.
+The Issuing Credential feature in the mock app is responsible for issuing a Verifiable Credential (VC) along with its credential status. The status is added to the VC payload before the VC is issued and is managed by the VC issuer.
 
 ## Diagram
 
-The sequence diagram below illustrates the flow of injecting the status into the VC:
+The sequence diagram below illustrates the process of issuing a VC along with its status.
 
 ```mermaid
 
@@ -25,17 +25,7 @@ participant MA as Mock App
 
 participant V as VCKit
 
-participant S as Storage
-
-participant D as DLR
-
 C->>MA: Call issue a VC (data, context)
-
-MA->>MA: Validate context
-
-MA->>MA: Extract identifier
-
-MA->>MA: Check if the data contains a credential status
 
 alt Status is not present
   MA ->> V: Issue new credential status
@@ -48,15 +38,7 @@ MA->>V: Issue VC
 
 V-->>MA: Return VC
 
-MA->>S: Upload VC
-
-S-->>MA: Return VC URL
-
-MA->>D: Register link resolver
-
-D-->>MA: Return resolver URL
-
-MA-->>C: Return VC and resolver URL
+MA-->>C: Return VC
 
 ```
 
