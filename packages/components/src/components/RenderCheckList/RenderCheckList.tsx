@@ -30,18 +30,12 @@ export const RenderCheckList = ({ checkBoxLabel, requiredFieldPath, onChange, ne
     const uploadedFiles = [];
     if (Array.isArray(data)) {
       uploadedFiles.push(...data);
-    }
-    if (typeof data === 'object') {
+    } else if (typeof data === 'object') {
       uploadedFiles.push(data);
     }
 
     const validItems = uploadedFiles.reduce((acc, item) => {
-      const requiredFieldValue = getValueByPath(item, requiredFieldPath);
-      if (!requiredFieldValue) {
-        return acc;
-      }
-
-      return { ...acc, [requiredFieldValue]: item };
+      return { ...acc, ...item };
     }, {});
 
     return setCheckBoxes((prev) => ({ ...prev, ...validItems }));

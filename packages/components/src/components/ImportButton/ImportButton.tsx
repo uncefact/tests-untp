@@ -2,23 +2,34 @@ import React, { ChangeEvent, useState } from 'react';
 import { Box } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 import { UploadFile as UploadFileIcon } from '@mui/icons-material';
+import { ImportDataType } from '../../types/common.types.js';
+import { processVerifiableCredentialData } from '../../utils/index.js';
 
 export interface IImportButtonProps {
   onChange: (data: object[]) => void;
   label?: string;
+  type?: ImportDataType;
+  vcOptions?: {
+    credentialPath: string;
+  };
 }
 
 /**
  * ImportButton component is used to display the footer
  */
-export const ImportButton = ({ label = 'Import', onChange}: IImportButtonProps) => {
+export const ImportButton = ({
+  label = 'Import',
+  type = ImportDataType.VerifiableCredential,
+  vcOptions,
+  onChange,
+}: IImportButtonProps) => {
   const [loading, setLoading] = useState<boolean>(false);
 
   const loadJsonFile = (file: File): Promise<object> => {
-    const maxFileSizeMB = 5;
+    const maxFileSizeMB = 5; // 5 MB
 
     return new Promise((resolve) => {
-      if (file.size > maxFileSizeMB * 1024 * 1024) {// 5 MB
+      if (file.size > maxFileSizeMB * 1024 * 1024) {
         throw new Error(`File size exceeds the maximum allowed size of ${maxFileSizeMB} MB.`);
       }
       const fileReader = new FileReader();
@@ -43,7 +54,7 @@ export const ImportButton = ({ label = 'Import', onChange}: IImportButtonProps) 
 
       fileReader.readAsText(file);
     });
-  }
+  };
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     setLoading(true);
@@ -55,7 +66,16 @@ export const ImportButton = ({ label = 'Import', onChange}: IImportButtonProps) 
       }
 
       const fileArray = Array.from(files);
-      const fileContents = await Promise.all(fileArray.map((file: File) => loadJsonFile(file)));
+      const fileContents = await Promise.all(
+        fileArray.map(async (file: File) => {
+          const content = await loadJsonFile(file);
+          if (type === ImportDataType.VerifiableCredential) {
+            const processedData = await processVerifiableCredentialData(content, vcOptions?.credentialPath);
+            return { [file.name]: processedData };
+          }
+          return { [file.name]: content };
+        }),
+      );
 
       onChange(fileContents);
     } catch (error: any) {

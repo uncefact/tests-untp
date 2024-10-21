@@ -2,9 +2,15 @@
 /* eslint-disable jest/no-conditional-expect */
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ImportButton } from '..';
+import { ImportButton } from '../components/ImportButton/ImportButton';
+import { processVerifiableCredentialData } from '../utils/index.js';
+import { ImportDataType } from '../types/common.types';
 
-describe('ImportButton', () => {
+jest.mock('../utils/index.js', () => ({
+  processVerifiableCredentialData: jest.fn(),
+}));
+
+describe('ImportButton, when type is JSON', () => {
   // Mock Json object
   const contentObjectMock = {
     pdfUrl: 'https://integritysystems.com.au/api/v1/kqUvtmA',
@@ -30,7 +36,7 @@ describe('ImportButton', () => {
     const label = 'Import JSON File';
 
     // Render the ImportButton component with the provided props
-    render(<ImportButton label={label} onChange={onChangeMock} />);
+    render(<ImportButton label={label} onChange={onChangeMock} type={ImportDataType.JSON} />);
 
     // Expect that the rendered button is present in the document
     const renderedImportButton = screen.getByText(label);
@@ -40,10 +46,11 @@ describe('ImportButton', () => {
   it('handles file upload and calls onChange with file content', async () => {
     render(
       <ImportButton
+        type={ImportDataType.JSON}
         onChange={(data: object[]) => {
           const [fileContentObject] = data;
           // Expect the onChange function to have been called with the expected content
-          expect(fileContentObject).toMatchObject(contentObjectMock);
+          expect(fileContentObject).toMatchObject({ 'testFile.json': contentObjectMock });
         }}
       />,
     );
@@ -69,7 +76,7 @@ describe('ImportButton', () => {
       Object.defineProperty(oversizedFileMock, 'size', { value: 1024 * 1024 * 6 });
 
       // Render the ImportButton component with the provided label and onChange mock function
-      render(<ImportButton onChange={onChangeMock} />);
+      render(<ImportButton onChange={onChangeMock} type={ImportDataType.JSON} />);
 
       // Simulate a file change event by providing an oversized file to the file input
       const input = screen.getByTestId('file-input');
@@ -91,7 +98,7 @@ describe('ImportButton', () => {
       });
 
       // Render the ImportButton component with the provided label and onChange mock function
-      render(<ImportButton onChange={onChangeMock} />);
+      render(<ImportButton onChange={onChangeMock} type={ImportDataType.JSON} />);
 
       // Simulate a file change event by providing a file with empty content to the file input
       const input = screen.getByTestId('file-input');
@@ -113,7 +120,7 @@ describe('ImportButton', () => {
       });
 
       // Render the ImportButton component with the provided label and onChange mock function
-      render(<ImportButton onChange={onChangeMock} />);
+      render(<ImportButton onChange={onChangeMock} type={ImportDataType.JSON} />);
 
       // Simulate a file change event by providing a file with invalid JSON content to the file input
       const input = screen.getByTestId('file-input');
@@ -125,4 +132,71 @@ describe('ImportButton', () => {
       expect(error.message).toMatch(/^Invalid JSON file! /);
     }
   });
+});
+
+describe('ImportButton, when type is VerifiableCredential', () => {
+  // Mock Json object
+  const contentObjectMock = {
+    '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
+    type: 'EnvelopedVerifiableCredential',
+    id: 'data:application/vc-ld+jwt,jwt.abc.123',
+  };
+  const fileMock = new File([JSON.stringify(contentObjectMock, null, 2)], 'testFile.json', {
+    type: 'application/json',
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('renders ImportButton component', () => {
+    const onChangeMock = jest.fn();
+    const label = 'Import Verifiable Credential';
+
+    render(<ImportButton label={label} onChange={onChangeMock} type={ImportDataType.VerifiableCredential} />);
+
+    const renderedImportButton = screen.getByText(label);
+    expect(renderedImportButton).toBeInTheDocument();
+  });
+
+  it('handles file upload and calls onChange with file content', async () => {
+    (processVerifiableCredentialData as jest.Mock).mockImplementation(() => ({
+      vc: contentObjectMock,
+      decodedEnvelopedVC: {
+        type: ['VerifiableCredential'],
+        credentialSubject: {
+          id: 'did:example:123',
+          name: 'Alice',
+        },
+      },
+    }));
+
+    render(
+      <ImportButton
+        type={ImportDataType.VerifiableCredential}
+        onChange={(data: object[]) => {
+          const [fileContentObject] = data;
+          expect(fileContentObject).toMatchObject({
+            'testFile.json': {
+              vc: contentObjectMock,
+              decodedEnvelopedVC: {
+                type: ['VerifiableCredential'],
+                credentialSubject: {
+                  id: 'did:example:123',
+                  name: 'Alice',
+                },
+              },
+            },
+          });
+        }}
+      />,
+    );
+
+    const fileInput = screen.getByLabelText('Import');
+    fireEvent.change(fileInput, { target: { files: [fileMock] } });
+
+    await waitFor(() => expect(fileInput).not.toBeDisabled());
+  });
+
+  it;
 });

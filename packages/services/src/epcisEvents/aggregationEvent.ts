@@ -1,5 +1,4 @@
-import { VerifiableCredential } from '@vckit/core-types';
-import { issueVC } from '../vckit.service.js';
+import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { IService } from '../types/IService.js';
@@ -11,7 +10,7 @@ import { EPCISBusinessStepCode, EPCISEventAction, EPCISEventDisposition, EPCISEv
 export const processAggregationEvent: IService = async (
   aggregationEvent: ITraceabilityEvent,
   context: IAggregationEventContext,
-): Promise<VerifiableCredential> => {
+): Promise<any> => {
   const validationResult = validateAggregationEventContext(context);
   if (!validationResult.ok) {
     throw new Error(validationResult.value);
@@ -49,6 +48,7 @@ export const processAggregationEvent: IService = async (
     },
   });
 
+  const decodedEnvelopedVC = decodeEnvelopedVC(aggregationVC);
   const aggregationVCLink = await uploadData(storage, aggregationVC, generateUUID());
 
   await registerLinkResolver(
@@ -64,5 +64,5 @@ export const processAggregationEvent: IService = async (
     qualifierPath,
   );
 
-  return aggregationVC;
+  return { vc: aggregationVC, decodedEnvelopedVC, linkResolver: aggregationVCLink };
 };

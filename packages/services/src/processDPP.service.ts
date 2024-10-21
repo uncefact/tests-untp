@@ -3,7 +3,7 @@ import { IDppContext, IService } from './types/index.js';
 import { constructIdentifierString, generateUUID } from './utils/helpers.js';
 
 import { uploadData } from './storage.service.js';
-import { issueVC } from './vckit.service.js';
+import { decodeEnvelopedVC, issueVC } from './vckit.service.js';
 import { validateContextDPP } from './validateContext.js';
 import { deleteItemFromLocalStorage } from './features/localStorage.service.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from './linkResolver.service.js';
@@ -38,6 +38,8 @@ export const processDPP: IService = async (data: any, context: IDppContext): Pro
       restOfVC,
     });
 
+    const decodedEnvelopedVC = decodeEnvelopedVC(vc);
+
     const storageContext = context.storage;
     const vcUrl = await uploadData(storageContext, vc, generateUUID());
 
@@ -60,7 +62,7 @@ export const processDPP: IService = async (data: any, context: IDppContext): Pro
       deleteItemFromLocalStorage(context.localStorageParams);
     }
 
-    return { vc, linkResolver };
+    return { vc, decodedEnvelopedVC, linkResolver };
   } catch (error: any) {
     throw new Error(error.message ?? 'Error processing DPP');
   }
