@@ -5,6 +5,7 @@ import {
   ITransactionEventContext,
   ITransformationEventContext,
   IObjectEventContext,
+  IAssociationEventContext,
   IAggregationEventContext,
   IDppContext,
   IDigitalIdentityAnchorContext,
@@ -223,6 +224,36 @@ export const validateDigitalFacilityRecordContext = (
   if (_.isEmpty(context.digitalFacilityRecord.dlrVerificationPage)) return error('Invalid dlrVerificationPage');
   if (_.isEmpty(context.digitalFacilityRecord.dlrIdentificationKeyType))
     return error('Invalid dlrIdentificationKeyType');
+
+  if (_.isEmpty(context.storage)) return error('Invalid storage context');
+  if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
+  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
+
+  if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
+  if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
+
+  return { ok: true, value: context };
+};
+
+export const validateAssociationEventContext = (
+  context: IAssociationEventContext,
+): Result<IAssociationEventContext> => {
+  if (_.isEmpty(context.vckit)) return error('Invalid vckit context');
+  if (_.isEmpty(context.epcisAssociationEvent)) return error('Invalid epcisAssociationEvent context');
+  if (_.isEmpty(context.storage)) return error('Invalid storage context');
+  if (_.isEmpty(context.dlr)) return error('Invalid dlr context');
+  if (_.isEmpty(context.identifierKeyPath)) return error('identifierKeyPath not found');
+
+  if (_.isEmpty(context.vckit.vckitAPIUrl)) return error('Invalid vckitAPIUrl');
+  if (_.isEmpty(context.vckit.issuer)) return error('Invalid issuer');
+
+  if (_.isEmpty(context.epcisAssociationEvent.context)) return error('Invalid epcisAssociationEvent context');
+  if (_.isEmpty(context.epcisAssociationEvent.type)) return error('Invalid epcisAssociationEvent type');
+  if (_.isEmpty(context.epcisAssociationEvent.dlrLinkTitle)) return error('Invalid epcisAssociationEvent dlrLinkTitle');
+  if (_.isEmpty(context.epcisAssociationEvent.dlrVerificationPage))
+    return error('Invalid epcisAssociationEvent dlrVerificationPage');
+  if (_.isEmpty(context.epcisAssociationEvent.dlrIdentificationKeyType))
+    return error('Invalid epcisAssociationEvent dlrIdentificationKeyType');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');

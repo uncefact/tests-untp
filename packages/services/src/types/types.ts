@@ -130,3 +130,7 @@ export interface IObjectEventContext extends IContext {
 export interface IDigitalFacilityRecordContext extends IContext {
   digitalFacilityRecord: IEntityIssue;
 }
+
+export interface IAssociationEventContext extends IContext {
+  epcisAssociationEvent: IEntityIssue;
+}

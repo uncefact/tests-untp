@@ -310,3 +310,36 @@ export const digitalFacilityRecordContext = {
   },
   identifierKeyPath: '/id',
 };
+
+export const associationEventContext = {
+  vckit: {
+    vckitAPIUrl: 'https://api.vckit.example.com',
+    issuer: 'did:example:123456789abcdefghi',
+  },
+  epcisAssociationEvent: {
+    context: ['https://www.w3.org/2018/credentials/v1', 'https://gs1.org/voc/'],
+    type: ['VerifiableCredential', 'AssociationEventCredential'],
+    renderTemplate: [
+      {
+        template: '<div><h2>Association Event</h2></div>',
+        '@type': 'WebRenderingTemplate2022',
+      },
+    ],
+    dlrIdentificationKeyType: 'gtin',
+    dlrLinkTitle: 'Association Event',
+    dlrVerificationPage: 'https://verify.example.com',
+  },
+  storage: {
+    url: 'https://storage.example.com/upload',
+    params: {
+      resultPath: '/url',
+    },
+  },
+  dlr: {
+    dlrAPIUrl: 'https://dlr.example.com/api',
+    dlrAPIKey: 'dlr-api-key-12345',
+    namespace: 'gs1',
+    linkRegisterPath: '/api/resolver',
+  },
+  identifierKeyPath: '/id',
+};
