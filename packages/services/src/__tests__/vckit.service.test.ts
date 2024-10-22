@@ -14,7 +14,7 @@ describe('issueVC', () => {
     jest.restoreAllMocks();
   });
 
-  it('should issue VC successfully without credential status', async () => {
+  it('should issue VC successfully when credential status is provided in the issue VC payload', async () => {
     jest.spyOn(privateAPI, 'post')
       .mockResolvedValueOnce({
         verifiableCredential: {
@@ -41,7 +41,7 @@ describe('issueVC', () => {
     });
   });
 
-  it('should issue VC successfully with credential status', async () => {
+  it('should issue VC successfully when credential status is not provided in the issue VC payload', async () => {
     jest.spyOn(privateAPI, 'post')
       .mockResolvedValueOnce(mockCredentialStatus)
       .mockResolvedValueOnce({

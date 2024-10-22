@@ -3,6 +3,7 @@ import {
   CredentialSubject,
   VerifiableCredential,
   CredentialStatusReference,
+  IssuerType,
 } from '@vckit/core-types';
 import { privateAPI } from './utils/httpService.js';
 import appConfig from '../../mock-app/src/constants/app-config.json';
@@ -27,6 +28,8 @@ export interface IVcKitIssueVC extends CredentialPayload {
 
 export interface IArgIssueCredentialStatus {
   host: string;
+  apiKey: string;
+  bitstringStatusIssuer: IssuerType;
   statusPurpose?: string;
 
   [x: string]: any;
