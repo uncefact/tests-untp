@@ -8,7 +8,7 @@ export default {
     },
     RenderTemplate2024: {
       url: 'http://localhost:3332/agent/renderCredential',
-      headers: {},
+      headers: { Authorization: 'Bearer test123' },
       method: 'POST',
     },
     Storage: {

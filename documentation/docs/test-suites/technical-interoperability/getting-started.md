@@ -21,6 +21,8 @@ The Getting Started section covers the following topics for technical interopera
 
    **Note**: The preset configuration in the config file (`packages/vc-test-suite/config.ts`) has already been preconfigured to use the services set up with Docker Compose. If you're using the default Docker setup, you may not need to modify these settings.
 
+   **Note**: In the config file, you can specify headers to be included in the request for each test suite within the Tier 1 test suite (e.g. `RenderTemplate2024`, `Storage`, etc.). Each test case will inherit these headers from the respective config. This is particularly useful if you need to include an authorization token, such as `Bearer <token>`.
+
 3. **Usage**: Learn how to run the various components of the technical interoperability test suite and interpret the results. This section will guide you through:
    - Running the W3C V2 VCDM tests
    - Executing UNTP extension tests
