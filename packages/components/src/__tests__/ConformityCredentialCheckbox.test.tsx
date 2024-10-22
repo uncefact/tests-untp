@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ConformityCredentialCheckbox } from '../components';
+import { ConformityCredentialCheckbox } from '../components/ConformityCredentialCheckBox';
 import { getCaseInsensitive } from '../components/ConformityCredentialCheckBox/utils';
 
 jest.mock('../components/ConformityCredentialCheckBox/utils', () => ({

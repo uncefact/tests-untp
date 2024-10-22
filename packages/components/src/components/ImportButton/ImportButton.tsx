@@ -3,7 +3,7 @@ import { Box } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 import { UploadFile as UploadFileIcon } from '@mui/icons-material';
 import { ImportDataType } from '../../types/common.types.js';
-import { processVerifiableCredentialData } from '../../utils/index.js';
+import { processVerifiableCredentialData } from '../../utils/importDataHelpers.js';
 
 export interface IImportButtonProps {
   onChange: (data: object[]) => void;

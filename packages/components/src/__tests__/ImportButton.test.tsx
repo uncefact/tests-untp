@@ -3,10 +3,10 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ImportButton } from '../components/ImportButton/ImportButton';
-import { processVerifiableCredentialData } from '../utils/index.js';
+import { processVerifiableCredentialData } from '../utils/importDataHelpers.js';
 import { ImportDataType } from '../types/common.types';
 
-jest.mock('../utils/index.js', () => ({
+jest.mock('../utils/importDataHelpers.js', () => ({
   processVerifiableCredentialData: jest.fn(),
 }));
 
