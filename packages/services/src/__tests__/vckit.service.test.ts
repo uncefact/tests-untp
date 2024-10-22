@@ -26,7 +26,7 @@ describe('issueVC', () => {
 
     const vc = await issueVC({
       context: ['https://www.w3.org/ns/credentials/v2'],
-      type: ['VerifiableCredential', 'Event'],
+      type: ['Event'],
       issuer: 'did:example:123',
       credentialStatus: mockCredentialStatus,
       credentialSubject: { id: 'did:example:123', name: 'John Doe' },
@@ -34,6 +34,29 @@ describe('issueVC', () => {
       vcKitAPIUrl: 'https://api.vc.example.com',
     });
 
+    expect(privateAPI.post).toHaveBeenCalledTimes(1);
+    expect(privateAPI.post).toHaveBeenCalledWith('https://api.vc.example.com/credentials/issue', {
+      credential: {
+        '@context': [
+          'https://www.w3.org/ns/credentials/v2',
+          'https://www.w3.org/ns/credentials/examples/v2',
+          'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
+          'https://www.w3.org/ns/credentials/v2'
+        ],
+        type: [ 'VerifiableCredential', 'Event' ],
+        issuer: 'did:example:123',
+        credentialSubject: { id: 'did:example:123', name: 'John Doe' },
+        credentialStatus: {
+          id: 'http://example.com/bitstring-status-list/1#0',
+          type: 'BitstringStatusListEntry',
+          statusPurpose: 'revocation',
+          statusListIndex: 0,
+          statusListCredential: 'http://example.com/bitstring-status-list/1'
+        },
+        render: {}
+      },
+      options: { proofFormat: 'EnvelopingProofJose' }
+    });
     expect(vc).toEqual({
       '@context': ['https://www.w3.org/ns/credentials/v2'],
       type: 'EnvelopedVerifiableCredential',
@@ -54,13 +77,40 @@ describe('issueVC', () => {
 
     const vc = await issueVC({
       context: ['https://www.w3.org/ns/credentials/v2'],
-      type: ['VerifiableCredential', 'Event'],
+      type: ['Event'],
       issuer: 'did:example:123',
       credentialSubject: { id: 'did:example:123', name: 'John Doe' },
       restOfVC: { render: {} },
       vcKitAPIUrl: 'https://api.vc.example.com',
     });
 
+    expect(privateAPI.post).toHaveBeenCalledTimes(2);
+    expect(privateAPI.post).toHaveBeenNthCalledWith(1, 'https://api.vc.example.com/agent/issueBitstringStatusList', {
+      bitstringStatusIssuer: 'did:example:123',
+      statusPurpose: 'revocation',
+    });
+    expect(privateAPI.post).toHaveBeenLastCalledWith('https://api.vc.example.com/credentials/issue', {
+      credential: {
+        '@context': [
+          'https://www.w3.org/ns/credentials/v2',
+          'https://www.w3.org/ns/credentials/examples/v2',
+          'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
+          'https://www.w3.org/ns/credentials/v2'
+        ],
+        type: [ 'VerifiableCredential', 'Event' ],
+        issuer: 'did:example:123',
+        credentialSubject: { id: 'did:example:123', name: 'John Doe' },
+        credentialStatus: {
+          id: 'http://example.com/bitstring-status-list/1#0',
+          type: 'BitstringStatusListEntry',
+          statusPurpose: 'revocation',
+          statusListIndex: 0,
+          statusListCredential: 'http://example.com/bitstring-status-list/1'
+        },
+        render: {}
+      },
+      options: { proofFormat: 'EnvelopingProofJose' }
+    });
     expect(vc).toEqual({
       '@context': ['https://www.w3.org/ns/credentials/v2'],
       type: 'EnvelopedVerifiableCredential',
@@ -81,6 +131,11 @@ describe('issueVC', () => {
         vcKitAPIUrl: 'https://api.vc.example.com',
       });
     } catch (error: any) {
+      expect(privateAPI.post).toHaveBeenCalledTimes(1);
+      expect(privateAPI.post).toHaveBeenNthCalledWith(1, 'https://api.vc.example.com/agent/issueBitstringStatusList', {
+        bitstringStatusIssuer: 'did:example:123',
+        statusPurpose: 'revocation',
+      });
       expect(error.message).toEqual('Agent not available');
     }
   });
@@ -101,6 +156,29 @@ describe('issueVC', () => {
         vcKitAPIUrl: 'invalid-api-url', // invalid api url
       });
     } catch (error: any) {
+      expect(privateAPI.post).toHaveBeenCalledTimes(1);
+      expect(privateAPI.post).toHaveBeenNthCalledWith(1, 'https://api.vc.example.com/agent/issueBitstringStatusList', {
+        credential: {
+          '@context': [
+            'https://www.w3.org/ns/credentials/v2',
+            'https://www.w3.org/ns/credentials/examples/v2',
+            'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
+            'https://www.w3.org/ns/credentials/v2'
+          ],
+          type: [ 'VerifiableCredential', 'Event' ],
+          issuer: 'did:example:123',
+          credentialSubject: { id: 'did:example:123', name: 'John Doe' },
+          credentialStatus: {
+            id: 'http://example.com/bitstring-status-list/1#0',
+            type: 'BitstringStatusListEntry',
+            statusPurpose: 'revocation',
+            statusListIndex: 0,
+            statusListCredential: 'http://example.com/bitstring-status-list/1'
+          },
+          render: {}
+        },
+        options: { proofFormat: 'EnvelopingProofJose' }
+      });
       expect(error.message).toEqual('Invalid URL: invalid-api-url');
     }
   });
@@ -112,7 +190,7 @@ describe('issueVC', () => {
     try {
       await issueVC({
         context: ['https://www.w3.org/ns/credentials/v2'],
-        type: ['VerifiableCredential', 'Event'],
+        type: ['Event'],
         issuer: 'did:example:123',
         credentialStatus: mockCredentialStatus,
         credentialSubject: { id: 'did:example:123', name: 'John Doe' },
@@ -120,6 +198,29 @@ describe('issueVC', () => {
         vcKitAPIUrl: 'https://api.vc.example.com',
       });
     } catch (error: any) {
+      expect(privateAPI.post).toHaveBeenCalledTimes(1);
+      expect(privateAPI.post).toHaveBeenNthCalledWith(1, 'https://api.vc.example.com/credentials/issue', {
+        credential: {
+          '@context': [
+            'https://www.w3.org/ns/credentials/v2',
+            'https://www.w3.org/ns/credentials/examples/v2',
+            'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
+            'https://www.w3.org/ns/credentials/v2'
+          ],
+          type: [ 'VerifiableCredential', 'Event' ],
+          issuer: 'did:example:123',
+          credentialSubject: { id: 'did:example:123', name: 'John Doe' },
+          credentialStatus: {
+            id: 'http://example.com/bitstring-status-list/1#0',
+            type: 'BitstringStatusListEntry',
+            statusPurpose: 'revocation',
+            statusListIndex: 0,
+            statusListCredential: 'http://example.com/bitstring-status-list/1'
+          },
+          render: {}
+        },
+        options: { proofFormat: 'EnvelopingProofJose' }
+      });
       expect(error.message).toEqual('invalid_argument: apiKey is invalid');
     }
   });
@@ -138,12 +239,39 @@ describe('issueVC', () => {
         vcKitAPIUrl: 'https://api.vc.example.com',
       });
     } catch (error: any) {
+      expect(privateAPI.post).toHaveBeenCalledTimes(1);
+      expect(privateAPI.post).toHaveBeenNthCalledWith(1, 'https://api.vc.example.com/credentials/issue', {
+        credential: {
+          '@context': [
+            'https://www.w3.org/ns/credentials/v2',
+            'https://www.w3.org/ns/credentials/examples/v2',
+            'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
+            'https://www.w3.org/ns/credentials/v2'
+          ],
+          type: [ 'VerifiableCredential', 'Event' ],
+          issuer: 'did:example:123',
+          credentialSubject: { id: 'did:example:123', name: 'John Doe' },
+          credentialStatus: {
+            id: 'http://example.com/bitstring-status-list/1#0',
+            type: 'BitstringStatusListEntry',
+            statusPurpose: 'revocation',
+            statusListIndex: 0,
+            statusListCredential: 'http://example.com/bitstring-status-list/1'
+          },
+          render: {}
+        },
+        options: { proofFormat: 'EnvelopingProofJose' }
+      });
       expect(error.message).toEqual(`"type" must include \`VerifiableCredential\`.`);
     }
   });
 });
 
 describe('issueCredentialStatus', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('should issue credential status successfully', async () => {
     jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({
       id: 'http://example.com/bitstring-status-list/25#0',
@@ -157,6 +285,11 @@ describe('issueCredentialStatus', () => {
       bitstringStatusIssuer: 'did:example:123',
     });
 
+    expect(privateAPI.post).toHaveBeenCalledTimes(1);
+    expect(privateAPI.post).toHaveBeenCalledWith('https://api.vc.example.com/agent/issueBitstringStatusList', {
+      bitstringStatusIssuer: 'did:example:123',
+      statusPurpose: 'revocation',
+    });
     expect(credentialStatus).toEqual({
       id: 'http://example.com/bitstring-status-list/25#0',
       statusPurpose: 'revocation',
@@ -164,6 +297,8 @@ describe('issueCredentialStatus', () => {
   });
 
   it('should throw error when missing required host parameter', async () => {
+    jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({});
+
     try {
       await issueCredentialStatus({
         host: '', // missing host
@@ -172,11 +307,14 @@ describe('issueCredentialStatus', () => {
         bitstringStatusIssuer: 'did:example:123',
       });
     } catch (error: any) {
+      expect(privateAPI.post).not.toHaveBeenCalled();
       expect(error.message).toEqual('Error issuing credential status: Host is required');
     }
   });
 
   it('should throw error when missing required apiKey parameter', async () => {
+    jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({});
+
     try {
       await issueCredentialStatus({
         host: 'https://api.vc.example.com',
@@ -185,11 +323,14 @@ describe('issueCredentialStatus', () => {
         bitstringStatusIssuer: 'did:example:123',
       });
     } catch (error: any) {
+      expect(privateAPI.post).not.toHaveBeenCalled();
       expect(error.message).toEqual('Error issuing credential status: API Key is required');
     }
   });
 
   it('should throw error when missing required bitstringStatusIssuer parameter', async () => {
+    jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({});
+
     try {
       await issueCredentialStatus({
         host: 'https://api.vc.example.com',
@@ -198,6 +339,7 @@ describe('issueCredentialStatus', () => {
         bitstringStatusIssuer: '', // missing bitstringStatusIssuer
       });
     } catch (error: any) {
+      expect(privateAPI.post).not.toHaveBeenCalled();
       expect(error.message).toEqual('Error issuing credential status: Bitstring Status Issuer is required');
     }
   });
@@ -215,6 +357,11 @@ describe('issueCredentialStatus', () => {
         bitstringStatusIssuer: 'invalid:issuer:123', // invalid issuer
       });
     } catch (error: any) {
+      expect(privateAPI.post).toHaveBeenCalledTimes(1);
+      expect(privateAPI.post).toHaveBeenCalledWith('https://api.vc.example.com/agent/issueBitstringStatusList', {
+        bitstringStatusIssuer: 'invalid:issuer:123',
+        statusPurpose: 'revocation',
+      });
       expect(error.message).toEqual('invalid_argument: credential.issuer must be a DID managed by this agent.');
     }
   });
@@ -230,6 +377,11 @@ describe('issueCredentialStatus', () => {
         bitstringStatusIssuer: 'did:example:123',
       });
     } catch (error: any) {
+      expect(privateAPI.post).toHaveBeenCalledTimes(1);
+      expect(privateAPI.post).toHaveBeenCalledWith('invalid-api-url/agent/issueBitstringStatusList', {
+        bitstringStatusIssuer: 'did:example:123',
+        statusPurpose: 'revocation',
+      });
       expect(error.message).toEqual('Agent not available');
     }
   });
@@ -246,6 +398,11 @@ describe('issueCredentialStatus', () => {
         bitstringStatusIssuer: 'did:example:123',
       });
     } catch (error: any) {
+      expect(privateAPI.post).toHaveBeenCalledTimes(1);
+      expect(privateAPI.post).toHaveBeenCalledWith('https://api.vc.example.com/agent/issueBitstringStatusList', {
+        bitstringStatusIssuer: 'did:example:123',
+        statusPurpose: 'revocation',
+      });
       expect(error.message).toEqual('invalid_argument: apiKey is invalid');
     }
   });
