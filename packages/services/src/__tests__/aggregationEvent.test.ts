@@ -1,9 +1,9 @@
 import * as vckitService from '../vckit.service';
-import { getStorageServiceLink } from '../storage.service';
+import { uploadData } from '../storage.service';
 import * as linkResolverService from '../linkResolver.service';
-import { IAggregationEventContext } from '../epcisEvents/types';
+import { IAggregationEventContext } from '../types/types';
 import { Result } from '../types/validateContext';
-import * as validateContext from '../epcisEvents/validateContext';
+import * as validateContext from '../validateContext';
 import * as helpers from '../epcisEvents/helpers';
 import { processAggregationEvent } from '../epcisEvents';
 import { publicAPI } from '../utils/httpService';
@@ -13,18 +13,19 @@ jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
 }));
 jest.mock('../storage.service', () => ({
-  getStorageServiceLink: jest.fn(),
+  uploadData: jest.fn(),
 }));
 jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
   createLinkResolver: jest.fn(),
   IdentificationKeyType: jest.fn(),
   getLinkResolverIdentifier: jest.fn(),
+  getLinkResolverIdentifierFromURI: jest.fn(),
   LinkType: {
-    verificationLinkType : 'gs1:verificationService',
-    certificationLinkType : 'gs1:certificationInfo',
-    epcisLinkType : 'gs1:epcis',
-  }
+    verificationLinkType: 'gs1:verificationService',
+    certificationLinkType: 'gs1:certificationInfo',
+    epcisLinkType: 'gs1:epcis',
+  },
 }));
 
 describe('processAggregationEvent', () => {
@@ -55,7 +56,7 @@ describe('processAggregationEvent', () => {
 
   it('should process aggregation event', async () => {
     (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => aggregationVCMock);
-    (getStorageServiceLink as jest.Mock).mockResolvedValueOnce('https://exampleStorage.com/vc.json');
+    (uploadData as jest.Mock).mockResolvedValueOnce('https://exampleStorage.com/vc.json');
 
     jest
       .spyOn(validateContext, 'validateAggregationEventContext')
@@ -67,7 +68,7 @@ describe('processAggregationEvent', () => {
     const aggregationVC = await processAggregationEvent(aggregationEvent, context);
 
     expect(aggregationVC).toBe(aggregationVCMock);
-    expect(getStorageServiceLink).toHaveBeenCalled();
+    expect(uploadData).toHaveBeenCalled();
     expect(validateContext.validateAggregationEventContext).toHaveBeenCalled();
     expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
   });
@@ -119,6 +120,11 @@ describe('processAggregationEvent', () => {
       jest
         .spyOn(linkResolverService, 'getLinkResolverIdentifier')
         .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
+      jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
+        identifier: '0123456789',
+        qualifierPath: '/10/ABC123',
+        elementString: '01012345678910ABC123',
+      });
       jest.spyOn(publicAPI, 'post').mockRejectedValueOnce("Can't issue VC");
 
       await processAggregationEvent(aggregationEvent, invalidIssuerContext);
@@ -142,6 +148,11 @@ describe('processAggregationEvent', () => {
       jest
         .spyOn(linkResolverService, 'getLinkResolverIdentifier')
         .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
+      jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
+        identifier: '0123456789',
+        qualifierPath: '/10/ABC123',
+        elementString: '01012345678910ABC123',
+      });
       jest.spyOn(publicAPI, 'put').mockRejectedValueOnce('Invalid storage provider');
 
       await processAggregationEvent(aggregationEvent, invalidStorageContext);
@@ -160,7 +171,7 @@ describe('processAggregationEvent', () => {
         dlr: { ...context.dlr, dlrAPIUrl: 'http://invalid-dlr.com' },
       };
       (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => aggregationVCMock);
-      (getStorageServiceLink as jest.Mock).mockImplementation(({ url, _data, path }) => {
+      (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
         return `${url}/${path}`;
       });
       jest
@@ -169,6 +180,11 @@ describe('processAggregationEvent', () => {
       jest
         .spyOn(linkResolverService, 'getLinkResolverIdentifier')
         .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
+      jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
+        identifier: '0123456789',
+        qualifierPath: '/10/ABC123',
+        elementString: '01012345678910ABC123',
+      });
       jest.spyOn(linkResolverService, 'createLinkResolver').mockRejectedValueOnce('Invalid DLR API link resolver url');
 
       await processAggregationEvent(aggregationEvent, invalidDLRContext);
@@ -177,7 +193,7 @@ describe('processAggregationEvent', () => {
       expect(error.message).toBe('Invalid DLR API link resolver url');
       expect(validateContext.validateAggregationEventContext).toHaveBeenCalled();
       expect(vckitService.issueVC).toHaveBeenCalled();
-      expect(getStorageServiceLink).toHaveBeenCalled();
+      expect(uploadData).toHaveBeenCalled();
     }
   });
 });

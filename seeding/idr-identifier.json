@@ -1,0 +1,38 @@
+{
+  "namespace": "gs1",
+  "applicationIdentifiers": [
+    {
+      "title": "Global Trade Item Number (GTIN)",
+      "label": "GTIN",
+      "shortcode": "gtin",
+      "ai": "01",
+      "type": "I",
+      "qualifiers": ["10", "21"],
+      "regex": "(\\d{12,14}|\\d{8})"
+    },
+    {
+      "title": "Batch or lot number",
+      "label": "BATCH/LOT",
+      "shortcode": "lot",
+      "ai": "10",
+      "type": "Q",
+      "regex": "([\\x21-\\x22\\x25-\\x2F\\x30-\\x39\\x41-\\x5A\\x5F\\x61-\\x7A]{0,20})"
+    },
+    {
+      "title": "Serial number",
+      "label": "SN",
+      "shortcode": "ser",
+      "ai": "21",
+      "type": "Q",
+      "regex": "(.{0,20})"
+    },
+    {
+      "title": "Identification of a physical location - Global Location Number",
+      "label": "LOC No",
+      "shortcode": "gln",
+      "ai": "414",
+      "type": "I",
+      "regex": "(\\d{13})"
+    }
+  ]
+}

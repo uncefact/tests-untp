@@ -2,7 +2,7 @@ import { VerifiableCredential } from '@vckit/core-types';
 import _ from 'lodash';
 
 import { issueVC } from '../vckit.service.js';
-import { getStorageServiceLink } from '../storage.service.js';
+import { uploadData } from '../storage.service.js';
 import {
   IdentificationKeyType,
   LinkType,
@@ -11,7 +11,7 @@ import {
 } from '../linkResolver.service.js';
 
 import { IService } from '../types/IService.js';
-import { IConfigDLR, ICredential, IEntityIssue, ITransformationEvent, IVCKitContext } from './types';
+import { IConfigDLR, ICredential, IEntityIssue, ITransformationEventContext, IVCKitContext } from '../types';
 import {
   IConstructObjectParameters,
   allowedIndexKeys,
@@ -21,7 +21,7 @@ import {
   randomIntegerString,
 } from '../utils/helpers.js';
 import { generateIdWithBatchLot, generateLinkResolver } from './helpers.js';
-import { validateContextTransformationEvent } from './validateContext.js';
+import { validateContextTransformationEvent } from '../validateContext.js';
 import { StorageServiceConfig } from '../types/storage.js';
 import JSONPointer from 'jsonpointer';
 
@@ -30,7 +30,10 @@ import JSONPointer from 'jsonpointer';
  * @param data - data for the transformation event, which nlsids are selected
  * @param context - context for the transformation event
  */
-export const processTransformationEvent: IService = async (data: any, context: ITransformationEvent): Promise<any> => {
+export const processTransformationEvent: IService = async (
+  data: any,
+  context: ITransformationEventContext,
+): Promise<any> => {
   try {
     const validationResult = validateContextTransformationEvent(context);
     if (!validationResult.ok) throw new Error(validationResult.value);
@@ -173,7 +176,7 @@ export const issueEpcisTransformationEvent = async (
  * @returns string - url of the uploaded verifiable credential
  */
 export const uploadVC = async (path: string, vc: VerifiableCredential, storageContext: StorageServiceConfig) => {
-  const result = await getStorageServiceLink(storageContext, vc, path);
+  const result = await uploadData(storageContext, vc, path);
   return result;
 };
 

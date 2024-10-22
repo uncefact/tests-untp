@@ -7,7 +7,7 @@ import {
   validateAndConstructVerifyURL,
   generateUUID,
   getJsonDataFromConformityAPI,
-  getStorageServiceLink,
+  uploadData,
   getValueByPath,
 } from '@mock-app/services';
 
@@ -172,7 +172,7 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
         return;
       }
 
-      const vcUrl = await getStorageServiceLink(storedCredentialsConfig, extractedCredential, generateUUID());
+      const vcUrl = await uploadData(storedCredentialsConfig, extractedCredential, generateUUID());
       const verifyURL = validateAndConstructVerifyURL(vcUrl);
       saveConformityCredentials(credentialRequestConfig.credentialName, verifyURL, credentialRequestConfig.appOnly);
 

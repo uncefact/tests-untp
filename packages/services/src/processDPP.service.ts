@@ -1,12 +1,11 @@
 import { W3CVerifiableCredential } from '@vckit/core-types';
-import { IService } from './types/index.js';
-import { IContext } from './epcisEvents/types.js';
+import { IService, IDppContext } from './types/index.js';
 import { constructIdentifierString, generateUUID } from './utils/helpers.js';
 
-import { getStorageServiceLink } from './storage.service.js';
+import { uploadData } from './storage.service.js';
 import { issueVC } from './vckit.service.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from './linkResolver.service.js';
-import { validateContextDPP } from './epcisEvents/validateContext.js';
+import { validateContextDPP } from './validateContext.js';
 import { deleteItemFromLocalStorage } from './features/localStorage.service.js';
 
 /**
@@ -15,7 +14,7 @@ import { deleteItemFromLocalStorage } from './features/localStorage.service.js';
  * @param context - DPP context
  * @returns
  */
-export const processDPP: IService = async (data: any, context: IContext): Promise<any> => {
+export const processDPP: IService = async (data: any, context: IDppContext): Promise<any> => {
   try {
     const credentialSubject = data.data;
     const validationResult = validateContextDPP(context);
@@ -39,7 +38,7 @@ export const processDPP: IService = async (data: any, context: IContext): Promis
     });
 
     const storageContext = context.storage;
-    const vcUrl = await getStorageServiceLink(storageContext, vc, `${identifier}/${generateUUID()}`);
+    const vcUrl = await uploadData(storageContext, vc, `${identifier}/${qualifierPath}`);
 
     const linkResolverContext = context.dlr;
     const linkResolver = await registerLinkResolver(

@@ -5,10 +5,10 @@ import {
   uploadVC,
 } from '../epcisEvents/transformationEvent';
 import { issueVC, contextDefault } from '../vckit.service';
-import { getStorageServiceLink } from '../storage.service';
+import { uploadData } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
 import { fillArray } from '../utils/helpers';
-import { IEntityIssue, IInputItems } from '../epcisEvents/types';
+import { IEntityIssue, IInputItems } from '../types';
 import { contextTransformationEvent, dataTransformationEvent } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
@@ -17,7 +17,7 @@ jest.mock('../vckit.service', () => ({
 }));
 
 jest.mock('../storage.service', () => ({
-  getStorageServiceLink: jest.fn(),
+  uploadData: jest.fn(),
 }));
 
 jest.mock('../linkResolver.service', () => ({
@@ -31,7 +31,7 @@ jest.mock('../linkResolver.service', () => ({
     verificationLinkType: 'gs1:verificationService',
     certificationLinkType: 'gs1:certificationInfo',
     epcisLinkType: 'gs1:epcis',
-  }
+  },
 }));
 
 describe('Transformation event', () => {
@@ -112,7 +112,7 @@ describe('Transformation event', () => {
 
     it('should upload vc and return link to the uploaded json file', async () => {
       let expectResult = 'http://localhost/epcis-transformation-event/1234';
-      (getStorageServiceLink as jest.Mock).mockResolvedValue(expectResult);
+      (uploadData as jest.Mock).mockResolvedValue(expectResult);
       const mockVc = {
         '@context': ['https://www.w3.org/2018/credentials/v1'],
         type: ['VerifiableCredential', 'MockEvent'],
@@ -198,7 +198,7 @@ describe('Transformation event', () => {
     });
 
     it('should call registerLinkResolver transformation event', async () => {
-      (getStorageServiceLink as jest.Mock).mockImplementation(({ url, _data, path }) => {
+      (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
         return `${url}/${path}`;
       });
       (registerLinkResolver as jest.Mock).mockImplementation(
@@ -224,7 +224,7 @@ describe('Transformation event', () => {
         },
       );
 
-      const data = await processTransformationEvent(dataTransformationEvent, contextTransformationEvent);      
+      const data = await processTransformationEvent(dataTransformationEvent, contextTransformationEvent);
       expect(registerLinkResolver).toHaveBeenCalledTimes(2);
     });
   });
@@ -331,11 +331,11 @@ describe('Transformation event', () => {
         transformationEventCredential: {
           mappingFields: [
             {
-              "sourcePath": "/vc/credentialSubject/productIdentifier/0/identifierValue",
-              "destinationPath": "/eventID"
-            }
-          ]
-        }
+              sourcePath: '/vc/credentialSubject/productIdentifier/0/identifierValue',
+              destinationPath: '/eventID',
+            },
+          ],
+        },
       };
       try {
         await processTransformationEvent(dataTransformationEvent, newContext);

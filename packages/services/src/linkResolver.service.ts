@@ -1,7 +1,6 @@
 import GS1DigitalLinkToolkit from 'digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js';
-import { IDLRAI } from './epcisEvents/types.js';
+import { IDLRAI, MimeTypeEnum } from './types/index.js';
 import { GS1ServiceEnum } from './identityProviders/GS1Provider.js';
-import { MimeTypeEnum } from './types/types.js';
 import { privateAPI } from './utils/httpService.js';
 import { extractDomain } from './utils/helpers.js';
 /**
@@ -115,13 +114,11 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
   try {
     privateAPI.setBearerTokenAuthorizationHeaders(arg.dlrAPIKey || '');
     await privateAPI.post<string>(`${dlrAPIUrl}${linkRegisterPath}`, params);
+    const linkTypeQuery = responseLinkType === 'all' ? 'all' : `${namespace}:${responseLinkType}`;
 
-    const path =
-      responseLinkType === 'all'
-        ? '?linkType=all'
-        : qualifierPath.includes('?')
-          ? `${qualifierPath}&linkType=${responseLinkType}`
-          : `${qualifierPath}?linkType=${responseLinkType}`;
+    const path = qualifierPath.includes('?')
+      ? `${qualifierPath}&linkType=${linkTypeQuery}`
+      : `${qualifierPath}?linkType=${linkTypeQuery}`;
     return `${dlrAPIUrl}/${namespace}/${linkResolver.identificationKeyType}/${linkResolver.identificationKey}${path}`;
   } catch (error) {
     throw new Error('Error creating link resolver');
@@ -359,6 +356,32 @@ export const getLinkResolverIdentifier = (elementString: string): { identifier: 
     identifier: primaryIdentifierAI.value,
     qualifierPath,
   };
+};
+
+/**
+ * Retrieves the identifier and qualifier path from a URI.
+ * 
+ * @param {string} uri - The URI.
+ * @returns {{ identifier: string, qualifierPath: string }} - An object containing the identifier and qualifier path.
+ * 
+ * How to use:
+  try {
+    const uri = 'https://idr.com/gs1/01/09359502000010/10/ABC123';
+    const { identifier, qualifierPath, elementString } = getLinkResolverIdentifierFromURI(uri);
+
+    console.log('Identifier:', identifier); // 09359502000010
+    console.log('Qualifier Path:', qualifierPath); // /10/ABC123
+    console.log('Element String:', elementString); // (01)09359502000010(10)ABC123
+  } catch (error) {
+    console.error(error.message);
+  }
+ */
+export const getLinkResolverIdentifierFromURI = (
+  uri: string,
+): { identifier: string; qualifierPath: string; elementString: string } => {
+  const gs1DigitalLinkToolkit = new GS1DigitalLinkToolkit();
+  const elementString = gs1DigitalLinkToolkit.gs1digitalLinkToGS1elementStrings(uri, true);
+  return { elementString, ...getLinkResolverIdentifier(elementString) };
 };
 
 export const buildElementString = (ai: any) => {

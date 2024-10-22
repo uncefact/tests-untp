@@ -7,6 +7,9 @@ SERVICE_NAME="Identity Resolver"
 MAX_RETRIES=3
 RETRY_COUNT=0
 
+# Path to the IDR identifier JSON file
+IDENTIFIER_FILE="./seeding/idr-identifier.json"
+
 # Wait for the service to be available
 echo "Waiting for ${SERVICE_NAME} service to be ready..."
 
@@ -32,44 +35,12 @@ done
 
 echo "${SERVICE_NAME} service is seeding data…"
 
-# Execute create identifier request
+# Execute create identifier request with JSON data from a file
 curl -X POST \
   http://${IDR_SERVICE_HOST}:${IDR_SERVICE_PORT}/api/identifiers \
   -H 'accept: application/json' \
   -H "Authorization: Bearer ${IDR_SERVICE_API_KEY}" \
   -H 'Content-Type: application/json' \
-  -d '{
-  "namespace": "gs1",
-  "applicationIdentifiers": [
-    {
-      "title": "Global Trade Item Number (GTIN)",
-      "label": "GTIN",
-      "shortcode": "gtin",
-      "ai": "01",
-      "type": "I",
-      "qualifiers": [
-        "10",
-        "21"
-      ],
-      "regex": "(\\d{12,14}|\\d{8})"
-    },
-    {
-      "title": "Batch or lot number",
-      "label": "BATCH/LOT",
-      "shortcode": "lot",
-      "ai": "10",
-      "type": "Q",
-      "regex": "([\\x21-\\x22\\x25-\\x2F\\x30-\\x39\\x41-\\x5A\\x5F\\x61-\\x7A]{0,20})"
-    },
-    {
-      "title": "Serial number",
-      "label": "SN",
-      "shortcode": "ser",
-      "ai": "21",
-      "type": "Q",
-      "regex": "(.{0,20})"
-    }
-  ]
-}'
+  -d @"$IDENTIFIER_FILE"
 
 printf "\nSeeding ${SERVICE_NAME} service data complete!\n\n"

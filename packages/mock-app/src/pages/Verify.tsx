@@ -62,14 +62,10 @@ const Verify = () => {
       }
 
       if (
-        encryptedCredential?.verifiableCredential?.type.includes('EnvelopedVerifiableCredential') &&
-        'id' in encryptedCredential?.verifiableCredential
+        encryptedCredential?.type?.includes('EnvelopedVerifiableCredential') &&
+        encryptedCredential?.id?.startsWith('data:application/')
       ) {
-        if (encryptedCredential.verifiableCredential.id.startsWith('data:application/')) {
-          return setCredential(encryptedCredential);
-        } else {
-          return displayErrorUI();
-        }
+        return setCredential(encryptedCredential);
       }
 
       const credentialJsonString = decryptString({
@@ -154,10 +150,10 @@ const Verify = () => {
 
         let customCredential = null;
 
-        if (credential?.verifiableCredential?.type?.includes('EnvelopedVerifiableCredential')) {
+        if (credential?.type?.includes('EnvelopedVerifiableCredential')) {
           try {
-            const encodedCredential = credential.verifiableCredential.id.split(',')[1];
-            customCredential = jose.decodeJwt(encodedCredential);
+            const encodedCredential = credential?.id?.split(',')[1];
+            customCredential = jose.decodeJwt(encodedCredential as string) as VerifiableCredential;
           } catch (error) {
             displayErrorUI();
           }
