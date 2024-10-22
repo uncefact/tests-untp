@@ -703,8 +703,11 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:9cb5-115-79-137-238.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -1196,8 +1199,11 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:9cb5-115-79-137-238.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -1948,8 +1954,11 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:9cb5-115-79-137-238.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -2431,8 +2440,11 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:9cb5-115-79-137-238.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -3183,8 +3195,11 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:9cb5-115-79-137-238.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -3666,8 +3681,11 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:9cb5-115-79-137-238.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -4418,8 +4436,11 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:9cb5-115-79-137-238.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -4901,8 +4922,11 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:9cb5-115-79-137-238.ngrok-free.app"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],

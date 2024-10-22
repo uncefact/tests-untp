@@ -33,6 +33,7 @@ export interface IVerifyURLPayload {
 export interface IVCKitContext {
   issuer: string;
   vckitAPIUrl: string;
+  headers?: Record<string, string>;
 }
 
 export interface ICredential {

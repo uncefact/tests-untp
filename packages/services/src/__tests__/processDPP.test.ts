@@ -69,13 +69,6 @@ describe('processDPP', () => {
           dlrAPIUrl: string,
           dlrAPIKey,
         ) => {
-          console.log({
-            url,
-            linkTitle,
-            verificationPage,
-            dlrAPIKey,
-            identificationKey,
-          });
           return `${dlrAPIUrl}/${identificationKeyType}/${identificationKey}?linkType=all`;
         },
       );
@@ -110,6 +103,51 @@ describe('processDPP', () => {
         LinkType.certificationLinkType,
       );
     });
+
+    it('should process DPP with custom verifiable credential service headers', async () => {
+      const customHeaders = { 'X-Custom-Header': 'test-value' };
+      const contextWithHeaders = {
+        ...contextDPP,
+        vckit: {
+          ...contextDPP.vckit,
+          headers: customHeaders,
+        },
+      };
+
+      (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
+        return `${url}/${dataDPP.data.herd.identifier}`;
+      });
+
+      (registerLinkResolver as jest.Mock).mockImplementation(
+        (
+          url,
+          identificationKeyType: IdentificationKeyType,
+          identificationKey: string,
+          linkTitle,
+          verificationPage,
+          dlrAPIUrl: string,
+          dlrAPIKey,
+        ) => {
+          return `${dlrAPIUrl}/${identificationKeyType}/${identificationKey}?linkType=all`;
+        },
+      );
+
+      const vc = await processDPP(dataDPP, contextWithHeaders);
+
+      expect(vc).toEqual({
+        vc: expectVCResult,
+        linkResolver: expect.any(String),
+      });
+
+      expect(issueVC).toHaveBeenCalledWith(
+        expect.objectContaining({
+          headers: customHeaders,
+        }),
+      );
+
+      expect(uploadData).toHaveBeenCalled();
+      expect(registerLinkResolver).toHaveBeenCalled();
+    });
   });
 
   describe('error case', () => {
@@ -137,7 +175,6 @@ describe('processDPP', () => {
       try {
         await processDPP(dataDPP, newContext);
       } catch (error: any) {
-        console.log(error.message);
         expect(error.message).not.toBeNull();
       }
     });

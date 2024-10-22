@@ -704,7 +704,10 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development"
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -893,7 +896,10 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development"
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "epcisObjectEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -1068,7 +1074,10 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development"
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "epcisAssociationEvent": {
                     "context": [
@@ -1287,7 +1296,10 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development"
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "digitalIdentityAnchor": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -3014,7 +3026,10 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development"
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "digitalConformityCredential": {
                     "context": [
@@ -4210,7 +4225,10 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development"
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "digitalFacilityRecord": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -4683,7 +4701,10 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development"
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -5434,8 +5455,11 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -5917,8 +5941,11 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -6669,8 +6696,11 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -7152,8 +7182,11 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],
@@ -7904,8 +7937,11 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "dpp": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -8387,8 +8423,11 @@
               "parameters": [
                 {
                   "vckit": {
-                    "vckitAPIUrl": "http://localhost:3332/v1",
-                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development"
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
                   },
                   "epcisTransactionEvent": {
                     "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/transaction-event-ld.json"],

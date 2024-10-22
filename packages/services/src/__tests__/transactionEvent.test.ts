@@ -184,4 +184,39 @@ describe('processTransactionEvent', () => {
       expect(uploadData).toHaveBeenCalled();
     }
   });
+
+  it('should process transaction event with custom verifiable credential service headers', async () => {
+    const mockHeaders = { 'X-Custom-Header': 'test-value' };
+    const contextWithHeaders = {
+      ...context,
+      vckit: {
+        ...context.vckit,
+        headers: mockHeaders,
+      },
+    };
+
+    (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
+    (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
+      return `${url}/${path}`;
+    });
+    jest
+      .spyOn(validateContext, 'validateTransactionEventContext')
+      .mockReturnValueOnce({ ok: true, value: contextWithHeaders } as unknown as Result<ITransactionEventContext>);
+    jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValueOnce(transactionEventDLRMock);
+
+    const transactionVC = await processTransactionEvent(transactionEvent, contextWithHeaders);
+
+    expect(transactionVC).toEqual({
+      vc: transactionVCMock,
+      linkResolver: transactionEventDLRMock,
+    });
+    expect(vckitService.issueVC).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: mockHeaders,
+      }),
+    );
+    expect(uploadData).toHaveBeenCalled();
+    expect(validateContext.validateTransactionEventContext).toHaveBeenCalled();
+    expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
+  });
 });

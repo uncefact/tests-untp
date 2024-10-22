@@ -162,6 +162,7 @@ export const issueEpcisTransformationEvent = async (
     issuer: vcKitContext.issuer,
     type: [...epcisTransformationEvent.type],
     vcKitAPIUrl: vcKitContext.vckitAPIUrl,
+    headers: vcKitContext.headers,
     restOfVC,
   });
 
@@ -204,6 +205,7 @@ export const issueDPP = async (
     issuer: vcKitContext.issuer,
     type: dppContext.type,
     vcKitAPIUrl: vcKitContext.vckitAPIUrl,
+    headers: vcKitContext.headers,
     credentialSubject: dppCredentialSubject,
     restOfVC,
   });

@@ -98,4 +98,36 @@ describe('processDigitalFacilityRecord', () => {
       'digitalFacilityRecord data not found',
     );
   });
+
+  it('should process digital facility record with custom verifiable credential service headers', async () => {
+    const mockHeaders = { 'X-Custom-Header': 'test-value' };
+    const contextWithHeaders = {
+      ...context,
+      vckit: {
+        ...context.vckit,
+        headers: mockHeaders,
+      },
+    };
+
+    (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
+      credentialSubject: { id: 'https://example.com/123' },
+    }));
+    (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
+
+    jest
+      .spyOn(validateContext, 'validateDigitalFacilityRecordContext')
+      .mockReturnValueOnce({ ok: true, value: contextWithHeaders } as unknown as Result<IDigitalFacilityRecordContext>);
+    jest
+      .spyOn(linkResolverService, 'getLinkResolverIdentifier')
+      .mockReturnValue({ identifier: '0123456789', qualifierPath: '/' });
+    jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValue('https://example.com/link-resolver');
+
+    await processDigitalFacilityRecord(digitalFacilityRecordData, contextWithHeaders);
+
+    expect(vckitService.issueVC).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: mockHeaders,
+      }),
+    );
+  });
 });

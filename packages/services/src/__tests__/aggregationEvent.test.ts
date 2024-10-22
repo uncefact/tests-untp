@@ -196,4 +196,40 @@ describe('processAggregationEvent', () => {
       expect(uploadData).toHaveBeenCalled();
     }
   });
+
+  it('should process aggregation event with custom verifiable credential service headers', async () => {
+    const customHeaders = { 'X-Custom-Header': 'test-value' };
+    const contextWithHeaders = {
+      ...context,
+      vckit: { ...context.vckit, headers: customHeaders },
+    };
+
+    (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => aggregationVCMock);
+    (uploadData as jest.Mock).mockResolvedValueOnce('https://exampleStorage.com/vc.json');
+
+    jest
+      .spyOn(validateContext, 'validateAggregationEventContext')
+      .mockReturnValueOnce({ ok: true, value: contextWithHeaders } as unknown as Result<IAggregationEventContext>);
+    jest
+      .spyOn(linkResolverService, 'getLinkResolverIdentifier')
+      .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
+    jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValueOnce(aggregationEventDLRMock);
+    jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
+      identifier: '0123456789',
+      qualifierPath: '/10/ABC123',
+      elementString: '01012345678910ABC123',
+    });
+
+    const aggregationVC = await processAggregationEvent(aggregationEvent, contextWithHeaders);
+
+    expect(aggregationVC).toBe(aggregationVCMock);
+    expect(vckitService.issueVC).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: customHeaders,
+      }),
+    );
+    expect(uploadData).toHaveBeenCalled();
+    expect(validateContext.validateAggregationEventContext).toHaveBeenCalled();
+    expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
+  });
 });

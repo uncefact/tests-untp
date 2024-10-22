@@ -1,409 +1,272 @@
-import { privateAPI } from '../utils';
-import  { issueCredentialStatus, issueVC }  from '../vckit.service';
+import { issueVC, issueCredentialStatus } from '../vckit.service';
+import { privateAPI } from '../utils/httpService';
 
-describe('issueVC', () => {
+jest.mock('../utils/httpService', () => ({
+  privateAPI: {
+    post: jest.fn(),
+    setBearerTokenAuthorizationHeaders: jest.fn(),
+  },
+}));
+
+describe('vckit.service', () => {
+  const mockVcKitAPIUrl = 'https://api.vc.example.com';
+  const mockCredentialSubject = { id: 'did:example:123', name: 'John Doe' };
+  const mockIssuer = 'did:example:issuer';
   const mockCredentialStatus = {
-    'id': 'http://example.com/bitstring-status-list/1#0',
-    'type': 'BitstringStatusListEntry',
-    'statusPurpose': 'revocation',
-    'statusListIndex': 0,
-    'statusListCredential': 'http://example.com/bitstring-status-list/1'
+    id: 'http://example.com/bitstring-status-list/1#0',
+    type: 'BitstringStatusListEntry',
+    statusPurpose: 'revocation',
+    statusListIndex: 0,
+    statusListCredential: 'http://example.com/bitstring-status-list/1',
   };
 
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it('should issue VC successfully when credential status is provided in the issue VC payload', async () => {
-    jest.spyOn(privateAPI, 'post')
-      .mockResolvedValueOnce({
-        verifiableCredential: {
-          '@context': ['https://www.w3.org/ns/credentials/v2'],
-          type: 'EnvelopedVerifiableCredential',
-          id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsImlzcyI6ImRpZDp3ZWIvcmcvMjAxOC9jcmVkZWyMDIyIn1dfQ.8pUt1rZktWKGBGyJ6GH3io6f7fliAg8IWsEqTWCYvKm0fQkIlPnqqTobxgR3qmtMd_jJXc8IHwbVVOBUEvpcCg',
-        },
-      });
+  describe('issueVC', () => {
+    const defaultParams = {
+      credentialSubject: mockCredentialSubject,
+      issuer: mockIssuer,
+      vcKitAPIUrl: mockVcKitAPIUrl,
+    };
 
-    const vc = await issueVC({
-      context: ['https://www.w3.org/ns/credentials/v2'],
-      type: ['Event'],
-      issuer: 'did:example:123',
-      credentialStatus: mockCredentialStatus,
-      credentialSubject: { id: 'did:example:123', name: 'John Doe' },
-      restOfVC: { render: {} },
-      vcKitAPIUrl: 'https://api.vc.example.com',
-    });
-
-    expect(privateAPI.post).toHaveBeenCalledTimes(1);
-    expect(privateAPI.post).toHaveBeenCalledWith('https://api.vc.example.com/credentials/issue', {
-      credential: {
-        '@context': [
-          'https://www.w3.org/ns/credentials/v2',
-          'https://www.w3.org/ns/credentials/examples/v2',
-          'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
-          'https://www.w3.org/ns/credentials/v2'
-        ],
-        type: [ 'VerifiableCredential', 'Event' ],
-        issuer: 'did:example:123',
-        credentialSubject: { id: 'did:example:123', name: 'John Doe' },
-        credentialStatus: {
-          id: 'http://example.com/bitstring-status-list/1#0',
-          type: 'BitstringStatusListEntry',
-          statusPurpose: 'revocation',
-          statusListIndex: 0,
-          statusListCredential: 'http://example.com/bitstring-status-list/1'
-        },
-        render: {}
-      },
-      options: { proofFormat: 'EnvelopingProofJose' }
-    });
-    expect(vc).toEqual({
+    const mockVerifiableCredential = {
       '@context': ['https://www.w3.org/ns/credentials/v2'],
       type: 'EnvelopedVerifiableCredential',
       id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsImlzcyI6ImRpZDp3ZWIvcmcvMjAxOC9jcmVkZWyMDIyIn1dfQ.8pUt1rZktWKGBGyJ6GH3io6f7fliAg8IWsEqTWCYvKm0fQkIlPnqqTobxgR3qmtMd_jJXc8IHwbVVOBUEvpcCg',
+    };
+
+    it('should issue VC with default context and type', async () => {
+      const mockResponse = { verifiableCredential: mockVerifiableCredential };
+      (privateAPI.post as jest.Mock).mockResolvedValue(mockResponse);
+
+      const result = await issueVC(defaultParams);
+
+      expect(privateAPI.post).toHaveBeenCalledWith(
+        `${mockVcKitAPIUrl}/credentials/issue`,
+        expect.objectContaining({
+          credential: expect.objectContaining({
+            '@context': expect.arrayContaining([
+              'https://www.w3.org/ns/credentials/v2',
+              'https://www.w3.org/ns/credentials/examples/v2',
+              'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
+            ]),
+            type: ['VerifiableCredential'],
+            issuer: mockIssuer,
+            credentialSubject: mockCredentialSubject,
+          }),
+          options: { proofFormat: 'EnvelopingProofJose' },
+        }),
+        { headers: {} },
+      );
+
+      expect(result).toEqual(mockVerifiableCredential);
     });
-  });
 
-  it('should issue VC successfully when credential status is not provided in the issue VC payload', async () => {
-    jest.spyOn(privateAPI, 'post')
-      .mockResolvedValueOnce(mockCredentialStatus)
-      .mockResolvedValueOnce({
-        verifiableCredential: {
-          '@context': ['https://www.w3.org/ns/credentials/v2'],
-          type: 'EnvelopedVerifiableCredential',
-          id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsImlzcyI6ImRpZDp3ZWIvcmcvMjAxOC9jcmVkZWyMDIyIn1dfQ.8pUt1rZktWKGBGyJ6GH3io6f7fliAg8IWsEqTWCYvKm0fQkIlPnqqTobxgR3qmtMd_jJXc8IHwbVVOBUEvpcCg',
-        },
-      });
+    it('should issue VC successfully when credential status is provided', async () => {
+      const mockResponse = { verifiableCredential: mockVerifiableCredential };
+      (privateAPI.post as jest.Mock).mockResolvedValue(mockResponse);
 
-    const vc = await issueVC({
-      context: ['https://www.w3.org/ns/credentials/v2'],
-      type: ['Event'],
-      issuer: 'did:example:123',
-      credentialSubject: { id: 'did:example:123', name: 'John Doe' },
-      restOfVC: { render: {} },
-      vcKitAPIUrl: 'https://api.vc.example.com',
-    });
-
-    expect(privateAPI.post).toHaveBeenCalledTimes(2);
-    expect(privateAPI.post).toHaveBeenNthCalledWith(1, 'https://api.vc.example.com/agent/issueBitstringStatusList', {
-      bitstringStatusIssuer: 'did:example:123',
-      statusPurpose: 'revocation',
-    });
-    expect(privateAPI.post).toHaveBeenLastCalledWith('https://api.vc.example.com/credentials/issue', {
-      credential: {
-        '@context': [
-          'https://www.w3.org/ns/credentials/v2',
-          'https://www.w3.org/ns/credentials/examples/v2',
-          'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
-          'https://www.w3.org/ns/credentials/v2'
-        ],
-        type: [ 'VerifiableCredential', 'Event' ],
-        issuer: 'did:example:123',
-        credentialSubject: { id: 'did:example:123', name: 'John Doe' },
-        credentialStatus: {
-          id: 'http://example.com/bitstring-status-list/1#0',
-          type: 'BitstringStatusListEntry',
-          statusPurpose: 'revocation',
-          statusListIndex: 0,
-          statusListCredential: 'http://example.com/bitstring-status-list/1'
-        },
-        render: {}
-      },
-      options: { proofFormat: 'EnvelopingProofJose' }
-    });
-    expect(vc).toEqual({
-      '@context': ['https://www.w3.org/ns/credentials/v2'],
-      type: 'EnvelopedVerifiableCredential',
-      id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsImlzcyI6ImRpZDp3ZWIvcmcvMjAxOC9jcmVkZWyMDIyIn1dfQ.8pUt1rZktWKGBGyJ6GH3io6f7fliAg8IWsEqTWCYvKm0fQkIlPnqqTobxgR3qmtMd_jJXc8IHwbVVOBUEvpcCg',
-    });
-  });
-
-  it('should throw error when issue credential status fails', async () => {
-    jest.spyOn(privateAPI, 'post').mockRejectedValueOnce(new Error('Agent not available'));
-
-    try {
-      await issueVC({
-        context: ['https://www.w3.org/ns/credentials/v2'],
-        type: ['VerifiableCredential', 'Event'],
-        issuer: 'did:example:123',
-        credentialSubject: { id: 'did:example:123', name: 'John Doe' },
-        restOfVC: { render: {} },
-        vcKitAPIUrl: 'https://api.vc.example.com',
-      });
-    } catch (error: any) {
-      expect(privateAPI.post).toHaveBeenCalledTimes(1);
-      expect(privateAPI.post).toHaveBeenNthCalledWith(1, 'https://api.vc.example.com/agent/issueBitstringStatusList', {
-        bitstringStatusIssuer: 'did:example:123',
-        statusPurpose: 'revocation',
-      });
-      expect(error.message).toEqual('Agent not available');
-    }
-  });
-
-  it('should throw error when vcKitAPIUrl is invalid', async () => {
-    jest.spyOn(privateAPI, 'post')
-      .mockResolvedValueOnce(mockCredentialStatus)
-      .mockResolvedValueOnce(new Error('Invalid URL: invalid-api-url'));
-
-    try {
-      await issueVC({
-        context: ['https://www.w3.org/ns/credentials/v2'],
-        type: ['VerifiableCredential', 'Event'],
-        issuer: 'did:example:123',
+      const result = await issueVC({
+        ...defaultParams,
         credentialStatus: mockCredentialStatus,
-        credentialSubject: { id: 'did:example:123', name: 'John Doe' },
-        restOfVC: { render: {} },
-        vcKitAPIUrl: 'invalid-api-url', // invalid api url
-      });
-    } catch (error: any) {
-      expect(privateAPI.post).toHaveBeenCalledTimes(1);
-      expect(privateAPI.post).toHaveBeenNthCalledWith(1, 'https://api.vc.example.com/agent/issueBitstringStatusList', {
-        credential: {
-          '@context': [
-            'https://www.w3.org/ns/credentials/v2',
-            'https://www.w3.org/ns/credentials/examples/v2',
-            'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
-            'https://www.w3.org/ns/credentials/v2'
-          ],
-          type: [ 'VerifiableCredential', 'Event' ],
-          issuer: 'did:example:123',
-          credentialSubject: { id: 'did:example:123', name: 'John Doe' },
-          credentialStatus: {
-            id: 'http://example.com/bitstring-status-list/1#0',
-            type: 'BitstringStatusListEntry',
-            statusPurpose: 'revocation',
-            statusListIndex: 0,
-            statusListCredential: 'http://example.com/bitstring-status-list/1'
-          },
-          render: {}
-        },
-        options: { proofFormat: 'EnvelopingProofJose' }
-      });
-      expect(error.message).toEqual('Invalid URL: invalid-api-url');
-    }
-  });
-
-  it('should throw error when apiKey is invalid', async () => {
-    privateAPI.setBearerTokenAuthorizationHeaders('invalid-api'); // invalid api key
-    jest.spyOn(privateAPI, 'post').mockRejectedValueOnce(new Error('invalid_argument: apiKey is invalid'));
-
-    try {
-      await issueVC({
-        context: ['https://www.w3.org/ns/credentials/v2'],
         type: ['Event'],
-        issuer: 'did:example:123',
-        credentialStatus: mockCredentialStatus,
-        credentialSubject: { id: 'did:example:123', name: 'John Doe' },
-        restOfVC: { render: {} },
-        vcKitAPIUrl: 'https://api.vc.example.com',
       });
-    } catch (error: any) {
-      expect(privateAPI.post).toHaveBeenCalledTimes(1);
-      expect(privateAPI.post).toHaveBeenNthCalledWith(1, 'https://api.vc.example.com/credentials/issue', {
-        credential: {
-          '@context': [
-            'https://www.w3.org/ns/credentials/v2',
-            'https://www.w3.org/ns/credentials/examples/v2',
-            'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
-            'https://www.w3.org/ns/credentials/v2'
-          ],
-          type: [ 'VerifiableCredential', 'Event' ],
-          issuer: 'did:example:123',
-          credentialSubject: { id: 'did:example:123', name: 'John Doe' },
-          credentialStatus: {
-            id: 'http://example.com/bitstring-status-list/1#0',
-            type: 'BitstringStatusListEntry',
-            statusPurpose: 'revocation',
-            statusListIndex: 0,
-            statusListCredential: 'http://example.com/bitstring-status-list/1'
-          },
-          render: {}
-        },
-        options: { proofFormat: 'EnvelopingProofJose' }
-      });
-      expect(error.message).toEqual('invalid_argument: apiKey is invalid');
-    }
-  });
 
-  it('should throw error when type does not include VerifiableCredential', async () => {
-    jest.spyOn(privateAPI, 'post').mockRejectedValueOnce(new Error('"type" must include `VerifiableCredential`.'));
-
-    try {
-      await issueVC({
-        context: ['https://www.w3.org/ns/credentials/v2'],
-        type: ['Event'], // type does not include VerifiableCredential
-        issuer: 'did:example:123',
-        credentialStatus: mockCredentialStatus,
-        credentialSubject: { id: 'did:example:123', name: 'John Doe' },
-        restOfVC: { render: {} },
-        vcKitAPIUrl: 'https://api.vc.example.com',
-      });
-    } catch (error: any) {
-      expect(privateAPI.post).toHaveBeenCalledTimes(1);
-      expect(privateAPI.post).toHaveBeenNthCalledWith(1, 'https://api.vc.example.com/credentials/issue', {
-        credential: {
-          '@context': [
-            'https://www.w3.org/ns/credentials/v2',
-            'https://www.w3.org/ns/credentials/examples/v2',
-            'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
-            'https://www.w3.org/ns/credentials/v2'
-          ],
-          type: [ 'VerifiableCredential', 'Event' ],
-          issuer: 'did:example:123',
-          credentialSubject: { id: 'did:example:123', name: 'John Doe' },
-          credentialStatus: {
-            id: 'http://example.com/bitstring-status-list/1#0',
-            type: 'BitstringStatusListEntry',
-            statusPurpose: 'revocation',
-            statusListIndex: 0,
-            statusListCredential: 'http://example.com/bitstring-status-list/1'
-          },
-          render: {}
-        },
-        options: { proofFormat: 'EnvelopingProofJose' }
-      });
-      expect(error.message).toEqual(`"type" must include \`VerifiableCredential\`.`);
-    }
-  });
-});
-
-describe('issueCredentialStatus', () => {
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
-
-  it('should issue credential status successfully', async () => {
-    jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({
-      id: 'http://example.com/bitstring-status-list/25#0',
-      statusPurpose: 'revocation',
+      expect(privateAPI.post).toHaveBeenCalledWith(
+        `${mockVcKitAPIUrl}/credentials/issue`,
+        expect.objectContaining({
+          credential: expect.objectContaining({
+            credentialStatus: mockCredentialStatus,
+          }),
+        }),
+        { headers: {} },
+      );
+      expect(result).toEqual(mockVerifiableCredential);
     });
 
-    const credentialStatus = await issueCredentialStatus({
-      host: 'https://api.vc.example.com',
+    it('should issue VC successfully when credential status is not provided', async () => {
+      (privateAPI.post as jest.Mock)
+        .mockResolvedValueOnce(mockCredentialStatus)
+        .mockResolvedValueOnce({ verifiableCredential: mockVerifiableCredential });
+
+      const result = await issueVC({
+        ...defaultParams,
+        type: ['Event'],
+      });
+
+      expect(privateAPI.post).toHaveBeenCalledTimes(2);
+      expect(privateAPI.post).toHaveBeenNthCalledWith(
+        1,
+        `${mockVcKitAPIUrl}/agent/issueBitstringStatusList`,
+        {
+          bitstringStatusIssuer: mockIssuer,
+          statusPurpose: 'revocation',
+        },
+        { headers: {} },
+      );
+      expect(result).toEqual(mockVerifiableCredential);
+    });
+
+    it('should include custom context and type if provided', async () => {
+      const customParams = {
+        ...defaultParams,
+        context: ['https://custom-context.example.com'],
+        type: ['CustomCredential'],
+      };
+
+      const mockResponse = { verifiableCredential: mockVerifiableCredential };
+      (privateAPI.post as jest.Mock).mockResolvedValue(mockResponse);
+
+      await issueVC(customParams);
+
+      expect(privateAPI.post).toHaveBeenCalledWith(
+        `${mockVcKitAPIUrl}/credentials/issue`,
+        expect.objectContaining({
+          credential: expect.objectContaining({
+            '@context': expect.arrayContaining([
+              'https://www.w3.org/ns/credentials/v2',
+              'https://www.w3.org/ns/credentials/examples/v2',
+              'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
+              'https://custom-context.example.com',
+            ]),
+            type: ['VerifiableCredential', 'CustomCredential'],
+          }),
+        }),
+        { headers: {} },
+      );
+    });
+
+    it('should include custom headers if provided', async () => {
+      const customHeaders = { 'X-Custom-Header': 'CustomValue' };
+      const mockResponse = { verifiableCredential: mockVerifiableCredential };
+      (privateAPI.post as jest.Mock).mockResolvedValue(mockResponse);
+
+      await issueVC({
+        ...defaultParams,
+        headers: customHeaders,
+      });
+
+      expect(privateAPI.post).toHaveBeenCalledWith(expect.any(String), expect.any(Object), { headers: customHeaders });
+    });
+
+    it('should throw error when headers are not a plain object with string values', async () => {
+      const invalidHeaders = { invalidHeader: 123 };
+
+      await expect(
+        issueVC({
+          ...defaultParams,
+          headers: invalidHeaders as any,
+        }),
+      ).rejects.toThrow('VcKit headers defined in app config must be a plain object with string values');
+    });
+
+    it('should include additional properties in restOfVC', async () => {
+      const mockResponse = { verifiableCredential: mockVerifiableCredential };
+      (privateAPI.post as jest.Mock).mockResolvedValue(mockResponse);
+
+      await issueVC({
+        ...defaultParams,
+        restOfVC: {
+          expirationDate: '2023-12-31T23:59:59Z',
+        },
+      });
+
+      expect(privateAPI.post).toHaveBeenCalledWith(
+        `${mockVcKitAPIUrl}/credentials/issue`,
+        expect.objectContaining({
+          credential: expect.objectContaining({
+            expirationDate: '2023-12-31T23:59:59Z',
+          }),
+        }),
+        { headers: {} },
+      );
+    });
+  });
+
+  describe('issueCredentialStatus', () => {
+    const defaultStatusParams = {
+      host: mockVcKitAPIUrl,
       apiKey: 'test123',
       statusPurpose: 'revocation',
-      bitstringStatusIssuer: 'did:example:123',
+      bitstringStatusIssuer: mockIssuer,
+    };
+
+    it('should issue credential status successfully', async () => {
+      const mockResponse = {
+        id: 'http://example.com/bitstring-status-list/25#0',
+        statusPurpose: 'revocation',
+      };
+      (privateAPI.post as jest.Mock).mockResolvedValue(mockResponse);
+
+      const result = await issueCredentialStatus(defaultStatusParams);
+
+      expect(privateAPI.post).toHaveBeenCalledWith(
+        `${mockVcKitAPIUrl}/agent/issueBitstringStatusList`,
+        {
+          bitstringStatusIssuer: mockIssuer,
+          statusPurpose: 'revocation',
+          apiKey: 'test123',
+        },
+        { headers: {} },
+      );
+      expect(result).toEqual(mockResponse);
     });
 
-    expect(privateAPI.post).toHaveBeenCalledTimes(1);
-    expect(privateAPI.post).toHaveBeenCalledWith('https://api.vc.example.com/agent/issueBitstringStatusList', {
-      bitstringStatusIssuer: 'did:example:123',
-      statusPurpose: 'revocation',
+    it('should throw error when missing required host parameter', async () => {
+      await expect(
+        issueCredentialStatus({
+          ...defaultStatusParams,
+          host: '',
+        }),
+      ).rejects.toThrow('Error issuing credential status: Host is required');
+
+      expect(privateAPI.post).not.toHaveBeenCalled();
     });
-    expect(credentialStatus).toEqual({
-      id: 'http://example.com/bitstring-status-list/25#0',
-      statusPurpose: 'revocation',
+
+    it('should throw error when missing required bitstringStatusIssuer parameter', async () => {
+      await expect(
+        issueCredentialStatus({
+          ...defaultStatusParams,
+          bitstringStatusIssuer: '',
+        }),
+      ).rejects.toThrow('Error issuing credential status: Bitstring Status Issuer is required');
+
+      expect(privateAPI.post).not.toHaveBeenCalled();
     });
-  });
 
-  it('should throw error when missing required host parameter', async () => {
-    jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({});
+    it('should throw error when issuer is invalid', async () => {
+      (privateAPI.post as jest.Mock).mockRejectedValue(
+        new Error('invalid_argument: credential.issuer must be a DID managed by this agent.'),
+      );
 
-    try {
+      await expect(
+        issueCredentialStatus({
+          ...defaultStatusParams,
+          bitstringStatusIssuer: 'invalid:issuer:123',
+        }),
+      ).rejects.toThrow('invalid_argument: credential.issuer must be a DID managed by this agent.');
+    });
+
+    it('should handle custom headers', async () => {
+      const customHeaders = { 'X-Custom-Header': 'CustomValue' };
+      const mockResponse = {
+        id: 'http://example.com/bitstring-status-list/25#0',
+        statusPurpose: 'revocation',
+      };
+      (privateAPI.post as jest.Mock).mockResolvedValue(mockResponse);
+
       await issueCredentialStatus({
-        host: '', // missing host
-        apiKey: 'test123',
-        statusPurpose: 'revocation',
-        bitstringStatusIssuer: 'did:example:123',
+        ...defaultStatusParams,
+        headers: customHeaders,
       });
-    } catch (error: any) {
-      expect(privateAPI.post).not.toHaveBeenCalled();
-      expect(error.message).toEqual('Error issuing credential status: Host is required');
-    }
-  });
 
-  it('should throw error when missing required apiKey parameter', async () => {
-    jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({});
-
-    try {
-      await issueCredentialStatus({
-        host: 'https://api.vc.example.com',
-        apiKey: '', // missing apiKey
-        statusPurpose: 'revocation',
-        bitstringStatusIssuer: 'did:example:123',
-      });
-    } catch (error: any) {
-      expect(privateAPI.post).not.toHaveBeenCalled();
-      expect(error.message).toEqual('Error issuing credential status: API Key is required');
-    }
-  });
-
-  it('should throw error when missing required bitstringStatusIssuer parameter', async () => {
-    jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({});
-
-    try {
-      await issueCredentialStatus({
-        host: 'https://api.vc.example.com',
-        apiKey: 'test123',
-        statusPurpose: 'revocation',
-        bitstringStatusIssuer: '', // missing bitstringStatusIssuer
-      });
-    } catch (error: any) {
-      expect(privateAPI.post).not.toHaveBeenCalled();
-      expect(error.message).toEqual('Error issuing credential status: Bitstring Status Issuer is required');
-    }
-  });
-
-  it('should throw error when issuer is invalid', async () => {
-    jest
-      .spyOn(privateAPI, 'post')
-      .mockRejectedValueOnce(new Error('invalid_argument: credential.issuer must be a DID managed by this agent.'));
-
-    try {
-      await issueCredentialStatus({
-        host: 'https://api.vc.example.com',
-        apiKey: 'test123',
-        statusPurpose: 'revocation',
-        bitstringStatusIssuer: 'invalid:issuer:123', // invalid issuer
-      });
-    } catch (error: any) {
-      expect(privateAPI.post).toHaveBeenCalledTimes(1);
-      expect(privateAPI.post).toHaveBeenCalledWith('https://api.vc.example.com/agent/issueBitstringStatusList', {
-        bitstringStatusIssuer: 'invalid:issuer:123',
-        statusPurpose: 'revocation',
-      });
-      expect(error.message).toEqual('invalid_argument: credential.issuer must be a DID managed by this agent.');
-    }
-  });
-
-  it('should throw error when agent is not available', async () => {
-    jest.spyOn(privateAPI, 'post').mockRejectedValueOnce(new Error('Agent not available'));
-
-    try {
-      await issueCredentialStatus({
-        host: 'invalid-api-url', // invalid api url
-        apiKey: 'test123',
-        statusPurpose: 'revocation',
-        bitstringStatusIssuer: 'did:example:123',
-      });
-    } catch (error: any) {
-      expect(privateAPI.post).toHaveBeenCalledTimes(1);
-      expect(privateAPI.post).toHaveBeenCalledWith('invalid-api-url/agent/issueBitstringStatusList', {
-        bitstringStatusIssuer: 'did:example:123',
-        statusPurpose: 'revocation',
-      });
-      expect(error.message).toEqual('Agent not available');
-    }
-  });
-
-  it('should throw error when apiKey is invalid', async () => {
-    privateAPI.setBearerTokenAuthorizationHeaders('invalid-api'); // invalid api key
-    jest.spyOn(privateAPI, 'post').mockRejectedValueOnce(new Error('invalid_argument: apiKey is invalid'));
-
-    try {
-      await issueCredentialStatus({
-        host: 'https://api.vc.example.com',
-        apiKey: 'test123',
-        statusPurpose: 'revocation',
-        bitstringStatusIssuer: 'did:example:123',
-      });
-    } catch (error: any) {
-      expect(privateAPI.post).toHaveBeenCalledTimes(1);
-      expect(privateAPI.post).toHaveBeenCalledWith('https://api.vc.example.com/agent/issueBitstringStatusList', {
-        bitstringStatusIssuer: 'did:example:123',
-        statusPurpose: 'revocation',
-      });
-      expect(error.message).toEqual('invalid_argument: apiKey is invalid');
-    }
+      expect(privateAPI.post).toHaveBeenCalledWith(expect.any(String), expect.any(Object), { headers: customHeaders });
+    });
   });
 });

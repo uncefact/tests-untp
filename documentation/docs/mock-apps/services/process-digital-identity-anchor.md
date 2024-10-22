@@ -40,8 +40,11 @@ P-->>C: Return digital identity anchor VC and resolver URL
   "parameters": [
     {
       "vckit": {
-        "vckitAPIUrl": "https://api.vckit.example.com",
-        "issuer": "did:example:123456789abcdefghi"
+        "vckitAPIUrl": "http://localhost:3332/v2",
+        "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+        "headers": {
+          "Authorization": "Bearer test123"
+        }
       },
       "digitalIdentityAnchor": {
         "context": ["https://www.w3.org/2018/credentials/v1", "https://gs1.org/voc/"],

@@ -34,6 +34,7 @@ export const processDPP: IService = async (data: any, context: IDppContext): Pro
       issuer: vckitContext.issuer,
       type: [...dppContext.type],
       vcKitAPIUrl: vckitContext.vckitAPIUrl,
+      headers: vckitContext.headers,
       restOfVC,
     });
 
