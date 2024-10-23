@@ -52,11 +52,7 @@ export const processTransformationEvent: IService = async (
     );
 
     const storageContext = context.storage;
-    const transformantionEventLink = await uploadVC(
-      generateUUID(),
-      epcisVc,
-      storageContext,
-    );
+    const transformantionEventLink = await uploadVC(generateUUID(), epcisVc, storageContext);
 
     const dppContext = context.dpp;
 
