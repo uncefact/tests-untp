@@ -47,7 +47,7 @@ P-->>C: Return VC and resolver URL
       },
       "epcisTransactionEvent": {
         "context": ["https://www.w3.org/2018/credentials/v1", "https://gs1.org/voc/"],
-        "type": ["VerifiableCredential", "EPCISTransactionEvent"],
+        "type": ["DigitalTraceabilityEvent"],
         "renderTemplate": [
           {
             "type": "html",

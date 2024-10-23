@@ -10,6 +10,7 @@ import {
   IDppContext,
   IDigitalIdentityAnchorContext,
   IDigitalFacilityRecordContext,
+  IDigitalConformityCredentialContext,
 } from './types/index.js';
 
 export const error: <T>(message: string) => Result<T> = (message) => ({
@@ -261,6 +262,35 @@ export const validateAssociationEventContext = (
     return error('Invalid epcisAssociationEvent dlrVerificationPage');
   if (_.isEmpty(context.epcisAssociationEvent.dlrIdentificationKeyType))
     return error('Invalid epcisAssociationEvent dlrIdentificationKeyType');
+
+  if (_.isEmpty(context.storage)) return error('Invalid storage context');
+  if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
+  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
+
+  if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
+  if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
+  if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
+
+  return { ok: true, value: context };
+};
+
+export const validateDigitalConformityCredentialContext = (
+  context: IDigitalConformityCredentialContext,
+): Result<IDigitalConformityCredentialContext> => {
+  const validationResult = checkContextProperties(context);
+  if (!validationResult.ok) return error(validationResult.value);
+
+  if (_.isEmpty(context.vckit.vckitAPIUrl)) return error('Invalid vckitAPIUrl');
+  if (_.isEmpty(context.vckit.issuer)) return error('Invalid issuer');
+
+  if (_.isEmpty(context.digitalConformityCredential)) return error('Invalid digitalConformityCredential context');
+  if (_.isEmpty(context.digitalConformityCredential.context))
+    return error('Invalid digitalConformityCredential context');
+  if (_.isEmpty(context.digitalConformityCredential.type)) return error('Invalid type');
+  if (_.isEmpty(context.digitalConformityCredential.dlrLinkTitle)) return error('Invalid dlrLinkTitle');
+  if (_.isEmpty(context.digitalConformityCredential.dlrVerificationPage)) return error('Invalid dlrVerificationPage');
+  if (_.isEmpty(context.digitalConformityCredential.dlrIdentificationKeyType))
+    return error('Invalid dlrIdentificationKeyType');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');

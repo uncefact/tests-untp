@@ -45,7 +45,7 @@ P-->>C: Return digital facility record VC and resolver URL
       },
       "digitalFacilityRecord": {
         "context": ["https://www.w3.org/2018/credentials/v1", "https://gs1.org/voc/"],
-        "type": ["VerifiableCredential", "DigitalFacilityRecord"],
+        "type": ["DigitalFacilityRecord"],
         "renderTemplate": [
           {
             "template": "<div><h2>DigitalFacilityRecord</h2></div>",

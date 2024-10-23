@@ -68,7 +68,7 @@ P-->>C: Return VC and resolver URL
             "@type": "WebRenderingTemplate2022"
           }
         ],
-        "type": ["VerifiableCredential", " DigitalProductPassport"],
+        "type": ["DigitalProductPassport"],
         "dlrLinkTitle": "Steel Passport",
         "dlrIdentificationKeyType": "gtin",
         "dlrVerificationPage": "http://localhost:3332/verify"

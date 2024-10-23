@@ -42,6 +42,8 @@ export const contextTransformationEvent = {
   dlr: {
     dlrAPIUrl: 'http://localhost',
     dlrAPIKey: '5555555555555',
+    namespace: 'gs1',
+    linkRegisterPath: '/api/resolver',
   },
   storage: {
     url: 'https://storage.example.com',
@@ -170,7 +172,7 @@ export const transactionEventMock = {
   transactionEventDLRMock: `https://example-dlr.com/nlisid/9988776600000?linkType=all`,
   transactionVCMock: {
     '@context': ['https://example.sh/TransactionEvent.jsonld'],
-    type: ['VerifiableCredential', 'TransactionEventCredential'],
+    type: ['TransactionEventCredential'],
     issuer: 'did:web:example.com',
     credentialSubject: {
       sourceParty: { partyID: `https://beef-steak-shop.com/info.json`, name: 'Beef Steak Shop' },
@@ -194,7 +196,7 @@ export const aggregationEventMock = {
   aggregationEventDLRMock: `https://example.com/gtin/9988776600000.json`,
   aggregationVCMock: {
     '@context': ['https://example.sh/AggregationEvent.jsonld'],
-    type: ['VerifiableCredential', 'AggregationEventCredential'],
+    type: ['AggregationEventCredential'],
     issuer: 'did:web:example.com',
     credentialSubject: {
       parentItem: {
@@ -214,7 +216,7 @@ export const objectEventContext = {
   },
   epcisObjectEvent: {
     context: ['https://www.w3.org/2018/credentials/v1', 'https://gs1.org/voc/'],
-    type: ['VerifiableCredential', 'ObjectEventCredential'],
+    type: ['ObjectEventCredential'],
     renderTemplate: [
       {
         template: '<div><h2>Object Event</h2></div>',
@@ -275,6 +277,8 @@ export const digitalIdentityAnchorContext = {
   dlr: {
     dlrAPIUrl: 'http://dlr.example.com',
     dlrAPIKey: '1234',
+    namespace: 'gs1',
+    linkRegisterPath: '/api/resolver',
   },
   storage: {
     url: 'https://storage.example.com',
@@ -301,6 +305,8 @@ export const digitalFacilityRecordContext = {
   dlr: {
     dlrAPIUrl: 'http://dlr.example.com',
     dlrAPIKey: '1234',
+    namespace: 'gs1',
+    linkRegisterPath: '/api/resolver',
   },
   storage: {
     url: 'https://storage.example.com',
@@ -318,7 +324,7 @@ export const associationEventContext = {
   },
   epcisAssociationEvent: {
     context: ['https://www.w3.org/2018/credentials/v1', 'https://gs1.org/voc/'],
-    type: ['VerifiableCredential', 'AssociationEventCredential'],
+    type: ['AssociationEventCredential'],
     renderTemplate: [
       {
         template: '<div><h2>Association Event</h2></div>',
@@ -340,6 +346,34 @@ export const associationEventContext = {
     dlrAPIKey: 'dlr-api-key-12345',
     namespace: 'gs1',
     linkRegisterPath: '/api/resolver',
+  },
+  identifierKeyPath: '/id',
+};
+
+export const digitalConformityCredentialContext = {
+  vckit: {
+    vckitAPIUrl: 'https://vckit.example.com',
+    issuer: 'did:web:example.com',
+  },
+  digitalConformityCredential: {
+    context: ['https://www.w3.org/2018/credentials/v1'],
+    renderTemplate: [{ template: '<p>Render dcc template</p>', '@type': 'WebRenderingTemplate2022' }],
+    type: ['DigitalConformityCredential'],
+    dlrLinkTitle: 'DigitalConformityCredential',
+    dlrIdentificationKeyType: 'gtin',
+    dlrVerificationPage: 'https://web.example.com/verify',
+  },
+  dlr: {
+    dlrAPIUrl: 'http://dlr.example.com',
+    dlrAPIKey: '1234',
+    namespace: 'gs1',
+    linkRegisterPath: '/api/resolver',
+  },
+  storage: {
+    url: 'https://storage.example.com',
+    params: {
+      resultPath: '',
+    },
   },
   identifierKeyPath: '/id',
 };

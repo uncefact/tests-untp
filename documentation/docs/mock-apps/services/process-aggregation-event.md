@@ -45,7 +45,7 @@ P-->>C: Return VC and resolver URL
       },
       "epcisAggregationEvent": {
         "context": ["https://www.w3.org/2018/credentials/v1", "https://gs1.org/voc/"],
-        "type": ["VerifiableCredential", "EPCISAggregationEvent"],
+        "type": ["DigitalTraceabilityEvent"],
         "renderTemplate": [
           {
             "type": "html",

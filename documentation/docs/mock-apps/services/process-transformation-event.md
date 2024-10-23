@@ -52,7 +52,7 @@ P-->>C: Return EPCIS VC
       },
       "epcisTransformationEvent": {
         "context": ["https://www.w3.org/2018/credentials/v1", "https://gs1.org/voc/"],
-        "type": ["VerifiableCredential", "EPCISTransformationEvent"],
+        "type": ["DigitalTraceabilityEvent"],
         "renderTemplate": [
           {
             "type": "html",
@@ -84,7 +84,7 @@ P-->>C: Return EPCIS VC
       },
       "dpp": {
         "context": ["https://www.w3.org/2018/credentials/v1", "https://schema.org/"],
-        "type": ["VerifiableCredential", "DigitalProductPassport"],
+        "type": ["DigitalProductPassport"],
         "renderTemplate": [
           {
             "type": "html",

@@ -135,3 +135,7 @@ export interface IDigitalFacilityRecordContext extends IContext {
 export interface IAssociationEventContext extends IContext {
   epcisAssociationEvent: IEntityIssue;
 }
+
+export interface IDigitalConformityCredentialContext extends IContext {
+  digitalConformityCredential: IEntityIssue;
+}
