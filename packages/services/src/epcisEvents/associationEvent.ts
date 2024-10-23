@@ -45,11 +45,7 @@ export const processAssociationEvent: IService = async (
     },
   });
 
-  const associationEventVcUrl = await uploadData(
-    storage,
-    associationEventVc,
-    `${associationEventIdentifier}/${generateUUID()}`,
-  );
+  const associationEventVcUrl = await uploadData(storage, associationEventVc, generateUUID());
 
   const associationEventLinkResolver = await registerLinkResolver(
     associationEventVcUrl,

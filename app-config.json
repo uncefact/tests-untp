@@ -1068,7 +1068,7 @@
                 {
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
-                    "issuer": "did:web:60c5-115-79-212-164.ngrok-free.app"
+                    "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development"
                   },
                   "epcisAssociationEvent": {
                     "context": [
