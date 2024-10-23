@@ -44,7 +44,6 @@ export const validateContextDPP = (context: IDppContext): Result<IContext> => {
   if (_.isEmpty(context.dpp.dlrLinkTitle)) return error('Invalid dlrLinkTitle');
   if (_.isEmpty(context.dpp.dlrVerificationPage)) return error('Invalid dlrVerificationPage');
   if (_.isEmpty(context.dpp.dlrIdentificationKeyType)) return error('Invalid dlrIdentificationKeyType');
-  if (_.isEmpty(context.dpp.renderTemplate)) return error('Invalid dpp renderTemplate');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
@@ -92,8 +91,6 @@ export const validateContextTransformationEvent = (
     return error('Invalid epcisTransformationEvent dlrVerificationPage');
   if (_.isEmpty(context.epcisTransformationEvent.dlrIdentificationKeyType))
     return error('Invalid epcisTransformationEvent dlrIdentificationKeyType');
-  if (_.isEmpty(context.epcisTransformationEvent.renderTemplate))
-    return error('Invalid epcisTransformationEvent renderTemplate');
 
   if (_.isEmpty(context.dppCredentials)) return error('dppCredentials not found');
 
@@ -119,8 +116,6 @@ export const validateTransactionEventContext = (
     return error('Invalid epcisTransactionEvent dlrVerificationPage');
   if (_.isEmpty(context.epcisTransactionEvent.dlrIdentificationKeyType))
     return error('Invalid epcisTransactionEvent dlrIdentificationKeyType');
-  if (_.isEmpty(context.epcisTransactionEvent.renderTemplate))
-    return error('Invalid epcisTransactionEvent renderTemplate');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
@@ -153,8 +148,6 @@ export const validateAggregationEventContext = (
     return error('Invalid epcisAggregationEvent dlrVerificationPage');
   if (_.isEmpty(context.epcisAggregationEvent.dlrIdentificationKeyType))
     return error('Invalid epcisAggregationEvent dlrIdentificationKeyType');
-  if (_.isEmpty(context.epcisAggregationEvent.renderTemplate))
-    return error('Invalid epcisAggregationEvent renderTemplate');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
@@ -185,7 +178,6 @@ export const validateObjectEventContext = (context: IObjectEventContext): Result
     return error('Invalid epcisObjectEvent dlrVerificationPage');
   if (_.isEmpty(context.epcisObjectEvent.dlrIdentificationKeyType))
     return error('Invalid epcisObjectEvent dlrIdentificationKeyType');
-  if (_.isEmpty(context.epcisObjectEvent.renderTemplate)) return error('Invalid epcisObjectEvent renderTemplate');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
@@ -215,8 +207,6 @@ export const validateDigitalIdentityAnchorContext = (
   if (_.isEmpty(context.digitalIdentityAnchor.dlrVerificationPage)) return error('Invalid dlrVerificationPage');
   if (_.isEmpty(context.digitalIdentityAnchor.dlrIdentificationKeyType))
     return error('Invalid dlrIdentificationKeyType');
-  if (_.isEmpty(context.digitalIdentityAnchor.renderTemplate))
-    return error('Invalid digitalIdentityAnchor renderTemplate');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
@@ -246,8 +236,6 @@ export const validateDigitalFacilityRecordContext = (
   if (_.isEmpty(context.digitalFacilityRecord.dlrVerificationPage)) return error('Invalid dlrVerificationPage');
   if (_.isEmpty(context.digitalFacilityRecord.dlrIdentificationKeyType))
     return error('Invalid dlrIdentificationKeyType');
-  if (_.isEmpty(context.digitalFacilityRecord.renderTemplate))
-    return error('Invalid digitalFacilityRecord renderTemplate');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
@@ -280,8 +268,6 @@ export const validateAssociationEventContext = (
     return error('Invalid epcisAssociationEvent dlrVerificationPage');
   if (_.isEmpty(context.epcisAssociationEvent.dlrIdentificationKeyType))
     return error('Invalid epcisAssociationEvent dlrIdentificationKeyType');
-  if (_.isEmpty(context.epcisAssociationEvent.renderTemplate))
-    return error('Invalid epcisAssociationEvent renderTemplate');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
