@@ -51,7 +51,6 @@ export const validateContextDPP = (context: IDppContext): Result<IContext> => {
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
-  if (_.isEmpty(context.dlr.linkRegisterPath)) return error('Invalid dlr linkRegisterPath');
   if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   return { ok: true, value: context };
@@ -79,7 +78,6 @@ export const validateContextTransformationEvent = (
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
-  if (_.isEmpty(context.dlr.linkRegisterPath)) return error('Invalid dlr linkRegisterPath');
   if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   if (_.isEmpty(context.epcisTransformationEvent)) return error('epcisTransformationEvent not found');
@@ -123,7 +121,6 @@ export const validateTransactionEventContext = (
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
-  if (_.isEmpty(context.dlr.linkRegisterPath)) return error('Invalid dlr linkRegisterPath');
   if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   return { ok: true, value: context };
@@ -155,7 +152,6 @@ export const validateAggregationEventContext = (
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
-  if (_.isEmpty(context.dlr.linkRegisterPath)) return error('Invalid dlr linkRegisterPath');
   if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   return { ok: true, value: context };
@@ -185,7 +181,6 @@ export const validateObjectEventContext = (context: IObjectEventContext): Result
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
-  if (_.isEmpty(context.dlr.linkRegisterPath)) return error('Invalid dlr linkRegisterPath');
   if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   return { ok: true, value: context };
@@ -214,7 +209,6 @@ export const validateDigitalIdentityAnchorContext = (
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
-  if (_.isEmpty(context.dlr.linkRegisterPath)) return error('Invalid dlr linkRegisterPath');
   if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   return { ok: true, value: context };
@@ -243,7 +237,6 @@ export const validateDigitalFacilityRecordContext = (
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
-  if (_.isEmpty(context.dlr.linkRegisterPath)) return error('Invalid dlr linkRegisterPath');
   if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   return { ok: true, value: context };
@@ -275,7 +268,6 @@ export const validateAssociationEventContext = (
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
-  if (_.isEmpty(context.dlr.linkRegisterPath)) return error('Invalid dlr linkRegisterPath');
   if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   return { ok: true, value: context };

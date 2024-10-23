@@ -61,7 +61,7 @@ export interface IConfigDLR {
   dlrAPIUrl: string;
   dlrAPIKey: string;
   namespace: string;
-  linkRegisterPath: string;
+  linkRegisterPath?: string;
 }
 
 export interface IStorageContext {
