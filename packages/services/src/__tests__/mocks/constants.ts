@@ -42,6 +42,8 @@ export const contextTransformationEvent = {
   dlr: {
     dlrAPIUrl: 'http://localhost',
     dlrAPIKey: '5555555555555',
+    namespace: 'gs1',
+    linkRegisterPath: '/api/resolver',
   },
   storage: {
     url: 'https://storage.example.com',
@@ -275,6 +277,8 @@ export const digitalIdentityAnchorContext = {
   dlr: {
     dlrAPIUrl: 'http://dlr.example.com',
     dlrAPIKey: '1234',
+    namespace: 'gs1',
+    linkRegisterPath: '/api/resolver',
   },
   storage: {
     url: 'https://storage.example.com',
@@ -301,6 +305,8 @@ export const digitalFacilityRecordContext = {
   dlr: {
     dlrAPIUrl: 'http://dlr.example.com',
     dlrAPIKey: '1234',
+    namespace: 'gs1',
+    linkRegisterPath: '/api/resolver',
   },
   storage: {
     url: 'https://storage.example.com',
@@ -360,6 +366,8 @@ export const digitalConformityCredentialContext = {
   dlr: {
     dlrAPIUrl: 'http://dlr.example.com',
     dlrAPIKey: '1234',
+    namespace: 'gs1',
+    linkRegisterPath: '/api/resolver',
   },
   storage: {
     url: 'https://storage.example.com',
