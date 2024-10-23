@@ -44,3 +44,15 @@ To test your Storage implementation, follow these steps:
    - Navigate to `packages/vc-test-suite/reports/index.html`
    - Open this file in a web browser
    - Look for the "Storage Service" section to view your test results
+
+- `url`: This is the full URL for the unencrypted storage service endpoint of your storage service.
+
+- `encryptionUrl`: This is the full URL for the encryption service endpoint of your storage service.
+
+- `headers`: An object containing any additional HTTP headers required for the request to the storage service. You may need to add headers depending on your implementation.
+
+- `method`: The HTTP method used to request the verifiable credential from the storage service. In this case, it's set to 'POST'.
+
+- `additionalParams`: An object containing any additional parameters required for the request to the storage service.
+
+- `additionalPayload`: An object containing any additional payload required for the request to the storage service.

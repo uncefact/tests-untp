@@ -87,7 +87,7 @@ To test your Rendering implementation, follow these steps:
      testSuites: {
        RenderTemplate2024: {
          url: 'http://localhost:3332/agent/renderCredential',
-         headers: {},
+         headers: { Authorization: 'Bearer test123' },
          method: 'POST',
        },
      },
@@ -105,3 +105,9 @@ To test your Rendering implementation, follow these steps:
    - Navigate to `packages/vc-test-suite/reports/index.html`
    - Open this file in a web browser
    - Look for the "RenderTemplate2024" section to view your test results
+
+- `url`: This is the full URL for the credential renderer endpoint of your verifiable credential service.
+
+- `headers`: An object containing any additional HTTP headers required for the request to the verifiable credential service. You may need to add headers depending on your implementation.
+
+- `method`: The HTTP method used to request the rendered credential from the verifiable credential service. In this case, it's set to 'POST'.
