@@ -4,7 +4,7 @@ import { CredentialInfo } from '../CredentialInfo';
 import { CredentialTabs } from '../CredentialTabs';
 import { CredentialComponentProps } from '../../types/common.types';
 
-const Credential = ({ credential, decodeCredential }: CredentialComponentProps) => {
+const Credential = ({ credential, decodedEnvelopedVC }: CredentialComponentProps) => {
   return (
     <Box
       sx={{
@@ -16,7 +16,7 @@ const Credential = ({ credential, decodeCredential }: CredentialComponentProps) 
       }}
     >
       <CredentialInfo credential={credential} />
-      <CredentialTabs credential={credential} decodeCredential={decodeCredential} />
+      <CredentialTabs credential={credential} decodedEnvelopedVC={decodedEnvelopedVC} />
     </Box>
   );
 };

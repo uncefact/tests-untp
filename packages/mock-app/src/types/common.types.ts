@@ -31,5 +31,5 @@ export interface IStyles {
 
 export interface CredentialComponentProps {
   credential: VerifiableCredential;
-  decodeCredential?: UnsignedCredential | null;
+  decodedEnvelopedVC?: UnsignedCredential | null;
 }

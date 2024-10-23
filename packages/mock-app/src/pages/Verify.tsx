@@ -160,7 +160,7 @@ const Verify = () => {
 
         return (
           <BackButton>
-            <Credential credential={credential} decodeCredential={customCredential} />
+            <Credential credential={credential} decodedEnvelopedVC={customCredential} />
           </BackButton>
         );
       default:

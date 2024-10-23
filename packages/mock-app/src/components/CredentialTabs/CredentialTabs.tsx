@@ -6,15 +6,15 @@ import { JsonBlock } from '../JsonBlock';
 import { CredentialComponentProps } from '../../types/common.types';
 import { DownloadCredentialButton } from '../DownloadCredentialButton/DownloadCredentialButton';
 
-const CredentialTabs = ({ credential, decodeCredential }: CredentialComponentProps) => {
+const CredentialTabs = ({ credential, decodedEnvelopedVC }: CredentialComponentProps) => {
   const credentialTabs = [
     {
       label: 'Rendered',
-      children: <CredentialRender credential={decodeCredential ?? credential} />,
+      children: <CredentialRender credential={decodedEnvelopedVC ?? credential} />,
     },
     {
       label: 'JSON',
-      children: <JsonBlock credential={decodeCredential ?? credential} />,
+      children: <JsonBlock credential={decodedEnvelopedVC ?? credential} />,
     },
   ];
 
@@ -27,7 +27,7 @@ const CredentialTabs = ({ credential, decodeCredential }: CredentialComponentPro
   }, [credential]);
 
   const configDefaultTabs = () => {
-    if (decodeCredential?.render?.[0]?.template) {
+    if (decodedEnvelopedVC?.render?.[0]?.template) {
       return setCurrentTabIndex(0);
     }
 
