@@ -1,8 +1,8 @@
 import React from 'react';
 import { Card, CardContent } from '@mui/material';
-import { VerifiableCredential } from '@vckit/core-types';
+import { UnsignedCredential, VerifiableCredential } from '@vckit/core-types';
 
-const JsonBlock = ({ credential }: { credential: VerifiableCredential }) => {
+const JsonBlock = ({ credential }: { credential: VerifiableCredential | UnsignedCredential }) => {
   return (
     <>
       <Card sx={{ width: '100%', textAlign: 'left', overflowX: 'scroll' }}>
