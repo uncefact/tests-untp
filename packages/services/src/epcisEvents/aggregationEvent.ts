@@ -40,6 +40,7 @@ export const processAggregationEvent: IService = async (
   const aggregationVC = await issueVC({
     credentialSubject,
     vcKitAPIUrl: vckit.vckitAPIUrl,
+    headers: vckit.headers,
     issuer: vckit.issuer,
     context: epcisAggregationEvent.context,
     type: epcisAggregationEvent.type,

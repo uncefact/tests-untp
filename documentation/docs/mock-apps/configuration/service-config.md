@@ -45,7 +45,10 @@ graph TD
         {
           "vckit": {
             "vckitAPIUrl": "http://localhost:3332/v2",
-            "issuer": "did:web:example.com"
+            "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+            "headers": {
+              "Authorization": "Bearer test123"
+            }
           },
           "dpp": {
             "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],

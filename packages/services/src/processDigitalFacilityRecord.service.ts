@@ -36,6 +36,7 @@ export const processDigitalFacilityRecord: IService = async (
   const vc: VerifiableCredential = await issueVC({
     credentialSubject: digitalFacilityRecordData.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
+    headers: vckit.headers,
     issuer: vckit.issuer,
     context: digitalFacilityRecord.context,
     type: digitalFacilityRecord.type,

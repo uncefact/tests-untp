@@ -37,6 +37,7 @@ export const processObjectEvent: IService = async (
   const objectEventVc: VerifiableCredential = await issueVC({
     credentialSubject: objectEvent.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
+    headers: vckit.headers,
     issuer: vckit.issuer,
     context: epcisObjectEvent.context,
     type: epcisObjectEvent.type,

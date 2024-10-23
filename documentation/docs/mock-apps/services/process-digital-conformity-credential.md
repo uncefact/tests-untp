@@ -40,8 +40,11 @@ P-->>C: Return digital conformity credential VC and resolver URL
   "parameters": [
     {
       "vckit": {
-        "vckitAPIUrl": "https://api.vckit.example.com",
-        "issuer": "did:example:123456789abcdefghi"
+        "vckitAPIUrl": "http://localhost:3332/v2",
+        "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+        "headers": {
+          "Authorization": "Bearer test123"
+        }
       },
       "digitalConformityCredential": {
         "context": [

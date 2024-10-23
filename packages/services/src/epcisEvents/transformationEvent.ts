@@ -52,11 +52,7 @@ export const processTransformationEvent: IService = async (
     );
 
     const storageContext = context.storage;
-    const transformantionEventLink = await uploadVC(
-      generateUUID(),
-      epcisVc,
-      storageContext,
-    );
+    const transformantionEventLink = await uploadVC(generateUUID(), epcisVc, storageContext);
 
     const dppContext = context.dpp;
 
@@ -162,6 +158,7 @@ export const issueEpcisTransformationEvent = async (
     issuer: vcKitContext.issuer,
     type: [...epcisTransformationEvent.type],
     vcKitAPIUrl: vcKitContext.vckitAPIUrl,
+    headers: vcKitContext.headers,
     restOfVC,
   });
 
@@ -204,6 +201,7 @@ export const issueDPP = async (
     issuer: vcKitContext.issuer,
     type: dppContext.type,
     vcKitAPIUrl: vcKitContext.vckitAPIUrl,
+    headers: vcKitContext.headers,
     credentialSubject: dppCredentialSubject,
     restOfVC,
   });
