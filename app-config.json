@@ -903,7 +903,7 @@
                         "@type": "WebRenderingTemplate2022"
                       }
                     ],
-                    "type": ["VerifiableCredential", "DigitalTraceabilityEvent"],
+                    "type": ["DigitalTraceabilityEvent"],
                     "dlrLinkTitle": "Object Event",
                     "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
@@ -1080,7 +1080,7 @@
                         "@type": "WebRenderingTemplate2022"
                       }
                     ],
-                    "type": ["VerifiableCredential", "DigitalTraceabilityEvent"],
+                    "type": ["DigitalTraceabilityEvent"],
                     "dlrLinkTitle": "Association Event",
                     "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
