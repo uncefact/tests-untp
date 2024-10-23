@@ -1,6 +1,5 @@
 import { render, screen } from '@testing-library/react';
 import { JsonBlock } from '../components/JsonBlock';
-import { VerifyPageContext } from '../hooks/VerifyPageContext';
 
 // Mocking VerifiableCredential from @vckit/core-types
 jest.mock('@vckit/core-types', () => ({
@@ -35,11 +34,7 @@ describe('Json block content', () => {
   };
 
   const renderComponent = (verifiableCredential: any) => {
-    return render(
-      <VerifyPageContext.Provider value={{ vc: verifiableCredential }}>
-        <JsonBlock credential={credential} />
-      </VerifyPageContext.Provider>,
-    );
+    return render(<JsonBlock credential={credential} />);
   };
 
   it('should render json block content component', () => {

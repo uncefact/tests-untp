@@ -65,8 +65,8 @@ describe('Credential tabs content', () => {
     };
     // Render the CredentialTabs component with the modified credential
     render(<CredentialTabs credential={credential2} />);
-    // Expecting the text 'CredentialRender' to be present in the rendered component
-    expect(screen.getByText('CredentialRender')).not.toBeNull();
+    // Expecting the text 'Rendered' to be present in the rendered component
+    expect(screen.getByText('Rendered')).not.toBeNull();
   });
 
   it('should display on change value', () => {
