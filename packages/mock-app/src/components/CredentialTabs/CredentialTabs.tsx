@@ -53,7 +53,7 @@ const CredentialTabs = ({ credential, decodedEnvelopedVC }: CredentialComponentP
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          flexDirection: isMobile ? 'row' : 'row',
+          flexDirection: 'row',
           gap: isMobile ? 1 : 2,
           maxWidth: '800px',
           margin: 'auto',
