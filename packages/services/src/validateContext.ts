@@ -298,6 +298,7 @@ export const validateDigitalConformityCredentialContext = (
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
+  if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   return { ok: true, value: context };
 };
