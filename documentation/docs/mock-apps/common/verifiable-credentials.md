@@ -9,9 +9,7 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The `Verifiable Credentials` is following the flow of the [W3C Verifiable Credentials Data Model 2.0](https://www.w3.org/TR/vc-data-model/). It is a standard for issuing, presenting, and verifying credentials in a secure and privacy-preserving manner. Verifiable Credentials are tamper-proof, cryptographically signed documents that contain claims about a subject, such as a person, organization, or device. They are issued by trusted entities, known as issuers, and can be presented to verifiers to prove the authenticity of the claims.
-
----
+Verifiable Credentials follow the flow of the W3C Verifiable Credentials Data Model 2.0. It is a standard for issuing, presenting, and verifying credentials in a secure and privacy-preserving manner. Verifiable Credentials are tamper-proof, cryptographically signed documents containing claims about a subject, such as a person, organization, or device. They are issued by trusted entities known as issuers and can be presented to verifiers to prove the authenticity of the claims.
 
 ## Credential Securing Mechanism
 
@@ -22,7 +20,7 @@ Verifiable Credentials rely on digital signatures or proofs to ensure the authen
    - **JOSE**: JSON Object Signing and Encryption, which enables signed credentials using JWS.
    - **COSE**: CBOR Object Signing and Encryption, used for compact and efficient serialization.
 
-Credentials can also be encrypted if sensitive information must be protected. Encryption keys are managed through secure Key Management Systems (KMS) to ensure credentials remain confidential and tamper-proof.
+Credentials can also be encrypted if sensitive information needs to be protected. Encryption keys are managed through secure Key Management Systems (KMS) to ensure credentials remain confidential and tamper-proof.
 
 ---
 
@@ -30,9 +28,9 @@ Refer to the [Verifiable Credentials Data Model 2.0 - Securing Mechanisms](https
 
 ## Credential Payload Structure
 
-The Credential when issuing will have payload follows the [Verifiable Credentials API v0.3](https://w3c-ccg.github.io/vc-api/#issue-credential) specification. A typical payload contains the following fields:
+When issuing, the credential will follow the [Verifiable Credentials API v0.3](https://w3c-ccg.github.io/vc-api/#issue-credential) specification. A typical payload contains the following fields:
 
-For EnvelopedVerifiableCredential:
+Example: EnvelopedVerifiableCredential
 
 ```json
 {
@@ -42,7 +40,7 @@ For EnvelopedVerifiableCredential:
 }
 ```
 
-For a JSON-LD Verifiable Credential with a proof:
+Example: JSON-LD Verifiable Credential with a Proof
 
 ```json
 {
@@ -67,7 +65,7 @@ For a JSON-LD Verifiable Credential with a proof:
 
 ---
 
-When verifying a credential, the verifier will call to the server to verify the credential. The server will return the verification result as follows:
+When verifying a credential, the verifier will call the server to verify the credential. The server will return the verification result as follows:
 
 ```json
 {
