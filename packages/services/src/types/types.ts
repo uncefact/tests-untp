@@ -61,6 +61,7 @@ export interface IConfigDLR {
   dlrAPIUrl: string;
   dlrAPIKey: string;
   namespace: string;
+  linkRegisterPath?: string;
 }
 
 export interface IStorageContext {
@@ -129,4 +130,8 @@ export interface IObjectEventContext extends IContext {
 
 export interface IDigitalFacilityRecordContext extends IContext {
   digitalFacilityRecord: IEntityIssue;
+}
+
+export interface IAssociationEventContext extends IContext {
+  epcisAssociationEvent: IEntityIssue;
 }
