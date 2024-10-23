@@ -1,0 +1,2758 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap"
+    rel="stylesheet">
+  <title>Digital Product Passport</title>
+  <style>
+    :root {
+      --image-src: url('{{credentialSubject.productImage.linkURL}}');
+      --highlight: rgba(0, 99, 83, 1);
+      --primary-colorsblue-400: rgba(79, 149, 221, 1);
+      --primary-colorsblue-50: rgba(210, 229, 249, 1);
+      --primary-colorsblue-10: rgba(247, 250, 253, 1);
+      --white: rgba(255, 255, 255, 1);
+      --black: rgba(0, 0, 0, 1);
+      --primary-colorsgray-400: rgba(212, 214, 216, 1);
+      --primary-colorsgray-600: rgba(85, 96, 110, 1);
+      --primary-colorsblue-700: rgba(31, 90, 149, 1);
+      --primary-colorsgray-700: rgba(35, 46, 61, 1);
+      --accent-colorslight-green: rgba(184, 236, 182, 1);
+      --text-color-green: rgba(8, 50, 0, 1);
+      --accent-colorslight-red: rgba(255, 188, 183, 1);
+      --text-color-red: rgba(50, 0, 0, 1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Lato', sans-serif;
+    }
+
+    section {
+      padding: 0 16px 0 16px;
+    }
+
+    a {
+      text-decoration: none;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 19.62px;
+      color: #000000;
+    }
+
+    .section-description {
+      margin-top: 12px;
+      font-size: 16px;
+      line-height: 18.88px;
+      color: #000000;
+      font-weight: 400;
+    }
+
+    .table {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .table-item {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      column-gap: 16px;
+      align-items: center;
+      padding-bottom: 10px;
+
+      border-bottom: 1px solid #d4d6d8;
+    }
+
+    .table-item span {
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 17.44px;
+      color: var(--primary-colorsgray-600);
+    }
+
+    .table-item p,
+    .table-item a,
+    .table-item a:link {
+      font-size: 16px;
+      font-weight: 500;
+      line-height: 17.44px;
+      color: var(--primary-colorsgray-700);
+    }
+
+    .table-line {
+      border-bottom: 1px solid #d4d6d8;
+    }
+
+    .item-title {
+      display: flex;
+
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 17.44px;
+      color: #55606E;
+    }
+
+    .item-value {
+      display: flex;
+      flex-direction: column;
+
+      font-size: 16px;
+      font-weight: 500;
+      line-height: 17.44px;
+      color: #232E3D;
+    }
+
+    .item-value a,
+    .item-value span {
+      color: #232E3D;
+    }
+
+    .annotation {
+      display: flex;
+      gap: 4px;
+
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 15.26px;
+      color: #55606E;
+    }
+
+    .annotation span {
+      padding-top: 2px;
+    }
+
+    .mobile {
+      min-width: 150px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      word-break: break-word;
+    }
+
+    .header {
+      min-height: 320px;
+    }
+
+    .header-image {
+      background: linear-gradient(248.36deg, rgba(0, 0, 0, 0.18) 7.6%, rgba(0, 0, 0, 0.6) 70.52%);
+      background-image: var(--image-src);
+      background-size: cover;
+      background-position: center;
+      height: 232px;
+      position: relative;
+    }
+
+    .header-image-top-left {
+      position: absolute;
+      top: 25px;
+      left: 15px;
+
+      font-weight: 500;
+      font-size: 16px;
+      line-height: 22px;
+      color: #ffffff;
+    }
+
+    .header-image-bottom-left {
+      position: absolute;
+      bottom: 18px;
+      left: 15px;
+      color: #ffffff;
+    }
+
+    .header-image-bottom-left h1 {
+      font-size: 30px;
+      font-weight: 900;
+      line-height: 32.5px;
+    }
+
+    .header-batch {
+      padding: 12px 16px 16px 16px;
+      background-color: #F7FAFD;
+
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      grid-auto-flow: row;
+      row-gap: 12px;
+    }
+
+    .header-batch-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .header-batch-item a {
+      color: #232E3D;
+      font-size: 14px;
+      line-height: 15.25px;
+      font-weight: 500;
+    }
+
+    .header-batch a {
+      padding: 0 2px;
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 19.25px;
+      text-decoration: none;
+      color: #000000;
+    }
+
+    .information {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .information-text {
+      font-size: 19px;
+      font-weight: 300;
+      line-height: 22.42px;
+    }
+
+    .information-show-more {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 15.26px;
+    }
+
+    .information-show-more a {
+      color: var(--primary-colorsgray-700);
+    }
+
+    .passport {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .passport-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .passport-box {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+
+      border: #D4D6D8 1px dotted;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    .passport-box-item {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+
+      padding: 12px 16px 12px 16px;
+
+      border: #D4D6D8 1px dotted;
+      outline-offset: -1px;
+      min-height: 94px;
+      color: #1F5A95;
+    }
+
+    .passport-box-item h3 {
+      font-size: 40px;
+      font-weight: 900;
+      line-height: 43.33px;
+      letter-spacing: 2px;
+    }
+
+    .passport-box-item p {
+      margin-top: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 18.88px;
+    }
+
+    .passport-box-item:last-child {
+      background-color: #F7FAFD;
+    }
+
+    .passport-issued-by-header {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .passport-issued-by-header h3 {
+      margin-top: 2px;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 21.8px;
+    }
+
+    .passport-issued-by-header p {
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 19.25px;
+      color: #55606E;
+    }
+
+    .passport-annotation {
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 15.26px;
+      color: #55606E;
+    }
+
+    .traceability-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .traceability-card {
+      display: grid;
+      grid-template-columns: 3fr 1fr;
+      justify-content: space-between;
+      align-items: center;
+
+      min-height: 40px;
+      text-decoration: none;
+    }
+
+    .traceability-card-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 17.44px;
+      color: #000000;
+    }
+
+    .traceability-card-view-details,
+    .traceability-card-view-details:link {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .emission-score-card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .mission-score-title {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 21.8px;
+    }
+
+    .mission-score-description {
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 18.88px;
+      color: #000000;
+    }
+
+    .score {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .score-unit {
+      font-size: 40px;
+      font-weight: 900;
+      line-height: 43.33px;
+      color: #1F5A95;
+      letter-spacing: 2px;
+    }
+
+    .score-name {
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 17.44px;
+      color: #55606E;
+    }
+
+    .declarations {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .declaration-title {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 21.8px;
+    }
+
+    .cards-conformities {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .cards-conformity {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+
+      min-width: 336px;
+      padding: 16px 18px 16px 16px;
+      position: relative;
+      background-color: var(--white);
+      border-radius: 4px;
+      border: 1px solid;
+      border-color: var(--primary-colorsgray-400);
+    }
+
+    .frame {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      align-self: stretch;
+      width: 100%;
+      flex: 0 0 auto;
+    }
+
+    .div {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .company-name {
+      position: relative;
+      width: fit-content;
+      font-weight: 400;
+      color: var(--primary-colorsgray-600);
+      font-size: 14px;
+      line-height: 19.2px;
+    }
+
+    .tags-VC-badge-red {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 4px 8px;
+      flex: 0 0 auto;
+      background-color: var(--accent-colorslight-red);
+      color: var(--text-color-red);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .tags-VC-badge-green {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 4px 8px;
+      flex: 0 0 auto;
+      background-color: var(--accent-colorslight-green);
+      color: var(--text-color-green);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .verifiable {
+      width: fit-content;
+      font-weight: 600;
+      font-size: 14px;
+      line-height: 15.3px;
+    }
+
+    .mobile .frame-2 {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      position: relative;
+      align-self: stretch;
+      width: 100%;
+      flex: 0 0 auto;
+    }
+
+    .text-wrapper {
+      position: relative;
+      align-self: stretch;
+      margin-top: -1px;
+      font-weight: 400;
+      color: var(--primary-colorsblue-700);
+      font-size: 18px;
+      line-height: 21.2px;
+    }
+
+    .p {
+      color: var(--primary-colorsgray-600);
+      font-size: 14px;
+      line-height: 19.2px;
+      align-self: stretch;
+      font-weight: 400;
+      color: #55606e;
+    }
+
+    .span {
+      font-weight: 400;
+      font-size: 14px;
+      line-height: 19.2px;
+    }
+
+    .text-wrapper-2 {
+      color: #55606e;
+    }
+
+    .frame-3 {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      position: relative;
+      flex: 0 0 auto;
+      margin-right: -2px;
+      border-bottom-width: 1px;
+      border-bottom-style: solid;
+      border-color: var(--white);
+    }
+
+    .frame-4 {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      padding: 4px 0px;
+      position: relative;
+      flex: 0 0 auto;
+      border-top-width: 1px;
+      border-top-style: solid;
+      border-color: var(--white);
+    }
+
+    .typography-heading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .heading {
+      position: relative;
+      flex: 1;
+      font-weight: 400;
+      color: var(--primary-colorsgray-700);
+      font-size: 16px;
+      line-height: 17.4px;
+    }
+
+    .heading-2 {
+      position: relative;
+      flex: 1;
+      margin-top: -0.5px;
+      font-weight: 400;
+      color: var(--primary-colorsgray-600);
+      font-size: 14px;
+      line-height: 19.2px;
+    }
+
+    .cards-traceability {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0px;
+      position: relative;
+      align-self: stretch;
+      width: 100%;
+      flex: 0 0 auto;
+      border-radius: 4px;
+    }
+
+    .history-information {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .history-value-chain-item {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .history-value-chain {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .history-value-chain p {
+      font-size: 18px;
+      font-weight: 400;
+      line-height: 21.24px;
+      color: #1F5A95;
+    }
+
+    .verified-ratio {
+      background-color: #D2E5F9;
+      width: fit-content;
+      padding: 2px 4px;
+    }
+
+    .verified-ratio p {
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 19.25px;
+      color: var(--black);
+    }
+
+    .frame-5 {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .company-name-wrapper {
+      display: flex;
+      flex-direction: column;
+      width: 260px;
+      align-items: flex-start;
+      gap: 4px;
+      position: relative;
+    }
+
+    .company-name-2 {
+      margin-top: -1px;
+      color: var(--black);
+      font-size: 16px;
+      line-height: 17.4px;
+      position: relative;
+      align-self: stretch;
+      font-weight: 400;
+    }
+
+    .img {
+      position: relative;
+      flex: 0 0 auto;
+      margin-right: -1px;
+    }
+
+    .production {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .production:has(.table-item) {
+      display: flex;
+    }
+
+    .production-title {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 21.8px;
+    }
+
+    .product-table,
+    .product-table:link,
+    .product-table:visited,
+    .product-table:active {
+      color: #232E3D;
+    }
+
+    .composition-box {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .composition-box-item {
+      border: 1px solid #d4d6d8;
+      border-radius: 4px;
+      padding: 16px;
+
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .composition-percent {
+      font-size: 16px;
+      font-weight: 500;
+      line-height: 21.92px;
+      color: #000000;
+    }
+
+    .composition-title {
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 17.44px;
+      color: #000000;
+    }
+
+    .composition-tag {
+      display: flex;
+    }
+
+    .composition-tag-item {
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 19.25px;
+      color: #000000;
+      background-color: #D2E5F9;
+      padding: 2px 4px 2px 4px;
+      margin-right: 4px;
+    }
+
+    .composition-box-first-column {
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      gap: 12px;
+    }
+
+    .composition-box-second-column {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .composition-box-second-column a {
+      color: #232E3D;
+    }
+
+    .composition-box-third-column {
+      display: flex;
+      align-items: start;
+      gap: 12px;
+    }
+
+    .composition-box-third-column svg {
+      margin: 1px 10px 0 0;
+    }
+
+    .passport-issued-by {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .history {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .history-event {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .history-item {
+      border-bottom: 1px solid #d4d6d8;
+      padding: 10px 0 12px 0;
+
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .history-item span {
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 17.44px;
+      color: #000000;
+    }
+
+    .history-item a {
+      font-size: 16px;
+      font-weight: 500;
+      line-height: 17.44px;
+      color: var(--primary-colorsgray-700);
+      text-decoration-color: #4f95dd;
+      text-decoration-thickness: 2px;
+    }
+
+    .country-code {
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 19.25px;
+      color: #55606e;
+    }
+
+    .blue-bottom-line-thin,
+    .blue-bottom-line-thin:link {
+      border-bottom: 1px #4F95DD solid;
+      width: fit-content;
+      justify-content: flex-start;
+      align-items: flex-start;
+      gap: 10px;
+      display: inline-flex;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .blue-bottom-line-thick,
+    .blue-bottom-line-thick:link {
+      border-bottom: 2px #4F95DD solid;
+      width: fit-content;
+      justify-content: flex-start;
+      align-items: flex-start;
+      gap: 10px;
+      display: inline-flex;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .gray-bottom-line {
+      border-bottom: 1px #55606E solid;
+      width: fit-content;
+      text-decoration: none;
+    }
+
+    .view-more-button {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: var(--primary-colorsblue-700);
+      cursor: pointer;
+    }
+
+    footer {
+      padding: 16px 16px 32px 16px;
+      min-height: 60px;
+      background-color: #F7FAFD;
+    }
+
+    footer p,
+    footer a,
+    footer a:link {
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 19.25px;
+      color: #232E3D;
+    }
+
+    /* Media Queries for Mobiles */
+    @media (min-width: 50px) {
+      .container {
+        min-width: 390px;
+      }
+
+      .contents {
+        display: none;
+      }
+    }
+
+    /* Media Queries for Desktops */
+    @media (min-width: 1440px) {
+      .container {
+        min-width: 1040px;
+        min-height: 3000px;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        background-color: #ffffff;
+        width: 100%;
+      }
+
+      .mobile {
+        display: none;
+      }
+
+      html,
+      body {
+        margin: 0px;
+        height: 100%;
+      }
+
+      /* a blue color as a generic focus style */
+      button:focus-visible {
+        outline: 2px solid #4a90e2 !important;
+        outline: -webkit-focus-ring-color auto 5px !important;
+      }
+
+      a {
+        text-decoration: none;
+      }
+
+      .container {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        background-color: #ffffff;
+        width: 100%;
+        min-width: 1440px;
+        min-height: 3000px;
+      }
+
+      .container .contents {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 40px;
+        flex: 1;
+        flex-grow: 1;
+      }
+
+      .container .frame {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 56px 200px 0px;
+        align-self: stretch;
+        width: 100%;
+      }
+
+      .container .cards-conformity-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: relative;
+        align-self: stretch;
+        width: 100%;
+        flex: 0 0 auto;
+      }
+
+      .container .conformance {
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 19.25px;
+        color: var(--primary-colorsgray-600);
+      }
+
+      .container .cards-conformity-conformance {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        flex: 0 0 auto;
+      }
+
+      .container .cards-conformity-body {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .container .cards-conformity-title {
+        font-size: 20px;
+        font-weight: 400;
+        line-height: 23.6px;
+        color: var(--primary-colorsblue-700);
+      }
+
+      .container .cards-conformity-description {
+        color: var(--primary-colorsgray-600);
+        font-size: 14px;
+        line-height: 19.2px;
+        align-self: stretch;
+        font-weight: 400;
+      }
+
+      .container .cards-conformity-description a {
+        color: var(--primary-colorsgray-600);
+      }
+
+      .container .cards-conformity-description {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .container .declared-values {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .container .declared-value {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .container .declared-value h3 {
+        font-size: 16px;
+        font-weight: 400;
+        line-height: 17.44px;
+      }
+
+      .container .declared-value p {
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 19.25px;
+      }
+
+      .container .PP-title {
+        width: 300px;
+        margin-top: -1px;
+        font-weight: 500;
+        color: var(--primary-colorsgray-600);
+        font-size: 24px;
+        line-height: 33px;
+      }
+
+      .container .text-wrapper {
+        align-self: stretch;
+        font-weight: 900;
+        color: var(--black);
+        font-size: 72px;
+        letter-spacing: 4.32px;
+        line-height: 78px;
+      }
+
+      .container .product-ID-ALT {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 12px 12px;
+        padding: 12px 12px 16px;
+        align-self: stretch;
+        width: 100%;
+        background-color: var(--primary-colorsblue-10);
+      }
+
+      .container .div {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .container .line {
+        gap: 10px;
+        display: inline-flex;
+        align-items: flex-start;
+        border-bottom-width: 2px;
+        border-bottom-style: solid;
+        border-color: var(--primary-colorsblue-400);
+      }
+
+      .container .text-wrapper-2 {
+        width: fit-content;
+        margin-top: -2px;
+        font-weight: 500;
+        color: var(--primary-colorsgray-700);
+        font-size: 16px;
+        line-height: 17.4px;
+      }
+
+      .container .div-wrapper {
+        display: inline-flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 0px 0px 3px;
+      }
+
+      .container .text-wrapper-3 {
+        width: fit-content;
+        margin-top: -2px;
+        font-weight: 500;
+        color: var(--primary-colorsgray-700);
+        font-size: 16px;
+        line-height: 17.4px;
+      }
+
+      .container .frame-2 {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        align-self: stretch;
+        width: 100%;
+      }
+
+      .container .PP-header {
+        min-width: 320px;
+        min-height: 200px;
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.6) 79.5%);
+        background-image: var(--image-src);
+        background-size: cover;
+        background-position: 50% 50%;
+      }
+
+      .container .frame-3 {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-end;
+        gap: 8px;
+        align-self: stretch;
+        width: 100%;
+      }
+
+      .container .frame-4 {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        flex: 1;
+        flex-grow: 1;
+      }
+
+      .container .p {
+        align-self: stretch;
+        margin-top: -1px;
+        font-weight: 300;
+        color: var(--black);
+        font-size: 19px;
+        line-height: 22.4px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 4;
+        -webkit-box-orient: vertical;
+      }
+
+      .container .div-2 {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 0px 200px;
+        align-self: stretch;
+        width: 100%;
+      }
+
+      .container .typography-heading {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .container .text-wrapper-4 {
+        width: fit-content;
+        font-weight: 700;
+        color: var(--primary-colorsgray-700);
+        font-size: 40px;
+        line-height: 43.6px;
+      }
+
+      .container .text-wrapper-5 {
+        align-self: stretch;
+        font-weight: 400;
+        color: var(--black);
+        font-size: 16px;
+        line-height: 18.9px;
+      }
+
+      .container .div-3 {
+        display: grid;
+        grid-template-columns: 1fr 1.3fr;
+        gap: 32px;
+        width: 100%;
+      }
+
+      .container .div-7 {
+        display: grid;
+        grid-template-columns: 1fr 3fr;
+        gap: 32px;
+        justify-items: center;
+      }
+
+      .container .frame-5 {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .container .frame-6 {
+        display: flex;
+        flex-wrap: wrap;
+        width: 510px;
+        align-items: flex-start;
+        gap: 0px 0px;
+        margin-top: -1px;
+        margin-left: -1px;
+        margin-right: -1px;
+        border-radius: 5px;
+        border: 1px solid;
+        border-color: var(--primary-colorsgray-400);
+      }
+
+      .container .frame-7 {
+        display: flex;
+        flex-direction: column;
+        min-width: 170px;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        flex: 1;
+        flex-grow: 1;
+      }
+
+      .container .text-wrapper-6 {
+        align-self: stretch;
+        margin-top: -1px;
+        font-weight: 900;
+        color: var(--primary-colorsblue-700);
+        font-size: 56px;
+        text-align: center;
+        letter-spacing: 3.36px;
+        line-height: 60.7px;
+      }
+
+      .container .text-wrapper-7 {
+        width: fit-content;
+        font-weight: 700;
+        color: var(--primary-colorsblue-700);
+        font-size: 16px;
+        line-height: 18.9px;
+      }
+
+      .container .frame-8 {
+        display: flex;
+        flex-direction: column;
+        min-width: 170px;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        flex: 1;
+        flex-grow: 1;
+        background-color: var(--primary-colorsblue-10);
+      }
+
+      .container .text-wrapper-8 {
+        align-self: stretch;
+        font-weight: 400;
+        color: var(--primary-colorsgray-600);
+        font-size: 14px;
+        line-height: 15.3px;
+      }
+
+      .container .frame-9 {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        flex: 1;
+        flex-grow: 1;
+      }
+
+      .container .cards-traceability {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 0px;
+        align-self: stretch;
+        width: 100%;
+        background-color: var(--white);
+        border-radius: 4px;
+      }
+
+      .container .div-4 {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .container .frame-10 {
+        display: flex;
+        flex-direction: column;
+        width: 260px;
+        align-items: flex-start;
+        gap: 4px;
+      }
+
+      .container .text-wrapper-9 {
+        align-self: stretch;
+        font-weight: 600;
+        color: var(--black);
+        font-size: 16px;
+        line-height: 17.4px;
+      }
+
+      .container .frame-11 {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .container .text-wrapper-10 {
+        width: fit-content;
+        margin-top: -1px;
+        font-weight: 900;
+        color: var(--primary-colorsblue-700);
+        font-size: 56px;
+        letter-spacing: 3.36px;
+        line-height: 60.7px;
+      }
+
+      .container .co-eq {
+        width: 130px;
+        font-weight: 400;
+        color: var(--primary-colorsgray-600);
+        font-size: 16px;
+        line-height: 17.4px;
+      }
+
+      .container .span {
+        font-weight: 400;
+        color: #55606e;
+        font-size: 16px;
+        line-height: 17.4px;
+      }
+
+      .container .text-wrapper-11 {
+        font-size: 20px;
+        line-height: 21.8px;
+      }
+
+      .container .div-5 {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        align-self: stretch;
+        width: 100%;
+      }
+
+      .container .data-two-columns {
+        display: grid;
+        grid-template-columns: 1fr 8fr;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 10px 0px 12px;
+        align-self: stretch;
+        width: 100%;
+        border-bottom-width: 1px;
+        border-bottom-style: solid;
+        border-color: var(--primary-colorsgray-400);
+      }
+
+      .container .data-two-columns-2 {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 10px 0px 12px;
+        align-self: stretch;
+        width: 100%;
+        border-bottom-width: 1px;
+        border-bottom-style: solid;
+        border-color: var(--primary-colorsgray-400);
+      }
+
+      .container .data-two-columns-3 {
+        display: grid;
+        grid-template-columns: 1.1fr 2fr;
+        gap: 16px;
+        padding: 10px 0px 12px;
+        width: 100%;
+        border-bottom-width: 1px;
+        border-bottom-style: solid;
+        border-color: var(--primary-colorsgray-400);
+      }
+
+      .container .data-two-columns .list {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .container .text-wrapper-12 {
+        font-weight: 400;
+        color: var(--primary-colorsgray-600);
+        font-size: 16px;
+        line-height: 17.4px;
+      }
+
+      .container .data-data {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        align-self: stretch;
+        flex-grow: 1;
+        flex: 1;
+      }
+
+      .container .data {
+        flex: 1;
+        font-weight: 500;
+        color: var(--primary-colorsgray-700);
+        font-size: 16px;
+      }
+
+      .container .data-2 {
+        font-weight: 500;
+        color: var(--primary-colorsgray-700);
+        font-size: 16px;
+        line-height: 17.4px;
+        flex: 1;
+      }
+
+      .container .frame-12 {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        flex: 1;
+        flex-grow: 1;
+      }
+
+      .container .line-wrapper {
+        flex-wrap: wrap;
+        gap: 10px 10px;
+        display: inline-flex;
+        align-items: flex-start;
+        padding: 0px 0px 3px;
+        border-bottom-width: 2px;
+        border-bottom-style: solid;
+        border-color: var(--primary-colorsblue-400);
+      }
+
+      .container .frame-13 {
+        display: flex;
+        align-items: flex-start;
+        gap: 4px;
+        align-self: stretch;
+        width: 100%;
+      }
+
+      .container .text-wrapper-13 {
+        width: fit-content;
+        font-weight: 400;
+        color: var(--primary-colorsgray-600);
+        font-size: 14px;
+        line-height: 15.3px;
+        margin-top: -1px;
+      }
+
+      .container .text-wrapper-14 {
+        width: 358px;
+        margin-top: -1px;
+        font-weight: 700;
+        color: var(--primary-colorsgray-700);
+        font-size: 40px;
+        line-height: 43.6px;
+      }
+
+      .container .frame-14 {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 0px 32px 32px;
+        align-self: stretch;
+        width: 100%;
+        background-color: var(--primary-colorsblue-10);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+
+      .container .frame-15 {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 16px 0px 0px;
+        align-self: stretch;
+        width: 100%;
+      }
+
+      .container .environment {
+        align-self: stretch;
+        margin-top: -1px;
+        font-weight: 400;
+        color: var(--primary-colorsgray-600);
+        font-size: 14px;
+        line-height: 19.2px;
+        text-transform: uppercase;
+      }
+
+      .container .text-wrapper-15 {
+        align-self: stretch;
+        font-weight: 400;
+        color: var(--primary-colorsblue-700);
+        font-size: 18px;
+        line-height: 21.2px;
+      }
+
+      .container .frame-16 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        row-gap: 24px;
+        column-gap: 32px;
+        align-self: stretch;
+      }
+
+      .container .frame-17 {
+        display: flex;
+        flex-direction: column;
+        min-width: 400px;
+        align-items: flex-start;
+        gap: 4px;
+        flex: 1;
+        flex-grow: 1;
+      }
+
+      .container .data-wrapper {
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        display: flex;
+        flex: 1;
+        flex-grow: 1;
+      }
+
+      .container .text-wrapper-16 {
+        font-weight: 500;
+        color: var(--primary-colorsgray-700);
+        font-size: 14px;
+      }
+
+      .container .cards-conformities {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 16px;
+      }
+
+      .container .history-due-diligence {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        color: var(--black);
+      }
+
+      .container .history-due-diligence div {
+        font-size: 16px;
+        font-weight: 400;
+        line-height: 17.44px;
+      }
+
+      .container .contents .history-information {
+        width: 100%;
+
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .container .contents .history-value-chain-item {
+        margin-top: 8px;
+
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .container .contents .history-value-chain {
+        display: flex;
+        flex-direction: row;
+        gap: 16px;
+      }
+      .container .contents .verified-ratio {}
+      .container .contents .history-event {}
+      .container .contents .history-item {}
+      .container .contents .view-more-button {
+        align-self: baseline;
+      }
+
+      .container .frame-18 {
+        display: flex;
+        flex-direction: column;
+        min-width: 400px;
+        align-items: flex-start;
+        flex: 1;
+        flex-grow: 1;
+      }
+
+      .container .frame-19 {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .container .frame-20 {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        align-self: stretch;
+        width: 100%;
+      }
+
+      .container .cards-traceability-2 {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 0px;
+        align-self: stretch;
+        width: 100%;
+        border-radius: 4px;
+      }
+
+      .container .frame-21 {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .container .company-name {
+        align-self: stretch;
+        font-weight: 400;
+        color: var(--black);
+        font-size: 16px;
+        line-height: 17.4px;
+      }
+
+      .container .frame-22 {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        align-self: stretch;
+        width: 100%;
+      }
+
+      .container .rectangle-3 {
+        align-self: stretch;
+        width: 100%;
+        height: 1px;
+        background-color: var(--primary-colorsgray-400);
+      }
+
+      .container .frame-23 {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        align-self: stretch;
+        width: 100%;
+      }
+
+      .container .div-6 {
+        width: fit-content;
+        margin-top: -1px;
+        font-weight: 400;
+        color: var(--primary-colorsgray-700);
+        font-size: 14px;
+        line-height: 19.2px;
+      }
+
+      .container .text-wrapper-17 {
+        font-weight: 400;
+        color: #232e3d;
+        font-size: 14px;
+        line-height: 19.2px;
+      }
+
+      .container .text-wrapper-18 {
+        font-size: 16px;
+        font-weight: 500;
+        line-height: 17.44px;
+        color: #232E3D;
+      }
+
+      .container .black-line {
+        text-decoration: none;
+        color: #232e3d;
+        border-bottom: 1px solid;
+      }
+
+      .container .frame-24 {
+        display: none;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 0px 200px;
+        align-self: stretch;
+        width: 100%;
+      }
+
+      .container .frame-24:has(.data-two-columns) {
+        display: flex;
+      }
+
+      .container .heading-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        align-self: stretch;
+        width: 100%;
+      }
+
+      .container .heading {
+        flex: 1;
+        margin-top: -1px;
+        font-weight: 700;
+        color: var(--primary-colorsgray-700);
+        font-size: 40px;
+        line-height: 43.6px;
+      }
+
+      .container .cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        align-items: flex-start;
+        gap: 20px 20px;
+        align-self: stretch;
+      }
+
+      .container .cards-composition {
+        display: flex;
+        min-width: 400px;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding: 20px;
+        flex: 1;
+        flex-grow: 1;
+        background-color: var(--white);
+        border-radius: 4px;
+        border: 1px solid;
+        border-color: var(--primary-colorsgray-400);
+      }
+
+      .container .first-column {
+        display: flex;
+        width: 260px;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .container .percentage {
+        width: 40px;
+        margin-top: -1px;
+        font-weight: 500;
+        color: var(--black);
+        font-size: 15px;
+        line-height: 20.6px;
+      }
+
+      .container .details {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        flex: 1;
+        flex-grow: 1;
+      }
+
+      .container .frame-25 {
+        display: inline-flex;
+        align-items: flex-start;
+        gap: 6px;
+      }
+
+      .container .frame-26 {
+        display: inline-flex;
+        align-items: flex-start;
+        gap: 4px;
+        padding: 2px 4px;
+        background-color: #d2e5f8;
+      }
+
+      .container .text-wrapper-19 {
+        width: fit-content;
+        margin-top: -1px;
+        font-weight: 400;
+        color: var(--black);
+        font-size: 14px;
+        text-align: right;
+        line-height: 19.2px;
+      }
+
+      .container .frame-27 {
+        display: inline-flex;
+        align-items: flex-start;
+        gap: 4px;
+        padding: 2px 4px;
+        background-color: var(--primary-colorsblue-50);
+      }
+
+      .container .data-data-link-2 {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+
+      .container .frame-28 {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        align-self: stretch;
+        width: 100%;
+      }
+
+      .container .frame-29 {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .container .type-of-event {
+        flex: 1;
+        margin-top: -1px;
+        font-weight: 400;
+        color: var(--black);
+        font-size: 16px;
+        line-height: 17.4px;
+      }
+
+      .container .text-wrapper-20 {
+        align-self: stretch;
+        font-weight: 400;
+        color: var(--primary-colorsblue-700);
+        font-size: 16px;
+        line-height: 17.4px;
+        cursor: pointer;
+      }
+
+      .container .this-digital-product-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 24px 200px 76px;
+        align-self: stretch;
+        width: 100%;
+        background-color: var(--primary-colorsblue-10);
+      }
+
+      .container .this-digital-product {
+        flex: 1;
+        margin-top: -1px;
+        font-weight: 400;
+        color: var(--primary-colorsgray-700);
+        font-size: 14px;
+        line-height: 19.2px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <!-- Mobile width 390px-->
+    <div class="mobile">
+      <header class="header">
+        <div class="header-image">
+          <p class="header-image-top-left">PRODUCT PASSPORT</p>
+          <div class="header-image-bottom-left">
+            <h1>{{credentialSubject.name}}</h1>
+          </div>
+        </div>
+
+        <div>
+          <div class="header-batch">
+            <div class="header-batch-item">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
+                  fill="#1F5A95" />
+              </svg>
+              <a href="{{credentialSubject.idScheme.id}}" class="blue-bottom-line-thick">ID: {{credentialSubject.registeredId}}</a>
+            </div>
+            <div class="header-batch-item">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
+                  fill="#1F5A95" />
+              </svg>
+              <a>Batch: {{credentialSubject.batchNumber}}</a>
+            </div>
+            <div class="header-batch-item">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
+                  fill="#1F5A95" />
+              </svg>
+              <a>Serial: {{credentialSubject.serialNumber}}</a>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section class="information">
+        <div class="information-text">
+          {{credentialSubject.description}}
+        </div>
+        <div class="information-show-more">
+          {{#each credentialSubject.furtherInformation}}
+          <a href="{{linkURL}}" class="blue-bottom-line-thick">{{linkName}}</a>
+          {{/each}}
+        </div>
+      </section>
+
+      {{#if credentialSubject.characteristic}}
+      <section class="production">
+        <div class="production-title">Characteristics</div>
+        <div class="product-table table">
+        {{#each credentialSubject.characteristic}}
+        <div class="table-item">
+          <span class="item-title">{{@key}}</span>
+          <p class="item-value">{{this}}</p>
+        </div>
+        {{/each}}
+        </div>
+      </section>
+      {{/if}}
+
+      <section class="passport">
+        <div class="passport-issued-by-header">
+          <h3>Circularity Scorecard</h3>
+          <p>The circularity Scorecard provides a simple high level summary of circularity performance of the product.</p>
+        </div>
+
+        <div class="passport-box">
+          <div class="passport-box-item">
+            <h3>{{credentialSubject.circularityScorecard.recyclableContent}}%</h3>
+            <p>Recyclable content</p>
+          </div>
+          <div class="passport-box-item">
+            <h3>{{credentialSubject.circularityScorecard.recycledContent}}%</h3>
+            <p>Recycled content</p>
+          </div>
+          <div class="passport-box-item">
+            <h3>{{credentialSubject.circularityScorecard.utilityFactor}}</h3>
+            <p>Utility factor</p>
+          </div>
+          <div class="passport-box-item">
+            <h3>{{credentialSubject.circularityScorecard.materialCircularityIndicator}}</h3>
+            <p>Material circularity*</p>
+          </div>
+        </div>
+
+        <div class="passport-annotation">
+          <p>*The Material Circularity Indicator provides an overall circularity score which is a function of all three of
+            the earlier measures.</p>
+        </div>
+
+        <div class="traceability-cards">
+          <a href="{{credentialSubject.circularityScorecard.recyclingInformation.linkURL}}" class="traceability-card">
+            <div class="traceability-card-text">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M21.82 15.42L19.32 19.75C18.83 20.61 17.92 21.06 17 21H15V23L12.5 18.5L15 14V16H17.82L15.6 12.15L19.93 9.65L21.73 12.77C22.25 13.54 22.32 14.57 21.82 15.42ZM9.21003 3.06H14.21C15.19 3.06 16.04 3.63 16.45 4.45L17.45 6.19L19.18 5.19L16.54 9.6L11.39 9.69L13.12 8.69L11.71 6.24L9.50003 10.09L5.16003 7.59L6.96003 4.47C7.37003 3.64 8.22003 3.06 9.21003 3.06ZM5.05003 19.76L2.55003 15.43C2.06003 14.58 2.13003 13.56 2.64003 12.79L3.64003 11.06L1.91003 10.06L7.05003 10.14L9.70003 14.56L7.97003 13.56L6.56003 16H11V21H7.40003C6.93154 21.0339 6.46293 20.9357 6.0475 20.7165C5.63206 20.4973 5.28648 20.1659 5.05003 19.76Z"
+                  fill="#1F5A95" />
+              </svg>
+              <p>Recycling instructions</p>
+            </div>
+            <div class="traceability-card-view-details">
+              <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round" />
+              </svg>
+            </div>
+          </a>
+          <a href="{{credentialSubject.circularityScorecard.repairInformation.linkURL}}" class="traceability-card">
+            <div class="traceability-card-text">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M18.85 21.975C18.7167 21.975 18.5917 21.9543 18.475 21.913C18.3583 21.8717 18.25 21.8007 18.15 21.7L13.05 16.6C12.95 16.5 12.879 16.3917 12.837 16.275C12.795 16.1583 12.7743 16.0333 12.775 15.9C12.7757 15.7667 12.7967 15.6417 12.838 15.525C12.8793 15.4083 12.95 15.3 13.05 15.2L15.175 13.075C15.275 12.975 15.3833 12.9043 15.5 12.863C15.6167 12.8217 15.7417 12.8007 15.875 12.8C16.0083 12.7993 16.1333 12.8203 16.25 12.863C16.3667 12.9057 16.475 12.9763 16.575 13.075L21.675 18.175C21.775 18.275 21.846 18.3833 21.888 18.5C21.93 18.6167 21.9507 18.7417 21.95 18.875C21.9493 19.0083 21.9287 19.1333 21.888 19.25C21.8473 19.3667 21.7763 19.475 21.675 19.575L19.55 21.7C19.45 21.8 19.3417 21.871 19.225 21.913C19.1083 21.955 18.9833 21.9757 18.85 21.975ZM18.85 19.6L19.575 18.875L15.9 15.2L15.175 15.925L18.85 19.6ZM5.125 22C4.99167 22 4.86267 21.975 4.738 21.925C4.61333 21.875 4.50067 21.8 4.4 21.7L2.3 19.6C2.2 19.5 2.125 19.3873 2.075 19.262C2.025 19.1367 2 19.008 2 18.876C2 18.744 2.025 18.619 2.075 18.501C2.125 18.383 2.2 18.2747 2.3 18.176L7.6 12.876H9.725L10.575 12.026L6.45 7.9H5.025L2 4.875L4.825 2.05L7.85 5.075V6.5L11.975 10.625L14.875 7.725L13.8 6.65L15.2 5.25H12.375L11.675 4.55L15.225 1L15.925 1.7V4.525L17.325 3.125L20.875 6.675C21.1583 6.95833 21.375 7.27933 21.525 7.638C21.675 7.99667 21.75 8.37567 21.75 8.775C21.75 9.17433 21.675 9.55767 21.525 9.925C21.375 10.2923 21.1583 10.6173 20.875 10.9L18.75 8.775L17.35 10.175L16.3 9.125L11.125 14.3V16.4L5.825 21.7C5.725 21.8 5.61667 21.875 5.5 21.925C5.38333 21.975 5.25833 22 5.125 22ZM5.125 19.6L9.375 15.35V14.625H8.65L4.4 18.875L5.125 19.6ZM5.125 19.6L4.4 18.875L4.775 19.225L5.125 19.6Z"
+                  fill="#1F5A95" />
+              </svg>
+              <p>Repair instructions</p>
+            </div>
+            <div class="traceability-card-view-details">
+              <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round" />
+              </svg>
+            </div>
+          </a>
+        </div>
+      </section>
+
+      <section class="emission-score-card">
+        <h3 class="mission-score-title">Emissions Scorecard</h3>
+        <p class="mission-score-description">The Emissions Scorecard gives a clear snapshot of the product's greenhouse
+          gas (GHG) emissions performance, providing a single indicator to assess its overall environmental impact.</p>
+        <div class="score">
+          <p class="score-unit">
+            {{credentialSubject.emissionsScorecard.carbonFootprint}}{{credentialSubject.emissionsScorecard.declaredUnit}}
+          </p>
+          <p class="score-name">Co2Eq</p>
+        </div>
+        <div class="table">
+          <div class="table-item">
+            <span class="item-title">Scope includes</span>
+            <p class="item-value">{{credentialSubject.emissionsScorecard.operationalScope}}</p>
+          </div>
+          <div class="table-item">
+            <span class="item-title">Primary sourced ratio*</span>
+            <p class="item-value">{{credentialSubject.emissionsScorecard.primarySourcedRatio}}% primary sources</p>
+          </div>
+          <div class="table-item">
+            <span class="item-title">Reporting standard</span>
+            <div class="item-value">
+              <a href="{{credentialSubject.emissionsScorecard.reportingStandard.id}}"
+                class="blue-bottom-line-thick">{{credentialSubject.emissionsScorecard.reportingStandard.name}}</a>
+            </div>
+          </div>
+          <div class="table-item">
+            <span class="item-title">Issue date</span>
+            <p class="item-value">{{credentialSubject.emissionsScorecard.reportingStandard.issueDate}}</p>
+          </div>
+        </div>
+        <div class="annotation">
+          <span>*</span>
+          <p>The Primary Sourced Ratio shows the percentage of scope 3 emissions data that is directly collected from
+            actual sources, rather than being based on estimates.</p>
+        </div>
+      </section>
+
+      <section class="declarations">
+        <div class="declaration-title">Declarations</div>
+        <div class="cards-conformities">
+          {{#each credentialSubject.conformityClaim}}
+          <div class="cards-conformity">
+            <div class="frame">
+              <div class="div">
+                <div class="company-name">Conformance:</div>
+                <div class="{{#if conformance}}tags-VC-badge-green{{else}}tags-VC-badge-red{{/if}}">
+                  <div class="verifiable">{{#if conformance}}Yes{{else}}No{{/if}}</div>
+                </div>
+              </div>
+              <div class="company-name">Assessed: {{assessmentDate}}</div>
+            </div>
+            <div class="frame-2">
+              <div class="text-wrapper">{{conformityEvidence.linkName}}</div>
+              <p class="p">
+                <span class="span">{{referenceRegulation.name}} administered in {{referenceRegulation.jurisdictionCountry}} by </span>
+                <a href="{{referenceRegulation.administeredBy.id}}" class="text-wrapper-2 gray-bottom-line">{{referenceRegulation.administeredBy.name}}</a>
+              </p>
+              <p class="p">
+                <span class="span">{{referenceStandard.name}} issued by </span>
+                <a href="{{referenceStandard.issuingParty.id}}" class="text-wrapper-2 gray-bottom-line">{{referenceStandard.issuingParty.name}}</a>
+              </p>
+            </div>
+            <div class="frame-3">
+              {{#each declaredValue}}
+              <div class="frame-4">
+                <div class="typography-heading">
+                  <p class="heading">{{metricName}} is {{metricValue.value}}{{metricValue.unit}}</p>
+                </div>
+                <div class="typography-heading">
+                  <p class="heading-2">Score: {{score}} | Accuracy {{accuracy}}</p>
+                </div>
+              </div>
+              {{/each}}
+            </div>
+            <a href="{{conformityEvidence.linkURL}}" class="cards-traceability">
+              <div class="frame-5">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M5 21C4.45 21 3.97933 20.8043 3.588 20.413C3.19667 20.0217 3.00067 19.5507 3 19V5C3 4.45 3.196 3.97933 3.588 3.588C3.98 3.19667 4.45067 3.00067 5 3H19C19.55 3 20.021 3.196 20.413 3.588C20.805 3.98 21.0007 4.45067 21 5V19C21 19.55 20.8043 20.021 20.413 20.413C20.0217 20.805 19.5507 21.0007 19 21H5ZM5 5V19H19V5H17V12L14.5 10.5L12 12V5H5Z"
+                    fill="#1F5A95"></path>
+                </svg>
+                <div class="company-name-wrapper">
+                  <div class="company-name-2">Evidence</div>
+                </div>
+              </div>
+              <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                </path>
+              </svg>
+            </a>
+          </div>
+          {{/each}}
+        </div>
+      </section>
+
+      <section class="production">
+        <div class="production-title">Production</div>
+        <div class="product-table table">
+          <div class="table-item">
+            <span class="item-title">Product category</span>
+            <p class="item-value">{{#each credentialSubject.productCategory}}{{name}}{{#unless @last}},{{/unless}}
+              {{/each}}</p>
+          </div>
+          <div class="table-item">
+            <span class="item-title">Produced by</span>
+            <a href="{{credentialSubject.producedByParty.id}}"
+              class="blue-bottom-line-thick">{{credentialSubject.producedByParty.name}}</a>
+          </div>
+          <div class="table-item">
+            <span class="item-title">Produced at</span>
+            <div class="item-value">
+              <a href="{{credentialSubject.producedAtFacility.id}}"
+                class="blue-bottom-line-thick">{{credentialSubject.producedAtFacility.name}}</a>
+            </div>
+          </div>
+          <div class="table-item">
+            <span class="item-title">Date produced</span>
+            <p class="item-value">{{credentialSubject.productionDate}}</p>
+          </div>
+          <div class="table-item">
+            <span class="item-title">Country</span>
+            <p class="item-value">{{credentialSubject.countryOfProduction}}</p>
+          </div>
+          <div class="table-item">
+            <span class="item-title">Dimensions</span>
+            <p class="item-value">
+              <span>Weight: {{credentialSubject.dimensions.weight.value}}{{credentialSubject.dimensions.weight.unit}}</span>
+              <span>Length: {{credentialSubject.dimensions.length.value}}{{credentialSubject.dimensions.length.unit}}</span>
+              <span>Width: {{credentialSubject.dimensions.width.value}}{{credentialSubject.dimensions.width.unit}}</span>
+              <span>Height: {{credentialSubject.dimensions.height.value}}{{credentialSubject.dimensions.height.unit}}</span>
+              <span>Volume: {{credentialSubject.dimensions.volume.value}}{{credentialSubject.dimensions.volume.unit}}</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="composition">
+        <div>
+          <p class="section-title">Product composition</p>
+          <p class="section-description">
+            A complete list of materials that make up the composition of this product.
+          </p>
+        </div>
+
+        <div class="composition-box">
+          {{#each credentialSubject.materialsProvenance}}
+          <div class="composition-box-item">
+            <div class="composition-box-first-column">
+              <p class="composition-percent">{{massFraction}}%</p>
+              <div class="composition-box-second-column">
+                <p class="composition-title">{{massAmount.value}}{{massAmount.unit}} {{name}}</p>
+                <div class="composition-tag">
+                  <p class="composition-tag-item">Recycled {{recycledAmount}}%</p>
+                  <p class="composition-tag-item">Hazard {{#if hazardous}}Yes{{else}}No{{/if}}</p>
+                </div>
+                <a href="{{materialSafetyInformation.linkURL}}"
+                  class="blue-bottom-line-thick">{{materialSafetyInformation.linkName}}</a>
+              </div>
+            </div>
+
+            <div class="composition-box-third-column">
+              <div class="country-code">{{originCountry}}</div>
+            </div>
+          </div>
+          {{/each}}
+        </div>
+      </section>
+
+      <section class="history">
+        <div>
+          <p class="section-title">History</p>
+        </div>
+
+        {{!-- start: Supply chain due diligence report --}}
+        <a href="{{credentialSubject.dueDiligenceDeclaration.linkURL}}" class="cards-traceability">
+          <div class="frame-5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M5 21C4.45 21 3.97933 20.8043 3.588 20.413C3.19667 20.0217 3.00067 19.5507 3 19V5C3 4.45 3.196 3.97933 3.588 3.588C3.98 3.19667 4.45067 3.00067 5 3H19C19.55 3 20.021 3.196 20.413 3.588C20.805 3.98 21.0007 4.45067 21 5V19C21 19.55 20.8043 20.021 20.413 20.413C20.0217 20.805 19.5507 21.0007 19 21H5ZM5 5V19H19V5H17V12L14.5 10.5L12 12V5H5Z"
+                fill="#1F5A95"></path>
+            </svg>
+            <div class="company-name-wrapper">
+              <div class="company-name-2">Supply chain due diligence report</div>
+            </div>
+          </div>
+          <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            </path>
+          </svg>
+        </a>
+        {{!-- end: Supply chain due diligence report --}}
+
+        <div class="history-information">
+          {{#each credentialSubject.traceabilityInformation}}
+          <div class="history-value-chain-item">
+            <div class="history-value-chain">
+              <p>{{valueChainProcess}}</p>
+              <div class="verified-ratio">
+                <p>Verified ratio {{verifiedRatio}}</p>
+              </div>
+            </div>
+
+            <div id="history-items-390px-{{@index}}" class="history-event">
+              {{#each traceabilityEvent}}
+              <div class="history-item">
+                <span>{{linkName}}</span>
+                <a href="{{linkURL}}" class="blue-bottom-line-thick">View</a>
+              </div>
+              {{/each}}
+            </div>
+
+            <div id="view-more-btn-mobile-{{@index}}" class="view-more-button">
+              <p class="blue-bottom-line-thin">View more</p>
+            </div>
+          </div>
+          {{/each}}
+        </div>
+
+      </section>
+
+      <section class="passport-issued-by">
+        <div>
+          <h2 class="section-title">Passport issued by</h2>
+        </div>
+        <div class="table">
+          <div class="table-item">
+            <span>Organisation</span>
+            <p>{{issuer.name}}</p>
+          </div>
+          <div class="table-item">
+            <span>Registered ID</span>
+            <a href="{{issuer.id}}" class="blue-bottom-line-thick">{{issuer.id}}</a>
+          </div>
+          <div class="table-item">
+            <span>Valid from</span>
+            <p>{{validFrom}}</p>
+          </div>
+          <div class="table-item">
+            <span>Valid to</span>
+            <p>{{validUntil}}</p>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <p>This Digital Product Passport (DPP) is a digital record of the product's sustainability and environmental
+          performance, ensuring transparency and accountability in line with UNTP standards. The DPP can be verified at
+          any time using the QR code or visiting <a href="https://www.untp-certification.org"
+            class="gray-bottom-line">www.untp-certification.org</a> with the passport ID.</p>
+      </footer>
+    </div>
+    <!-- End mobile -->
+
+    <!-- Desktop width 1440px -->
+    <div class="contents">
+      <div class="frame">
+        <div class="PP-title">PRODUCT PASSPORT</div>
+        <div class="text-wrapper">{{credentialSubject.name}}</div>
+        <div class="product-ID-ALT">
+          <div class="div">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
+                fill="#1F5A95" />
+            </svg>
+            <a href="{{credentialSubject.id}}" class="line">
+              <div class="text-wrapper-2">ID: {{credentialSubject.id}}</div>
+            </a>
+          </div>
+          <div class="div">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
+                fill="#1F5A95" />
+            </svg>
+            <div class="div-wrapper">
+              <div class="text-wrapper-3">Batch: {{credentialSubject.batchNumber}}</div>
+            </div>
+          </div>
+          <div class="div">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
+                fill="#1F5A95" />
+            </svg>
+            <div class="div-wrapper">
+              <div class="text-wrapper-2">Serial: {{credentialSubject.serialNumber}}</div>
+            </div>
+          </div>
+        </div>
+        <div class="frame-2">
+          <div class="PP-header">
+            <div class="frame-3"></div>
+          </div>
+          <div class="frame-4">
+            <p class="p">
+              {{credentialSubject.description}}
+            </p>
+            {{#each credentialSubject.furtherInformation}}
+            <a href="{{linkURL}}" class="line">
+              <div class="text-wrapper-16">{{linkName}}</div>
+            </a>
+            {{/each}}
+          </div>
+        </div>
+      </div>
+
+      {{#if credentialSubject.characteristic}}
+      <div class="frame-24">
+        <div class="heading-wrapper">
+          <div class="heading">Characteristics</div>
+        </div>
+        <div class="div-5">
+          {{#each credentialSubject.characteristic}}
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">{{@key}}</div>
+            <div class="data-wrapper">
+              <div class="data">{{this}}</div>
+            </div>
+          </div>
+          {{/each}}
+        </div>
+      </div>
+      {{/if}}
+
+      <div class="div-2">
+        <div class="typography-heading">
+          <div class="text-wrapper-4">Circularity Scorecard</div>
+        </div>
+        <p class="text-wrapper-5">
+          The circularity Scorecard provides a simple high level summary of circularity
+          performance of the product.
+        </p>
+        <div class="div-3">
+          <div class="frame-5">
+            <div class="frame-6">
+              <div class="frame-7">
+                <div class="text-wrapper-6">{{credentialSubject.circularityScorecard.recyclableContent}}%</div>
+                <div class="text-wrapper-7">Recyclable content</div>
+              </div>
+              <div class="frame-7">
+                <div class="text-wrapper-6">{{credentialSubject.circularityScorecard.recycledContent}}%</div>
+                <div class="text-wrapper-7">Recycled content</div>
+              </div>
+              <div class="frame-7">
+                <div class="text-wrapper-6">{{credentialSubject.circularityScorecard.utilityFactor}}</div>
+                <div class="text-wrapper-7">Utility factor</div>
+              </div>
+              <div class="frame-8">
+                <div class="text-wrapper-6">{{credentialSubject.circularityScorecard.materialCircularityIndicator}}
+                </div>
+                <div class="text-wrapper-7">Material circularity*</div>
+              </div>
+            </div>
+            <p class="text-wrapper-8">
+              *The Material Circularity Indicator provides an overall circularity score which is a function of all three
+              of the earlier measures.
+            </p>
+          </div>
+          <div class="frame-9">
+            <a href="{{credentialSubject.circularityScorecard.recyclingInformation.linkURL}}"
+              class="cards-traceability">
+              <div class="div-4">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M21.82 15.42L19.32 19.75C18.83 20.61 17.92 21.06 17 21H15V23L12.5 18.5L15 14V16H17.82L15.6 12.15L19.93 9.65L21.73 12.77C22.25 13.54 22.32 14.57 21.82 15.42ZM9.21003 3.06H14.21C15.19 3.06 16.04 3.63 16.45 4.45L17.45 6.19L19.18 5.19L16.54 9.6L11.39 9.69L13.12 8.69L11.71 6.24L9.50003 10.09L5.16003 7.59L6.96003 4.47C7.37003 3.64 8.22003 3.06 9.21003 3.06ZM5.05003 19.76L2.55003 15.43C2.06003 14.58 2.13003 13.56 2.64003 12.79L3.64003 11.06L1.91003 10.06L7.05003 10.14L9.70003 14.56L7.97003 13.56L6.56003 16H11V21H7.40003C6.93154 21.0339 6.46293 20.9357 6.0475 20.7165C5.63206 20.4973 5.28648 20.1659 5.05003 19.76Z"
+                    fill="#1F5A95" />
+                </svg>
+                <div class="frame-10">
+                  <div class="text-wrapper-9">Recycling instructions</div>
+                </div>
+              </div>
+              <div class="div-4">
+                <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" />
+                </svg>
+              </div>
+            </a>
+            <a href="{{credentialSubject.circularityScorecard.repairInformation.linkURL}}" class="cards-traceability">
+              <div class="div-4">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M18.85 21.975C18.7167 21.975 18.5917 21.9543 18.475 21.913C18.3583 21.8717 18.25 21.8007 18.15 21.7L13.05 16.6C12.95 16.5 12.879 16.3917 12.837 16.275C12.795 16.1583 12.7743 16.0333 12.775 15.9C12.7757 15.7667 12.7967 15.6417 12.838 15.525C12.8793 15.4083 12.95 15.3 13.05 15.2L15.175 13.075C15.275 12.975 15.3833 12.9043 15.5 12.863C15.6167 12.8217 15.7417 12.8007 15.875 12.8C16.0083 12.7993 16.1333 12.8203 16.25 12.863C16.3667 12.9057 16.475 12.9763 16.575 13.075L21.675 18.175C21.775 18.275 21.846 18.3833 21.888 18.5C21.93 18.6167 21.9507 18.7417 21.95 18.875C21.9493 19.0083 21.9287 19.1333 21.888 19.25C21.8473 19.3667 21.7763 19.475 21.675 19.575L19.55 21.7C19.45 21.8 19.3417 21.871 19.225 21.913C19.1083 21.955 18.9833 21.9757 18.85 21.975ZM18.85 19.6L19.575 18.875L15.9 15.2L15.175 15.925L18.85 19.6ZM5.125 22C4.99167 22 4.86267 21.975 4.738 21.925C4.61333 21.875 4.50067 21.8 4.4 21.7L2.3 19.6C2.2 19.5 2.125 19.3873 2.075 19.262C2.025 19.1367 2 19.008 2 18.876C2 18.744 2.025 18.619 2.075 18.501C2.125 18.383 2.2 18.2747 2.3 18.176L7.6 12.876H9.725L10.575 12.026L6.45 7.9H5.025L2 4.875L4.825 2.05L7.85 5.075V6.5L11.975 10.625L14.875 7.725L13.8 6.65L15.2 5.25H12.375L11.675 4.55L15.225 1L15.925 1.7V4.525L17.325 3.125L20.875 6.675C21.1583 6.95833 21.375 7.27933 21.525 7.638C21.675 7.99667 21.75 8.37567 21.75 8.775C21.75 9.17433 21.675 9.55767 21.525 9.925C21.375 10.2923 21.1583 10.6173 20.875 10.9L18.75 8.775L17.35 10.175L16.3 9.125L11.125 14.3V16.4L5.825 21.7C5.725 21.8 5.61667 21.875 5.5 21.925C5.38333 21.975 5.25833 22 5.125 22ZM5.125 19.6L9.375 15.35V14.625H8.65L4.4 18.875L5.125 19.6ZM5.125 19.6L4.4 18.875L4.775 19.225L5.125 19.6Z"
+                    fill="#1F5A95" />
+                </svg>
+                <div class="frame-10">
+                  <div class="text-wrapper-9">Repair instructions</div>
+                </div>
+              </div>
+              <div class="div-4">
+                <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" />
+                </svg>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="div-2">
+        <div class="typography-heading">
+          <div class="text-wrapper-4">Emissions Scorecard</div>
+        </div>
+        <p class="text-wrapper-5">
+          The Emissions Scorecard gives a clear snapshot of the product's greenhouse gas (GHG) emissions performance,
+          providing a single indicator to assess its overall environmental impact.
+        </p>
+        <div class="div-7">
+          <div class="frame-11">
+            <div class="text-wrapper-10">
+              {{credentialSubject.emissionsScorecard.carbonFootprint}}{{credentialSubject.emissionsScorecard.declaredUnit}}
+            </div>
+            <p class="co-eq">
+              <span class="span">Co2Eq</span>
+            </p>
+          </div>
+          <div class="frame-9">
+            <div class="div-3">
+              <div class="frame-9">
+                <div class="div-5">
+                  <div class="data-two-columns-3">
+                    <div class="text-wrapper-12">Scope includes</div>
+                    <div class="data-data">
+                      <div class="data">{{credentialSubject.emissionsScorecard.operationalScope}}</div>
+                    </div>
+                  </div>
+                  <div class="data-two-columns-3">
+                    <div class="text-wrapper-12">Primary sourced ratio*</div>
+                    <div class="data-data">
+                      <div class="data-2">{{credentialSubject.emissionsScorecard.primarySourcedRatio}}% primary sources
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <p class="text-wrapper-8">
+                  The Primary Sourced Ratio shows the percentage of scope 3 emissions data that is
+                  directly collected from actual sources, rather than being based on estimates.
+                </p>
+              </div>
+              <div class="frame-12">
+                <div class="data-two-columns-3">
+                  <div class="text-wrapper-12">Reporting standard</div>
+                  <a href="{{credentialSubject.emissionsScorecard.reportingStandard.id}}" class="line">
+                    <div class="text-wrapper-2">{{credentialSubject.emissionsScorecard.reportingStandard.name}}</div>
+                  </a>
+                </div>
+                <div class="data-two-columns-3">
+                  <div class="text-wrapper-12">Issue date</div>
+                  <div class="data-data">
+                    <div class="data">{{credentialSubject.emissionsScorecard.reportingStandard.issueDate}}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="frame-13">
+              <div class="text-wrapper-13">*</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <section class="div-2">
+        <div class="text-wrapper-14">Declarations</div>
+        <div class="cards-conformities">
+          {{#each credentialSubject.conformityClaim}}
+          <div class="cards-conformity">
+            <div class="cards-conformity-header">
+              <div class="cards-conformity-conformance">
+                <div class="conformance">Conformance:</div>
+                <div class="{{#if conformance}}tags-VC-badge-green{{else}}tags-VC-badge-red{{/if}}">
+                  <div class="verifiable">{{#if conformance}}Yes{{else}}No{{/if}}</div>
+                </div>
+              </div>
+              <div class="conformance">Assessed: {{assessmentDate}}</div>
+            </div>
+            <div class="cards-conformity-body">
+              <div class="cards-conformity-title">{{conformityEvidence.linkName}}</div>
+              <p class="cards-conformity-description">
+                <span>{{referenceRegulation.name}} administered in {{referenceRegulation.jurisdictionCountry}} by </span>
+                <a href="{{referenceRegulation.administeredBy.id}}" class="gray-bottom-line">{{referenceRegulation.administeredBy.name}}</a>
+              </p>
+              <p class="cards-conformity-description">
+                <span>{{referenceStandard.name}} issued by </span>
+                <a href="{{referenceStandard.issuingParty.id}}" class="gray-bottom-line">{{referenceStandard.issuingParty.name}}</a>
+              </p>
+            </div>
+            <div class="declared-values">
+              {{#each declaredValue}}
+              <div class="declared-value">
+                <h3>{{metricName}} is {{metricValue.value}}{{metricValue.unit}}</h3>
+                <p class="heading-2">Score: {{score}} | Accuracy {{accuracy}}</p>
+              </div>
+              {{/each}}
+            </div>
+            <a href="{{conformityEvidence.linkURL}}" class="cards-traceability-2">
+              <div class="frame-21">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M5 21C4.45 21 3.97933 20.8043 3.588 20.413C3.19667 20.0217 3.00067 19.5507 3 19V5C3 4.45 3.196 3.97933 3.588 3.588C3.98 3.19667 4.45067 3.00067 5 3H19C19.55 3 20.021 3.196 20.413 3.588C20.805 3.98 21.0007 4.45067 21 5V19C21 19.55 20.8043 20.021 20.413 20.413C20.0217 20.805 19.5507 21.0007 19 21H5ZM5 5V19H19V5H17V12L14.5 10.5L12 12V5H5Z"
+                    fill="#1F5A95"></path>
+                </svg>
+                <div class="company-name-wrapper">
+                  <div class="company-name-2">Evidence</div>
+                </div>
+              </div>
+              <div class="div-4">
+                <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  </path>
+                </svg>
+              </div>
+            </a>
+          </div>
+          {{/each}}
+        </div>
+      </section>
+
+      <div class="div-2">
+        <div class="typography-heading">
+          <div class="text-wrapper-4">Production</div>
+        </div>
+        <div class="div-5">
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Product category</div>
+            <div class="data-data">
+              <div class="data-2">{{#each credentialSubject.productCategory}}{{name}}{{#unless @last}},{{/unless}}
+                {{/each}}</div>
+            </div>
+          </div>
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Produced by</div>
+            <div class="data-data-link">
+              <a href="{{credentialSubject.producedByParty.id}}" class="line">
+                <p class="text-wrapper-2">{{credentialSubject.producedByParty.name}}</p>
+              </a>
+            </div>
+          </div>
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Produced at</div>
+            <div class="data-data-link">
+              <a href="{{credentialSubject.producedAtFacility.id}}" class="line">
+                <p class="text-wrapper-2">{{credentialSubject.producedAtFacility.name}}</p>
+              </a>
+            </div>
+          </div>
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Date produced</div>
+            <div class="data-wrapper">
+              <div class="data">{{credentialSubject.productionDate}}</div>
+            </div>
+          </div>
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Country</div>
+            <div class="data-data">
+              <div class="data">{{credentialSubject.countryOfProduction}}</div>
+            </div>
+          </div>
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Dimensions</div>
+            <div class="list">
+              <span>Weight: {{credentialSubject.dimensions.weight.value}}{{credentialSubject.dimensions.weight.unit}}</span>
+              <span>Length: {{credentialSubject.dimensions.length.value}}{{credentialSubject.dimensions.length.unit}}</span>
+              <span>Width: {{credentialSubject.dimensions.width.value}}{{credentialSubject.dimensions.width.unit}}</span>
+              <span>Height: {{credentialSubject.dimensions.height.value}}{{credentialSubject.dimensions.height.unit}}</span>
+              <span>Volume: {{credentialSubject.dimensions.volume.value}}{{credentialSubject.dimensions.volume.unit}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="div-2">
+        <div class="typography-heading">
+          <div class="text-wrapper-4">Composition</div>
+        </div>
+        <p class="text-wrapper-5">
+          The Product Composition List details the materials and components used in the product,
+          providing transparency on the origin and nature of each element.
+        </p>
+        <div class="cards">
+          {{#each credentialSubject.materialsProvenance}}
+          <div class="cards-composition">
+            <div class="first-column">
+              <div class="percentage">{{massFraction}}%</div>
+              <div class="details">
+                <div class="text-wrapper-9">{{massAmount.value}}{{massAmount.unit}} {{name}}</div>
+                <div class="frame-25">
+                  <div class="frame-26">
+                    <div class="text-wrapper-19">Recycled {{#if recycledAmount}}{{recycledAmount}}{{else}}0{{/if}}%</div>
+                  </div>
+                  <div class="frame-27">
+                    <div class="text-wrapper-19">Hazard {{#if hazardous}}Yes{{else}}No{{/if}}</div>
+                  </div>
+                </div>
+                <div class="data-data-link-2">
+                  <a href="{{materialSafetyInformation.linkURL}}" class="line">
+                    <div class="text-wrapper-2">{{materialSafetyInformation.linkName}}</div>
+                  </a>
+                </div>
+              </div>
+            </div>
+            <div class="div-4">
+              <div class="text-wrapper-19">{{originCountry}}</div>
+            </div>
+          </div>
+          {{/each}}
+        </div>
+      </div>
+
+      <div class="div-2">
+        <div class="typography-heading">
+          <div class="text-wrapper-4">History</div>
+        </div>
+
+        {{!-- start: Supply chain due diligence report --}}
+        <a href="{{credentialSubject.dueDiligenceDeclaration.linkURL}}" class="cards-traceability">
+          <div class="history-due-diligence">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M5 21C4.45 21 3.97933 20.8043 3.588 20.413C3.19667 20.0217 3.00067 19.5507 3 19V5C3 4.45 3.196 3.97933 3.588 3.588C3.98 3.19667 4.45067 3.00067 5 3H19C19.55 3 20.021 3.196 20.413 3.588C20.805 3.98 21.0007 4.45067 21 5V19C21 19.55 20.8043 20.021 20.413 20.413C20.0217 20.805 19.5507 21.0007 19 21H5ZM5 5V19H19V5H17V12L14.5 10.5L12 12V5H5Z"
+                fill="#1F5A95"></path>
+            </svg>
+            <div>Supply chain due diligence report</div>
+          </div>
+          <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            </path>
+          </svg>
+        </a>
+        {{!-- end: Supply chain due diligence report --}}
+
+        <div class="history-information">
+          {{#each credentialSubject.traceabilityInformation}}
+          <div class="history-value-chain-item">
+            <div class="history-value-chain">
+              <p>{{valueChainProcess}}</p>
+              <div class="verified-ratio">
+                <p>Verified ratio {{verifiedRatio}}</p>
+              </div>
+            </div>
+
+            <div id="history-items-1440px-{{@index}}" class="history-event">
+              {{#each traceabilityEvent}}
+              <div class="history-item">
+                <span>{{linkName}}</span>
+                <a href="{{linkURL}}" class="blue-bottom-line-thick">View</a>
+              </div>
+              {{/each}}
+            </div>
+
+            <div id="view-more-btn-desktop-{{@index}}" class="view-more-button">
+              <p>View more</p>
+            </div>
+          </div>
+          {{/each}}
+        </div>
+
+      </div>
+
+      <div class="div-2">
+        <div class="text-wrapper-4">Passport issued by</div>
+        <div class="div-5">
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Organisation</div>
+            <div class="data-data">
+              <div class="data">{{issuer.name}}</div>
+            </div>
+          </div>
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Registered ID</div>
+            <div class="data-data-link">
+              <a href="{{issuer.id}}" class="line">
+                <div class="text-wrapper-2">{{issuer.id}}</div>
+              </a>
+            </div>
+          </div>
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Valid from</div>
+            <div class="data-data">
+              <div class="data">{{validFrom}}</div>
+            </div>
+          </div>
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Valid to</div>
+            <div class="data-data">
+              <div class="data">{{validUntil}}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="this-digital-product-wrapper">
+        <p class="this-digital-product">
+          <span class="text-wrapper-17">This Digital Product Passport (DPP) is a digital record of the product’s
+            sustainability and environmental performance, ensuring transparency and accountability
+            in line with UNTP standards. The DPP can be verified at any time using the QR code or
+            visiting
+          </span>
+          <a href="https://www.untp-certification.org" class="black-line" target="_blank"
+            rel="noopener noreferrer"><span>www.untp-certification.org</span></a>
+          <span class="text-wrapper-17"> with the passport ID.</span>
+        </p>
+      </div>
+    </div>
+    <!-- End desktop -->
+  </div>
+</body>
+
+</html>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const itemsToShow = 5; // Number of items to show by default
+
+    {{#each credentialSubject.traceabilityInformation}}
+      // select view more buttons of mobile and desktop
+      const viewMoreButtonMobile{{@index}} = document.getElementById('view-more-btn-mobile-{{@index}}');
+      const viewMoreButtonDesktop{{@index}} = document.getElementById('view-more-btn-desktop-{{@index}}');
+      // set history items class name to the view more buttons
+      viewMoreButtonMobile{{@index}}.setAttribute('history-items-query-selector', '#history-items-390px-{{@index}} .history-item');
+      viewMoreButtonDesktop{{@index}}.setAttribute('history-items-query-selector', '#history-items-1440px-{{@index}} .history-item');
+      // Initial setup for the view more buttons
+      updateItemsVisibility(viewMoreButtonMobile{{@index}});
+      updateItemsVisibility(viewMoreButtonDesktop{{@index}});
+      // Register click event listeners for view more buttons on mobile and desktop
+      viewMoreButtonMobile{{@index}}.onclick = toggleItemsVisibility;
+      viewMoreButtonDesktop{{@index}}.onclick = toggleItemsVisibility;
+    {{/each}}
+
+    function toggleItemsVisibility() {
+      const displayState = this.getAttribute('data-state'); // collapsed or expanded
+      const isCollapsed = displayState === 'collapsed';
+
+      if (isCollapsed) {
+        this.firstElementChild.textContent = 'View less';
+        this.setAttribute('data-state', 'expanded');
+      } else {
+        this.firstElementChild.textContent = 'View more';
+        this.setAttribute('data-state', 'collapsed');
+      }
+      updateItemsVisibility(this);
+    }
+
+    function updateItemsVisibility(element) {
+      const historyItemsClassName = element.getAttribute('history-items-query-selector');
+      const historyItems = document.querySelectorAll(historyItemsClassName);
+
+      // Hide the view more button if there are no more than itemsToShow (5 items)
+      if (historyItems && historyItems.length <= itemsToShow) {
+        return element.style.display = 'none';
+      }
+
+      // Show or hide items based on the current state
+      const displayState = element.getAttribute('data-state'); // collapsed or expanded
+      if (!displayState) { // Initial setup
+        element.setAttribute('data-state', 'collapsed');
+        element.firstElementChild.textContent = 'View more';
+        return historyItems.forEach((item, index) => {
+          // Hide items beyond the first 5 by default
+          if (index >= itemsToShow) {
+            item.style.display = 'none';
+          }
+        });
+      }
+
+      // Update items visibility based on the current state
+      historyItems.forEach((item, index) => {
+        if (index >= itemsToShow) {
+          // Show or hide items based on the current state
+          const display = displayState === 'collapsed' ? 'none' : '';
+          item.style.display = display;
+        }
+      });
+    }
+  });
+</script>
