@@ -47,7 +47,7 @@ P-->>C: Return digital conformity credential VC and resolver URL
         "context": [
           "https://jargon.sh/user/unece/ConformityCredential/v/0.5.0/artefacts/jsonldContexts/ConformityCredential.jsonld?class=ConformityCredential"
         ],
-        "type": ["VerifiableCredential", "DigitalConformityCredential"],
+        "type": ["DigitalConformityCredential"],
         "renderTemplate": [
           {
             "template": "<div><h2>DigitalConformityCredential</h2></div>",

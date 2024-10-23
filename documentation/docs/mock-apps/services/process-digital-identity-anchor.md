@@ -45,7 +45,7 @@ P-->>C: Return digital identity anchor VC and resolver URL
       },
       "digitalIdentityAnchor": {
         "context": ["https://www.w3.org/2018/credentials/v1", "https://gs1.org/voc/"],
-        "type": ["VerifiableCredential", "DigitalIdentityAnchor"],
+        "type": ["DigitalIdentityAnchor"],
         "renderTemplate": [
           {
             "template": "<div><h2>DigitalIdentityAnchor</h2></div>",

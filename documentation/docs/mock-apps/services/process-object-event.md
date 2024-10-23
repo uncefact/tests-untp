@@ -45,7 +45,7 @@ P-->>C: Return object event VC and resolver URL
       },
       "epcisObjectEvent": {
         "context": ["https://www.w3.org/2018/credentials/v1", "https://gs1.org/voc/"],
-        "type": ["VerifiableCredential", "DigitalTraceabilityEvent"],
+        "type": ["DigitalTraceabilityEvent"],
         "renderTemplate": [
           {
             "template": "<div><h2>Object Event</h2></div>",

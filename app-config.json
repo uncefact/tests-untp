@@ -714,7 +714,7 @@
                         "@type": "WebRenderingTemplate2022"
                       }
                     ],
-                    "type": ["VerifiableCredential", "DigitalProductPassport"],
+                    "type": ["DigitalProductPassport"],
                     "dlrLinkTitle": "Cherries Product Passport",
                     "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
@@ -1297,7 +1297,7 @@
                         "@type": "WebRenderingTemplate2022"
                       }
                     ],
-                    "type": ["VerifiableCredential", "DigitalIdentityAnchor"],
+                    "type": ["DigitalIdentityAnchor"],
                     "dlrLinkTitle": "DigitalIdentityAnchor",
                     "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
@@ -3026,7 +3026,7 @@
                         "@type": "WebRenderingTemplate2022"
                       }
                     ],
-                    "type": ["VerifiableCredential", "DigitalConformityCredential"],
+                    "type": ["DigitalConformityCredential"],
                     "dlrLinkTitle": "DigitalConformityCredential",
                     "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
@@ -4220,7 +4220,7 @@
                         "@type": "WebRenderingTemplate2022"
                       }
                     ],
-                    "type": ["VerifiableCredential", "DigitalFacilityRecord"],
+                    "type": ["DigitalFacilityRecord"],
                     "dlrLinkTitle": "DigitalFacilityRecord",
                     "dlrIdentificationKeyType": "gln",
                     "dlrVerificationPage": "http://localhost:3003/verify"
@@ -5445,7 +5445,7 @@
                         "@type": "WebRenderingTemplate2022"
                       }
                     ],
-                    "type": ["VerifiableCredential", "DigitalProductPassport"],
+                    "type": ["DigitalProductPassport"],
                     "dlrLinkTitle": "Cherries Product Passport",
                     "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
@@ -6680,7 +6680,7 @@
                         "@type": "WebRenderingTemplate2022"
                       }
                     ],
-                    "type": ["VerifiableCredential", "DigitalProductPassport"],
+                    "type": ["DigitalProductPassport"],
                     "dlrLinkTitle": "Cherries Product Passport",
                     "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
@@ -7915,7 +7915,7 @@
                         "@type": "WebRenderingTemplate2022"
                       }
                     ],
-                    "type": ["VerifiableCredential", "DigitalProductPassport"],
+                    "type": ["DigitalProductPassport"],
                     "dlrLinkTitle": "Cherries Product Passport",
                     "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
