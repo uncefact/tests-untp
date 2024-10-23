@@ -71,9 +71,10 @@ graph TD
             "dlrAPIKey": "5555555555555"
           },
           "storage": {
-            "url": "http://localhost:3001/upload",
+            "url": "http://localhost:3334/v1/documents",
             "params": {
-              "resultPath": "/url"
+              "resultPath": "/uri",
+              "bucket": "verifiable-credentials"
             },
             "options": {
               "method": "POST",

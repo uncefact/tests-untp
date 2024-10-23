@@ -4,6 +4,7 @@
   "description": "> TODO: description",
   "author": "Nam Hoang <hoangxuannam160493@gmail.com>",
   "homepage": "https://github.com/uncefact/tests-untp#readme",
+  "type": "module",
   "license": "ISC",
   "publishConfig": {
     "access": "public"
@@ -13,7 +14,7 @@
     "url": "git+https://github.com/uncefact/tests-untp.git"
   },
   "scripts": {
-    "test": "mocha tests/ --reporter @digitalbazaar/mocha-w3c-interop-reporter --reporter-options reportDir=\"$PWD/reports\",respec=\"$PWD/respecConfig.json\",suiteLog='./suite.log',templateData=\"$PWD/reports/index.json\",title=\"VC test suite\" --timeout 15000 --preserve-symlinks",
+    "test": "mocha tests/ -n=loader=ts-node/esm -n=es-module-specifier-resolution=node tests/**/*.test.ts --reporter @digitalbazaar/mocha-w3c-interop-reporter --reporter-options reportDir=\"$PWD/reports\",respec=\"$PWD/respecConfig.json\",suiteLog='./suite.log',templateData=\"$PWD/reports/index.json\",title=\"VC test suite\" --timeout 15000 --preserve-symlinks",
     "test:package": "jest"
   },
   "bugs": {
@@ -21,6 +22,7 @@
   },
   "dependencies": {
     "@digitalbazaar/mocha-w3c-interop-reporter": "^1.6.0",
+    "@mock-app/services": "1.0.0",
     "axios": "^1.7.2",
     "chai": "^4.3.6",
     "mocha": "^10.5.2"
@@ -28,6 +30,7 @@
   "devDependencies": {
     "@types/chai": "^4.3.16",
     "@types/mocha": "^10.0.7",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "ts-node": "^10.4.0"
   }
 }

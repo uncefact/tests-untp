@@ -6,7 +6,7 @@ import {
   IssuerType,
 } from '@vckit/core-types';
 import { privateAPI } from './utils/httpService.js';
-import appConfig from '../../mock-app/src/constants/app-config.json';
+import appConfig from '../../mock-app/src/constants/app-config.json' assert { type: 'json' };
 
 export const contextDefault = [
   'https://www.w3.org/ns/credentials/v2',

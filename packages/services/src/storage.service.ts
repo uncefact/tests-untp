@@ -24,16 +24,13 @@ export const storageService: IStorageService = async (config) => {
   }
 };
 
-export const uploadData: IUploadData = async (storage, data, filename) => {
-  // TODO: remove jwt check in the future
-  const payloadData = typeof data === 'string' ? { jwt: data } : data;
-
+export const uploadData: IUploadData = async (storage, data, id) => {
   const result = await storageService({
     url: storage.url,
     params: {
       ...storage.params,
-      data: payloadData,
-      filename,
+      data,
+      id,
     },
     options: storage.options,
   });
