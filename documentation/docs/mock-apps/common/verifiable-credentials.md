@@ -1,5 +1,5 @@
 ---
-sidebar_position: 44
+sidebar_position: 46
 title: Verifiable Credentials
 ---
 
