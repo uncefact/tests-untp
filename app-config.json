@@ -32,48 +32,6 @@
       },
       "features": [
         {
-          "name": "Process Steel",
-          "id": "process_product",
-          "components": [
-            {
-              "name": "RenderCheckList",
-              "type": "EntryData",
-              "props": {
-                "checkBoxLabel": "Imported valid json:",
-                "nestedComponents": [
-                  {
-                    "name": "ImportButton",
-                    "type": "EntryData",
-                    "props": {
-                      "label": "Import JSON",
-                      "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" },
-                      "vcOptions": {
-                        "credentialPath": "/vc"
-                      }
-                    }
-                  },
-                  {
-                    "name": "QRCodeScannerDialogButton",
-                    "type": "EntryData"
-                  }
-                ],
-                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
-              }
-            },
-            {
-              "name": "CustomButton",
-              "type": "Submit",
-              "props": {}
-            }
-          ],
-          "services": [
-            {
-              "name": "test",
-              "parameters": []
-            }
-          ]
-        },
-        {
           "name": "Issue DPP",
           "id": "produce_product",
           "components": [
