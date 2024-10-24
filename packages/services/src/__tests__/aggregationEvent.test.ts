@@ -239,7 +239,11 @@ describe('processAggregationEvent', () => {
 
     const aggregationVC = await processAggregationEvent(aggregationEvent, contextWithHeaders);
 
-    expect(aggregationVC).toBe(aggregationVCMock);
+    expect(aggregationVC).toEqual({
+      vc: aggregationVCMock,
+      decodedEnvelopedVC: aggregationVCMock,
+      linkResolver: aggregationEventDLRMock,
+    });
     expect(vckitService.issueVC).toHaveBeenCalledWith(
       expect.objectContaining({
         headers: customHeaders,

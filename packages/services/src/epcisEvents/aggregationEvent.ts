@@ -51,7 +51,7 @@ export const processAggregationEvent: IService = async (
   const decodedEnvelopedVC = decodeEnvelopedVC(aggregationVC);
   const aggregationVCLink = await uploadData(storage, aggregationVC, generateUUID());
 
-  await registerLinkResolver(
+  const aggregationLinkResolver = await registerLinkResolver(
     aggregationVCLink,
     epcisAggregationEvent.dlrIdentificationKeyType,
     identifier,
@@ -64,5 +64,5 @@ export const processAggregationEvent: IService = async (
     qualifierPath,
   );
 
-  return { vc: aggregationVC, decodedEnvelopedVC, linkResolver: aggregationVCLink };
+  return { vc: aggregationVC, decodedEnvelopedVC, linkResolver: aggregationLinkResolver };
 };
