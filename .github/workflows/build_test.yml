@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - next
+      - fix/decode-jwt
+  workflow_dispatch:
 
 jobs:
   test_and_build:
