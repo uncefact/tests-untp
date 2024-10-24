@@ -5,79 +5,54 @@
     "type": {
       "type": "array",
       "readOnly": true,
-      "const": ["Facility", "Entity"],
-      "default": ["Facility", "Entity"],
+      "const": ["DigitalFacilityRecord", "VerifiableCredential"],
+      "default": ["DigitalFacilityRecord", "VerifiableCredential"],
       "items": {
         "type": "string",
-        "enum": ["Facility", "Entity"]
+        "enum": ["DigitalFacilityRecord", "VerifiableCredential"]
       }
     },
+    "@context": {
+      "example": "https://test.uncefact.org/vocabulary/untp/dpp/dpp-context.jsonld",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dfr/0.3.10"]
+      },
+      "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
+      "readOnly": true,
+      "const": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dfr/0.3.10"],
+      "default": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dfr/0.3.10"]
+    },
     "id": {
-      "example": "https://id.gs1.org/gln/0614141123452",
+      "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
       "type": "string",
       "format": "uri",
-      "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+      "description": "A unique identifier (URI) assigned to the product passport. May be a UUID"
     },
-    "registeredId": {
-      "example": "0614141123452",
+    "issuer": {
+      "$ref": "#/$defs/CredentialIssuer",
+      "description": "The organisation that is the isuer of this VC. Note that the \"id\" property MUST be a W3C DID.  Other identifiers such as tax registration numbers can be listed in the \"otherIdentifiers\" property."
+    },
+    "validFrom": {
+      "example": "2024-03-15T12:00:00",
       "type": "string",
-      "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+      "format": "date-time",
+      "description": "The date and time from which the credential is valid."
     },
-    "description": {
-      "example": "LiFePO4 Battery plant number 7",
+    "validUntil": {
+      "example": "2034-03-15T12:00:00",
       "type": "string",
-      "description": "An optional short description of the facility"
+      "format": "date-time",
+      "description": "The expiry date (if applicable) of this verifiable credential."
     },
-    "name": {
-      "example": "Example facility 7",
-      "type": "string",
-      "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
-    },
-    "idScheme": {
-      "$ref": "#/$defs/IdentifierScheme",
-      "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
-    },
-    "countryOfOperation": {
-      "type": "string",
-      "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
-      "description": "The country in which this facility is operating.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
-    },
-    "processCategories": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/Classification"
-      },
-      "description": "The idustrial or production processes performed by this facility.    id:unstats.un.org/isic/1030  code:1030  name:Processing and preserving of fruit and vegetables  schemeID:unstats.un.org/unsd/classifications/Econ/isic  schemeName:ISIC"
-    },
-    "operatedByParty": {
-      "$ref": "#/$defs/Entity",
-      "description": "The Party entity responsible for operating the facility.An object structure that uniquely identifies the party within a known party identifiaction scheme. "
-    },
-    "otherIdentifiers": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/Entity"
-      },
-      "description": "An optional list of other registered identifiers for this facility - eg GLNs or other schemes."
-    },
-    "address": {
-      "$ref": "#/$defs/Address",
-      "description": "The Postal address of the location."
-    },
-    "locationInformation": {
-      "$ref": "#/$defs/Location",
-      "description": "Physical location details"
-    },
-    "conformityDeclarations": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/Declaration"
-      },
-      "description": "A list of conformity declarations agains specific criterai from recognised standards or regulations. "
+    "credentialSubject": {
+      "$ref": "#/$defs/Facility",
+      "description": "The subject of a digitial facility record is a Facility "
     }
   },
-  "description": "A facility sustainabiloty performacne record.",
-  "required": ["id", "name"],
+  "description": "A digital verifiable credential hodling faiclity performance inofmration.",
+  "required": ["@context", "id", "issuer"],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
     "CredentialIssuer": {
@@ -85,9 +60,14 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "type": "string",
-          "default": "CredentialIssuer",
-          "enum": ["CredentialIssuer"]
+          "type": "array",
+          "readOnly": true,
+          "const": ["CredentialIssuer"],
+          "default": ["CredentialIssuer"],
+          "items": {
+            "type": "string",
+            "enum": ["CredentialIssuer"]
+          }
         },
         "id": {
           "example": "did:web:identifiers.example-company.com:12345",
@@ -105,7 +85,7 @@
           "items": {
             "$ref": "#/$defs/Entity"
           },
-          "description": "An optional list of other registered identifiers for this credential issuer"
+          "description": "An optional list of other registered identifiers for this credential issuer "
         }
       },
       "description": "The issuer party ()person or orgnaition) of a verifiable credential.",
@@ -116,9 +96,14 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "type": "string",
-          "default": "Entity",
-          "enum": ["Entity"]
+          "type": "array",
+          "readOnly": true,
+          "const": ["Entity"],
+          "default": ["Entity"],
+          "items": {
+            "type": "string",
+            "enum": ["Entity"]
+          }
         },
         "id": {
           "example": "https://id.gs1.org/01/09520123456788/21/12345",
@@ -149,9 +134,14 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "type": "string",
-          "default": "IdentifierScheme",
-          "enum": ["IdentifierScheme"]
+          "type": "array",
+          "readOnly": true,
+          "const": ["IdentifierScheme"],
+          "default": ["IdentifierScheme"],
+          "items": {
+            "type": "string",
+            "enum": ["IdentifierScheme"]
+          }
         },
         "id": {
           "example": "https://id.gs1.org/01/",
@@ -167,14 +157,100 @@
       },
       "description": "An identifier registration scheme for products, facilities, or organisations. Typically operated by a state, national or gloabl authority."
     },
+    "Facility": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Facility", "Entity"],
+          "default": ["Facility", "Entity"],
+          "items": {
+            "type": "string",
+            "enum": ["Facility", "Entity"]
+          }
+        },
+        "id": {
+          "example": "https://id.gs1.org/gln/0614141123452",
+          "type": "string",
+          "format": "uri",
+          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+        },
+        "registeredId": {
+          "example": "0614141123452",
+          "type": "string",
+          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+        },
+        "description": {
+          "example": "LiFePO4 Battery plant number 7",
+          "type": "string",
+          "description": "An optional short description of the facility"
+        },
+        "name": {
+          "example": "Example facility 7",
+          "type": "string",
+          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
+        },
+        "idScheme": {
+          "$ref": "#/$defs/IdentifierScheme",
+          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+        },
+        "countryOfOperation": {
+          "type": "string",
+          "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
+          "description": "The country in which this facility is operating.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+        },
+        "processCategories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Classification"
+          },
+          "description": "The idustrial or production processes performed by this facility.    id:unstats.un.org/isic/1030  code:1030  name:Processing and preserving of fruit and vegetables  schemeID:unstats.un.org/unsd/classifications/Econ/isic  schemeName:ISIC"
+        },
+        "operatedByParty": {
+          "$ref": "#/$defs/Entity",
+          "description": "The Party entity responsible for operating the facility.An object structure that uniquely identifies the party within a known party identifiaction scheme. "
+        },
+        "otherIdentifiers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Entity"
+          },
+          "description": "An optional list of other registered identifiers for this facility - eg GLNs or other schemes."
+        },
+        "address": {
+          "$ref": "#/$defs/Address",
+          "description": "The Postal address of the location."
+        },
+        "locationInformation": {
+          "$ref": "#/$defs/Location",
+          "description": "Physical location details"
+        },
+        "conformityDeclarations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Declaration"
+          },
+          "description": "A list of conformity declarations agains specific criterai from recognised standards or regulations. "
+        }
+      },
+      "description": "A facility sustainabiloty performacne record.",
+      "required": ["id", "name"]
+    },
     "Classification": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "type": {
-          "type": "string",
-          "default": "Classification",
-          "enum": ["Classification"]
+          "type": "array",
+          "readOnly": true,
+          "const": ["Classification"],
+          "default": ["Classification"],
+          "items": {
+            "type": "string",
+            "enum": ["Classification"]
+          }
         },
         "id": {
           "example": "https://unstats.un.org/unsd/classifications/Econ/cpc/46410",
@@ -211,6 +287,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Address"],
+          "default": ["Address"],
+          "items": {
+            "type": "string",
+            "enum": ["Address"]
+          }
+        },
         "streetAddress": {
           "example": "level 11, 15 London Circuit",
           "type": "string",
@@ -243,6 +329,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Location"],
+          "default": ["Location"],
+          "items": {
+            "type": "string",
+            "enum": ["Location"]
+          }
+        },
         "geoLocation": {
           "$ref": "#/$defs/Point",
           "description": "The latitude and logditude coordinates that best represent the specified location. Using GeoJSON Point notation."
@@ -277,6 +373,16 @@
       "oneOf": [
         {
           "type": "array",
+          "readOnly": true,
+          "const": ["Point3D"],
+          "default": ["Point3D"],
+          "items": {
+            "type": "string",
+            "enum": ["Point3D"]
+          }
+        },
+        {
+          "type": "array",
           "items": {
             "type": "number",
             "format": "float"
@@ -309,6 +415,16 @@
     "Point3DWrapper": {
       "description": "",
       "oneOf": [
+        {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Point3DWrapper"],
+          "default": ["Point3DWrapper"],
+          "items": {
+            "type": "string",
+            "enum": ["Point3DWrapper"]
+          }
+        },
         {
           "type": "array",
           "items": {
@@ -400,9 +516,14 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "type": "string",
-          "default": "Standard",
-          "enum": ["Standard"]
+          "type": "array",
+          "readOnly": true,
+          "const": ["Standard"],
+          "default": ["Standard"],
+          "items": {
+            "type": "string",
+            "enum": ["Standard"]
+          }
         },
         "id": {
           "example": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf",
@@ -434,9 +555,14 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "type": "string",
-          "default": "Regulation",
-          "enum": ["Regulation"]
+          "type": "array",
+          "readOnly": true,
+          "const": ["Regulation"],
+          "default": ["Regulation"],
+          "items": {
+            "type": "string",
+            "enum": ["Regulation"]
+          }
         },
         "id": {
           "example": "https://www.legislation.gov.au/F2008L02309/latest/versions",
@@ -473,9 +599,14 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "type": "string",
-          "default": "Criterion",
-          "enum": ["Criterion"]
+          "type": "array",
+          "readOnly": true,
+          "const": ["Criterion"],
+          "default": ["Criterion"],
+          "items": {
+            "type": "string",
+            "enum": ["Criterion"]
+          }
         },
         "id": {
           "example": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf#BatteryAssembly",
@@ -503,6 +634,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Metric"],
+          "default": ["Metric"],
+          "items": {
+            "type": "string",
+            "enum": ["Metric"]
+          }
+        },
         "metricName": {
           "example": "GHG emissions intensity",
           "type": "string",
@@ -525,6 +666,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Measure"],
+          "default": ["Measure"],
+          "items": {
+            "type": "string",
+            "enum": ["Measure"]
+          }
+        },
         "value": {
           "example": 10,
           "type": "number",
