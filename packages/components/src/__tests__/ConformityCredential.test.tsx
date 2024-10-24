@@ -9,6 +9,7 @@ jest.mock('@mock-app/services', () => ({
   uploadData: jest.fn(),
   generateUUID: jest.fn(),
   getJsonDataFromConformityAPI: jest.fn(),
+  getValueByPath: jest.fn(),
 }));
 
 jest.mock('../components/ToastMessage/ToastMessage', () => ({
@@ -18,7 +19,6 @@ jest.mock('../components/ToastMessage/ToastMessage', () => ({
 }));
 
 jest.mock('../components/ConformityCredential/utils', () => ({
-  getValueByPath: jest.fn(),
   checkStoredCredentialsConfig: jest.fn(),
 }));
 

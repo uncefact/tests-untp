@@ -1,7 +1,7 @@
 /* eslint-disable testing-library/no-node-access */
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { DownloadButton, DownloadFileType } from '..';
+import { DownloadButton, DownloadFileType } from '../components/DownloadButton/DownloadButton';
 
 describe('DownloadButton', () => {
   const jsonData = { key: 'value' };
@@ -17,7 +17,7 @@ describe('DownloadButton', () => {
         fileName={fileName}
         fileExtension={fileExtensionJson}
         fileType={DownloadFileType.json}
-      />
+      />,
     );
 
     // Check if the rendered button with default text is in the document
@@ -34,7 +34,7 @@ describe('DownloadButton', () => {
         fileName={fileName}
         fileExtension={fileExtensionJson}
         fileType={DownloadFileType.json}
-      />
+      />,
     );
 
     // Check if the rendered button with custom text is in the document
@@ -52,7 +52,7 @@ describe('DownloadButton', () => {
         fileName={fileName}
         fileExtension={fileExtensionJson}
         fileType={DownloadFileType.json}
-      />
+      />,
     );
 
     // Find the download button and simulate a click
@@ -74,7 +74,7 @@ describe('DownloadButton', () => {
         fileName={fileName}
         fileExtension={fileExtensionTxt}
         fileType={DownloadFileType.plainText}
-      />
+      />,
     );
 
     // Find the download button and simulate a click

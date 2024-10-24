@@ -4,7 +4,10 @@ import {
   VerifiableCredential,
   CredentialStatusReference,
   IssuerType,
+  IVerifyResult,
+  UnsignedCredential,
 } from '@vckit/core-types';
+import { decodeJwt } from 'jose';
 import { privateAPI } from './utils/httpService.js';
 import { isPlainObject, every, isString } from 'lodash';
 
@@ -149,4 +152,42 @@ const constructCredentialObject = ({ context, type, issuer, credentialSubject, .
       proofFormat: PROOF_FORMAT,
     },
   };
+};
+
+/**
+ * Integrate with vckit to verify VC
+ * @param verifiableCredential
+ * @param vcKitAPIUrl
+ * @returns
+ */
+export const verifyVC = async (
+  verifiableCredential: VerifiableCredential,
+  vcKitAPIUrl?: string,
+): Promise<IVerifyResult> => {
+  const verifyCredentialParams = {
+    credential: verifiableCredential,
+    fetchRemoteContexts: true,
+    policies: {
+      credentialStatus: true,
+    },
+  };
+
+  privateAPI.setBearerTokenAuthorizationHeaders(appConfig.defaultVerificationServiceLink.apiKey ?? '');
+  return await privateAPI.post<IVerifyResult>(
+    vcKitAPIUrl || appConfig.defaultVerificationServiceLink.href,
+    verifyCredentialParams,
+  );
+};
+
+/**
+ * Decode enveloped VC
+ * @param vc
+ * @returns
+ */
+export const decodeEnvelopedVC = (vc: VerifiableCredential): UnsignedCredential | null => {
+  if (vc?.type === 'EnvelopedVerifiableCredential') {
+    const encodedCredential = vc?.id?.split(',')[1];
+    return decodeJwt(encodedCredential as string) as UnsignedCredential;
+  }
+  return null;
 };

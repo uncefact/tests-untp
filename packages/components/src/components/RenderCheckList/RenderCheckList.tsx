@@ -5,11 +5,9 @@ import {
   DynamicComponentRenderer,
   IDynamicComponentRendererProps,
 } from '../DynamicComponentRenderer/DynamicComponentRenderer.js';
-import { getValueByPath } from '@mock-app/services/build/utils/index.js';
 
 export interface IRenderCheckList {
   checkBoxLabel?: string;
-  requiredFieldPath: string;
   nestedComponents: IDynamicComponentRendererProps[];
   onChange: (data: any) => void;
 }
@@ -19,7 +17,7 @@ export enum AllowNestedComponent {
   QRCodeScannerDialogButton = 'QRCodeScannerDialogButton',
 }
 
-export const RenderCheckList = ({ checkBoxLabel, requiredFieldPath, onChange, nestedComponents }: IRenderCheckList) => {
+export const RenderCheckList = ({ checkBoxLabel, onChange, nestedComponents }: IRenderCheckList) => {
   const [checkBoxes, setCheckBoxes] = useState<ICheckBoxes>({});
 
   const handleOnChange = (data: object | object[]) => {
@@ -30,18 +28,12 @@ export const RenderCheckList = ({ checkBoxLabel, requiredFieldPath, onChange, ne
     const uploadedFiles = [];
     if (Array.isArray(data)) {
       uploadedFiles.push(...data);
-    }
-    if (typeof data === 'object') {
+    } else if (typeof data === 'object') {
       uploadedFiles.push(data);
     }
 
     const validItems = uploadedFiles.reduce((acc, item) => {
-      const requiredFieldValue = getValueByPath(item, requiredFieldPath);
-      if (!requiredFieldValue) {
-        return acc;
-      }
-
-      return { ...acc, [requiredFieldValue]: item };
+      return { ...acc, ...item };
     }, {});
 
     return setCheckBoxes((prev) => ({ ...prev, ...validItems }));

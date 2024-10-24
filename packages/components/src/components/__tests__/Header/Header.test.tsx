@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import { Header } from '../../../';
+import { Header } from '../../../components/Header/Header';
 
 describe('Header', () => {
   // Define an array of router links for testing

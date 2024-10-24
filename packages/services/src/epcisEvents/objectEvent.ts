@@ -3,7 +3,7 @@ import { registerLinkResolver, LinkType, getLinkResolverIdentifier } from '../li
 import { uploadData } from '../storage.service.js';
 import { IService } from '../types/IService.js';
 import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
-import { issueVC } from '../vckit.service.js';
+import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { ITraceabilityEvent, IObjectEventContext } from '../types/index.js';
 import { validateObjectEventContext } from '../validateContext.js';
 
@@ -46,6 +46,7 @@ export const processObjectEvent: IService = async (
     },
   });
 
+  const decodedEnvelopedVC = decodeEnvelopedVC(objectEventVc);
   const objectEventVcUrl = await uploadData(storage, objectEventVc, generateUUID());
 
   const objectEventLinkResolver = await registerLinkResolver(
@@ -62,5 +63,5 @@ export const processObjectEvent: IService = async (
     LinkType.epcisLinkType,
   );
 
-  return { vc: objectEventVc, linkResolver: objectEventLinkResolver };
+  return { vc: objectEventVc, decodedEnvelopedVC, linkResolver: objectEventLinkResolver };
 };

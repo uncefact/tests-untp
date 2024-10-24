@@ -760,7 +760,7 @@
               "parameters": [
                 {
                   "storageKey": "CherriesFarm_dpps",
-                  "objectKeyPath": "/vc/credentialSubject/productIdentifier/0/identifierValue"
+                  "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/productIdentifier/0/identifierValue"
                 }
               ]
             }
@@ -4604,11 +4604,11 @@
                     "constructData": {
                       "mappingFields": [
                         {
-                          "sourcePath": "/vc/credentialSubject/productIdentifier/0/identifierValue",
+                          "sourcePath": "/decodedEnvelopedVC/credentialSubject/productIdentifier/0/identifierValue",
                           "destinationPath": "/eventID"
                         },
                         {
-                          "sourcePath": "/vc/credentialSubject/productIdentifier/0/identifierValue",
+                          "sourcePath": "/decodedEnvelopedVC/credentialSubject/productIdentifier/0/identifierValue",
                           "destinationPath": "/epcList/index/name"
                         },
                         {
@@ -4748,7 +4748,7 @@
               "parameters": [
                 {
                   "storageKey": "orchard_facility_transaction_event",
-                  "objectKeyPath": "/vc/credentialSubject/eventID"
+                  "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/eventID"
                 }
               ]
             }
@@ -5502,7 +5502,7 @@
               "parameters": [
                 {
                   "storageKey": "CherriesFarm_dpps",
-                  "objectKeyPath": "/vc/credentialSubject/productIdentifier/0/identifierValue"
+                  "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/productIdentifier/0/identifierValue"
                 }
               ]
             }
@@ -5845,11 +5845,11 @@
                     "constructData": {
                       "mappingFields": [
                         {
-                          "sourcePath": "/vc/credentialSubject/productIdentifier/0/identifierValue",
+                          "sourcePath": "/decodedEnvelopedVC/credentialSubject/productIdentifier/0/identifierValue",
                           "destinationPath": "/eventID"
                         },
                         {
-                          "sourcePath": "/vc/credentialSubject/productIdentifier/0/identifierValue",
+                          "sourcePath": "/decodedEnvelopedVC/credentialSubject/productIdentifier/0/identifierValue",
                           "destinationPath": "/epcList/index/name"
                         },
                         {
@@ -5989,7 +5989,7 @@
               "parameters": [
                 {
                   "storageKey": "packhouse_facility_transaction_event",
-                  "objectKeyPath": "/vc/credentialSubject/eventID"
+                  "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/eventID"
                 }
               ]
             }
@@ -6743,7 +6743,7 @@
               "parameters": [
                 {
                   "storageKey": "CherriesFarm_dpps",
-                  "objectKeyPath": "/vc/credentialSubject/productIdentifier/0/identifierValue"
+                  "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/productIdentifier/0/identifierValue"
                 }
               ]
             }
@@ -7086,11 +7086,11 @@
                     "constructData": {
                       "mappingFields": [
                         {
-                          "sourcePath": "/vc/credentialSubject/productIdentifier/0/identifierValue",
+                          "sourcePath": "/decodedEnvelopedVC/credentialSubject/productIdentifier/0/identifierValue",
                           "destinationPath": "/eventID"
                         },
                         {
-                          "sourcePath": "/vc/credentialSubject/productIdentifier/0/identifierValue",
+                          "sourcePath": "/decodedEnvelopedVC/credentialSubject/productIdentifier/0/identifierValue",
                           "destinationPath": "/epcList/index/name"
                         },
                         {
@@ -7230,7 +7230,7 @@
               "parameters": [
                 {
                   "storageKey": "fumigation_and_freight_forwarding_facility_transaction_event",
-                  "objectKeyPath": "/vc/credentialSubject/eventID"
+                  "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/eventID"
                 }
               ]
             }
@@ -7984,7 +7984,7 @@
               "parameters": [
                 {
                   "storageKey": "CherriesFarm_dpps",
-                  "objectKeyPath": "/vc/credentialSubject/productIdentifier/0/identifierValue"
+                  "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/productIdentifier/0/identifierValue"
                 }
               ]
             }
@@ -8327,11 +8327,11 @@
                     "constructData": {
                       "mappingFields": [
                         {
-                          "sourcePath": "/vc/credentialSubject/productIdentifier/0/identifierValue",
+                          "sourcePath": "/decodedEnvelopedVC/credentialSubject/productIdentifier/0/identifierValue",
                           "destinationPath": "/eventID"
                         },
                         {
-                          "sourcePath": "/vc/credentialSubject/productIdentifier/0/identifierValue",
+                          "sourcePath": "/decodedEnvelopedVC/credentialSubject/productIdentifier/0/identifierValue",
                           "destinationPath": "/epcList/index/name"
                         },
                         {

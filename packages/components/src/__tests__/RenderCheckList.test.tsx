@@ -1,19 +1,27 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { RenderCheckList } from '../components/RenderCheckList/RenderCheckList';
-import * as DynamicComponentRendererComponent from '../components/DynamicComponentRenderer/DynamicComponentRenderer';
+import { IDynamicComponentRendererProps } from '../components/DynamicComponentRenderer/DynamicComponentRenderer';
+import { processVerifiableCredentialData } from '../utils/importDataHelpers.js';
 
 jest.mock('../components/ConformityCredential/index.ts', () => ({}));
 
+jest.mock('../utils/importDataHelpers.js', () => ({
+  processVerifiableCredentialData: jest.fn(),
+}));
+
+jest.mock('@mock-app/services', () => ({
+  publicAPI: jest.fn(),
+}));
+
 describe('render RenderCheckList component', () => {
   const checkBoxLabel = 'checkBoxLabel';
-  const requiredFieldPath = '/requiredField1';
   const nestedComponents = [
     {
       name: 'ImportButton',
       type: 'EntryData',
-      props: { label: 'Import JSON' },
-    } as DynamicComponentRendererComponent.IDynamicComponentRendererProps,
+      props: { label: 'Import JSON', type: 'JSON' },
+    } as IDynamicComponentRendererProps,
   ];
   const onChange = jest.fn();
 
@@ -22,14 +30,7 @@ describe('render RenderCheckList component', () => {
     let componentError: any;
 
     try {
-      render(
-        <RenderCheckList
-          checkBoxLabel={checkBoxLabel}
-          requiredFieldPath={requiredFieldPath}
-          onChange={onChange}
-          nestedComponents={nestedComponents}
-        />,
-      );
+      render(<RenderCheckList checkBoxLabel={checkBoxLabel} onChange={onChange} nestedComponents={nestedComponents} />);
     } catch (error) {
       // If an error is thrown during rendering, catch it and assign it to componentError
       componentError = error;
@@ -40,14 +41,7 @@ describe('render RenderCheckList component', () => {
   });
 
   it('Should display an ImportButton component when "nestedComponents" prop have ImportButton item', () => {
-    render(
-      <RenderCheckList
-        checkBoxLabel={checkBoxLabel}
-        requiredFieldPath={requiredFieldPath}
-        onChange={onChange}
-        nestedComponents={nestedComponents}
-      />,
-    );
+    render(<RenderCheckList checkBoxLabel={checkBoxLabel} onChange={onChange} nestedComponents={nestedComponents} />);
 
     // This assumes that the ImportButton component displays this text
     const importButton = screen.getByText('Import JSON');
@@ -57,14 +51,7 @@ describe('render RenderCheckList component', () => {
   });
 
   it('Should not display a CheckboxList component when renderCheckboxList state is empty', () => {
-    render(
-      <RenderCheckList
-        checkBoxLabel={checkBoxLabel}
-        requiredFieldPath={requiredFieldPath}
-        onChange={onChange}
-        nestedComponents={nestedComponents}
-      />,
-    );
+    render(<RenderCheckList checkBoxLabel={checkBoxLabel} onChange={onChange} nestedComponents={nestedComponents} />);
 
     // Use screen.queryByLabelText to find an element with the label text equal to checkBoxLabel
     const checkboxList = screen.queryByLabelText(checkBoxLabel);
@@ -78,17 +65,10 @@ describe('render RenderCheckList component', () => {
       name: 'InvalidComponent',
       type: 'EntryData',
       props: { label: 'Import JSON' },
-    } as DynamicComponentRendererComponent.IDynamicComponentRendererProps;
+    } as IDynamicComponentRendererProps;
     const nestedComponents = [nestedComponent];
 
-    render(
-      <RenderCheckList
-        checkBoxLabel={checkBoxLabel}
-        requiredFieldPath={requiredFieldPath}
-        onChange={onChange}
-        nestedComponents={nestedComponents}
-      />,
-    );
+    render(<RenderCheckList checkBoxLabel={checkBoxLabel} onChange={onChange} nestedComponents={nestedComponents} />);
     // Try to find an element with the text 'Import JSON'
     const importButton = screen.queryByText('Import JSON');
 
@@ -101,14 +81,7 @@ describe('render RenderCheckList component', () => {
       type: 'application/json',
     });
 
-    render(
-      <RenderCheckList
-        checkBoxLabel={checkBoxLabel}
-        requiredFieldPath={requiredFieldPath}
-        onChange={onChange}
-        nestedComponents={nestedComponents}
-      />,
-    );
+    render(<RenderCheckList checkBoxLabel={checkBoxLabel} onChange={onChange} nestedComponents={nestedComponents} />);
 
     // Find the import button and simulate a change event with a JSON file
     const importButton = screen.getByTestId('file-input');
@@ -118,7 +91,7 @@ describe('render RenderCheckList component', () => {
 
     // Wait for the checkbox to appear and assert that it's checked after being clicked
     await waitFor(() => {
-      const checkBox1 = screen.getByLabelText('label-test-1');
+      const checkBox1 = screen.getByLabelText('vc.json');
       expect(checkBox1).not.toBeChecked();
 
       checkBox1.click();
@@ -136,7 +109,6 @@ describe('render RenderCheckList component', () => {
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFieldPath={requiredFieldPath}
         onChange={onChangeCheckBoxList}
         nestedComponents={nestedComponents}
       />,
@@ -150,10 +122,10 @@ describe('render RenderCheckList component', () => {
 
     // Wait for the checkbox to appear, click it, and assert that the onChange prop was called with the correct data
     await waitFor(() => {
-      const checkBox1 = screen.getByLabelText('label-test-1');
+      const checkBox1 = screen.getByLabelText('vc.json');
       checkBox1.click();
 
-      expect(checkBoxListData).toEqual([{ label: 'label-test-1', value: { requiredField1: 'label-test-1' } }]);
+      expect(checkBoxListData).toEqual({ 'vc.json': { requiredField1: 'label-test-1' } });
     });
   });
 
@@ -164,14 +136,7 @@ describe('render RenderCheckList component', () => {
       new File([JSON.stringify({ requiredField1: 'label-test-3' })], 'vc3.json', { type: 'application/json' }),
     ];
 
-    render(
-      <RenderCheckList
-        checkBoxLabel={checkBoxLabel}
-        requiredFieldPath={requiredFieldPath}
-        onChange={onChange}
-        nestedComponents={nestedComponents}
-      />,
-    );
+    render(<RenderCheckList checkBoxLabel={checkBoxLabel} onChange={onChange} nestedComponents={nestedComponents} />);
 
     // Find the import button and simulate a change event with multiple JSON files
     const importButton = screen.getByTestId('file-input');
@@ -181,9 +146,9 @@ describe('render RenderCheckList component', () => {
 
     // Wait for the checkboxes to appear, click them, and assert that they are checked
     await waitFor(() => {
-      const checkBox1 = screen.getByLabelText('label-test-1');
-      const checkBox2 = screen.getByLabelText('label-test-2');
-      const checkBox3 = screen.getByLabelText('label-test-3');
+      const checkBox1 = screen.getByLabelText('vc1.json');
+      const checkBox2 = screen.getByLabelText('vc2.json');
+      const checkBox3 = screen.getByLabelText('vc3.json');
 
       checkBox1.click();
       checkBox2.click();
@@ -205,7 +170,6 @@ describe('render RenderCheckList component', () => {
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFieldPath={requiredFieldPath}
         onChange={onChangeCheckBoxList}
         nestedComponents={nestedComponents}
       />,
@@ -220,13 +184,13 @@ describe('render RenderCheckList component', () => {
     // Wait for the checkbox to appear, assert that it's not checked and the onChange prop was not called,
     // then click the checkbox and assert that it's checked and the onChange prop was called with the correct data
     await waitFor(() => {
-      const checkBox1 = screen.getByLabelText('label-test-1');
+      const checkBox1 = screen.getByLabelText('vc1.json');
       expect(checkBox1).not.toBeChecked();
       expect(checkBoxListData).toEqual([]);
 
       checkBox1.click();
       expect(checkBox1).toBeChecked();
-      expect(checkBoxListData).toEqual([{ label: 'label-test-1', value: { requiredField1: 'label-test-1' } }]);
+      expect(checkBoxListData).toEqual({ 'vc1.json': { requiredField1: 'label-test-1' } });
     });
   });
 
@@ -240,7 +204,6 @@ describe('render RenderCheckList component', () => {
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFieldPath={requiredFieldPath}
         onChange={onChangeCheckBoxList}
         nestedComponents={nestedComponents}
       />,
@@ -255,14 +218,14 @@ describe('render RenderCheckList component', () => {
     // Wait for the checkbox to appear, click it to check it, assert that it's checked and the onChange prop was called with the correct data,
     // then click it again to uncheck it and assert that it's not checked and the onChange prop was called with an empty array
     await waitFor(() => {
-      const checkBox1 = screen.getByLabelText('label-test-1');
+      const checkBox1 = screen.getByLabelText('vc1.json');
       checkBox1.click();
       expect(checkBox1).toBeChecked();
-      expect(checkBoxListData).toEqual([{ label: 'label-test-1', value: { requiredField1: 'label-test-1' } }]);
+      expect(checkBoxListData).toEqual({ 'vc1.json': { requiredField1: 'label-test-1' } });
 
       checkBox1.click();
       expect(checkBox1).not.toBeChecked();
-      expect(checkBoxListData).toEqual([]);
+      expect(checkBoxListData).toEqual({});
     });
   });
 
@@ -278,7 +241,6 @@ describe('render RenderCheckList component', () => {
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFieldPath={requiredFieldPath}
         onChange={onChangeCheckBoxList}
         nestedComponents={nestedComponents}
       />,
@@ -292,28 +254,28 @@ describe('render RenderCheckList component', () => {
 
     // Wait for the checkboxes to appear, click them, and assert that they are checked and the onChange prop was called with the correct data
     await waitFor(() => {
-      const checkBox1 = screen.getByLabelText('label-test-1');
-      const checkBox2 = screen.getByLabelText('label-test-2');
-      const checkBox3 = screen.getByLabelText('label-test-3');
+      const checkBox1 = screen.getByLabelText('vc1.json');
+      const checkBox2 = screen.getByLabelText('vc2.json');
+      const checkBox3 = screen.getByLabelText('vc3.json');
 
       checkBox1.click();
       expect(checkBox1).toBeChecked();
-      expect(checkBoxListData).toEqual([{ label: 'label-test-1', value: { requiredField1: 'label-test-1' } }]);
+      expect(checkBoxListData).toEqual({ 'vc1.json': { requiredField1: 'label-test-1' } });
 
       checkBox2.click();
       expect(checkBox2).toBeChecked();
-      expect(checkBoxListData).toEqual([
-        { label: 'label-test-1', value: { requiredField1: 'label-test-1' } },
-        { label: 'label-test-2', value: { requiredField1: 'label-test-2' } },
-      ]);
+      expect(checkBoxListData).toEqual({
+        'vc1.json': { requiredField1: 'label-test-1' },
+        'vc2.json': { requiredField1: 'label-test-2' },
+      });
 
       checkBox3.click();
       expect(checkBox3).toBeChecked();
-      expect(checkBoxListData).toEqual([
-        { label: 'label-test-1', value: { requiredField1: 'label-test-1' } },
-        { label: 'label-test-2', value: { requiredField1: 'label-test-2' } },
-        { label: 'label-test-3', value: { requiredField1: 'label-test-3' } },
-      ]);
+      expect(checkBoxListData).toEqual({
+        'vc1.json': { requiredField1: 'label-test-1' },
+        'vc2.json': { requiredField1: 'label-test-2' },
+        'vc3.json': { requiredField1: 'label-test-3' },
+      });
     });
   });
 
@@ -329,7 +291,6 @@ describe('render RenderCheckList component', () => {
     render(
       <RenderCheckList
         checkBoxLabel={checkBoxLabel}
-        requiredFieldPath={requiredFieldPath}
         onChange={onChangeCheckBoxList}
         nestedComponents={nestedComponents}
       />,
@@ -345,9 +306,9 @@ describe('render RenderCheckList component', () => {
     // click on them to check them, assert that they are checked and the state is updated correctly,
     // then uncheck some of them and assert that they are unchecked and the state is updated correctly
     await waitFor(() => {
-      const checkBox1 = screen.getByLabelText('label-test-1');
-      const checkBox2 = screen.getByLabelText('label-test-2');
-      const checkBox3 = screen.getByLabelText('label-test-3');
+      const checkBox1 = screen.getByLabelText('vc1.json');
+      const checkBox2 = screen.getByLabelText('vc2.json');
+      const checkBox3 = screen.getByLabelText('vc3.json');
 
       // Assert that all checkboxes are unchecked and the state is empty
       expect(checkBox1).not.toBeChecked();
@@ -364,11 +325,11 @@ describe('render RenderCheckList component', () => {
       expect(checkBox1).toBeChecked();
       expect(checkBox2).toBeChecked();
       expect(checkBox3).toBeChecked();
-      expect(checkBoxListData).toEqual([
-        { label: 'label-test-1', value: { requiredField1: 'label-test-1' } },
-        { label: 'label-test-2', value: { requiredField1: 'label-test-2' } },
-        { label: 'label-test-3', value: { requiredField1: 'label-test-3' } },
-      ]);
+      expect(checkBoxListData).toEqual({
+        'vc1.json': { requiredField1: 'label-test-1' },
+        'vc2.json': { requiredField1: 'label-test-2' },
+        'vc3.json': { requiredField1: 'label-test-3' },
+      });
 
       // Uncheck checkbox 1 and 2, and assert that they are unchecked and the state is updated correctly
       checkBox1.click();
@@ -376,7 +337,7 @@ describe('render RenderCheckList component', () => {
       expect(checkBox1).not.toBeChecked();
       expect(checkBox2).not.toBeChecked();
       expect(checkBox3).toBeChecked();
-      expect(checkBoxListData).toEqual([{ label: 'label-test-3', value: { requiredField1: 'label-test-3' } }]);
+      expect(checkBoxListData).toEqual({ 'vc3.json': { requiredField1: 'label-test-3' } });
     });
   });
 });

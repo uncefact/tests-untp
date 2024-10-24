@@ -27,7 +27,7 @@ import JSONPointer from 'jsonpointer';
 
 /**
  * Process transformation event, issue epcis transformation event and dpp for each identifiers, then upload to storage and register link resolver for each dpp
- * @param data - data for the transformation event, which nlsids are selected
+ * @param data - data for the transformation event
  * @param context - context for the transformation event
  */
 export const processTransformationEvent: IService = async (
@@ -143,7 +143,7 @@ export const issueEpcisTransformationEvent = async (
           dlrContext.dlrAPIUrl,
           dlrContext.namespace,
           IdentificationKeyType.gtin,
-          `linkType=${LinkType.certificationLinkType}`,
+          `linkType=${dlrContext.namespace}:${LinkType.certificationLinkType}`,
         ),
         generateIdWithBatchLot,
         generateCurrentDatetime,

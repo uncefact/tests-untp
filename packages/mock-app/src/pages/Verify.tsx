@@ -1,5 +1,5 @@
 import { Status } from '@mock-app/components';
-import { computeHash, decryptCredential, privateAPI, publicAPI } from '@mock-app/services';
+import { computeHash, decryptCredential, privateAPI, publicAPI, verifyVC } from '@mock-app/services';
 import { IVerifyResult, VerifiableCredential } from '@vckit/core-types';
 import * as jose from 'jose';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -97,17 +97,9 @@ const Verify = () => {
   // TODO: Move this function to the vckit service
   const verifyCredential = async (verifiableCredential: VerifiableCredential) => {
     try {
-      const verifyCredentialParams = {
-        credential: verifiableCredential,
-        fetchRemoteContexts: true,
-        policies: {
-          credentialStatus: true,
-        },
-      };
-
       const verifyServiceUrl = appConfig.defaultVerificationServiceLink.href;
-      privateAPI.setBearerTokenAuthorizationHeaders(appConfig.defaultVerificationServiceLink.apiKey ?? '');
-      const verifiedCredentialResult = await privateAPI.post<IVerifyResult>(verifyServiceUrl, verifyCredentialParams);
+      const verifiedCredentialResult = await verifyVC(verifiableCredential, verifyServiceUrl);
+
       showVerifiedCredentialResult(verifiedCredentialResult);
     } catch (error) {
       displayErrorUI();

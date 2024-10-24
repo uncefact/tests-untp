@@ -1,11 +1,12 @@
 import { processDPP } from '../processDPP.service';
-import { issueVC, contextDefault } from '../vckit.service';
+import { issueVC, contextDefault, decodeEnvelopedVC } from '../vckit.service';
 import { uploadData } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType, LinkType } from '../linkResolver.service';
 import { contextDPP, dataDPP } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
+  decodeEnvelopedVC: jest.fn(),
   contextDefault: ['https://www.w3.org/2018/credentials/v1', 'https://w3id.org/vc-revocation-list-2020/v1'],
 }));
 
@@ -48,6 +49,10 @@ describe('processDPP', () => {
 
         return Promise.resolve(expectVCResult);
       });
+
+      (decodeEnvelopedVC as jest.Mock).mockReturnValue({
+        credentialSubject: { id: 'https://example.com/123' },
+      });
     });
 
     afterEach(() => {
@@ -76,6 +81,9 @@ describe('processDPP', () => {
       const vc = await processDPP(dataDPP, contextDPP);
       expect(vc).toEqual({
         vc: expectVCResult,
+        decodedEnvelopedVC: {
+          credentialSubject: { id: 'https://example.com/123' },
+        },
         linkResolver:
           contextDPP.dpp.dlrVerificationPage +
           '/' +

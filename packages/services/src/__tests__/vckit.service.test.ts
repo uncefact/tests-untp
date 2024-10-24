@@ -1,9 +1,17 @@
 import { issueVC, issueCredentialStatus } from '../vckit.service';
 import { privateAPI } from '../utils/httpService';
+import { decodeJwt } from 'jose';
+import appConfig from '../../../mock-app/src/constants/app-config.json';
+import { decodeEnvelopedVC, verifyVC } from '../vckit.service';
+
+jest.mock('jose', () => ({
+  decodeJwt: jest.fn(),
+}));
 
 jest.mock('../utils/httpService', () => ({
   privateAPI: {
     post: jest.fn(),
+    put: jest.fn(),
     setBearerTokenAuthorizationHeaders: jest.fn(),
   },
 }));
@@ -267,6 +275,113 @@ describe('vckit.service', () => {
       });
 
       expect(privateAPI.post).toHaveBeenCalledWith(expect.any(String), expect.any(Object), { headers: customHeaders });
+    });
+  });
+});
+jest.mock('../../../mock-app/src/constants/app-config.json', () => ({
+  defaultVerificationServiceLink: {
+    href: 'https://example.com/credentials/verify',
+    apiKey: '123',
+  },
+}));
+
+describe('verifyVC', () => {
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('should call privateAPI.post with the correct arguments when vcKitAPIUrl is not provided', async () => {
+    const vc = {
+      '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
+      type: ['VerifiableCredential'],
+      issuer: 'did:web:localhost',
+      credentialSubject: {
+        id: 'did:web:localhost',
+        name: 'John Doe',
+        age: 30,
+      },
+    } as any;
+
+    await verifyVC(vc);
+
+    expect(privateAPI.setBearerTokenAuthorizationHeaders).toHaveBeenCalledWith('123');
+    expect(privateAPI.post).toHaveBeenCalledWith('https://example.com/credentials/verify', {
+      credential: vc,
+      fetchRemoteContexts: true,
+      policies: {
+        credentialStatus: true,
+      },
+    });
+  });
+
+  it('should call privateAPI.post with the correct arguments when vcKitAPIUrl is provided', async () => {
+    const vc = {
+      '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
+      type: ['VerifiableCredential'],
+      issuer: 'did:web:localhost',
+      credentialSubject: {
+        id: 'did:web:localhost',
+        name: 'John Doe',
+        age: 30,
+      },
+    } as any;
+
+    const vckitAPIUrl = 'https://example.vcservice.com/credentials/verify';
+
+    await verifyVC(vc, vckitAPIUrl);
+
+    expect(privateAPI.setBearerTokenAuthorizationHeaders).toHaveBeenCalledWith('123');
+    expect(privateAPI.post).toHaveBeenCalledWith('https://example.vcservice.com/credentials/verify', {
+      credential: vc,
+      fetchRemoteContexts: true,
+      policies: {
+        credentialStatus: true,
+      },
+    });
+  });
+
+  describe('decodeEnvelopedVC', () => {
+    afterEach(() => {
+      jest.resetAllMocks();
+    });
+
+    it('should return null when vc is not enveloped', () => {
+      const vc = {
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
+        type: ['VerifiableCredential'],
+        issuer: 'did:web:localhost',
+        credentialSubject: {
+          id: 'did:web:localhost',
+          name: 'John Doe',
+          age: 30,
+        },
+      } as any;
+
+      const result = decodeEnvelopedVC(vc);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return the decoded vc when vc is enveloped', () => {
+      const vc = {
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
+        type: 'EnvelopedVerifiableCredential',
+        id: 'data:application/vc-ld+jwt,jwt.abc.123',
+      } as any;
+
+      (decodeJwt as jest.Mock).mockReturnValue({
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
+        type: ['VerifiableCredential'],
+        issuer: 'did:web:localhost',
+        credentialSubject: {
+          id: 'did:web:localhost',
+          name: 'John Doe',
+          age: 30,
+        },
+      });
+
+      const result = decodeEnvelopedVC(vc);
+      expect(result).not.toBeNull();
     });
   });
 });
