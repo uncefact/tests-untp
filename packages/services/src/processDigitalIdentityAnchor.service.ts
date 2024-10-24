@@ -36,6 +36,7 @@ export const processDigitalIdentityAnchor: IService = async (
   const vc: VerifiableCredential = await issueVC({
     credentialSubject: digitalIdentityAnchorData.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
+    headers: vckit.headers,
     issuer: vckit.issuer,
     context: digitalIdentityAnchor.context,
     type: digitalIdentityAnchor.type,
@@ -44,7 +45,7 @@ export const processDigitalIdentityAnchor: IService = async (
     },
   });
 
-  const vcUrl = await uploadData(storage, vc, `${identifier}/${generateUUID()}`);
+  const vcUrl = await uploadData(storage, vc, generateUUID());
 
   const linkResolver = await registerLinkResolver(
     vcUrl,

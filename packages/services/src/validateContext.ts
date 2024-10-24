@@ -5,10 +5,12 @@ import {
   ITransactionEventContext,
   ITransformationEventContext,
   IObjectEventContext,
+  IAssociationEventContext,
   IAggregationEventContext,
   IDppContext,
   IDigitalIdentityAnchorContext,
   IDigitalFacilityRecordContext,
+  IDigitalConformityCredentialContext,
 } from './types/index.js';
 
 export const error: <T>(message: string) => Result<T> = (message) => ({
@@ -50,6 +52,7 @@ export const validateContextDPP = (context: IDppContext): Result<IContext> => {
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
+  if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   return { ok: true, value: context };
 };
@@ -76,6 +79,7 @@ export const validateContextTransformationEvent = (
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
+  if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   if (_.isEmpty(context.epcisTransformationEvent)) return error('epcisTransformationEvent not found');
   if (_.isEmpty(context.epcisTransformationEvent.context)) return error('Invalid epcisTransformationEvent context');
@@ -118,6 +122,7 @@ export const validateTransactionEventContext = (
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
+  if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   return { ok: true, value: context };
 };
@@ -148,6 +153,7 @@ export const validateAggregationEventContext = (
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
+  if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   return { ok: true, value: context };
 };
@@ -176,6 +182,7 @@ export const validateObjectEventContext = (context: IObjectEventContext): Result
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
+  if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   return { ok: true, value: context };
 };
@@ -203,6 +210,7 @@ export const validateDigitalIdentityAnchorContext = (
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
+  if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   return { ok: true, value: context };
 };
@@ -230,6 +238,67 @@ export const validateDigitalFacilityRecordContext = (
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
+  if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
+
+  return { ok: true, value: context };
+};
+
+export const validateAssociationEventContext = (
+  context: IAssociationEventContext,
+): Result<IAssociationEventContext> => {
+  if (_.isEmpty(context.vckit)) return error('Invalid vckit context');
+  if (_.isEmpty(context.epcisAssociationEvent)) return error('Invalid epcisAssociationEvent context');
+  if (_.isEmpty(context.storage)) return error('Invalid storage context');
+  if (_.isEmpty(context.dlr)) return error('Invalid dlr context');
+  if (_.isEmpty(context.identifierKeyPath)) return error('identifierKeyPath not found');
+
+  if (_.isEmpty(context.vckit.vckitAPIUrl)) return error('Invalid vckitAPIUrl');
+  if (_.isEmpty(context.vckit.issuer)) return error('Invalid issuer');
+
+  if (_.isEmpty(context.epcisAssociationEvent.context)) return error('Invalid epcisAssociationEvent context');
+  if (_.isEmpty(context.epcisAssociationEvent.type)) return error('Invalid epcisAssociationEvent type');
+  if (_.isEmpty(context.epcisAssociationEvent.dlrLinkTitle)) return error('Invalid epcisAssociationEvent dlrLinkTitle');
+  if (_.isEmpty(context.epcisAssociationEvent.dlrVerificationPage))
+    return error('Invalid epcisAssociationEvent dlrVerificationPage');
+  if (_.isEmpty(context.epcisAssociationEvent.dlrIdentificationKeyType))
+    return error('Invalid epcisAssociationEvent dlrIdentificationKeyType');
+
+  if (_.isEmpty(context.storage)) return error('Invalid storage context');
+  if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
+  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
+
+  if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
+  if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
+  if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
+
+  return { ok: true, value: context };
+};
+
+export const validateDigitalConformityCredentialContext = (
+  context: IDigitalConformityCredentialContext,
+): Result<IDigitalConformityCredentialContext> => {
+  const validationResult = checkContextProperties(context);
+  if (!validationResult.ok) return error(validationResult.value);
+
+  if (_.isEmpty(context.vckit.vckitAPIUrl)) return error('Invalid vckitAPIUrl');
+  if (_.isEmpty(context.vckit.issuer)) return error('Invalid issuer');
+
+  if (_.isEmpty(context.digitalConformityCredential)) return error('Invalid digitalConformityCredential context');
+  if (_.isEmpty(context.digitalConformityCredential.context))
+    return error('Invalid digitalConformityCredential context');
+  if (_.isEmpty(context.digitalConformityCredential.type)) return error('Invalid type');
+  if (_.isEmpty(context.digitalConformityCredential.dlrLinkTitle)) return error('Invalid dlrLinkTitle');
+  if (_.isEmpty(context.digitalConformityCredential.dlrVerificationPage)) return error('Invalid dlrVerificationPage');
+  if (_.isEmpty(context.digitalConformityCredential.dlrIdentificationKeyType))
+    return error('Invalid dlrIdentificationKeyType');
+
+  if (_.isEmpty(context.storage)) return error('Invalid storage context');
+  if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
+  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
+
+  if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
+  if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
+  if (_.isEmpty(context.dlr.namespace)) return error('Invalid dlr namespace');
 
   return { ok: true, value: context };
 };

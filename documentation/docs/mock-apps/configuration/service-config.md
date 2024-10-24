@@ -45,7 +45,10 @@ graph TD
         {
           "vckit": {
             "vckitAPIUrl": "http://localhost:3332/v2",
-            "issuer": "did:web:example.com"
+            "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+            "headers": {
+              "Authorization": "Bearer test123"
+            }
           },
           "dpp": {
             "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -60,9 +63,10 @@ graph TD
             "dlrAPIKey": "5555555555555"
           },
           "storage": {
-            "url": "http://localhost:3001/upload",
+            "url": "http://localhost:3334/v1/documents",
             "params": {
-              "resultPath": "/url"
+              "resultPath": "/uri",
+              "bucket": "verifiable-credentials"
             },
             "options": {
               "method": "POST",

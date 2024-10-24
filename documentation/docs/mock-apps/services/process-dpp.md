@@ -58,7 +58,10 @@ P-->>C: Return VC and resolver URL
     {
       "vckit": {
         "vckitAPIUrl": "http://localhost:3332/v2",
-        "issuer": "did:web:example.com:steel-mill-1"
+        "issuer": "did:web:uncefact.github.io:project-vckit:test-and-development",
+        "headers": {
+          "Authorization": "Bearer test123"
+        }
       },
       "dpp": {
         "context": ["https://dpp-json-ld.s3.ap-southeast-2.amazonaws.com/dppld.json"],
@@ -68,7 +71,7 @@ P-->>C: Return VC and resolver URL
             "@type": "WebRenderingTemplate2022"
           }
         ],
-        "type": ["VerifiableCredential", " DigitalProductPassport"],
+        "type": ["DigitalProductPassport"],
         "dlrLinkTitle": "Steel Passport",
         "dlrIdentificationKeyType": "gtin",
         "dlrVerificationPage": "http://localhost:3332/verify"
@@ -80,10 +83,10 @@ P-->>C: Return VC and resolver URL
         "linkRegisterPath": "/api/resolver"
       },
       "storage": {
-        "url": "https://storage.example.com/v1/documents",
+        "url": "http://localhost:3334/v1/documents",
         "params": {
-          "bucket": "verifiable-credentials",
-          "resultPath": "/uri"
+          "resultPath": "/uri",
+          "bucket": "verifiable-credentials"
         },
         "options": {
           "method": "POST",

@@ -36,6 +36,7 @@ export const processDigitalFacilityRecord: IService = async (
   const vc: VerifiableCredential = await issueVC({
     credentialSubject: digitalFacilityRecordData.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
+    headers: vckit.headers,
     issuer: vckit.issuer,
     context: digitalFacilityRecord.context,
     type: digitalFacilityRecord.type,
@@ -44,7 +45,7 @@ export const processDigitalFacilityRecord: IService = async (
     },
   });
 
-  const vcUrl = await uploadData(storage, vc, `${identifier}/${generateUUID()}`);
+  const vcUrl = await uploadData(storage, vc, generateUUID());
 
   const linkResolver = await registerLinkResolver(
     vcUrl,

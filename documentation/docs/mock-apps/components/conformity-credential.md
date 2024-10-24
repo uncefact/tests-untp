@@ -3,7 +3,7 @@ sidebar_position: 20
 title: Conformity Credential
 ---
 
-import Disclaimer from '../../_disclaimer.mdx';
+import Disclaimer from '../../\_disclaimer.mdx';
 
 <Disclaimer />
 <!-- TODO: Add Verify link generator to conformity credential component -->
@@ -53,12 +53,17 @@ The ConformityCredential component allows users to request and manage conformity
       }
     ],
     "storedCredentialsConfig": {
-      "url": "https://storage.example.com",
-      "params": {},
-      "options": {
-        "bucket": "bucket-stored-example"
+      "url": "http://localhost:3334/v1/documents",
+      "params": {
+        "resultPath": "/uri",
+        "bucket": "verifiable-credentials"
       },
-      "type": "s3"
+      "options": {
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
     }
   }
 }
@@ -66,32 +71,33 @@ The ConformityCredential component allows users to request and manage conformity
 
 ## Definitions
 
-| Property | Required | Description | Type |
-|----------|----------|-------------|------|
-| name | Yes | The name of the component (should be "ConformityCredential") | String |
-| type | Yes | The type of the component (should be "Void") | [ComponentType](/docs/mock-apps/common/component-type) |
-| props | Yes | The properties for the ConformityCredential | [Props](/docs/mock-apps/components/conformity-credential#props) |
+| Property | Required | Description                                                  | Type                                                            |
+| -------- | -------- | ------------------------------------------------------------ | --------------------------------------------------------------- |
+| name     | Yes      | The name of the component (should be "ConformityCredential") | String                                                          |
+| type     | Yes      | The type of the component (should be "Void")                 | [ComponentType](/docs/mock-apps/common/component-type)          |
+| props    | Yes      | The properties for the ConformityCredential                  | [Props](/docs/mock-apps/components/conformity-credential#props) |
 
 ### Props
 
-| Property | Required | Description | Type |
-|----------|----------|-------------|------|
-| credentialRequestConfigs | Yes | An array of credential request configurations | [CredentialRequestConfig[]](/docs/mock-apps/components/conformity-credential#credentialrequestconfig) |
-| storedCredentialsConfig | Yes | Configuration for storing credentials | [Storage](/docs/mock-apps/common/storage)
+| Property                 | Required | Description                                   | Type                                                                                                  |
+| ------------------------ | -------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| credentialRequestConfigs | Yes      | An array of credential request configurations | [CredentialRequestConfig[]](/docs/mock-apps/components/conformity-credential#credentialrequestconfig) |
+| storedCredentialsConfig  | Yes      | Configuration for storing credentials         | [Storage](/docs/mock-apps/common/storage)                                                             |
+
 ### CredentialRequestConfig
 
-| Property | Required | Description | Type |
-|----------|----------|-------------|------|
-| url | Yes | The URL for the credential request | String |
-| params | No | Parameters for the request | Object |
-| options | Yes | Request options | [RequestOptions](/docs/mock-apps/components/conformity-credential#requestoptions) |
-| credentialName | Yes | The name of the credential | String |
-| credentialPath | No | The path to extract the credential from the response | String |
-| appOnly | Yes | The application context for the credential | String |
+| Property       | Required | Description                                          | Type                                                                              |
+| -------------- | -------- | ---------------------------------------------------- | --------------------------------------------------------------------------------- |
+| url            | Yes      | The URL for the credential request                   | String                                                                            |
+| params         | No       | Parameters for the request                           | Object                                                                            |
+| options        | Yes      | Request options                                      | [RequestOptions](/docs/mock-apps/components/conformity-credential#requestoptions) |
+| credentialName | Yes      | The name of the credential                           | String                                                                            |
+| credentialPath | No       | The path to extract the credential from the response | String                                                                            |
+| appOnly        | Yes      | The application context for the credential           | String                                                                            |
 
 ### RequestOptions
 
-| Property | Required | Description | Type |
-|----------|----------|-------------|------|
-| headers | No | Headers for the request | Array |
-| method | Yes | HTTP method for the request | String |
+| Property | Required | Description                 | Type   |
+| -------- | -------- | --------------------------- | ------ |
+| headers  | No       | Headers for the request     | Array  |
+| method   | Yes      | HTTP method for the request | String |

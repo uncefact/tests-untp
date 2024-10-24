@@ -13,7 +13,8 @@ The `VCkit` object contains configuration details for the [Verifiable Credential
 
 ## Definition
 
-| Property | Required | Description | Type |
-|----------|----------|-------------|------|
-| vckitAPIUrl | Yes | URL for the VCKit API | String |
-| issuer | Yes | Issuer identifier for the Verifiable Credential | String |
+| Property    | Required | Description                                                                       | Type   |
+| ----------- | -------- | --------------------------------------------------------------------------------- | ------ |
+| vckitAPIUrl | Yes      | URL for the VCKit API                                                             | String |
+| issuer      | Yes      | Issuer identifier for the Verifiable Credential                                   | String |
+| headers     | No       | Custom headers to be included in the request to the Verifiable Credential service | Object |

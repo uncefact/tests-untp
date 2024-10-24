@@ -33,6 +33,7 @@ export interface IVerifyURLPayload {
 export interface IVCKitContext {
   issuer: string;
   vckitAPIUrl: string;
+  headers?: Record<string, string>;
 }
 
 export interface ICredential {
@@ -61,6 +62,7 @@ export interface IConfigDLR {
   dlrAPIUrl: string;
   dlrAPIKey: string;
   namespace: string;
+  linkRegisterPath?: string;
 }
 
 export interface IStorageContext {
@@ -129,4 +131,12 @@ export interface IObjectEventContext extends IContext {
 
 export interface IDigitalFacilityRecordContext extends IContext {
   digitalFacilityRecord: IEntityIssue;
+}
+
+export interface IAssociationEventContext extends IContext {
+  epcisAssociationEvent: IEntityIssue;
+}
+
+export interface IDigitalConformityCredentialContext extends IContext {
+  digitalConformityCredential: IEntityIssue;
 }

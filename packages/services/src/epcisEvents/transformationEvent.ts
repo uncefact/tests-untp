@@ -52,11 +52,7 @@ export const processTransformationEvent: IService = async (
     );
 
     const storageContext = context.storage;
-    const transformantionEventLink = await uploadVC(
-      `epcis-transformation-event/${generateUUID()}`,
-      epcisVc,
-      storageContext,
-    );
+    const transformantionEventLink = await uploadVC(generateUUID(), epcisVc, storageContext);
 
     const dppContext = context.dpp;
 
@@ -97,7 +93,7 @@ export const processTransformationEvent: IService = async (
         };
 
         const dpp = await issueDPP(vcKitContext, dppContext, dppCredential, transformationEventData);
-        const DPPLink = await uploadVC(`${productID as string}/${generateUUID()}`, dpp, storageContext);
+        const DPPLink = await uploadVC(generateUUID(), dpp, storageContext);
         const { identifier, qualifierPath } = getLinkResolverIdentifier(productID);
 
         await registerLinkResolver(
@@ -162,6 +158,7 @@ export const issueEpcisTransformationEvent = async (
     issuer: vcKitContext.issuer,
     type: [...epcisTransformationEvent.type],
     vcKitAPIUrl: vcKitContext.vckitAPIUrl,
+    headers: vcKitContext.headers,
     restOfVC,
   });
 
@@ -170,13 +167,13 @@ export const issueEpcisTransformationEvent = async (
 
 /**
  * Upload the verifiable credential to the storage
- * @param path - filename of the verifiable credential
+ * @param id - id of the verifiable credential
  * @param vc - verifiable credential to be uploaded
  * @param storageContext - context for the storage to upload the verifiable credential
  * @returns string - url of the uploaded verifiable credential
  */
-export const uploadVC = async (path: string, vc: VerifiableCredential, storageContext: StorageServiceConfig) => {
-  const result = await uploadData(storageContext, vc, path);
+export const uploadVC = async (id: string, vc: VerifiableCredential, storageContext: StorageServiceConfig) => {
+  const result = await uploadData(storageContext, vc, id);
   return result;
 };
 
@@ -204,6 +201,7 @@ export const issueDPP = async (
     issuer: vcKitContext.issuer,
     type: dppContext.type,
     vcKitAPIUrl: vcKitContext.vckitAPIUrl,
+    headers: vcKitContext.headers,
     credentialSubject: dppCredentialSubject,
     restOfVC,
   });

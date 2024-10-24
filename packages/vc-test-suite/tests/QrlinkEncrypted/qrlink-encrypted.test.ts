@@ -1,4 +1,4 @@
-import { decryptString } from '@govtechsg/oa-encryption';
+import { decryptCredential } from '@mock-app/services';
 import chai from 'chai';
 import * as config from '../../config';
 import { reportRow, setupMatrix } from '../../helpers';
@@ -50,10 +50,9 @@ describe('QR Link Verification', function () {
     //   url: parsedLink.q.payload.uri,
     //   method: 'GET',
     // });
-    // const stringifyVC = decryptString({
+    // const stringifyVC = decryptCredential({
     //   ...res.document,
     //   key: parsedLink.q.payload.key,
-    //   type: 'OPEN-ATTESTATION-TYPE-1',
     // });
     // const vc = JSON.parse(stringifyVC);
     // const credentialHash = computeEntryHash(vc);
@@ -70,10 +69,9 @@ describe('QR Link Verification', function () {
       method,
     });
 
-    const stringifyVC = decryptString({
+    const stringifyVC = decryptCredential({
       ...data.document,
       key: parsedLink.q.payload.key,
-      type: 'OPEN-ATTESTATION-TYPE-1',
     });
 
     const vc = JSON.parse(stringifyVC);
