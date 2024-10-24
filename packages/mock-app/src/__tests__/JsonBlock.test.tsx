@@ -33,13 +33,9 @@ describe('Json block content', () => {
     },
   };
 
-  const renderComponent = (verifiableCredential: any) => {
-    return render(<JsonBlock credential={credential} />);
-  };
-
   it('should render json block content component', () => {
     // Render the JsonBlock component with the mock credential
-    renderComponent(credential);
+    render(<JsonBlock credential={credential} />);
     // Expecting the text 'VerifiableCredential' to be present in the rendered component
     expect(screen.getByText(/VerifiableCredential/i)).not.toBeNull();
   });
