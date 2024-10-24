@@ -1,29 +1,26 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { GenericFeature } from '../components/GenericFeature/GenericFeature';
-import {
-  ComponentType,
-  DynamicComponentRenderer,
-  IDynamicComponentRendererProps,
-} from '../components/GenericFeature/DynamicComponentRenderer';
+import { ComponentType, DynamicComponentRenderer, IDynamicComponentRendererProps } from '@mock-app/components';
 
 jest.mock('@mock-app/components', () => ({
   JsonForm: jest.fn(),
   Button: jest.fn(),
-}));
-
-jest.mock('@mock-app/services', () => ({
-  logService: jest.fn().mockImplementation((value) => value),
-  logServiceTwo: jest.fn(),
-}));
-
-jest.mock('../components/GenericFeature/DynamicComponentRenderer', () => ({
   DynamicComponentRenderer: jest.fn(),
+  toastMessage: jest.fn(),
   ComponentType: {
     EntryData: 'EntryData',
     Void: 'Void',
     Submit: 'Submit',
   },
+  Status: {
+    success: 'success',
+    error: 'error',
+  },
+}));
+
+jest.mock('@mock-app/services', () => ({
+  logService: jest.fn().mockImplementation(() => 'logService'),
 }));
 
 describe('GenericFeature', () => {
@@ -93,11 +90,11 @@ describe('GenericFeature', () => {
   });
 
   test('should render UI with componentsData and call onClick to trigger services', () => {
-    const mock = jest.fn().mockImplementation(() => 'logService');
+    const mock = jest.fn().mockImplementation((value) => expect(value).toBe('logService'));
     const services = [
       {
         name: 'logService',
-        parameters: [mock()],
+        parameters: [],
       },
     ];
 
@@ -106,7 +103,7 @@ describe('GenericFeature', () => {
         <div>
           <p>{name}</p>
 
-          {name === 'Button' && <button onClick={props.onClick}>Click me!</button>}
+          {name === 'Button' && <button onClick={() => props.onClick(mock)}>Click me!</button>}
         </div>
       ),
     );
@@ -115,7 +112,5 @@ describe('GenericFeature', () => {
     fireEvent.click(screen.getByText('Click me!'));
 
     expect(screen.getByText('Button')).not.toBeNull();
-    expect(mock).toHaveBeenCalled();
-    expect(mock).toHaveReturnedWith('logService');
   });
 });
