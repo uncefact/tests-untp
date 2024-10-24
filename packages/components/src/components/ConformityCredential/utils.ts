@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { StorageServiceConfig } from '@mock-app/services/build/types/storage.js';
+import { StorageServiceConfig } from '@mock-app/services';
 
 export type Result<T> = { ok: true; value: T } | { ok: false; value: string };
 
