@@ -1,8 +1,8 @@
 import { issueVC, issueCredentialStatus } from '../vckit.service';
 import { privateAPI } from '../utils/httpService';
 import { decodeJwt } from 'jose';
-import appConfig from '../../../mock-app/src/constants/app-config.json';
 import { decodeEnvelopedVC, verifyVC } from '../vckit.service';
+import appConfig from '../../../../app-config.json';
 
 jest.mock('jose', () => ({
   decodeJwt: jest.fn(),
@@ -278,7 +278,8 @@ describe('vckit.service', () => {
     });
   });
 });
-jest.mock('../../../mock-app/src/constants/app-config.json', () => ({
+
+jest.mock('../../../../app-config.json', () => ({
   defaultVerificationServiceLink: {
     href: 'https://example.com/credentials/verify',
     apiKey: '123',

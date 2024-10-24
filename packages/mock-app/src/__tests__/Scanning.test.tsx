@@ -5,7 +5,7 @@ import { fireEvent, render } from '@testing-library/react';
 import { publicAPI } from '@mock-app/services';
 import { act } from 'react-dom/test-utils';
 import { Scanner } from '../components/Scanner';
-import { Scanning } from '../pages';
+import Scanning from '../pages/Scanning';
 
 const mockUsedNavigate = jest.fn();
 jest.mock('react-router', () => ({

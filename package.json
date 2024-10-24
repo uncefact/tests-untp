@@ -10,7 +10,8 @@
     "build:components": "cd packages/components && yarn run build",
     "build:untp-test-suite": "cd packages/untp-test-suite && yarn run build",
     "build-clean": "rimraf --glob ./yarn.lock ./node_modules ./packages/*/tsconfig.tsbuildinfo ./packages/*/build ./packages/*/node_modules",
-    "test": "yarn run test:services && yarn run test:components && yarn run test:mock-app",
+    "test": "lerna exec -- yarn jest",
+    "test:coverage": "lerna exec -- yarn jest --coverage && istanbul-merge --out coverage/coverage-final.json packages/*/coverage/coverage-final.json && nyc report --reporter=html --temp-dir=./coverage",
     "test:components": "cd packages/components && yarn run test",
     "test:services": "cd packages/services && yarn run test",
     "test:mock-app": "cd packages/mock-app && yarn run test",
@@ -57,6 +58,8 @@
     "node": ">= 20.12.2"
   },
   "dependencies": {
-    "rimraf": "^5.0.5"
+    "rimraf": "^5.0.5",
+    "istanbul-merge": "2.0.0",
+    "nyc": "17.1.0"
   }
 }

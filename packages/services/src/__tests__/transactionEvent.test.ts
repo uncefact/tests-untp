@@ -215,6 +215,7 @@ describe('processTransactionEvent', () => {
 
     expect(transactionVC).toEqual({
       vc: transactionVCMock,
+      decodedEnvelopedVC: transactionVCMock,
       linkResolver: transactionEventDLRMock,
     });
     expect(vckitService.issueVC).toHaveBeenCalledWith(

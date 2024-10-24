@@ -144,6 +144,9 @@ describe('processDPP', () => {
 
       expect(vc).toEqual({
         vc: expectVCResult,
+        decodedEnvelopedVC: {
+          credentialSubject: { id: 'https://example.com/123' },
+        },
         linkResolver: expect.any(String),
       });
 

@@ -10,6 +10,7 @@ import {
 import { decodeJwt } from 'jose';
 import { privateAPI } from './utils/httpService.js';
 import { isPlainObject, every, isString } from 'lodash';
+import appConfig from '../../../app-config.json';
 
 export const contextDefault = [
   'https://www.w3.org/ns/credentials/v2',

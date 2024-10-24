@@ -2,7 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryHistory } from 'history';
 import { Router as RouterDom } from 'react-router-dom';
 import { Verify } from '../pages';
-import { privateAPI, publicAPI } from '@mock-app/services';
+import { privateAPI, publicAPI, verifyVC } from '@mock-app/services';
 import { VerifiableCredential } from '@vckit/core-types';
 
 console.error = jest.fn();
@@ -15,12 +15,13 @@ jest.mock('@mock-app/services', () => ({
   getDlrPassport: jest.fn(),
   IdentityProvider: jest.fn(),
   getProviderByType: jest.fn(),
+  decryptCredential: jest.fn(),
+  computeHash: jest.fn(),
+  verifyVC: jest.fn(),
   publicAPI: { get: jest.fn() },
   privateAPI: { post: jest.fn(), setBearerTokenAuthorizationHeaders: jest.fn() },
 }));
-jest.mock('@veramo/utils', () => ({
-  computeEntryHash: jest.fn(),
-}));
+
 jest.mock('jose', () => ({
   decodeJwt: jest.fn(),
 }));
@@ -96,12 +97,12 @@ describe('Verify', () => {
   it('should render failure screen due to no matching proofs', async () => {
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockEncryptedCredential);
     // Simulate the response of a verify VC request failing due to no matching proofs.
-    jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({
+    (verifyVC as jest.Mock).mockImplementation(() => ({
       verified: false,
       error: {
         message: 'No matching proofs found in the given document.',
       },
-    });
+    }));
 
     await act(async () => {
       render(
@@ -119,12 +120,13 @@ describe('Verify', () => {
   it('should render failure screen for revoked credential', async () => {
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockEncryptedCredential);
     // Simulate the response of a verify VC request failing due to the revoked status.
-    jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({
+
+    (verifyVC as jest.Mock).mockImplementation(() => ({
       verified: false,
       error: {
         message: 'revoked: The credential was revoked by the issuer',
       },
-    });
+    }));
 
     await act(async () => {
       render(
@@ -142,7 +144,9 @@ describe('Verify', () => {
   it('should render success screen for active credential', async () => {
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockEncryptedCredential);
     // Simulate the response of a verify VC request succeeding due to the active status.
-    jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({ verified: true });
+    (verifyVC as jest.Mock).mockImplementation(() => ({
+      verified: true,
+    }));
 
     await act(async () => {
       render(
@@ -163,7 +167,9 @@ describe('Verify', () => {
     const { credentialStatus, ...mockEncryptedCredentialWithoutStatus } = mockEncryptedCredential;
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockEncryptedCredentialWithoutStatus);
     // Simulate the response of a verify VC request succeeding without a credential status.
-    jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({ verified: true });
+    (verifyVC as jest.Mock).mockImplementation(() => ({
+      verified: true,
+    }));
 
     await act(async () => {
       render(

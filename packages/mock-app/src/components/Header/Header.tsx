@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppBar,
@@ -24,7 +24,7 @@ import DialpadIcon from '@mui/icons-material/Dialpad';
 
 import appConfig from '../../constants/app-config.json';
 import { convertPathToString, convertStringToPath } from '../../utils';
-import { GlobalContext } from '../../hooks/GlobalContext';
+import { useGlobalContext } from '../../hooks/GlobalContext';
 
 type ConfigAppType = typeof appConfig;
 
@@ -45,7 +45,7 @@ const iconConfig: { [key: string]: JSX.Element } = {
 function Header() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { theme } = useContext<any>(GlobalContext);
+  const { theme } = useGlobalContext() as any;
 
   const [open, setOpen] = useState(false);
   const [headerBrandInfo, setHeaderBrandInfo] = useState({
@@ -186,6 +186,7 @@ function Header() {
             <Drawer open={open} onClose={toggleDrawer(false)}>
               <Box sx={{ width: 250 }} role='presentation' onClick={toggleDrawer(!open)}>
                 <Stack
+                  data-testid='app-name'
                   component={Link}
                   to='/'
                   sx={{
