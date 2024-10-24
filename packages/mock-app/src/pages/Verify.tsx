@@ -162,7 +162,7 @@ const Verify = () => {
 
         return (
           <BackButton>
-            <Credential credential={customCredential ?? credential} />
+            <Credential credential={credential} decodedEnvelopedVC={customCredential} />
           </BackButton>
         );
       default:
