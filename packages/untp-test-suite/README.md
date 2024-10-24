@@ -29,6 +29,8 @@ The UNTP Test Suite is a tool that allows you to test your credentials against t
 - `objectEvent`: Contains the schema files for the object event (An object event describes an action on specific product(s) such as an inspection).
 - `transactionEvent`: Contains the schema files for the transaction event (A transaction event describes the exchange of product(s) between two actors such as sale of goods between seller and buyer).
 - `transformationEvent`: Contains the schema files for the transformation event (A transformation event describes a manufacturing process that consumes input product(s) to create new output product(s)).
+- `traceabilityEvents`: Contains the schema files for the traceability events. This schema defines a Digital Traceability Event as a Verifiable Credential (VC), enabling the tracking and documentation of events such as transactions, transformations, aggregations, and associations within a supply chain. It ensures standardized data exchange by encapsulating event details (e.g., time, location, and product identifiers) with context-driven semantics to support traceability and accountability.
+- `digitalFacibilityRecord`: Contains the schema files for the digital facibility record. It holds performance and compliance information about a facility, such as sustainability metrics, standards, and regulatory conformity. It ensures structured data interoperability by referencing identifiers, classifications, and location details while supporting JSON-LD contexts for semantic meaning.
 
 `templates`: Contains the templates for the log messages include timestamps, log levels, and descriptive messages regarding the test execution and outcomes.
 
