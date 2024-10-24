@@ -33,14 +33,14 @@ jobs:
 
       - name: Run tests
         run: |
-          yarn jest --changedSince=origin/next --ci --json --coverage --testLocationInResults --outputFile=report.json
+          yarn test:coverage
 
       - name: Coverage
         uses: artiomtr/jest-coverage-report-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          coverage-file: report.json
-          base-coverage-file: report.json
+          coverage-file: ./coverage/coverage-final.json
+          base-coverage-file: ./coverage/coverage-final.json
           threshold: 80
 
       - name: Build
