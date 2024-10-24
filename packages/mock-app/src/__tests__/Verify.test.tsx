@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryHistory } from 'history';
 import { Router as RouterDom } from 'react-router-dom';
-import { Verify } from '../pages';
+import Verify from '../pages/Verify';
 import { privateAPI, publicAPI, verifyVC } from '@mock-app/services';
 import { VerifiableCredential } from '@vckit/core-types';
 
