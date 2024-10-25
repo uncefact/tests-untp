@@ -11,6 +11,9 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 Verifiable Credentials follow the flow of the W3C Verifiable Credentials Data Model 2.0. It is a standard for issuing, presenting, and verifying credentials in a secure and privacy-preserving manner. Verifiable Credentials are tamper-proof, cryptographically signed documents containing claims about a subject, such as a person, organization, or device. They are issued by trusted entities known as issuers and can be presented to verifiers to prove the authenticity of the claims.
 
+---
+Please take a look at the [Verifiable Credentials Data Model 2.0](https://www.w3.org/TR/vc-data-model-2.0/) for more information on the specification
+
 ## Credential Securing Mechanism
 
 Verifiable Credentials rely on digital signatures or proofs to ensure the authenticity and integrity of the issued credentials. Two key securing mechanisms are used:
