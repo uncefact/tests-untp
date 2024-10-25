@@ -28,7 +28,7 @@ Refer to the [Verifiable Credentials Data Model 2.0 - Securing Mechanisms](https
 
 ## Credential Payload Structure
 
-When issuing, the credential will follow the [Verifiable Credentials API v0.3](https://w3c-ccg.github.io/vc-api/#issue-credential) specification. A typical payload contains the following fields:
+When issuing, the credential will follow the [Verifiable Credentials API v0.3 - Issue Credential](https://w3c-ccg.github.io/vc-api/#issue-credential) specification. A typical payload contains the following fields:
 
 Example: EnvelopedVerifiableCredential
 
@@ -76,4 +76,4 @@ When verifying a credential, the verifier will call the server to verify the cre
 
 ---
 
-Refer to the [Verifiable Credentials API v0.3](https://w3c-ccg.github.io/vc-api/#verify-credential) for more information on the specification.
+Refer to the [Verifiable Credentials API v0.3 - Verify Credential](https://w3c-ccg.github.io/vc-api/#verify-credential) for more information on the specification.
