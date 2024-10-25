@@ -33,6 +33,9 @@ jobs:
       - name: Check linting
         run: yarn lint
 
+      - name: Build
+        run: yarn build
+
       - name: Run tests
         run: |
           yarn test:coverage
@@ -44,6 +47,3 @@ jobs:
           coverage-file: ./coverage/coverage-final.json
           base-coverage-file: ./coverage/coverage-final.json
           threshold: 80
-
-      - name: Build
-        run: yarn build
