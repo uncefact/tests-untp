@@ -39,7 +39,7 @@ jobs:
       - name: Run tests
         run: |
           yarn test:coverage
-
+      - run: cat coverage/coverage-final.json
       - name: Coverage
         uses: artiomtr/jest-coverage-report-action@v2.3.1
         with:
