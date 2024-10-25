@@ -40,10 +40,14 @@ jobs:
         run: |
           yarn test:coverage
       - run: cat coverage/coverage-final.json
-      - name: Coverage
-        uses: artiomtr/jest-coverage-report-action@v2.3.1
+      - name: Jest Coverage Comment
+        uses: MishaKav/jest-coverage-comment@main
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          coverage-file: coverage/coverage-final.json
-          base-coverage-file: coverage/coverage-final.json
-          threshold: 80
+          title: Code Coverage Report
+          multiple-files: |
+            All packages, ./coverage/coverage-summary.json
+            Components, ./packages/components/coverage/coverage-summary.json
+            Mock app, ./packages/mock-app/coverage/coverage-summary.json
+            Services, ./packages/services/coverage/coverage-summary.json
+            UNTP test suite, ./packages/untp-test-suite/coverage/coverage-summary.json
+            VC test suite, ./packages/vc-test-suite/coverage/coverage-summary.json
