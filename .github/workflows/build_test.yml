@@ -41,7 +41,7 @@ jobs:
           yarn test:coverage
 
       - name: Coverage
-        uses: artiomtr/jest-coverage-report-action@v2
+        uses: artiomtr/jest-coverage-report-action@v2.3.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           coverage-file: coverage/coverage-final.json
