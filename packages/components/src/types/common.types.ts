@@ -6,3 +6,8 @@ export enum ImportDataType {
   VerifiableCredential = 'VerifiableCredential',
   JSON = 'JSON',
 }
+
+export interface IVCContext {
+  vckitAPIUrl?: string;
+  headers?: Record<string, string>;
+}

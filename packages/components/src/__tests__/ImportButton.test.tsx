@@ -198,5 +198,24 @@ describe('ImportButton, when type is VerifiableCredential', () => {
     await waitFor(() => expect(fileInput).not.toBeDisabled());
   });
 
-  it;
+  it('passes vcOptions to processVerifiableCredentialData', async () => {
+    const vcOptions = {
+      credentialPath: '/path/to/credential',
+      vckitAPIUrl: 'https://api.example.com',
+      headers: { Authorization: 'Bearer token' },
+    };
+
+    render(<ImportButton type={ImportDataType.VerifiableCredential} onChange={jest.fn()} vcOptions={vcOptions} />);
+
+    const fileInput = screen.getByLabelText('Import');
+    fireEvent.change(fileInput, { target: { files: [fileMock] } });
+
+    await waitFor(() => {
+      expect(processVerifiableCredentialData).toHaveBeenCalledWith(
+        contentObjectMock,
+        { vckitAPIUrl: vcOptions.vckitAPIUrl, headers: vcOptions.headers },
+        vcOptions.credentialPath,
+      );
+    });
+  });
 });

@@ -140,6 +140,57 @@ describe('QRCodeScannerDialogButton, when type is VerifiableCredential', () => {
     jest.resetAllMocks();
   });
 
+  it('should pass vcOptions to processVerifiableCredentialData', async () => {
+    const url = 'https://example.com';
+    const vcOptions = {
+      credentialPath: '/path/to/credential',
+      vckitAPIUrl: 'https://api.example.com',
+      headers: { Authorization: 'Bearer token' },
+    };
+
+    function MockScannerDialog({ onScanQRResult }: { onScanQRResult: (value: string) => () => void }) {
+      return (
+        <button data-testid='my-scanner' onClick={() => onScanQRResult(url)}>
+          Click
+        </button>
+      );
+    }
+
+    (ScannerDialog as any).mockImplementation(MockScannerDialog);
+
+    const result = {
+      '@context': ['https://www.w3.org/ns/credentials/v2'],
+      type: 'EnvelopedVerifiableCredential',
+      id: 'data:application/vc-ld+jwt,jwt.abc.123',
+    };
+
+    publicAPI.get = jest.fn().mockResolvedValue(result);
+
+    render(
+      <QRCodeScannerDialogButton
+        type={ImportDataType.VerifiableCredential}
+        onChange={jest.fn()}
+        vcOptions={vcOptions}
+      />,
+    );
+
+    act(() => {
+      const button = getByText(document.body, 'ScanQR');
+      fireEvent.click(button);
+    });
+
+    act(() => {
+      const button = getByText(document.body, 'Click');
+      fireEvent.click(button);
+    });
+
+    expect(processVerifiableCredentialData).toHaveBeenCalledWith(
+      result,
+      { vckitAPIUrl: vcOptions.vckitAPIUrl, headers: vcOptions.headers },
+      vcOptions.credentialPath,
+    );
+  });
+
   fit('should call onChange with result when getQRCodeDataFromUrl is called with valid URL', async () => {
     const url = 'https://example.com';
     function MockScannerDialog({ onScanQRResult }: { onScanQRResult: (value: string) => () => void }) {

@@ -4753,6 +4753,75 @@
               ]
             }
           ]
+        },
+        {
+          "name": "Import Credential (QR)",
+          "id": "import_credential_qr",
+          "components": [
+            {
+              "name": "QRCodeScannerDialogButton",
+              "type": "EntryData",
+              "props": {
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" },
+                "vcOptions": {
+                  "vckitAPIUrl": "http://localhost:3332/agent/routeVerificationCredential",
+                  "headers": {
+                    "Authorization": "Bearer test123"
+                  }
+                }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {}
+            }
+          ],
+          "services": [
+            {
+              "name": "mergeToLocalStorage",
+              "parameters": [
+                {
+                  "storageKey": "CherriesFarm_qr_credential"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Import Credential (JSON)",
+          "id": "import_credential_json",
+          "components": [
+            {
+              "name": "ImportButton",
+              "type": "EntryData",
+              "props": {
+                "label": "Import JSON",
+                "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" },
+                "vcOptions": {
+                  "vckitAPIUrl": "http://localhost:3332/agent/routeVerificationCredential",
+                  "headers": {
+                    "Authorization": "Bearer test123"
+                  }
+                }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {}
+            }
+          ],
+          "services": [
+            {
+              "name": "mergeToLocalStorage",
+              "parameters": [
+                {
+                  "storageKey": "CherriesFarm_json_credential"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -8482,6 +8551,9 @@
     "type": "application/json",
     "href": "http://localhost:3332/agent/routeVerificationCredential",
     "hreflang": ["en"],
-    "apiKey": "test123"
+    "headers": {
+      "Authorization": "Bearer test123",
+      "Content-Type": "application/json"
+    }
   }
 }

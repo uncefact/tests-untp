@@ -72,9 +72,7 @@ export const issueVC = async ({
   let _credentialStatus = credentialStatus ? { ...credentialStatus } : null;
 
   if (headers) {
-    if (!isPlainObject(headers) || !every(headers, isString)) {
-      throw new Error('VcKit headers defined in app config must be a plain object with string values');
-    }
+    _validateVckitHeaders(headers);
   }
 
   // issue credential status if not provided
@@ -132,6 +130,10 @@ export const issueCredentialStatus = async (args: IArgIssueCredentialStatus): Pr
   const { host, headers, statusPurpose = 'revocation', ...rest } = args;
   const body = { statusPurpose, ...rest };
 
+  if (headers) {
+    _validateVckitHeaders(headers);
+  }
+
   // issue credential status
   const response = await privateAPI.post<CredentialStatusReference>(`${host}/agent/issueBitstringStatusList`, body, {
     headers: headers || {},
@@ -163,6 +165,7 @@ const constructCredentialObject = ({ context, type, issuer, credentialSubject, .
 export const verifyVC = async (
   verifiableCredential: VerifiableCredential,
   vcKitAPIUrl?: string,
+  headers?: Record<string, string>,
 ): Promise<IVerifyResult> => {
   const verifyCredentialParams = {
     credential: verifiableCredential,
@@ -172,11 +175,15 @@ export const verifyVC = async (
     },
   };
 
-  privateAPI.setBearerTokenAuthorizationHeaders(appConfig.defaultVerificationServiceLink.apiKey ?? '');
-  return await privateAPI.post<IVerifyResult>(
-    vcKitAPIUrl || appConfig.defaultVerificationServiceLink.href,
-    verifyCredentialParams,
-  );
+  if (!vcKitAPIUrl) {
+    throw new Error('Error verifying VC. VcKit API URL is required.');
+  }
+
+  if (headers) {
+    _validateVckitHeaders(headers);
+  }
+
+  return await privateAPI.post<IVerifyResult>(vcKitAPIUrl, verifyCredentialParams, { headers: headers || {} });
 };
 
 /**
@@ -185,9 +192,23 @@ export const verifyVC = async (
  * @returns
  */
 export const decodeEnvelopedVC = (vc: VerifiableCredential): UnsignedCredential | null => {
-  if (vc?.type === 'EnvelopedVerifiableCredential') {
-    const encodedCredential = vc?.id?.split(',')[1];
-    return decodeJwt(encodedCredential as string) as UnsignedCredential;
+  try {
+    if (vc?.type === 'EnvelopedVerifiableCredential') {
+      const encodedCredential = vc?.id?.split(',')[1];
+      return decodeJwt(encodedCredential as string) as UnsignedCredential;
+    }
+  } catch (error) {
+    console.error('Error decoding enveloped VC.', error);
   }
   return null;
+};
+
+/**
+ * Validate VcKit headers
+ * @param headers
+ */
+const _validateVckitHeaders = (headers: Record<string, string>) => {
+  if (!isPlainObject(headers) || !every(headers, isString)) {
+    throw new Error('VcKit headers defined in app config must be a plain object with string values');
+  }
 };

@@ -13,6 +13,8 @@ export interface IQRCodeScannerDialogButton {
   type?: ImportDataType;
   vcOptions?: {
     credentialPath: string;
+    vckitAPIUrl: string;
+    headers?: Record<string, string>;
   };
 }
 
@@ -31,7 +33,12 @@ export const QRCodeScannerDialogButton = ({
 
       const credential = await publicAPI.get(url);
       if (type === ImportDataType.VerifiableCredential) {
-        const processedData = await processVerifiableCredentialData(credential, vcOptions?.credentialPath);
+        const { vckitAPIUrl, headers, credentialPath } = vcOptions || {};
+        const processedData = await processVerifiableCredentialData(
+          credential,
+          { vckitAPIUrl, headers },
+          credentialPath,
+        );
         onChange({ [url]: processedData });
       } else {
         onChange({ [url]: credential });

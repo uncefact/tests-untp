@@ -6,7 +6,38 @@ jest.mock('@mock-app/services', () => ({
   decodeEnvelopedVC: jest.fn(),
 }));
 
+const vcContext = { vckitAPIUrl: 'http://localhost:3332/agent/routeVerificationCredential', headers: {} };
+
 describe('processVerifiableCredentialData', () => {
+  it('should pass vcContext correctly to verifyVC', async () => {
+    const data = {
+      vc: {
+        type: ['VerifiableCredential'],
+        credentialSubject: {
+          id: 'did:example:123',
+          name: 'Alice',
+        },
+      },
+    };
+    const customVcContext = {
+      vckitAPIUrl: 'https://custom.api.example.com',
+      headers: {
+        Authorization: 'Bearer token123',
+        'Custom-Header': 'custom-value',
+      },
+    };
+    const credentialPath = '/vc';
+
+    (verifyVC as jest.Mock).mockImplementation(() => ({
+      verified: true,
+    }));
+    (decodeEnvelopedVC as jest.Mock).mockReturnValue(null);
+
+    await processVerifiableCredentialData(data, customVcContext, credentialPath);
+
+    expect(verifyVC).toHaveBeenCalledWith(data.vc, customVcContext.vckitAPIUrl, customVcContext.headers);
+  });
+
   it('should return input data when the VC is not envelopedVC', async () => {
     const data = {
       vc: {
@@ -23,7 +54,7 @@ describe('processVerifiableCredentialData', () => {
       verified: true,
     }));
     (decodeEnvelopedVC as jest.Mock).mockReturnValue(null);
-    const result = await processVerifiableCredentialData(data, credentialPath);
+    const result = await processVerifiableCredentialData(data, vcContext, credentialPath);
 
     expect(result).toEqual(data);
   });
@@ -48,7 +79,7 @@ describe('processVerifiableCredentialData', () => {
         name: 'Alice',
       },
     });
-    const result = await processVerifiableCredentialData(data, credentialPath);
+    const result = await processVerifiableCredentialData(data, vcContext, credentialPath);
 
     expect(result).toEqual({
       vc: {
@@ -85,7 +116,7 @@ describe('processVerifiableCredentialData', () => {
         name: 'Alice',
       },
     });
-    const result = await processVerifiableCredentialData(data);
+    const result = await processVerifiableCredentialData(data, vcContext);
 
     expect(result).toEqual({
       vc: {
@@ -120,7 +151,7 @@ describe('processVerifiableCredentialData', () => {
     }));
     (decodeEnvelopedVC as jest.Mock).mockReturnValue(null);
 
-    expect(async () => await processVerifiableCredentialData(data, credentialPath)).rejects.toThrow(
+    expect(async () => await processVerifiableCredentialData(data, vcContext, credentialPath)).rejects.toThrow(
       'Invalid Verifiable Credential!',
     );
   });

@@ -11,6 +11,8 @@ export interface IImportButtonProps {
   type?: ImportDataType;
   vcOptions?: {
     credentialPath: string;
+    vckitAPIUrl?: string;
+    headers?: Record<string, string>;
   };
 }
 
@@ -70,7 +72,12 @@ export const ImportButton = ({
         fileArray.map(async (file: File) => {
           const content = await loadJsonFile(file);
           if (type === ImportDataType.VerifiableCredential) {
-            const processedData = await processVerifiableCredentialData(content, vcOptions?.credentialPath);
+            const { vckitAPIUrl, headers, credentialPath } = vcOptions || {};
+            const processedData = await processVerifiableCredentialData(
+              content,
+              { vckitAPIUrl, headers },
+              credentialPath,
+            );
             return { [file.name]: processedData };
           }
           return { [file.name]: content };

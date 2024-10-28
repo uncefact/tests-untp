@@ -276,67 +276,109 @@ describe('vckit.service', () => {
 
       expect(privateAPI.post).toHaveBeenCalledWith(expect.any(String), expect.any(Object), { headers: customHeaders });
     });
-  });
-});
-jest.mock('../../../mock-app/src/constants/app-config.json', () => ({
-  defaultVerificationServiceLink: {
-    href: 'https://example.com/credentials/verify',
-    apiKey: '123',
-  },
-}));
 
-describe('verifyVC', () => {
-  afterEach(() => {
-    jest.resetAllMocks();
-  });
+    it('should throw error when headers are not a plain object with string values', async () => {
+      const invalidArrayHeaders = ['invalid-header'];
+      const invalidValueHeaders = { 'invalid-header': 123 };
 
-  it('should call privateAPI.post with the correct arguments when vcKitAPIUrl is not provided', async () => {
-    const vc = {
-      '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
-      type: ['VerifiableCredential'],
-      issuer: 'did:web:localhost',
-      credentialSubject: {
-        id: 'did:web:localhost',
-        name: 'John Doe',
-        age: 30,
-      },
-    } as any;
+      await expect(
+        issueCredentialStatus({
+          ...defaultStatusParams,
+          headers: invalidArrayHeaders as any,
+        }),
+      ).rejects.toThrow('VcKit headers defined in app config must be a plain object with string values');
 
-    await verifyVC(vc);
+      await expect(
+        issueCredentialStatus({
+          ...defaultStatusParams,
+          headers: invalidValueHeaders as any,
+        }),
+      ).rejects.toThrow('VcKit headers defined in app config must be a plain object with string values');
 
-    expect(privateAPI.setBearerTokenAuthorizationHeaders).toHaveBeenCalledWith('123');
-    expect(privateAPI.post).toHaveBeenCalledWith('https://example.com/credentials/verify', {
-      credential: vc,
-      fetchRemoteContexts: true,
-      policies: {
-        credentialStatus: true,
-      },
+      expect(privateAPI.post).not.toHaveBeenCalled();
     });
   });
 
-  it('should call privateAPI.post with the correct arguments when vcKitAPIUrl is provided', async () => {
-    const vc = {
-      '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
-      type: ['VerifiableCredential'],
-      issuer: 'did:web:localhost',
-      credentialSubject: {
-        id: 'did:web:localhost',
-        name: 'John Doe',
-        age: 30,
-      },
-    } as any;
+  describe('verifyVC', () => {
+    afterEach(() => {
+      jest.resetAllMocks();
+    });
 
-    const vckitAPIUrl = 'https://example.vcservice.com/credentials/verify';
+    it('should throw error when vcKitAPIUrl is not provided', async () => {
+      const vc = {
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
+        type: ['VerifiableCredential'],
+        issuer: 'did:web:localhost',
+        credentialSubject: {
+          id: 'did:web:localhost',
+          name: 'John Doe',
+          age: 30,
+        },
+      } as any;
 
-    await verifyVC(vc, vckitAPIUrl);
+      await expect(verifyVC(vc)).rejects.toThrow('Error verifying VC: VcKit API URL is required');
+      expect(privateAPI.post).not.toHaveBeenCalled();
+    });
 
-    expect(privateAPI.setBearerTokenAuthorizationHeaders).toHaveBeenCalledWith('123');
-    expect(privateAPI.post).toHaveBeenCalledWith('https://example.vcservice.com/credentials/verify', {
-      credential: vc,
-      fetchRemoteContexts: true,
-      policies: {
-        credentialStatus: true,
-      },
+    it('should call privateAPI.post with the correct arguments when vcKitAPIUrl is provided', async () => {
+      const vc = {
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
+        type: ['VerifiableCredential'],
+        issuer: 'did:web:localhost',
+        credentialSubject: {
+          id: 'did:web:localhost',
+          name: 'John Doe',
+          age: 30,
+        },
+      } as any;
+
+      const vckitAPIUrl = 'https://example.vcservice.com/credentials/verify';
+
+      await verifyVC(vc, vckitAPIUrl);
+
+      expect(privateAPI.post).toHaveBeenCalledWith(
+        vckitAPIUrl,
+        {
+          credential: vc,
+          fetchRemoteContexts: true,
+          policies: {
+            credentialStatus: true,
+          },
+        },
+        { headers: {} },
+      );
+    });
+
+    it('should handle custom headers', async () => {
+      const vc = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: ['VerifiableCredential'],
+        issuer: 'did:web:localhost',
+        credentialSubject: { id: 'did:web:localhost' },
+      } as any;
+
+      const customHeaders = { 'X-Custom-Header': 'CustomValue' };
+      const vckitAPIUrl = 'https://example.vcservice.com/credentials/verify';
+
+      await verifyVC(vc, vckitAPIUrl, customHeaders);
+
+      expect(privateAPI.post).toHaveBeenCalledWith(vckitAPIUrl, expect.any(Object), { headers: customHeaders });
+    });
+
+    it('should throw error when headers are not a plain object with string values', async () => {
+      const vc = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: ['VerifiableCredential'],
+        issuer: 'did:web:localhost',
+        credentialSubject: { id: 'did:web:localhost' },
+      } as any;
+
+      const invalidHeaders = { invalidHeader: 123 };
+      const vckitAPIUrl = 'https://example.vcservice.com/credentials/verify';
+
+      await expect(verifyVC(vc, vckitAPIUrl, invalidHeaders as any)).rejects.toThrow(
+        'VcKit headers defined in app config must be a plain object with string values',
+      );
     });
   });
 

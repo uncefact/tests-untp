@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { RenderCheckList } from '../components/RenderCheckList/RenderCheckList';
 import { IDynamicComponentRendererProps } from '../components/DynamicComponentRenderer/DynamicComponentRenderer';
 import { processVerifiableCredentialData } from '../utils/importDataHelpers.js';
+import { publicAPI } from '@mock-app/services';
 
 jest.mock('../components/ConformityCredential/index.ts', () => ({}));
 
@@ -339,5 +340,98 @@ describe('render RenderCheckList component', () => {
       expect(checkBox3).toBeChecked();
       expect(checkBoxListData).toEqual({ 'vc3.json': { requiredField1: 'label-test-3' } });
     });
+  });
+});
+
+describe('RenderCheckList vcOptions handling', () => {
+  const checkBoxLabel = 'vc.json';
+  const onChange = jest.fn();
+
+  it('should pass vcOptions through to nested ImportButton component', () => {
+    const vcOptions = {
+      credentialPath: '/path/to/credential',
+      vckitAPIUrl: 'https://api.example.com',
+      headers: { Authorization: 'Bearer token' },
+    };
+
+    const nestedComponentsWithVcOptions = [
+      {
+        name: 'ImportButton',
+        type: 'EntryData',
+        props: {
+          label: 'Import JSON',
+          type: 'VerifiableCredential',
+          vcOptions,
+        },
+      } as IDynamicComponentRendererProps,
+    ];
+
+    render(
+      <RenderCheckList
+        checkBoxLabel={checkBoxLabel}
+        onChange={onChange}
+        nestedComponents={nestedComponentsWithVcOptions}
+      />,
+    );
+
+    const jsonFile = new File([JSON.stringify({ requiredField1: 'test' })], 'vc.json', { type: 'application/json' });
+
+    const importButton = screen.getByTestId('file-input');
+    act(() => {
+      fireEvent.change(importButton, { target: { files: [jsonFile] } });
+    });
+
+    expect(processVerifiableCredentialData).toHaveBeenCalledWith(
+      expect.any(Object),
+      { vckitAPIUrl: vcOptions.vckitAPIUrl, headers: vcOptions.headers },
+      vcOptions.credentialPath,
+    );
+  });
+
+  it('should pass vcOptions through to nested QRCodeScannerDialogButton component', () => {
+    const vcOptions = {
+      credentialPath: '/path/to/credential',
+      vckitAPIUrl: 'https://api.example.com',
+      headers: { Authorization: 'Bearer token' },
+    };
+
+    const nestedComponentsWithVcOptions = [
+      {
+        name: 'QRCodeScannerDialogButton',
+        type: 'EntryData',
+        props: {
+          type: 'VerifiableCredential',
+          vcOptions,
+        },
+      } as IDynamicComponentRendererProps,
+    ];
+
+    render(
+      <RenderCheckList
+        checkBoxLabel={checkBoxLabel}
+        onChange={onChange}
+        nestedComponents={nestedComponentsWithVcOptions}
+      />,
+    );
+
+    const scanButton = screen.getByText('ScanQR');
+    fireEvent.click(scanButton);
+
+    // Simulate QR scan result
+    const mockUrl = 'https://example.com/credential';
+    const mockCredential = { type: 'VerifiableCredential' };
+    (publicAPI.get as jest.Mock).mockResolvedValueOnce(mockCredential);
+
+    // Trigger QR scan result
+    act(() => {
+      const scannerButton = screen.getByTestId('my-scanner');
+      fireEvent.click(scannerButton);
+    });
+
+    expect(processVerifiableCredentialData).toHaveBeenCalledWith(
+      mockCredential,
+      { vckitAPIUrl: vcOptions.vckitAPIUrl, headers: vcOptions.headers },
+      vcOptions.credentialPath,
+    );
   });
 });

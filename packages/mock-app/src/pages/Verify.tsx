@@ -98,7 +98,9 @@ const Verify = () => {
   const verifyCredential = async (verifiableCredential: VerifiableCredential) => {
     try {
       const verifyServiceUrl = appConfig.defaultVerificationServiceLink.href;
-      const verifiedCredentialResult = await verifyVC(verifiableCredential, verifyServiceUrl);
+      const verifyServiceHeaders = appConfig.defaultVerificationServiceLink.headers;
+
+      const verifiedCredentialResult = await verifyVC(verifiableCredential, verifyServiceUrl, verifyServiceHeaders);
 
       showVerifiedCredentialResult(verifiedCredentialResult);
     } catch (error) {
