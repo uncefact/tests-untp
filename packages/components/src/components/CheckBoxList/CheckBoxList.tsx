@@ -11,7 +11,7 @@ export interface ICheckBoxList {
 }
 
 export const CheckBoxList = ({ label = 'CheckBoxList', data, onChange }: ICheckBoxList) => {
-  const [checkList, setCheckList] = useState<{ [key: string]: { value: any; checked: boolean } }>(data);
+  const [checkList, setCheckList] = useState<{ [key: string]: { value: any; checked: boolean } }>({});
 
   useEffect(() => {
     const checkListData = { ...data };

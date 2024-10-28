@@ -7,12 +7,12 @@ import {
 import { issueVC, contextDefault } from '../vckit.service';
 import { uploadData } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
-import { fillArray } from '../utils/helpers';
 import { IEntityIssue, IInputItems } from '../types';
 import { contextTransformationEvent, dataTransformationEvent } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
+  decodeEnvelopedVC: jest.fn(),
   contextDefault: ['https://www.w3.org/2018/credentials/v1', 'https://w3id.org/vc-revocation-list-2020/v1'],
 }));
 

@@ -9,6 +9,7 @@ import { digitalConformityCredentialContext as context } from './mocks/constants
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
+  decodeEnvelopedVC: jest.fn(),
 }));
 jest.mock('../storage.service', () => ({
   uploadData: jest.fn(),
@@ -114,12 +115,10 @@ describe('processDigitalConformityCredential', () => {
     }));
     (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
 
-    jest
-      .spyOn(validateContext, 'validateDigitalConformityCredentialContext')
-      .mockReturnValueOnce({
-        ok: true,
-        value: contextWithHeaders,
-      } as unknown as Result<IDigitalConformityCredentialContext>);
+    jest.spyOn(validateContext, 'validateDigitalConformityCredentialContext').mockReturnValueOnce({
+      ok: true,
+      value: contextWithHeaders,
+    } as unknown as Result<IDigitalConformityCredentialContext>);
     jest
       .spyOn(linkResolverService, 'getLinkResolverIdentifier')
       .mockReturnValue({ identifier: '0123456789', qualifierPath: '/' });
