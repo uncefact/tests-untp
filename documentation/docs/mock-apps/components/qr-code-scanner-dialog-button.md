@@ -40,6 +40,8 @@ The QRCodeScannerDialogButton component is responsible for rendering a button th
 
 #### vcOptions
 
-| Property       | Required | Description                                                           | Type   |
-| -------------- | -------- | --------------------------------------------------------------------- | ------ |
-| credentialPath | Yes      | The path for the credential data that is fetched from the QR code URL | String |
+| Property       | Required | Description                                                                | Type   |
+| -------------- | -------- | -------------------------------------------------------------------------- | ------ |
+| credentialPath | Yes      | The path for the credential data that is fetched from the QR code URL      | String |
+| vckitAPIUrl    | No       | The URL for the vckit API                                                  | String |
+| headers        | No       | The headers for the vckit API, example: { Authorization: "Bearer test123"} | Object |
