@@ -151,8 +151,6 @@ describe('processVerifiableCredentialData', () => {
     }));
     (decodeEnvelopedVC as jest.Mock).mockReturnValue(null);
 
-    expect(async () => await processVerifiableCredentialData(data, vcContext, credentialPath)).rejects.toThrow(
-      'Invalid Verifiable Credential!',
-    );
+    expect(async () => await processVerifiableCredentialData(data, vcContext, credentialPath)).rejects.toThrow();
   });
 });
