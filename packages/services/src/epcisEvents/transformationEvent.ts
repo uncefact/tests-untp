@@ -1,7 +1,7 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import _ from 'lodash';
 
-import { issueVC } from '../vckit.service.js';
+import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
 import {
   IdentificationKeyType,
@@ -51,6 +51,7 @@ export const processTransformationEvent: IService = async (
       data,
     );
 
+    const decodedEnvelopedVC = decodeEnvelopedVC(epcisVc);
     const storageContext = context.storage;
     const transformantionEventLink = await uploadVC(generateUUID(), epcisVc, storageContext);
 
@@ -111,7 +112,7 @@ export const processTransformationEvent: IService = async (
       }),
     );
 
-    return epcisVc;
+    return { vc: epcisVc, decodedEnvelopedVC, linkResolver: transformantionEventLink };
   } catch (error: any) {
     throw new Error(error);
   }

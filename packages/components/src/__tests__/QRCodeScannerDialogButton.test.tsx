@@ -1,6 +1,6 @@
 import React from 'react';
 import { publicAPI } from '@mock-app/services';
-import { render, screen, getByText, act, fireEvent } from '@testing-library/react';
+import { render, screen, getByText, act, fireEvent, waitFor } from '@testing-library/react';
 import { processVerifiableCredentialData } from '../utils/importDataHelpers.js';
 import { QRCodeScannerDialogButton } from '../components/QRCodeScannerDialogButton/QRCodeScannerDialogButton';
 import { ScannerDialog } from '../components/QRCodeScannerDialogButton/ScannerDialog';
@@ -184,14 +184,16 @@ describe('QRCodeScannerDialogButton, when type is VerifiableCredential', () => {
       fireEvent.click(button);
     });
 
-    expect(processVerifiableCredentialData).toHaveBeenCalledWith(
-      result,
-      { vckitAPIUrl: vcOptions.vckitAPIUrl, headers: vcOptions.headers },
-      vcOptions.credentialPath,
-    );
+    await waitFor(() => {
+      expect(processVerifiableCredentialData).toHaveBeenCalledWith(
+        result,
+        { vckitAPIUrl: vcOptions.vckitAPIUrl, headers: vcOptions.headers },
+        vcOptions.credentialPath,
+      );
+    });
   });
 
-  fit('should call onChange with result when getQRCodeDataFromUrl is called with valid URL', async () => {
+  it('should call onChange with result when getQRCodeDataFromUrl is called with valid URL', async () => {
     const url = 'https://example.com';
     function MockScannerDialog({ onScanQRResult }: { onScanQRResult: (value: string) => () => void }) {
       return (

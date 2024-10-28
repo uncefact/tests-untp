@@ -4,6 +4,7 @@ import { RenderCheckList } from '../components/RenderCheckList/RenderCheckList';
 import { IDynamicComponentRendererProps } from '../components/DynamicComponentRenderer/DynamicComponentRenderer';
 import { processVerifiableCredentialData } from '../utils/importDataHelpers.js';
 import { publicAPI } from '@mock-app/services';
+import { ScannerDialog } from '../components/QRCodeScannerDialogButton/ScannerDialog';
 
 jest.mock('../components/ConformityCredential/index.ts', () => ({}));
 
@@ -12,7 +13,13 @@ jest.mock('../utils/importDataHelpers.js', () => ({
 }));
 
 jest.mock('@mock-app/services', () => ({
-  publicAPI: jest.fn(),
+  publicAPI: {
+    get: jest.fn(),
+  },
+}));
+
+jest.mock('../components/QRCodeScannerDialogButton/ScannerDialog', () => ({
+  ScannerDialog: jest.fn(),
 }));
 
 describe('render RenderCheckList component', () => {
@@ -347,7 +354,7 @@ describe('RenderCheckList vcOptions handling', () => {
   const checkBoxLabel = 'vc.json';
   const onChange = jest.fn();
 
-  it('should pass vcOptions through to nested ImportButton component', () => {
+  it('should pass vcOptions through to nested ImportButton component', async () => {
     const vcOptions = {
       credentialPath: '/path/to/credential',
       vckitAPIUrl: 'https://api.example.com',
@@ -381,14 +388,27 @@ describe('RenderCheckList vcOptions handling', () => {
       fireEvent.change(importButton, { target: { files: [jsonFile] } });
     });
 
-    expect(processVerifiableCredentialData).toHaveBeenCalledWith(
-      expect.any(Object),
-      { vckitAPIUrl: vcOptions.vckitAPIUrl, headers: vcOptions.headers },
-      vcOptions.credentialPath,
-    );
+    await waitFor(() => {
+      expect(processVerifiableCredentialData).toHaveBeenCalledWith(
+        expect.any(Object),
+        { vckitAPIUrl: vcOptions.vckitAPIUrl, headers: vcOptions.headers },
+        vcOptions.credentialPath,
+      );
+    });
   });
 
-  it('should pass vcOptions through to nested QRCodeScannerDialogButton component', () => {
+  it('should pass vcOptions through to nested QRCodeScannerDialogButton component', async () => {
+    const url = 'https://example.com';
+    function MockScannerDialog({ onScanQRResult }: { onScanQRResult: (value: string) => () => void }) {
+      return (
+        <button data-testid='my-scanner' onClick={() => onScanQRResult(url)}>
+          Click
+        </button>
+      );
+    }
+
+    (ScannerDialog as any).mockImplementation(MockScannerDialog);
+
     const vcOptions = {
       credentialPath: '/path/to/credential',
       vckitAPIUrl: 'https://api.example.com',
@@ -428,10 +448,12 @@ describe('RenderCheckList vcOptions handling', () => {
       fireEvent.click(scannerButton);
     });
 
-    expect(processVerifiableCredentialData).toHaveBeenCalledWith(
-      mockCredential,
-      { vckitAPIUrl: vcOptions.vckitAPIUrl, headers: vcOptions.headers },
-      vcOptions.credentialPath,
-    );
+    await waitFor(() => {
+      expect(processVerifiableCredentialData).toHaveBeenCalledWith(
+        mockCredential,
+        { vckitAPIUrl: vcOptions.vckitAPIUrl, headers: vcOptions.headers },
+        vcOptions.credentialPath,
+      );
+    });
   });
 });

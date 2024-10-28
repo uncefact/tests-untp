@@ -316,7 +316,7 @@ describe('vckit.service', () => {
         },
       } as any;
 
-      await expect(verifyVC(vc)).rejects.toThrow('Error verifying VC: VcKit API URL is required');
+      await expect(verifyVC(vc)).rejects.toThrow('Error verifying VC. VcKit API URL is required.');
       expect(privateAPI.post).not.toHaveBeenCalled();
     });
 
