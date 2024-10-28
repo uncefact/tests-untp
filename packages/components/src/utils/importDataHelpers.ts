@@ -28,6 +28,6 @@ export const processVerifiableCredentialData = async (data: any, vcContext: IVCC
 
     return data;
   } catch (error: any) {
-    throw new Error(error);
+    throw new Error('processVerifiableCredentialData: ', { cause: error });
   }
 };
