@@ -8,9 +8,17 @@ export interface ICredentialFileData {
     type: string;
     version: string | null;
     dataPath: string;
-    url?: string | null
+    url?: string | null;
   }[];
 }
+
+// Current UNTP data models.
+const untpDefaultModel = new Set([
+  'traceabilityEvents',
+  'productPassport',
+  'digitalFacilityRecord',
+  'conformityCredential',
+]);
 
 export const getLastestVersionFolder = async (schemasPath: string, eventType: string) => {
   const versionFolders = await readdir(`${schemasPath}/${eventType}`);
@@ -29,7 +37,7 @@ export const getLatestCredentialVersions = async (schemasPath: string) => {
       type: eventType,
       version: latestVersion,
       dataPath: '',
-      url: ''
+      url: '',
     };
   });
 
@@ -41,8 +49,10 @@ export const generateCredentialFile = async (storePath: string): Promise<ICreden
   const currentDirPath = getCurrentDirPath(getCurrentFilePath());
   const schemasPath = path.resolve(currentDirPath, '../../src/schemas');
   const latestCredentials = await getLatestCredentialVersions(schemasPath);
+  const filteredCredentials = latestCredentials.filter((credential) => untpDefaultModel.has(credential.type));
+
   const credentialFileData = {
-    credentials: latestCredentials,
+    credentials: filteredCredentials,
   };
 
   const credentialFileDataJson = JSON.stringify(credentialFileData, null, 2);
