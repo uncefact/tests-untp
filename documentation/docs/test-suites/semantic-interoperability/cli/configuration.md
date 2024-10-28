@@ -224,7 +224,7 @@ Running the command `yarn run untp config` will create a configuration file cont
 }
 ```
 
-With the version is latest version of the schema. You can update the version to the version of the schema you want to test against.
+The default version used will be the latest version of the schema. You can update the version to match the specific version of the schema you want to test against.
 
 ### You can add additional schemas in two ways:
 
