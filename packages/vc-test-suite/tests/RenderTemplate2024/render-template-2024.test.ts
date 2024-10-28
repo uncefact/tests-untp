@@ -100,8 +100,7 @@ describe('RenderTemplate2024', function () {
     },
   );
 
-  // TODO check grammar
-  reportRow("should successfully render when 'mediaQuery' is not provided", config.implementationName, async () => {
+  reportRow('should render successfully when ‘mediaQuery’ is not provided', config.implementationName, async () => {
     // Import the input data for the test from the specified JSON file.
     const input = require('./input/no-mediaQuery-in-renderMethod-ok.json');
 
