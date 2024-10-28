@@ -88,7 +88,7 @@ describe('generateCredentialFile', () => {
   const storePath = './test/credentials.json';
 
   it('should generate latest credential file successfully', async () => {
-    const latestCredentialVersions = [{ type: 'aggregationEvent', version: 'v0.0.3', dataPath: '', url: '' }];
+    const latestCredentialVersions = [{ type: 'traceabilityEvents', version: 'v0.0.3', dataPath: '', url: '' }];
     jest.spyOn(path, 'resolve').mockReturnValueOnce('../../../src/schemas');
     jest.spyOn(credentials, 'getLatestCredentialVersions').mockResolvedValueOnce(latestCredentialVersions);
     jest.spyOn(fs, 'writeFile').mockResolvedValueOnce();
@@ -100,6 +100,30 @@ describe('generateCredentialFile', () => {
       JSON.stringify({ credentials: latestCredentialVersions }, null, 2),
     );
     expect(credentialFileData).toEqual({ credentials: latestCredentialVersions });
+  });
+
+  it('should return empty array when unable to filter out default models', async () => {
+    const latestCredentialVersions = [{ type: 'invalidModel', version: 'v0.0.3', dataPath: '', url: '' }];
+    jest.spyOn(path, 'resolve').mockReturnValueOnce('../../../src/schemas');
+    jest.spyOn(credentials, 'getLatestCredentialVersions').mockResolvedValueOnce(latestCredentialVersions);
+    jest.spyOn(fs, 'writeFile').mockResolvedValueOnce();
+
+    const credentialFileData = await credentials.generateCredentialFile(storePath);
+
+    expect(fs.writeFile).toHaveBeenCalledWith(storePath, JSON.stringify({ credentials: [] }, null, 2));
+    expect(credentialFileData).toEqual({ credentials: [] });
+  });
+
+  it('should return an empty array when the default model is empty', async () => {
+    const latestCredentialVersions = [] as any;
+    jest.spyOn(path, 'resolve').mockReturnValueOnce('../../../src/schemas');
+    jest.spyOn(credentials, 'getLatestCredentialVersions').mockResolvedValueOnce(latestCredentialVersions);
+    jest.spyOn(fs, 'writeFile').mockResolvedValueOnce();
+
+    const credentialFileData = await credentials.generateCredentialFile(storePath);
+
+    expect(fs.writeFile).toHaveBeenCalledWith(storePath, JSON.stringify({ credentials: [] }, null, 2));
+    expect(credentialFileData).toEqual({ credentials: [] });
   });
 
   it('should throw an error when invalid store path', async () => {
