@@ -37,7 +37,7 @@ jobs:
       - name: Run tests
         run: |
           yarn test:coverage
-      - run: cat coverage/coverage-final.json
+
       - name: Jest Coverage Comment
         uses: MishaKav/jest-coverage-comment@main
         with:
