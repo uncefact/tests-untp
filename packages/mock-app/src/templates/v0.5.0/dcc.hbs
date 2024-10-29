@@ -149,9 +149,12 @@
       }
 
       .container .text-wrapper-2 {
-        text-decoration: none;
         color: var(--white);
-        border-bottom: 1px solid var(--white);
+
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-decoration-color: var(--white);
+        text-underline-offset: 3px;
       }
 
       .container .text-wrapper-3 {
@@ -381,11 +384,13 @@
         display: flex;
         align-items: flex-start;
         gap: 10px;
-        border-bottom-width: 2px;
-        border-bottom-style: solid;
-        border-color: var(--primary-colorsblue-400);
         width: fit-content;
         height: fit-content;
+
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-decoration-color: var(--primary-colorsblue-400);
+        text-underline-offset: 3px;
       }
 
       .container .line-2 {
@@ -615,13 +620,17 @@
 
       .container .trustmark-description a {
         color: var(--primary-colorsgray-700);
-        border-bottom: 1px solid var(--primary-colorsgray-700);
+
+        text-decoration: underline;
+        text-decoration-thickness: 1px;
+        text-decoration-color: var(--primary-colorsgray-700);
+        text-underline-offset: 3px;
       }
 
       /* Media Queries for Mobiles */
       @media (min-width: 50px) {
         .container {
-          min-width: 390px;
+          min-width: 375px;
         }
       }
     </style>
