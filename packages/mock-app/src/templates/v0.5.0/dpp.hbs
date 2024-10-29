@@ -693,12 +693,13 @@
     }
 
     .composition-box-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      justify-content: space-between;
+
       border: 1px solid #d4d6d8;
       border-radius: 4px;
       padding: 16px;
-
-      display: flex;
-      justify-content: space-between;
     }
 
     .composition-percent {
@@ -731,7 +732,7 @@
 
     .composition-box-first-column {
       display: grid;
-      grid-template-columns: 60px 1fr;
+      grid-template-columns: 40px 1fr;
       gap: 12px;
     }
 
@@ -747,7 +748,7 @@
 
     .composition-box-third-column {
       display: flex;
-      align-items: start;
+      justify-content: end;
       gap: 12px;
     }
 
@@ -817,14 +818,16 @@
 
     .blue-bottom-line-thick,
     .blue-bottom-line-thick:link {
-      border-bottom: 2px #4F95DD solid;
       width: fit-content;
       justify-content: flex-start;
       align-items: flex-start;
       gap: 10px;
       display: inline-flex;
-      cursor: pointer;
-      text-decoration: none;
+
+      text-decoration-line: underline;
+      text-decoration-thickness: 2px;
+      text-decoration-color: #4F95DD;
+      text-underline-offset: 3px;
     }
 
     .gray-bottom-line {
@@ -975,12 +978,6 @@
 
       .container .cards-conformity-description a {
         color: var(--primary-colorsgray-600);
-      }
-
-      .container .cards-conformity-description {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
       }
 
       .container .declared-values {
@@ -1717,8 +1714,6 @@
         align-items: flex-start;
         justify-content: space-between;
         padding: 20px;
-        flex: 1;
-        flex-grow: 1;
         background-color: var(--white);
         border-radius: 4px;
         border: 1px solid;
@@ -2172,17 +2167,16 @@
         {{!-- end: Supply chain due diligence report --}}
 
         <div class="history-information">
-          {{#each credentialSubject.traceabilityInformation}}
           <div class="history-value-chain-item">
             <div class="history-value-chain">
-              <p>{{valueChainProcess}}</p>
+              <p>{{credentialSubject.traceabilityInformation.valueChainProcess}}</p>
               <div class="verified-ratio">
-                <p>Verified ratio {{verifiedRatio}}</p>
+                <p>Verified ratio {{credentialSubject.traceabilityInformation.verifiedRatio}}</p>
               </div>
             </div>
 
-            <div id="history-items-390px-{{@index}}" class="history-event">
-              {{#each traceabilityEvent}}
+            <div id="history-items-390px" class="history-event">
+              {{#each credentialSubject.traceabilityInformation.traceabilityEvent}}
               <div class="history-item">
                 <span>{{linkName}}</span>
                 <a href="{{linkURL}}" class="blue-bottom-line-thick">View</a>
@@ -2190,11 +2184,10 @@
               {{/each}}
             </div>
 
-            <div id="view-more-btn-mobile-{{@index}}" class="view-more-button">
+            <div id="view-more-btn-mobile" class="view-more-button">
               <p class="blue-bottom-line-thin">View more</p>
             </div>
           </div>
-          {{/each}}
         </div>
 
       </section>
@@ -2612,17 +2605,16 @@
         {{!-- end: Supply chain due diligence report --}}
 
         <div class="history-information">
-          {{#each credentialSubject.traceabilityInformation}}
           <div class="history-value-chain-item">
             <div class="history-value-chain">
-              <p>{{valueChainProcess}}</p>
+              <p>{{credentialSubject.traceabilityInformation.valueChainProcess}}</p>
               <div class="verified-ratio">
-                <p>Verified ratio {{verifiedRatio}}</p>
+                <p>Verified ratio {{credentialSubject.traceabilityInformation.verifiedRatio}}</p>
               </div>
             </div>
 
-            <div id="history-items-1440px-{{@index}}" class="history-event">
-              {{#each traceabilityEvent}}
+            <div id="history-items-1440px" class="history-event">
+              {{#each credentialSubject.traceabilityInformation.traceabilityEvent}}
               <div class="history-item">
                 <span>{{linkName}}</span>
                 <a href="{{linkURL}}" class="blue-bottom-line-thick">View</a>
@@ -2630,11 +2622,10 @@
               {{/each}}
             </div>
 
-            <div id="view-more-btn-desktop-{{@index}}" class="view-more-button">
+            <div id="view-more-btn-desktop" class="view-more-button">
               <p>View more</p>
             </div>
           </div>
-          {{/each}}
         </div>
 
       </div>
@@ -2694,20 +2685,18 @@
   document.addEventListener('DOMContentLoaded', () => {
     const itemsToShow = 5; // Number of items to show by default
 
-    {{#each credentialSubject.traceabilityInformation}}
-      // select view more buttons of mobile and desktop
-      const viewMoreButtonMobile{{@index}} = document.getElementById('view-more-btn-mobile-{{@index}}');
-      const viewMoreButtonDesktop{{@index}} = document.getElementById('view-more-btn-desktop-{{@index}}');
-      // set history items class name to the view more buttons
-      viewMoreButtonMobile{{@index}}.setAttribute('history-items-query-selector', '#history-items-390px-{{@index}} .history-item');
-      viewMoreButtonDesktop{{@index}}.setAttribute('history-items-query-selector', '#history-items-1440px-{{@index}} .history-item');
-      // Initial setup for the view more buttons
-      updateItemsVisibility(viewMoreButtonMobile{{@index}});
-      updateItemsVisibility(viewMoreButtonDesktop{{@index}});
-      // Register click event listeners for view more buttons on mobile and desktop
-      viewMoreButtonMobile{{@index}}.onclick = toggleItemsVisibility;
-      viewMoreButtonDesktop{{@index}}.onclick = toggleItemsVisibility;
-    {{/each}}
+    // select view more buttons of mobile and desktop
+    const viewMoreButtonMobile = document.getElementById('view-more-btn-mobile');
+    const viewMoreButtonDesktop = document.getElementById('view-more-btn-desktop');
+    // set history items class name to the view more buttons
+    viewMoreButtonMobile.setAttribute('history-items-query-selector', '#history-items-390px .history-item');
+    viewMoreButtonDesktop.setAttribute('history-items-query-selector', '#history-items-1440px .history-item');
+    // Initial setup for the view more buttons
+    updateItemsVisibility(viewMoreButtonMobile);
+    updateItemsVisibility(viewMoreButtonDesktop);
+    // Register click event listeners for view more buttons on mobile and desktop
+    viewMoreButtonMobile.onclick = toggleItemsVisibility;
+    viewMoreButtonDesktop.onclick = toggleItemsVisibility;
 
     function toggleItemsVisibility() {
       const displayState = this.getAttribute('data-state'); // collapsed or expanded
