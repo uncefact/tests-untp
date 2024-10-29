@@ -1,5 +1,4 @@
-import { VerifiableCredential } from '@vckit/core-types';
-import { issueVC } from '../vckit.service.js';
+import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { IService } from '../types/IService.js';
@@ -7,12 +6,11 @@ import { ITraceabilityEvent, IAggregationEventContext } from '../types';
 import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
 import { validateAggregationEventContext } from '../validateContext.js';
 import { EPCISBusinessStepCode, EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
-import JSONPointer from 'jsonpointer';
 
 export const processAggregationEvent: IService = async (
   aggregationEvent: ITraceabilityEvent,
   context: IAggregationEventContext,
-): Promise<VerifiableCredential> => {
+): Promise<any> => {
   const validationResult = validateAggregationEventContext(context);
   if (!validationResult.ok) {
     throw new Error(validationResult.value);
@@ -41,6 +39,7 @@ export const processAggregationEvent: IService = async (
   const aggregationVC = await issueVC({
     credentialSubject,
     vcKitAPIUrl: vckit.vckitAPIUrl,
+    headers: vckit.headers,
     issuer: vckit.issuer,
     context: epcisAggregationEvent.context,
     type: epcisAggregationEvent.type,
@@ -49,9 +48,10 @@ export const processAggregationEvent: IService = async (
     },
   });
 
-  const aggregationVCLink = await uploadData(storage, aggregationVC, `${identifier}/${generateUUID()}`);
+  const decodedEnvelopedVC = decodeEnvelopedVC(aggregationVC);
+  const aggregationVCLink = await uploadData(storage, aggregationVC, generateUUID());
 
-  await registerLinkResolver(
+  const aggregationLinkResolver = await registerLinkResolver(
     aggregationVCLink,
     epcisAggregationEvent.dlrIdentificationKeyType,
     identifier,
@@ -64,5 +64,5 @@ export const processAggregationEvent: IService = async (
     qualifierPath,
   );
 
-  return aggregationVC;
+  return { vc: aggregationVC, decodedEnvelopedVC, linkResolver: aggregationLinkResolver };
 };

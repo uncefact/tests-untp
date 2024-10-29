@@ -10,8 +10,8 @@
     "build:watch": "tsc -b --watch",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test": "jest --ci --env=jest-environment-jsdom",
-    "coverage": "jest --coverage"
+    "test": "jest",
+    "test:coverage": "jest --coverage"
   },
   "eslintConfig": {
     "extends": [

@@ -31,17 +31,21 @@ jobs:
       - name: Check linting
         run: yarn lint
 
-      - name: Run tests
-        run: |
-          yarn jest --changedSince=origin/next --ci --json --coverage --testLocationInResults --outputFile=report.json
-
-      - name: Coverage
-        uses: artiomtr/jest-coverage-report-action@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          coverage-file: report.json
-          base-coverage-file: report.json
-          threshold: 80
-
       - name: Build
         run: yarn build
+
+      - name: Run tests
+        run: |
+          yarn test:coverage
+
+      - name: Jest Coverage Comment
+        uses: MishaKav/jest-coverage-comment@main
+        with:
+          title: Code Coverage Report
+          multiple-files: |
+            All packages, ./coverage/coverage-summary.json
+            Components, ./packages/components/coverage/coverage-summary.json
+            Mock app, ./packages/mock-app/coverage/coverage-summary.json
+            Services, ./packages/services/coverage/coverage-summary.json
+            UNTP test suite, ./packages/untp-test-suite/coverage/coverage-summary.json
+            VC test suite, ./packages/vc-test-suite/coverage/coverage-summary.json

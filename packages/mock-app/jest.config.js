@@ -1,4 +1,6 @@
+const base = require('../../jest.config.base');
 const jestConfig = {
+  ...base,
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
   extensionsToTreatAsEsm: ['.ts'],

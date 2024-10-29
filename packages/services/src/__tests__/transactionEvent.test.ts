@@ -8,9 +8,11 @@ import { Result } from '../types/validateContext';
 import { ITransactionEventContext } from '../types/types';
 import { publicAPI } from '../utils/httpService';
 import { transactionEventMock } from './mocks/constants';
+import { decode } from 'punycode';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
+  decodeEnvelopedVC: jest.fn(),
 }));
 jest.mock('../storage.service', () => ({
   uploadData: jest.fn(),
@@ -68,9 +70,11 @@ describe('processTransactionEvent', () => {
 
   it('should process transaction event', async () => {
     (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
+    (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue(transactionVCMock);
     (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
       return `${url}/${path}`;
     });
+
     jest
       .spyOn(validateContext, 'validateTransactionEventContext')
       .mockReturnValueOnce({ ok: true, value: context } as Result<ITransactionEventContext>);
@@ -80,6 +84,7 @@ describe('processTransactionEvent', () => {
 
     expect(transactionVC).toEqual({
       vc: transactionVCMock,
+      decodedEnvelopedVC: transactionVCMock,
       linkResolver: transactionEventDLRMock,
     });
     expect(uploadData).toHaveBeenCalled();
@@ -148,6 +153,8 @@ describe('processTransactionEvent', () => {
         storage: { ...context.storage, storageAPIUrl: 'https://invalid-storage-provider.com' },
       };
       (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
+      (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue(transactionVCMock);
+
       jest
         .spyOn(validateContext, 'validateTransactionEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as Result<ITransactionEventContext>);
@@ -183,5 +190,41 @@ describe('processTransactionEvent', () => {
       expect(vckitService.issueVC).toHaveBeenCalled();
       expect(uploadData).toHaveBeenCalled();
     }
+  });
+
+  it('should process transaction event with custom verifiable credential service headers', async () => {
+    const mockHeaders = { 'X-Custom-Header': 'test-value' };
+    const contextWithHeaders = {
+      ...context,
+      vckit: {
+        ...context.vckit,
+        headers: mockHeaders,
+      },
+    };
+
+    (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
+    (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
+      return `${url}/${path}`;
+    });
+    jest
+      .spyOn(validateContext, 'validateTransactionEventContext')
+      .mockReturnValueOnce({ ok: true, value: contextWithHeaders } as unknown as Result<ITransactionEventContext>);
+    jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValueOnce(transactionEventDLRMock);
+
+    const transactionVC = await processTransactionEvent(transactionEvent, contextWithHeaders);
+
+    expect(transactionVC).toEqual({
+      vc: transactionVCMock,
+      decodedEnvelopedVC: transactionVCMock,
+      linkResolver: transactionEventDLRMock,
+    });
+    expect(vckitService.issueVC).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: mockHeaders,
+      }),
+    );
+    expect(uploadData).toHaveBeenCalled();
+    expect(validateContext.validateTransactionEventContext).toHaveBeenCalled();
+    expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
   });
 });

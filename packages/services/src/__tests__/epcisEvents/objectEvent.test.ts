@@ -10,6 +10,7 @@ import { objectEventContext as context } from '../mocks/constants';
 
 jest.mock('../../vckit.service', () => ({
   issueVC: jest.fn(),
+  decodeEnvelopedVC: jest.fn(),
 }));
 jest.mock('../../storage.service', () => ({
   uploadData: jest.fn(),
@@ -60,6 +61,9 @@ describe('processObjectEvent', () => {
     (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
       credentialSubject: { id: 'https://example.com/123' },
     }));
+    (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue({
+      credentialSubject: { id: 'https://example.com/123' },
+    });
     (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
 
     jest
@@ -119,6 +123,43 @@ describe('processObjectEvent', () => {
 
     expect(async () => await processObjectEvent(invalidObjectEvent, context)).rejects.toThrow(
       'Object event data not found',
+    );
+  });
+
+  it('should process object event with custom verifiable credential service headers', async () => {
+    const mockHeaders = { 'X-Custom-Header': 'test-value' };
+    const contextWithHeaders = {
+      ...context,
+      vckit: {
+        ...context.vckit,
+        headers: mockHeaders,
+      },
+    };
+
+    (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
+      credentialSubject: { id: 'https://example.com/123' },
+    }));
+    (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
+
+    jest
+      .spyOn(validateContext, 'validateObjectEventContext')
+      .mockReturnValueOnce({ ok: true, value: contextWithHeaders } as unknown as Result<IObjectEventContext>);
+    jest
+      .spyOn(linkResolverService, 'getLinkResolverIdentifier')
+      .mockReturnValue({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
+    jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
+      identifier: '0123456789',
+      qualifierPath: '/10/ABC123',
+      elementString: '01012345678910ABC123',
+    });
+    jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValue('https://example.com/link-resolver');
+
+    await processObjectEvent(objectEvent, contextWithHeaders);
+
+    expect(vckitService.issueVC).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: mockHeaders,
+      }),
     );
   });
 });

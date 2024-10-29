@@ -1,7 +1,7 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import _ from 'lodash';
 
-import { issueVC } from '../vckit.service.js';
+import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
 import {
   IdentificationKeyType,
@@ -27,7 +27,7 @@ import JSONPointer from 'jsonpointer';
 
 /**
  * Process transformation event, issue epcis transformation event and dpp for each identifiers, then upload to storage and register link resolver for each dpp
- * @param data - data for the transformation event, which nlsids are selected
+ * @param data - data for the transformation event
  * @param context - context for the transformation event
  */
 export const processTransformationEvent: IService = async (
@@ -51,12 +51,9 @@ export const processTransformationEvent: IService = async (
       data,
     );
 
+    const decodedEnvelopedVC = decodeEnvelopedVC(epcisVc);
     const storageContext = context.storage;
-    const transformantionEventLink = await uploadVC(
-      `epcis-transformation-event/${generateUUID()}`,
-      epcisVc,
-      storageContext,
-    );
+    const transformantionEventLink = await uploadVC(generateUUID(), epcisVc, storageContext);
 
     const dppContext = context.dpp;
 
@@ -97,7 +94,7 @@ export const processTransformationEvent: IService = async (
         };
 
         const dpp = await issueDPP(vcKitContext, dppContext, dppCredential, transformationEventData);
-        const DPPLink = await uploadVC(`${productID as string}/${generateUUID()}`, dpp, storageContext);
+        const DPPLink = await uploadVC(generateUUID(), dpp, storageContext);
         const { identifier, qualifierPath } = getLinkResolverIdentifier(productID);
 
         await registerLinkResolver(
@@ -115,7 +112,7 @@ export const processTransformationEvent: IService = async (
       }),
     );
 
-    return epcisVc;
+    return { vc: epcisVc, decodedEnvelopedVC, linkResolver: transformantionEventLink };
   } catch (error: any) {
     throw new Error(error);
   }
@@ -147,7 +144,7 @@ export const issueEpcisTransformationEvent = async (
           dlrContext.dlrAPIUrl,
           dlrContext.namespace,
           IdentificationKeyType.gtin,
-          `linkType=${LinkType.certificationLinkType}`,
+          `linkType=${dlrContext.namespace}:${LinkType.certificationLinkType}`,
         ),
         generateIdWithBatchLot,
         generateCurrentDatetime,
@@ -162,6 +159,7 @@ export const issueEpcisTransformationEvent = async (
     issuer: vcKitContext.issuer,
     type: [...epcisTransformationEvent.type],
     vcKitAPIUrl: vcKitContext.vckitAPIUrl,
+    headers: vcKitContext.headers,
     restOfVC,
   });
 
@@ -170,13 +168,13 @@ export const issueEpcisTransformationEvent = async (
 
 /**
  * Upload the verifiable credential to the storage
- * @param path - filename of the verifiable credential
+ * @param id - id of the verifiable credential
  * @param vc - verifiable credential to be uploaded
  * @param storageContext - context for the storage to upload the verifiable credential
  * @returns string - url of the uploaded verifiable credential
  */
-export const uploadVC = async (path: string, vc: VerifiableCredential, storageContext: StorageServiceConfig) => {
-  const result = await uploadData(storageContext, vc, path);
+export const uploadVC = async (id: string, vc: VerifiableCredential, storageContext: StorageServiceConfig) => {
+  const result = await uploadData(storageContext, vc, id);
   return result;
 };
 
@@ -204,6 +202,7 @@ export const issueDPP = async (
     issuer: vcKitContext.issuer,
     type: dppContext.type,
     vcKitAPIUrl: vcKitContext.vckitAPIUrl,
+    headers: vcKitContext.headers,
     credentialSubject: dppCredentialSubject,
     restOfVC,
   });

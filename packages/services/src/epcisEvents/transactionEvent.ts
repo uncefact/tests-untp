@@ -1,11 +1,10 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import { IService, ITraceabilityEvent, ITransactionEventContext } from '../types/index.js';
-import { issueVC } from '../vckit.service.js';
+import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
 import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { validateTransactionEventContext } from '../validateContext.js';
-import JSONPointer from 'jsonpointer';
 import { deleteValuesFromLocalStorageByKeyPath } from './helpers.js';
 
 export const processTransactionEvent: IService = async (
@@ -28,6 +27,7 @@ export const processTransactionEvent: IService = async (
   const vc: VerifiableCredential = await issueVC({
     credentialSubject: transactionEvent.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
+    headers: vckit.headers,
     issuer: vckit.issuer,
     context: epcisTransactionEvent.context,
     type: epcisTransactionEvent.type,
@@ -36,7 +36,8 @@ export const processTransactionEvent: IService = async (
     },
   });
 
-  const vcUrl = await uploadData(storage, vc, `${identifier}/${generateUUID()}`);
+  const decodedEnvelopedVC = decodeEnvelopedVC(vc);
+  const vcUrl = await uploadData(storage, vc, generateUUID());
 
   const linkResolver = await registerLinkResolver(
     vcUrl,
@@ -58,5 +59,5 @@ export const processTransactionEvent: IService = async (
     localStorageParams.keyPath,
   );
 
-  return { vc, linkResolver };
+  return { vc, decodedEnvelopedVC, linkResolver };
 };

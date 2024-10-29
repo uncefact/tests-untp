@@ -5,7 +5,7 @@ import { fireEvent, render } from '@testing-library/react';
 import { publicAPI } from '@mock-app/services';
 import { act } from 'react-dom/test-utils';
 import { Scanner } from '../components/Scanner';
-import { Scanning } from '../pages';
+import Scanning from '../pages/Scanning';
 
 const mockUsedNavigate = jest.fn();
 jest.mock('react-router', () => ({
@@ -28,11 +28,7 @@ jest.mock('@mock-app/services', () => ({
 jest.mock('@mock-app/components', () => ({
   Status: 'success',
   toastMessage: jest.fn(),
-  ToastMessage: jest.fn()
-}));
-
-jest.mock('@veramo/utils', () => ({
-  computeEntryHash: jest.fn(),
+  ToastMessage: jest.fn(),
 }));
 
 jest.mock('@vckit/renderer', () => ({

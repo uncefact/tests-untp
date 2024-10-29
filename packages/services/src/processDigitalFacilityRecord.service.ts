@@ -3,7 +3,7 @@ import { registerLinkResolver, LinkType, getLinkResolverIdentifier } from './lin
 import { uploadData } from './storage.service.js';
 import { IService } from './types/IService.js';
 import { constructIdentifierString, generateUUID } from './utils/helpers.js';
-import { issueVC } from './vckit.service.js';
+import { decodeEnvelopedVC, issueVC } from './vckit.service.js';
 import { ITraceabilityEvent, IDigitalFacilityRecordContext } from './types/index.js';
 import { validateDigitalFacilityRecordContext } from './validateContext.js';
 
@@ -36,6 +36,7 @@ export const processDigitalFacilityRecord: IService = async (
   const vc: VerifiableCredential = await issueVC({
     credentialSubject: digitalFacilityRecordData.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
+    headers: vckit.headers,
     issuer: vckit.issuer,
     context: digitalFacilityRecord.context,
     type: digitalFacilityRecord.type,
@@ -44,7 +45,9 @@ export const processDigitalFacilityRecord: IService = async (
     },
   });
 
-  const vcUrl = await uploadData(storage, vc, `${identifier}/${generateUUID()}`);
+  const decodedEnvelopedVC = decodeEnvelopedVC(vc);
+
+  const vcUrl = await uploadData(storage, vc, generateUUID());
 
   const linkResolver = await registerLinkResolver(
     vcUrl,
@@ -60,5 +63,5 @@ export const processDigitalFacilityRecord: IService = async (
     LinkType.certificationLinkType,
   );
 
-  return { vc, linkResolver };
+  return { vc, decodedEnvelopedVC, linkResolver };
 };

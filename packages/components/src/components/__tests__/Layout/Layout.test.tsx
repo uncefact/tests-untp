@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 
-import { FallbackErrorContent, Layout, LayoutStatus, MessageText } from '../../..';
+import { FallbackErrorContent, Layout, LayoutStatus, MessageText } from '../../../components/Layout/Layout';
 
 describe('Layout', () => {
   test('should render Layout component with children', () => {
@@ -57,7 +57,7 @@ describe('Layout', () => {
     render(
       <Layout>
         <ErrorThrowingComponent />
-      </Layout>
+      </Layout>,
     );
 
     // Expect that the FallbackErrorContent component is rendered for error scenario

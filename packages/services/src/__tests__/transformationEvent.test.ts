@@ -7,12 +7,12 @@ import {
 import { issueVC, contextDefault } from '../vckit.service';
 import { uploadData } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
-import { fillArray } from '../utils/helpers';
 import { IEntityIssue, IInputItems } from '../types';
 import { contextTransformationEvent, dataTransformationEvent } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
+  decodeEnvelopedVC: jest.fn(),
   contextDefault: ['https://www.w3.org/2018/credentials/v1', 'https://w3id.org/vc-revocation-list-2020/v1'],
 }));
 
@@ -147,8 +147,6 @@ describe('Transformation event', () => {
         },
       };
       (issueVC as jest.Mock).mockImplementation((value) => {
-        console.log('issueDPP', JSON.stringify(value));
-
         expectResult = {
           '@context': [...contextDefault, ...value.context],
           type: ['VerifiableCredential', ...value.type],
@@ -212,20 +210,65 @@ describe('Transformation event', () => {
           dlrAPIKey,
           qualifierPath,
         ) => {
-          console.log({
-            url,
-            linkTitle,
-            verificationPage,
-            dlrAPIKey,
-            qualifierPath,
-            identificationKey,
-          });
           return `${dlrAPIUrl}/${identificationKeyType}/${identificationKey}?linkType=all`;
         },
       );
 
       const data = await processTransformationEvent(dataTransformationEvent, contextTransformationEvent);
       expect(registerLinkResolver).toHaveBeenCalledTimes(2);
+    });
+
+    it('should process transformation event with custom verifiable credential service headers', async () => {
+      const mockHeaders = { 'X-Custom-Header': 'test-value' };
+      const mockVcKitContext = {
+        issuer: 'did:example:123',
+        vckitAPIUrl: 'https://api.vckit.example.com',
+        headers: mockHeaders,
+      };
+      const mockEpcisTransformationEvent = {
+        context: ['https://example.com/epcis-context'],
+        type: ['EPCISTransformationEvent'],
+        renderTemplate: {},
+      };
+      const mockDlrContext = {
+        dlrAPIUrl: 'https://dlr.example.com',
+        dlrAPIKey: 'test-api-key',
+        namespace: 'test-namespace',
+      };
+      const mockTransformationEventCredential = {
+        mappingFields: [
+          {
+            sourcePath: '/data/eventID',
+            destinationPath: '/eventID',
+          },
+        ],
+      };
+      const mockData = {
+        data: {
+          eventID: '1234',
+        },
+      };
+
+      (issueVC as jest.Mock).mockResolvedValue({
+        '@context': ['https://www.w3.org/2018/credentials/v1', 'https://example.com/epcis-context'],
+        type: ['VerifiableCredential', 'EPCISTransformationEvent'],
+        issuer: { id: 'did:example:123' },
+        credentialSubject: { eventID: '1234' },
+      });
+
+      await issueEpcisTransformationEvent(
+        mockVcKitContext,
+        mockEpcisTransformationEvent as IEntityIssue,
+        mockDlrContext,
+        mockTransformationEventCredential,
+        mockData,
+      );
+
+      expect(issueVC).toHaveBeenCalledWith(
+        expect.objectContaining({
+          headers: mockHeaders,
+        }),
+      );
     });
   });
 
@@ -255,7 +298,6 @@ describe('Transformation event', () => {
       try {
         await processTransformationEvent(dataTransformationEvent, emptyContext);
       } catch (error: any) {
-        console.log(error.message);
         expect(error.message).not.toBeNull();
       }
     });
@@ -268,7 +310,6 @@ describe('Transformation event', () => {
       try {
         await processTransformationEvent(dataTransformationEvent, newContext);
       } catch (error: any) {
-        console.log(error.message);
         expect(error.message).not.toBeNull();
       }
     });
@@ -304,7 +345,6 @@ describe('Transformation event', () => {
       try {
         await processTransformationEvent(dataTransformationEvent, newContext);
       } catch (error: any) {
-        console.log(error.message);
         expect(error.message).not.toBeNull();
       }
     });

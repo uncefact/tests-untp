@@ -1,4 +1,6 @@
+import base from '../../jest.config.base.js';
 const jestConfig = {
+  ...base,
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
   extensionsToTreatAsEsm: ['.ts'],

@@ -9,6 +9,7 @@ import { digitalIdentityAnchorContext as context } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
+  decodeEnvelopedVC: jest.fn(),
 }));
 jest.mock('../storage.service', () => ({
   uploadData: jest.fn(),
@@ -40,6 +41,9 @@ describe('processDigitalIdentityAnchor', () => {
     (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
       credentialSubject: { id: 'https://example.com/123' },
     }));
+    (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue({
+      credentialSubject: { id: 'https://example.com/123' },
+    });
     (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
 
     jest
@@ -96,6 +100,38 @@ describe('processDigitalIdentityAnchor', () => {
 
     expect(async () => await processDigitalIdentityAnchor(invalidDigitalIdentityAnchorData, context)).rejects.toThrow(
       'digitalIdentityAnchor data not found',
+    );
+  });
+
+  it('should process digital identity anchor with custom verifiable credential service headers', async () => {
+    const mockHeaders = { 'X-Custom-Header': 'test-value' };
+    const contextWithHeaders = {
+      ...context,
+      vckit: {
+        ...context.vckit,
+        headers: mockHeaders,
+      },
+    };
+
+    (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
+      credentialSubject: { id: 'https://example.com/123' },
+    }));
+    (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
+
+    jest
+      .spyOn(validateContext, 'validateDigitalIdentityAnchorContext')
+      .mockReturnValueOnce({ ok: true, value: contextWithHeaders } as unknown as Result<IDigitalIdentityAnchorContext>);
+    jest
+      .spyOn(linkResolverService, 'getLinkResolverIdentifier')
+      .mockReturnValue({ identifier: '0123456789', qualifierPath: '/' });
+    jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValue('https://example.com/link-resolver');
+
+    await processDigitalIdentityAnchor(digitalIdentityAnchorData, contextWithHeaders);
+
+    expect(vckitService.issueVC).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: mockHeaders,
+      }),
     );
   });
 });

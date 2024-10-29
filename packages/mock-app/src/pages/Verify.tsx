@@ -1,15 +1,13 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { decryptString } from '@govtechsg/oa-encryption';
-import { IVerifyResult, VerifiableCredential } from '@vckit/core-types';
-import { useLocation } from 'react-router-dom';
-import { computeEntryHash } from '@veramo/utils';
 import { Status } from '@mock-app/components';
-import { publicAPI, privateAPI } from '@mock-app/services';
+import { computeHash, decryptCredential, publicAPI, verifyVC } from '@mock-app/services';
+import { IVerifyResult, VerifiableCredential } from '@vckit/core-types';
 import * as jose from 'jose';
-import { MessageText } from '../components/MessageText';
-import { LoadingWithText } from '../components/LoadingWithText';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { BackButton } from '../components/BackButton';
 import Credential from '../components/Credential/Credential';
+import { LoadingWithText } from '../components/LoadingWithText';
+import { MessageText } from '../components/MessageText';
 import appConfig from '../constants/app-config.json';
 
 enum PassportStatus {
@@ -67,14 +65,18 @@ const Verify = () => {
         return setCredential(encryptedCredential);
       }
 
-      const credentialJsonString = decryptString({
-        ...encryptedCredential,
+      const { cipherText, iv, tag, type } = encryptedCredential;
+
+      const credentialJsonString = decryptCredential({
+        cipherText,
         key,
-        type: 'OPEN-ATTESTATION-TYPE-1',
+        iv,
+        tag,
+        type,
       });
 
       const credentialObject = JSON.parse(credentialJsonString);
-      const credentialHash = computeEntryHash(credentialObject);
+      const credentialHash = computeHash(credentialObject);
       if (credentialHash !== hash) {
         return displayErrorUI();
       }
@@ -92,20 +94,14 @@ const Verify = () => {
     setErrorMessages(errorMessages);
     setCurrentScreen(screen);
   };
-
+  // TODO: Move this function to the vckit service
   const verifyCredential = async (verifiableCredential: VerifiableCredential) => {
     try {
-      const verifyCredentialParams = {
-        credential: verifiableCredential,
-        fetchRemoteContexts: true,
-        policies: {
-          credentialStatus: true,
-        },
-      };
-
       const verifyServiceUrl = appConfig.defaultVerificationServiceLink.href;
-      privateAPI.setBearerTokenAuthorizationHeaders(appConfig.defaultVerificationServiceLink.apiKey ?? '');
-      const verifiedCredentialResult = await privateAPI.post<IVerifyResult>(verifyServiceUrl, verifyCredentialParams);
+      const verifyServiceHeaders = appConfig.defaultVerificationServiceLink.headers;
+
+      const verifiedCredentialResult = await verifyVC(verifiableCredential, verifyServiceUrl, verifyServiceHeaders);
+
       showVerifiedCredentialResult(verifiedCredentialResult);
     } catch (error) {
       displayErrorUI();
