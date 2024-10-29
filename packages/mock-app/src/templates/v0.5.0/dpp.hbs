@@ -229,7 +229,7 @@
 
       font-size: 14px;
       font-weight: 500;
-      line-height: 15.26px;
+      line-height: 22px;
     }
 
     .information-show-more a {
@@ -774,7 +774,9 @@
       border-bottom: 1px solid #d4d6d8;
       padding: 10px 0 12px 0;
 
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
       justify-content: space-between;
     }
 
@@ -1040,18 +1042,19 @@
         gap: 10px;
         display: inline-flex;
         align-items: flex-start;
-        border-bottom-width: 2px;
-        border-bottom-style: solid;
-        border-color: var(--primary-colorsblue-400);
+
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-decoration-color: var(--primary-colorsblue-400);
+        text-underline-offset: 3px;
       }
 
       .container .text-wrapper-2 {
         width: fit-content;
-        margin-top: -2px;
         font-weight: 500;
         color: var(--primary-colorsgray-700);
         font-size: 16px;
-        line-height: 17.4px;
+        line-height: 22px;
       }
 
       .container .div-wrapper {
@@ -1358,7 +1361,7 @@
         font-weight: 400;
         color: var(--primary-colorsgray-600);
         font-size: 16px;
-        line-height: 17.4px;
+        line-height: 22px;
       }
 
       .container .data-data {
@@ -1510,6 +1513,8 @@
         display: grid;
         grid-template-columns: 1fr 1fr 1fr;
         gap: 16px;
+
+        width: 100%;
       }
 
       .container .history-due-diligence {
