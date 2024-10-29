@@ -1,7 +1,7 @@
 import { VerifiableCredential } from '@vckit/core-types';
 import _ from 'lodash';
 
-import { issueVC } from '../vckit.service.js';
+import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
 import {
   IdentificationKeyType,
@@ -27,7 +27,7 @@ import JSONPointer from 'jsonpointer';
 
 /**
  * Process transformation event, issue epcis transformation event and dpp for each identifiers, then upload to storage and register link resolver for each dpp
- * @param data - data for the transformation event, which nlsids are selected
+ * @param data - data for the transformation event
  * @param context - context for the transformation event
  */
 export const processTransformationEvent: IService = async (
@@ -51,6 +51,7 @@ export const processTransformationEvent: IService = async (
       data,
     );
 
+    const decodedEnvelopedVC = decodeEnvelopedVC(epcisVc);
     const storageContext = context.storage;
     const transformantionEventLink = await uploadVC(generateUUID(), epcisVc, storageContext);
 
@@ -111,7 +112,7 @@ export const processTransformationEvent: IService = async (
       }),
     );
 
-    return epcisVc;
+    return { vc: epcisVc, decodedEnvelopedVC, linkResolver: transformantionEventLink };
   } catch (error: any) {
     throw new Error(error);
   }
@@ -143,7 +144,7 @@ export const issueEpcisTransformationEvent = async (
           dlrContext.dlrAPIUrl,
           dlrContext.namespace,
           IdentificationKeyType.gtin,
-          `linkType=${LinkType.certificationLinkType}`,
+          `linkType=${dlrContext.namespace}:${LinkType.certificationLinkType}`,
         ),
         generateIdWithBatchLot,
         generateCurrentDatetime,

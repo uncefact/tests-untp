@@ -5,226 +5,91 @@
     "type": {
       "type": "array",
       "readOnly": true,
-      "const": ["ConformityAttestation", "Attestation"],
-      "default": ["ConformityAttestation", "Attestation"],
+      "const": ["DigitalProductPassport", "VerifiableCredential"],
+      "default": ["DigitalProductPassport", "VerifiableCredential"],
       "items": {
         "type": "string",
-        "enum": ["ConformityAttestation", "Attestation"]
+        "enum": ["DigitalProductPassport", "VerifiableCredential"]
       }
     },
+    "@context": {
+      "example": "https://test.uncefact.org/vocabulary/untp/dpp/dpp-context.jsonld",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/0.4.0/"]
+      },
+      "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
+      "readOnly": true,
+      "const": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/0.4.0/"],
+      "default": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dpp/0.4.0/"]
+    },
     "id": {
-      "example": "https://exampleCAB.com/38f73303-a39e-45a7-b8b7-e73517548f27",
+      "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
       "type": "string",
       "format": "uri",
-      "description": "The globally unique ID of this conformity attestation."
+      "description": "A unique identifier (URI) assigned to the product passport. May be a UUID"
     },
-    "name": {
-      "example": "Carbon Lifecycle assessment 12345567",
+    "issuer": {
+      "$ref": "#/$defs/CredentialIssuer",
+      "description": "The organisation that is the isuer of this VC. Note that the \"id\" property MUST be a W3C DID.  Other identifiers such as tax registration numbers can be listed in the \"otherIdentifiers\" property."
+    },
+    "validFrom": {
+      "example": "2024-03-15T12:00:00",
       "type": "string",
-      "description": "Product GHG Footprint certificate in accordance with GBA Rulebook."
+      "format": "date-time",
+      "description": "The date and time from which the credential is valid."
     },
-    "assessorLevel": {
+    "validUntil": {
+      "example": "2034-03-15T12:00:00",
       "type": "string",
-      "enum": ["Self", "Commercial", "Buyer", "Membership", "Unspecified", "3rdParty"],
-      "example": "Self",
-      "description": "Assurance code pertaining to assessor (relation to the object under assessment)"
+      "format": "date-time",
+      "description": "The expiry date (if applicable) of this verifiable credential."
     },
-    "assessmentLevel": {
-      "type": "string",
-      "enum": ["GovtApproval", "GlobalMRA", "Accredited", "Verified", "Validated", "Unspecified"],
-      "example": "GovtApproval",
-      "description": "Assurance pertaining to assessment (any authority or support for the assessment process)"
-    },
-    "attestationType": {
-      "type": "string",
-      "enum": ["certification", "declaration", "inspection", "testing", "verification", "validation", "calibration"],
-      "example": "certification",
-      "description": "The type of criterion (optional or mandatory)."
-    },
-    "attestationDescription": {
-      "example": "Assessment of battery products against the GHG Protocol.",
-      "type": "string",
-      "description": "SampleCAB Inc attests that the product class LiFePO4 EV batteries manufactured at Sample battery facility have reported GHG foorptint that conform to the GBA rulebook version 1.5. "
-    },
-    "issuedToParty": {
-      "$ref": "#/$defs/Party",
-      "description": ""
-    },
-    "authorisations": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/Endorsement"
-      },
-      "description": "The authority under which a conformity claim is issued.  For example a national accrediation authority may accredit a test lab to issue test certificates about a product against a standard. "
-    },
-    "conformityCertificate": {
-      "$ref": "#/$defs/SecureLink",
-      "description": "A reference to the human / printable version of this conformity attestation - typically represented as a PDF document. The document may have more details than are represented in the digital attestation."
-    },
-    "auditableEvidence": {
-      "$ref": "#/$defs/SecureLink",
-      "description": "Auditable evidence supporting this assessment such as raw measurements, supporting documents. This is usally private data and would normally be encrypted."
-    },
-    "scope": {
-      "$ref": "#/$defs/ConformityAssessmentScheme",
-      "description": "A list of relevant standards and/or regulations against which apply to this attestation (eg AS1163:2016). "
-    },
-    "assessments": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/ConformityAssessment"
-      },
-      "description": "The list of specific assessments made within this conformity attestation."
+    "credentialSubject": {
+      "$ref": "#/$defs/Product",
+      "description": "The subject of a digital product passport credential is the identified product. "
     }
   },
-  "description": "A conformity attestation issued by a competent body that defines one or more assessments (eg carbon intensity) about a product (eg batttery) against a specification (eg LCA method) defined in a standard or regulation.",
-  "required": ["id", "assessorLevel", "assessmentLevel", "attestationType"],
+  "description": "The ProductPassport is a comprehensive data structure that encapsulates various details pertaining to a product, including its identification details, who issued it, batch information, provernance information, circularity information and a set of verifable product confomrity & sistainability claims.",
+  "required": ["@context", "id", "issuer"],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
-    "Party": {
+    "CredentialIssuer": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": ["Party"],
-          "default": ["Party"],
+          "const": ["CredentialIssuer"],
+          "default": ["CredentialIssuer"],
           "items": {
             "type": "string",
-            "enum": ["Party"]
+            "enum": ["CredentialIssuer"]
           }
         },
         "id": {
-          "example": "https://abr.business.gov.au/ABN/View?abn=90664869327",
+          "example": "did:web:identifiers.example-company.com:12345",
           "type": "string",
           "format": "uri",
-          "description": "The globally unique ID of the party as a URI, ideall as a resolvable ID. "
+          "description": "The W3C DID of the issuer - should be a did:web or did:tdw"
         },
         "name": {
-          "example": "Sample Company Pty Ltd.",
+          "example": "Example Company Pty Ltd",
           "type": "string",
-          "description": "The registered name of the party within the identifier scheme."
+          "description": "The name of the issuer person or organisation"
         },
-        "registeredId": {
-          "example": "90664869327",
-          "type": "string",
-          "description": "The registration number (alphanumeric) of the Party within the register. Unique within the register."
-        },
-        "idScheme": {
-          "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme of the party.  Typically a national business register or a global schem such as GLEIF. "
-        },
-        "description": {
-          "example": "A leading electric energy storage company",
-          "type": "string",
-          "description": "An optional short description of the party."
+        "otherIdentifiers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "description": "An optional list of other registered identifiers for this credential issuer "
         }
       },
-      "description": "An organisation.  May be a supply chain actor, a certifier, a government agency.",
+      "description": "The issuer party ()person or orgnaition) of a verifiable credential.",
       "required": ["id", "name"]
-    },
-    "IdentifierScheme": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": ["IdentifierScheme"],
-          "default": ["IdentifierScheme"],
-          "items": {
-            "type": "string",
-            "enum": ["IdentifierScheme"]
-          }
-        },
-        "id": {
-          "example": "https://id.gs1.org/01/",
-          "type": "string",
-          "format": "uri",
-          "description": "The globally unique identifier of the registration scheme. The scheme should be registered and discoverable from vocabulary.uncefact.org/identifierSchemes"
-        },
-        "name": {
-          "example": "Global Trade Identification Number (GTIN)",
-          "type": "string",
-          "description": "The name of the identifier scheme. "
-        }
-      },
-      "description": "An identifier registration scheme for products, facilities, or organisations. Typically operated by a state, national or gloabl authority."
-    },
-    "Endorsement": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": ["Endorsement"],
-          "default": ["Endorsement"],
-          "items": {
-            "type": "string",
-            "enum": ["Endorsement"]
-          }
-        },
-        "id": {
-          "example": "https://authority.gov/schemeABC/123456789",
-          "type": "string",
-          "format": "uri",
-          "description": "Globally unique identifier of an accreditation or authority issued to a confomrity assessment body by a regulator or national accreditation authority."
-        },
-        "name": {
-          "example": "Accreditation of certifiers.com under the Australian National Greenhouse and Energy Reporting scheme (NGER).",
-          "type": "string",
-          "description": "The name of the accreditation."
-        },
-        "trustmark": {
-          "$ref": "#/$defs/BinaryFile",
-          "description": "The trust mark image awarded by the AB to the CAB to indicate accrediation."
-        },
-        "issuingAuthority": {
-          "$ref": "#/$defs/Identifier",
-          "description": "The competent authority that issued the accreditation."
-        },
-        "accreditationCertificate": {
-          "$ref": "#/$defs/Link",
-          "description": "The evidence that supports the authroty under which the attestation is issued - eg an accreditation certificate."
-        }
-      },
-      "description": "The authority under which a conformity claim is issued.  For example a national accrediation authority may accredit a test lab to issue test certificates about a product against a standard. ",
-      "required": ["id", "name", "issuingAuthority"]
-    },
-    "BinaryFile": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": ["BinaryFile"],
-          "default": ["BinaryFile"],
-          "items": {
-            "type": "string",
-            "enum": ["BinaryFile"]
-          }
-        },
-        "fileName": {
-          "example": "GHG protocol trust mark",
-          "type": "string",
-          "description": "A name for referenced binary file"
-        },
-        "fileType": {
-          "type": "string",
-          "x-external-enumeration": "https://mimetype.io/all-types",
-          "description": "The type of file, represented as a MIME type.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://mimetype.io/all-types\n    "
-        },
-        "file": {
-          "example": "iVBORw0KGgoAAAANSUhEUgAAADkAAAA2CAYAAAB9TjFQAAAABGdBTUEAAi/9H3pWy6vI9uFdAAAAAElFTkSuQmCC",
-          "type": "string",
-          "format": "byte",
-          "description": "The binary file data encoded as Base64 string."
-        }
-      },
-      "description": "A binary file reference including name and filetype"
     },
     "Identifier": {
       "type": "object",
@@ -264,6 +129,158 @@
       "description": "The ID and Name of an identified entity such qs a product, facility, party, standard, etc.  If the identifier is a W3C DID then the corresponding DID document SHOULD include a serviceEndpoint of type \"IdentityResolver\". If the identifier is not a W3C DID then the id peroperty SHOULD be an identity resolver URL.",
       "required": ["id", "name"]
     },
+    "IdentifierScheme": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["IdentifierScheme"],
+          "default": ["IdentifierScheme"],
+          "items": {
+            "type": "string",
+            "enum": ["IdentifierScheme"]
+          }
+        },
+        "id": {
+          "example": "https://id.gs1.org/01/",
+          "type": "string",
+          "format": "uri",
+          "description": "The globally unique identifier of the registration scheme. The scheme should be registered and discoverable from vocabulary.uncefact.org/identifierSchemes"
+        },
+        "name": {
+          "example": "Global Trade Identification Number (GTIN)",
+          "type": "string",
+          "description": "The name of the identifier scheme. "
+        }
+      },
+      "description": "An identifier registration scheme for products, facilities, or organisations. Typically operated by a state, national or gloabl authority."
+    },
+    "Product": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Product"],
+          "default": ["Product"],
+          "items": {
+            "type": "string",
+            "enum": ["Product"]
+          }
+        },
+        "id": {
+          "example": "https://id.gs1.org/01/09520123456788/21/12345",
+          "type": "string",
+          "format": "uri",
+          "description": "The globally unique ID of the product as a URI. Ideall as a resolvable URL according to ISO 18975. "
+        },
+        "name": {
+          "example": "EV battery 300Ah.",
+          "type": "string",
+          "description": "The registered name of the product within the identifier scheme. "
+        },
+        "registeredId": {
+          "example": "09520123456788.21.12345",
+          "type": "string",
+          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+        },
+        "idScheme": {
+          "$ref": "#/$defs/IdentifierScheme",
+          "description": "The identifier scheme for this product.  Eg a GS1 GTIn or an AU Livestock NLIS, or similar. If self issued then use the party ID of the issuer.  "
+        },
+        "serialNumber": {
+          "example": "12345678",
+          "type": "string",
+          "description": "A number or code representing a specific serialised item of the product. Unique within product class."
+        },
+        "batchNumber": {
+          "example": "6789",
+          "type": "string",
+          "description": "Identifier of the specific production batch of the product.  Unique within the product class."
+        },
+        "productImage": {
+          "$ref": "#/$defs/Link",
+          "description": "Reference information (location, type, name) of an image of the product."
+        },
+        "description": {
+          "example": "400Ah 24v LiFePO4 battery",
+          "type": "string",
+          "description": "A textual description providing details about the product."
+        },
+        "productCategory": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Classification"
+          },
+          "description": "A code representing the product's class, typically using the UN CPC (United Nations Central Product Classification) https://unstats.un.org/unsd/classifications/Econ/cpc"
+        },
+        "furtherInformation": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "description": "A URL pointing to further human readable information about the product."
+        },
+        "producedByParty": {
+          "$ref": "#/$defs/Identifier",
+          "description": "The Party entity that manufactured the product."
+        },
+        "producedAtFacility": {
+          "$ref": "#/$defs/Identifier",
+          "description": "The Facility where the product batch was produced / manufactured."
+        },
+        "dimensions": {
+          "$ref": "#/$defs/Dimension",
+          "description": "The physical dimensions of the product. Not every dimension is relevant to every products.  For example bulk materials may have wieght and volume but not length, with, or height.\"weight\":{\"value\":10, \"unit\":\"KGM\"}"
+        },
+        "productionDate": {
+          "example": "2024-04-25",
+          "type": "string",
+          "format": "date",
+          "description": "The ISO 8601 date on which the product batch was manufactured."
+        },
+        "countryOfProduction": {
+          "type": "string",
+          "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
+          "description": "The country in which this item was produced / manufactured.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+        },
+        "dueDiligenceDeclaration": {
+          "$ref": "#/$defs/Link",
+          "description": "The due diligence declaration that conforms with the regulations of the market into which the product is sold."
+        },
+        "materialsProvenance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Material"
+          },
+          "description": "An array of Provenance objects providing details on the origin and mass fraction of components or ingredients of the product batch. "
+        },
+        "conformityClaims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "description": "An array of claim objects representing various product conformity claims about the product / batch.  These can be sustainability claims, circularity claims, or any other claim type within the conformity topic list."
+        },
+        "circularityScorecard": {
+          "$ref": "#/$defs/CircularityPerformance",
+          "description": "A circularity performance scorecard"
+        },
+        "emissionsScorecard": {
+          "$ref": "#/$defs/EmissionsPerformance",
+          "description": "An emissions performacne scorecard"
+        },
+        "traceabilityInformation": {
+          "$ref": "#/$defs/TraceabilityPerformance",
+          "description": "An array of secure links to TraceabilityEvent objects detailing EPCIS events related to the traceability of the product batch. SHOULD be provided for any product passport issued at batch or item level. Links should include the hash of the target and may point to encrypted targets."
+        }
+      },
+      "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details.  ",
+      "required": ["id", "name"]
+    },
     "Link": {
       "type": "object",
       "additionalProperties": false,
@@ -297,111 +314,188 @@
       },
       "description": "A structure to provide a URL link plus metadata associated with the link."
     },
-    "SecureLink": {
+    "Classification": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": ["SecureLink", "Link"],
-          "default": ["SecureLink", "Link"],
+          "const": ["Classification"],
+          "default": ["Classification"],
           "items": {
             "type": "string",
-            "enum": ["SecureLink", "Link"]
-          }
-        },
-        "linkURL": {
-          "example": "https://files.example-certifier.com/1234567.json",
-          "type": "string",
-          "format": "uri",
-          "description": "The URL of the target resource. "
-        },
-        "linkName": {
-          "example": "GBA rule book conformity certificate",
-          "type": "string",
-          "description": "A display name for the target resource "
-        },
-        "linkType": {
-          "example": "https://test.uncefact.org/vocabulary/linkTypes/dcc",
-          "type": "string",
-          "description": "The type of the target resource - drawn from a controlled vocabulary "
-        },
-        "hashDigest": {
-          "example": "6239119dda5bd4c8a6ffb832fe16feaa5c27b7dba154d24c53d4470a2c69adc2",
-          "type": "string",
-          "description": "The hash of the file."
-        },
-        "hashMethod": {
-          "type": "string",
-          "enum": ["SHA-256", "SHA-1"],
-          "example": "SHA-256",
-          "description": "The hashing algorithm used to create the target hash.  SHA-265 is the recommedned standard"
-        },
-        "encryptionMethod": {
-          "type": "string",
-          "enum": ["none", "AES"],
-          "example": "none",
-          "description": "The symmetric encryption algorithm used to encrypt the link target.  AES is the recommended standard. Decryption keys are expected to be passed out of bounds."
-        }
-      },
-      "description": "A binary file that is hashed ()for tamper evidence) and optionally encrypted (for confidentiality)."
-    },
-    "ConformityAssessmentScheme": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": ["ConformityAssessmentScheme", "Standard"],
-          "default": ["ConformityAssessmentScheme", "Standard"],
-          "items": {
-            "type": "string",
-            "enum": ["ConformityAssessmentScheme", "Standard"]
+            "enum": ["Classification"]
           }
         },
         "id": {
-          "example": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf",
+          "example": "https://unstats.un.org/unsd/classifications/Econ/cpc/46410",
           "type": "string",
           "format": "uri",
-          "description": "A unique identifier for the standard (eg https://www.iso.org/standard/60857.html)."
+          "description": "The globally unique URI representing the specific classifier value"
+        },
+        "code": {
+          "example": "46410",
+          "type": "string",
+          "description": "classification code within the scheme"
         },
         "name": {
-          "example": "GBA Battery Passport Greenhouse Gas Rulebook - V.2.0",
+          "example": "Primary cells and primary batteries",
           "type": "string",
-          "description": "The name of the standard"
+          "description": "Name of the classification represented by the code"
         },
-        "issuingParty": {
-          "$ref": "#/$defs/Identifier",
-          "description": "The party that issued the standard "
-        },
-        "issueDate": {
-          "example": "2023-12-05",
+        "schemeID": {
+          "example": "https://unstats.un.org/unsd/classifications/Econ/cpc/",
           "type": "string",
-          "format": "date",
-          "description": "The date when the standard was issued."
+          "format": "uri",
+          "description": "Classification scheme ID"
         },
-        "trustmark": {
-          "$ref": "#/$defs/BinaryFile",
-          "description": "The trust mark that represents the conformity assessment scheme."
+        "schemeName": {
+          "example": "UN Central Product Classification (CPC)",
+          "type": "string",
+          "description": "The name of the classification scheme"
         }
       },
-      "description": "A formal governance scheme under which this attestation is issued (eg ACRS structural steel certification) ",
-      "required": ["issuingParty"]
+      "description": "A classification scheme and code / name representing a category value for a product, entity, or facility.",
+      "required": ["id", "name"]
     },
-    "ConformityAssessment": {
+    "Dimension": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": ["ConformityAssessment", "Declaration"],
-          "default": ["ConformityAssessment", "Declaration"],
+          "const": ["Dimension"],
+          "default": ["Dimension"],
           "items": {
             "type": "string",
-            "enum": ["ConformityAssessment", "Declaration"]
+            "enum": ["Dimension"]
+          }
+        },
+        "weight": {
+          "$ref": "#/$defs/Measure",
+          "description": "the weight of the product. EG {\"value\":10, \"unit\":\"KGM\"}"
+        },
+        "length": {
+          "$ref": "#/$defs/Measure",
+          "description": "The length of the product or packaging eg {\"value\":840, \"unit\":\"MMT\"}"
+        },
+        "width": {
+          "$ref": "#/$defs/Measure",
+          "description": "The width of the product or packaging. eg {\"value\":150, \"unit\":\"MMT\"}"
+        },
+        "height": {
+          "$ref": "#/$defs/Measure",
+          "description": "The height of the product or packaging. eg {\"value\":220, \"unit\":\"MMT\"}"
+        },
+        "volume": {
+          "$ref": "#/$defs/Measure",
+          "description": "The displacement volume of the product. eg {\"value\":7.5, \"unit\":\"LTR\"}"
+        }
+      },
+      "description": "Overall (length, width, height) dimensions and weight/volume of an item."
+    },
+    "Measure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Measure"],
+          "default": ["Measure"],
+          "items": {
+            "type": "string",
+            "enum": ["Measure"]
+          }
+        },
+        "value": {
+          "example": 10,
+          "type": "number",
+          "description": "The numeric value of the measure"
+        },
+        "unit": {
+          "type": "string",
+          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
+          "description": "Unit of measure drawn from the UNECE rec20 measure code list.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+        }
+      },
+      "description": "The measure class defines a numeric measured value (eg 10) and a coded unit of measure (eg KG).",
+      "required": ["value", "unit"]
+    },
+    "Material": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Material"],
+          "default": ["Material"],
+          "items": {
+            "type": "string",
+            "enum": ["Material"]
+          }
+        },
+        "name": {
+          "example": "Lithium Spodumene",
+          "type": "string",
+          "description": "Name of this material (eg \"Egyptian Cotton\")"
+        },
+        "originCountry": {
+          "type": "string",
+          "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
+          "description": "A ISO 3166-1 code representing the country of origin of the component or ingredient.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+        },
+        "materialType": {
+          "$ref": "#/$defs/Classification",
+          "description": "The type of this material - as a value drawn from a controlled vocabulary eg from UN Framework Classification for Resources (UNFC)."
+        },
+        "massFraction": {
+          "example": 0.2,
+          "type": "number",
+          "description": "The mass fraction of the product represented by this material. The sum of all mass fraction values for a given passport should be 1."
+        },
+        "massAmount": {
+          "$ref": "#/$defs/Measure",
+          "description": "The mass of the material component."
+        },
+        "recycledAmount": {
+          "example": 0.5,
+          "type": "number",
+          "description": "Mass fraction of this material that is recycled (eg 50% recycled Lithium)"
+        },
+        "hazardous": {
+          "example": "false",
+          "type": "boolean",
+          "description": "Indicates whether this material is hazardous. If true then the materialSafetyInformation proerty must be present"
+        },
+        "symbol": {
+          "type": "string",
+          "format": "binary",
+          "description": "Based 64 encoded binary used to represent a visual symbol for a given material. "
+        },
+        "materialSafetyInformation": {
+          "$ref": "#/$defs/Link",
+          "description": "Refernece to further information obout safe handling of this hazardous material (for example a link to a material safety data sheet)"
+        }
+      },
+      "description": "The material class encapsulates details about the origin or source of raw materials in a product, including the country of origin and the mass fraction.",
+      "required": ["name"]
+    },
+    "Claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Claim", "Declaration"],
+          "default": ["Claim", "Declaration"],
+          "items": {
+            "type": "string",
+            "enum": ["Claim", "Declaration"]
           }
         },
         "assessmentDate": {
@@ -411,7 +505,7 @@
           "description": "The date on which this assessment was made. "
         },
         "id": {
-          "example": "https://exampleCAB.com/38f73303-a39e-45a7-b8b7-e73517548f27/01",
+          "example": "https://products.example-company.com/09520123456788/declarations/12345",
           "type": "string",
           "format": "uri",
           "description": "A unique identifier for the delcaration. Often this will be an extension of the product.id or attestation.id. But could be a UUID."
@@ -465,30 +559,12 @@
           "example": "environment.energy",
           "description": "The conformity topic category for this assessment (eg vocabulary.uncefact.org/sustainability/emissions)"
         },
-        "assessedProducts": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Product"
-          },
-          "description": "The list of products that are the subject of this conformity assessment"
-        },
-        "assessedFacilities": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Facility"
-          },
-          "description": "The list of facilities that are the subject of this conformity assessment."
-        },
-        "assessedOrganisation": {
-          "$ref": "#/$defs/Party",
-          "description": "The organisation that is the subject of this assessment."
-        },
-        "auditor": {
-          "$ref": "#/$defs/Party",
-          "description": "The person or organisations that performed this assessment (if different to the issuer of the parent attestaiton)"
+        "conformityEvidence": {
+          "$ref": "#/$defs/SecureLink",
+          "description": "A URI pointing to the evidence supporting the claim. SHOULD be a URL to a UNTP Digital COnformity Credential (DCC)"
         }
       },
-      "description": "A specific assessment about the product or facility against a specific specification.  Eg the carbon intensity of a given product or batch.",
+      "description": "A declaration of conformance with one or more criteria from a specific standard or regulation.  ",
       "required": ["id", "compliance", "conformityTopic"]
     },
     "Standard": {
@@ -647,294 +723,183 @@
       "description": "A specific measure of performance against the criteria that governs the claim.  Expressed as an array of metric (ie unit of emasure) / value (ie the actual numeric value) pairs.  ",
       "required": ["metricName", "metricValue"]
     },
-    "Measure": {
+    "SecureLink": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": ["Measure"],
-          "default": ["Measure"],
+          "const": ["SecureLink", "Link"],
+          "default": ["SecureLink", "Link"],
           "items": {
             "type": "string",
-            "enum": ["Measure"]
+            "enum": ["SecureLink", "Link"]
           }
         },
-        "value": {
-          "example": 10,
-          "type": "number",
-          "description": "The numeric value of the measure"
+        "linkURL": {
+          "example": "https://files.example-certifier.com/1234567.json",
+          "type": "string",
+          "format": "uri",
+          "description": "The URL of the target resource. "
         },
-        "unit": {
+        "linkName": {
+          "example": "GBA rule book conformity certificate",
+          "type": "string",
+          "description": "A display name for the target resource "
+        },
+        "linkType": {
+          "example": "https://test.uncefact.org/vocabulary/linkTypes/dcc",
+          "type": "string",
+          "description": "The type of the target resource - drawn from a controlled vocabulary "
+        },
+        "hashDigest": {
+          "example": "6239119dda5bd4c8a6ffb832fe16feaa5c27b7dba154d24c53d4470a2c69adc2",
+          "type": "string",
+          "description": "The hash of the file."
+        },
+        "hashMethod": {
+          "type": "string",
+          "enum": ["SHA-256", "SHA-1"],
+          "example": "SHA-256",
+          "description": "The hashing algorithm used to create the target hash.  SHA-265 is the recommedned standard"
+        },
+        "encryptionMethod": {
+          "type": "string",
+          "enum": ["none", "AES"],
+          "example": "none",
+          "description": "The symmetric encryption algorithm used to encrypt the link target.  AES is the recommended standard. Decryption keys are expected to be passed out of bounds."
+        }
+      },
+      "description": "A binary file that is hashed ()for tamper evidence) and optionally encrypted (for confidentiality)."
+    },
+    "CircularityPerformance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["CircularityPerformance"],
+          "default": ["CircularityPerformance"],
+          "items": {
+            "type": "string",
+            "enum": ["CircularityPerformance"]
+          }
+        },
+        "recyclingInformation": {
+          "$ref": "#/$defs/Link",
+          "description": "A URI pointing to recycling information for the product."
+        },
+        "repairInformation": {
+          "$ref": "#/$defs/Link",
+          "description": "A URI pointing to repair instructions for this product."
+        },
+        "recyclableContent": {
+          "example": 0.5,
+          "type": "number",
+          "format": "float",
+          "description": "The fraction of the this product (my mass) that has been designed to be recyclable / re-usable. This will be be the total fraction that can avoid waste / landfill."
+        },
+        "recyecledContent": {
+          "example": 0.3,
+          "type": "number",
+          "format": "float",
+          "description": "The fraction (by mass) of recycled / repurposed, repaired content in this product.  This will be the total virgin content fraction."
+        },
+        "utilityFactor": {
+          "example": 1.2,
+          "type": "number",
+          "format": "float",
+          "description": "An indicator of durability defined as the lifetime (typically measures as usage cycles) for this product divided by the industry average. For example a battery with a 10,000 cycle lifetime where industry average is 5,000 cycles will have a durability factor of 2. If unknown set to 1 or omit.  "
+        },
+        "materialCircularityIndicator": {
+          "example": 0.67,
+          "type": "number",
+          "format": "float",
+          "description": "The overall circularity performance indicator for this product. Calculated as 1 - (V+W)/2D where - V = Virgin material proportion by mass (will be 1- recycled content) - W = Waste leakage proportion by mass (will be 1 - recyclableContent)  - D = Utility factor (set to 1 if unknown).  "
+        }
+      },
+      "description": "High level corcularity information about this product.  Note that this doens not substitute for detailed product circularity data sheet (PCDS) criteria which would be represented as a set of conformity claims against individual ISO PCDS criteria."
+    },
+    "EmissionsPerformance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["EmissionsPerformance"],
+          "default": ["EmissionsPerformance"],
+          "items": {
+            "type": "string",
+            "enum": ["EmissionsPerformance"]
+          }
+        },
+        "carbonFootprint": {
+          "example": 1.8,
+          "type": "number",
+          "format": "float",
+          "description": "The carbon footprint of the product in KgCO2e per declared unit."
+        },
+        "declaredUnit": {
           "type": "string",
           "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
-          "description": "Unit of measure drawn from the UNECE rec20 measure code list.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+          "description": "The unit of product (EA, KGM, LTR, etc) that is the basis for carbon footprint.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+        },
+        "operationalScope": {
+          "type": "string",
+          "enum": ["None", "CradleToGate", "CradleToGrave"],
+          "example": "None",
+          "description": "The operational scope of the emissions performance. Only scope 1 & 2, or inlcuing upstream scope 3 (cradle to gate) or upstream and downstream scope 3 (cradle to grave)."
+        },
+        "primarySourcedRatio": {
+          "example": 0.3,
+          "type": "number",
+          "format": "float",
+          "description": "The ratio of emissions data from primary sources (ie from supplier / product specific information rather than secondary / industry averages)."
+        },
+        "reportingStandard": {
+          "$ref": "#/$defs/Standard",
+          "description": "The reporting standard (eg GHG Protocol, IFRS S2, ESRS, etc) against which this product emissions performance is assessed."
         }
       },
-      "description": "The measure class defines a numeric measured value (eg 10) and a coded unit of measure (eg KG).",
-      "required": ["value", "unit"]
+      "description": "Product specific characteristics.  This class is an extension point for industry specific product characteristics or performance information such as clothing size or battery capacity.",
+      "required": ["carbonFootprint", "declaredUnit", "operationalScope", "primarySourcedRatio"]
     },
-    "Product": {
+    "TraceabilityPerformance": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": ["Product"],
-          "default": ["Product"],
+          "const": ["TraceabilityPerformance"],
+          "default": ["TraceabilityPerformance"],
           "items": {
             "type": "string",
-            "enum": ["Product"]
+            "enum": ["TraceabilityPerformance"]
           }
         },
-        "id": {
-          "example": "https://id.gs1.org/01/09520123456788/21/12345",
+        "valueChainProcess": {
+          "example": "Spinning",
           "type": "string",
-          "format": "uri",
-          "description": "The globally unique ID of the product as a URI. Ideall as a resolvable URL according to ISO 18975. "
+          "description": "Hman readable name for the industry specific value chain process representing this traceability data set."
         },
-        "name": {
-          "example": "EV battery 300Ah.",
-          "type": "string",
-          "description": "The registered name of the product within the identifier scheme. "
+        "verifiedRatio": {
+          "example": 0.5,
+          "type": "number",
+          "description": "The proportion (0 to 1) of materials in this value chain process that have been  traced using verifiable traceability event."
         },
-        "registeredId": {
-          "example": "09520123456788.21.12345",
-          "type": "string",
-          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
-        },
-        "idScheme": {
-          "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme for this product.  Eg a GS1 GTIn or an AU Livestock NLIS, or similar. If self issued then use the party ID of the issuer.  "
-        },
-        "serialNumber": {
-          "example": "12345678",
-          "type": "string",
-          "description": "A number or code representing a specific serialised item of the product. Unique within product class."
-        },
-        "batchNumber": {
-          "example": "6789",
-          "type": "string",
-          "description": "Identifier of the specific production batch of the product.  Unique within the product class."
-        },
-        "IDverifiedByCAB": {
-          "example": "true",
-          "type": "boolean",
-          "description": "Indicates whether the conformity assessment body has verified the identity product that is the subject of the assessment."
-        }
-      },
-      "description": "The product which is the subject of this conformity assessment",
-      "required": ["id", "name"]
-    },
-    "Facility": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": ["Facility"],
-          "default": ["Facility"],
-          "items": {
-            "type": "string",
-            "enum": ["Facility"]
-          }
-        },
-        "id": {
-          "example": "https://sample-facility-register.com/1234567",
-          "type": "string",
-          "format": "uri",
-          "description": "The globally unique ID of the facility as URI, ideally as a resolvable URL."
-        },
-        "name": {
-          "example": "Greenacres battery factory",
-          "type": "string",
-          "description": "The registered name of the facility within the identifier scheme.  "
-        },
-        "registeredId": {
-          "example": "1234567",
-          "type": "string",
-          "description": "The registration number (alphanumeric) of the facility within the identifir scheme. Unique within the register."
-        },
-        "idScheme": {
-          "$ref": "#/$defs/IdentifierScheme",
-          "description": "The ID scheme of the facility. eg a GS1 GLN or a National land registry scheme. If self issued then use the prty ID of the facility owner. "
-        },
-        "locationInformation": {
-          "$ref": "#/$defs/Location",
-          "description": "Geolocation information for this facility.  For example  \"id\":\"maps.app.goo.gl/6yyPVdwJDWjtj9fG6\"  \"areaReference\":\"plus.codes/4RPFR872+\"\"  \"geoLocation\":[\"-35.186250\",\"149.301250\"]"
-        },
-        "address": {
-          "$ref": "#/$defs/Address",
-          "description": "The Postal address of the location."
-        },
-        "IDverifiedByCAB": {
-          "example": "true",
-          "type": "boolean",
-          "description": "Indicates whether the conformity assessment body has verified the identity of the facility which is the subject of the assement."
-        }
-      },
-      "description": "The facility which is the subject of this conformity assessment",
-      "required": ["id", "name"]
-    },
-    "Location": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": ["Location"],
-          "default": ["Location"],
-          "items": {
-            "type": "string",
-            "enum": ["Location"]
-          }
-        },
-        "plusCode": {
-          "example": "https://plus.codes/8CGRC78W+MM",
-          "type": "string",
-          "format": "uri",
-          "description": "An open location code (https://maps.google.com/pluscodes/) representing this geographic location or region. Open location codes can represent any sized area from a point to a large region and are easily resolved to a visual map location. "
-        },
-        "geoLocation": {
-          "$ref": "#/$defs/Point",
-          "description": "The latitude and logditude coordinates that best represent the specified location. Using GeoJSON Point notation."
-        },
-        "geoBoundary": {
-          "$ref": "#/$defs/Polygon",
-          "description": "The list of ordered coordinates that define a closed area polygon as a location boundary using GeoJSON polygon notation."
-        }
-      },
-      "description": "Location information including address and geolocation of points, areas, and boundaries"
-    },
-    "Point": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["Point"],
-          "example": "Point",
-          "description": ""
-        },
-        "coordinates": {
-          "$ref": "#/$defs/Point3D",
-          "description": "Coordinates property of type Point3D"
-        }
-      },
-      "description": "Represents a Point geometry",
-      "required": ["type"]
-    },
-    "Point3D": {
-      "description": "Point in 3d space",
-      "oneOf": [
-        {
-          "type": "array",
-          "readOnly": true,
-          "const": ["Point3D"],
-          "default": ["Point3D"],
-          "items": {
-            "type": "string",
-            "enum": ["Point3D"]
-          }
-        },
-        {
+        "traceabilityEvents": {
           "type": "array",
           "items": {
-            "type": "number",
-            "format": "float"
+            "$ref": "#/$defs/SecureLink"
           },
-          "description": "Array of decimal values"
-        }
-      ]
-    },
-    "Polygon": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["Polygon"],
-          "example": "Polygon",
-          "description": ""
-        },
-        "coordinates": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Point3DWrapper"
-          },
-          "description": "Array of PolygonCoordinates"
+          "description": "A list of secure links to digital traceability events that support this traceability performance statement. May be encrypted for confidentiality purposes. "
         }
       },
-      "description": "Represents a Polygon geometry",
-      "required": ["type"]
-    },
-    "Point3DWrapper": {
-      "description": "",
-      "oneOf": [
-        {
-          "type": "array",
-          "readOnly": true,
-          "const": ["Point3DWrapper"],
-          "default": ["Point3DWrapper"],
-          "items": {
-            "type": "string",
-            "enum": ["Point3DWrapper"]
-          }
-        },
-        {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Point3D"
-          },
-          "description": ""
-        }
-      ]
-    },
-    "Address": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "array",
-          "readOnly": true,
-          "const": ["Address"],
-          "default": ["Address"],
-          "items": {
-            "type": "string",
-            "enum": ["Address"]
-          }
-        },
-        "streetAddress": {
-          "example": "level 11, 15 London Circuit",
-          "type": "string",
-          "description": "the street address - eg "
-        },
-        "postalCode": {
-          "example": "2601",
-          "type": "string",
-          "description": "The post code"
-        },
-        "addressLocality": {
-          "example": "Acton",
-          "type": "string",
-          "description": "The city, suburb or township."
-        },
-        "addressRegion": {
-          "example": "ACT",
-          "type": "string",
-          "description": "The state or territory or province"
-        },
-        "addressCountry": {
-          "type": "string",
-          "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
-          "description": "The address country\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
-        }
-      },
-      "description": "A postal address"
+      "description": ""
     }
   }
 }
