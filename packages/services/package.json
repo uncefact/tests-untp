@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc --build --clean && tsc",
     "watch": "tsc -b --watch",
-    "test": "jest --ci",
+    "test": "jest",
     "test:coverage": "jest --coverage"
   },
   "type": "module",
@@ -25,6 +25,7 @@
     "babel-jest": "^29.7.0",
     "digitallink_toolkit_server": "file:../../digitallink_toolkit_server",
     "jsonpointer": "^5.0.1",
+    "jose": "^5.9.3",
     "lodash": "^4.17.21",
     "moment": "^2.30.1",
     "uuid": "^9.0.1"
@@ -32,27 +33,5 @@
   "devDependencies": {
     "axios-mock-adapter": "^1.19.0",
     "typescript": "^5.3.3"
-  },
-  "jest": {
-    "testEnvironment": "jsdom",
-    "testPathIgnorePatterns": [
-      "/node_modules/",
-      "/build/",
-      "/__tests__/mocks/"
-    ],
-    "transform": {
-      "\\.[jt]sx?$": "ts-jest"
-    },
-    "globals": {
-      "ts-jest": {
-        "useESM": true
-      }
-    },
-    "moduleNameMapper": {
-      "(.+)\\.js": "$1"
-    },
-    "extensionsToTreatAsEsm": [
-      ".ts"
-    ]
   }
 }

@@ -1,4 +1,4 @@
-import { StorageServiceConfig } from "@mock-app/services/build/types";
+import { StorageServiceConfig } from '@mock-app/services';
 
 export type FetchOptions = {
   method: 'POST' | 'GET';

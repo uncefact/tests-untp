@@ -2,122 +2,12 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Router as RouterDom } from 'react-router-dom';
 import { createMemoryHistory } from 'history';
+import appConfig from './mocks/app-config.mock.json';
 import { Router } from '../components/Router';
+import { Home, Scanning, Verify, Application, GenericPage } from '../pages';
 
 // Mock the appConfig to provide test data
-jest.mock(
-  '../../src/constants/app-config.json',
-  () => ({
-    name: 'Red meat',
-    styles: {
-      primaryColor: '#fff',
-      secondaryColor: 'white',
-      tertiaryColor: 'black',
-    },
-    generalFeatures: [
-      {
-        name: 'General features',
-        type: '',
-        styles: {
-          primaryColor: 'rgb(255, 207, 7)',
-          secondaryColor: 'black',
-          tertiaryColor: 'black',
-        },
-        features: [
-          {
-            name: 'Conformity Credential',
-            id: 'conformity_credential',
-            components: [
-              {
-                name: 'ConformityCredential',
-                type: '',
-                props: {
-                  credentialRequestConfigs: [
-                    {
-                      url: 'http://example.com/deforestation-free-assessment',
-                      params: {},
-                      options: {
-                        headers: [],
-                        method: 'POST',
-                      },
-                      credentialName: 'Deforestation Free Assessment',
-                      credentialPath: '/body/credentil',
-                      appOnly: 'Farm',
-                    },
-                  ],
-                  storedCredentialsConfig: {
-                    url: 'https://storage.example.com',
-                    params: {},
-                    options: {
-                      bucket: 'bucket-stored-example',
-                    },
-                    type: 's3',
-                  },
-                },
-              },
-            ],
-            services: [],
-          },
-        ],
-      },
-    ],
-    apps: [
-      {
-        name: 'Farm',
-        features: [{ name: 'Issue DLP' }],
-        styles: {
-          primaryColor: '#fff',
-          secondaryColor: 'white',
-          tertiaryColor: 'black',
-        },
-      },
-      {
-        name: 'Feedlot',
-        features: [{ name: 'Import DLP' }, { name: 'Feed Cattle' }, { name: 'Sell Cattle' }],
-        styles: {
-          primaryColor: '#fff',
-          secondaryColor: 'white',
-          tertiaryColor: 'black',
-        },
-      },
-      {
-        name: 'Processor',
-        features: [{ name: 'Import DLP' }, { name: 'Process Cattle' }],
-        styles: {
-          primaryColor: '#fff',
-          secondaryColor: 'white',
-          tertiaryColor: 'black',
-        },
-      },
-    ],
-    scanningApp: {
-      config: {
-        path: '/scanning',
-        styles: {
-          primaryColor: 'rgb(41, 171, 48)',
-          secondaryColor: 'white',
-          tertiaryColor: 'black',
-        },
-      },
-      provider: 'gs1',
-      providerVerifyUrl: 'https://verified-by-gs1.agtrace.showthething.com',
-      services: {
-        certificationInfo: 'https://gs1.org/voc/certificationInfo',
-        verificationService: 'https://gs1.org/voc/verificationService',
-        serviceInfo: 'https://gs1.org/voc/serviceInfo',
-      },
-      defaultVerificationServiceLink: {
-        title: 'Default Verification Service',
-        context: 'Default Verification Service',
-        type: 'application/json',
-        href: 'https://verify.agtrace.showthething.com/credentials/verify',
-        hreflang: ['en'],
-      },
-    },
-  }),
-  { virtual: true },
-);
-
+jest.mock('../../src/constants/app-config.json', () => appConfig, { virtual: true });
 jest.mock('@mock-app/components', () => ({
   Footer: jest.fn(),
 }));
@@ -129,6 +19,14 @@ jest.mock('@mock-app/services', () => ({
 jest.mock('@vckit/renderer', () => ({
   Renderer: jest.fn(),
   WebRenderingTemplate2022: jest.fn(),
+}));
+
+jest.mock('../pages', () => ({
+  Home: jest.fn().mockReturnValue(<div>Home</div>),
+  Scanning: jest.fn().mockReturnValue(<div>Scanning</div>),
+  Verify: jest.fn().mockReturnValue(<div>Verify</div>),
+  Application: jest.fn().mockReturnValue(<div>Application</div>),
+  GenericPage: jest.fn().mockReturnValue(<div>GenericPage</div>),
 }));
 
 describe('Router Component', () => {
@@ -159,31 +57,39 @@ describe('Router Component', () => {
       </RouterDom>,
     );
 
-    // Find all buttons with text matching 'Farm', 'Feedlot', and 'Processor'
-    const farmButton = screen.getAllByText(/Farm/i);
-    const feedlotButton = screen.getAllByText(/Feedlot/i);
-    const processorButton = screen.getAllByText(/Processor/i);
-
-    // Assert that all buttons for the respective apps are displayed on the Home page
-    expect(farmButton).not.toBeNull();
-    expect(feedlotButton).not.toBeNull();
-    expect(processorButton).not.toBeNull();
+    expect(screen.getByText('Home')).not.toBeNull();
   });
 
-  // Test case to check if clicking on a feature in the Router navigates to the correct subpath
-  it('should renders route subpath correctly', () => {
-    // Create a memory history object with an initial entry of the '/farm' route
-    const history = createMemoryHistory({ initialEntries: ['/farm'] });
-    // Render the Router component with the provided history
+  it('should renders scanning page', () => {
+    const history = createMemoryHistory({ initialEntries: ['/scanning'] });
     render(
       <RouterDom location={history.location} navigator={history}>
         <Router />
       </RouterDom>,
     );
 
-    // Simulate a click on a feature in the Router (Issue DLP)
-    fireEvent.click(screen.getByText('Issue DLP'));
-    // Expect the Router to navigate to the '/farm/issue-dlp' subpath
-    expect(history.location.pathname).toBe('/farm/issue-dlp');
+    expect(screen.getByText('Scanning')).not.toBeNull();
+  });
+
+  it('should renders verify page', () => {
+    const history = createMemoryHistory({ initialEntries: ['/verify'] });
+    render(
+      <RouterDom location={history.location} navigator={history}>
+        <Router />
+      </RouterDom>,
+    );
+
+    expect(screen.getByText('Verify')).not.toBeNull();
+  });
+
+  it('should renders route feature path correctly', () => {
+    const history = createMemoryHistory({ initialEntries: ['/orchard-facility'] });
+    render(
+      <RouterDom location={history.location} navigator={history}>
+        <Router />
+      </RouterDom>,
+    );
+
+    expect(screen.getByText('Application')).not.toBeNull();
   });
 });
