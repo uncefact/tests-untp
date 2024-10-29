@@ -1,7 +1,6 @@
 import { issueVC, issueCredentialStatus } from '../vckit.service';
 import { privateAPI } from '../utils/httpService';
 import { decodeJwt } from 'jose';
-import appConfig from '../../../mock-app/src/constants/app-config.json';
 import { decodeEnvelopedVC, verifyVC } from '../vckit.service';
 
 jest.mock('jose', () => ({
