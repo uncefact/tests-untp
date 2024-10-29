@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import moment from 'moment';
 import { List, ListItem, ListItemText } from '@mui/material';
-import { IssuerType, VerifiableCredential } from '@vckit/core-types';
+import { IssuerType, UnsignedCredential, VerifiableCredential } from '@vckit/core-types';
 
-const CredentialInfo = ({ credential }: { credential: VerifiableCredential }) => {
+const CredentialInfo = ({ credential }: { credential: VerifiableCredential | UnsignedCredential }) => {
   const credentialType = useMemo(() => {
     if (typeof credential.type === 'string') {
       return credential.type;

@@ -15,7 +15,7 @@ const Credential = ({ credential, decodedEnvelopedVC }: CredentialComponentProps
         width: '100%',
       }}
     >
-      <CredentialInfo credential={credential} />
+      <CredentialInfo credential={decodedEnvelopedVC ?? credential} />
       <CredentialTabs credential={credential} decodedEnvelopedVC={decodedEnvelopedVC} />
     </Box>
   );

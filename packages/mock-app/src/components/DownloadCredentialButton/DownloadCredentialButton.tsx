@@ -1,6 +1,6 @@
 import React from 'react';
 import CloudDownloadOutlinedIcon from '@mui/icons-material/CloudDownloadOutlined';
-import { Button, useMediaQuery, useTheme } from '@mui/material';
+import { Button, IconButton, useMediaQuery, useTheme } from '@mui/material';
 import { UnsignedCredential, VerifiableCredential } from '@vckit/core-types';
 
 export const DownloadCredentialButton = ({ credential }: { credential: VerifiableCredential | UnsignedCredential }) => {
@@ -21,21 +21,16 @@ export const DownloadCredentialButton = ({ credential }: { credential: Verifiabl
   };
 
   return (
-    <Button
-      variant='text'
-      startIcon={<CloudDownloadOutlinedIcon sx={{ marginRight: '5px' }} />}
-      sx={{
-        color: 'primary.main',
-        textTransform: 'none',
-        marginLeft: 2,
-        paddingRight: 0,
-        justifyContent: 'end',
-        fontSize: '16px',
-        '.MuiButton-startIcon': { marginRight: 0 },
-      }}
-      onClick={handleClickDownloadVC}
-    >
-      {isMobile ? '' : 'Download'}
-    </Button>
+    <>
+      {isMobile ? (
+        <IconButton color='primary' aria-label='download' onClick={handleClickDownloadVC}>
+          <CloudDownloadOutlinedIcon />
+        </IconButton>
+      ) : (
+        <Button variant='text' onClick={handleClickDownloadVC} startIcon={<CloudDownloadOutlinedIcon />}>
+          Download
+        </Button>
+      )}
+    </>
   );
 };
