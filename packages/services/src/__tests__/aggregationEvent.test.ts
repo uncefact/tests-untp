@@ -11,6 +11,7 @@ import { aggregationEventMock } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
+  decodeEnvelopedVC: jest.fn(),
 }));
 jest.mock('../storage.service', () => ({
   uploadData: jest.fn(),
@@ -56,7 +57,8 @@ describe('processAggregationEvent', () => {
 
   it('should process aggregation event', async () => {
     (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => aggregationVCMock);
-    (uploadData as jest.Mock).mockResolvedValueOnce('https://exampleStorage.com/vc.json');
+    (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue(aggregationVCMock);
+    (uploadData as jest.Mock).mockResolvedValueOnce(aggregationEventDLRMock);
 
     jest
       .spyOn(validateContext, 'validateAggregationEventContext')
@@ -64,10 +66,20 @@ describe('processAggregationEvent', () => {
     jest
       .spyOn(linkResolverService, 'getLinkResolverIdentifier')
       .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
+    jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
+      identifier: '0123456789',
+      qualifierPath: '/10/ABC123',
+      elementString: '01012345678910ABC123',
+    });
+
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValueOnce(aggregationEventDLRMock);
     const aggregationVC = await processAggregationEvent(aggregationEvent, context);
 
-    expect(aggregationVC).toBe(aggregationVCMock);
+    expect(aggregationVC).toEqual({
+      vc: aggregationVCMock,
+      decodedEnvelopedVC: aggregationVCMock,
+      linkResolver: aggregationEventDLRMock,
+    });
     expect(uploadData).toHaveBeenCalled();
     expect(validateContext.validateAggregationEventContext).toHaveBeenCalled();
     expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
@@ -142,6 +154,8 @@ describe('processAggregationEvent', () => {
         storage: { ...context.storage, storageAPIUrl: 'https://invalid-storage-provider.com' },
       };
       (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => aggregationVCMock);
+      (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue(aggregationVCMock);
+
       jest
         .spyOn(validateContext, 'validateAggregationEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as Result<IAggregationEventContext>);
@@ -171,9 +185,12 @@ describe('processAggregationEvent', () => {
         dlr: { ...context.dlr, dlrAPIUrl: 'http://invalid-dlr.com' },
       };
       (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => aggregationVCMock);
+      (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue(aggregationVCMock);
+
       (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
         return `${url}/${path}`;
       });
+
       jest
         .spyOn(validateContext, 'validateAggregationEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as Result<IAggregationEventContext>);
@@ -222,7 +239,11 @@ describe('processAggregationEvent', () => {
 
     const aggregationVC = await processAggregationEvent(aggregationEvent, contextWithHeaders);
 
-    expect(aggregationVC).toBe(aggregationVCMock);
+    expect(aggregationVC).toEqual({
+      vc: aggregationVCMock,
+      decodedEnvelopedVC: aggregationVCMock,
+      linkResolver: aggregationEventDLRMock,
+    });
     expect(vckitService.issueVC).toHaveBeenCalledWith(
       expect.objectContaining({
         headers: customHeaders,

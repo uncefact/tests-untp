@@ -40,7 +40,7 @@ describe('render CheckBoxList component', () => {
     fireEvent.click(checkbox1);
 
     expect(checkbox1).toBeChecked();
-    expect(data).toEqual({ label1: { checked: true, value: { value: 'value1' } } });
+    expect(data).toEqual({ label1: { value: 'value1' } });
   });
 
   it('Should call onChange with the selected items when multiple checkbox are checked', () => {
@@ -65,9 +65,7 @@ describe('render CheckBoxList component', () => {
     expect(checkbox2).not.toBeChecked();
     expect(checkbox3).not.toBeChecked();
     expect(CheckBoxListState).toEqual({
-      label1: { checked: true, value: { value: 'value1' } },
-      label2: { value: { value: 'value2' } },
-      label3: { value: { value: 'value3' } },
+      label1: { value: 'value1' },
     });
 
     // Check the second checkbox
@@ -76,9 +74,8 @@ describe('render CheckBoxList component', () => {
     expect(checkbox2).toBeChecked();
     expect(checkbox3).not.toBeChecked();
     expect(CheckBoxListState).toEqual({
-      label1: { checked: true, value: { value: 'value1' } },
-      label2: { checked: true, value: { value: 'value2' } },
-      label3: { value: { value: 'value3' } },
+      label1: { value: 'value1' },
+      label2: { value: 'value2' },
     });
 
     // Check the third checkbox
@@ -87,9 +84,9 @@ describe('render CheckBoxList component', () => {
     expect(checkbox2).toBeChecked();
     expect(checkbox3).toBeChecked();
     expect(CheckBoxListState).toEqual({
-      label1: { checked: true, value: { value: 'value1' } },
-      label2: { checked: true, value: { value: 'value2' } },
-      label3: { checked: true, value: { value: 'value3' } },
+      label1: { value: 'value1' },
+      label2: { value: 'value2' },
+      label3: { value: 'value3' },
     });
   });
 
@@ -112,18 +109,14 @@ describe('render CheckBoxList component', () => {
     expect(checkbox1).toBeChecked();
     expect(checkbox2).not.toBeChecked();
     expect(CheckBoxListState).toEqual({
-      label1: { checked: true, value: { value: 'value1' } },
-      label2: { value: { value: 'value2' } },
+      label1: { value: 'value1' },
     });
 
     // Uncheck the first checkbox
     fireEvent.click(checkbox1);
     expect(checkbox1).not.toBeChecked();
     expect(checkbox2).not.toBeChecked();
-    expect(CheckBoxListState).toEqual({
-      label1: { checked: false, value: { value: 'value1' } },
-      label2: { value: { value: 'value2' } },
-    });
+    expect(CheckBoxListState).toEqual({});
   });
 
   it("Should display the default label 'CheckBoxList' when no label prop is provided", () => {
