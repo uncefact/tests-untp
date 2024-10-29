@@ -1,5 +1,5 @@
 import axios, { AxiosRequestConfig } from 'axios';
-import { isPlainObject, every, isString } from 'lodash';
+import _ from 'lodash';
 
 const defaultHeaders = {
   'Content-Type': 'application/json',
@@ -7,7 +7,7 @@ const defaultHeaders = {
 
 export const request = async (params: AxiosRequestConfig) => {
   if (params.headers) {
-    if (!isPlainObject(params.headers) || !every(params.headers, isString)) {
+    if (!_.isPlainObject(params.headers) || !_.every(params.headers, (value) => _.isString(value))) {
       throw new Error('Headers specified in the config must be a plain object with string values.');
     }
   }

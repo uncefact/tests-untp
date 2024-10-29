@@ -4,6 +4,8 @@ import chai from 'chai';
 import config from '../../config';
 import { reportRow, setupMatrix } from '../../helpers';
 import { request } from '../../httpService';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 
 chai.should();
 
