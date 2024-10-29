@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc --build --clean && tsc",
     "watch": "tsc -b --watch",
-    "test": "jest --ci",
+    "test": "jest",
     "test:coverage": "jest --coverage"
   },
   "type": "module",

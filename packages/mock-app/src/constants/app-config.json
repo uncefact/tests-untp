@@ -6537,6 +6537,8 @@
     "type": "application/json",
     "href": "http://localhost:3332/agent/routeVerificationCredential",
     "hreflang": ["en"],
-    "apiKey": "test123"
+    "headers": {
+      "Authorization": "Bearer test123"
+    }
   }
 }
