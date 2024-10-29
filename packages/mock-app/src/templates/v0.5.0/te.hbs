@@ -83,21 +83,6 @@
       width: 100%;
     }
 
-    .event-object .data-two-columns {
-      display: grid;
-      grid-template-columns: 1fr 2fr;
-      gap: 16px;
-
-      padding: 10px 0px 12px;
-      width: 100%;
-      border-bottom-width: 1px;
-      border-bottom-style: solid;
-    }
-
-    .div .data-two-columns:last-child {
-      border-bottom: none;
-    }
-
     .event-object .data-two-columns-2 {
       display: grid;
       grid-template-columns: 1.4fr 3fr;
@@ -175,12 +160,14 @@
     .event-object .line-wrapper {
       flex-wrap: wrap;
       gap: 10px 10px;
-      border-color: var(--primary-colorsblue-100);
       display: inline-flex;
       align-items: flex-start;
       padding: 0px 0px 3px;
-      border-bottom-width: 2px;
-      border-bottom-style: solid;
+
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-decoration-color: var(--primary-colorsblue-100);
+      text-underline-offset: 3px;
     }
 
     .event-object .frame-2 {
@@ -337,11 +324,13 @@
     }
 
     .event-object .div-wrapper {
-      border-color: var(--primary-colorsblue-400);
       display: inline-flex;
       align-items: flex-start;
-      border-bottom-width: 2px;
-      border-bottom-style: solid;
+
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-decoration-color: var(--primary-colorsblue-400);
+      text-underline-offset: 3px;
     }
 
     .event-object .text-wrapper-5 {
@@ -381,7 +370,7 @@
       font-weight: 500;
       color: var(--primary-colorsgray-700);
       font-size: 16px;
-      line-height: 17.4px;
+      line-height: 22px;
     }
 
     .event-object .data-wrapper {
@@ -669,21 +658,6 @@
       width: 100%;
     }
 
-    .aggregation .data-two-columns {
-      display: grid;
-      grid-template-columns: 1fr 2fr;
-      gap: 16px;
-
-      padding: 10px 0px 12px;
-      width: 100%;
-      border-bottom-width: 1px;
-      border-bottom-style: solid;
-    }
-
-    .div .data-two-columns:last-child {
-      border-bottom: none;
-    }
-
     .aggregation .data-two-columns-2 {
       display: grid;
       grid-template-columns: 1.4fr 3fr;
@@ -747,17 +721,6 @@
       color: var(--white);
       font-size: 16px;
       line-height: 17.4px;
-    }
-
-    .aggregation .line-wrapper {
-      flex-wrap: wrap;
-      gap: 10px 10px;
-      border-color: var(--primary-colorsblue-100);
-      display: inline-flex;
-      align-items: flex-start;
-      padding: 0px 0px 3px;
-      border-bottom-width: 2px;
-      border-bottom-style: solid;
     }
 
     .aggregation .frame-2 {
@@ -827,7 +790,7 @@
       font-weight: 400;
       color: var(--primary-colorsgray-600);
       font-size: 16px;
-      line-height: 17.4px;
+      line-height: 22px;
     }
 
     .aggregation .data-2 {
@@ -1009,21 +972,6 @@
       width: 100%;
     }
 
-    .transformation .data-two-columns {
-      display: grid;
-      grid-template-columns: 1fr 2fr;
-      gap: 16px;
-
-      padding: 10px 0px 12px;
-      width: 100%;
-      border-bottom-width: 1px;
-      border-bottom-style: solid;
-    }
-
-    .div .data-two-columns:last-child {
-      border-bottom: none;
-    }
-
     .transformation .data-two-columns-2 {
       display: grid;
       grid-template-columns: 1.4fr 3fr;
@@ -1087,17 +1035,6 @@
       color: var(--white);
       font-size: 16px;
       line-height: 17.4px;
-    }
-
-    .transformation .line-wrapper {
-      flex-wrap: wrap;
-      gap: 10px 10px;
-      border-color: var(--primary-colorsblue-100);
-      display: inline-flex;
-      align-items: flex-start;
-      padding: 0px 0px 3px;
-      border-bottom-width: 2px;
-      border-bottom-style: solid;
     }
 
     .transformation .frame-2 {
@@ -1349,21 +1286,6 @@
       width: 100%;
     }
 
-    .association .data-two-columns {
-      display: grid;
-      grid-template-columns: 1fr 2fr;
-      gap: 16px;
-
-      padding: 10px 0px 12px;
-      width: 100%;
-      border-bottom-width: 1px;
-      border-bottom-style: solid;
-    }
-
-    .div .data-two-columns:last-child {
-      border-bottom: none;
-    }
-
     .association .data-two-columns-2 {
       display: grid;
       grid-template-columns: 1.4fr 3fr;
@@ -1427,17 +1349,6 @@
       color: var(--white);
       font-size: 16px;
       line-height: 17.4px;
-    }
-
-    .association .line-wrapper {
-      flex-wrap: wrap;
-      gap: 10px 10px;
-      border-color: var(--primary-colorsblue-100);
-      display: inline-flex;
-      align-items: flex-start;
-      padding: 0px 0px 3px;
-      border-bottom-width: 2px;
-      border-bottom-style: solid;
     }
 
     .association .frame-2 {
@@ -1689,21 +1600,6 @@
       width: 100%;
     }
 
-    .transaction .data-two-columns {
-      display: grid;
-      grid-template-columns: 1fr 2fr;
-      gap: 16px;
-
-      padding: 10px 0px 12px;
-      width: 100%;
-      border-bottom-width: 1px;
-      border-bottom-style: solid;
-    }
-
-    .div .data-two-columns:last-child {
-      border-bottom: none;
-    }
-
     .transaction .data-two-columns-2 {
       display: grid;
       grid-template-columns: 1.4fr 3fr;
@@ -1767,17 +1663,6 @@
       color: var(--white);
       font-size: 16px;
       line-height: 17.4px;
-    }
-
-    .transaction .line-wrapper {
-      flex-wrap: wrap;
-      gap: 10px 10px;
-      border-color: var(--primary-colorsblue-100);
-      display: inline-flex;
-      align-items: flex-start;
-      padding: 0px 0px 3px;
-      border-bottom-width: 2px;
-      border-bottom-style: solid;
     }
 
     .transaction .frame-2 {
@@ -2021,21 +1906,6 @@
       width: 100%;
     }
 
-    .object .data-two-columns {
-      display: grid;
-      grid-template-columns: 1fr 2fr;
-      gap: 16px;
-
-      padding: 10px 0px 12px;
-      width: 100%;
-      border-bottom-width: 1px;
-      border-bottom-style: solid;
-    }
-
-    .div .data-two-columns:last-child {
-      border-bottom: none;
-    }
-
     .object .data-two-columns-2 {
       display: grid;
       grid-template-columns: 1.4fr 3fr;
@@ -2099,17 +1969,6 @@
       color: var(--white);
       font-size: 16px;
       line-height: 17.4px;
-    }
-
-    .object .line-wrapper {
-      flex-wrap: wrap;
-      gap: 10px 10px;
-      border-color: var(--primary-colorsblue-100);
-      display: inline-flex;
-      align-items: flex-start;
-      padding: 0px 0px 3px;
-      border-bottom-width: 2px;
-      border-bottom-style: solid;
     }
 
     .object .frame-2 {
@@ -2255,7 +2114,7 @@
     /* Media Queries for Mobiles */
     @media (min-width: 50px) {
       .event-object {
-        min-width: 390px;
+        min-width: 375px;
       }
     }
 
