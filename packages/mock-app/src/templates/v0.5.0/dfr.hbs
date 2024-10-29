@@ -438,14 +438,14 @@
       font-weight: 400;
       color: var(--primary-colorsgray-300);
       font-size: 16px;
-      line-height: 17.4px;
+      line-height: 22px;
     }
 
     .facility-record .label-2 {
       font-weight: 400;
       color: var(--primary-colorsgray-600);
       font-size: 16px;
-      line-height: 17.4px;
+      line-height: 22px;
     }
 
     .facility-record .data-data-link {
@@ -460,11 +460,13 @@
 
     .facility-record .div-wrapper {
       gap: 10px;
-      border-color: var(--primary-colorsblue-400);
       display: inline-flex;
       align-items: flex-start;
-      border-bottom-width: 2px;
-      border-bottom-style: solid;
+
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-decoration-color: var(--primary-colorsblue-400);
+      text-underline-offset: 3px;
     }
 
     .facility-record .line {
@@ -489,7 +491,7 @@
       font-weight: 500;
       color: var(--primary-colorsgray-700);
       font-size: 16px;
-      line-height: 17.4px;
+      line-height: 22px;
     }
 
     .facility-record .line-4 {
@@ -508,6 +510,10 @@
       align-self: stretch;
       flex-grow: 1;
       flex: 1;
+    }
+
+    .facility-record .data-data a {
+      line-height: 22px;
     }
 
     .facility-record .data-data-2 a {
@@ -545,9 +551,20 @@
 
     .blue-bottom-line-2,
     .blue-bottom-line-2:link {
-      border-bottom: 2px var(--primary-colorsblue-200) solid;
       width: fit-content;
       color: var(--white);
+
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-decoration-color: var(--primary-colorsblue-200);
+      text-underline-offset: 3px;
+    }
+
+    /* Media Queries for Mobiles */
+    @media (min-width: 50px) {
+      .facility-record {
+        min-width: 375px;
+      }
     }
   </style>
 </head>
@@ -580,9 +597,12 @@
             <div class="data-two-columns border-bottom-gray-500">
               <div class="label">Address</div>
               <div class="data-data">
-                <div class="data">{{credentialSubject.address.streetAddress}} {{credentialSubject.address.addressLocality}}, {{credentialSubject.address.postalCode}}</div>
-                {{!-- TODO: confirm --}}
+                {{!-- TODO 1: plain text --}}
+                {{!-- <div class="data">{{credentialSubject.address.streetAddress}} {{credentialSubject.address.addressLocality}}, {{credentialSubject.address.postalCode}}</div> --}}
+                {{!-- TODO 2: confirm --}}
                 {{!-- <a href="https://www.google.com/maps/?q={{credentialSubject.address.streetAddress}} {{credentialSubject.address.addressRegion}} {{credentialSubject.address.postalCode}} {{credentialSubject.address.addressCountry}}" class="blue-bottom-line-2" target="_blank">{{credentialSubject.address.streetAddress}}</a> --}}
+                {{!-- TODO 3: confirm --}}
+                <a href="{{credentialSubject.locationInformation.plusCode}}" class="blue-bottom-line-2" target="_blank">{{credentialSubject.address.streetAddress}} {{credentialSubject.address.addressLocality}}, {{credentialSubject.address.postalCode}}</a>
               </div>
             </div>
             <div class="data-two-columns border-bottom-gray-500">
@@ -595,6 +615,7 @@
             </div>
             <div class="data-two-columns border-bottom-gray-500">
               <div class="label">Geolocation</div>
+              {{!-- TODO: confirm --}}
               <a href="https://www.google.com/maps/?q={{#each credentialSubject.locationInformation.geoLocation.coordinates}}{{this}},{{/each}}&ll={{#each credentialSubject.locationInformation.geoLocation.coordinates}}{{this}},{{/each}}&z=13" class="data-data-link" target="_blank">
                 <div class="line-4">
                   <div class="line-2">Show on map</div>
