@@ -10,6 +10,7 @@ import { objectEventContext as context } from '../mocks/constants';
 
 jest.mock('../../vckit.service', () => ({
   issueVC: jest.fn(),
+  decodeEnvelopedVC: jest.fn(),
 }));
 jest.mock('../../storage.service', () => ({
   uploadData: jest.fn(),
@@ -60,6 +61,9 @@ describe('processObjectEvent', () => {
     (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
       credentialSubject: { id: 'https://example.com/123' },
     }));
+    (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue({
+      credentialSubject: { id: 'https://example.com/123' },
+    });
     (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
 
     jest
