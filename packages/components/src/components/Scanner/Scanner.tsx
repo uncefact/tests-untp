@@ -1,8 +1,17 @@
-import React, { forwardRef, useImperativeHandle, useState, useCallback, useEffect, useMemo, memo, ForwardedRef } from 'react';
-import {CameraswitchRounded} from '@mui/icons-material';
+import React, {
+  forwardRef,
+  useImperativeHandle,
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  memo,
+  ForwardedRef,
+} from 'react';
+import { CameraswitchRounded } from '@mui/icons-material';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Box } from '@mui/material';
-import { detectDevice } from '../../utils/index.js';
+import { detectDevice } from '../../utils/helpers.js';
 import { DeviceTypeEnum, FacingCameraEnum, IHtml5QrcodePluginProps, IScannerRef } from '../../types/scanner.types.js';
 
 /**
@@ -15,11 +24,14 @@ const Scanner = forwardRef((props: IHtml5QrcodePluginProps, ref: ForwardedRef<IS
   /**
    * Define config with props passed and default property.
    */
-  const config = useMemo(() => ({
-    fps: props.fps || 10,
-    qrbox: props.qrbox || { width: 250, height: 250 },
-    disableFlip: props.disableFlip || false,
-  }), [props.fps, props.qrbox, props.disableFlip]);
+  const config = useMemo(
+    () => ({
+      fps: props.fps || 10,
+      qrbox: props.qrbox || { width: 250, height: 250 },
+      disableFlip: props.disableFlip || false,
+    }),
+    [props.fps, props.qrbox, props.disableFlip],
+  );
 
   /**
    * create method with hook to use in parent with ref.

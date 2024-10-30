@@ -9,6 +9,7 @@ import { digitalFacilityRecordContext as context } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
+  decodeEnvelopedVC: jest.fn(),
 }));
 jest.mock('../storage.service', () => ({
   uploadData: jest.fn(),
