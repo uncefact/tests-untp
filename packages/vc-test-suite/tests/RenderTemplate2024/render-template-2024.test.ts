@@ -78,26 +78,47 @@ describe('RenderTemplate2024', function () {
   );
 
   reportRow(
-    "should verify that the 'name' field, if present, is a non-empty string",
+    "should verify that the 'name' field is optional",
     config.implementationName,
     async () => {
       // Import the input data for the test from the specified JSON file.
-      const input = require('./input/name-field-empty-ok.json');
+      const emptyNameInput = require('./input/name-field-empty-ok.json');
+      const nonEmptyNameInput = require('./input/name-field-non-empty-ok.json');
+      const undefinedNameInput = require('./input/name-field-undefined-ok.json');
 
       // Send the input data to the service to get the rendered document response.
-      const { data } = await request({
+      const { data: emptyNameResponse } = await request({
         method,
         url,
-        data: input,
+        data: emptyNameInput,
+        headers,
+      });
+      const { data: nonEmptyNameResponse } = await request({
+        method,
+        url,
+        data: nonEmptyNameInput,
+        headers,
+      });
+      const { data: undefinedNameResponse } = await request({
+        method,
+        url,
+        data: undefinedNameInput,
         headers,
       });
 
-      // Verify each item in the returned documents array.
-      data.documents.forEach((document) => {
-        // Check that the name is a string.
+      // Assert that the 'name' field is non-empty when provided.
+      nonEmptyNameResponse.documents.forEach((document) => {
         document.name.should.be.a('string');
-        // Check that the name is not empty.
         document.name.trim().should.not.equal('');
+      });
+      // Assert that the 'name' field is empty when provided as an empty string.
+      emptyNameResponse.documents.forEach((document) => {
+        document.name.should.be.a('string');
+        document.name.trim().should.equal('');
+      });
+      // Assert that the 'name' field is undefined when not provided.
+      undefinedNameResponse.documents.forEach((document) => {
+        assert.strictEqual(document.name, undefined);
       });
     },
   );
