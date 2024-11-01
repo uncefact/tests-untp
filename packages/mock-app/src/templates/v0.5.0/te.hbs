@@ -2166,7 +2166,7 @@
                   {{#each outputEPCList}}
                   <div class="input-output-item input-output-item-bottom-line">
                     <div class="item-title">{{name}}</div>
-                    <a href="{{id}}" class="navigation">
+                    <a target="_blank" href="{{id}}" class="navigation">
                       <div class="view line">View</div>
                     </a>
                   </div>
@@ -2174,7 +2174,7 @@
                   {{#each outputQuantityList}}
                   <div class="input-output-item input-output-item-bottom-line">
                     <div class="item-title">{{quantity}}{{uom}} {{productName}}</div>
-                    <a href="{{productId}}" class="navigation">
+                    <a target="_blank" href="{{productId}}" class="navigation">
                       <div class="view line">View</div>
                     </a>
                   </div>
@@ -2199,7 +2199,7 @@
                   {{#each inputEPCList}}
                   <div class="input-output-item input-output-item-bottom-line">
                     <div class="item-title">{{name}}</div>
-                    <a href="{{id}}" class="navigation">
+                    <a target="_blank" href="{{id}}" class="navigation">
                       <div class="view line">View</div>
                     </a>
                   </div>
@@ -2207,7 +2207,7 @@
                   {{#each inputQuantityList}}
                   <div class="input-output-item input-output-item-bottom-line">
                     <div class="item-title">{{quantity}}{{uom}} {{productName}}</div>
-                    <a href="{{productId}}" class="navigation">
+                    <a target="_blank" href="{{productId}}" class="navigation">
                       <div class="view line">View</div>
                     </a>
                   </div>
@@ -2228,7 +2228,7 @@
               <div class="frame-5">
                 <div class="text-wrapper-4">{{sensorMetadata.device.name}}</div>
                 <div class="div-wrapper">
-                  <a href="{{sensorMetadata.dataProcessingMethod}}" class="text-wrapper-5">Data processing method</a>
+                  <a target="_blank" href="{{sensorMetadata.dataProcessingMethod}}" class="text-wrapper-5">Data processing method</a>
                 </div>
               </div>
               {{#each sensorReport}}
@@ -2243,7 +2243,7 @@
                   <div class="label-2">Sensor type</div>
                   <div class="data-data-link">
                     <div class="div-wrapper">
-                      <a href="{{sensorType}}" class="line-3">Type information</a>
+                      <a target="_blank" href="{{sensorType}}" class="line-3">Type information</a>
                     </div>
                   </div>
                 </div>
@@ -2255,7 +2255,7 @@
                 </div>
               </div>
               {{/each}}
-              <a href="{{sensorIntegrityProof}}" class="cards-traceability">
+              <a target="_blank" href="{{sensorIntegrityProof}}" class="cards-traceability">
                 <div class="frame-7">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path
@@ -2279,7 +2279,7 @@
             <div class="div-wrapper">
               {{!-- TODO: to be confirmed, since the SensorElementList.sensorIntegrityProof duplicate --}}
               {{!-- being assumed --}}
-              <a href="{{bizLocation}}" class="biz-location">Event location information</a>
+              <a target="_blank" href="{{bizLocation}}" class="biz-location">Event location information</a>
             </div>
           </div>
         </div>
@@ -2301,7 +2301,7 @@
                     <div class="item-title">Source</div>
                     {{!-- TODO: to be confirmed, since the navigation link wasn't provided --}}
                     {{!-- being assumed --}}
-                    <a href="{{sourcePartyId}}" class="navigation">
+                    <a target="_blank" href="{{sourcePartyId}}" class="navigation">
                       <div class="view line">View</div>
                     </a>
                   </div>
@@ -2309,7 +2309,7 @@
                     <div class="item-title">Destination</div>
                     {{!-- TODO: to be confirmed, since the navigation link wasn't provided --}}
                     {{!-- being assumed --}}
-                    <a href="{{destinationPartyId}}" class="navigation">
+                    <a target="_blank" href="{{destinationPartyId}}" class="navigation">
                       <div class="view line">View</div>
                     </a>
                   </div>
@@ -2323,7 +2323,7 @@
                 {{#each epcList}}
                 <div class="input-output-item input-output-item-bottom-line">
                   <div class="item-title">{{name}}</div>
-                  <a href="{{id}}" class="navigation">
+                  <a target="_blank" href="{{id}}" class="navigation">
                     <div class="view line">View</div>
                   </a>
                 </div>
@@ -2331,7 +2331,7 @@
                 {{#each quantityList}}
                 <div class="input-output-item input-output-item-bottom-line">
                   <div class="item-title">{{quantity}}{{uom}} {{productName}}</div>
-                  <a href="{{productId}}" class="navigation">
+                  <a target="_blank" href="{{productId}}" class="navigation">
                     <div class="view line">View</div>
                   </a>
                 </div>
@@ -2350,7 +2350,7 @@
               <div class="frame-5">
                 <div class="text-wrapper-4">{{sensorMetadata.device.name}}</div>
                 <div class="div-wrapper">
-                  <a href="{{sensorMetadata.dataProcessingMethod}}" class="text-wrapper-5">Data processing method</a>
+                  <a target="_blank" href="{{sensorMetadata.dataProcessingMethod}}" class="text-wrapper-5">Data processing method</a>
                 </div>
               </div>
               {{#each sensorReport}}
@@ -2365,7 +2365,7 @@
                   <div class="label-2">Sensor type</div>
                   <div class="data-data-link">
                     <div class="div-wrapper">
-                      <a href="{{sensorType}}" class="line-3">Type information</a>
+                      <a target="_blank" href="{{sensorType}}" class="line-3">Type information</a>
                     </div>
                   </div>
                 </div>
@@ -2377,7 +2377,7 @@
                 </div>
               </div>
               {{/each}}
-              <a href="{{sensorIntegrityProof}}" class="cards-traceability">
+              <a target="_blank" href="{{sensorIntegrityProof}}" class="cards-traceability">
                 <div class="frame-7">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path
@@ -2401,7 +2401,7 @@
             <div class="div-wrapper">
               {{!-- TODO: to be confirmed, since the SensorElementList.sensorIntegrityProof duplicate --}}
               {{!-- being assumed --}}
-              <a href="{{bizLocation}}" class="biz-location">Event location information</a>
+              <a target="_blank" href="{{bizLocation}}" class="biz-location">Event location information</a>
             </div>
           </div>
         </div>
@@ -2423,7 +2423,7 @@
                   {{#each epcList}}
                   <div class="input-output-item input-output-item-bottom-line">
                     <div class="item-title">{{name}}</div>
-                    <a href="{{id}}" class="navigation">
+                    <a target="_blank" href="{{id}}" class="navigation">
                       <div class="view line">View</div>
                     </a>
                   </div>
@@ -2431,7 +2431,7 @@
                   {{#each quantityList}}
                   <div class="input-output-item input-output-item-bottom-line">
                     <div class="item-title">{{quantity}}{{uom}} {{productName}}</div>
-                    <a href="{{productId}}" class="navigation">
+                    <a target="_blank" href="{{productId}}" class="navigation">
                       <div class="view line">View</div>
                     </a>
                   </div>
@@ -2451,7 +2451,7 @@
               <div class="frame-5">
                 <div class="text-wrapper-4">{{sensorMetadata.device.name}}</div>
                 <div class="div-wrapper">
-                  <a href="{{sensorMetadata.dataProcessingMethod}}" class="text-wrapper-5">Data processing method</a>
+                  <a target="_blank" href="{{sensorMetadata.dataProcessingMethod}}" class="text-wrapper-5">Data processing method</a>
                 </div>
               </div>
               {{#each sensorReport}}
@@ -2466,7 +2466,7 @@
                   <div class="label-2">Sensor type</div>
                   <div class="data-data-link">
                     <div class="div-wrapper">
-                      <a href="{{sensorType}}" class="line-3">Type information</a>
+                      <a target="_blank" href="{{sensorType}}" class="line-3">Type information</a>
                     </div>
                   </div>
                 </div>
@@ -2478,7 +2478,7 @@
                 </div>
               </div>
               {{/each}}
-              <a href="{{sensorIntegrityProof}}" class="cards-traceability">
+              <a target="_blank" href="{{sensorIntegrityProof}}" class="cards-traceability">
                 <div class="frame-7">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path
@@ -2502,7 +2502,7 @@
             <div class="div-wrapper">
               {{!-- TODO: to be confirmed, since the SensorElementList.sensorIntegrityProof duplicate --}}
               {{!-- being assumed --}}
-              <a href="{{bizLocation}}" class="biz-location">Event location information</a>
+              <a target="_blank" href="{{bizLocation}}" class="biz-location">Event location information</a>
             </div>
           </div>
         </div>
@@ -2523,7 +2523,7 @@
                 <div class="input-output-table">
                   <div class="input-output-item">
                     <div class="item-title">{{parentEPC.name}}</div>
-                    <a href="{{parentEPC.id}}" class="navigation">
+                    <a target="_blank" href="{{parentEPC.id}}" class="navigation">
                       <div class="view line">View</div>
                     </a>
                   </div>
@@ -2547,7 +2547,7 @@
                   {{#each childEPCList}}
                   <div class="input-output-item input-output-item-bottom-line">
                     <div class="item-title">{{name}}</div>
-                    <a href="{{id}}" class="navigation">
+                    <a target="_blank" href="{{id}}" class="navigation">
                       <div class="view line">View</div>
                     </a>
                   </div>
@@ -2555,7 +2555,7 @@
                   {{#each childQuantityList}}
                   <div class="input-output-item input-output-item-bottom-line">
                     <div class="item-title">{{quantity}}{{uom}} {{productName}}</div>
-                    <a href="{{productId}}" class="navigation">
+                    <a target="_blank" href="{{productId}}" class="navigation">
                       <div class="view line">View</div>
                     </a>
                   </div>
@@ -2576,7 +2576,7 @@
               <div class="frame-5">
                 <div class="text-wrapper-4">{{sensorMetadata.device.name}}</div>
                 <div class="div-wrapper">
-                  <a href="{{sensorMetadata.dataProcessingMethod}}" class="text-wrapper-5">Data processing method</a>
+                  <a target="_blank" href="{{sensorMetadata.dataProcessingMethod}}" class="text-wrapper-5">Data processing method</a>
                 </div>
               </div>
               {{#each sensorReport}}
@@ -2591,7 +2591,7 @@
                   <div class="label-2">Sensor type</div>
                   <div class="data-data-link">
                     <div class="div-wrapper">
-                      <a href="{{sensorType}}" class="line-3">Type information</a>
+                      <a target="_blank" href="{{sensorType}}" class="line-3">Type information</a>
                     </div>
                   </div>
                 </div>
@@ -2603,7 +2603,7 @@
                 </div>
               </div>
               {{/each}}
-              <a href="{{sensorIntegrityProof}}" class="cards-traceability">
+              <a target="_blank" href="{{sensorIntegrityProof}}" class="cards-traceability">
                 <div class="frame-7">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path
@@ -2627,7 +2627,7 @@
             <div class="div-wrapper">
               {{!-- TODO: to be confirmed, since the SensorElementList.sensorIntegrityProof duplicate --}}
               {{!-- being assumed --}}
-              <a href="{{bizLocation}}" class="biz-location">Event location information</a>
+              <a target="_blank" href="{{bizLocation}}" class="biz-location">Event location information</a>
             </div>
           </div>
         </div>
@@ -2648,7 +2648,7 @@
                 <div class="input-output-table">
                   <div class="input-output-item">
                     <div class="item-title">{{parentEPC.name}}</div>
-                    <a href="{{parentEPC.id}}" class="navigation">
+                    <a target="_blank" href="{{parentEPC.id}}" class="navigation">
                       <div class="view line">View</div>
                     </a>
                   </div>
@@ -2672,7 +2672,7 @@
                   {{#each childEPCList}}
                   <div class="input-output-item input-output-item-bottom-line">
                     <div class="item-title">{{name}}</div>
-                    <a href="{{id}}" class="navigation">
+                    <a target="_blank" href="{{id}}" class="navigation">
                       <div class="view line">View</div>
                     </a>
                   </div>
@@ -2680,7 +2680,7 @@
                   {{#each childQuantityList}}
                   <div class="input-output-item input-output-item-bottom-line">
                     <div class="item-title">{{quantity}}{{uom}} {{productName}}</div>
-                    <a href="{{productId}}" class="navigation">
+                    <a target="_blank" href="{{productId}}" class="navigation">
                       <div class="view line">View</div>
                     </a>
                   </div>
@@ -2701,7 +2701,7 @@
               <div class="frame-5">
                 <div class="text-wrapper-4">{{sensorMetadata.device.name}}</div>
                 <div class="div-wrapper">
-                  <a href="{{sensorMetadata.dataProcessingMethod}}" class="text-wrapper-5">Data processing method</a>
+                  <a target="_blank" href="{{sensorMetadata.dataProcessingMethod}}" class="text-wrapper-5">Data processing method</a>
                 </div>
               </div>
               {{#each sensorReport}}
@@ -2716,7 +2716,7 @@
                   <div class="label-2">Sensor type</div>
                   <div class="data-data-link">
                     <div class="div-wrapper">
-                      <a href="{{sensorType}}" class="line-3">Type information</a>
+                      <a target="_blank" href="{{sensorType}}" class="line-3">Type information</a>
                     </div>
                   </div>
                 </div>
@@ -2728,7 +2728,7 @@
                 </div>
               </div>
               {{/each}}
-              <a href="{{sensorIntegrityProof}}" class="cards-traceability">
+              <a target="_blank" href="{{sensorIntegrityProof}}" class="cards-traceability">
                 <div class="frame-7">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path
@@ -2752,7 +2752,7 @@
             <div class="div-wrapper">
               {{!-- TODO: to be confirmed, since the SensorElementList.sensorIntegrityProof duplicate --}}
               {{!-- being assumed --}}
-              <a href="{{bizLocation}}" class="biz-location">Event location information</a>
+              <a target="_blank" href="{{bizLocation}}" class="biz-location">Event location information</a>
             </div>
           </div>
 
@@ -2771,7 +2771,7 @@
           <div class="label-2">Issued by</div>
           <div class="data-data-link">
             <div class="div-wrapper">
-              <a href="{{issuer.id}}" class="line-3">{{issuer.name}}</a>
+              <a target="_blank" href="{{issuer.id}}" class="line-3">{{issuer.name}}</a>
             </div>
           </div>
         </div>

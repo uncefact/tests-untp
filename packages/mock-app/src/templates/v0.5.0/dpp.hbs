@@ -1851,7 +1851,7 @@
                   d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
                   fill="#1F5A95" />
               </svg>
-              <a href="{{credentialSubject.idScheme.id}}" class="blue-bottom-line-thick">ID: {{credentialSubject.registeredId}}</a>
+              <a target="_blank" href="{{credentialSubject.idScheme.id}}" class="blue-bottom-line-thick">ID: {{credentialSubject.registeredId}}</a>
             </div>
             <div class="header-batch-item">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1879,7 +1879,7 @@
         </div>
         <div class="information-show-more">
           {{#each credentialSubject.furtherInformation}}
-          <a href="{{linkURL}}" class="blue-bottom-line-thick">{{linkName}}</a>
+          <a target="_blank" href="{{linkURL}}" class="blue-bottom-line-thick">{{linkName}}</a>
           {{/each}}
         </div>
       </section>
@@ -1929,7 +1929,7 @@
         </div>
 
         <div class="traceability-cards">
-          <a href="{{credentialSubject.circularityScorecard.recyclingInformation.linkURL}}" class="traceability-card">
+          <a target="_blank" href="{{credentialSubject.circularityScorecard.recyclingInformation.linkURL}}" class="traceability-card">
             <div class="traceability-card-text">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
@@ -1945,7 +1945,7 @@
               </svg>
             </div>
           </a>
-          <a href="{{credentialSubject.circularityScorecard.repairInformation.linkURL}}" class="traceability-card">
+          <a target="_blank" href="{{credentialSubject.circularityScorecard.repairInformation.linkURL}}" class="traceability-card">
             <div class="traceability-card-text">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
@@ -1986,7 +1986,7 @@
           <div class="table-item">
             <span class="item-title">Reporting standard</span>
             <div class="item-value">
-              <a href="{{credentialSubject.emissionsScorecard.reportingStandard.id}}"
+              <a target="_blank" href="{{credentialSubject.emissionsScorecard.reportingStandard.id}}"
                 class="blue-bottom-line-thick">{{credentialSubject.emissionsScorecard.reportingStandard.name}}</a>
             </div>
           </div>
@@ -2020,11 +2020,11 @@
               <div class="text-wrapper">{{conformityEvidence.linkName}}</div>
               <p class="p">
                 <span class="span">{{referenceRegulation.name}} administered in {{referenceRegulation.jurisdictionCountry}} by </span>
-                <a href="{{referenceRegulation.administeredBy.id}}" class="text-wrapper-2 gray-bottom-line">{{referenceRegulation.administeredBy.name}}</a>
+                <a target="_blank" href="{{referenceRegulation.administeredBy.id}}" class="text-wrapper-2 gray-bottom-line">{{referenceRegulation.administeredBy.name}}</a>
               </p>
               <p class="p">
                 <span class="span">{{referenceStandard.name}} issued by </span>
-                <a href="{{referenceStandard.issuingParty.id}}" class="text-wrapper-2 gray-bottom-line">{{referenceStandard.issuingParty.name}}</a>
+                <a target="_blank" href="{{referenceStandard.issuingParty.id}}" class="text-wrapper-2 gray-bottom-line">{{referenceStandard.issuingParty.name}}</a>
               </p>
             </div>
             <div class="frame-3">
@@ -2039,7 +2039,7 @@
               </div>
               {{/each}}
             </div>
-            <a href="{{conformityEvidence.linkURL}}" class="cards-traceability">
+            <a target="_blank" href="{{conformityEvidence.linkURL}}" class="cards-traceability">
               <div class="frame-5">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path
@@ -2070,13 +2070,13 @@
           </div>
           <div class="table-item">
             <span class="item-title">Produced by</span>
-            <a href="{{credentialSubject.producedByParty.id}}"
+            <a target="_blank" href="{{credentialSubject.producedByParty.id}}"
               class="blue-bottom-line-thick">{{credentialSubject.producedByParty.name}}</a>
           </div>
           <div class="table-item">
             <span class="item-title">Produced at</span>
             <div class="item-value">
-              <a href="{{credentialSubject.producedAtFacility.id}}"
+              <a target="_blank" href="{{credentialSubject.producedAtFacility.id}}"
                 class="blue-bottom-line-thick">{{credentialSubject.producedAtFacility.name}}</a>
             </div>
           </div>
@@ -2120,7 +2120,7 @@
                   <p class="composition-tag-item">Recycled {{recycledAmount}}%</p>
                   <p class="composition-tag-item">Hazard {{#if hazardous}}Yes{{else}}No{{/if}}</p>
                 </div>
-                <a href="{{materialSafetyInformation.linkURL}}"
+                <a target="_blank" href="{{materialSafetyInformation.linkURL}}"
                   class="blue-bottom-line-thick">{{materialSafetyInformation.linkName}}</a>
               </div>
             </div>
@@ -2139,7 +2139,7 @@
         </div>
 
         {{!-- start: Supply chain due diligence report --}}
-        <a href="{{credentialSubject.dueDiligenceDeclaration.linkURL}}" class="cards-traceability">
+        <a target="_blank" href="{{credentialSubject.dueDiligenceDeclaration.linkURL}}" class="cards-traceability">
           <div class="frame-5">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path
@@ -2170,7 +2170,7 @@
               {{#each credentialSubject.traceabilityInformation.traceabilityEvent}}
               <div class="history-item">
                 <span>{{linkName}}</span>
-                <a href="{{linkURL}}" class="blue-bottom-line-thick">View</a>
+                <a target="_blank" href="{{linkURL}}" class="blue-bottom-line-thick">View</a>
               </div>
               {{/each}}
             </div>
@@ -2194,7 +2194,7 @@
           </div>
           <div class="table-item">
             <span>Registered ID</span>
-            <a href="{{issuer.id}}" class="blue-bottom-line-thick">{{issuer.id}}</a>
+            <a target="_blank" href="{{issuer.id}}" class="blue-bottom-line-thick">{{issuer.id}}</a>
           </div>
           <div class="table-item">
             <span>Valid from</span>
@@ -2210,7 +2210,7 @@
       <footer>
         <p>This Digital Product Passport (DPP) is a digital record of the product's sustainability and environmental
           performance, ensuring transparency and accountability in line with UNTP standards. The DPP can be verified at
-          any time using the QR code or visiting <a href="https://www.untp-certification.org"
+          any time using the QR code or visiting <a target="_blank" href="https://www.untp-certification.org"
             class="gray-bottom-line">www.untp-certification.org</a> with the passport ID.</p>
       </footer>
     </div>
@@ -2228,7 +2228,7 @@
                 d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
                 fill="#1F5A95" />
             </svg>
-            <a href="{{credentialSubject.id}}" class="line">
+            <a target="_blank" href="{{credentialSubject.id}}" class="line">
               <div class="text-wrapper-2">ID: {{credentialSubject.id}}</div>
             </a>
           </div>
@@ -2262,7 +2262,7 @@
               {{credentialSubject.description}}
             </p>
             {{#each credentialSubject.furtherInformation}}
-            <a href="{{linkURL}}" class="line">
+            <a target="_blank" href="{{linkURL}}" class="line">
               <div class="text-wrapper-16">{{linkName}}</div>
             </a>
             {{/each}}
@@ -2323,7 +2323,7 @@
             </p>
           </div>
           <div class="frame-9">
-            <a href="{{credentialSubject.circularityScorecard.recyclingInformation.linkURL}}"
+            <a target="_blank" href="{{credentialSubject.circularityScorecard.recyclingInformation.linkURL}}"
               class="cards-traceability">
               <div class="div-4">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -2342,7 +2342,7 @@
                 </svg>
               </div>
             </a>
-            <a href="{{credentialSubject.circularityScorecard.repairInformation.linkURL}}" class="cards-traceability">
+            <a target="_blank" href="{{credentialSubject.circularityScorecard.repairInformation.linkURL}}" class="cards-traceability">
               <div class="div-4">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path
@@ -2407,7 +2407,7 @@
               <div class="frame-12">
                 <div class="data-two-columns-3">
                   <div class="text-wrapper-12">Reporting standard</div>
-                  <a href="{{credentialSubject.emissionsScorecard.reportingStandard.id}}" class="line">
+                  <a target="_blank" href="{{credentialSubject.emissionsScorecard.reportingStandard.id}}" class="line">
                     <div class="text-wrapper-2">{{credentialSubject.emissionsScorecard.reportingStandard.name}}</div>
                   </a>
                 </div>
@@ -2444,11 +2444,11 @@
               <div class="cards-conformity-title">{{conformityEvidence.linkName}}</div>
               <p class="cards-conformity-description">
                 <span>{{referenceRegulation.name}} administered in {{referenceRegulation.jurisdictionCountry}} by </span>
-                <a href="{{referenceRegulation.administeredBy.id}}" class="gray-bottom-line">{{referenceRegulation.administeredBy.name}}</a>
+                <a target="_blank" href="{{referenceRegulation.administeredBy.id}}" class="gray-bottom-line">{{referenceRegulation.administeredBy.name}}</a>
               </p>
               <p class="cards-conformity-description">
                 <span>{{referenceStandard.name}} issued by </span>
-                <a href="{{referenceStandard.issuingParty.id}}" class="gray-bottom-line">{{referenceStandard.issuingParty.name}}</a>
+                <a target="_blank" href="{{referenceStandard.issuingParty.id}}" class="gray-bottom-line">{{referenceStandard.issuingParty.name}}</a>
               </p>
             </div>
             <div class="declared-values">
@@ -2459,7 +2459,7 @@
               </div>
               {{/each}}
             </div>
-            <a href="{{conformityEvidence.linkURL}}" class="cards-traceability-2">
+            <a target="_blank" href="{{conformityEvidence.linkURL}}" class="cards-traceability-2">
               <div class="frame-21">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path
@@ -2497,7 +2497,7 @@
           <div class="data-two-columns">
             <div class="text-wrapper-12">Produced by</div>
             <div class="data-data-link">
-              <a href="{{credentialSubject.producedByParty.id}}" class="line">
+              <a target="_blank" href="{{credentialSubject.producedByParty.id}}" class="line">
                 <p class="text-wrapper-2">{{credentialSubject.producedByParty.name}}</p>
               </a>
             </div>
@@ -2505,7 +2505,7 @@
           <div class="data-two-columns">
             <div class="text-wrapper-12">Produced at</div>
             <div class="data-data-link">
-              <a href="{{credentialSubject.producedAtFacility.id}}" class="line">
+              <a target="_blank" href="{{credentialSubject.producedAtFacility.id}}" class="line">
                 <p class="text-wrapper-2">{{credentialSubject.producedAtFacility.name}}</p>
               </a>
             </div>
@@ -2559,7 +2559,7 @@
                   </div>
                 </div>
                 <div class="data-data-link-2">
-                  <a href="{{materialSafetyInformation.linkURL}}" class="line">
+                  <a target="_blank" href="{{materialSafetyInformation.linkURL}}" class="line">
                     <div class="text-wrapper-2">{{materialSafetyInformation.linkName}}</div>
                   </a>
                 </div>
@@ -2579,7 +2579,7 @@
         </div>
 
         {{!-- start: Supply chain due diligence report --}}
-        <a href="{{credentialSubject.dueDiligenceDeclaration.linkURL}}" class="cards-traceability">
+        <a target="_blank" href="{{credentialSubject.dueDiligenceDeclaration.linkURL}}" class="cards-traceability">
           <div class="history-due-diligence">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path
@@ -2608,7 +2608,7 @@
               {{#each credentialSubject.traceabilityInformation.traceabilityEvent}}
               <div class="history-item">
                 <span>{{linkName}}</span>
-                <a href="{{linkURL}}" class="blue-bottom-line-thick">View</a>
+                <a target="_blank" href="{{linkURL}}" class="blue-bottom-line-thick">View</a>
               </div>
               {{/each}}
             </div>
@@ -2633,7 +2633,7 @@
           <div class="data-two-columns">
             <div class="text-wrapper-12">Registered ID</div>
             <div class="data-data-link">
-              <a href="{{issuer.id}}" class="line">
+              <a target="_blank" href="{{issuer.id}}" class="line">
                 <div class="text-wrapper-2">{{issuer.id}}</div>
               </a>
             </div>
@@ -2660,8 +2660,7 @@
             in line with UNTP standards. The DPP can be verified at any time using the QR code or
             visiting
           </span>
-          <a href="https://www.untp-certification.org" class="black-line" target="_blank"
-            rel="noopener noreferrer"><span>www.untp-certification.org</span></a>
+          <a target="_blank" href="https://www.untp-certification.org" class="black-line" rel="noopener noreferrer"><span>www.untp-certification.org</span></a>
           <span class="text-wrapper-17"> with the passport ID.</span>
         </p>
       </div>

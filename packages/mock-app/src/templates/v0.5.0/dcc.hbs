@@ -648,7 +648,7 @@
                 </div>
                 <div class="p">
                   <span>Issued to:</span>
-                  <a href="{{credentialSubject.issuedToParty.id}}" class="text-wrapper-2">{{credentialSubject.issuedToParty.name}}</a>
+                  <a target="_blank" href="{{credentialSubject.issuedToParty.id}}" class="text-wrapper-2">{{credentialSubject.issuedToParty.name}}</a>
                 </div>
                 <p class="text-wrapper-3">
                   {{credentialSubject.description}}
@@ -668,7 +668,7 @@
 
               </div>
               <div class="div">
-                <a href="{{credentialSubject.auditableEvidence.linkURL}}" class="cards-traceability">
+                <a target="_blank" href="{{credentialSubject.auditableEvidence.linkURL}}" class="cards-traceability">
                   <div class="frame-3">
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M2 18C1.45 18 0.979333 17.8043 0.588 17.413C0.196667 17.0217 0.000666667 16.5507 0 16V2C0 1.45 0.196 0.979333 0.588 0.588C0.98 0.196667 1.45067 0.000666667 2 0H16C16.55 0 17.021 0.196 17.413 0.588C17.805 0.98 18.0007 1.45067 18 2V16C18 16.55 17.8043 17.021 17.413 17.413C17.0217 17.805 16.5507 18.0007 16 18H2ZM2 2V16H16V2H14V9L11.5 7.5L9 9V2H2Z" fill="#94C4F5"/>
@@ -681,7 +681,7 @@
                       </svg>
                   </div>
                 </a>
-                <a href="{{credentialSubject.scope.id}}" class="cards-traceability">
+                <a target="_blank" href="{{credentialSubject.scope.id}}" class="cards-traceability">
                   <div class="frame-3">
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M2 18C1.45 18 0.979333 17.8043 0.588 17.413C0.196667 17.0217 0.000666667 16.5507 0 16V2C0 1.45 0.196 0.979333 0.588 0.588C0.98 0.196667 1.45067 0.000666667 2 0H16C16.55 0 17.021 0.196 17.413 0.588C17.805 0.98 18.0007 1.45067 18 2V16C18 16.55 17.8043 17.021 17.413 17.413C17.0217 17.805 16.5507 18.0007 16 18H2ZM2 2V16H16V2H14V9L11.5 7.5L9 9V2H2Z" fill="#94C4F5"/>
@@ -694,7 +694,7 @@
                     </svg>
                   </div>
                 </a>
-                <a href="{{credentialSubject.conformityCertificate.linkURL}}" class="cards-traceability">
+                <a target="_blank" href="{{credentialSubject.conformityCertificate.linkURL}}" class="cards-traceability">
                   <div class="frame-3">
                     <svg width="20" height="18" viewBox="0 0 20 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M16 4H4V0H16V4ZM16 9.5C16.2833 9.5 16.521 9.404 16.713 9.212C16.905 9.02 17.0007 8.78267 17 8.5C16.9993 8.21733 16.9033 7.98 16.712 7.788C16.5207 7.596 16.2833 7.5 16 7.5C15.7167 7.5 15.4793 7.596 15.288 7.788C15.0967 7.98 15.0007 8.21733 15 8.5C14.9993 8.78267 15.0953 9.02033 15.288 9.213C15.4807 9.40567 15.718 9.50133 16 9.5ZM14 16V12H6V16H14ZM16 18H4V14H0V8C0 7.15 0.291667 6.43767 0.875 5.863C1.45833 5.28833 2.16667 5.00067 3 5H17C17.85 5 18.5627 5.28767 19.138 5.863C19.7133 6.43833 20.0007 7.15067 20 8V14H16V18Z" fill="#94C4F5"/>
@@ -748,7 +748,7 @@
                 {{#each assessmentCriteria}}
                 <div class="text-wrapper-8">{{name}}</div>
                 <div class="data-data-link">
-                  <div class="line"><a href="{{id}}" class="line-2">Assessment criteria</a></div>
+                  <div class="line"><a target="_blank" href="{{id}}" class="line-2">Assessment criteria</a></div>
                 </div>
                 <ul class="frame-12">
                   {{#each thresholdValues}}
@@ -772,7 +772,7 @@
                       {{name}}
                     </p>
                     <div class="line-wrapper">
-                      <a href="{{id}}" class="line"><div class="line-3">View</div></a>
+                      <a target="_blank" href="{{id}}" class="line"><div class="line-3">View</div></a>
                     </div>
                   </div>
                   {{/each}}
@@ -785,7 +785,7 @@
                   <div class="data-two-columns">
                     <div class="text-wrapper-10">{{name}}</div>
                     <div class="line-wrapper">
-                      <a href="{{id}}" class="line"><div class="line-3">View</div></a>
+                      <a target="_blank" href="{{id}}" class="line"><div class="line-3">View</div></a>
                     </div>
                   </div>
                   {{/each}}
@@ -802,19 +802,19 @@
                     </div>
                     <div class="data-two-columns-3">
                       <div class="text-wrapper-6">Organisation assessed</div>
-                      <a href="{{assessedOrganisation.id}}" class="line"><div class="text-wrapper-7">{{assessedOrganisation.name}}</div></a>
+                      <a target="_blank" href="{{assessedOrganisation.id}}" class="line"><div class="text-wrapper-7">{{assessedOrganisation.name}}</div></a>
                     </div>
                     <div class="data-two-columns-3">
                       <div class="text-wrapper-6">Auditor</div>
-                      <a href="{{auditor.id}}" class="line"><div class="text-wrapper-7">{{auditor.name}}</div></a>
+                      <a target="_blank" href="{{auditor.id}}" class="line"><div class="text-wrapper-7">{{auditor.name}}</div></a>
                     </div>
                     <div class="data-two-columns-3">
                       <div class="text-wrapper-6">Standard</div>
-                      <a href="{{referenceStandard.id}}" class="line"><div class="text-wrapper-7">{{referenceStandard.name}}</div></a>
+                      <a target="_blank" href="{{referenceStandard.id}}" class="line"><div class="text-wrapper-7">{{referenceStandard.name}}</div></a>
                     </div>
                     <div class="data-two-columns-3">
                       <div class="text-wrapper-6">Regulation</div>
-                      <a href="{{referenceRegulation.id}}" class="line"><div class="text-wrapper-7">{{referenceRegulation.name}}</div></a>
+                      <a target="_blank" href="{{referenceRegulation.id}}" class="line"><div class="text-wrapper-7">{{referenceRegulation.name}}</div></a>
                     </div>
                   </div>
                 </div>
@@ -835,7 +835,7 @@
                       <div class="trustmark-text">trustmark</div>
                     </div>
                     <div class="trustmark-description">
-                      {{name}} is accredited by <a href="{{issuingAuthority.id}}" class="">{{issuingAuthority.name}}</a>.
+                      {{name}} is accredited by <a target="_blank" href="{{issuingAuthority.id}}" class="">{{issuingAuthority.name}}</a>.
                     </div>
                   </div>
                 {{/each}}
@@ -852,7 +852,7 @@
           <div class="data-two-columns-2">
             <div class="text-wrapper-6">Issued by</div>
             <div class="data-data-link-2">
-              <a href="{{issuer.id}}" class="line"><div class="line-3">{{issuer.name}}</div></a>
+              <a target="_blank" href="{{issuer.id}}" class="line"><div class="line-3">{{issuer.name}}</div></a>
             </div>
           </div>
           <div class="data-two-columns-2">
