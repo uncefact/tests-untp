@@ -1,10 +1,10 @@
 import React from 'react';
 import { Box } from '@mui/material';
-import { VerifiableCredential } from '@vckit/core-types';
 import { CredentialInfo } from '../CredentialInfo';
 import { CredentialTabs } from '../CredentialTabs';
+import { CredentialComponentProps } from '../../types/common.types';
 
-const Credential = ({ credential }: { credential: VerifiableCredential }) => {
+const Credential = ({ credential, decodedEnvelopedVC }: CredentialComponentProps) => {
   return (
     <Box
       sx={{
@@ -15,9 +15,8 @@ const Credential = ({ credential }: { credential: VerifiableCredential }) => {
         width: '100%',
       }}
     >
-
-      <CredentialInfo credential={credential} />
-      <CredentialTabs credential={credential} />
+      <CredentialInfo credential={decodedEnvelopedVC ?? credential} />
+      <CredentialTabs credential={credential} decodedEnvelopedVC={decodedEnvelopedVC} />
     </Box>
   );
 };

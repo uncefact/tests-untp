@@ -17,12 +17,12 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/0.3.10/"]
+        "enum": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/0.4.0/"]
       },
       "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
       "readOnly": true,
-      "const": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/0.3.10/"],
-      "default": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/0.3.10/"]
+      "const": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/0.4.0/"],
+      "default": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dcc/0.4.0/"]
     },
     "id": {
       "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
@@ -83,7 +83,7 @@
         "otherIdentifiers": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/Entity"
+            "$ref": "#/$defs/Identifier"
           },
           "description": "An optional list of other registered identifiers for this credential issuer "
         }
@@ -91,18 +91,18 @@
       "description": "The issuer party ()person or orgnaition) of a verifiable credential.",
       "required": ["id", "name"]
     },
-    "Entity": {
+    "Identifier": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": ["Entity"],
-          "default": ["Entity"],
+          "const": ["Identifier"],
+          "default": ["Identifier"],
           "items": {
             "type": "string",
-            "enum": ["Entity"]
+            "enum": ["Identifier"]
           }
         },
         "id": {
@@ -214,8 +214,8 @@
           "description": "SampleCAB Inc attests that the product class LiFePO4 EV batteries manufactured at Sample battery facility have reported GHG foorptint that conform to the GBA rulebook version 1.5. "
         },
         "issuedToParty": {
-          "$ref": "#/$defs/Entity",
-          "description": "The party to whom the conformity attestation was issued."
+          "$ref": "#/$defs/Party",
+          "description": ""
         },
         "authorisations": {
           "type": "array",
@@ -245,7 +245,50 @@
         }
       },
       "description": "A conformity attestation issued by a competent body that defines one or more assessments (eg carbon intensity) about a product (eg batttery) against a specification (eg LCA method) defined in a standard or regulation.",
-      "required": ["id", "assessorLevel", "assessmentLevel", "attestationType", "issuedToParty"]
+      "required": ["id", "assessorLevel", "assessmentLevel", "attestationType"]
+    },
+    "Party": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Party"],
+          "default": ["Party"],
+          "items": {
+            "type": "string",
+            "enum": ["Party"]
+          }
+        },
+        "id": {
+          "example": "https://abr.business.gov.au/ABN/View?abn=90664869327",
+          "type": "string",
+          "format": "uri",
+          "description": "The globally unique ID of the party as a URI, ideall as a resolvable ID. "
+        },
+        "name": {
+          "example": "Sample Company Pty Ltd.",
+          "type": "string",
+          "description": "The registered name of the party within the identifier scheme."
+        },
+        "registeredId": {
+          "example": "90664869327",
+          "type": "string",
+          "description": "The registration number (alphanumeric) of the Party within the register. Unique within the register."
+        },
+        "idScheme": {
+          "$ref": "#/$defs/IdentifierScheme",
+          "description": "The identifier scheme of the party.  Typically a national business register or a global schem such as GLEIF. "
+        },
+        "description": {
+          "example": "A leading electric energy storage company",
+          "type": "string",
+          "description": "An optional short description of the party."
+        }
+      },
+      "description": "An organisation.  May be a supply chain actor, a certifier, a government agency.",
+      "required": ["id", "name"]
     },
     "Endorsement": {
       "type": "object",
@@ -277,7 +320,7 @@
           "description": "The trust mark image awarded by the AB to the CAB to indicate accrediation."
         },
         "issuingAuthority": {
-          "$ref": "#/$defs/Entity",
+          "$ref": "#/$defs/Identifier",
           "description": "The competent authority that issued the accreditation."
         },
         "accreditationCertificate": {
@@ -430,7 +473,7 @@
           "description": "The name of the standard"
         },
         "issuingParty": {
-          "$ref": "#/$defs/Entity",
+          "$ref": "#/$defs/Identifier",
           "description": "The party that issued the standard "
         },
         "issueDate": {
@@ -460,6 +503,12 @@
             "type": "string",
             "enum": ["ConformityAssessment", "Declaration"]
           }
+        },
+        "assessmentDate": {
+          "example": "2024-03-15",
+          "type": "string",
+          "format": "date",
+          "description": "The date on which this assessment was made. "
         },
         "id": {
           "example": "https://exampleCAB.com/38f73303-a39e-45a7-b8b7-e73517548f27/01",
@@ -529,6 +578,14 @@
             "$ref": "#/$defs/Facility"
           },
           "description": "The list of facilities that are the subject of this conformity assessment."
+        },
+        "assessedOrganisation": {
+          "$ref": "#/$defs/Party",
+          "description": "The organisation that is the subject of this assessment."
+        },
+        "auditor": {
+          "$ref": "#/$defs/Party",
+          "description": "The person or organisations that performed this assessment (if different to the issuer of the parent attestaiton)"
         }
       },
       "description": "A specific assessment about the product or facility against a specific specification.  Eg the carbon intensity of a given product or batch.",
@@ -560,7 +617,7 @@
           "description": "The name of the standard"
         },
         "issuingParty": {
-          "$ref": "#/$defs/Entity",
+          "$ref": "#/$defs/Identifier",
           "description": "The party that issued the standard "
         },
         "issueDate": {
@@ -604,7 +661,7 @@
           "description": "The legal jurisdiction (country) under which the regulation is issued.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
         },
         "administeredBy": {
-          "$ref": "#/$defs/Entity",
+          "$ref": "#/$defs/Identifier",
           "description": "the issuing body of the regulation. For example Australin Goernment Department of Climate Change, Energy, the Environment and Water"
         },
         "effectiveDate": {
@@ -676,6 +733,11 @@
           "$ref": "#/$defs/Measure",
           "description": "A numeric value and unit of measure for this metric. Could be a measured value or a specified threshold. Eg {\"value\":400, \"unit\":\"MPA\"} as tensile strenght of structural steel"
         },
+        "score": {
+          "example": "BB",
+          "type": "string",
+          "description": "A score or rank associated with this measured metric."
+        },
         "accuracy": {
           "example": 0.05,
           "type": "number",
@@ -720,32 +782,42 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": ["Product", "Entity"],
-          "default": ["Product", "Entity"],
+          "const": ["Product"],
+          "default": ["Product"],
           "items": {
             "type": "string",
-            "enum": ["Product", "Entity"]
+            "enum": ["Product"]
           }
         },
         "id": {
           "example": "https://id.gs1.org/01/09520123456788/21/12345",
           "type": "string",
           "format": "uri",
-          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+          "description": "The globally unique ID of the product as a URI. Ideall as a resolvable URL according to ISO 18975. "
         },
         "name": {
           "example": "EV battery 300Ah.",
           "type": "string",
-          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
+          "description": "The registered name of the product within the identifier scheme. "
         },
         "registeredId": {
-          "example": "90664869327",
+          "example": "09520123456788.21.12345",
           "type": "string",
           "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
         },
         "idScheme": {
           "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+          "description": "The identifier scheme for this product.  Eg a GS1 GTIn or an AU Livestock NLIS, or similar. If self issued then use the party ID of the issuer.  "
+        },
+        "serialNumber": {
+          "example": "12345678",
+          "type": "string",
+          "description": "A number or code representing a specific serialised item of the product. Unique within product class."
+        },
+        "batchNumber": {
+          "example": "6789",
+          "type": "string",
+          "description": "Identifier of the specific production batch of the product.  Unique within the product class."
         },
         "IDverifiedByCAB": {
           "example": "true",
@@ -763,32 +835,40 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": ["Facility", "Entity"],
-          "default": ["Facility", "Entity"],
+          "const": ["Facility"],
+          "default": ["Facility"],
           "items": {
             "type": "string",
-            "enum": ["Facility", "Entity"]
+            "enum": ["Facility"]
           }
         },
         "id": {
-          "example": "https://id.gs1.org/01/09520123456788/21/12345",
+          "example": "https://sample-facility-register.com/1234567",
           "type": "string",
           "format": "uri",
-          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+          "description": "The globally unique ID of the facility as URI, ideally as a resolvable URL."
         },
         "name": {
-          "example": "EV battery 300Ah.",
+          "example": "Greenacres battery factory",
           "type": "string",
-          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
+          "description": "The registered name of the facility within the identifier scheme.  "
         },
         "registeredId": {
-          "example": "90664869327",
+          "example": "1234567",
           "type": "string",
-          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+          "description": "The registration number (alphanumeric) of the facility within the identifir scheme. Unique within the register."
         },
         "idScheme": {
           "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
+          "description": "The ID scheme of the facility. eg a GS1 GLN or a National land registry scheme. If self issued then use the prty ID of the facility owner. "
+        },
+        "locationInformation": {
+          "$ref": "#/$defs/Location",
+          "description": "Geolocation information for this facility.  For example  \"id\":\"maps.app.goo.gl/6yyPVdwJDWjtj9fG6\"  \"areaReference\":\"plus.codes/4RPFR872+\"\"  \"geoLocation\":[\"-35.186250\",\"149.301250\"]"
+        },
+        "address": {
+          "$ref": "#/$defs/Address",
+          "description": "The Postal address of the location."
         },
         "IDverifiedByCAB": {
           "example": "true",
@@ -798,6 +878,163 @@
       },
       "description": "The facility which is the subject of this conformity assessment",
       "required": ["id", "name"]
+    },
+    "Location": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Location"],
+          "default": ["Location"],
+          "items": {
+            "type": "string",
+            "enum": ["Location"]
+          }
+        },
+        "plusCode": {
+          "example": "https://plus.codes/8CGRC78W+MM",
+          "type": "string",
+          "format": "uri",
+          "description": "An open location code (https://maps.google.com/pluscodes/) representing this geographic location or region. Open location codes can represent any sized area from a point to a large region and are easily resolved to a visual map location. "
+        },
+        "geoLocation": {
+          "$ref": "#/$defs/Point",
+          "description": "The latitude and logditude coordinates that best represent the specified location. Using GeoJSON Point notation."
+        },
+        "geoBoundary": {
+          "$ref": "#/$defs/Polygon",
+          "description": "The list of ordered coordinates that define a closed area polygon as a location boundary using GeoJSON polygon notation."
+        }
+      },
+      "description": "Location information including address and geolocation of points, areas, and boundaries"
+    },
+    "Point": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["Point"],
+          "example": "Point",
+          "description": ""
+        },
+        "coordinates": {
+          "$ref": "#/$defs/Point3D",
+          "description": "Coordinates property of type Point3D"
+        }
+      },
+      "description": "Represents a Point geometry",
+      "required": ["type"]
+    },
+    "Point3D": {
+      "description": "Point in 3d space",
+      "oneOf": [
+        {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Point3D"],
+          "default": ["Point3D"],
+          "items": {
+            "type": "string",
+            "enum": ["Point3D"]
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "description": "Array of decimal values"
+        }
+      ]
+    },
+    "Polygon": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["Polygon"],
+          "example": "Polygon",
+          "description": ""
+        },
+        "coordinates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Point3DWrapper"
+          },
+          "description": "Array of PolygonCoordinates"
+        }
+      },
+      "description": "Represents a Polygon geometry",
+      "required": ["type"]
+    },
+    "Point3DWrapper": {
+      "description": "",
+      "oneOf": [
+        {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Point3DWrapper"],
+          "default": ["Point3DWrapper"],
+          "items": {
+            "type": "string",
+            "enum": ["Point3DWrapper"]
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Point3D"
+          },
+          "description": ""
+        }
+      ]
+    },
+    "Address": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "array",
+          "readOnly": true,
+          "const": ["Address"],
+          "default": ["Address"],
+          "items": {
+            "type": "string",
+            "enum": ["Address"]
+          }
+        },
+        "streetAddress": {
+          "example": "level 11, 15 London Circuit",
+          "type": "string",
+          "description": "the street address - eg "
+        },
+        "postalCode": {
+          "example": "2601",
+          "type": "string",
+          "description": "The post code"
+        },
+        "addressLocality": {
+          "example": "Acton",
+          "type": "string",
+          "description": "The city, suburb or township."
+        },
+        "addressRegion": {
+          "example": "ACT",
+          "type": "string",
+          "description": "The state or territory or province"
+        },
+        "addressCountry": {
+          "type": "string",
+          "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
+          "description": "The address country\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+        }
+      },
+      "description": "A postal address"
     }
   }
 }

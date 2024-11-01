@@ -14,10 +14,10 @@ export interface ICredentialFileData {
 
 // Current UNTP data models.
 const untpDefaultModel = new Set([
-  'traceabilityEvents',
-  'productPassport',
+  'digitalTraceabilityEvent',
+  'digitalProductPassport',
   'digitalFacilityRecord',
-  'conformityCredential',
+  'digitalConformityCredential',
 ]);
 
 export const getLastestVersionFolder = async (schemasPath: string, eventType: string) => {

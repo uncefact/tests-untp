@@ -9,7 +9,7 @@ import {
 } from '@vckit/core-types';
 import { decodeJwt } from 'jose';
 import { privateAPI } from './utils/httpService.js';
-import { isPlainObject, every, isString } from 'lodash';
+import _ from 'lodash';
 
 export const contextDefault = [
   'https://www.w3.org/ns/credentials/v2',
@@ -208,7 +208,7 @@ export const decodeEnvelopedVC = (vc: VerifiableCredential): UnsignedCredential 
  * @param headers
  */
 const _validateVckitHeaders = (headers: Record<string, string>) => {
-  if (!isPlainObject(headers) || !every(headers, isString)) {
+  if (!_.isPlainObject(headers) || !_.every(headers, (value) => _.isString(value))) {
     throw new Error('VcKit headers defined in app config must be a plain object with string values');
   }
 };

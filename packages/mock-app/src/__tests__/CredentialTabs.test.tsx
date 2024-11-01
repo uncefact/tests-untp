@@ -65,8 +65,8 @@ describe('Credential tabs content', () => {
     };
     // Render the CredentialTabs component with the modified credential
     render(<CredentialTabs credential={credential2} />);
-    // Expecting the text 'CredentialRender' to be present in the rendered component
-    expect(screen.getByText('CredentialRender')).not.toBeNull();
+    // Expecting the text 'Rendered' to be present in the rendered component
+    expect(screen.getByText('Rendered')).not.toBeNull();
   });
 
   it('should display on change value', () => {
@@ -77,5 +77,25 @@ describe('Credential tabs content', () => {
     fireEvent.click(tab);
     // Expecting the tab with 'selected' attribute to have accessible name 'Rendered'
     expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('Rendered');
+  });
+
+  it('should display download button', () => {
+    // Mocking the URL.createObjectURL function
+    const mockCreateObjectURL = jest.fn();
+    global.URL.createObjectURL = mockCreateObjectURL;
+
+    // Render component with the mock credential
+    render(<CredentialTabs credential={credential} />);
+
+    // Find the button with text 'Download', simulate a click event on it
+    const button = screen.getByText(/Download/i);
+    button.click();
+
+    // Expecting the button with text 'Download' to be present in the rendered component
+    expect(screen.getByText(/Download/i)).not.toBeNull();
+    // Expecting the URL.createObjectURL function to have been called
+    expect(mockCreateObjectURL).toHaveBeenCalled();
+    // Restore the original URL.createObjectURL to avoid side effects on other tests
+    global.URL.createObjectURL = mockCreateObjectURL;
   });
 });

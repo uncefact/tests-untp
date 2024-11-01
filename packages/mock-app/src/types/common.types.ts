@@ -1,3 +1,4 @@
+import { UnsignedCredential, VerifiableCredential } from '@vckit/core-types';
 import { IGenericFeatureProps } from '../components/GenericFeature';
 
 export interface IFeature extends IGenericFeatureProps {
@@ -26,4 +27,9 @@ export interface IStyles {
   secondaryColor: string;
   tertiaryColor: string;
   menuIconColor?: string;
+}
+
+export interface CredentialComponentProps {
+  credential: VerifiableCredential;
+  decodedEnvelopedVC?: UnsignedCredential | null;
 }
