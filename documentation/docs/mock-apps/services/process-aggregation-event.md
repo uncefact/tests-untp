@@ -46,7 +46,7 @@ P-->>C: Return VC and resolver URL
           "Authorization": "Bearer test123"
         }
       },
-      "epcisAggregationEvent": {
+      "traceabilityEvent": {
         "context": ["https://www.w3.org/2018/credentials/v1", "https://gs1.org/voc/"],
         "type": ["DigitalTraceabilityEvent"],
         "renderTemplate": [
@@ -78,7 +78,7 @@ P-->>C: Return VC and resolver URL
         "namespace": "gs1",
         "linkRegisterPath": "/api/resolver"
       },
-      "identifierKeyPath": "/parentItem/epc"
+      "identifierKeyPath": "/0/id"
     }
   ]
 }
@@ -86,10 +86,10 @@ P-->>C: Return VC and resolver URL
 
 ## Definitions
 
-| Property              | Required | Description                                                                                                                         | Type                                                            |
-| --------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| vckit                 | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/mock-apps/common/vckit)                           |
-| epcisAggregationEvent | Yes      | Configuration for the EPCIS Aggregation Event                                                                                       | [Credential](/docs/mock-apps/common/credential)                 |
-| storage               | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/mock-apps/common/storage)                       |
-| dlr                   | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/mock-apps/common/idr)                               |
-| identifierKeyPath     | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/mock-apps/common/identifier-key-path) |
+| Property          | Required | Description                                                                                                                         | Type                                                            |
+| ----------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| vckit             | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/mock-apps/common/vckit)                           |
+| traceabilityEvent | Yes      | Configuration for the EPCIS Aggregation Event                                                                                       | [Credential](/docs/mock-apps/common/credential)                 |
+| storage           | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/mock-apps/common/storage)                       |
+| dlr               | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/mock-apps/common/idr)                               |
+| identifierKeyPath | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/mock-apps/common/identifier-key-path) |

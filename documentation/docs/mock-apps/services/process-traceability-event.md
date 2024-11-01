@@ -1,6 +1,6 @@
 ---
-sidebar_position: 26
-title: Process Object Event
+sidebar_position: 55
+title: Process Traceability Event
 ---
 
 import Disclaimer from '../../\_disclaimer.mdx';
@@ -9,34 +9,28 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The `processObjectEvent` service is responsible for processing an [Object Event (DTE)](https://uncefact.github.io/spec-untp/docs/specification/DigitalTraceabilityEvents), issuing a [Verifiable Credential (VC)](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials), uploading it to the [Storage service](/docs/mock-apps/dependent-services/storage-service), registering the link to the stored DTE with the [Identity Resolver service](/docs/mock-apps/dependent-services/identity-resolution-service). It handles the entire lifecycle of creating and managing an object event, from data input to storage and resolution.
+The `processTraceabilityEvent` service is responsible for processing an [Traceability Event (DTE)](https://uncefact.github.io/spec-untp/docs/specification/DigitalTraceabilityEvents), it only process one event type in one time. The service will check the event type and call the corresponding service to process the event such as [processObjectEvent](/docs/mock-apps/services/process-object-event), [processAggregationEvent](/docs/mock-apps/services/process-aggregation-event), [processTransformationEventOnly](/docs/mock-apps/services/process-transformation-event-only), [processAssociationEvent](/docs/mock-apps/services/process-association-event), and [processTransactionEvent](/docs/mock-apps/services/process-transaction-event).
 
 ## Diagram
 
 ```mermaid
 sequenceDiagram
 participant C as Client
-participant P as processObjectEvent
-participant V as VCKit
-participant S as Storage
-participant D as DLR
+participant P as processTraceabilityEvent
+participant IE as Individual Event
 C->>P: Call processObjectEvent(objectEvent, context)
 P->>P: Validate context
-P->>P: Extract identifier
-P->>V: Issue VC
-V-->>P: Return VC
-P->>S: Upload VC
-S-->>P: Return VC URL
-P->>D: Register link resolver
-D-->>P: Return resolver URL
-P-->>C: Return object event VC and resolver URL
+P->>P: Extract event type
+P->>IE: Forward to appropriate event
+IE-->>P: Return event VC and link resolver URL
+P-->>C: Return event VC and resolver URL
 ```
 
 ## Example
 
 ```json
 {
-  "name": "processObjectEvent",
+  "name": "processTraceabilityEvent",
   "parameters": [
     {
       "vckit": {
@@ -51,12 +45,12 @@ P-->>C: Return object event VC and resolver URL
         "type": ["DigitalTraceabilityEvent"],
         "renderTemplate": [
           {
-            "template": "<div><h2>Object Event</h2></div>",
+            "template": "<div><h2>Traceability Event</h2></div>",
             "@type": "WebRenderingTemplate2022"
           }
         ],
         "dlrIdentificationKeyType": "gtin",
-        "dlrLinkTitle": "Object Event",
+        "dlrLinkTitle": "Traceability Event",
         "dlrVerificationPage": "https://verify.example.com"
       },
       "storage": {
@@ -78,7 +72,8 @@ P-->>C: Return object event VC and resolver URL
         "namespace": "gs1",
         "linkRegisterPath": "/api/resolver"
       },
-      "identifierKeyPath": "/0/id"
+      "identifierKeyPath": "/0/id",
+      "eventTypePath": "/0/type/0"
     }
   ]
 }
@@ -89,7 +84,8 @@ P-->>C: Return object event VC and resolver URL
 | Property          | Required | Description                                                                                                                         | Type                                                            |
 | ----------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | vckit             | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/mock-apps/common/vckit)                           |
-| traceabilityEvent | Yes      | Configuration for the EPCIS Object Event Event                                                                                      | [Credential](/docs/mock-apps/common/credential)                 |
+| traceabilityEvent | Yes      | Configuration for the EPCIS Traceability Event Event                                                                                | [Credential](/docs/mock-apps/common/credential)                 |
 | storage           | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/mock-apps/common/storage)                       |
 | dlr               | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/mock-apps/common/idr)                               |
 | identifierKeyPath | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/mock-apps/common/identifier-key-path) |
+| eventTypePath     | Yes      | JSON path to the event type in the credential subject                                                                               | String                                                          |

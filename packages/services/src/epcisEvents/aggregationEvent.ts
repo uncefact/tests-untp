@@ -2,49 +2,38 @@ import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 import { IService } from '../types/IService.js';
-import { ITraceabilityEvent, IAggregationEventContext } from '../types';
+import { ITraceabilityEvent, ITraceabilityEventContext } from '../types';
 import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
-import { validateAggregationEventContext } from '../validateContext.js';
+import { validateTraceabilityEventContext } from '../validateContext.js';
 import { EPCISBusinessStepCode, EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
 
 export const processAggregationEvent: IService = async (
   aggregationEvent: ITraceabilityEvent,
-  context: IAggregationEventContext,
+  context: ITraceabilityEventContext,
 ): Promise<any> => {
-  const validationResult = validateAggregationEventContext(context);
+  const validationResult = validateTraceabilityEventContext(context);
   if (!validationResult.ok) {
     throw new Error(validationResult.value);
   }
 
-  const { vckit, epcisAggregationEvent, dlr, storage, identifierKeyPath } = context;
+  const { vckit, traceabilityEvent, dlr, storage, identifierKeyPath } = context;
+
   const parentIdentifier = constructIdentifierString(aggregationEvent.data, identifierKeyPath);
   if (!parentIdentifier) {
     throw new Error('Identifier not found');
   }
 
   const { identifier, qualifierPath } = getLinkResolverIdentifier(parentIdentifier);
-  aggregationEvent.data.parentItem.itemID = `${dlr.dlrAPIUrl}/${epcisAggregationEvent.dlrIdentificationKeyType}/${identifier}${qualifierPath}`;
-
-  const credentialSubject = {
-    ...aggregationEvent.data,
-    eventID: generateUUID(),
-    eventType: EPCISEventType.Aggregation,
-    eventTime: new Date().toISOString(),
-    actionCode: EPCISEventAction.Add,
-    dispositionCode: EPCISEventDisposition.InTransit,
-    businessStepCode: EPCISBusinessStepCode.Packing,
-    readPointId: generateUUID(),
-  };
 
   const aggregationVC = await issueVC({
-    credentialSubject,
+    credentialSubject: aggregationEvent.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
     headers: vckit.headers,
     issuer: vckit.issuer,
-    context: epcisAggregationEvent.context,
-    type: epcisAggregationEvent.type,
+    context: traceabilityEvent.context,
+    type: traceabilityEvent.type,
     restOfVC: {
-      render: epcisAggregationEvent.renderTemplate,
+      render: traceabilityEvent.renderTemplate,
     },
   });
 
@@ -53,11 +42,11 @@ export const processAggregationEvent: IService = async (
 
   const aggregationLinkResolver = await registerLinkResolver(
     aggregationVCLink,
-    epcisAggregationEvent.dlrIdentificationKeyType,
+    traceabilityEvent.dlrIdentificationKeyType,
     identifier,
-    epcisAggregationEvent.dlrLinkTitle,
+    traceabilityEvent.dlrLinkTitle,
     LinkType.epcisLinkType,
-    epcisAggregationEvent.dlrVerificationPage,
+    traceabilityEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
     dlr.namespace,

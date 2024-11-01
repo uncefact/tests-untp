@@ -3,10 +3,10 @@ import { processObjectEvent } from '../../epcisEvents/objectEvent';
 import * as vckitService from '../../vckit.service';
 import { uploadData } from '../../storage.service';
 import * as linkResolverService from '../../linkResolver.service';
-import { IAggregationEventContext, IObjectEventContext } from '../../types';
+import { ITraceabilityEventContext } from '../../types';
 import { Result } from '../../types/validateContext';
 import * as validateContext from '../../validateContext';
-import { objectEventContext as context } from '../mocks/constants';
+import { traceabilityEventContext as context } from '../mocks/constants';
 
 jest.mock('../../vckit.service', () => ({
   issueVC: jest.fn(),
@@ -30,31 +30,33 @@ jest.mock('../../linkResolver.service', () => ({
 
 describe('processObjectEvent', () => {
   const objectEvent: ITraceabilityEvent = {
-    data: {
-      id: '010501234567890021951350380',
-      type: 'urn:epcglobal:cbv:mda',
-      action: 'OBSERVE',
-      bizStep: 'urn:epcglobal:cbv:bizstep:receiving',
-      disposition: 'urn:epcglobal:cbv:disp:in_progress',
-      readPoint: {
-        id: 'urn:uuid:60a76c80-d399-11eb-8d0a-0242ac130003',
-      },
-      bizLocation: {
-        id: 'urn:uuid:60a76c80-d399-11eb-8d0a-0242ac130003',
-      },
-      bizTransactionList: [
-        {
-          type: 'urn:epcglobal:cbv:btt:po',
-          bizTransaction: 'http://transaction.acme.com/po/12345678',
+    data: [
+      {
+        id: '010501234567890021951350380',
+        type: 'urn:epcglobal:cbv:mda',
+        action: 'OBSERVE',
+        bizStep: 'urn:epcglobal:cbv:bizstep:receiving',
+        disposition: 'urn:epcglobal:cbv:disp:in_progress',
+        readPoint: {
+          id: 'urn:uuid:60a76c80-d399-11eb-8d0a-0242ac130003',
         },
-      ],
-      epcList: [
-        {
-          epc: 'urn:epc:id:sgtin:0614141.107346.2021',
-          quantity: 1,
+        bizLocation: {
+          id: 'urn:uuid:60a76c80-d399-11eb-8d0a-0242ac130003',
         },
-      ],
-    },
+        bizTransactionList: [
+          {
+            type: 'urn:epcglobal:cbv:btt:po',
+            bizTransaction: 'http://transaction.acme.com/po/12345678',
+          },
+        ],
+        epcList: [
+          {
+            epc: 'urn:epc:id:sgtin:0614141.107346.2021',
+            quantity: 1,
+          },
+        ],
+      },
+    ],
   };
 
   it('should process object event successfully', async () => {
@@ -67,8 +69,8 @@ describe('processObjectEvent', () => {
     (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
 
     jest
-      .spyOn(validateContext, 'validateObjectEventContext')
-      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<IObjectEventContext>);
+      .spyOn(validateContext, 'validateTraceabilityEventContext')
+      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
     jest
       .spyOn(linkResolverService, 'getLinkResolverIdentifier')
       .mockReturnValue({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
@@ -87,10 +89,10 @@ describe('processObjectEvent', () => {
 
   it('should throw error when context validation false', async () => {
     const invalidContext: any = { ...context };
-    delete invalidContext.epcisObjectEvent;
+    delete invalidContext.traceabilityEvent;
 
     jest
-      .spyOn(validateContext, 'validateObjectEventContext')
+      .spyOn(validateContext, 'validateTraceabilityEventContext')
       .mockReturnValueOnce({ ok: false, value: 'Invalid context' });
 
     expect(async () => await processObjectEvent(objectEvent, invalidContext)).rejects.toThrow('Invalid context');
@@ -103,8 +105,8 @@ describe('processObjectEvent', () => {
     };
 
     jest
-      .spyOn(validateContext, 'validateObjectEventContext')
-      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<IObjectEventContext>);
+      .spyOn(validateContext, 'validateTraceabilityEventContext')
+      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
 
     expect(async () => await processObjectEvent(objectEvent, invalidIdentifierContent)).rejects.toThrow(
       'Identifier not found',
@@ -118,8 +120,8 @@ describe('processObjectEvent', () => {
     };
 
     jest
-      .spyOn(validateContext, 'validateObjectEventContext')
-      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<IObjectEventContext>);
+      .spyOn(validateContext, 'validateTraceabilityEventContext')
+      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
 
     expect(async () => await processObjectEvent(invalidObjectEvent, context)).rejects.toThrow(
       'Object event data not found',
@@ -142,8 +144,8 @@ describe('processObjectEvent', () => {
     (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
 
     jest
-      .spyOn(validateContext, 'validateObjectEventContext')
-      .mockReturnValueOnce({ ok: true, value: contextWithHeaders } as unknown as Result<IObjectEventContext>);
+      .spyOn(validateContext, 'validateTraceabilityEventContext')
+      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
     jest
       .spyOn(linkResolverService, 'getLinkResolverIdentifier')
       .mockReturnValue({ identifier: '0123456789', qualifierPath: '/10/ABC123' });

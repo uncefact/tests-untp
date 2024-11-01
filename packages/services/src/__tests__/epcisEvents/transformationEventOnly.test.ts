@@ -1,5 +1,5 @@
 import { ITraceabilityEvent } from '../../types';
-import { processAssociationEvent } from '../../epcisEvents/associationEvent';
+import { processTransformationEventOnly } from '../../epcisEvents/transformationEventOnly';
 import * as vckitService from '../../vckit.service';
 import { uploadData } from '../../storage.service';
 import * as linkResolverService from '../../linkResolver.service';
@@ -28,11 +28,11 @@ jest.mock('../../linkResolver.service', () => ({
   },
 }));
 
-describe('processAssociationEvent', () => {
-  const associationEvent: ITraceabilityEvent = {
+describe('processTransformationEventOnly', () => {
+  const transformationEvent: ITraceabilityEvent = {
     data: [
       {
-        type: ['AssociationEvent', 'Event'],
+        type: ['TransformationEvent', 'Event'],
         id: '010501234567890021951350380',
         processType: 'Weaving',
         eventTime: '2024-09-01T12:00:00',
@@ -92,12 +92,7 @@ describe('processAssociationEvent', () => {
             sensorIntegrityProof: 'https://jargon.sh',
           },
         ],
-        parentEPC: {
-          type: ['Item'],
-          id: 'https://id.gs1.org/01/09520123456788/21/12345',
-          name: 'EV battery 300Ah.',
-        },
-        childEPCList: [
+        outputEPCList: [
           {
             type: ['Item'],
             id: 'https://id.gs1.org/01/09520123456788/21/12345',
@@ -109,7 +104,33 @@ describe('processAssociationEvent', () => {
             name: 'EV battery 300Ah.',
           },
         ],
-        childQuantityList: [
+        inputEPCList: [
+          {
+            type: ['Item'],
+            id: 'https://id.gs1.org/01/09520123456788/21/12345',
+            name: 'EV battery 300Ah.',
+          },
+          {
+            type: ['Item'],
+            id: 'https://id.gs1.org/01/09520123456788/21/12345',
+            name: 'EV battery 300Ah.',
+          },
+        ],
+        inputQuantityList: [
+          {
+            productId: 'https://id.gs1.org/01/09520123456788/21/12345',
+            productName: 'EV battery 300Ah.',
+            quantity: 20,
+            uom: 'KGM',
+          },
+          {
+            productId: 'https://id.gs1.org/01/09520123456788/21/12345',
+            productName: 'EV battery 300Ah.',
+            quantity: 20,
+            uom: 'KGM',
+          },
+        ],
+        outputQuantityList: [
           {
             productId: 'https://id.gs1.org/01/09520123456788/21/12345',
             productName: 'EV battery 300Ah.',
@@ -127,10 +148,13 @@ describe('processAssociationEvent', () => {
     ],
   };
 
-  it('should process association event successfully', async () => {
+  it('should process transformation event successfully', async () => {
     (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
       credentialSubject: { id: 'https://example.com/123' },
     }));
+    (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue({
+      credentialSubject: { id: 'https://example.com/123' },
+    });
     (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
 
     jest
@@ -140,13 +164,13 @@ describe('processAssociationEvent', () => {
       .spyOn(linkResolverService, 'getLinkResolverIdentifier')
       .mockReturnValue({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
     jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
-      identifier: '0105012345678900',
-      qualifierPath: '/21/951350380',
-      elementString: '010501234567890021951350380',
+      identifier: '0123456789',
+      qualifierPath: '/10/ABC123',
+      elementString: '01012345678910ABC123',
     });
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValue('https://example.com/link-resolver');
 
-    const result = await processAssociationEvent(associationEvent, context);
+    const result = await processTransformationEventOnly(transformationEvent, context);
 
     expect(result.vc).toEqual({ credentialSubject: { id: 'https://example.com/123' } });
     expect(result.linkResolver).toEqual('https://example.com/link-resolver');
@@ -160,7 +184,7 @@ describe('processAssociationEvent', () => {
       .spyOn(validateContext, 'validateTraceabilityEventContext')
       .mockReturnValueOnce({ ok: false, value: 'Invalid context' });
 
-    expect(async () => await processAssociationEvent(associationEvent, invalidContext)).rejects.toThrow(
+    expect(async () => await processTransformationEventOnly(transformationEvent, invalidContext)).rejects.toThrow(
       'Invalid context',
     );
   });
@@ -175,14 +199,14 @@ describe('processAssociationEvent', () => {
       .spyOn(validateContext, 'validateTraceabilityEventContext')
       .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
 
-    expect(async () => await processAssociationEvent(associationEvent, invalidIdentifierContent)).rejects.toThrow(
-      'Identifier not found',
-    );
+    expect(
+      async () => await processTransformationEventOnly(transformationEvent, invalidIdentifierContent),
+    ).rejects.toThrow('Identifier not found');
   });
 
-  it('should throw error when AssociationEvent data not found', async () => {
-    const invalidAssociationEvent = {
-      ...associationEvent,
+  it('should throw error when TransformationEvent data not found', async () => {
+    const invalidTransformationEvent = {
+      ...transformationEvent,
       data: undefined,
     };
 
@@ -190,12 +214,12 @@ describe('processAssociationEvent', () => {
       .spyOn(validateContext, 'validateTraceabilityEventContext')
       .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
 
-    expect(async () => await processAssociationEvent(invalidAssociationEvent, context)).rejects.toThrow(
-      'Association event data not found',
+    expect(async () => await processTransformationEventOnly(invalidTransformationEvent, context)).rejects.toThrow(
+      'Transformation event data not found',
     );
   });
 
-  it('should process association event with custom verifiable credential service headers', async () => {
+  it('should process transformation event with custom verifiable credential service headers', async () => {
     const mockHeaders = { 'X-Custom-Header': 'test-value' };
     const contextWithHeaders = {
       ...context,
@@ -217,13 +241,13 @@ describe('processAssociationEvent', () => {
       .spyOn(linkResolverService, 'getLinkResolverIdentifier')
       .mockReturnValue({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
     jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
-      identifier: '0105012345678900',
-      qualifierPath: '/21/951350380',
-      elementString: '010501234567890021951350380',
+      identifier: '0123456789',
+      qualifierPath: '/10/ABC123',
+      elementString: '01012345678910ABC123',
     });
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValue('https://example.com/link-resolver');
 
-    await processAssociationEvent(associationEvent, contextWithHeaders);
+    await processTransformationEventOnly(transformationEvent, contextWithHeaders);
 
     expect(vckitService.issueVC).toHaveBeenCalledWith(
       expect.objectContaining({

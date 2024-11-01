@@ -394,3 +394,26 @@ export const validateAndConstructVerifyURL = (value: any) => {
 
   throw new Error('Unsupported value type');
 };
+
+/**
+ *
+ * This function converts an object to an array with one item. The function can configure in app-config.json like this:
+ * { "name": "convertObjectToArray1Item", "parameters": [{ "path": "/data" }] },
+ * @param data
+ * @param params { path: string } path to the value in the nested object
+ * @returns
+ */
+export const convertObjectToArray1Item = (data: Record<string, any>, params: { path: string }): any => {
+  const _data = { ...data };
+  if (params.path) {
+    try {
+      const value = JSONPointer.get(_data, params.path);
+      JSONPointer.set(_data, params.path, [value]);
+      return _data;
+    } catch (error) {
+      throw new Error('Error converting object to array, invalid path');
+    }
+  } else {
+    return [_data];
+  }
+};

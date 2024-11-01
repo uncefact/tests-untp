@@ -102,41 +102,21 @@ export interface ITransformationEventContext extends IContext {
 }
 
 export interface ITraceabilityEvent {
-  data: {
-    [key: string]: any;
-  };
-}
-
-export interface ITransactionEventContext extends IContext {
-  epcisTransactionEvent: IEntityIssue;
-}
-
-export interface IAggregationEvent {
-  data: {
-    [key: string]: any;
-  };
-}
-
-export interface IAggregationEventContext extends IContext {
-  epcisAggregationEvent: IEntityIssue;
+  data: any;
 }
 
 export interface IDigitalIdentityAnchorContext extends IContext {
   digitalIdentityAnchor: IEntityIssue;
 }
 
-export interface IObjectEventContext extends IContext {
-  epcisObjectEvent: IEntityIssue;
-}
-
 export interface IDigitalFacilityRecordContext extends IContext {
   digitalFacilityRecord: IEntityIssue;
 }
 
-export interface IAssociationEventContext extends IContext {
-  epcisAssociationEvent: IEntityIssue;
-}
-
 export interface IDigitalConformityCredentialContext extends IContext {
   digitalConformityCredential: IEntityIssue;
+}
+
+export interface ITraceabilityEventContext extends IContext {
+  traceabilityEvent: IEntityIssue;
 }
