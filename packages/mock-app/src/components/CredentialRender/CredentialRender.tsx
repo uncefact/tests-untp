@@ -54,18 +54,21 @@ const CredentialRender = ({ credential }: { credential: VerifiableCredential | U
       >
         {documents.length !== 0
           ? documents.map((doc, i) => (
-              <div
-                style={{
-                  margin: '0 auto',
-                  width: '100%',
-                  maxWidth: '400px',
-                  height: '100%',
-                  minHeight: '100vh',
-                  overflow: 'hidden',
-                }}
-                key={i}
-                dangerouslySetInnerHTML={{ __html: doc }}
-              ></div>
+              <>
+                <div
+                  style={{
+                    contain: 'content', // isolate the content
+                    margin: '0 auto',
+                    height: '100%',
+                    minHeight: '100vh',
+                    overflowY: 'scroll',
+                    width: '100%',
+                    textAlign: 'left',
+                  }}
+                  key={i}
+                  dangerouslySetInnerHTML={{ __html: doc }}
+                ></div>
+              </>
             ))
           : ''}
       </Box>
