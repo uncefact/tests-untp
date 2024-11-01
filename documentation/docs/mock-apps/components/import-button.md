@@ -42,8 +42,8 @@ The ImportButton component is responsible for rendering a button that allows the
 
 #### vcOptions
 
-| Property       | Required | Description                                                                | Type   |
-| -------------- | -------- | -------------------------------------------------------------------------- | ------ |
-| credentialPath | Yes      | The path for the credential data                                           | String |
-| vckitAPIUrl    | No       | The URL for the vckit API                                                  | String |
-| headers        | No       | The headers for the vckit API, example: { Authorization: "Bearer test123"} | Object |
+| Property       | Required | Description                                                                  | Type   |
+| -------------- | -------- | ---------------------------------------------------------------------------- | ------ |
+| credentialPath | Yes      | The path for the credential data                                             | String |
+| vckitAPIUrl    | No       | The URL for the vckit API                                                    | String |
+| headers        | No       | The headers for the vckit API, example: \{ Authorization: "Bearer test123"\} | Object |
