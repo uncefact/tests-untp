@@ -9,7 +9,7 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The `convertObjectToArray1Item` service is responsible for converting an object to an array with one item. This service is used to convert an object to an array with one item to be used in the individual event services like [processObjectEvent](/docs/mock-apps/services/process-object-event), [processAggregationEvent](/docs/mock-apps/services/process-aggregation-event), [processTransformationEvent](/docs/mock-apps/services/process-transformation-event), [processAssociationEvent](/docs/mock-apps/services/process-association-event), and [processTransactionEvent](/docs/mock-apps/services/process-transaction-event). The service will convert the data that is from the JSON form of the JSON schema with the root type is an object to an array with one item.
+The `convertObjectToArray1Item` service is responsible for converting an object to an array with one item. This service is used to convert an object to an array with one item to be used in the individual event services like [processObjectEvent](/docs/mock-apps/services/process-object-event), [processAggregationEvent](/docs/mock-apps/services/process-aggregation-event), [processTransformationEventOnly](/docs/mock-apps/services/process-transformation-event-only), [processAssociationEvent](/docs/mock-apps/services/process-association-event), and [processTransactionEvent](/docs/mock-apps/services/process-transaction-event). The service will convert the data that is from the JSON form of the JSON schema with the root type is an object to an array with one item.
 
 ## Diagram
 
