@@ -2174,10 +2174,6 @@
               </div>
               {{/each}}
             </div>
-
-            <div id="view-more-btn-mobile" class="view-more-button">
-              <p class="blue-bottom-line-thin">View more</p>
-            </div>
           </div>
         </div>
 
@@ -2612,13 +2608,8 @@
               </div>
               {{/each}}
             </div>
-
-            <div id="view-more-btn-desktop" class="view-more-button">
-              <p>View more</p>
-            </div>
           </div>
         </div>
-
       </div>
 
       <div class="div-2">
@@ -2671,68 +2662,3 @@
 </body>
 
 </html>
-
-<script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const itemsToShow = 5; // Number of items to show by default
-
-    // select view more buttons of mobile and desktop
-    const viewMoreButtonMobile = document.getElementById('view-more-btn-mobile');
-    const viewMoreButtonDesktop = document.getElementById('view-more-btn-desktop');
-    // set history items class name to the view more buttons
-    viewMoreButtonMobile.setAttribute('history-items-query-selector', '#history-items-390px .history-item');
-    viewMoreButtonDesktop.setAttribute('history-items-query-selector', '#history-items-1440px .history-item');
-    // Initial setup for the view more buttons
-    updateItemsVisibility(viewMoreButtonMobile);
-    updateItemsVisibility(viewMoreButtonDesktop);
-    // Register click event listeners for view more buttons on mobile and desktop
-    viewMoreButtonMobile.onclick = toggleItemsVisibility;
-    viewMoreButtonDesktop.onclick = toggleItemsVisibility;
-
-    function toggleItemsVisibility() {
-      const displayState = this.getAttribute('data-state'); // collapsed or expanded
-      const isCollapsed = displayState === 'collapsed';
-
-      if (isCollapsed) {
-        this.firstElementChild.textContent = 'View less';
-        this.setAttribute('data-state', 'expanded');
-      } else {
-        this.firstElementChild.textContent = 'View more';
-        this.setAttribute('data-state', 'collapsed');
-      }
-      updateItemsVisibility(this);
-    }
-
-    function updateItemsVisibility(element) {
-      const historyItemsClassName = element.getAttribute('history-items-query-selector');
-      const historyItems = document.querySelectorAll(historyItemsClassName);
-
-      // Hide the view more button if there are no more than itemsToShow (5 items)
-      if (historyItems && historyItems.length <= itemsToShow) {
-        return element.style.display = 'none';
-      }
-
-      // Show or hide items based on the current state
-      const displayState = element.getAttribute('data-state'); // collapsed or expanded
-      if (!displayState) { // Initial setup
-        element.setAttribute('data-state', 'collapsed');
-        element.firstElementChild.textContent = 'View more';
-        return historyItems.forEach((item, index) => {
-          // Hide items beyond the first 5 by default
-          if (index >= itemsToShow) {
-            item.style.display = 'none';
-          }
-        });
-      }
-
-      // Update items visibility based on the current state
-      historyItems.forEach((item, index) => {
-        if (index >= itemsToShow) {
-          // Show or hide items based on the current state
-          const display = displayState === 'collapsed' ? 'none' : '';
-          item.style.display = display;
-        }
-      });
-    }
-  });
-</script>
