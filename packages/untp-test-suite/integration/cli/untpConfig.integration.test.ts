@@ -15,9 +15,9 @@ describe("CLI 'untp config' Commands", () => {
       expect(fs.existsSync(storePath)).toBe(true);
 
       const fileContent = await fs.promises.readFile(`${process.cwd()}/${credentialFileName}`, 'utf-8');
-      expect(fileContent).toContain('conformityCredential');
-      expect(fileContent).toContain('traceabilityEvents');
-      expect(fileContent).toContain('productPassport');
+      expect(fileContent).toContain('digitalConformityCredential');
+      expect(fileContent).toContain('digitalTraceabilityEvent');
+      expect(fileContent).toContain('digitalProductPassport');
       expect(fileContent).toContain('digitalFacilityRecord');
     });
   });
