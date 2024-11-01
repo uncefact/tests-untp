@@ -6,6 +6,7 @@ title: QR Code Scanner Dialog Button
 import Disclaimer from '../../\_disclaimer.mdx';
 
 <Disclaimer />
+
 ## Description
 
 The QRCodeScannerDialogButton component is responsible for rendering a button that allows the user to scan a QR code. The component will return the data that is scanned by the user.
@@ -40,8 +41,8 @@ The QRCodeScannerDialogButton component is responsible for rendering a button th
 
 #### vcOptions
 
-| Property       | Required | Description                                                                | Type   |
-| -------------- | -------- | -------------------------------------------------------------------------- | ------ |
-| credentialPath | Yes      | The path for the credential data that is fetched from the QR code URL      | String |
-| vckitAPIUrl    | No       | The URL for the vckit API                                                  | String |
-| headers        | No       | The headers for the vckit API, example: { Authorization: "Bearer test123"} | Object |
+| Property       | Required | Description                                                                  | Type   |
+| -------------- | -------- | ---------------------------------------------------------------------------- | ------ |
+| credentialPath | Yes      | The path for the credential data that is fetched from the QR code URL        | String |
+| vckitAPIUrl    | No       | The URL for the vckit API                                                    | String |
+| headers        | No       | The headers for the vckit API, example: \{ Authorization: "Bearer test123"\} | Object |
