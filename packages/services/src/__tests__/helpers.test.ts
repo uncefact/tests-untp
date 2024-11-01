@@ -1,3 +1,4 @@
+import path from 'path';
 import {
   fillArray,
   randomIntegerString,
@@ -9,6 +10,7 @@ import {
   validateAndConstructVerifyURL,
   constructVerifyURL,
   isValidUrl,
+  convertObjectToArray1Item,
 } from '../utils/helpers';
 
 describe('helpers', () => {
@@ -356,5 +358,41 @@ describe('isValidUrl', () => {
     const url = 'invalid';
     const result = isValidUrl(url);
     expect(result).toBe(false);
+  });
+});
+
+describe('convertObjectToArray1Item', () => {
+  it('should return an array with one item', () => {
+    const data = {
+      data: { test: 'test' },
+    };
+    const params = {
+      path: '/data',
+    };
+    const result = convertObjectToArray1Item(data, params);
+    expect(result).toEqual({ data: [{ test: 'test' }] });
+  });
+
+  it('should return an array with one item when the path is empty', () => {
+    const data = {
+      data: { test: 'test' },
+    };
+    const params = {} as any;
+    const result = convertObjectToArray1Item(data, params);
+    expect(result).toEqual([
+      {
+        data: { test: 'test' },
+      },
+    ]);
+  });
+
+  it('should throw an error if the path is invalid', () => {
+    const data = {
+      data: { test: 'test' },
+    };
+    const params = {
+      path: 'invalid',
+    };
+    expect(() => convertObjectToArray1Item(data, params)).toThrow('Error converting object to array, invalid path');
   });
 });

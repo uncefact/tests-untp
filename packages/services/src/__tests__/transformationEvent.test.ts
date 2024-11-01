@@ -1,5 +1,4 @@
 import {
-  issueDPP,
   issueEpcisTransformationEvent,
   processTransformationEvent,
   uploadVC,
@@ -7,7 +6,7 @@ import {
 import { issueVC, contextDefault } from '../vckit.service';
 import { uploadData } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
-import { IEntityIssue, IInputItems } from '../types';
+import { IEntityIssue } from '../types';
 import { contextTransformationEvent, dataTransformationEvent } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({

@@ -1,22 +1,22 @@
 import { VerifiableCredential } from '@vckit/core-types';
-import { IService, ITraceabilityEvent, ITransactionEventContext } from '../types/index.js';
+import { IService, ITraceabilityEvent, ITraceabilityEventContext } from '../types/index.js';
 import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
 import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
 import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
-import { validateTransactionEventContext } from '../validateContext.js';
+import { validateTraceabilityEventContext } from '../validateContext.js';
 import { deleteValuesFromLocalStorageByKeyPath } from './helpers.js';
 
 export const processTransactionEvent: IService = async (
   transactionEvent: ITraceabilityEvent,
-  context: ITransactionEventContext,
+  context: ITraceabilityEventContext,
 ): Promise<any> => {
-  const validationResult = validateTransactionEventContext(context);
+  const validationResult = validateTraceabilityEventContext(context);
   if (!validationResult.ok) {
     throw new Error(validationResult.value);
   }
 
-  const { vckit, epcisTransactionEvent, dlr, storage, identifierKeyPath, localStorageParams } = context;
+  const { vckit, traceabilityEvent, dlr, storage, identifierKeyPath, localStorageParams } = context;
   const transactionIdentifier = constructIdentifierString(transactionEvent.data, identifierKeyPath);
   if (!transactionIdentifier) {
     throw new Error('Identifier not found');
@@ -29,10 +29,10 @@ export const processTransactionEvent: IService = async (
     vcKitAPIUrl: vckit.vckitAPIUrl,
     headers: vckit.headers,
     issuer: vckit.issuer,
-    context: epcisTransactionEvent.context,
-    type: epcisTransactionEvent.type,
+    context: traceabilityEvent.context,
+    type: traceabilityEvent.type,
     restOfVC: {
-      render: epcisTransactionEvent.renderTemplate,
+      render: traceabilityEvent.renderTemplate,
     },
   });
 
@@ -41,11 +41,11 @@ export const processTransactionEvent: IService = async (
 
   const linkResolver = await registerLinkResolver(
     vcUrl,
-    epcisTransactionEvent.dlrIdentificationKeyType,
+    traceabilityEvent.dlrIdentificationKeyType,
     identifier,
-    epcisTransactionEvent.dlrLinkTitle,
+    traceabilityEvent.dlrLinkTitle,
     LinkType.epcisLinkType,
-    epcisTransactionEvent.dlrVerificationPage,
+    traceabilityEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
     dlr.namespace,

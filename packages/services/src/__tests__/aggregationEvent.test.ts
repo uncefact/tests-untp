@@ -1,10 +1,9 @@
 import * as vckitService from '../vckit.service';
 import { uploadData } from '../storage.service';
 import * as linkResolverService from '../linkResolver.service';
-import { IAggregationEventContext } from '../types/types';
+import { ITraceabilityEventContext } from '../types/types';
 import { Result } from '../types/validateContext';
 import * as validateContext from '../validateContext';
-import * as helpers from '../epcisEvents/helpers';
 import { processAggregationEvent } from '../epcisEvents';
 import { publicAPI } from '../utils/httpService';
 import { aggregationEventMock } from './mocks/constants';
@@ -33,15 +32,17 @@ describe('processAggregationEvent', () => {
   const { parentItem, aggregationVCMock, uploadedAggregationEventLinkMock, aggregationEventDLRMock } =
     aggregationEventMock;
   const aggregationEvent = {
-    data: {
-      parentItem: { itemID: [{ ai: '01', value: '09359502000010' }], name: 'Beef Variety Container' },
-      childItems: [{ itemID: 'http://example.com/beef-scotch-box.json', name: 'Beef Scotch Fillet Box' }],
-      childQuantityList: [{ productClass: 'Beef', quantity: '50', uom: 'box' }],
-    },
+    data: [
+      {
+        parentItem: { itemID: [{ ai: '01', value: '09359502000010' }], name: 'Beef Variety Container' },
+        childItems: [{ itemID: 'http://example.com/beef-scotch-box.json', name: 'Beef Scotch Fillet Box' }],
+        childQuantityList: [{ productClass: 'Beef', quantity: '50', uom: 'box' }],
+      },
+    ],
   };
   const context = {
     vckit: { vckitAPIUrl: 'https://example.com', issuer: 'did:web:example.com' },
-    epcisAggregationEvent: {
+    traceabilityEvent: {
       context: ['https://example.sh/AggregationEvent.jsonld'],
       type: ['AggregationEventCredential'],
       renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
@@ -52,7 +53,7 @@ describe('processAggregationEvent', () => {
     },
     dlr: { dlrAPIUrl: 'http://exampleDLR.com', dlrAPIKey: 'test-key' },
     storage: { url: 'https://exampleStorage.com' },
-    identifierKeyPath: '/parentItem/itemID',
+    identifierKeyPath: '/0/parentItem/itemID',
   };
 
   it('should process aggregation event', async () => {
@@ -61,8 +62,8 @@ describe('processAggregationEvent', () => {
     (uploadData as jest.Mock).mockResolvedValueOnce(aggregationEventDLRMock);
 
     jest
-      .spyOn(validateContext, 'validateAggregationEventContext')
-      .mockReturnValueOnce({ ok: true, value: context } as Result<IAggregationEventContext>);
+      .spyOn(validateContext, 'validateTraceabilityEventContext')
+      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
     jest
       .spyOn(linkResolverService, 'getLinkResolverIdentifier')
       .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
@@ -81,7 +82,7 @@ describe('processAggregationEvent', () => {
       linkResolver: aggregationEventDLRMock,
     });
     expect(uploadData).toHaveBeenCalled();
-    expect(validateContext.validateAggregationEventContext).toHaveBeenCalled();
+    expect(validateContext.validateTraceabilityEventContext).toHaveBeenCalled();
     expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
   });
 
@@ -92,7 +93,7 @@ describe('processAggregationEvent', () => {
         vckit: { vckitAPIUrl: 'invalid-url', issuer: 'invalid-issuer' },
       };
       jest
-        .spyOn(validateContext, 'validateAggregationEventContext')
+        .spyOn(validateContext, 'validateTraceabilityEventContext')
         .mockReturnValueOnce({ ok: false, value: 'Invalid context' });
 
       await processAggregationEvent(aggregationEvent, invalidContext);
@@ -109,14 +110,14 @@ describe('processAggregationEvent', () => {
         identifierKeyPath: '/invalid',
       };
       jest
-        .spyOn(validateContext, 'validateAggregationEventContext')
-        .mockReturnValueOnce({ ok: true, value: context } as Result<IAggregationEventContext>);
+        .spyOn(validateContext, 'validateTraceabilityEventContext')
+        .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
 
       await processAggregationEvent(aggregationEvent, invalidIdentifierContent);
     } catch (e) {
       const error = e as Error;
       expect(error.message).toBe('Identifier not found');
-      expect(validateContext.validateAggregationEventContext).toHaveBeenCalled();
+      expect(validateContext.validateTraceabilityEventContext).toHaveBeenCalled();
     }
   });
 
@@ -127,8 +128,8 @@ describe('processAggregationEvent', () => {
         vckit: { ...context.vckit, issuer: 'invalid-issuer' },
       };
       jest
-        .spyOn(validateContext, 'validateAggregationEventContext')
-        .mockReturnValueOnce({ ok: true, value: context } as Result<IAggregationEventContext>);
+        .spyOn(validateContext, 'validateTraceabilityEventContext')
+        .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
       jest
         .spyOn(linkResolverService, 'getLinkResolverIdentifier')
         .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
@@ -143,7 +144,7 @@ describe('processAggregationEvent', () => {
     } catch (e) {
       const error = e as Error;
       expect(error.message).toBe("Can't issue VC");
-      expect(validateContext.validateAggregationEventContext).toHaveBeenCalled();
+      expect(validateContext.validateTraceabilityEventContext).toHaveBeenCalled();
     }
   });
 
@@ -157,8 +158,8 @@ describe('processAggregationEvent', () => {
       (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue(aggregationVCMock);
 
       jest
-        .spyOn(validateContext, 'validateAggregationEventContext')
-        .mockReturnValueOnce({ ok: true, value: context } as Result<IAggregationEventContext>);
+        .spyOn(validateContext, 'validateTraceabilityEventContext')
+        .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
       jest
         .spyOn(linkResolverService, 'getLinkResolverIdentifier')
         .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
@@ -173,7 +174,7 @@ describe('processAggregationEvent', () => {
     } catch (e) {
       const error = e as Error;
       expect(error.message).toBe('Invalid storage provider');
-      expect(validateContext.validateAggregationEventContext).toHaveBeenCalled();
+      expect(validateContext.validateTraceabilityEventContext).toHaveBeenCalled();
       expect(vckitService.issueVC).toHaveBeenCalled();
     }
   });
@@ -192,8 +193,8 @@ describe('processAggregationEvent', () => {
       });
 
       jest
-        .spyOn(validateContext, 'validateAggregationEventContext')
-        .mockReturnValueOnce({ ok: true, value: context } as Result<IAggregationEventContext>);
+        .spyOn(validateContext, 'validateTraceabilityEventContext')
+        .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
       jest
         .spyOn(linkResolverService, 'getLinkResolverIdentifier')
         .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
@@ -208,7 +209,7 @@ describe('processAggregationEvent', () => {
     } catch (e) {
       const error = e as Error;
       expect(error.message).toBe('Invalid DLR API link resolver url');
-      expect(validateContext.validateAggregationEventContext).toHaveBeenCalled();
+      expect(validateContext.validateTraceabilityEventContext).toHaveBeenCalled();
       expect(vckitService.issueVC).toHaveBeenCalled();
       expect(uploadData).toHaveBeenCalled();
     }
@@ -225,8 +226,8 @@ describe('processAggregationEvent', () => {
     (uploadData as jest.Mock).mockResolvedValueOnce('https://exampleStorage.com/vc.json');
 
     jest
-      .spyOn(validateContext, 'validateAggregationEventContext')
-      .mockReturnValueOnce({ ok: true, value: contextWithHeaders } as unknown as Result<IAggregationEventContext>);
+      .spyOn(validateContext, 'validateTraceabilityEventContext')
+      .mockReturnValueOnce({ ok: true, value: contextWithHeaders } as unknown as Result<ITraceabilityEventContext>);
     jest
       .spyOn(linkResolverService, 'getLinkResolverIdentifier')
       .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
@@ -250,7 +251,7 @@ describe('processAggregationEvent', () => {
       }),
     );
     expect(uploadData).toHaveBeenCalled();
-    expect(validateContext.validateAggregationEventContext).toHaveBeenCalled();
+    expect(validateContext.validateTraceabilityEventContext).toHaveBeenCalled();
     expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
   });
 });

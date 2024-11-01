@@ -4,8 +4,8 @@ import { uploadData } from '../storage.service.js';
 import { IService } from '../types/IService.js';
 import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
 import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
-import { ITraceabilityEvent, IAssociationEventContext } from '../types/index.js';
-import { validateAssociationEventContext } from '../validateContext.js';
+import { ITraceabilityEvent, ITraceabilityEventContext } from '../types/index.js';
+import { validateTraceabilityEventContext } from '../validateContext.js';
 
 /**
  * Processes an association event by issuing a verifiable credential, storing it in a storage service and registering a link resolver.
@@ -15,16 +15,16 @@ import { validateAssociationEventContext } from '../validateContext.js';
  */
 export const processAssociationEvent: IService = async (
   associationEvent: ITraceabilityEvent,
-  context: IAssociationEventContext,
+  context: ITraceabilityEventContext,
 ): Promise<any> => {
-  const validationResult = validateAssociationEventContext(context);
+  const validationResult = validateTraceabilityEventContext(context);
   if (!validationResult.ok) throw new Error(validationResult.value);
 
   if (!associationEvent.data) {
     throw new Error('Association event data not found');
   }
 
-  const { vckit, epcisAssociationEvent, dlr, storage, identifierKeyPath } = context;
+  const { vckit, traceabilityEvent, dlr, storage, identifierKeyPath } = context;
 
   const associationIdentifier = constructIdentifierString(associationEvent.data, identifierKeyPath);
   if (!associationIdentifier) {
@@ -39,10 +39,10 @@ export const processAssociationEvent: IService = async (
     vcKitAPIUrl: vckit.vckitAPIUrl,
     headers: vckit.headers,
     issuer: vckit.issuer,
-    context: epcisAssociationEvent.context,
-    type: epcisAssociationEvent.type,
+    context: traceabilityEvent.context,
+    type: traceabilityEvent.type,
     restOfVC: {
-      render: epcisAssociationEvent.renderTemplate,
+      render: traceabilityEvent.renderTemplate,
     },
   });
 
@@ -51,11 +51,11 @@ export const processAssociationEvent: IService = async (
 
   const associationEventLinkResolver = await registerLinkResolver(
     associationEventVcUrl,
-    epcisAssociationEvent.dlrIdentificationKeyType,
+    traceabilityEvent.dlrIdentificationKeyType,
     associationEventIdentifier,
-    epcisAssociationEvent.dlrLinkTitle,
+    traceabilityEvent.dlrLinkTitle,
     LinkType.epcisLinkType,
-    epcisAssociationEvent.dlrVerificationPage,
+    traceabilityEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
     dlr.namespace,

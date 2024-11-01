@@ -1,5 +1,5 @@
-import { validateContextDPP, validateObjectEventContext } from '../validateContext';
-import { contextDPP, objectEventContext } from './mocks/constants';
+import { validateContextDPP, validateTraceabilityEventContext } from '../validateContext';
+import { contextDPP, traceabilityEventContext } from './mocks/constants';
 
 describe('validateContext', () => {
   describe('successful case', () => {
@@ -210,202 +210,202 @@ describe('validateContext', () => {
   });
 });
 
-describe('validateObjectEventContext', () => {
+describe('validateTraceabilityEventContext', () => {
   it('should return success when context is valid', () => {
-    const result = validateObjectEventContext(objectEventContext as any);
+    const result = validateTraceabilityEventContext(traceabilityEventContext as any);
     expect(result.ok).toBe(true);
-    expect(result.value).toEqual(objectEventContext);
+    expect(result.value).toEqual(traceabilityEventContext);
   });
 
   it('should return error when context is empty', () => {
-    const result = validateObjectEventContext({} as any);
+    const result = validateTraceabilityEventContext({} as any);
     expect(result.ok).toBe(false);
   });
 
   it('should return error when vckit context is empty', () => {
     const newContext = {
-      ...objectEventContext,
+      ...traceabilityEventContext,
       vckit: {},
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
   });
 
-  it('should return error when epcisObjectEvent context is empty', () => {
+  it('should return error when traceabilityEvent context is empty', () => {
     const newContext = {
-      ...objectEventContext,
-      epcisObjectEvent: {},
+      ...traceabilityEventContext,
+      traceabilityEvent: {},
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
   });
 
   it('should return error when storage context is empty', () => {
     const newContext = {
-      ...objectEventContext,
+      ...traceabilityEventContext,
       storage: {},
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
   });
 
   it('should return error when dlr context is empty', () => {
     const newContext = {
-      ...objectEventContext,
+      ...traceabilityEventContext,
       dlr: {},
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
   });
 
   it('should return error when identifierKeyPath in context is empty', () => {
     const newContext = {
-      ...objectEventContext,
+      ...traceabilityEventContext,
       identifierKeyPath: '',
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
     expect(result.value).toEqual('identifierKeyPath not found');
   });
 
   it('should return error when vckitAPIUrl in vckit context is invalid', () => {
     const newContext = {
-      ...objectEventContext,
+      ...traceabilityEventContext,
       vckit: {
         vckitAPIUrl: '',
       },
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
     expect(result.value).toEqual('Invalid vckitAPIUrl');
   });
 
   it('should return error when issuer in vckit context is invalid', () => {
     const newContext = {
-      ...objectEventContext,
+      ...traceabilityEventContext,
       vckit: {
-        ...objectEventContext.vckit,
+        ...traceabilityEventContext.vckit,
         issuer: '',
       },
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
     expect(result.value).toEqual('Invalid issuer');
   });
 
-  it('should return error when context in epcisObjectEvent is invalid', () => {
+  it('should return error when context in traceabilityEvent is invalid', () => {
     const newContext = {
-      ...objectEventContext,
-      epcisObjectEvent: {
-        ...objectEventContext.epcisObjectEvent,
+      ...traceabilityEventContext,
+      traceabilityEvent: {
+        ...traceabilityEventContext.traceabilityEvent,
         context: [],
       },
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
-    expect(result.value).toEqual('Invalid epcisObjectEvent context');
+    expect(result.value).toEqual('Invalid traceabilityEvent context');
   });
 
-  it('should return error when type in epcisObjectEvent is invalid', () => {
+  it('should return error when type in traceabilityEvent is invalid', () => {
     const newContext = {
-      ...objectEventContext,
-      epcisObjectEvent: {
-        ...objectEventContext.epcisObjectEvent,
+      ...traceabilityEventContext,
+      traceabilityEvent: {
+        ...traceabilityEventContext.traceabilityEvent,
         type: [],
       },
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
-    expect(result.value).toEqual('Invalid epcisObjectEvent type');
+    expect(result.value).toEqual('Invalid traceabilityEvent type');
   });
 
-  it('should return error when dlrLinkTitle in epcisObjectEvent is invalid', () => {
+  it('should return error when dlrLinkTitle in traceabilityEvent is invalid', () => {
     const newContext = {
-      ...objectEventContext,
-      epcisObjectEvent: {
-        ...objectEventContext.epcisObjectEvent,
+      ...traceabilityEventContext,
+      traceabilityEvent: {
+        ...traceabilityEventContext.traceabilityEvent,
         dlrLinkTitle: '',
       },
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
-    expect(result.value).toEqual('Invalid epcisObjectEvent dlrLinkTitle');
+    expect(result.value).toEqual('Invalid traceabilityEvent dlrLinkTitle');
   });
 
-  it('should return error when dlrVerificationPage in epcisObjectEvent is invalid', () => {
+  it('should return error when dlrVerificationPage in traceabilityEvent is invalid', () => {
     const newContext = {
-      ...objectEventContext,
-      epcisObjectEvent: {
-        ...objectEventContext.epcisObjectEvent,
+      ...traceabilityEventContext,
+      traceabilityEvent: {
+        ...traceabilityEventContext.traceabilityEvent,
         dlrVerificationPage: '',
       },
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
-    expect(result.value).toEqual('Invalid epcisObjectEvent dlrVerificationPage');
+    expect(result.value).toEqual('Invalid traceabilityEvent dlrVerificationPage');
   });
 
-  it('should return error when dlrIdentificationKeyType in epcisObjectEvent is invalid', () => {
+  it('should return error when dlrIdentificationKeyType in traceabilityEvent is invalid', () => {
     const newContext = {
-      ...objectEventContext,
-      epcisObjectEvent: {
-        ...objectEventContext.epcisObjectEvent,
+      ...traceabilityEventContext,
+      traceabilityEvent: {
+        ...traceabilityEventContext.traceabilityEvent,
         dlrIdentificationKeyType: '',
       },
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
-    expect(result.value).toEqual('Invalid epcisObjectEvent dlrIdentificationKeyType');
+    expect(result.value).toEqual('Invalid traceabilityEvent dlrIdentificationKeyType');
   });
 
   it('should return error when storageAPIUrl in storage context is invalid', () => {
     const newContext = {
-      ...objectEventContext,
+      ...traceabilityEventContext,
       storage: {
-        ...objectEventContext.storage,
+        ...traceabilityEventContext.storage,
         url: '',
       },
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
     expect(result.value).toEqual('Invalid storage url');
   });
 
   it('should return error when params in storage context is invalid', () => {
     const newContext = {
-      ...objectEventContext,
+      ...traceabilityEventContext,
       storage: {
-        ...objectEventContext.storage,
+        ...traceabilityEventContext.storage,
         params: {},
       },
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
     expect(result.value).toEqual('Invalid storage params');
   });
 
   it('should return error when dlrAPIUrl in dlr context is invalid', () => {
     const newContext = {
-      ...objectEventContext,
+      ...traceabilityEventContext,
       dlr: {
-        ...objectEventContext.dlr,
+        ...traceabilityEventContext.dlr,
         dlrAPIUrl: '',
       },
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
     expect(result.value).toEqual('Invalid dlrAPIUrl');
   });
 
   it('should return error when dlrAPIKey in dlr context is invalid', () => {
     const newContext = {
-      ...objectEventContext,
+      ...traceabilityEventContext,
       dlr: {
-        ...objectEventContext.dlr,
+        ...traceabilityEventContext.dlr,
         dlrAPIKey: '',
       },
     };
-    const result = validateObjectEventContext(newContext as any);
+    const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
     expect(result.value).toEqual('Invalid dlrAPIKey');
   });

@@ -1,6 +1,6 @@
 ---
-sidebar_position: 44
-title: Process Association Event
+sidebar_position: 54
+title: Process Transformation Event Only
 ---
 
 import Disclaimer from '../../\_disclaimer.mdx';
@@ -9,18 +9,18 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The `processAssociationEvent` service is responsible for processing an [Association Event (DTE)](https://uncefact.github.io/spec-untp/docs/specification/DigitalTraceabilityEvents), issuing a [Verifiable Credential (VC)](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials), uploading it to the [Storage service](/docs/mock-apps/dependent-services/storage-service), registering the link to the stored DTE with the [Identity Resolver service](/docs/mock-apps/dependent-services/identity-resolution-service). It handles the entire lifecycle of creating and managing an association event, from data input to storage and resolution.
+The `processTransformationEventOnly` service is responsible for processing an [Transformation Event (DTE)](https://uncefact.github.io/spec-untp/docs/specification/DigitalTraceabilityEvents), issuing a [Verifiable Credential (VC)](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials), uploading it to the [Storage service](/docs/mock-apps/dependent-services/storage-service), registering the link to the stored DTE with the [Identity Resolver service](/docs/mock-apps/dependent-services/identity-resolution-service). It handles the entire lifecycle of creating and managing an transformation event, from data input to storage and resolution.
 
 ## Diagram
 
 ```mermaid
 sequenceDiagram
 participant C as Client
-participant P as processAssociationEvent
+participant P as processTransformationEvent
 participant V as VCKit
 participant S as Storage
 participant D as DLR
-C->>P: Call processAssociationEvent(associationEvent, context)
+C->>P: Call processTransformationEventOnly(transformationEvent, context)
 P->>P: Validate context
 P->>P: Extract identifier
 P->>V: Issue VC
@@ -29,14 +29,14 @@ P->>S: Upload VC
 S-->>P: Return VC URL
 P->>D: Register link resolver
 D-->>P: Return resolver URL
-P-->>C: Return association event VC and resolver URL
+P-->>C: Return transformation event VC and resolver URL
 ```
 
 ## Example
 
 ```json
 {
-  "name": "processAssociationEvent",
+  "name": "processTransformationEvent",
   "parameters": [
     {
       "vckit": {
@@ -53,12 +53,12 @@ P-->>C: Return association event VC and resolver URL
         "type": ["VerifiableCredential", "DigitalTraceabilityEvent"],
         "renderTemplate": [
           {
-            "template": "<div><h2>Association Event</h2></div>",
+            "template": "<div><h2>Transformation Event</h2></div>",
             "@type": "WebRenderingTemplate2022"
           }
         ],
         "dlrIdentificationKeyType": "gtin",
-        "dlrLinkTitle": "Association Event",
+        "dlrLinkTitle": "Transformation Event",
         "dlrVerificationPage": "https://verify.example.com"
       },
       "storage": {
@@ -85,7 +85,7 @@ P-->>C: Return association event VC and resolver URL
 | Property          | Required | Description                                                                                                                              | Type                                                            |
 | ----------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | vckit             | Yes      | Configuration for the VCKit service                                                                                                      | [VCKit](/docs/mock-apps/common/vckit)                           |
-| traceabilityEvent | Yes      | Configuration for the EPCIS Association Event Event                                                                                      | [Credential](/docs/mock-apps/common/credential)                 |
+| traceabilityEvent | Yes      | Configuration for the EPCIS Transformation Event Event                                                                                   | [Credential](/docs/mock-apps/common/credential)                 |
 | storage           | Yes      | Configuration for storage service                                                                                                        | [Storage](/docs/mock-apps/common/storage)                       |
 | dlr               | Yes      | Configuration for the Digital Link Resolver                                                                                              | [IDR](/docs/mock-apps/common/idr)                               |
 | identifierKeyPath | Yes      | JSON path to the identifier in the credential subject or the association for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/mock-apps/common/identifier-key-path) |

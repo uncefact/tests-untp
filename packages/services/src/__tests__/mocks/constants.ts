@@ -209,12 +209,12 @@ export const aggregationEventMock = {
   },
 };
 
-export const objectEventContext = {
+export const traceabilityEventContext = {
   vckit: {
     vckitAPIUrl: 'https://api.vckit.example.com',
     issuer: 'did:example:123456789abcdefghi',
   },
-  epcisObjectEvent: {
+  traceabilityEvent: {
     context: ['https://www.w3.org/2018/credentials/v1', 'https://gs1.org/voc/'],
     type: ['ObjectEventCredential'],
     renderTemplate: [
@@ -239,26 +239,7 @@ export const objectEventContext = {
     namespace: 'gs1',
     linkRegisterPath: '/api/resolver',
   },
-  identifierKeyPath: '/id',
-  dpp: {
-    dlrIdentificationKeyType: 'gtin',
-    dlrLinkTitle: 'Product DPP',
-    dlrVerificationPage: 'https://verify.example.com',
-  },
-  dppCredential: {
-    mappingFields: [
-      {
-        sourcePath: '/linkResolver',
-        destinationPath: '/traceabilityInformation/0/eventReference',
-      },
-    ],
-    dummyFields: [
-      {
-        path: '/traceabilityInformation/0/eventType',
-        data: 'object',
-      },
-    ],
-  },
+  identifierKeyPath: '/0/id',
 };
 
 export const digitalIdentityAnchorContext = {
@@ -313,39 +294,6 @@ export const digitalFacilityRecordContext = {
     params: {
       resultPath: '',
     },
-  },
-  identifierKeyPath: '/id',
-};
-
-export const associationEventContext = {
-  vckit: {
-    vckitAPIUrl: 'https://api.vckit.example.com',
-    issuer: 'did:example:123456789abcdefghi',
-  },
-  epcisAssociationEvent: {
-    context: ['https://www.w3.org/2018/credentials/v1', 'https://gs1.org/voc/'],
-    type: ['AssociationEventCredential'],
-    renderTemplate: [
-      {
-        template: '<div><h2>Association Event</h2></div>',
-        '@type': 'WebRenderingTemplate2022',
-      },
-    ],
-    dlrIdentificationKeyType: 'gtin',
-    dlrLinkTitle: 'Association Event',
-    dlrVerificationPage: 'https://verify.example.com',
-  },
-  storage: {
-    url: 'https://storage.example.com/upload',
-    params: {
-      resultPath: '/url',
-    },
-  },
-  dlr: {
-    dlrAPIUrl: 'https://dlr.example.com/api',
-    dlrAPIKey: 'dlr-api-key-12345',
-    namespace: 'gs1',
-    linkRegisterPath: '/api/resolver',
   },
   identifierKeyPath: '/id',
 };
