@@ -27,38 +27,26 @@ The generated configuration file will have the following structure:
 {
   "credentials": [
     {
-      "type": "aggregationEvent",
-      "version": "v0.0.1",
+      "type": "digitalConformityCredential",
+      "version": "v0.5.0",
       "dataPath": "",
       "url": ""
     },
     {
-      "type": "conformityCredential",
-      "version": "v0.0.1",
+      "type": "digitalFacilityRecord",
+      "version": "v0.5.0",
       "dataPath": "",
       "url": ""
     },
     {
-      "type": "objectEvent",
-      "version": "v0.0.1",
+      "type": "digitalProductPassport",
+      "version": "v0.5.0",
       "dataPath": "",
       "url": ""
     },
     {
-      "type": "productPassport",
-      "version": "v0.0.1",
-      "dataPath": "",
-      "url": ""
-    },
-    {
-      "type": "transactionEvent",
-      "version": "v0.0.1",
-      "dataPath": "",
-      "url": ""
-    },
-    {
-      "type": "transformationEvent",
-      "version": "v0.0.1",
+      "type": "digitalTraceabilityEvent",
+      "version": "v0.5.0",
       "dataPath": "",
       "url": ""
     }
@@ -146,39 +134,27 @@ packages/
 {
   "credentials": [
     {
-      "type": "aggregationEvent",
-      "version": "v0.0.1",
-      "dataPath": "credentials/aggregationEvent-sample.json",
+      "type": "digitalConformityCredential",
+      "version": "v0.5.0",
+      "dataPath": "credentials/conformityCredential/DigitalConformityCredential_instance-v0.5.0.json",
       "url": ""
     },
     {
-      "type": "conformityCredential",
-      "version": "v0.0.1",
-      "dataPath": "credentials/conformityCredential-sample.json",
+      "type": "digitalFacilityRecord",
+      "version": "v0.5.0",
+      "dataPath": "credentials/digitalFacilityRecord/DigitalFacilityRecord_instance-v0.5.0.json",
       "url": ""
     },
     {
-      "type": "objectEvent",
-      "version": "v0.0.1",
-      "dataPath": "credentials/objectEvent-sample.json",
+      "type": "digitalProductPassport",
+      "version": "v0.5.0",
+      "dataPath": "credentials/productPassport/DigitalProductPassport_instance-v0.5.0.json",
       "url": ""
     },
     {
-      "type": "productPassport",
-      "version": "v0.0.1",
-      "dataPath": "credentials/productPassport-sample.json",
-      "url": ""
-    },
-    {
-      "type": "transactionEvent",
-      "version": "v0.0.1",
-      "dataPath": "credentials/transactionEvent-sample.json",
-      "url": ""
-    },
-    {
-      "type": "transformationEvent",
-      "version": "v0.0.1",
-      "dataPath": "credentials/transformationEvent-sample.json",
+      "type": "digitalTraceabilityEvent",
+      "version": "v0.5.0",
+      "dataPath": "credentials/traceabilityEvents/DigitalTraceabilityEvent_instance-v0.5.0.json",
       "url": ""
     }
   ]
@@ -247,10 +223,10 @@ You can also add the name of the schema type to the `untpDefaultModel` in the pa
 
 ```typescript
 export const untpDefaultModel = [
-  'conformityCredential',
+  'digitalTraceabilityEvent',
+  'digitalProductPassport',
   'digitalFacilityRecord',
-  'traceabilityEvent',
-  'productPassport',
+  'digitalConformityCredential',
   'objectEvent',
 ];
 ```
