@@ -43,17 +43,20 @@ export const processTransformationEvent: IService = async (
     const vcKitContext = context.vckit;
     const transformationEventCredential = context.transformationEventCredential;
 
+    const transformationEventCredentialId = generateUUID();
+
     const epcisVc = await issueEpcisTransformationEvent(
       vcKitContext,
       epcisTransformationEventContext,
       dlrContext,
       transformationEventCredential,
+      transformationEventCredentialId,
       data,
     );
 
     const decodedEnvelopedVC = decodeEnvelopedVC(epcisVc);
     const storageContext = context.storage;
-    const transformantionEventLink = await uploadVC(generateUUID(), epcisVc, storageContext);
+    const transformantionEventLink = await uploadVC(transformationEventCredentialId, epcisVc, storageContext);
 
     const dppContext = context.dpp;
 
@@ -93,8 +96,10 @@ export const processTransformationEvent: IService = async (
           linkResolver: transformationEventLinkResolver,
         };
 
-        const dpp = await issueDPP(vcKitContext, dppContext, dppCredential, transformationEventData);
-        const DPPLink = await uploadVC(generateUUID(), dpp, storageContext);
+        const dppId = generateUUID();
+
+        const dpp = await issueDPP(vcKitContext, dppContext, dppCredential, dppId, transformationEventData);
+        const DPPLink = await uploadVC(dppId, dpp, storageContext);
         const { identifier, qualifierPath } = getLinkResolverIdentifier(productID);
 
         await registerLinkResolver(
@@ -124,6 +129,7 @@ export const processTransformationEvent: IService = async (
  * @param epcisTransformationEvent - context for the vckit to issue vc for epcis transformation event
  * @param dlrContext - context for the vckit to issue vc for epcis transformation event
  * @param productTransformation - context for the vckit to issue vc for epcis transformation event
+ * @param transformationEventCredentialId - id for the transformation event credential
  * @param inputIdentifiers - input identifiers for the transformation event
  * @returns VerifiableCredential
  */
@@ -132,9 +138,13 @@ export const issueEpcisTransformationEvent = async (
   epcisTransformationEvent: IEntityIssue,
   dlrContext: IConfigDLR,
   transformationEventCredential: any,
+  transformationEventCredentialId: string,
   data: any,
 ) => {
-  const restOfVC = { render: epcisTransformationEvent.renderTemplate };
+  const restOfVC = {
+    id: `urn:uuid:${transformationEventCredentialId}`,
+    render: epcisTransformationEvent.renderTemplate,
+  };
   const values = Object.values(data);
 
   const credentialSubject: any = values.reduce((acc, item, index) => {
@@ -185,6 +195,7 @@ export const uploadVC = async (id: string, vc: VerifiableCredential, storageCont
  * @param numberOfItems - number of cows
  * @param linkEpcis - link to the epcis event
  * @param data - data for the transformation event, which nlsids are selected
+ * @param dppId - id for the dpp
  * @param outputItem - output item of the transformation event
  * @returns
  */
@@ -192,9 +203,10 @@ export const issueDPP = async (
   vcKitContext: IVCKitContext,
   dppContext: ICredential,
   dppCredential: IConstructObjectParameters,
+  dppId: string,
   transformationEventData: { vc: VerifiableCredential; linkResolver: string },
 ) => {
-  const restOfVC = { render: dppContext.renderTemplate };
+  const restOfVC = { id: `urn:uuid:${dppId}`, render: dppContext.renderTemplate };
 
   const dppCredentialSubject = constructObject({}, transformationEventData, dppCredential);
   const result: VerifiableCredential = await issueVC({

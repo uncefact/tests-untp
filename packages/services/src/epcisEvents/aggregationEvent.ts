@@ -25,6 +25,8 @@ export const processAggregationEvent: IService = async (
 
   const { identifier, qualifierPath } = getLinkResolverIdentifier(parentIdentifier);
 
+  const credentialId = generateUUID();
+
   const aggregationVC = await issueVC({
     credentialSubject: aggregationEvent.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
@@ -33,12 +35,13 @@ export const processAggregationEvent: IService = async (
     context: traceabilityEvent.context,
     type: traceabilityEvent.type,
     restOfVC: {
+      id: `urn:uuid:${credentialId}`,
       render: traceabilityEvent.renderTemplate,
     },
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(aggregationVC);
-  const aggregationVCLink = await uploadData(storage, aggregationVC, generateUUID());
+  const aggregationVCLink = await uploadData(storage, aggregationVC, credentialId);
 
   const aggregationLinkResolver = await registerLinkResolver(
     aggregationVCLink,

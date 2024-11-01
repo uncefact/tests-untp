@@ -25,9 +25,12 @@ export const processDPP: IService = async (data: any, context: IDppContext): Pro
 
     const { identifier, qualifierPath } = getLinkResolverIdentifier(objectIdentifier);
 
+    const credentialId = generateUUID();
     const vckitContext = context.vckit;
     const dppContext = context.dpp;
-    const restOfVC = { render: dppContext?.renderTemplate ?? [] };
+
+    const restOfVC = { id: `urn:uuid:${credentialId}`, render: dppContext?.renderTemplate ?? [] };
+
     const vc: W3CVerifiableCredential = await issueVC({
       context: dppContext.context,
       credentialSubject,
@@ -41,7 +44,7 @@ export const processDPP: IService = async (data: any, context: IDppContext): Pro
     const decodedEnvelopedVC = decodeEnvelopedVC(vc);
 
     const storageContext = context.storage;
-    const vcUrl = await uploadData(storageContext, vc, generateUUID());
+    const vcUrl = await uploadData(storageContext, vc, credentialId);
 
     const linkResolverContext = context.dlr;
     const linkResolver = await registerLinkResolver(

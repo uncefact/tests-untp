@@ -33,6 +33,8 @@ export const processDigitalFacilityRecord: IService = async (
 
   const { identifier, qualifierPath } = getLinkResolverIdentifier(identifierString);
 
+  const credentialId = generateUUID();
+
   const vc: VerifiableCredential = await issueVC({
     credentialSubject: digitalFacilityRecordData.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
@@ -41,13 +43,14 @@ export const processDigitalFacilityRecord: IService = async (
     context: digitalFacilityRecord.context,
     type: digitalFacilityRecord.type,
     restOfVC: {
+      id: `urn:uuid:${credentialId}`,
       render: digitalFacilityRecord.renderTemplate,
     },
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(vc);
 
-  const vcUrl = await uploadData(storage, vc, generateUUID());
+  const vcUrl = await uploadData(storage, vc, credentialId);
 
   const linkResolver = await registerLinkResolver(
     vcUrl,

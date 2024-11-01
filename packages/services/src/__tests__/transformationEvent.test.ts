@@ -8,6 +8,7 @@ import { uploadData } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
 import { IEntityIssue } from '../types';
 import { contextTransformationEvent, dataTransformationEvent } from './mocks/constants';
+import { generateUUID } from '../utils';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
@@ -247,6 +248,7 @@ describe('Transformation event', () => {
           eventID: '1234',
         },
       };
+      const transformationEventCredentialId = generateUUID();
 
       (issueVC as jest.Mock).mockResolvedValue({
         '@context': ['https://www.w3.org/2018/credentials/v1', 'https://example.com/epcis-context'],
@@ -260,6 +262,7 @@ describe('Transformation event', () => {
         mockEpcisTransformationEvent as IEntityIssue,
         mockDlrContext,
         mockTransformationEventCredential,
+        transformationEventCredentialId,
         mockData,
       );
 

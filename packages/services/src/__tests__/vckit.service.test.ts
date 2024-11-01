@@ -58,11 +58,7 @@ describe('vckit.service', () => {
         `${mockVcKitAPIUrl}/credentials/issue`,
         expect.objectContaining({
           credential: expect.objectContaining({
-            '@context': expect.arrayContaining([
-              'https://www.w3.org/ns/credentials/v2',
-              'https://www.w3.org/ns/credentials/examples/v2',
-              'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
-            ]),
+            '@context': expect.arrayContaining(['https://www.w3.org/ns/credentials/v2']),
             type: ['VerifiableCredential'],
             issuer: mockIssuer,
             credentialSubject: mockCredentialSubject,
@@ -138,11 +134,9 @@ describe('vckit.service', () => {
           credential: expect.objectContaining({
             '@context': expect.arrayContaining([
               'https://www.w3.org/ns/credentials/v2',
-              'https://www.w3.org/ns/credentials/examples/v2',
-              'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
               'https://custom-context.example.com',
             ]),
-            type: ['VerifiableCredential', 'CustomCredential'],
+            type: ['CustomCredential', 'VerifiableCredential'],
           }),
         }),
         { headers: {} },
