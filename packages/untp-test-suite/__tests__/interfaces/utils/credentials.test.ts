@@ -88,7 +88,7 @@ describe('generateCredentialFile', () => {
   const storePath = './test/credentials.json';
 
   it('should generate latest credential file successfully', async () => {
-    const latestCredentialVersions = [{ type: 'traceabilityEvents', version: 'v0.0.3', dataPath: '', url: '' }];
+    const latestCredentialVersions = [{ type: 'digitalTraceabilityEvent', version: 'v0.5.0', dataPath: '', url: '' }];
     jest.spyOn(path, 'resolve').mockReturnValueOnce('../../../src/schemas');
     jest.spyOn(credentials, 'getLatestCredentialVersions').mockResolvedValueOnce(latestCredentialVersions);
     jest.spyOn(fs, 'writeFile').mockResolvedValueOnce();
