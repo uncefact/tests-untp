@@ -57,12 +57,13 @@ const CredentialRender = ({ credential }: { credential: VerifiableCredential }) 
               <>
                 <div
                   style={{
-                    all: 'initial', // reset all css
                     contain: 'content', // isolate the content
                     margin: '0 auto',
                     height: '100%',
                     minHeight: '100vh',
-                    overflow: 'hidden',
+                    overflowY: 'scroll',
+                    width: '100%',
+                    textAlign: 'left',
                   }}
                   key={i}
                   dangerouslySetInnerHTML={{ __html: doc }}
