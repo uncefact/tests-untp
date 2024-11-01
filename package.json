@@ -54,7 +54,8 @@
   },
   "resolutions": {
     "@types/eslint": "^8.4.6",
-    "strip-ansi": "6.0.0"
+    "strip-ansi": "6.0.0",
+    "string-width": "4.0.0"
   },
   "engines": {
     "node": ">= 20.12.2"
