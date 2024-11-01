@@ -9,7 +9,7 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The `processTraceabilityEvent` service is responsible for processing an [Traceability Event (DTE)](https://uncefact.github.io/spec-untp/docs/specification/DigitalTraceabilityEvents), it only process one event type in one time. The service will check the event type and call the corresponding service to process the event such as [processObjectEvent](/docs/mock-apps/services/process-object-event), [processAggregationEvent](/docs/mock-apps/services/process-aggregation-event), [processTransformationEventOnly](/docs/mock-apps/services/process-transformation-event-only), [processAssociationEvent](/docs/mock-apps/services/process-association-event), and [processTransactionEvent](/docs/mock-apps/services/process-transaction-event).
+The `processTraceabilityEvent` service is responsible for processing an [Traceability Event (DTE)](https://uncefact.github.io/spec-untp/docs/specification/DigitalTraceabilityEvents), it only process one event type in one time. The service will check the event type and call the corresponding service to process the event such as [processObjectEvent](/docs/mock-apps/services/process-object-event), [processAggregationEvent](/docs/mock-apps/services/process-aggregation-event), [processTransformationEvent](/docs/mock-apps/services/process-transformation-event), [processAssociationEvent](/docs/mock-apps/services/process-association-event), and [processTransactionEvent](/docs/mock-apps/services/process-transaction-event).
 
 ## Diagram
 
