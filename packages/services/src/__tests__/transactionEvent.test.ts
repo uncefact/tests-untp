@@ -52,7 +52,7 @@ describe('processTransactionEvent', () => {
     vckit: { vckitAPIUrl: 'https://example.com', issuer: 'did:web:example.com' },
     traceabilityEvent: {
       context: ['https://example.sh/TransactionEvent.jsonld'],
-      type: ['TransactionEventCredential'],
+      type: ['DigitalTraceabilityEvent'],
       dlrLinkTitle: 'Transaction Event',
       dlrIdentificationKeyType: linkResolverService.IdentificationKeyType.nlisid,
       dlrVerificationPage: 'http://exampleUI.com/verify',

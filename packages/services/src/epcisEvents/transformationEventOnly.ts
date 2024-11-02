@@ -34,6 +34,8 @@ export const processTransformationEventOnly: IService = async (
   const { identifier: transformationEventIdentifier, qualifierPath: transformationEventQualifierPath } =
     getLinkResolverIdentifier(transformationIdentifier);
 
+  const credentialId = generateUUID();
+
   const transformationEventVc: VerifiableCredential = await issueVC({
     credentialSubject: transformationEvent.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
@@ -42,12 +44,13 @@ export const processTransformationEventOnly: IService = async (
     context: traceabilityEvent.context,
     type: traceabilityEvent.type,
     restOfVC: {
+      id: `urn:uuid:${credentialId}`,
       render: traceabilityEvent.renderTemplate,
     },
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(transformationEventVc);
-  const transformationEventVcUrl = await uploadData(storage, transformationEventVc, generateUUID());
+  const transformationEventVcUrl = await uploadData(storage, transformationEventVc, credentialId);
 
   const transformationEventLinkResolver = await registerLinkResolver(
     transformationEventVcUrl,

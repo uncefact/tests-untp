@@ -34,6 +34,8 @@ export const processObjectEvent: IService = async (
   const { identifier: objectEventIdentifier, qualifierPath: objectEventQualifierPath } =
     getLinkResolverIdentifier(objectIdentifier);
 
+  const credentialId = generateUUID();
+
   const objectEventVc: VerifiableCredential = await issueVC({
     credentialSubject: objectEvent.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
@@ -42,12 +44,13 @@ export const processObjectEvent: IService = async (
     context: traceabilityEvent.context,
     type: traceabilityEvent.type,
     restOfVC: {
+      id: `urn:uuid:${credentialId}`,
       render: traceabilityEvent.renderTemplate,
     },
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(objectEventVc);
-  const objectEventVcUrl = await uploadData(storage, objectEventVc, generateUUID());
+  const objectEventVcUrl = await uploadData(storage, objectEventVc, credentialId);
 
   const objectEventLinkResolver = await registerLinkResolver(
     objectEventVcUrl,

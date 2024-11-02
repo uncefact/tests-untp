@@ -33,6 +33,8 @@ export const processDigitalConformityCredential: IService = async (
 
   const { identifier, qualifierPath } = getLinkResolverIdentifier(identifierString);
 
+  const credentialId = generateUUID();
+
   const vc: VerifiableCredential = await issueVC({
     credentialSubject: digitalConformityCredentialData.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
@@ -41,13 +43,14 @@ export const processDigitalConformityCredential: IService = async (
     context: digitalConformityCredential.context,
     type: digitalConformityCredential.type,
     restOfVC: {
+      id: `urn:uuid:${credentialId}`,
       render: digitalConformityCredential.renderTemplate,
     },
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(vc);
 
-  const vcUrl = await uploadData(storage, vc, generateUUID());
+  const vcUrl = await uploadData(storage, vc, credentialId);
 
   const linkResolver = await registerLinkResolver(
     vcUrl,

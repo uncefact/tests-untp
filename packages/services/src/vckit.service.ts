@@ -11,11 +11,7 @@ import { decodeJwt } from 'jose';
 import { privateAPI } from './utils/httpService.js';
 import _ from 'lodash';
 
-export const contextDefault = [
-  'https://www.w3.org/ns/credentials/v2',
-  'https://www.w3.org/ns/credentials/examples/v2',
-  'https://dev-render-method-context.s3.ap-southeast-1.amazonaws.com/dev-render-method-context.json',
-];
+export const contextDefault = ['https://www.w3.org/ns/credentials/v2'];
 
 export const typeDefault = ['VerifiableCredential'];
 
@@ -127,8 +123,21 @@ export const issueCredentialStatus = async (args: IArgIssueCredentialStatus): Pr
     throw new Error('Error issuing credential status: Bitstring Status Issuer is required');
   }
 
+  let issuerId = args.bitstringStatusIssuer;
+  if (_.isPlainObject(args.bitstringStatusIssuer)) {
+    if ((args.bitstringStatusIssuer as any).id) {
+      issuerId = (args.bitstringStatusIssuer as any).id;
+    } else {
+      throw new Error('Error issuing credential status: Bitstring Status Issuer ID is required');
+    }
+  }
+
   const { host, headers, statusPurpose = 'revocation', ...rest } = args;
-  const body = { statusPurpose, ...rest };
+  const body = {
+    statusPurpose,
+    ...rest,
+    bitstringStatusIssuer: issuerId,
+  };
 
   if (headers) {
     _validateVckitHeaders(headers);
@@ -145,7 +154,7 @@ const constructCredentialObject = ({ context, type, issuer, credentialSubject, .
   return {
     credential: {
       '@context': [...contextDefault, ...(context || [])],
-      type: [...typeDefault, ...(type || [])],
+      type: [...(type || []), ...typeDefault],
       issuer: issuer,
       credentialSubject,
       ...restOfVC,
