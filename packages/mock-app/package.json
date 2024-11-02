@@ -1,10 +1,10 @@
 {
   "name": "@mock-app/core",
-  "version": "1.0.0",
+  "version": "0.1.0-beta",
   "private": true,
   "dependencies": {
-    "@mock-app/components": "1.0.0",
-    "@mock-app/services": "1.0.0",
+    "@mock-app/components": "0.1.0-beta",
+    "@mock-app/services": "0.1.0-beta",
     "@mui/icons-material": "^5.15.5",
     "@mui/material": "^5.15.5",
     "@vckit/core-types": "1.0.0-beta.7",

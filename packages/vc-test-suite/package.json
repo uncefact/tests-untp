@@ -1,6 +1,6 @@
 {
   "name": "@test-untp/vc-test-suite",
-  "version": "1.0.0",
+  "version": "0.1.0-beta",
   "description": "> TODO: description",
   "author": "Nam Hoang <hoangxuannam160493@gmail.com>",
   "homepage": "https://github.com/uncefact/tests-untp#readme",
@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@digitalbazaar/mocha-w3c-interop-reporter": "1.6.0",
-    "@mock-app/services": "1.0.0",
+    "@mock-app/services": "0.1.0-beta",
     "axios": "^1.7.2",
     "chai": "^4.3.6",
     "jsonwebtoken": "^9.0.2",
