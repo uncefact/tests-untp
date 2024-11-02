@@ -172,7 +172,7 @@ export const transactionEventMock = {
   transactionEventDLRMock: `https://example-dlr.com/nlisid/9988776600000?linkType=all`,
   transactionVCMock: {
     '@context': ['https://example.sh/TransactionEvent.jsonld'],
-    type: ['TransactionEventCredential'],
+    type: ['DigitalTraceabilityEvent'],
     issuer: 'did:web:example.com',
     credentialSubject: {
       sourceParty: { partyID: `https://beef-steak-shop.com/info.json`, name: 'Beef Steak Shop' },

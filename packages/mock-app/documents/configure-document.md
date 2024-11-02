@@ -216,7 +216,7 @@ Based on the example, you can define the features of the apps in the configurati
                     "renderTemplate": [
                       { "template": "<p>Render dpp template</p>", "@type": "WebRenderingTemplate2022" }
                     ],
-                    "type": ["TransactionEventCredential"],
+                    "type": ["DigitalTraceabilityEvent"],
                     "dlrLinkTitle": "Transaction Event",
                     "dlrIdentificationKeyType": "nlisid",
                     "dlrVerificationPage": "http://dlr.example.com/verify"
