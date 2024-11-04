@@ -93,7 +93,7 @@ const Verify = () => {
     errorMessages = ['Something went wrong. Please try again.'],
     screen: PassportStatus = PassportStatus.ERROR,
   ) => {
-    setErrorMessages(errorMessages ?? ['Something went wrong. Please try again.']);
+    setErrorMessages(errorMessages);
     setCurrentScreen(screen);
   };
   // TODO: Move this function to the vckit service
