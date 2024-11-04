@@ -64,25 +64,28 @@ const Verify = () => {
         return setCredential(credential);
       };
 
-      if (
-        encryptedCredential?.credentialSubject ||
-        (encryptedCredential?.type?.includes('EnvelopedVerifiableCredential') &&
-          encryptedCredential?.id?.startsWith('data:application/'))
-      ) {
-        return verifyHash(encryptedCredential);
-      }
-
       const { cipherText, iv, tag, type } = encryptedCredential;
 
-      const credentialJsonString = decryptCredential({
-        cipherText,
-        key,
-        iv,
-        tag,
-        type,
-      });
+      let credentialObject;
+      if (
+        'cipherText' in encryptedCredential &&
+        'iv' in encryptedCredential &&
+        'tag' in encryptedCredential &&
+        'type' in encryptedCredential
+      ) {
+        const credentialJsonString = decryptCredential({
+          cipherText,
+          key,
+          iv,
+          tag,
+          type,
+        });
 
-      const credentialObject = JSON.parse(credentialJsonString);
+        credentialObject = JSON.parse(credentialJsonString);
+      } else {
+        credentialObject = encryptedCredential;
+      }
+
       return verifyHash(credentialObject);
     } catch (error) {
       displayErrorUI();
