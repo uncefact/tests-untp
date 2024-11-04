@@ -199,15 +199,16 @@ describe('Verify', () => {
         hash: 'c60a35053e0d9f64e2072ad1d995182169dc05eaeded065b128e006681149ba3',
       },
     };
-
     // URL-encode the payload for use as a query parameter
     const encodedPayload = `q=${encodeURIComponent(JSON.stringify(mockPayloadValidHash))}`;
-
-    (computeHash as any).mockImplementation(() => mockPayloadValidHash.payload.hash);
     (useLocation as any).mockImplementation(() => ({
       search: encodedPayload,
     }));
+
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockEncryptedCredential);
+
+    (computeHash as any).mockImplementation(() => mockPayloadValidHash.payload.hash);
+
     (verifyVC as jest.Mock).mockImplementation(() => ({
       verified: true,
     }));
@@ -226,28 +227,27 @@ describe('Verify', () => {
   });
 
   it('should render success screen for valid hash and enveloping proof without key', async () => {
-    const mockCredentialEnvelopingProof = {
-      '@context': ['https://www.w3.org/ns/credentials/v2', 'https://vocabulary.uncefact.org/untp/dpp/0.5.0/'],
-      type: 'EnvelopedVerifiableCredential',
-      id: 'data:application/vc-ld+jwt,eyJhbGciOiJIUzI1NiIsImlzcyI6ImRpZDp3ZWI6dW5jZWZhY3QuZ2l0aHViLmlvOnByb2plY3QtdmNraXQ6dGVzdC1hbmQtZGV2ZWxvcG1lbnQiLCJ0eXAiOiJ2Yy1sZCtqd3QifQ.eyJjcmVkZW50aWFsU3RhdHVzIjp7ImlkIjoiaHR0cDovL2V4YW1wbGUuY29tL2JpdHN0cmluZy1zdGF0dXMtbGlzdC8xIzAiLCJ0eXBlIjoiQml0c3RyaW5nU3RhdHVzTGlzdEVudHJ5Iiwic3RhdHVzUHVycG9zZSI6InJldm9jYXRpb24iLCJzdGF0dXNMaXN0SW5kZXgiOjAsInN0YXR1c0xpc3RDcmVkZW50aWFsIjoiaHR0cDovL2V4YW1wbGUuY29tL2JpdHN0cmluZy1zdGF0dXMtbGlzdC8xIn0sInJlbmRlciI6eyJ0ZW1wbGF0ZSI6IjxoMT57e25hbWV9fTwvaDE-In0sInR5cGUiOlsiVmVyaWZpYWJsZUNyZWRlbnRpYWwiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsibmFtZSI6IkpvaG4gRG9lIn19.cn7DawmWIcyONNqMNMQrDISUMQjEmT7SqRn8kG1aAMk',
-    };
-
     const mockPayloadValidHash = {
       payload: {
         uri: 'http://localhost:3334/v1/verifiable-credentials/6c70251a-f2e7-48a0-a86c-e1027f0e7143.json',
         hash: '595d8d20c586c6f55f8a758f294674fa85069db5c518a0f4cbbd3fd61f46522f',
       },
     };
-
     // URL-encode the payload for use as a query parameter
     const encodedPayload = `q=${encodeURIComponent(JSON.stringify(mockPayloadValidHash))}`;
-
-    (computeHash as any).mockImplementation(() => mockPayloadValidHash.payload.hash);
     (useLocation as any).mockImplementation(() => ({
       search: encodedPayload,
     }));
 
+    const mockCredentialEnvelopingProof = {
+      '@context': ['https://www.w3.org/ns/credentials/v2', 'https://vocabulary.uncefact.org/untp/dpp/0.5.0/'],
+      type: 'EnvelopedVerifiableCredential',
+      id: 'data:application/vc-ld+jwt,eyJhbGciOiJIUzI1NiIsImlzcyI6ImRpZDp3ZWI6dW5jZWZhY3QuZ2l0aHViLmlvOnByb2plY3QtdmNraXQ6dGVzdC1hbmQtZGV2ZWxvcG1lbnQiLCJ0eXAiOiJ2Yy1sZCtqd3QifQ.eyJjcmVkZW50aWFsU3RhdHVzIjp7ImlkIjoiaHR0cDovL2V4YW1wbGUuY29tL2JpdHN0cmluZy1zdGF0dXMtbGlzdC8xIzAiLCJ0eXBlIjoiQml0c3RyaW5nU3RhdHVzTGlzdEVudHJ5Iiwic3RhdHVzUHVycG9zZSI6InJldm9jYXRpb24iLCJzdGF0dXNMaXN0SW5kZXgiOjAsInN0YXR1c0xpc3RDcmVkZW50aWFsIjoiaHR0cDovL2V4YW1wbGUuY29tL2JpdHN0cmluZy1zdGF0dXMtbGlzdC8xIn0sInJlbmRlciI6eyJ0ZW1wbGF0ZSI6IjxoMT57e25hbWV9fTwvaDE-In0sInR5cGUiOlsiVmVyaWZpYWJsZUNyZWRlbnRpYWwiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsibmFtZSI6IkpvaG4gRG9lIn19.cn7DawmWIcyONNqMNMQrDISUMQjEmT7SqRn8kG1aAMk',
+    };
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockCredentialEnvelopingProof);
+
+    (computeHash as any).mockImplementation(() => mockPayloadValidHash.payload.hash);
+
     (verifyVC as jest.Mock).mockImplementation(() => ({
       verified: true,
     }));
@@ -270,6 +270,19 @@ describe('Verify', () => {
   });
 
   it('should render success screen for valid hash and enveloping proof with key', async () => {
+    const mockPayloadValidHash = {
+      payload: {
+        uri: 'http://localhost:3334/v1/verifiable-credentials/6c70251a-f2e7-48a0-a86c-e1027f0e7143.json',
+        hash: '595d8d20c586c6f55f8a758f294674fa85069db5c518a0f4cbbd3fd61f46522f',
+        key: 'key',
+      },
+    };
+    // URL-encode the payload for use as a query parameter
+    const encodedPayload = `q=${encodeURIComponent(JSON.stringify(mockPayloadValidHash))}`;
+    (useLocation as any).mockImplementation(() => ({
+      search: encodedPayload,
+    }));
+
     const mockNewEncryptedCredential = {
       cipherText:
         'LGoWS4IlsMnp4OrMZ1Pm85hAS+y6iQ2kj3j0ZSQzpB8De30T/1IbQr42XPlUZSxqP2El9qBFvRz9sk0yQ4jGTw8jLKLEv9ZGu3svfj/oAygVB8hexOLQc6fHq0Jw5h+zXTNye6syOfaq7+jxGOJC3xBjOuqfqprnw6Idli6GAJ/LOdj+/C/OZoEMNvEEH+l51MWWBz2m3J5RxvfeNnaqfKylfYquf0Ajk/Eba6QtVFGrMcgY6kkgQu4FCkWMHwS89vDy4guEzecYQYXn4WtCJc0lnIMwYzIbVs9Sm03lIwk60nKyt1XU1Cu8tQyjGjOl6RiODsNjq1yNXFxUXwf75wAcwdY0qpsFD79MWyPHnOQApQxvwJx3a4exjSV+36y4Zjtv/6lu9Epq25+kEwdlevRSYU5KYg7tMhG7sDtyOvHJ9WksBX6O5OuZ1rzP89l/+0vDagdeiF4XbtAo9CcdfeRvxPzEaw7X55DdpVzv9YVYuMSi/IKxa3XLbkmR2eBIUz/ZdxpXXoMmnovSs4tHAwJzu3U5KMf2/dfjCpFbOwUZQ/j+RNlDFeQMuQzW8Xd2l3IfAHev0SXR5td1hvC1RbNj4loQHWugdbwMXf7AG7DhEmK7F3u0deNyuPlayqRUkxC8sWTiWlzJz9vM0KEb4dB9giGkPdtXgLqk3paiGk4Tqa9218yaP9E+wF0lcu0NElcR3nlW2aEsPFFQddbuD8jRHPDThCeH20+9mfNL3FcyllviK4dBjysWURc0tXeAWoloxwcphqIgjyDn3xZHJAfPKfIz+i8q3vgp15eAYs3fIV+GUp4r3bAk4qoIVx0cOn/Oea2XXwsp3zdNk3V+1rDKZdGmXFwQBCbutXOBrOpgZMaNgMVL9iq4umVIRZAXhG1mW9reLycqUMdoxIVvjqWbc5F+7uAUHwZCNBpmuLFVuK/hJbFBMb7/aDCA4P+9PUGEYAAfo8ZDrg5uRLX0vcAeYqB0WlgAdAH7/Tw8mSbyMoV8U7oNf5BNrpHvgAqGQjLmF9884nt6vRK0/p3BWV0ClLWND5DTQUfdTHqDIBnp1ZnlWGIZinhzNTg=',
@@ -278,24 +291,12 @@ describe('Verify', () => {
       type: 'aes-256-gcm',
     };
 
-    const mockPayloadValidHash = {
-      payload: {
-        uri: 'http://localhost:3334/v1/verifiable-credentials/6c70251a-f2e7-48a0-a86c-e1027f0e7143.json',
-        hash: '595d8d20c586c6f55f8a758f294674fa85069db5c518a0f4cbbd3fd61f46522f',
-        key: 'key',
-      },
-    };
-
-    // URL-encode the payload for use as a query parameter
-    const encodedPayload = `q=${encodeURIComponent(JSON.stringify(mockPayloadValidHash))}`;
+    jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockNewEncryptedCredential);
 
     (computeHash as any).mockImplementation(() => mockPayloadValidHash.payload.hash);
-    (useLocation as any).mockImplementation(() => ({
-      search: encodedPayload,
-    }));
 
-    jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockNewEncryptedCredential);
     (decryptCredential as any).mockImplementation(() => JSON.stringify(mockEncryptedCredential));
+
     (verifyVC as jest.Mock).mockImplementation(() => ({
       verified: true,
     }));
@@ -324,15 +325,16 @@ describe('Verify', () => {
         hash: 'invalid-hash',
       },
     };
-
     // URL-encode the payload for use as a query parameter
     const encodedPayload = `q=${encodeURIComponent(JSON.stringify(mockPayloadInvalidHash))}`;
-
-    (computeHash as any).mockImplementation(() => 'valid-hash');
     (useLocation as any).mockImplementation(() => ({
       search: encodedPayload,
     }));
+
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockEncryptedCredential);
+
+    (computeHash as any).mockImplementation(() => 'valid-hash');
+
     (verifyVC as jest.Mock).mockImplementation(() => ({
       verified: true,
     }));
