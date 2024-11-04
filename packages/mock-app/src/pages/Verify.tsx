@@ -2,6 +2,7 @@ import { Status } from '@mock-app/components';
 import { computeHash, decryptCredential, publicAPI, verifyVC } from '@mock-app/services';
 import { IVerifyResult, VerifiableCredential } from '@vckit/core-types';
 import * as jose from 'jose';
+import _ from 'lodash';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { BackButton } from '../components/BackButton';
@@ -83,7 +84,7 @@ const Verify = () => {
 
         credentialObject = JSON.parse(credentialJsonString);
       } else {
-        credentialObject = encryptedCredential;
+        credentialObject = _.cloneDeep(encryptedCredential);
       }
 
       return verifyHash(credentialObject);
