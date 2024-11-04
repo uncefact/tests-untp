@@ -54,15 +54,22 @@ const Verify = () => {
       const { payload } = JSON.parse(payloadQuery);
       const { uri, key, hash } = payload;
       const encryptedCredential = await publicAPI.get(uri);
-      if (encryptedCredential?.credentialSubject) {
-        return setCredential(encryptedCredential);
-      }
+
+      const verifyHash = (credential: VerifiableCredential) => {
+        if (hash) {
+          const computedHash = computeHash(credential);
+          if (computedHash !== hash) return displayErrorUI(['Hash invalid']);
+        }
+
+        return setCredential(credential);
+      };
 
       if (
-        encryptedCredential?.type?.includes('EnvelopedVerifiableCredential') &&
-        encryptedCredential?.id?.startsWith('data:application/')
+        encryptedCredential?.credentialSubject ||
+        (encryptedCredential?.type?.includes('EnvelopedVerifiableCredential') &&
+          encryptedCredential?.id?.startsWith('data:application/'))
       ) {
-        return setCredential(encryptedCredential);
+        return verifyHash(encryptedCredential);
       }
 
       const { cipherText, iv, tag, type } = encryptedCredential;
@@ -76,12 +83,7 @@ const Verify = () => {
       });
 
       const credentialObject = JSON.parse(credentialJsonString);
-      const credentialHash = computeHash(credentialObject);
-      if (credentialHash !== hash) {
-        return displayErrorUI();
-      }
-
-      setCredential(credentialObject);
+      return verifyHash(credentialObject);
     } catch (error) {
       displayErrorUI();
     }
@@ -91,7 +93,7 @@ const Verify = () => {
     errorMessages = ['Something went wrong. Please try again.'],
     screen: PassportStatus = PassportStatus.ERROR,
   ) => {
-    setErrorMessages(errorMessages);
+    setErrorMessages(errorMessages ?? ['Something went wrong. Please try again.']);
     setCurrentScreen(screen);
   };
   // TODO: Move this function to the vckit service
