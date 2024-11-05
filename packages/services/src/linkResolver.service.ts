@@ -2,7 +2,7 @@ import GS1DigitalLinkToolkit from 'digitallink_toolkit_server/src/GS1DigitalLink
 import { IDLRAI, MimeTypeEnum } from './types/index.js';
 import { GS1ServiceEnum } from './identityProviders/GS1Provider.js';
 import { privateAPI } from './utils/httpService.js';
-import { extractDomain } from './utils/helpers.js';
+import { constructVerifyURL, extractDomain } from './utils/helpers.js';
 /**
  * Generates a link resolver URL based on the provided linkResolver and linkResponse objects.
  *
@@ -174,7 +174,7 @@ export const constructLinkResolver = (
 };
 
 export const registerLinkResolver = async (
-  url: string,
+  storageCredential: any,
   identificationKeyType: IdentificationKeyType,
   identificationKey: string,
   linkTitle: string,
@@ -191,9 +191,11 @@ export const registerLinkResolver = async (
     identificationKey: identificationKey,
     itemDescription: linkTitle,
   };
-  const query = encodeURIComponent(JSON.stringify({ payload: { uri: url } }));
-  const queryString = `q=${query}`;
-  const verificationPassportPage = `${verificationPage}/?${queryString}`;
+  let verifyURL = storageCredential;
+  if (typeof storageCredential !== 'string') {
+    verifyURL = constructVerifyURL(storageCredential);
+  }
+
   const linkResponses: ILinkResponse[] = [
     {
       linkType: `${namespace}:${LinkType.verificationLinkType}`,
@@ -204,13 +206,13 @@ export const registerLinkResolver = async (
     {
       linkType: `${namespace}:${linkType}`,
       linkTitle: linkTitle,
-      targetUrl: url,
+      targetUrl: storageCredential?.uri ?? storageCredential ?? '',
       mimeType: MimeType.applicationJson,
     },
     {
       linkType: `${namespace}:${linkType}`,
       linkTitle: linkTitle,
-      targetUrl: verificationPassportPage,
+      targetUrl: verifyURL,
       mimeType: MimeType.textHtml,
       defaultLinkType: true,
       defaultIanaLanguage: true,
@@ -223,7 +225,6 @@ export const registerLinkResolver = async (
     namespace,
     linkResolver,
     linkResponses,
-    queryString,
     dlrAPIKey,
     qualifierPath: qualifierPath ?? '/',
     responseLinkType,

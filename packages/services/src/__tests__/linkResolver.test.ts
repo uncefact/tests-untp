@@ -147,6 +147,52 @@ describe('create link resolve service', () => {
     );
   });
 
+  it('should return url when creating link resolver with target URL containing hash', async () => {
+    let expectParamsCallAPI: any;
+    jest.spyOn(privateAPI, 'post').mockImplementation((value, params) => {
+      expectParamsCallAPI = params;
+      return Promise.resolve({});
+    });
+
+    let expectToken = '';
+    jest.spyOn(privateAPI, 'setBearerTokenAuthorizationHeaders' as any).mockImplementation((token) => {
+      expectToken = token as string;
+      return Promise.resolve({});
+    });
+
+    const mockValue = {
+      eventLink: {
+        hash: 'c865b6cc188b099c2a61a36f9acaefba72140eb945b46d69205fdb385d004194',
+        uri: 'http://localhost:3334/v1/verifiable-credentials/c9fbfdd9-7b29-48de-82f8-23e355406c09.json',
+      },
+      identificationKeyType: IdentificationKeyType.nlisid,
+      identificationKey: 'gtin-key',
+      itemDescription: 'EPCIS transformation event VC',
+      verificationPage: 'https://verify.com/dev/verifyCredential',
+      linkType: LinkType.epcisLinkType,
+      dlrAPIUrl: 'https://dlr.com',
+      dlrAPIKey: 'dlr-key',
+      namespace: 'gtin',
+      qualifierPath: '',
+    };
+
+    const resolverUrl = await registerLinkResolver(
+      mockValue.eventLink,
+      mockValue.identificationKeyType,
+      mockValue.identificationKey,
+      mockValue.itemDescription,
+      mockValue.linkType,
+      mockValue.verificationPage,
+      mockValue.dlrAPIUrl,
+      mockValue.dlrAPIKey,
+      mockValue.namespace,
+    );
+
+    expect(resolverUrl).toEqual(
+      `${mockValue.dlrAPIUrl}/${mockValue.namespace}/${mockValue.identificationKeyType}/${mockValue.identificationKey}/?linkType=all`,
+    );
+  });
+
   it('should throw error when creating link resolver', async () => {
     const errorMessage = 'Error creating link resolver';
     try {
@@ -165,6 +211,51 @@ describe('create link resolve service', () => {
       });
     } catch (error: any) {
       expect(error.message).toEqual(errorMessage);
+    }
+  });
+
+  it('should throw error when creating link resolver with target URL invalid', async () => {
+    try {
+      let expectParamsCallAPI: any;
+      jest.spyOn(privateAPI, 'post').mockImplementation((value, params) => {
+        expectParamsCallAPI = params;
+        return Promise.resolve({});
+      });
+
+      let expectToken = '';
+      jest.spyOn(privateAPI, 'setBearerTokenAuthorizationHeaders' as any).mockImplementation((token) => {
+        expectToken = token as string;
+        return Promise.resolve({});
+      });
+
+      const mockValue = {
+        eventLink: {},
+        identificationKeyType: IdentificationKeyType.nlisid,
+        identificationKey: 'gtin-key',
+        itemDescription: 'EPCIS transformation event VC',
+        verificationPage: 'https://verify.com/dev/verifyCredential',
+        linkType: LinkType.epcisLinkType,
+        dlrAPIUrl: 'https://dlr.com',
+        dlrAPIKey: 'dlr-key',
+        namespace: 'gtin',
+        qualifierPath: '/10/ABC123',
+      };
+
+      await registerLinkResolver(
+        mockValue.eventLink,
+        mockValue.identificationKeyType,
+        mockValue.identificationKey,
+        mockValue.itemDescription,
+        mockValue.linkType,
+        mockValue.verificationPage,
+        mockValue.dlrAPIUrl,
+        mockValue.dlrAPIKey,
+        mockValue.namespace,
+        mockValue.qualifierPath,
+        mockValue.linkType,
+      );
+    } catch (error: any) {
+      expect(error.message).toEqual('URI is required');
     }
   });
 });
