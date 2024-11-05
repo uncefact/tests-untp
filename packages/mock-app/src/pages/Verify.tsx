@@ -2,6 +2,7 @@ import { Status } from '@mock-app/components';
 import { computeHash, decryptCredential, publicAPI, verifyVC } from '@mock-app/services';
 import { IVerifyResult, VerifiableCredential } from '@vckit/core-types';
 import * as jose from 'jose';
+import _ from 'lodash';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { BackButton } from '../components/BackButton';
@@ -54,34 +55,39 @@ const Verify = () => {
       const { payload } = JSON.parse(payloadQuery);
       const { uri, key, hash } = payload;
       const encryptedCredential = await publicAPI.get(uri);
-      if (encryptedCredential?.credentialSubject) {
-        return setCredential(encryptedCredential);
-      }
 
-      if (
-        encryptedCredential?.type?.includes('EnvelopedVerifiableCredential') &&
-        encryptedCredential?.id?.startsWith('data:application/')
-      ) {
-        return setCredential(encryptedCredential);
-      }
+      const verifyHash = (credential: VerifiableCredential) => {
+        if (hash) {
+          const computedHash = computeHash(credential);
+          if (computedHash !== hash) return displayErrorUI(['Hash invalid']);
+        }
+
+        return setCredential(credential);
+      };
 
       const { cipherText, iv, tag, type } = encryptedCredential;
 
-      const credentialJsonString = decryptCredential({
-        cipherText,
-        key,
-        iv,
-        tag,
-        type,
-      });
+      let credentialObject;
+      if (
+        'cipherText' in encryptedCredential &&
+        'iv' in encryptedCredential &&
+        'tag' in encryptedCredential &&
+        'type' in encryptedCredential
+      ) {
+        const credentialJsonString = decryptCredential({
+          cipherText,
+          key,
+          iv,
+          tag,
+          type,
+        });
 
-      const credentialObject = JSON.parse(credentialJsonString);
-      const credentialHash = computeHash(credentialObject);
-      if (credentialHash !== hash) {
-        return displayErrorUI();
+        credentialObject = JSON.parse(credentialJsonString);
+      } else {
+        credentialObject = _.cloneDeep(encryptedCredential);
       }
 
-      setCredential(credentialObject);
+      return verifyHash(credentialObject);
     } catch (error) {
       displayErrorUI();
     }
