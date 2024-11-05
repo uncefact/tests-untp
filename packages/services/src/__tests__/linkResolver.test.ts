@@ -214,7 +214,7 @@ describe('create link resolve service', () => {
     }
   });
 
-  it('should throw error when creating link resolver with target URL invalid', async () => {
+  it('should throw error when creating link resolver with invalid target URL', async () => {
     try {
       let expectParamsCallAPI: any;
       jest.spyOn(privateAPI, 'post').mockImplementation((value, params) => {
