@@ -6,6 +6,7 @@ title: Import Button
 import Disclaimer from '../../\_disclaimer.mdx';
 
 <Disclaimer />
+
 ## Description
 
 The ImportButton component is responsible for rendering a button that allows the user to import data. The component will return the data that is imported by the user.
@@ -21,6 +22,30 @@ The ImportButton component is responsible for rendering a button that allows the
     "style": { "margin": "40px auto", "paddingTop": "40px", "width": "80%" }
   }
 }
+```
+
+## Diagram
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant MA as Mock App
+    participant V as VCKit
+
+    U->>MA: Import file
+    alt is verifiable credential
+        MA->>V: Verify VC
+        V-->>MA: Return verified result
+        alt is verified
+            alt is enveloped verifiable credential
+                MA->>MA: Decode enveloped VC
+            else is embedded verifiable credential
+                MA->>U: Return data
+            end
+        end
+    else is JSON
+        MA->>U: Return data
+    end
 ```
 
 ## Definitions

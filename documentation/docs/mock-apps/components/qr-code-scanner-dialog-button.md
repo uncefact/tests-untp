@@ -23,6 +23,31 @@ The QRCodeScannerDialogButton component is responsible for rendering a button th
 }
 ```
 
+## Diagram
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant MA as Mock App
+    participant V as VCKit
+
+    U->>MA: Scan QRCode
+    MA->>MA: Fetch data from QRCode URL
+    alt is verifiable credential
+        MA->>V: Verify VC
+        V-->>MA: Return verified result
+        alt is verified
+            alt is enveloped verifiable credential
+                MA->>MA: Decode enveloped VC
+            else is embedded verifiable credential
+                MA->>U: Return data
+            end
+        end
+    else is JSON
+        MA->>U: Return data
+    end
+```
+
 ## Definitions
 
 | Property | Required | Description                                                      | Type                                                                    |
