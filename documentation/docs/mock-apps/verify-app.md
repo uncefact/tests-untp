@@ -36,7 +36,7 @@ The UI of this page includes these information fields: Type, Issued by and Issue
 
 With the download button, it will download the JSON data or JWT data if the credential is JWT.
 
-## Hash validation (if it exist in URL)
+## Hash validation (if it exist in the URL)
 
 To ensure the integrity of the credential, a hash value is included in the verification link. This hash value is generated using the SHA-256 algorithm, computed from the credential itself. The resulting hash is appended to the verification link as a query parameter.
 
