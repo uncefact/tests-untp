@@ -5,6 +5,7 @@ import {
   getLinkResolverIdentifier,
   registerLinkResolver,
 } from '../linkResolver.service';
+import { IVerifyURLPayload } from '../types';
 import { privateAPI } from '../utils/httpService';
 
 jest.mock('../utils/httpService', () => ({
@@ -29,7 +30,11 @@ describe('create link resolve service', () => {
     });
 
     const mockValue = {
-      eventLink: 'https://localhost/epcis-transformation-event/1234',
+      uploadedCredential: {
+        uri: 'http://test-example.com/test.json',
+        hash: '0a70f89385cd39d5309f519305eba8ef6fb35cf6a23e2e89a0f6af64d68e15a1',
+        key: 'af64d68e15a1',
+      },
       identificationKeyType: IdentificationKeyType.nlisid,
       identificationKey: 'gtin-key',
       itemDescription: 'EPCIS transformation event VC',
@@ -42,7 +47,7 @@ describe('create link resolve service', () => {
     };
 
     const resolverUrl = await registerLinkResolver(
-      mockValue.eventLink,
+      mockValue.uploadedCredential,
       mockValue.identificationKeyType,
       mockValue.identificationKey,
       mockValue.itemDescription,
@@ -72,7 +77,11 @@ describe('create link resolve service', () => {
     });
 
     const mockValue = {
-      eventLink: 'https://localhost/epcis-transformation-event/1234',
+      eventLink: {
+        uri: 'http://test-example.com/test.json',
+        hash: '0a70f89385cd39d5309f519305eba8ef6fb35cf6a23e2e89a0f6af64d68e15a1',
+        key: 'af64d68e15a1',
+      },
       identificationKeyType: IdentificationKeyType.nlisid,
       identificationKey: 'gtin-key',
       itemDescription: 'EPCIS transformation event VC',
@@ -116,7 +125,11 @@ describe('create link resolve service', () => {
     });
 
     const mockValue = {
-      eventLink: 'https://localhost/epcis-transformation-event/1234',
+      eventLink: {
+        uri: 'http://test-example.com/test.json',
+        hash: '0a70f89385cd39d5309f519305eba8ef6fb35cf6a23e2e89a0f6af64d68e15a1',
+        key: 'af64d68e15a1',
+      },
       identificationKeyType: IdentificationKeyType.nlisid,
       identificationKey: 'gtin-key',
       itemDescription: 'EPCIS transformation event VC',
@@ -229,7 +242,7 @@ describe('create link resolve service', () => {
       });
 
       const mockValue = {
-        eventLink: {},
+        eventLink: {} as IVerifyURLPayload,
         identificationKeyType: IdentificationKeyType.nlisid,
         identificationKey: 'gtin-key',
         itemDescription: 'EPCIS transformation event VC',

@@ -1,5 +1,5 @@
 import GS1DigitalLinkToolkit from 'digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js';
-import { IDLRAI, MimeTypeEnum } from './types/index.js';
+import { IDLRAI, IVerifyURLPayload, MimeTypeEnum } from './types/index.js';
 import { GS1ServiceEnum } from './identityProviders/GS1Provider.js';
 import { privateAPI } from './utils/httpService.js';
 import { constructVerifyURL, extractDomain } from './utils/helpers.js';
@@ -174,7 +174,7 @@ export const constructLinkResolver = (
 };
 
 export const registerLinkResolver = async (
-  storageCredential: any,
+  uploadedCredential: IVerifyURLPayload,
   identificationKeyType: IdentificationKeyType,
   identificationKey: string,
   linkTitle: string,
@@ -191,11 +191,8 @@ export const registerLinkResolver = async (
     identificationKey: identificationKey,
     itemDescription: linkTitle,
   };
-  let verifyURL = storageCredential;
-  if (typeof storageCredential !== 'string') {
-    verifyURL = constructVerifyURL(storageCredential);
-  }
 
+  const verifyURL = constructVerifyURL(uploadedCredential);
   const linkResponses: ILinkResponse[] = [
     {
       linkType: `${namespace}:${LinkType.verificationLinkType}`,
@@ -206,7 +203,7 @@ export const registerLinkResolver = async (
     {
       linkType: `${namespace}:${linkType}`,
       linkTitle: linkTitle,
-      targetUrl: storageCredential?.uri ?? storageCredential ?? '',
+      targetUrl: uploadedCredential.uri,
       mimeType: MimeType.applicationJson,
     },
     {
