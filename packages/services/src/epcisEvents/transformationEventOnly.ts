@@ -2,7 +2,7 @@ import { VerifiableCredential } from '@vckit/core-types';
 import { registerLinkResolver, LinkType, getLinkResolverIdentifier } from '../linkResolver.service.js';
 import { uploadData } from '../storage.service.js';
 import { IService } from '../types/IService.js';
-import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
+import { constructIdentifierString, constructVerifyURL, generateUUID } from '../utils/helpers.js';
 import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { ITraceabilityEvent, ITraceabilityEventContext } from '../types/index.js';
 import { validateTraceabilityEventContext } from '../validateContext.js';
@@ -50,10 +50,12 @@ export const processTransformationEventOnly: IService = async (
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(transformationEventVc);
-  const transformationEventVcUrl = await uploadData(storage, transformationEventVc, credentialId);
+  const { uri, key, hash } = await uploadData(storage, transformationEventVc, credentialId);
+  const verifyURL = constructVerifyURL({ uri, key, hash });
 
   const transformationEventLinkResolver = await registerLinkResolver(
-    transformationEventVcUrl,
+    uri,
+    verifyURL,
     traceabilityEvent.dlrIdentificationKeyType,
     transformationEventIdentifier,
     traceabilityEvent.dlrLinkTitle,

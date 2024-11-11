@@ -7,6 +7,8 @@ import { Result } from '../types/validateContext';
 import { ITraceabilityEventContext } from '../types/types';
 import { publicAPI } from '../utils/httpService';
 import { transactionEventMock } from './mocks/constants';
+import { constructVerifyURL } from '../utils/helpers';
+import { issueVC } from '../vckit.service';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
@@ -29,6 +31,10 @@ jest.mock('../linkResolver.service', () => ({
 
 jest.mock('../epcisEvents/helpers', () => ({
   deleteValuesFromLocalStorageByKeyPath: jest.fn(),
+}));
+jest.mock('../utils/helpers', () => ({
+  ...jest.requireActual('../utils/helpers'),
+  constructVerifyURL: jest.fn(),
 }));
 
 describe('processTransactionEvent', () => {
@@ -60,9 +66,7 @@ describe('processTransactionEvent', () => {
     dlr: { dlrAPIUrl: 'http://exampleDLR.com', dlrAPIKey: 'test-key' },
     storage: {
       url: 'https://storage.dlr.com',
-      params: {
-        resultPath: '',
-      },
+      params: {},
     },
     identifierKeyPath: '/0/transaction/identifier',
     localStorageParams: { storageKey: 'transaction', keyPath: '/transaction/type' },
@@ -71,9 +75,8 @@ describe('processTransactionEvent', () => {
   it('should process transaction event', async () => {
     (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
     (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue(transactionVCMock);
-    (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
-      return `${url}/${path}`;
-    });
+    (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+    (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
 
     jest
       .spyOn(validateContext, 'validateTraceabilityEventContext')
@@ -136,7 +139,7 @@ describe('processTransactionEvent', () => {
       jest
         .spyOn(validateContext, 'validateTraceabilityEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
-      jest.spyOn(publicAPI, 'post').mockRejectedValueOnce("Can't issue VC");
+      (issueVC as jest.Mock).mockRejectedValueOnce(new Error("Can't issue VC"));
 
       await processTransactionEvent(transactionEvent, invalidIssuerContext);
     } catch (e) {
@@ -158,7 +161,7 @@ describe('processTransactionEvent', () => {
       jest
         .spyOn(validateContext, 'validateTraceabilityEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
-      jest.spyOn(publicAPI, 'post').mockRejectedValueOnce('Invalid storage provider');
+      (uploadData as jest.Mock).mockRejectedValueOnce(new Error('Invalid storage provider'));
 
       await processTransactionEvent(transactionEvent, invalidStorageContext);
     } catch (e) {
@@ -176,7 +179,8 @@ describe('processTransactionEvent', () => {
         dlr: { ...context.dlr, dlrAPIUrl: 'http://invalid-dlr.com' },
       };
       (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
-      (uploadData as jest.Mock).mockResolvedValueOnce('https://storage.com/vc.json');
+      (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+      (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
       jest
         .spyOn(validateContext, 'validateTraceabilityEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
@@ -203,9 +207,8 @@ describe('processTransactionEvent', () => {
     };
 
     (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
-    (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
-      return `${url}/${path}`;
-    });
+    (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+    (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
     jest
       .spyOn(validateContext, 'validateTraceabilityEventContext')
       .mockReturnValueOnce({ ok: true, value: contextWithHeaders } as unknown as Result<ITraceabilityEventContext>);

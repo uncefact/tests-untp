@@ -8,7 +8,7 @@ import { uploadData } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
 import { IEntityIssue } from '../types';
 import { contextTransformationEvent, dataTransformationEvent } from './mocks/constants';
-import { generateUUID } from '../utils';
+import { constructVerifyURL, generateUUID } from '../utils';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
@@ -32,6 +32,10 @@ jest.mock('../linkResolver.service', () => ({
     certificationLinkType: 'gs1:certificationInfo',
     epcisLinkType: 'gs1:epcis',
   },
+}));
+jest.mock('../utils', () => ({
+  ...jest.requireActual('../utils'),
+  constructVerifyURL: jest.fn(),
 }));
 
 describe('Transformation event', () => {
@@ -111,8 +115,9 @@ describe('Transformation event', () => {
     });
 
     it('should upload vc and return link to the uploaded json file', async () => {
-      let expectResult = 'http://localhost/epcis-transformation-event/1234';
-      (uploadData as jest.Mock).mockResolvedValue(expectResult);
+      let expectResult = { uri: 'http://localhost/epcis-transformation-event/1234', key: '123', hash: 'ABC123' };
+      (uploadData as jest.Mock).mockResolvedValueOnce(expectResult);
+      (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
       const mockVc = {
         '@context': ['https://www.w3.org/2018/credentials/v1'],
         type: ['VerifiableCredential', 'MockEvent'],
@@ -196,12 +201,14 @@ describe('Transformation event', () => {
     });
 
     it('should call registerLinkResolver transformation event', async () => {
-      (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
-        return `${url}/${path}`;
-      });
+      (uploadData as jest.Mock)
+        .mockResolvedValueOnce({ uri: 'http://localhost/epcis-transformation-event/1234', key: '123', hash: 'ABC123' })
+        .mockResolvedValueOnce({ uri: 'http://localhost/dpp-event/1234', key: '123', hash: 'ABC123' });
+      (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
       (registerLinkResolver as jest.Mock).mockImplementation(
         (
           url,
+          verifyURL,
           identificationKeyType: IdentificationKeyType,
           identificationKey: string,
           linkTitle,
@@ -367,6 +374,9 @@ describe('Transformation event', () => {
     });
 
     it('should throw error when context is empty productTransformation field', async () => {
+      (uploadData as jest.Mock)
+        .mockResolvedValueOnce({ uri: 'http://localhost/transformation-event/1234', key: '123', hash: 'ABC123' })
+        .mockResolvedValueOnce({ uri: 'http://localhost/dpp/1234', key: '123', hash: 'ABC123' });
       const newContext = {
         ...contextTransformationEvent,
         productTransformation: [],

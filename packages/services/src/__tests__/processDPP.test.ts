@@ -3,6 +3,7 @@ import { issueVC, contextDefault, decodeEnvelopedVC } from '../vckit.service';
 import { uploadData } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType, LinkType } from '../linkResolver.service';
 import { contextDPP, dataDPP } from './mocks/constants';
+import { constructVerifyURL } from '../utils/helpers';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
@@ -26,6 +27,10 @@ jest.mock('../linkResolver.service', () => ({
     certificationLinkType: 'gs1:certificationInfo',
     epcisLinkType: 'gs1:epcis',
   },
+}));
+jest.mock('../utils/helpers', () => ({
+  ...jest.requireActual('../utils/helpers'),
+  constructVerifyURL: jest.fn(),
 }));
 
 describe('processDPP', () => {
@@ -60,13 +65,14 @@ describe('processDPP', () => {
     });
 
     it('should call process DPP', async () => {
-      (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
-        return `${url}/${dataDPP.data.herd.identifier}`;
-      });
+      const mockVerifyURL = 'https://example.com/vc.json';
+      (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+      (constructVerifyURL as jest.Mock).mockReturnValueOnce(mockVerifyURL);
 
-      (registerLinkResolver as jest.Mock).mockImplementation(
+      (registerLinkResolver as jest.Mock).mockImplementationOnce(
         (
           url,
+          verifyURL,
           identificationKeyType: IdentificationKeyType,
           identificationKey: string,
           linkTitle,
@@ -99,6 +105,7 @@ describe('processDPP', () => {
       const dlrContext = contextDPP.dlr;
       expect(registerLinkResolver).toHaveBeenCalledWith(
         expect.any(String),
+        mockVerifyURL,
         dppContext.dlrIdentificationKeyType,
         dataDPP.data.herd.identifier,
         dppContext.dlrLinkTitle,
@@ -122,13 +129,13 @@ describe('processDPP', () => {
         },
       };
 
-      (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
-        return `${url}/${dataDPP.data.herd.identifier}`;
-      });
+      (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+      (constructVerifyURL as jest.Mock).mockReturnValueOnce('https://example.com/vc.json');
 
       (registerLinkResolver as jest.Mock).mockImplementation(
         (
           url,
+          verifyURL,
           identificationKeyType: IdentificationKeyType,
           identificationKey: string,
           linkTitle,

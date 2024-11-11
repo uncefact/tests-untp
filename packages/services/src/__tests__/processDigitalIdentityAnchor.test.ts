@@ -6,6 +6,7 @@ import * as validateContext from '../validateContext';
 import { IDigitalIdentityAnchorContext } from '../types';
 import { processDigitalIdentityAnchor } from '../processDigitalIdentityAnchor.service';
 import { digitalIdentityAnchorContext as context } from './mocks/constants';
+import { constructVerifyURL } from '../utils/helpers';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
@@ -26,6 +27,10 @@ jest.mock('../linkResolver.service', () => ({
     epcisLinkType: 'epcis',
   },
 }));
+jest.mock('../utils/helpers', () => ({
+  ...jest.requireActual('../utils/helpers'),
+  constructVerifyURL: jest.fn(),
+}));
 
 describe('processDigitalIdentityAnchor', () => {
   const digitalIdentityAnchorData = {
@@ -44,7 +49,8 @@ describe('processDigitalIdentityAnchor', () => {
     (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue({
       credentialSubject: { id: 'https://example.com/123' },
     });
-    (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
+    (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+    (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
 
     jest
       .spyOn(validateContext, 'validateDigitalIdentityAnchorContext')
@@ -116,7 +122,8 @@ describe('processDigitalIdentityAnchor', () => {
     (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
       credentialSubject: { id: 'https://example.com/123' },
     }));
-    (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
+    (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+    (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
 
     jest
       .spyOn(validateContext, 'validateDigitalIdentityAnchorContext')

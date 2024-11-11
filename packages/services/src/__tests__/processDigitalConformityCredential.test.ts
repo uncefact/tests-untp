@@ -6,6 +6,7 @@ import * as validateContext from '../validateContext';
 import { IDigitalConformityCredentialContext } from '../types';
 import { processDigitalConformityCredential } from '../processDigitalConformityCredential.service';
 import { digitalConformityCredentialContext as context } from './mocks/constants';
+import { constructVerifyURL } from '../utils/helpers';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
@@ -26,6 +27,10 @@ jest.mock('../linkResolver.service', () => ({
     epcisLinkType: 'epcis',
   },
 }));
+jest.mock('../utils/helpers', () => ({
+  ...jest.requireActual('../utils/helpers'),
+  constructVerifyURL: jest.fn(),
+}));
 
 describe('processDigitalConformityCredential', () => {
   const digitalConformityCredentialData = {
@@ -41,7 +46,8 @@ describe('processDigitalConformityCredential', () => {
     (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
       credentialSubject: { id: 'https://example.com/123' },
     }));
-    (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
+    (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+    (constructVerifyURL as jest.Mock).mockReturnValueOnce('https://example.com/vc.json');
 
     jest
       .spyOn(validateContext, 'validateDigitalConformityCredentialContext')
@@ -113,7 +119,8 @@ describe('processDigitalConformityCredential', () => {
     (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
       credentialSubject: { id: 'https://example.com/123' },
     }));
-    (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
+    (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+    (constructVerifyURL as jest.Mock).mockReturnValueOnce('https://example.com/vc.json');
 
     jest.spyOn(validateContext, 'validateDigitalConformityCredentialContext').mockReturnValueOnce({
       ok: true,

@@ -16,6 +16,7 @@ import {
   IConstructObjectParameters,
   allowedIndexKeys,
   constructObject,
+  constructVerifyURL,
   generateCurrentDatetime,
   generateUUID,
   randomIntegerString,
@@ -56,7 +57,8 @@ export const processTransformationEvent: IService = async (
 
     const decodedEnvelopedVC = decodeEnvelopedVC(epcisVc);
     const storageContext = context.storage;
-    const transformantionEventLink = await uploadVC(transformationEventCredentialId, epcisVc, storageContext);
+    const uploadedTransformationEvent = await uploadVC(transformationEventCredentialId, epcisVc, storageContext);
+    const transformationEventVerifyURL = constructVerifyURL(uploadedTransformationEvent);
 
     const dppContext = context.dpp;
 
@@ -78,7 +80,8 @@ export const processTransformationEvent: IService = async (
           getLinkResolverIdentifier(`${productID as string}21${randomIntegerString(9)}`);
 
         const transformationEventLinkResolver = await registerLinkResolver(
-          transformantionEventLink,
+          uploadedTransformationEvent.uri,
+          transformationEventVerifyURL,
           epcisTransformationEventContext.dlrIdentificationKeyType,
           transformationEventIdentifier,
           epcisTransformationEventContext.dlrLinkTitle,
@@ -99,11 +102,13 @@ export const processTransformationEvent: IService = async (
         const dppId = generateUUID();
 
         const dpp = await issueDPP(vcKitContext, dppContext, dppCredential, dppId, transformationEventData);
-        const DPPLink = await uploadVC(dppId, dpp, storageContext);
+        const uploadedDPP = await uploadVC(dppId, dpp, storageContext);
+        const dppVerifyURL = constructVerifyURL(uploadedDPP);
         const { identifier, qualifierPath } = getLinkResolverIdentifier(productID);
 
         await registerLinkResolver(
-          DPPLink,
+          uploadedDPP.uri,
+          dppVerifyURL,
           dppContext.dlrIdentificationKeyType,
           identifier,
           dppContext.dlrLinkTitle,
@@ -117,7 +122,7 @@ export const processTransformationEvent: IService = async (
       }),
     );
 
-    return { vc: epcisVc, decodedEnvelopedVC, linkResolver: transformantionEventLink };
+    return { vc: epcisVc, decodedEnvelopedVC, linkResolver: transformationEventVerifyURL };
   } catch (error: any) {
     throw new Error(error);
   }

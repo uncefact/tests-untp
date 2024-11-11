@@ -1,5 +1,4 @@
 import { IStorageService, IUploadData } from './types/storage.js';
-import { getValueByPath } from './utils/helpers.js';
 import { publicAPI } from './utils/httpService.js';
 
 export const storageService: IStorageService = async (config) => {
@@ -35,5 +34,5 @@ export const uploadData: IUploadData = async (storage, data, id) => {
     options: storage.options,
   });
 
-  return getValueByPath(result, storage.params.resultPath);
+  return result;
 };

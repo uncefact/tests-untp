@@ -2,7 +2,7 @@ import { VerifiableCredential } from '@vckit/core-types';
 import { registerLinkResolver, LinkType, getLinkResolverIdentifier } from './linkResolver.service.js';
 import { uploadData } from './storage.service.js';
 import { IService } from './types/IService.js';
-import { constructIdentifierString, generateUUID } from './utils/helpers.js';
+import { constructIdentifierString, constructVerifyURL, generateUUID } from './utils/helpers.js';
 import { decodeEnvelopedVC, issueVC } from './vckit.service.js';
 import { ITraceabilityEvent, IDigitalFacilityRecordContext } from './types/index.js';
 import { validateDigitalFacilityRecordContext } from './validateContext.js';
@@ -50,10 +50,12 @@ export const processDigitalFacilityRecord: IService = async (
 
   const decodedEnvelopedVC = decodeEnvelopedVC(vc);
 
-  const vcUrl = await uploadData(storage, vc, credentialId);
+  const { uri, key, hash } = await uploadData(storage, vc, credentialId);
+  const verifyURL = constructVerifyURL({ uri, key, hash });
 
   const linkResolver = await registerLinkResolver(
-    vcUrl,
+    uri,
+    verifyURL,
     digitalFacilityRecord.dlrIdentificationKeyType,
     identifier,
     digitalFacilityRecord.dlrLinkTitle,
