@@ -7,7 +7,7 @@ export default {
       method: 'GET',
     },
     QrLinkUnencrypted: {
-      url: 'http://localhost:3003/verify/?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Flocalhost%3A3334%2Fv1%2Fverifiable-credentials%2F61bdef77-0bcf-47d8-a6e6-00074e530e31.json%22%7D%7D',
+      url: 'http://localhost:3003/verify/?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Flocalhost%3A3334%2Fv1%2Fverifiable-credentials%2F61bdef77-0bcf-47d8-a6e6-00074e530e31.json%22%2C%20%22hash%22%3A%229db052ff7b36aa3be34c4a92fb9444314b786380815984d7aba81af97123ce16%22%7D%7D',
       headers: {},
       method: 'GET',
     },

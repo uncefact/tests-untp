@@ -102,4 +102,19 @@ describe('QR Link Verification with unencrypted data', function () {
   reportRow('URI MUST exist and be a string', config.implementationName, function () {
     expect(parsedLink.q.payload.uri).to.be.a('string');
   });
+
+  reportRow('Hash MUST exist and be a string', config.implementationName, function () {
+    expect(parsedLink.q.payload.hash).to.be.a('string');
+  });
+
+  reportRow('Hash MUST match the credential hash', config.implementationName, async function () {
+    const { data } = await request({
+      url: parsedLink.q.payload.uri,
+      method: 'GET',
+      headers: {},
+    });
+
+    const credentialHash = computeHash(data, HashAlgorithm.SHA256);
+    expect(parsedLink.q.payload.hash).to.equal(credentialHash);
+  });
 });
