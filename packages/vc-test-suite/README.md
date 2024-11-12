@@ -8,7 +8,7 @@ yarn install
 
 ## Setup
 
-There are three parts of the test suite: `Render Template 2024`, `QR Link Encryption` and `Storage`. To add your implementation to this test suite you will need to add 2 endpoints to your implementation manifest in `config.ts`:
+There are three parts of the test suite: `Render Template 2024`, `QR Link Encryption` and `Storage`. To add your implementation to this test suite you will need to add some endpoints to your implementation manifest in `config.ts`:
 
 - A Render Template 2024 endpoint in the `RenderTemplate2024` property.
 - An Encrypted QR Link in the `QrLinkEncrypted` property.
