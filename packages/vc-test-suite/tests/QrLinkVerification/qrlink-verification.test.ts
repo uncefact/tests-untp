@@ -39,9 +39,7 @@ describe('QR Link Verification with encrypted data', function () {
       headers,
     });
 
-    data.should.not.be.null;
-    data.should.not.be.undefined;
-    data.should.not.be.empty;
+    data.should.be.an('object');
   });
 
   reportRow('Hash MUST exist and be a string', config.implementationName, function () {
@@ -66,22 +64,21 @@ describe('QR Link Verification with encrypted data', function () {
   reportRow('Key exist and be a string', config.implementationName, function () {
     expect(parsedLink.q.payload.key).to.be.a('string');
   });
-  
+
   reportRow('Key MUST decrypt the encrypted credential', config.implementationName, async function () {
     const { data } = await request({
       url: parsedLink.q.payload.uri,
       method,
       headers,
     });
-    const stringifyVC = decryptCredential({
+    const credential = decryptCredential({
       ...data,
       key: parsedLink.q.payload.key,
     });
 
-    // Assert that stringifyVC is not null, empty, or undefined
-    stringifyVC.should.not.be.null;
-    stringifyVC.should.not.be.undefined;
-    stringifyVC.should.not.be.empty;
+    credential.should.not.be.null;
+    credential.should.not.be.undefined;
+    credential.should.not.be.empty;
   });
 });
 
