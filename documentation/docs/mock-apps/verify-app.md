@@ -43,3 +43,7 @@ To ensure the integrity of the credential, a hash value is included in the verif
 Upon retrieval of the credential, the application will compute its hash and compare it with the provided value in the URL. If the computed hash matches the provided hash, the credential is considered valid and unaltered.
 
 The hash is optional and can be omitted from the verification link. If the hash is not provided, the credential will not be validated against it.
+
+## Decryption (if required)
+
+If the credential is encrypted, the decryption key is included in the verification link. The application will use this key to decrypt the credential before proceeding with the verification process.
