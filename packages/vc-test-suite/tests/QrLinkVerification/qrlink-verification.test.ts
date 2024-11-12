@@ -83,10 +83,14 @@ describe('QR Link Verification with encrypted data', function () {
 });
 
 describe('QR Link Verification with unencrypted data', function () {
-  const { url: qrLink } = config.testSuites.QrLinkUnencrypted;
+  const { url: qrLink, method, headers } = config.testSuites.QrLinkUnencrypted;
   const parsedLink = parseQRLink(qrLink);
 
   setupMatrix.call(this, [config.implementationName], 'Implementer');
+
+  reportRow('Fails if decryption key exists', config.implementationName, function () {
+    expect(parsedLink.q.payload.key).to.be.undefined;
+  });
 
   reportRow('QR link MUST be URL encoded', config.implementationName, function () {
     const data = isURLEncoded(qrLink);
@@ -103,6 +107,18 @@ describe('QR Link Verification with unencrypted data', function () {
 
   reportRow('URI MUST exist and be a string', config.implementationName, function () {
     expect(parsedLink.q.payload.uri).to.be.a('string');
+  });
+
+  reportRow('URI MUST be fetched', config.implementationName, async function () {
+    const { data } = await request({
+      url: parsedLink.q.payload.uri,
+      method,
+      headers,
+    });
+
+    data.should.not.be.null;
+    data.should.not.be.undefined;
+    data.should.not.be.empty;
   });
 
   reportRow('Hash MUST exist and be a string', config.implementationName, function () {
