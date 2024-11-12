@@ -2,21 +2,14 @@ export default {
   implementationName: 'Tier 1 Test Suite',
   testSuites: {
     QrLinkEncrypted: {
-      url: 'http://localhost:3001/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Flocalhost%3A3334%2Fv1%2Fverifiable-credentials%2F7a07aa7c-c961-4c74-a714-a6188cadd8f6.json%22%2C%22key%22%3A%222e2a9af227350b73733988ccb93581a5449cafa64394c13ffc7142b3b0b280b6%22%2C%22hash%22%3A%22a813f8aa1cdb5f391ec227d5a1f76a2764df7112bb26cd035b547a30ade03c8e%22%7D%7D',
+      url: 'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Flocalhost%3A3334%2Fv1%2Fverifiable-credentials%2F7a07aa7c-c961-4c74-a714-a6188cadd8f6.json%22%2C%22key%22%3A%222e2a9af227350b73733988ccb93581a5449cafa64394c13ffc7142b3b0b280b6%22%2C%22hash%22%3A%22a813f8aa1cdb5f391ec227d5a1f76a2764df7112bb26cd035b547a30ade03c8e%22%7D%7D',
       headers: {},
       method: 'GET',
     },
-    QrLink: {
-      unencrypted: {
-        qrLinkUrls: {
-          credentialObject:
-            'http://localhost:3003/verify/?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Flocalhost%3A3334%2Fv1%2Fverifiable-credentials%2F545bc89a-395b-4c0e-be7c-2a48b35f3ad5.json%22%7D%7D',
-          credentialJWT:
-            'http://localhost:3003/verify/?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Flocalhost%3A3334%2Fv1%2Fverifiable-credentials%2F61bdef77-0bcf-47d8-a6e6-00074e530e31.json%22%7D%7D',
-        },
-        headers: {},
-        method: 'GET',
-      },
+    QrLinkUnencrypted: {
+      url: 'http://localhost:3003/verify/?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Flocalhost%3A3334%2Fv1%2Fverifiable-credentials%2F61bdef77-0bcf-47d8-a6e6-00074e530e31.json%22%7D%7D',
+      headers: {},
+      method: 'GET',
     },
     RenderTemplate2024: {
       url: 'http://localhost:3332/agent/renderCredential',
