@@ -23,9 +23,11 @@ describe('QR Link Verification with encrypted data', function () {
   reportRow('Verification page link MUST exist and be a string', config.implementationName, function () {
     expect(parsedLink.verify_app_address).to.be.a('string');
   });
+
   reportRow('Payload MUST exist and be an object', config.implementationName, function () {
     expect(parsedLink.q.payload).to.be.an('object');
   });
+
   reportRow('URI MUST exist and be a string', config.implementationName, function () {
     expect(parsedLink.q.payload.uri).to.be.a('string');
   });
@@ -41,9 +43,11 @@ describe('QR Link Verification with encrypted data', function () {
     data.should.not.be.undefined;
     data.should.not.be.empty;
   });
+
   reportRow('Hash MUST exist and be a string', config.implementationName, function () {
     expect(parsedLink.q.payload.hash).to.be.a('string');
   });
+
   reportRow('Hash MUST match the credential hash', config.implementationName, async function () {
     const { data } = await request({
       url: parsedLink.q.payload.uri,
@@ -58,9 +62,11 @@ describe('QR Link Verification with encrypted data', function () {
     const credentialHash = computeHash(vc, HashAlgorithm.SHA256);
     expect(parsedLink.q.payload.hash).to.equal(credentialHash);
   });
+
   reportRow('Key exist and be a string', config.implementationName, function () {
     expect(parsedLink.q.payload.key).to.be.a('string');
   });
+  
   reportRow('Key MUST decrypt the encrypted credential', config.implementationName, async function () {
     const { data } = await request({
       url: parsedLink.q.payload.uri,
