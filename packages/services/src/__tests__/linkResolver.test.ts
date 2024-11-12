@@ -30,7 +30,7 @@ describe('create link resolve service', () => {
 
     const mockValue = {
       eventLink: 'https://localhost/epcis-transformation-event/1234',
-      eventVerifyLink: 'https://verify.com/dev/verifyCredential?q=https://localhost/epcis-transformation-event/1234&key=123&hash=abcde123',
+      eventVerifyLink: 'https%3A%2F%2Fverify.com%2Fdev%2FverifyCredential%3Fq%3Dhttps%3A%2F%2Flocalhost%2Fepcis-transformation-event%2F1234%26key%3D123%26hash%3Dabcde123',
       identificationKeyType: IdentificationKeyType.nlisid,
       identificationKey: 'gtin-key',
       itemDescription: 'EPCIS transformation event VC',
@@ -75,7 +75,7 @@ describe('create link resolve service', () => {
 
     const mockValue = {
       eventLink: 'https://localhost/epcis-transformation-event/1234',
-      eventVerifyLink: 'https://verify.com/dev/verifyCredential?q=https://localhost/epcis-transformation-event/1234&key=123&hash=abcde123',
+      eventVerifyLink: 'https%3A%2F%2Fverify.com%2Fdev%2FverifyCredential%3Fq%3Dhttps%3A%2F%2Flocalhost%2Fepcis-transformation-event%2F1234%26key%3D123%26hash%3Dabcde123',
       identificationKeyType: IdentificationKeyType.nlisid,
       identificationKey: 'gtin-key',
       itemDescription: 'EPCIS transformation event VC',
@@ -121,7 +121,7 @@ describe('create link resolve service', () => {
 
     const mockValue = {
       eventLink: 'https://localhost/epcis-transformation-event/1234',
-      eventVerifyLink: 'https://verify.com/dev/verifyCredential?q=https://localhost/epcis-transformation-event/1234&key=123&hash=abcde123',
+      eventVerifyLink: 'https%3A%2F%2Fverify.com%2Fdev%2FverifyCredential%3Fq%3Dhttps%3A%2F%2Flocalhost%2Fepcis-transformation-event%2F1234%26key%3D123%26hash%3Dabcde123',
       identificationKeyType: IdentificationKeyType.nlisid,
       identificationKey: 'gtin-key',
       itemDescription: 'EPCIS transformation event VC',
