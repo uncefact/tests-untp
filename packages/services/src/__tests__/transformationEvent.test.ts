@@ -135,7 +135,7 @@ describe('Transformation event', () => {
       };
 
       const filename = 'epcis-transformation-event/1234';
-      const urlUpload = await uploadVC(filename, mockVc, { url: 'http://localhost', params: { resultPath: '' } });
+      const urlUpload = await uploadVC(filename, mockVc, { url: 'http://localhost', params: {} });
       expect(urlUpload).toEqual(expectResult);
     });
 

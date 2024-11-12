@@ -54,7 +54,6 @@ describe('storage service', () => {
       params: {
         data: credentialPayload,
         path: path,
-        resultPath: '/url',
       },
       options: {
         method: 'PUT',

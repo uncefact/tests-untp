@@ -65,7 +65,6 @@ graph TD
           "storage": {
             "url": "http://localhost:3334/v1/documents",
             "params": {
-              "resultPath": "/uri",
               "bucket": "verifiable-credentials"
             },
             "options": {

@@ -65,7 +65,6 @@ P-->>C: Return association event VC and resolver URL
         "url": "https://storage.example.com/upload",
         "params": {
           "bucket": "bucket-name",
-          "resultPath": "/url"
         }
       },
       "dlr": {

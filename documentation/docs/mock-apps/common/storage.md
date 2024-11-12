@@ -18,7 +18,6 @@ The `Storage` object is responsible for managing the configuration of the [Stora
   "storage": {
     "url": "http://localhost:3334/v1/documents",
     "params": {
-      "resultPath": "/uri",
       "bucket": "verifiable-credentials"
     },
     "options": {
@@ -46,7 +45,6 @@ The `params` object contains specific parameters for the storage service.
 | Property   | Required | Description                                                          | Type   |
 | ---------- | -------- | -------------------------------------------------------------------- | ------ |
 | bucket     | Yes      | The name of the storage bucket                                       | String |
-| resultPath | Yes      | The path where the result (e.g., URI) will be stored in the response | String |
 
 ### options
 

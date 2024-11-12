@@ -44,9 +44,7 @@ describe('ConformityCredential', () => {
 
     const storedCredentialsConfig = {
       url: 'https://example.com',
-      params: {
-        resultPath: '',
-      },
+      params: {},
     };
 
     render(
@@ -82,9 +80,7 @@ describe('ConformityCredential', () => {
 
     const storedCredentialsConfig = {
       url: 'https://example.com',
-      params: {
-        resultPath: '',
-      },
+      params: {},
     };
 
     it('should save credential as string when trigger onClickStorageCredential function', async () => {
