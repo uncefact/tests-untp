@@ -59,7 +59,7 @@ const Verify = () => {
       const verifyHash = (credential: VerifiableCredential) => {
         if (hash) {
           const computedHash = computeHash(credential);
-          if (computedHash !== hash) return displayErrorUI(['Hash invalid']);
+          if (computedHash !== hash) return displayErrorUI(['Failed to compare the hash in the verify URL with the VC hash.']);
         }
 
         return setCredential(credential);
@@ -74,15 +74,20 @@ const Verify = () => {
         'tag' in encryptedCredential &&
         'type' in encryptedCredential
       ) {
-        const credentialJsonString = decryptCredential({
-          cipherText,
-          key,
-          iv,
-          tag,
-          type,
-        });
+        try {
+          const credentialJsonString = decryptCredential({
+            cipherText,
+            key,
+            iv,
+            tag,
+            type,
+          });
 
-        credentialObject = JSON.parse(credentialJsonString);
+          credentialObject = JSON.parse(credentialJsonString);
+        } catch (error) {
+          return displayErrorUI(['Failed to decrypt credential.']);
+        }
+
       } else {
         credentialObject = _.cloneDeep(encryptedCredential);
       }
