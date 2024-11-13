@@ -255,8 +255,8 @@ export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
     return null;
   }
 
-  // Find DLR passport with MIME type application/json
-  const dlrPassport = dlrPassports.find((passportItem: any) => passportItem?.type === MimeTypeEnum.applicationJson);
+  // Find DLR passport with MIME type text/html
+  const dlrPassport = dlrPassports.find((passportItem: any) => passportItem?.type === MimeTypeEnum.textHtml);
   if (!dlrPassport) {
     return null;
   }
