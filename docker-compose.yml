@@ -40,9 +40,9 @@ services:
       - 3334:3334
     environment:
       - API_VERSION=v1
-      - PROTOCOL=https
-      - DOMAIN=storage.untp.showthething.com
-      - PORT=
+      - PROTOCOL=http
+      - DOMAIN=localhost
+      - PORT=3334
       - AVAILABLE_BUCKETS=verifiable-credentials,private-verifiable-credentials,epcis-events
       - STORAGE_TYPE=local
 
