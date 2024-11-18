@@ -165,19 +165,6 @@
                       "Authorization": "Bearer test123"
                     }
                   },
-                  "dpp": {
-                    "context": ["https://vocabulary.uncefact.org/untp/dpp/0.5.0/"],
-                    "renderTemplate": [
-                      {
-                        "template": "<!DOCTYPE html>...",
-                        "@type": "WebRenderingTemplate2022"
-                      }
-                    ],
-                    "type": ["DigitalProductPassport"],
-                    "dlrLinkTitle": "Product Passport",
-                    "dlrIdentificationKeyType": "gtin",
-                    "dlrVerificationPage": "http://localhost:3003/verify"
-                  },
                   "dlr": {
                     "dlrAPIUrl": "http://localhost:3000",
                     "dlrAPIKey": "test123",
@@ -218,7 +205,7 @@
               "name": "mergeToLocalStorage",
               "parameters": [
                 {
-                  "storageKey": "BatteryManufacturer_dia",
+                  "storageKey": "EcoCharge-Battery-Systems-Pty-Ltd_DIA",
                   "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/id"
                 }
               ]
@@ -228,8 +215,857 @@
         {
           "id": "11tE4Y6NwRPFXO0biCDwO",
           "name": "Generate DFR",
-          "components": [],
-          "services": []
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "type": {
+                      "type": "array",
+                      "readOnly": true,
+                      "const": ["Facility"],
+                      "default": ["Facility"],
+                      "items": {
+                        "type": "string",
+                        "enum": ["Facility"]
+                      }
+                    },
+                    "id": {
+                      "example": "https://id.gs1.org/gln/0614141123452",
+                      "type": "string",
+                      "format": "uri",
+                      "description": "The globally unique ID of the facility as URI, ideally as a resolvable URL."
+                    },
+                    "registeredId": {
+                      "example": "0614141123452",
+                      "type": "string",
+                      "description": "The registration number (alphanumeric) of the facility within the identifier scheme. Unique within the register."
+                    },
+                    "description": {
+                      "example": "LiFePO4 Battery plant number 7",
+                      "type": "string",
+                      "description": "An optional short description of the facility"
+                    },
+                    "name": {
+                      "example": "Example facility 7",
+                      "type": "string",
+                      "description": "The registered name of the facility within the identifier scheme.  "
+                    },
+                    "idScheme": {
+                      "$ref": "#/$defs/IdentifierScheme",
+                      "description": "The ID scheme of the facility. eg a GS1 GLN or a National land registry scheme. If self issued then use the party ID of the facility owner. "
+                    },
+                    "countryOfOperation": {
+                      "type": "string",
+                      "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
+                      "description": "The country in which this facility is operating.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+                    },
+                    "processCategory": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/Classification"
+                      },
+                      "description": "The industrial or production processes performed by this facility. Example unstats.un.org/isic/1030."
+                    },
+                    "operatedByParty": {
+                      "$ref": "#/$defs/Identifier",
+                      "description": "The Party entity responsible for operating the facility.An object structure that uniquely identifies the party within a known party identification scheme. "
+                    },
+                    "otherIdentifier": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/Identifier"
+                      },
+                      "description": "An optional list of other registered identifiers for this facility - eg GLNs or other schemes."
+                    },
+                    "address": {
+                      "$ref": "#/$defs/Address",
+                      "description": "The Postal address of the location."
+                    },
+                    "locationInformation": {
+                      "$ref": "#/$defs/Location",
+                      "description": "Physical location details"
+                    },
+                    "conformityClaim": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/Claim"
+                      },
+                      "description": "A list of conformity declarations against specific criteria from recognised standards or regulations. "
+                    }
+                  },
+                  "description": "The physical site (eg farm or factory) where the product or materials was produced. Including the facility sustainability performance record.",
+                  "required": ["id", "name"],
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$defs": {
+                    "IdentifierScheme": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "array",
+                          "readOnly": true,
+                          "const": ["IdentifierScheme"],
+                          "default": ["IdentifierScheme"],
+                          "items": {
+                            "type": "string",
+                            "enum": ["IdentifierScheme"]
+                          }
+                        },
+                        "id": {
+                          "example": "https://id.gs1.org/01/",
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The globally unique identifier of the registration scheme. The scheme should be registered and discoverable from vocabulary.uncefact.org/identifierSchemes"
+                        },
+                        "name": {
+                          "example": "Global Trade Identification Number (GTIN)",
+                          "type": "string",
+                          "description": "The name of the identifier scheme. "
+                        }
+                      },
+                      "description": "An identifier registration scheme for products, facilities, or organisations. Typically operated by a state, national or global authority."
+                    },
+                    "Classification": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "array",
+                          "readOnly": true,
+                          "const": ["Classification"],
+                          "default": ["Classification"],
+                          "items": {
+                            "type": "string",
+                            "enum": ["Classification"]
+                          }
+                        },
+                        "id": {
+                          "example": "https://unstats.un.org/unsd/classifications/Econ/cpc/46410",
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The globally unique URI representing the specific classifier value"
+                        },
+                        "code": {
+                          "example": "46410",
+                          "type": "string",
+                          "description": "classification code within the scheme"
+                        },
+                        "name": {
+                          "example": "Primary cells and primary batteries",
+                          "type": "string",
+                          "description": "Name of the classification represented by the code"
+                        },
+                        "schemeID": {
+                          "example": "https://unstats.un.org/unsd/classifications/Econ/cpc/",
+                          "type": "string",
+                          "format": "uri",
+                          "description": "Classification scheme ID"
+                        },
+                        "schemeName": {
+                          "example": "UN Central Product Classification (CPC)",
+                          "type": "string",
+                          "description": "The name of the classification scheme"
+                        }
+                      },
+                      "description": "A classification scheme and code / name representing a category value for a product, entity, or facility.",
+                      "required": ["id", "name"]
+                    },
+                    "Identifier": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "array",
+                          "readOnly": true,
+                          "const": ["Identifier"],
+                          "default": ["Identifier"],
+                          "items": {
+                            "type": "string",
+                            "enum": ["Identifier"]
+                          }
+                        },
+                        "id": {
+                          "example": "https://id.gs1.org/01/09520123456788/21/12345",
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
+                        },
+                        "name": {
+                          "example": "EV battery 300Ah.",
+                          "type": "string",
+                          "description": "The registered name of the entity within the identifier scheme.  Examples: product - EV battery 300Ah, Party - Sample Company Pty Ltd,  Facility - Green Acres battery factory"
+                        },
+                        "registeredId": {
+                          "example": "90664869327",
+                          "type": "string",
+                          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+                        },
+                        "idScheme": {
+                          "$ref": "#/$defs/IdentifierScheme",
+                          "description": "The identifier scheme.  Examples : Product - id.gs1.org/01,  Party - business.gov.au/abn,  Facility - did:web:facilities.acme.com. "
+                        }
+                      },
+                      "description": "The ID and Name of an identified entity such as a product, facility, party, standard, etc.  If the identifier is a W3C DID then the corresponding DID document SHOULD include a serviceEndpoint of type \"IdentityResolver\". If the identifier is not a W3C DID then the id property SHOULD be an identity resolver URL.",
+                      "required": ["id", "name"]
+                    },
+                    "Address": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "array",
+                          "readOnly": true,
+                          "const": ["Address"],
+                          "default": ["Address"],
+                          "items": {
+                            "type": "string",
+                            "enum": ["Address"]
+                          }
+                        },
+                        "streetAddress": {
+                          "example": "level 11, 15 London Circuit",
+                          "type": "string",
+                          "description": "the street address as an unstructured string."
+                        },
+                        "postalCode": {
+                          "example": "2601",
+                          "type": "string",
+                          "description": "The postal code or zip code for this address."
+                        },
+                        "addressLocality": {
+                          "example": "Acton",
+                          "type": "string",
+                          "description": "The city, suburb or township name."
+                        },
+                        "addressRegion": {
+                          "example": "ACT",
+                          "type": "string",
+                          "description": "The state or territory or province"
+                        },
+                        "addressCountry": {
+                          "type": "string",
+                          "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
+                          "description": "The address country as an ISO-3166 two letter country code.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+                        }
+                      },
+                      "description": "A postal address."
+                    },
+                    "Location": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "properties": {
+                        "type": {
+                          "type": "array",
+                          "readOnly": true,
+                          "const": ["Location"],
+                          "default": ["Location"],
+                          "items": {
+                            "type": "string",
+                            "enum": ["Location"]
+                          }
+                        },
+                        "plusCode": {
+                          "example": "https://plus.codes/8CGRC78W+MM",
+                          "type": "string",
+                          "format": "uri",
+                          "description": "An open location code (https://maps.google.com/pluscodes/) representing this geographic location or region. Open location codes can represent any sized area from a point to a large region and are easily resolved to a visual map location. "
+                        },
+                        "geoLocation": {
+                          "$ref": "#/$defs/Point",
+                          "description": "The latitude and longitude coordinates that best represent the specified location. Using GeoJSON Point notation."
+                        },
+                        "geoBoundary": {
+                          "$ref": "#/$defs/Polygon",
+                          "description": "The list of ordered coordinates that define a closed area polygon as a location boundary using GeoJSON polygon notation."
+                        }
+                      },
+                      "description": "Location information including address and geo-location of points, areas, and boundaries"
+                    },
+                    "Point": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["Point"],
+                          "example": "Point",
+                          "description": ""
+                        },
+                        "coordinates": {
+                          "$ref": "#/$defs/Point3D",
+                          "description": "Coordinates property of type Point3D"
+                        }
+                      },
+                      "description": "Represents a Point geometry",
+                      "required": ["type"]
+                    },
+                    "Point3D": {
+                      "description": "Point in 3d space",
+                      "oneOf": [
+                        {
+                          "type": "array",
+                          "readOnly": true,
+                          "const": ["Point3D"],
+                          "default": ["Point3D"],
+                          "items": {
+                            "type": "string",
+                            "enum": ["Point3D"]
+                          }
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "number",
+                            "format": "float"
+                          },
+                          "description": "Array of decimal values"
+                        }
+                      ]
+                    },
+                    "Polygon": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["Polygon"],
+                          "example": "Polygon",
+                          "description": ""
+                        },
+                        "coordinates": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Point3DWrapper"
+                          },
+                          "description": "Array of PolygonCoordinates"
+                        }
+                      },
+                      "description": "Represents a Polygon geometry",
+                      "required": ["type"]
+                    },
+                    "Point3DWrapper": {
+                      "description": "",
+                      "oneOf": [
+                        {
+                          "type": "array",
+                          "readOnly": true,
+                          "const": ["Point3DWrapper"],
+                          "default": ["Point3DWrapper"],
+                          "items": {
+                            "type": "string",
+                            "enum": ["Point3DWrapper"]
+                          }
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Point3D"
+                          },
+                          "description": ""
+                        }
+                      ]
+                    },
+                    "Claim": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "properties": {
+                        "type": {
+                          "type": "array",
+                          "readOnly": true,
+                          "const": ["Claim", "Declaration"],
+                          "default": ["Claim", "Declaration"],
+                          "items": {
+                            "type": "string",
+                            "enum": ["Claim", "Declaration"]
+                          }
+                        },
+                        "assessmentDate": {
+                          "example": "2024-03-15",
+                          "type": "string",
+                          "format": "date",
+                          "description": "The date on which this assessment was made. "
+                        },
+                        "id": {
+                          "example": "https://products.example-company.com/09520123456788/declarations/12345",
+                          "type": "string",
+                          "format": "uri",
+                          "description": "A unique identifier for the declaration. Often this will be an extension of the product.id or attestation.id. But could be a UUID."
+                        },
+                        "referenceStandard": {
+                          "$ref": "#/$defs/Standard",
+                          "description": "The reference to the standard that defines the specification / criteria"
+                        },
+                        "referenceRegulation": {
+                          "$ref": "#/$defs/Regulation",
+                          "description": "The reference to the regulation that defines the assessment criteria"
+                        },
+                        "assessmentCriteria": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Criterion"
+                          },
+                          "description": "The specification against which the assessment is made."
+                        },
+                        "declaredValue": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Metric"
+                          },
+                          "description": "The list of specific values measured as part of this assessment (eg tensile strength)"
+                        },
+                        "conformance": {
+                          "example": "true",
+                          "type": "boolean",
+                          "description": "An indicator of whether or not the claim or assesment conforms to the regulatory or standard criteria."
+                        },
+                        "conformityTopic": {
+                          "type": "string",
+                          "enum": [
+                            "environment.energy",
+                            "environment.emissions",
+                            "environment.water",
+                            "environment.waste",
+                            "environment.deforestation",
+                            "environment.biodiversity",
+                            "circularity.content",
+                            "circularity.design",
+                            "social.labour",
+                            "social.rights",
+                            "social.community",
+                            "social.safety",
+                            "governance.ethics",
+                            "governance.compliance",
+                            "governance.transparency"
+                          ],
+                          "example": "environment.energy",
+                          "description": "The conformity topic category for this assessment (eg vocabulary.uncefact.org/sustainability/emissions)"
+                        },
+                        "conformityEvidence": {
+                          "$ref": "#/$defs/SecureLink",
+                          "description": "A binary file that is hashed ()for tamper evidence) and optionally encrypted (for confidentiality)."
+                        }
+                      },
+                      "description": "A conformity claim about the facility against a specific standard or regulation.",
+                      "required": ["id", "conformance", "conformityTopic"]
+                    },
+                    "Standard": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "array",
+                          "readOnly": true,
+                          "const": ["Standard"],
+                          "default": ["Standard"],
+                          "items": {
+                            "type": "string",
+                            "enum": ["Standard"]
+                          }
+                        },
+                        "id": {
+                          "example": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf",
+                          "type": "string",
+                          "format": "uri",
+                          "description": "A unique identifier for the standard (eg https://www.iso.org/standard/60857.html)."
+                        },
+                        "name": {
+                          "example": "GBA Battery Passport Greenhouse Gas Rulebook - V.2.0",
+                          "type": "string",
+                          "description": "The name of the standard"
+                        },
+                        "issuingParty": {
+                          "$ref": "#/$defs/Identifier",
+                          "description": "The party that issued the standard "
+                        },
+                        "issueDate": {
+                          "example": "2023-12-05",
+                          "type": "string",
+                          "format": "date",
+                          "description": "The date when the standard was issued."
+                        }
+                      },
+                      "description": "A standard (eg ISO 14000) that specifies the criteria for conformance.",
+                      "required": ["issuingParty"]
+                    },
+                    "Regulation": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "array",
+                          "readOnly": true,
+                          "const": ["Regulation"],
+                          "default": ["Regulation"],
+                          "items": {
+                            "type": "string",
+                            "enum": ["Regulation"]
+                          }
+                        },
+                        "id": {
+                          "example": "https://www.legislation.gov.au/F2008L02309/latest/versions",
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The globally unique identifier of this regulation. "
+                        },
+                        "name": {
+                          "example": "NNational Greenhouse and Energy Reporting (Measurement) Determination",
+                          "type": "string",
+                          "description": "The name of the regulation or act."
+                        },
+                        "jurisdictionCountry": {
+                          "type": "string",
+                          "x-external-enumeration": "https://vocabulary.uncefact.org/CountryId",
+                          "description": "The legal jurisdiction (country) under which the regulation is issued.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/CountryId\n    "
+                        },
+                        "administeredBy": {
+                          "$ref": "#/$defs/Identifier",
+                          "description": "the issuing body of the regulation. For example Australian Government Department of Climate Change, Energy, the Environment and Water"
+                        },
+                        "effectiveDate": {
+                          "example": "2024-03-20",
+                          "type": "string",
+                          "format": "date",
+                          "description": "the date at which the regulation came into effect."
+                        }
+                      },
+                      "description": "A regulation (eg EU deforestation regulation) that defines the criteria for assessment.",
+                      "required": ["administeredBy"]
+                    },
+                    "Criterion": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "array",
+                          "readOnly": true,
+                          "const": ["Criterion"],
+                          "default": ["Criterion"],
+                          "items": {
+                            "type": "string",
+                            "enum": ["Criterion"]
+                          }
+                        },
+                        "id": {
+                          "example": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf#BatteryAssembly",
+                          "type": "string",
+                          "format": "uri",
+                          "description": "A unique identifier for the criterion within the standard  or regulation. For example CO2 emissions calculations for liquid fuel combustion."
+                        },
+                        "name": {
+                          "example": "GBA Battery rule book v2.0 battery assembly guidelines.",
+                          "type": "string",
+                          "description": "A name that describes this criteria."
+                        },
+                        "thresholdValues": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Metric"
+                          },
+                          "description": "A conformity threshold defined by the specification (eg minimum compressive strength) "
+                        }
+                      },
+                      "description": "A specific rule or criterion within a standard or regulation. eg a carbon intensity calculation rule within an emissions standard.",
+                      "required": ["id", "name"]
+                    },
+                    "Metric": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "array",
+                          "readOnly": true,
+                          "const": ["Metric"],
+                          "default": ["Metric"],
+                          "items": {
+                            "type": "string",
+                            "enum": ["Metric"]
+                          }
+                        },
+                        "metricName": {
+                          "example": "GHG emissions intensity",
+                          "type": "string",
+                          "description": "A human readable name for this metric (for example \"Tensile strength\")"
+                        },
+                        "metricValue": {
+                          "$ref": "#/$defs/Measure",
+                          "description": "A numeric value and unit of measure for this metric. Could be a measured value or a specified threshold. Eg {\"value\":400, \"unit\":\"MPA\"} as tensile strength of structural steel"
+                        },
+                        "score": {
+                          "example": "BB",
+                          "type": "string",
+                          "description": "A score or rank associated with this measured metric."
+                        },
+                        "accuracy": {
+                          "example": 0.05,
+                          "type": "number",
+                          "description": "A percentage represented as a numeric between 0 and 1 indicating the rage of accuracy of the claimed value (eg 0.05 means that the actual value is within 5% of the claimed value.)"
+                        }
+                      },
+                      "description": "A specific measure of performance against the criteria that governs the claim.  Expressed as an array of metric (ie unit of measure) / value (ie the actual numeric value) pairs.  ",
+                      "required": ["metricName", "metricValue"]
+                    },
+                    "Measure": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "array",
+                          "readOnly": true,
+                          "const": ["Measure"],
+                          "default": ["Measure"],
+                          "items": {
+                            "type": "string",
+                            "enum": ["Measure"]
+                          }
+                        },
+                        "value": {
+                          "example": 10,
+                          "type": "number",
+                          "description": "The numeric value of the measure"
+                        },
+                        "unit": {
+                          "type": "string",
+                          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
+                          "description": "Unit of measure drawn from the UNECE Rec20 measure code list.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+                        }
+                      },
+                      "description": "The measure class defines a numeric measured value (eg 10) and a coded unit of measure (eg KG).",
+                      "required": ["value", "unit"]
+                    },
+                    "SecureLink": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "array",
+                          "readOnly": true,
+                          "const": ["SecureLink", "Link"],
+                          "default": ["SecureLink", "Link"],
+                          "items": {
+                            "type": "string",
+                            "enum": ["SecureLink", "Link"]
+                          }
+                        },
+                        "linkURL": {
+                          "example": "https://files.example-certifier.com/1234567.json",
+                          "type": "string",
+                          "format": "uri",
+                          "description": "The URL of the target resource. "
+                        },
+                        "linkName": {
+                          "example": "GBA rule book conformity certificate",
+                          "type": "string",
+                          "description": "A display name for the target resource "
+                        },
+                        "linkType": {
+                          "example": "https://test.uncefact.org/vocabulary/linkTypes/dcc",
+                          "type": "string",
+                          "description": "The type of the target resource - drawn from a controlled vocabulary "
+                        },
+                        "hashDigest": {
+                          "example": "6239119dda5bd4c8a6ffb832fe16feaa5c27b7dba154d24c53d4470a2c69adc2",
+                          "type": "string",
+                          "description": "The hash of the file."
+                        },
+                        "hashMethod": {
+                          "type": "string",
+                          "enum": ["SHA-256", "SHA-1"],
+                          "example": "SHA-256",
+                          "description": "The hashing algorithm used to create the target hash.  SHA-265 is the recommended standard"
+                        },
+                        "encryptionMethod": {
+                          "type": "string",
+                          "enum": ["none", "AES"],
+                          "example": "none",
+                          "description": "The symmetric encryption algorithm used to encrypt the link target.  AES is the recommended standard. Decryption keys are expected to be passed out of bounds."
+                        }
+                      },
+                      "description": "A binary file that is hashed ()for tamper evidence) and optionally encrypted (for confidentiality)."
+                    }
+                  }
+                },
+                "constructData": {},
+                "data": {
+                  "type": ["Facility"],
+                  "id": "https://id.gs1.org/414/1321202290648",
+                  "name": "EcoCharge Sydney Manufacturing Plant",
+                  "description": "State-of-the-art lithium-ion battery manufacturing facility",
+                  "countryOfOperation": "AU",
+                  "registeredId": "1321202290648",
+                  "idScheme": {
+                    "type": ["IdentifierScheme"],
+                    "id": "https://id.gs1.org/414/",
+                    "name": "Global Location Number"
+                  },
+                  "processCategory": [
+                    {
+                      "type": ["Classification"],
+                      "id": "https://unstats.un.org/unsd/classifications/Econ/isic/2720",
+                      "code": "2720",
+                      "name": "Manufacture of batteries and accumulators",
+                      "schemeID": "https://unstats.un.org/unsd/classifications/Econ/isic",
+                      "schemeName": "UN Standard Industry Classification"
+                    }
+                  ],
+                  "operatedByParty": {
+                    "type": ["Identifier"],
+                    "id": "did:web:battery-manufacturer.example.com",
+                    "name": "EcoCharge Battery Systems Pty Ltd",
+                    "registeredId": "90664869327",
+                    "idScheme": {
+                      "type": ["IdentifierScheme"],
+                      "id": "https://abr.business.gov.au",
+                      "name": "Australian Business Register"
+                    }
+                  },
+                  "address": {
+                    "type": ["Address"],
+                    "streetAddress": "123 Industrial Drive",
+                    "postalCode": "2000",
+                    "addressLocality": "Sydney",
+                    "addressRegion": "NSW",
+                    "addressCountry": "AU"
+                  },
+                  "locationInformation": {
+                    "type": ["Location"],
+                    "geoLocation": {
+                      "type": "Point",
+                      "coordinates": [151.2093, -33.8688]
+                    },
+                    "plusCode": "https://plus.codes/4RRH+G4"
+                  },
+                  "conformityClaim": [
+                    {
+                      "type": ["Claim", "Declaration"],
+                      "id": "https://battery-manufacturer.example.com/claims/facility-iso14001",
+                      "conformance": true,
+                      "conformityTopic": "environment.emissions",
+                      "assessmentDate": "2024-01-15",
+                      "referenceStandard": {
+                        "type": ["Standard"],
+                        "id": "https://standards.org/ISO14001",
+                        "name": "ISO 14001:2015 Environmental management systems",
+                        "issuingParty": {
+                          "type": ["Identifier"],
+                          "id": "https://iso.org",
+                          "name": "International Organization for Standardization"
+                        }
+                      }
+                    },
+                    {
+                      "type": ["Claim", "Declaration"],
+                      "id": "https://battery-manufacturer.example.com/claims/facility-emissions-2024",
+                      "conformance": true,
+                      "conformityTopic": "environment.emissions",
+                      "assessmentDate": "2024-01-01",
+                      "declaredValue": [
+                        {
+                          "type": ["Metric"],
+                          "metricName": "Annual CO2 Emissions",
+                          "metricValue": {
+                            "type": ["Measure"],
+                            "value": 5000,
+                            "unit": "TNE"
+                          },
+                          "accuracy": 0.95
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "style": {},
+                "className": ""
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {
+                "label": "Issue DFR",
+                "description": "",
+                "includeDownload": false,
+                "downloadFileName": ""
+              }
+            }
+          ],
+          "services": [
+            {
+              "name": "processDigitalFacilityRecord",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": {
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                      "name": "GS1 Australia"
+                    },
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIKey": "test123",
+                    "namespace": "gs1",
+                    "linkRegisterPath": "/api/resolver"
+                  },
+                  "storage": {
+                    "url": "http://localhost:3334/v1/documents",
+                    "params": {
+                      "resultPath": "/uri",
+                      "bucket": "verifiable-credentials"
+                    },
+                    "options": {
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
+                    }
+                  },
+                  "identifierKeyPath": {
+                    "function": "concatService",
+                    "args": [
+                      {
+                        "type": "text",
+                        "value": "414"
+                      },
+                      {
+                        "type": "path",
+                        "value": "/registeredId"
+                      }
+                    ]
+                  },
+                  "digitalFacilityRecord": {
+                    "context": ["https://vocabulary.uncefact.org/untp/dfr/0.5.0/"],
+                    "renderTemplate": [
+                      {
+                        "template": "<!DOCTYPE html>\n<html lang=\"en\">\n\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <link\n    href=\"https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap\"\n    rel=\"stylesheet\">\n  <title>Digital Facility Record</title>\n  <style>\n    :root {\n      --primary-colorsblue-10: rgba(247, 250, 253, 1);\n      --primary-colorsgray-100: rgba(250, 250, 250, 1);\n      --white: rgba(255, 255, 255, 1);\n      --black: rgba(0, 0, 0, 1);\n      --primary-colorsgray-300: rgba(237, 239, 240, 1);\n      --primary-colorsgray-500: rgba(169, 177, 183, 1);\n      --primary-colorsgray-600: rgba(85, 96, 110, 1);\n      --primary-colorsblue-700: rgba(31, 90, 149, 1);\n      --primary-colorsgray-700: rgba(35, 46, 61, 1);\n      --primary-colorsblue-100: rgba(181, 213, 245, 0.5);\n      --primary-colorsblue-100-full: rgba(181, 213, 245, 1);\n      --primary-colorsblue-200: rgba(148, 196, 245, 1);\n      --primary-colorsblue-400: rgba(79, 149, 221, 1);\n      --primary-colorsblue-600: rgba(0, 110, 181, 1);\n      --primary-colorsgray-400: rgba(212, 214, 216, 1);\n      --primary-colorsgray-300: rgba(237, 239, 240, 1);\n      --accent-colorslight-green: rgba(184, 236, 182, 1);\n      --text-color-green: rgba(8, 50, 0, 1);\n      --accent-colorslight-red: rgba(255, 188, 183, 1);\n      --text-color-red: rgba(50, 0, 0, 1);\n    }\n\n    /* Globals CSS */\n    * {\n      margin: 0;\n      box-sizing: border-box;\n    }\n\n    body {\n      font-family: 'Lato', sans-serif;\n    }\n\n    section {\n      padding: 0 16px 0 16px;\n    }\n\n    a {\n      text-decoration: none;\n    }\n\n    .facility-record {\n      width: 100%;\n      margin: 0 auto;\n      display: flex;\n      flex-direction: column;\n      gap: 32px;\n      word-break: break-word;\n    }\n\n    .facility-record .contents {\n      display: flex;\n      flex-direction: column;\n      gap: 24px;\n    }\n\n    .facility-record .traceability-header {\n      display: flex;\n      flex-direction: column;\n      width: 100%;\n      align-items: center;\n    }\n\n    .facility-record .TRACE-header {\n      display: flex;\n      flex-direction: column;\n      width: 100%;\n      align-items: flex-start;\n      gap: 12px;\n      padding: 32px 16px 20px 16px;\n      background-color: var(--primary-colorsgray-700);\n    }\n\n    .facility-record .PP-title {\n      width: 100%;\n      font-weight: 500;\n      color: var(--white);\n      font-size: 16px;\n      line-height: 22px;\n      text-transform: uppercase;\n    }\n\n    .facility-record .name-description {\n      display: flex;\n      flex-direction: column;\n      gap: 8px;\n    }\n\n    .facility-record .name-description h1 {\n      font-weight: 900;\n      color: var(--white);\n      font-size: 30px;\n      line-height: 32.5px;\n    }\n\n    .facility-record .name-description p {\n      font-weight: 500;\n      color: var(--white);\n      font-size: 16px;\n      line-height: 17.4px;\n    }\n\n    .facility-record .text-wrapper {\n      align-self: stretch;\n      font-weight: 900;\n      color: var(--white);\n      font-size: 30px;\n      line-height: 32.5px;\n    }\n\n    .facility-record .issuing-organisation {\n      padding: 0px 16px 16px;\n      align-self: stretch;\n      width: 100%;\n      display: flex;\n      flex-direction: column;\n      align-items: flex-start;\n      gap: 4px;\n\n      background-color: var(--primary-colorsgray-600);\n    }\n\n    .facility-record .data-two-columns {\n      display: grid;\n      grid-template-columns: 1fr 2fr;\n      gap: 16px;\n\n      padding: 10px 0px 12px;\n      width: 100%;\n      border-bottom-width: 1px;\n      border-bottom-style: solid;\n    }\n\n    .facility-record .data-two-columns:last-child {\n      border-bottom: none;\n    }\n\n    .facility-record .table-line {\n      border-bottom: 1px solid #d4d6d8;\n    }\n\n    .facility-record .item-value a {\n      color: #232E3D;\n    }\n\n    .facility-record .declarations {\n      display: flex;\n      flex-direction: column;\n      gap: 12px;\n      padding: 0px 16px;\n      width: 100%;\n    }\n\n    .facility-record .declaration-title {\n      font-size: 20px;\n      font-weight: 700;\n      line-height: 21.8px;\n      color: var(--primary-colorsgray-700);\n    }\n\n    .facility-record .cards-conformities {\n      display: flex;\n      flex-direction: column;\n      gap: 8px;\n    }\n\n    .facility-record .cards-conformity {\n      display: flex;\n      flex-direction: column;\n      align-items: flex-start;\n      gap: 8px;\n\n      min-width: 336px;\n      padding: 16px 18px 16px 16px;\n      position: relative;\n      background-color: var(--white);\n      border-radius: 4px;\n      border: 1px solid;\n      border-color: var(--primary-colorsgray-400);\n    }\n\n    .facility-record .frame {\n      display: flex;\n      align-items: center;\n      justify-content: space-between;\n      position: relative;\n      align-self: stretch;\n      width: 100%;\n      flex: 0 0 auto;\n    }\n\n    .facility-record .div-2 {\n      display: inline-flex;\n      align-items: center;\n      gap: 4px;\n      position: relative;\n      flex: 0 0 auto;\n    }\n\n    .facility-record .company-name {\n      position: relative;\n      width: fit-content;\n      font-weight: 400;\n      color: var(--primary-colorsgray-600);\n      font-size: 14px;\n      line-height: 19.2px;\n    }\n\n    .facility-record .tags-VC-badge-red {\n      display: inline-flex;\n      align-items: center;\n      justify-content: center;\n      gap: 10px;\n      padding: 4px 8px;\n      flex: 0 0 auto;\n      background-color: var(--accent-colorslight-red);\n      color: var(--text-color-red);\n      border-radius: 8px;\n      overflow: hidden;\n    }\n\n    .facility-record .tags-VC-badge-green {\n      display: inline-flex;\n      align-items: center;\n      justify-content: center;\n      gap: 10px;\n      padding: 4px 8px;\n      flex: 0 0 auto;\n      background-color: var(--accent-colorslight-green);\n      color: var(--text-color-green);\n      border-radius: 8px;\n      overflow: hidden;\n    }\n\n    .facility-record .verifiable {\n      width: fit-content;\n      font-weight: 600;\n      font-size: 14px;\n      line-height: 15.3px;\n    }\n\n    .facility-record .frame-2 {\n      display: flex;\n      flex-direction: column;\n      align-items: center;\n      gap: 4px;\n      position: relative;\n      align-self: stretch;\n      width: 100%;\n      flex: 0 0 auto;\n    }\n\n    .facility-record .text-wrapper {\n      position: relative;\n      align-self: stretch;\n      margin-top: -1px;\n      font-weight: 400;\n      color: var(--primary-colorsblue-700);\n      font-size: 18px;\n      line-height: 21.2px;\n    }\n\n    .facility-record .p {\n      color: var(--primary-colorsgray-600);\n      font-size: 14px;\n      line-height: 19.2px;\n      align-self: stretch;\n      font-weight: 400;\n      color: #55606e;\n    }\n\n    .facility-record .span {\n      font-weight: 400;\n      font-size: 14px;\n      line-height: 19.2px;\n    }\n\n    .facility-record .text-wrapper-3 {\n      color: #55606e;\n    }\n\n    .facility-record .gray-bottom-line {\n      border-bottom: 1px #55606E solid;\n      width: fit-content;\n      text-decoration: none;\n    }\n\n    .facility-record .frame-3 {\n      display: flex;\n      flex-direction: column;\n      align-items: flex-start;\n      justify-content: flex-end;\n      gap: 8px;\n      align-self: stretch;\n      width: 100%;\n    }\n\n    .facility-record .frame-4 {\n      display: flex;\n      flex-direction: column;\n      align-items: flex-start;\n      gap: 8px;\n      flex: 1;\n      flex-grow: 1;\n    }\n\n    .facility-record .typography-heading {\n      display: inline-flex;\n      align-items: center;\n      justify-content: center;\n      gap: 10px;\n    }\n\n    .facility-record .heading {\n      flex: 1;\n      color: var(--primary-colorsgray-700);\n      font-size: 16px;\n      font-weight: 400;\n      line-height: 17.44px;\n    }\n\n    .facility-record .heading-2 {\n      flex: 1;\n      font-weight: 400;\n      color: var(--primary-colorsgray-600);\n      font-size: 14px;\n      line-height: 19.2px;\n    }\n\n    .facility-record .cards-traceability {\n      display: flex;\n      align-items: center;\n      justify-content: space-between;\n      padding: 8px 0px;\n      position: relative;\n      align-self: stretch;\n      width: 100%;\n      flex: 0 0 auto;\n      border-radius: 4px;\n    }\n\n    .facility-record .frame-5 {\n      display: inline-flex;\n      align-items: center;\n      gap: 8px;\n      position: relative;\n      flex: 0 0 auto;\n    }\n\n    .facility-record .company-name-wrapper {\n      display: flex;\n      flex-direction: column;\n      width: 260px;\n      align-items: flex-start;\n      gap: 4px;\n    }\n\n    .facility-record .company-name-2 {\n      color: var(--black);\n      font-size: 16px;\n      line-height: 17.4px;\n      align-self: stretch;\n      font-weight: 400;\n    }\n\n    .facility-record .issuing-details {\n      width: 100%;\n      padding: 24px 16px 36px;\n      background-color: var(--primary-colorsgray-300);\n      display: flex;\n      flex-direction: column;\n      align-items: flex-start;\n      gap: 4px;\n    }\n\n    .facility-record .typography-heading {\n      display: inline-flex;\n      align-items: center;\n      justify-content: center;\n      gap: 10px;\n    }\n\n    .facility-record .text-wrapper-2 {\n      width: fit-content;\n      font-weight: 700;\n      color: var(--black);\n      font-size: 20px;\n      line-height: 21.8px;\n    }\n\n    .facility-record .div {\n      display: inline-flex;\n      flex-direction: column;\n      align-items: flex-start;\n\n      width: 100%;\n    }\n\n    .facility-record .data-two-columns-2 {\n      display: grid;\n      grid-template-columns: 1.4fr 3fr;\n      gap: 16px;\n\n      padding: 10px 0px 12px;\n      width: 100%;\n      border-bottom-width: 1px;\n      border-bottom-style: solid;\n    }\n\n    .facility-record .border-bottom-gray-400 {\n      border-color: var(--primary-colorsgray-400);\n    }\n\n    .facility-record .border-bottom-gray-500 {\n      border-color: var(--primary-colorsgray-500);\n    }\n\n    .facility-record .border-bottom-blue-100 {\n      border-color: var(--primary-colorsblue-100-full);\n    }\n\n    .facility-record .border-bottom-blue-200 {\n      border-color: var(--primary-colorsblue-200);\n    }\n\n    .facility-record .label {\n      font-weight: 400;\n      color: var(--primary-colorsgray-300);\n      font-size: 16px;\n      line-height: 22px;\n    }\n\n    .facility-record .label-2 {\n      font-weight: 400;\n      color: var(--primary-colorsgray-600);\n      font-size: 16px;\n      line-height: 22px;\n    }\n\n    .facility-record .data-data-link {\n      flex-direction: column;\n      align-items: flex-start;\n      gap: 6px;\n      align-self: stretch;\n      display: flex;\n      flex: 1;\n      flex-grow: 1;\n    }\n\n    .facility-record .div-wrapper {\n      gap: 10px;\n      display: inline-flex;\n      align-items: flex-start;\n\n      text-decoration: underline;\n      text-decoration-thickness: 2px;\n      text-decoration-color: var(--primary-colorsblue-400);\n      text-underline-offset: 3px;\n    }\n\n    .facility-record .line {\n      display: inline-flex;\n      align-items: flex-start;\n      gap: 10px;\n      border-bottom-width: 2px;\n      border-bottom-style: solid;\n      border-color: var(--primary-colorsblue-200);\n    }\n\n    .facility-record .line-2 {\n      width: fit-content;\n      font-weight: 500;\n      color: var(--white);\n      font-size: 16px;\n      line-height: 17.4px;\n    }\n\n    .facility-record .line-3 {\n      width: fit-content;\n      font-weight: 500;\n      color: var(--primary-colorsgray-700);\n      font-size: 16px;\n      line-height: 22px;\n    }\n\n    .facility-record .line-4 {\n      display: inline-flex;\n      align-items: flex-start;\n      gap: 10px;\n      border-bottom-width: 2px;\n      border-bottom-style: solid;\n      border-color: var(--primary-colorsblue-400);\n    }\n\n    .facility-record .data-data {\n      display: flex;\n      align-items: center;\n      gap: 10px;\n      align-self: stretch;\n      flex-grow: 1;\n      flex: 1;\n    }\n\n    .facility-record .data-data a {\n      line-height: 22px;\n    }\n\n    .facility-record .data-data-2 a {\n      margin-right: 10px;\n    }\n\n    .facility-record .data {\n      flex: 1;\n      font-weight: 500;\n      color: var(--white);\n      font-size: 16px;\n      line-height: 17.4px;\n    }\n\n    .facility-record .data-2 {\n      font-weight: 500;\n      color: var(--primary-colorsgray-700);\n      font-size: 16px;\n      line-height: 17.4px;\n      flex: 1;\n    }\n\n    .blue-bottom-line,\n    .blue-bottom-line:link {\n      border-bottom: 2px hsl(210, 68%, 59%) solid;\n      width: fit-content;\n      justify-content: flex-start;\n      align-items: flex-start;\n      gap: 10px;\n      display: inline-flex;\n      cursor: pointer;\n      text-decoration: none;\n      color: #232E3D;\n    }\n\n    .blue-bottom-line-2,\n    .blue-bottom-line-2:link {\n      width: fit-content;\n      color: var(--white);\n\n      text-decoration: underline;\n      text-decoration-thickness: 2px;\n      text-decoration-color: var(--primary-colorsblue-200);\n      text-underline-offset: 3px;\n    }\n\n    /* Media Queries for Mobiles */\n    @media (min-width: 50px) {\n      .facility-record {\n        min-width: 375px;\n      }\n    }\n  </style>\n</head>\n\n<body>\n  <div class=\"facility-record\">\n    <div class=\"contents\">\n      <div class=\"traceability-header\">\n        <div class=\"TRACE-header\">\n          <div class=\"PP-title\">FACILITY RECORD</div>\n          <div class=\"name-description\">\n            <h1>{{credentialSubject.name}}</h1>\n            <p>{{credentialSubject.description}}</p>\n          </div>\n        </div>\n        <div class=\"issuing-organisation\">\n          <div class=\"div\">\n            <div class=\"data-two-columns border-bottom-gray-500\">\n              <div class=\"label\">Operator</div>\n              <div class=\"data-data\">\n                <a href=\"{{credentialSubject.operatedByParty.id}}\" class=\"blue-bottom-line-2\">{{credentialSubject.operatedByParty.name}}</a>\n              </div>\n            </div>\n            <div class=\"data-two-columns border-bottom-gray-500\">\n              <div class=\"label\">Country</div>\n              <div class=\"data-data\">\n                <div class=\"data\">{{credentialSubject.countryOfOperation}}</div>\n              </div>\n            </div>\n            <div class=\"data-two-columns border-bottom-gray-500\">\n              <div class=\"label\">Address</div>\n              <div class=\"data-data\">\n                {{!-- TODO 1: plain text --}}\n                {{!-- <div class=\"data\">{{credentialSubject.address.streetAddress}} {{credentialSubject.address.addressLocality}}, {{credentialSubject.address.postalCode}}</div> --}}\n                {{!-- TODO 2: confirm --}}\n                {{!-- <a href=\"https://www.google.com/maps/?q={{credentialSubject.address.streetAddress}} {{credentialSubject.address.addressRegion}} {{credentialSubject.address.postalCode}} {{credentialSubject.address.addressCountry}}\" class=\"blue-bottom-line-2\" target=\"_blank\">{{credentialSubject.address.streetAddress}}</a> --}}\n                {{!-- TODO 3: confirm --}}\n                <a href=\"{{credentialSubject.locationInformation.plusCode}}\" class=\"blue-bottom-line-2\" target=\"_blank\">{{credentialSubject.address.streetAddress}} {{credentialSubject.address.addressLocality}}, {{credentialSubject.address.postalCode}}</a>\n              </div>\n            </div>\n            <div class=\"data-two-columns border-bottom-gray-500\">\n              <div class=\"label\">Processes</div>\n              <div class=\"data-data-2\">\n                {{#each credentialSubject.processCategory}}\n                <a href=\"{{id}}\" class=\"blue-bottom-line-2\">{{name}}</a>\n                {{/each}}\n              </div>\n            </div>\n            <div class=\"data-two-columns border-bottom-gray-500\">\n              <div class=\"label\">Geolocation</div>\n              {{!-- TODO: confirm --}}\n           <a href=\"https://www.google.com/maps?q={{lookup credentialSubject.locationInformation.geoLocation.coordinates 1}},{{lookup credentialSubject.locationInformation.geoLocation.coordinates 0}}\" class=\"data-data-link\" target=\"_blank\">\n                <div class=\"line-4\">\n                  <div class=\"line-2\">Show on map</div>\n                </div>\n              </a>\n            </div>\n          </div>\n        </div>\n      </div>\n\n      <section class=\"declarations\">\n        <div class=\"declaration-title\">Declarations</div>\n        \n        <div class=\"cards-conformities\">\n          {{#each credentialSubject.conformityClaims}}\n          <div class=\"cards-conformity\">\n            <div class=\"frame\">\n              <div class=\"div-2\">\n                <div class=\"company-name\">Conformance:</div>\n                <div class=\"{{#if conformance}}tags-VC-badge-green{{else}}tags-VC-badge-red{{/if}}\">\n                  <div class=\"verifiable\">{{#if conformance}}Yes{{else}}No{{/if}}</div>\n                </div>\n              </div>\n              <div class=\"company-name\">Assessed: {{assessmentDate}}</div>\n            </div>\n            <div class=\"frame-2\">\n              <div class=\"text-wrapper\">{{conformityEvidence.linkName}}</div>\n              <p class=\"p\">\n                <span class=\"span\">{{referenceRegulation.name}} administered in {{referenceRegulation.jurisdictionCountry}} by </span>\n                <a href=\"{{referenceRegulation.administeredBy.id}}\" class=\"text-wrapper-3 gray-bottom-line\">{{referenceRegulation.administeredBy.name}}</a>\n              </p>\n              <p class=\"p\">\n                <span class=\"span\">{{referenceStandard.name}} issued by </span>\n                <a href=\"{{referenceStandard.issuingParty.id}}\" class=\"text-wrapper-3 gray-bottom-line\">{{referenceStandard.issuingParty.name}}</a>\n              </p>\n            </div>\n            <div class=\"frame-3\">\n              {{#each declaredValue}}\n              <div class=\"frame-4\">\n                <div class=\"typography-heading\">\n                  <p class=\"heading\">{{metricName}} is {{metricValue.value}}{{metricValue.unit}}</p>\n                </div>\n                <div class=\"typography-heading\">\n                  <p class=\"heading-2\">Score: {{score}} | Accuracy {{accuracy}}</p>\n                </div>\n              </div>\n              {{/each}}\n            </div>\n            <a href=\"{{conformityEvidence.linkURL}}\" class=\"cards-traceability\">\n              <div class=\"frame-5\">\n                <svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n                  <path\n                    d=\"M5 21C4.45 21 3.97933 20.8043 3.588 20.413C3.19667 20.0217 3.00067 19.5507 3 19V5C3 4.45 3.196 3.97933 3.588 3.588C3.98 3.19667 4.45067 3.00067 5 3H19C19.55 3 20.021 3.196 20.413 3.588C20.805 3.98 21.0007 4.45067 21 5V19C21 19.55 20.8043 20.021 20.413 20.413C20.0217 20.805 19.5507 21.0007 19 21H5ZM5 5V19H19V5H17V12L14.5 10.5L12 12V5H5Z\"\n                    fill=\"#1F5A95\"></path>\n                </svg>\n                <div class=\"company-name-wrapper\">\n                  <div class=\"company-name-2\">Evidence</div>\n                </div>\n              </div>\n              <svg width=\"10\" height=\"15\" viewBox=\"0 0 10 15\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n                <path d=\"M1 1L8 8L1 15\" stroke=\"#1F5A95\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n                </path>\n              </svg>\n            </a>\n          </div>\n          {{/each}}\n        </div>\n      </section>\n    </div>\n\n    <div class=\"issuing-details\">\n      <div class=\"typography-heading\">\n        <div class=\"text-wrapper-2\">Issuing details</div>\n      </div>\n      <div class=\"div\">\n        <div class=\"data-two-columns-2 border-bottom-gray-400\">\n          <div class=\"label-2\">Issued by</div>\n          <div class=\"data-data-link\">\n            <div class=\"div-wrapper\">\n              <a href=\"{{issuer.id}}\" class=\"line-3\">{{issuer.name}}</a>\n            </div>\n          </div>\n        </div>\n        <div class=\"data-two-columns-2 border-bottom-gray-400\">\n          <div class=\"label-2\">Valid from</div>\n          <div class=\"data-data\">\n            <div class=\"data-2\">{{validFrom}}</div>\n          </div>\n        </div>\n        <div class=\"data-two-columns-2 border-bottom-gray-400\">\n          <div class=\"label-2\">Valid until</div>\n          <div class=\"data-data\">\n            <div class=\"data-2\">{{validUntil}}</div>\n          </div>\n        </div>\n      </div>\n    </div>\n  </div>\n</body>\n\n</html>",
+                        "@type": "WebRenderingTemplate2022"
+                      }
+                    ],
+                    "type": ["DigitalFacilityRecord"],
+                    "dlrLinkTitle": "Digital Facility Record",
+                    "dlrIdentificationKeyType": "gln",
+                    "dlrVerificationPage": "http://localhost:3003/verify"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "mergeToLocalStorage",
+              "parameters": [
+                {
+                  "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/id",
+                  "storageKey": "EcoCharge-Battery-Systems-Pty-Ltd_DFR"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "IOrsfKAvwgl17c3WSBWJW",
@@ -245,7 +1081,7 @@
   ],
   "apps": [
     {
-      "name": "Battery Manufacturer",
+      "name": "EcoCharge Battery Systems",
       "type": "producer",
       "assets": {
         "logo": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-sehRgvPbOeC328bfvtxJQxOk/user-kZ29ZvYUGEKeKmwZSzShXtxE/img-1x5ONRG7jOnxthMGHLluYDXN.png?st=2024-11-18T01%3A08%3A34Z&se=2024-11-18T03%3A08%3A34Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=d505667d-d6c1-4a0a-bac7-5c84a87759f8&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2024-11-18T00%3A24%3A45Z&ske=2024-11-19T00%3A24%3A45Z&sks=b&skv=2024-08-04&sig=vIvczv2i8cNUZNv/ob13qmhezjPurJzg6Tdu6ZUYANk%3D",
@@ -962,7 +1798,7 @@
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
                       "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
-                      "name": "Orchard Facility"
+                      "name": "EcoCharge Battery Systems Pty Ltd"
                     },
                     "headers": {
                       "Authorization": "Bearer test123"
