@@ -62,10 +62,10 @@ services:
       - OBJECT_STORAGE_PATH_STYLE=true
       - IDENTIFIER_PATH=identifiers
       - API_KEY=test123
-      - APP_ENDPOINT=http://localhost:3000
+      - APP_ENDPOINT=https://idr.untp.showthething.com
       - APP_NAME=IDR-1
-      - RESOLVER_DOMAIN=http://localhost:3000
-      - LINK_TYPE_VOC_DOMAIN=http://localhost:3000/voc
+      - RESOLVER_DOMAIN=https://idr.untp.showthething.com
+      - LINK_TYPE_VOC_DOMAIN=https://idr.untp.showthething.com/voc
       - PORT=3000
     depends_on:
       - identity-resolver-service-object-store
@@ -97,10 +97,10 @@ services:
       - OBJECT_STORAGE_PATH_STYLE=true
       - IDENTIFIER_PATH=identifiers
       - API_KEY=test456
-      - APP_ENDPOINT=http://localhost:3001
+      - APP_ENDPOINT=https://idr-mock.untp.showthething.com
       - APP_NAME=IDR-2
-      - RESOLVER_DOMAIN=http://localhost:3001
-      - LINK_TYPE_VOC_DOMAIN=http://localhost:3001/voc
+      - RESOLVER_DOMAIN=https://idr-mock.untp.showthething.com
+      - LINK_TYPE_VOC_DOMAIN=https://idr-mock.untp.showthething.com/voc
       - PORT=3001
     depends_on:
       - mock-global-gs1-resolver-object-store
