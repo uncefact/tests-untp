@@ -35,7 +35,7 @@ services:
     restart: always
 
   storage-service:
-    image: ghcr.io/uncefact/project-identity-resolver:sha-40264dd@sha256:aa3edd2f142f0edabfa9c7b1e16b6a69835913cc1fc345f3e478c7801c0eb060
+    image: gshuynguyen/project-identity-resolver
     ports:
       - 3334:3334
     environment:
