@@ -41,7 +41,7 @@ services:
     environment:
       - API_VERSION=v1
       - PROTOCOL=http
-      - DOMAIN=https://storage.untp.showthething.com
+      - DOMAIN=storage.untp.showthething.com
       - PORT=3334
       - AVAILABLE_BUCKETS=verifiable-credentials,private-verifiable-credentials,epcis-events
       - STORAGE_TYPE=local
