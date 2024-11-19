@@ -43,8 +43,9 @@ services:
       - PROTOCOL=http
       - DOMAIN=storage.untp.showthething.com
       - PORT=3334
-      - AVAILABLE_BUCKETS=verifiable-credentials,private-verifiable-credentials,epcis-events
-      - STORAGE_TYPE=local
+      - AVAILABLE_BUCKETS=untp-verifiable-credentials,verifiable-credentials,private-verifiable-credentials,epcis-events
+      - REGION=ap-southeast-2
+      - STORAGE_TYPE=aws
 
   identity-resolver-service:
     # Replace with local or deployed image
