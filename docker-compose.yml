@@ -41,10 +41,11 @@ services:
     environment:
       - API_VERSION=v1
       - PROTOCOL=http
-      - DOMAIN=localhost
+      - DOMAIN=storage.aatp.showthething.com
       - PORT=3334
-      - AVAILABLE_BUCKETS=verifiable-credentials,private-verifiable-credentials,epcis-events
-      - STORAGE_TYPE=local
+      - AVAILABLE_BUCKETS=aatp-verifiable-credentials,verifiable-credentials,private-verifiable-credentials,epcis-events
+      - REGION=ap-southeast-2
+      - STORAGE_TYPE=aws
 
   identity-resolver-service:
     # Replace with local or deployed image
@@ -61,10 +62,10 @@ services:
       - OBJECT_STORAGE_PATH_STYLE=true
       - IDENTIFIER_PATH=identifiers
       - API_KEY=test123
-      - APP_ENDPOINT=http://localhost:3000
+      - APP_ENDPOINT=https://idr.aatp.showthething.com
       - APP_NAME=IDR-1
-      - RESOLVER_DOMAIN=http://localhost:3000
-      - LINK_TYPE_VOC_DOMAIN=http://localhost:3000/voc
+      - RESOLVER_DOMAIN=https://idr.aatp.showthething.com
+      - LINK_TYPE_VOC_DOMAIN=https://idr.aatp.showthething.com/voc
       - PORT=3000
     depends_on:
       - identity-resolver-service-object-store
@@ -96,10 +97,10 @@ services:
       - OBJECT_STORAGE_PATH_STYLE=true
       - IDENTIFIER_PATH=identifiers
       - API_KEY=test456
-      - APP_ENDPOINT=http://localhost:3001
+      - APP_ENDPOINT=https://idr-mock.aatp.showthething.com
       - APP_NAME=IDR-2
-      - RESOLVER_DOMAIN=http://localhost:3001
-      - LINK_TYPE_VOC_DOMAIN=http://localhost:3001/voc
+      - RESOLVER_DOMAIN=https://idr-mock.aatp.showthething.com
+      - LINK_TYPE_VOC_DOMAIN=https://idr-mock.aatp.showthething.com/voc
       - PORT=3001
     depends_on:
       - mock-global-gs1-resolver-object-store
