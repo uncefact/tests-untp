@@ -18,7 +18,7 @@
         "ianaLanguage": "en",
         "context": "us",
         "title": "Digital Identity Resolver Service",
-        "targetUrl": "http://localhost:3000/gs1",
+        "targetUrl": "https://idr.aatp.showthething.com/gs1",
         "mimeType": "text/plain"
       }
     ]
@@ -42,7 +42,7 @@
         "ianaLanguage": "en",
         "context": "us",
         "title": "Digital Identity Resolver Service",
-        "targetUrl": "http://localhost:3000/gs1",
+        "targetUrl": "https://idr.aatp.showthething.com/gs1",
         "mimeType": "text/plain"
       }
     ]
