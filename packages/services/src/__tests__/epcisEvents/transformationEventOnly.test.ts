@@ -3,6 +3,7 @@ import { processTransformationEventOnly } from '../../epcisEvents/transformation
 import * as vckitService from '../../vckit.service';
 import { uploadData } from '../../storage.service';
 import * as linkResolverService from '../../linkResolver.service';
+import * as identifierSchemeServices from '../../identifierSchemes/identifierSchemeServices';
 import { ITraceabilityEventContext } from '../../types';
 import { Result } from '../../types/validateContext';
 import * as validateContext from '../../validateContext';
@@ -19,8 +20,6 @@ jest.mock('../../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
   createLinkResolver: jest.fn(),
   IdentificationKeyType: jest.fn(),
-  getLinkResolverIdentifier: jest.fn(),
-  getLinkResolverIdentifierFromURI: jest.fn(),
   LinkType: {
     verificationLinkType: 'verificationService',
     certificationLinkType: 'certificationInfo',
@@ -160,14 +159,14 @@ describe('processTransformationEventOnly', () => {
     jest
       .spyOn(validateContext, 'validateTraceabilityEventContext')
       .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
-    jest
-      .spyOn(linkResolverService, 'getLinkResolverIdentifier')
-      .mockReturnValue({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
-    jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
-      identifier: '0123456789',
-      qualifierPath: '/10/ABC123',
-      elementString: '01012345678910ABC123',
+    jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+      primary: { ai: '01', value: '0105012345678900' },
+      qualifiers: [
+        { ai: '21', value: '951350380' },
+        { ai: '10', value: 'ABC123' },
+      ],
     });
+    jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/21/951350380/10/ABC123');
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValue('https://example.com/link-resolver');
 
     const result = await processTransformationEventOnly(transformationEvent, context);
@@ -194,6 +193,14 @@ describe('processTransformationEventOnly', () => {
       ...context,
       identifierKeyPath: '/invalid',
     };
+
+    jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+      primary: { ai: '', value: '' },
+      qualifiers: [
+        { ai: '21', value: '951350380' },
+        { ai: '10', value: 'ABC123' },
+      ],
+    });
 
     jest
       .spyOn(validateContext, 'validateTraceabilityEventContext')
@@ -237,14 +244,14 @@ describe('processTransformationEventOnly', () => {
     jest
       .spyOn(validateContext, 'validateTraceabilityEventContext')
       .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
-    jest
-      .spyOn(linkResolverService, 'getLinkResolverIdentifier')
-      .mockReturnValue({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
-    jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
-      identifier: '0123456789',
-      qualifierPath: '/10/ABC123',
-      elementString: '01012345678910ABC123',
+    jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+      primary: { ai: '01', value: '0105012345678900' },
+      qualifiers: [
+        { ai: '21', value: '951350380' },
+        { ai: '10', value: 'ABC123' },
+      ],
     });
+    jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/21/951350380/10/ABC123');
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValue('https://example.com/link-resolver');
 
     await processTransformationEventOnly(transformationEvent, contextWithHeaders);

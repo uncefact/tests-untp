@@ -1,0 +1,14 @@
+{
+  "namespace": "nlis",
+  "applicationIdentifiers": [
+    {
+      "title": "NLIS",
+      "label": "NLIS",
+      "shortcode": "nlis",
+      "ai": "01",
+      "type": "I",
+      "regex": "(3ABCD123[a-zA-Z0-9]{8})",
+      "qualifiers": []
+    }
+  ]
+}

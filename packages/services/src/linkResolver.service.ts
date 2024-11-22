@@ -81,6 +81,13 @@ export interface ICreateLinkResolver {
   queryString?: string | null;
 }
 
+export interface IFetchIdentifier {
+  dlrAPIUrl: string;
+  dlrAPIKey: string;
+  namespace: string;
+  identifierPath?: string;
+}
+
 export interface LinkResolver extends Omit<ILinkResolver, 'identificationKeyNamespace'> {
   namespace: string;
   qualifierPath: string;
@@ -123,6 +130,12 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
   } catch (error) {
     throw new Error('Error creating link resolver');
   }
+};
+
+export const fetchIdentifier = async (arg: IFetchIdentifier) => {
+  const { dlrAPIUrl, dlrAPIKey, namespace } = arg;
+  privateAPI.setBearerTokenAuthorizationHeaders(dlrAPIKey || '');
+  return await privateAPI.get(`${dlrAPIUrl}/${namespace}/${arg.identifierPath || 'api/identifiers'}`);
 };
 
 export const constructLinkResolver = (
@@ -272,11 +285,11 @@ export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
  * This method will convert either a bracketed element string or an unbracketed element string into an associative array.
  * Input could be "(01)05412345000013(3103)000189(3923)2172(10)ABC123";
  * or input could be "3103000189010541234500001339232172"+groupSeparator+"10ABC123";
- * 
+ *
  * @param {string} elementString - The GS1 element string.
  * @returns {{ identifier: string, qualifierPath: string }} - An object containing the identifier and qualifier path.
  * @throws {Error} Throws an error if the element string contains more or less than one primary identification key.
- * 
+ *
  * How to use:
   try {
     const elementString = '(01)09359502000010(10)ABC123';
@@ -360,10 +373,10 @@ export const getLinkResolverIdentifier = (elementString: string): { identifier: 
 
 /**
  * Retrieves the identifier and qualifier path from a URI.
- * 
+ *
  * @param {string} uri - The URI.
  * @returns {{ identifier: string, qualifierPath: string }} - An object containing the identifier and qualifier path.
- * 
+ *
  * How to use:
   try {
     const uri = 'https://idr.com/gs1/01/09359502000010/10/ABC123';

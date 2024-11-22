@@ -1,8 +1,10 @@
-import { allowedIndexKeys, extractFromElementString } from '@mock-app/services';
+import { extractFromElementString, constructIdentifierData, constructElementString } from '@mock-app/services';
 import { Box } from '@mui/material';
-import JSONPointer from 'jsonpointer';
 import { useEffect, useState } from 'react';
 import Barcode from 'react-barcode';
+import appConfig from '../../constants/app-config.json';
+import { DataCarrierType } from '../../types/common.types';
+import { toastMessage, Status } from '../ToastMessage/ToastMessage';
 
 export interface IBarcodeProps {
   data?: string[];
@@ -12,26 +14,32 @@ export const BarcodeGenerator = (props: IBarcodeProps) => {
   const [values, setValues] = useState<string[]>([]);
   useEffect(() => {
     if (props.data && props.dataPath) {
-      const pathIndex = props.dataPath.split('/').findIndex((key) => allowedIndexKeys.includes(key));
-
-      if (pathIndex === -1) {
-        setValues([constructBarcode(JSONPointer.get(props.data, props.dataPath))]);
+      const aiData = constructIdentifierData(props.dataPath, props.data);
+      if (validateData(aiData)) {
+        const elementString = constructElementString(aiData);
+        setValues([constructBarcode(elementString)]);
       } else {
-        const headPath = props.dataPath.split('/').slice(0, pathIndex).join('/');
-        const tailPath = props.dataPath
-          .split('/')
-          .slice(pathIndex + 1)
-          .join('/');
-        const array = JSONPointer.get(props.data, headPath);
-        const values = array.map((item: any) => JSONPointer.get(item, `/${tailPath}`));
-        const parsedValues = values.map((item: any) => {
-          return constructBarcode(item);
-        });
-
-        setValues(parsedValues);
+        toastMessage({ status: Status.warning, message: 'Invalid data for barcode generation' });
       }
     }
   }, [props.data, props.dataPath]);
+
+  const validateData = (aiData: any) => {
+    if (!aiData) return false;
+    if (!aiData.primary || !aiData.primary.ai || !aiData.primary.value) return false;
+    const identifierSchemesForBarcode = (appConfig.identifierSchemes || []).filter(
+      (scheme) => scheme.carriers && scheme.carriers.includes(DataCarrierType.Barcode),
+    );
+    if (identifierSchemesForBarcode.length === 0) return false;
+
+    return identifierSchemesForBarcode.some((scheme) => {
+      const regex = new RegExp(scheme.format);
+      if (regex.test(aiData.primary.value)) {
+        return true;
+      }
+      return false;
+    });
+  };
 
   const constructBarcode = (data: string) => {
     const convertToGS1String = (obj: any) => {
@@ -66,9 +74,9 @@ export const BarcodeGenerator = (props: IBarcodeProps) => {
 
   return (
     <Box display='flex' flexDirection='column' alignItems='center' justifyContent='space-evenly'>
-      {values.map((item) => {
+      {values.map((item, idx) => {
         return (
-          <Box>
+          <Box key={idx}>
             <Barcode value={item} />
           </Box>
         );

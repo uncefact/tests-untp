@@ -1,11 +1,12 @@
 import { VerifiableCredential } from '@vckit/core-types';
-import { registerLinkResolver, LinkType, getLinkResolverIdentifier } from '../linkResolver.service.js';
+import { registerLinkResolver, LinkType } from '../linkResolver.service.js';
 import { uploadData } from '../storage.service.js';
 import { IService } from '../types/IService.js';
-import { constructIdentifierString, generateUUID } from '../utils/helpers.js';
+import { generateUUID } from '../utils/helpers.js';
 import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { ITraceabilityEvent, ITraceabilityEventContext } from '../types/index.js';
 import { validateTraceabilityEventContext } from '../validateContext.js';
+import { constructIdentifierData, constructQualifierPath } from '../identifierSchemes/identifierSchemeServices.js';
 
 /**
  * Processes an association event by issuing a verifiable credential, storing it in a storage service and registering a link resolver.
@@ -26,13 +27,10 @@ export const processAssociationEvent: IService = async (
 
   const { vckit, traceabilityEvent, dlr, storage, identifierKeyPath } = context;
 
-  const associationIdentifier = constructIdentifierString(associationEvent.data, identifierKeyPath);
-  if (!associationIdentifier) {
-    throw new Error('Identifier not found');
-  }
-
-  const { identifier: associationEventIdentifier, qualifierPath: associationEventQualifierPath } =
-    getLinkResolverIdentifier(associationIdentifier);
+  const aiData = constructIdentifierData(identifierKeyPath, associationEvent.data);
+  if (!aiData.primary.ai || !aiData.primary.value) throw new Error('Identifier not found');
+  const qualifierPath = constructQualifierPath(aiData.qualifiers);
+  const identifier = aiData.primary.value;
 
   const credentialId = generateUUID();
 
@@ -55,14 +53,14 @@ export const processAssociationEvent: IService = async (
   const associationEventLinkResolver = await registerLinkResolver(
     associationEventVcUrl,
     traceabilityEvent.dlrIdentificationKeyType,
-    associationEventIdentifier,
+    identifier,
     traceabilityEvent.dlrLinkTitle,
     LinkType.epcisLinkType,
     traceabilityEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
     dlr.namespace,
-    associationEventQualifierPath,
+    qualifierPath,
     LinkType.epcisLinkType,
   );
 

@@ -137,7 +137,7 @@ export const contextDPP = {
     renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
     type: ['DigitalProductPassport'],
     dlrLinkTitle: 'Livestock Passport',
-    dlrIdentificationKeyType: 'nlis',
+    dlrIdentificationKeyType: '01',
     dlrVerificationPage: 'https://web.example.com/verify',
   },
   dlr: {

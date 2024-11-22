@@ -2,6 +2,7 @@ import { processDPP } from '../processDPP.service';
 import { issueVC, contextDefault, decodeEnvelopedVC } from '../vckit.service';
 import { uploadData } from '../storage.service';
 import { registerLinkResolver, IdentificationKeyType, LinkType } from '../linkResolver.service';
+import * as identifierSchemeServices from '../identifierSchemes/identifierSchemeServices';
 import { contextDPP, dataDPP } from './mocks/constants';
 
 jest.mock('../vckit.service', () => ({
@@ -20,7 +21,6 @@ jest.mock('../linkResolver.service', () => ({
     gtin: 'gtin',
     nlisid: 'nlisid',
   },
-  getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' })),
   LinkType: {
     verificationLinkType: 'gs1:verificationService',
     certificationLinkType: 'gs1:certificationInfo',
@@ -64,6 +64,17 @@ describe('processDPP', () => {
         return `${url}/${dataDPP.data.herd.identifier}`;
       });
 
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '9359502000010' },
+        qualifiers: [
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
+      });
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/10/ABC123');
+
       (registerLinkResolver as jest.Mock).mockImplementation(
         (
           url,
@@ -84,13 +95,7 @@ describe('processDPP', () => {
         decodedEnvelopedVC: {
           credentialSubject: { id: 'https://example.com/123' },
         },
-        linkResolver:
-          contextDPP.dpp.dlrVerificationPage +
-          '/' +
-          contextDPP.dpp.dlrIdentificationKeyType +
-          '/' +
-          dataDPP.data.herd.identifier +
-          '?linkType=all',
+        linkResolver: 'https://web.example.com/verify/01/9359502000010?linkType=all',
       });
       expect(uploadData).toHaveBeenCalled();
       expect(registerLinkResolver).toHaveBeenCalled();
@@ -125,6 +130,12 @@ describe('processDPP', () => {
       (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
         return `${url}/${dataDPP.data.herd.identifier}`;
       });
+
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '0123456789' },
+        qualifiers: [],
+      });
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/');
 
       (registerLinkResolver as jest.Mock).mockImplementation(
         (
@@ -169,6 +180,11 @@ describe('processDPP', () => {
 
     it('should throw error when data is empty', async () => {
       try {
+        jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+          primary: { ai: '', value: '' },
+          qualifiers: [],
+        });
+
         await processDPP({ data: { herd: '' } }, contextDPP);
       } catch (error: any) {
         expect(error.message).toEqual('Identifier not found');
