@@ -6901,7 +6901,12 @@
     },
     {
       "type": "nlis",
-      "format": "^3ABCD123[a-zA-Z0-9]{8}$",
+      "format": "^[A-Z0-9]{8}[A-Z][A-Z][A-Z][A-Z0-9]{5}$",
+      "carriers": ["manual_entry"]
+    },
+    {
+      "type": "abn",
+      "format": "^(\\d *?){11}$",
       "carriers": ["manual_entry"]
     }
   ],

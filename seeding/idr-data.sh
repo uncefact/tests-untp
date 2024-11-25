@@ -13,6 +13,9 @@ GS1_IDENTIFIER_FILE="./seeding/idr-identifier.gs1.json"
 # Path to the IDR identifier JSON file for nlis namespace
 NLIS_IDENTIFIER_FILE="./seeding/idr-identifier.nlis.json"
 
+# Path to the IDR identifier JSON file for nlis namespace
+ATO_IDENTIFIER_FILE="./seeding/idr-identifier.ato.json"
+
 # Wait for the service to be available
 echo "Waiting for ${SERVICE_NAME} service to be ready..."
 
@@ -52,5 +55,12 @@ curl -X POST \
   -H "Authorization: Bearer ${IDR_SERVICE_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d @"$NLIS_IDENTIFIER_FILE"
+
+curl -X POST \
+  http://${IDR_SERVICE_HOST}:${IDR_SERVICE_PORT}/api/identifiers \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer ${IDR_SERVICE_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d @"$ATO_IDENTIFIER_FILE"
 
 printf "\nSeeding ${SERVICE_NAME} service data complete!\n\n"

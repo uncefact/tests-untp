@@ -679,7 +679,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Orchard Facility"
                     },
                     "headers": {
@@ -1376,7 +1376,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Orchard Facility"
                     },
                     "headers": {
@@ -1585,7 +1585,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Orchard Facility"
                     },
                     "headers": {
@@ -2524,7 +2524,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Orchard Facility"
                     },
                     "headers": {
@@ -2701,7 +2701,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Orchard Facility"
                     },
                     "headers": {
@@ -2882,7 +2882,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Orchard Facility"
                     },
                     "headers": {
@@ -3063,7 +3063,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Orchard Facility"
                     },
                     "headers": {
@@ -3265,7 +3265,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Orchard Facility"
                     },
                     "headers": {
@@ -3766,7 +3766,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Orchard Facility"
                     },
                     "headers": {
@@ -4183,7 +4183,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Orchard Facility"
                     },
                     "headers": {
@@ -4846,7 +4846,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Packhouse Facility"
                     },
                     "headers": {
@@ -5059,7 +5059,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Packhouse Facility"
                     },
                     "headers": {
@@ -5732,7 +5732,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Fumigation and Freight Forwarding Facility"
                     },
                     "headers": {
@@ -5945,7 +5945,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Fumigation and Freight Forwarding Facility"
                     },
                     "headers": {
@@ -6618,7 +6618,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Airport Terminal Facility"
                     },
                     "headers": {
@@ -6831,7 +6831,7 @@
                   "vckit": {
                     "vckitAPIUrl": "http://localhost:3332/v2",
                     "issuer": {
-                      "id": "did:web:6028-115-79-212-164.ngrok-free.app",
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
                       "name": "Airport Terminal Facility"
                     },
                     "headers": {
@@ -6901,7 +6901,12 @@
     },
     {
       "type": "nlis",
-      "format": "^3ABCD123[a-zA-Z0-9]{8}$",
+      "format": "^[A-Z0-9]{8}[A-Z][A-Z][A-Z][A-Z0-9]{5}$",
+      "carriers": ["manual_entry"]
+    },
+    {
+      "type": "abn",
+      "format": "^(\\d *?){11}$",
       "carriers": ["manual_entry"]
     }
   ],
