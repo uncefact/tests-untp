@@ -19,7 +19,6 @@ jest.mock('../storage.service', () => ({
 jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
   createLinkResolver: jest.fn(),
-  IdentificationKeyType: jest.fn(),
   LinkType: {
     verificationLinkType: 'gs1:verificationService',
     certificationLinkType: 'gs1:certificationInfo',

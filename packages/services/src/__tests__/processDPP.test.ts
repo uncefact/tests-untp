@@ -1,7 +1,7 @@
 import { processDPP } from '../processDPP.service';
 import { issueVC, contextDefault, decodeEnvelopedVC } from '../vckit.service';
 import { uploadData } from '../storage.service';
-import { registerLinkResolver, IdentificationKeyType, LinkType } from '../linkResolver.service';
+import { registerLinkResolver, LinkType } from '../linkResolver.service';
 import * as identifierSchemeServices from '../identifierSchemes/identifierSchemeServices';
 import { contextDPP, dataDPP } from './mocks/constants';
 
@@ -17,10 +17,6 @@ jest.mock('../storage.service', () => ({
 
 jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
-  IdentificationKeyType: {
-    gtin: 'gtin',
-    nlisid: 'nlisid',
-  },
   LinkType: {
     verificationLinkType: 'gs1:verificationService',
     certificationLinkType: 'gs1:certificationInfo',
@@ -78,7 +74,7 @@ describe('processDPP', () => {
       (registerLinkResolver as jest.Mock).mockImplementation(
         (
           url,
-          identificationKeyType: IdentificationKeyType,
+          identificationKeyType: string,
           identificationKey: string,
           linkTitle,
           verificationPage,
@@ -140,7 +136,7 @@ describe('processDPP', () => {
       (registerLinkResolver as jest.Mock).mockImplementation(
         (
           url,
-          identificationKeyType: IdentificationKeyType,
+          identificationKeyType: string,
           identificationKey: string,
           linkTitle,
           verificationPage,

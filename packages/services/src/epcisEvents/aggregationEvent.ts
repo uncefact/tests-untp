@@ -1,6 +1,6 @@
 import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
-import { IdentificationKeyType, LinkType, registerLinkResolver } from '../linkResolver.service.js';
+import { LinkType, registerLinkResolver } from '../linkResolver.service.js';
 import { IService } from '../types/IService.js';
 import { ITraceabilityEvent, ITraceabilityEventContext } from '../types';
 import { generateUUID } from '../utils/helpers.js';
@@ -43,7 +43,7 @@ export const processAggregationEvent: IService = async (
 
   const aggregationLinkResolver = await registerLinkResolver(
     aggregationVCLink,
-    aiData.primary.ai as IdentificationKeyType,
+    aiData.primary.ai,
     identifier,
     traceabilityEvent.dlrLinkTitle,
     LinkType.epcisLinkType,

@@ -13,7 +13,7 @@ import { extractDomain } from './utils/helpers.js';
  * @example
  * const arg: ICreateLinkResolver = {
  *  linkResolver: {
- *    identificationKeyType: IdentificationKeyType.nlisid,
+ *    identificationKeyType: '01',
  *    identificationKey: '1234',
  *    itemDescription: 'item',
  *  },
@@ -45,14 +45,8 @@ export enum MimeType {
   applicationJson = 'application/json',
 }
 
-export enum IdentificationKeyType {
-  gtin = 'gtin',
-  nlisid = 'nlisid',
-  consignment_id = 'consignment_id',
-}
-
 export interface ILinkResolver {
-  identificationKeyType: IdentificationKeyType;
+  identificationKeyType: string;
   identificationKey: string;
   itemDescription: string;
 }
@@ -175,7 +169,7 @@ export const constructLinkResolver = (
 
 export const registerLinkResolver = async (
   url: string,
-  identificationKeyType: IdentificationKeyType,
+  identificationKeyType: string,
   identificationKey: string,
   linkTitle: string,
   linkType: LinkType,

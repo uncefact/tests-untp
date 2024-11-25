@@ -6,7 +6,7 @@ import { uploadData } from './storage.service.js';
 import { decodeEnvelopedVC, issueVC } from './vckit.service.js';
 import { validateContextDPP } from './validateContext.js';
 import { deleteItemFromLocalStorage } from './features/localStorage.service.js';
-import { IdentificationKeyType, LinkType, registerLinkResolver } from './linkResolver.service.js';
+import { LinkType, registerLinkResolver } from './linkResolver.service.js';
 import { constructIdentifierData, constructQualifierPath } from './identifierSchemes/identifierSchemeServices.js';
 
 /**
@@ -50,7 +50,7 @@ export const processDPP: IService = async (data: any, context: IDppContext): Pro
     const linkResolverContext = context.dlr;
     const linkResolver = await registerLinkResolver(
       vcUrl,
-      aiData.primary.ai as IdentificationKeyType,
+      aiData.primary.ai,
       identifier,
       dppContext.dlrLinkTitle,
       LinkType.certificationLinkType,
