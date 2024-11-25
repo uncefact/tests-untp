@@ -6,8 +6,9 @@
     "packages/*"
   ],
   "scripts": {
-    "start": "cp app-config.json packages/mock-app/src/constants/app-config.json && cd packages/mock-app && yarn start",
-    "build": "yarn build:services && yarn build:components && yarn build:untp-test-suite",
+    "copy-config": "cp app-config.json packages/mock-app/src/constants/app-config.json && cp app-config.json packages/components/src/constants/app-config.json",
+    "start": "yarn copy-config && cd packages/mock-app && yarn start",
+    "build": "yarn copy-config && yarn build:services && yarn build:components && yarn build:untp-test-suite",
     "build:services": "cd packages/services && yarn run build",
     "build:components": "cd packages/components && yarn run build",
     "build:untp-test-suite": "cd packages/untp-test-suite && yarn run build",

@@ -55,7 +55,6 @@ P-->>C: Return digital facility record VC and resolver URL
             "@type": "WebRenderingTemplate2022"
           }
         ],
-        "dlrIdentificationKeyType": "gln",
         "dlrLinkTitle": "DigitalFacilityRecord",
         "dlrVerificationPage": "https://verify.example.com"
       },

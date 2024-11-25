@@ -7,8 +7,11 @@ SERVICE_NAME="Identity Resolver"
 MAX_RETRIES=3
 RETRY_COUNT=0
 
-# Path to the IDR identifier JSON file
-IDENTIFIER_FILE="./seeding/idr-identifier.json"
+# Path to the IDR identifier JSON file for gs1 namespace
+GS1_IDENTIFIER_FILE="./seeding/idr-identifier.gs1.json"
+
+# Path to the IDR identifier JSON file for nlis namespace
+NLIS_IDENTIFIER_FILE="./seeding/idr-identifier.nlis.json"
 
 # Wait for the service to be available
 echo "Waiting for ${SERVICE_NAME} service to be ready..."
@@ -41,6 +44,13 @@ curl -X POST \
   -H 'accept: application/json' \
   -H "Authorization: Bearer ${IDR_SERVICE_API_KEY}" \
   -H 'Content-Type: application/json' \
-  -d @"$IDENTIFIER_FILE"
+  -d @"$GS1_IDENTIFIER_FILE"
+  
+curl -X POST \
+  http://${IDR_SERVICE_HOST}:${IDR_SERVICE_PORT}/api/identifiers \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer ${IDR_SERVICE_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d @"$NLIS_IDENTIFIER_FILE"
 
 printf "\nSeeding ${SERVICE_NAME} service data complete!\n\n"

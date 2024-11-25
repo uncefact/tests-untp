@@ -57,7 +57,6 @@ P-->>C: Return association event VC and resolver URL
             "@type": "WebRenderingTemplate2022"
           }
         ],
-        "dlrIdentificationKeyType": "gtin",
         "dlrLinkTitle": "Association Event",
         "dlrVerificationPage": "https://verify.example.com"
       },

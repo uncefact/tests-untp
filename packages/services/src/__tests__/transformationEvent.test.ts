@@ -5,7 +5,7 @@ import {
 } from '../epcisEvents/transformationEvent';
 import { issueVC, contextDefault } from '../vckit.service';
 import { uploadData } from '../storage.service';
-import { registerLinkResolver, IdentificationKeyType } from '../linkResolver.service';
+import { registerLinkResolver } from '../linkResolver.service';
 import { IEntityIssue } from '../types';
 import { contextTransformationEvent, dataTransformationEvent } from './mocks/constants';
 import { generateUUID } from '../utils';
@@ -22,10 +22,6 @@ jest.mock('../storage.service', () => ({
 
 jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
-  IdentificationKeyType: {
-    gtin: 'gtin',
-    nlisid: 'nlisid',
-  },
   getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' })),
   LinkType: {
     verificationLinkType: 'gs1:verificationService',
@@ -202,7 +198,7 @@ describe('Transformation event', () => {
       (registerLinkResolver as jest.Mock).mockImplementation(
         (
           url,
-          identificationKeyType: IdentificationKeyType,
+          identificationKeyType: string,
           identificationKey: string,
           linkTitle,
           verificationPage,
