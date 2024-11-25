@@ -47,13 +47,13 @@ export const processTransactionEvent: IService = async (
     traceabilityEvent.dlrIdentificationKeyType,
     identifier,
     traceabilityEvent.dlrLinkTitle,
-    LinkType.epcisLinkType,
+    LinkType.traceability,
     traceabilityEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
     dlr.namespace,
     qualifierPath,
-    LinkType.epcisLinkType,
+    LinkType.traceability,
   );
 
   deleteValuesFromLocalStorageByKeyPath(

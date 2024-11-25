@@ -37,6 +37,11 @@ export enum LinkType {
   verificationLinkType = 'verificationService',
   certificationLinkType = 'certificationInfo',
   epcisLinkType = 'epcis',
+  locationInfo = 'locationInfo',
+  registryEntry = 'registryEntry',
+  sustainabilityInfo = 'sustainabilityInfo',
+  traceability = 'traceability',
+  serviceInfo = 'serviceInfo',
 }
 
 export enum MimeType {

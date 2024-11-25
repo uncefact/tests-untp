@@ -82,13 +82,13 @@ export const processTransformationEvent: IService = async (
           epcisTransformationEventContext.dlrIdentificationKeyType,
           transformationEventIdentifier,
           epcisTransformationEventContext.dlrLinkTitle,
-          LinkType.epcisLinkType,
+          LinkType.traceability,
           epcisTransformationEventContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,
           dlrContext.namespace,
           transformationEventQualifierPath,
-          LinkType.epcisLinkType,
+          LinkType.traceability,
         );
 
         const transformationEventData = {
@@ -107,7 +107,7 @@ export const processTransformationEvent: IService = async (
           dppContext.dlrIdentificationKeyType,
           identifier,
           dppContext.dlrLinkTitle,
-          LinkType.certificationLinkType,
+          LinkType.sustainabilityInfo,
           dppContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,

@@ -57,13 +57,13 @@ export const processTransformationEventOnly: IService = async (
     traceabilityEvent.dlrIdentificationKeyType,
     transformationEventIdentifier,
     traceabilityEvent.dlrLinkTitle,
-    LinkType.epcisLinkType,
+    LinkType.traceability,
     traceabilityEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
     dlr.namespace,
     transformationEventQualifierPath,
-    LinkType.epcisLinkType,
+    LinkType.traceability,
   );
 
   return { vc: transformationEventVc, decodedEnvelopedVC, linkResolver: transformationEventLinkResolver };

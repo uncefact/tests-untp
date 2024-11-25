@@ -57,13 +57,13 @@ export const processAssociationEvent: IService = async (
     traceabilityEvent.dlrIdentificationKeyType,
     associationEventIdentifier,
     traceabilityEvent.dlrLinkTitle,
-    LinkType.epcisLinkType,
+    LinkType.traceability,
     traceabilityEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
     dlr.namespace,
     associationEventQualifierPath,
-    LinkType.epcisLinkType,
+    LinkType.traceability,
   );
 
   return { vc: associationEventVc, decodedEnvelopedVC, linkResolver: associationEventLinkResolver };
