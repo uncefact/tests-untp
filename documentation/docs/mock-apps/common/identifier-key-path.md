@@ -9,13 +9,13 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 ## Description
 
-The `IdentifierKeyPath` is a property of services that interact with the data issued to get the identifier to be used for the [IDR](/docs/mock-apps/common/idr) registration. It can be a JSON path of the identifier of the data issued or an object that contains the function `concatService` and the `args` to be used to get the identifier.
+The `IdentifierKeyPath` can be an object or a string that defines the path to extract the identifier data from the [Json Form component](/docs/mock-apps/components/json-form). When the `identifierKeyPath` is a string, it should be a link resolver URL. When the `identifierKeyPath` is an object, it should contain AI codes and JSON pointer paths to extract the appropriate data for identifier generation.
 
 ## Example
 
 ```json
 {
-  "identifierKeyPath": "/eventID"
+  "identifierKeyPath": "/id" // Example of a link resolver URL: https://example.com/gs1/01/0123456789123/21/123456/10/123456
 }
 ```
 
@@ -24,22 +24,26 @@ or
 ```json
 {
   "identifierKeyPath": {
-    "function": "concatService",
-    "args": [
-      { "type": "text", "value": "(01)" },
-      { "type": "path", "value": "/productIdentifier/0/identifierValue" },
-      { "type": "text", "value": "(10)" },
-      { "type": "path", "value": "/batchIdentifier/0/identifierValue" },
-      { "type": "text", "value": "(21)" },
-      { "type": "path", "value": "/itemIdentifier/0/identifierValue" }
+    "primary": {
+      "ai": "01",
+      "path": "/registeredId"
+    },
+    "qualifiers": [
+      {
+        "ai": "21",
+        "path": "/serialNumber"
+      },
+      {
+        "ai": "10",
+        "path": "/batchNumber"
+      }
     ]
   }
 }
 ```
 
-## Definition for object
+## Definition
 
-| Property | Required | Description                                      | Type   |
-| -------- | :------: | ------------------------------------------------ | ------ |
-| function |   Yes    | The concat function supported                    | String |
-| args     |   Yes    | The array of object that can be `text` or `path` | Array  |
+| Property          | Required | Description                             | Type                                                         |
+| ----------------- | :------: | --------------------------------------- | ------------------------------------------------------------ |
+| identifierKeyPath |   Yes    | The path to extract the identifier data | String or [AIData](/docs/mock-apps/common/construct-ai-data) |

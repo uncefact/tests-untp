@@ -55,7 +55,6 @@ P-->>C: Return VC and resolver URL
             "template": "<div><h2>Aggregation Event</h2><p>Parent: {{parentItem.epc}}</p></div>"
           }
         ],
-        "dlrIdentificationKeyType": "sscc",
         "dlrLinkTitle": "Aggregation Event",
         "dlrVerificationPage": "https://verify.example.com"
       },

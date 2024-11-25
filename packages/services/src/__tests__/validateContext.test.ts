@@ -143,19 +143,6 @@ describe('validateContext', () => {
       expect(result.value).toEqual('Invalid dlrVerificationPage');
     });
 
-    it('should return error when dlrIdentificationKeyType in dpp context is invalid', () => {
-      const newContext = {
-        ...contextDPP,
-        dpp: {
-          ...contextDPP.dpp,
-          dlrIdentificationKeyType: '',
-        },
-      };
-      const result = validateContextDPP(newContext as any);
-      expect(result.ok).toBe(false);
-      expect(result.value).toEqual('Invalid dlrIdentificationKeyType');
-    });
-
     it('should return error when storageAPIUrl in storage context is invalid', () => {
       const newContext = {
         ...contextDPP,
@@ -343,19 +330,6 @@ describe('validateTraceabilityEventContext', () => {
     const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
     expect(result.value).toEqual('Invalid traceabilityEvent dlrVerificationPage');
-  });
-
-  it('should return error when dlrIdentificationKeyType in traceabilityEvent is invalid', () => {
-    const newContext = {
-      ...traceabilityEventContext,
-      traceabilityEvent: {
-        ...traceabilityEventContext.traceabilityEvent,
-        dlrIdentificationKeyType: '',
-      },
-    };
-    const result = validateTraceabilityEventContext(newContext as any);
-    expect(result.ok).toBe(false);
-    expect(result.value).toEqual('Invalid traceabilityEvent dlrIdentificationKeyType');
   });
 
   it('should return error when storageAPIUrl in storage context is invalid', () => {
