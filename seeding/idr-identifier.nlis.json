@@ -7,7 +7,7 @@
       "shortcode": "nlis",
       "ai": "01",
       "type": "I",
-      "regex": "(3ABCD123[a-zA-Z0-9]{8})",
+      "regex": "^[A-Z0-9]{8}[A-Z][A-Z][A-Z][A-Z0-9]{5}$",
       "qualifiers": []
     }
   ]
