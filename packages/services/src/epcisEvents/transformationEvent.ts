@@ -3,12 +3,7 @@ import _ from 'lodash';
 
 import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
-import {
-  IdentificationKeyType,
-  LinkType,
-  getLinkResolverIdentifier,
-  registerLinkResolver,
-} from '../linkResolver.service.js';
+import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 
 import { IService } from '../types/IService.js';
 import { IConfigDLR, ICredential, IEntityIssue, ITransformationEventContext, IVCKitContext } from '../types';
@@ -153,7 +148,7 @@ export const issueEpcisTransformationEvent = async (
         generateLinkResolver: generateLinkResolver(
           dlrContext.dlrAPIUrl,
           dlrContext.namespace,
-          IdentificationKeyType.gtin,
+          '01',
           `linkType=${dlrContext.namespace}:${LinkType.certificationLinkType}`,
         ),
         generateIdWithBatchLot,

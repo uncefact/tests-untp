@@ -41,7 +41,6 @@ export const validateContextDPP = (context: IDppContext): Result<IContext> => {
   if (_.isEmpty(context.dpp.type)) return error('Invalid type');
   if (_.isEmpty(context.dpp.dlrLinkTitle)) return error('Invalid dlrLinkTitle');
   if (_.isEmpty(context.dpp.dlrVerificationPage)) return error('Invalid dlrVerificationPage');
-  if (_.isEmpty(context.dpp.dlrIdentificationKeyType)) return error('Invalid dlrIdentificationKeyType');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
@@ -68,7 +67,6 @@ export const validateContextTransformationEvent = (
   if (_.isEmpty(context.dpp.type)) return error('Invalid dpp type');
   if (_.isEmpty(context.dpp.dlrLinkTitle)) return error('Invalid dpp dlrLinkTitle');
   if (_.isEmpty(context.dpp.dlrVerificationPage)) return error('Invalid dpp dlrVerificationPage');
-  if (_.isEmpty(context.dpp.dlrIdentificationKeyType)) return error('Invalid dpp dlrIdentificationKeyType');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
@@ -107,8 +105,6 @@ export const validateDigitalIdentityAnchorContext = (
   if (_.isEmpty(context.digitalIdentityAnchor.type)) return error('Invalid type');
   if (_.isEmpty(context.digitalIdentityAnchor.dlrLinkTitle)) return error('Invalid dlrLinkTitle');
   if (_.isEmpty(context.digitalIdentityAnchor.dlrVerificationPage)) return error('Invalid dlrVerificationPage');
-  if (_.isEmpty(context.digitalIdentityAnchor.dlrIdentificationKeyType))
-    return error('Invalid dlrIdentificationKeyType');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
@@ -135,8 +131,6 @@ export const validateDigitalFacilityRecordContext = (
   if (_.isEmpty(context.digitalFacilityRecord.type)) return error('Invalid type');
   if (_.isEmpty(context.digitalFacilityRecord.dlrLinkTitle)) return error('Invalid dlrLinkTitle');
   if (_.isEmpty(context.digitalFacilityRecord.dlrVerificationPage)) return error('Invalid dlrVerificationPage');
-  if (_.isEmpty(context.digitalFacilityRecord.dlrIdentificationKeyType))
-    return error('Invalid dlrIdentificationKeyType');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
@@ -164,8 +158,6 @@ export const validateDigitalConformityCredentialContext = (
   if (_.isEmpty(context.digitalConformityCredential.type)) return error('Invalid type');
   if (_.isEmpty(context.digitalConformityCredential.dlrLinkTitle)) return error('Invalid dlrLinkTitle');
   if (_.isEmpty(context.digitalConformityCredential.dlrVerificationPage)) return error('Invalid dlrVerificationPage');
-  if (_.isEmpty(context.digitalConformityCredential.dlrIdentificationKeyType))
-    return error('Invalid dlrIdentificationKeyType');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
@@ -195,8 +187,6 @@ export const validateTraceabilityEventContext = (
   if (_.isEmpty(context.traceabilityEvent.dlrLinkTitle)) return error('Invalid traceabilityEvent dlrLinkTitle');
   if (_.isEmpty(context.traceabilityEvent.dlrVerificationPage))
     return error('Invalid traceabilityEvent dlrVerificationPage');
-  if (_.isEmpty(context.traceabilityEvent.dlrIdentificationKeyType))
-    return error('Invalid traceabilityEvent dlrIdentificationKeyType');
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');

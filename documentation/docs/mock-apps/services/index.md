@@ -66,7 +66,6 @@ graph TD
             "renderTemplate": [],
             "type": ["VerifiableCredential", " DigitalProductPassport"],
             "dlrLinkTitle": "Steel Passport",
-            "dlrIdentificationKeyType": "gtin",
             "dlrVerificationPage": "http://localhost:3000/verify"
           },
           "dlr": {

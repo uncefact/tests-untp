@@ -57,7 +57,6 @@ P-->>C: Return digital conformity credential VC and resolver URL
             "@type": "WebRenderingTemplate2022"
           }
         ],
-        "dlrIdentificationKeyType": "gtin",
         "dlrLinkTitle": "DigitalConformityCredential",
         "dlrVerificationPage": "https://verify.example.com"
       },
