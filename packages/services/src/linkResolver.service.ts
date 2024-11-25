@@ -81,13 +81,6 @@ export interface ICreateLinkResolver {
   queryString?: string | null;
 }
 
-export interface IFetchIdentifier {
-  dlrAPIUrl: string;
-  dlrAPIKey: string;
-  namespace: string;
-  identifierPath?: string;
-}
-
 export interface LinkResolver extends Omit<ILinkResolver, 'identificationKeyNamespace'> {
   namespace: string;
   qualifierPath: string;
@@ -130,12 +123,6 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
   } catch (error) {
     throw new Error('Error creating link resolver');
   }
-};
-
-export const fetchIdentifier = async (arg: IFetchIdentifier) => {
-  const { dlrAPIUrl, dlrAPIKey, namespace } = arg;
-  privateAPI.setBearerTokenAuthorizationHeaders(dlrAPIKey || '');
-  return await privateAPI.get(`${dlrAPIUrl}/${namespace}/${arg.identifierPath || 'api/identifiers'}`);
 };
 
 export const constructLinkResolver = (
