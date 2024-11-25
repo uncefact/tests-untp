@@ -158,7 +158,6 @@ Based on the example, you can define the features of the apps in the configurati
                     ],
                     "type": ["DigitalProductPassport"],
                     "dlrLinkTitle": "Livestock Passport",
-                    "dlrIdentificationKeyType": "nlisid",
                     "dlrVerificationPage": "http://localhost:3001/verify"
                   },
 
@@ -218,7 +217,6 @@ Based on the example, you can define the features of the apps in the configurati
                     ],
                     "type": ["DigitalTraceabilityEvent"],
                     "dlrLinkTitle": "Transaction Event",
-                    "dlrIdentificationKeyType": "nlisid",
                     "dlrVerificationPage": "http://dlr.example.com/verify"
                   },
                   "dlr": {

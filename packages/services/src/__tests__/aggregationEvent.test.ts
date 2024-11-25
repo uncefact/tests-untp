@@ -46,7 +46,6 @@ describe('processAggregationEvent', () => {
       type: ['AggregationEventCredential'],
       renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
       dlrLinkTitle: 'Aggregation Event',
-      dlrIdentificationKeyType: linkResolverService.IdentificationKeyType.gtin,
       dlrVerificationPage: 'http://exampleUI.com/verify',
       dlrQualifierPath: '',
     },

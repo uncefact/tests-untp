@@ -1,5 +1,5 @@
 import { VerifiableCredential } from '@vckit/core-types';
-import { registerLinkResolver, LinkType } from './linkResolver.service.js';
+import { registerLinkResolver, LinkType, IdentificationKeyType } from './linkResolver.service.js';
 import { uploadData } from './storage.service.js';
 import { IService } from './types/IService.js';
 import { generateUUID } from './utils/helpers.js';
@@ -53,7 +53,7 @@ export const processDigitalConformityCredential: IService = async (
 
   const linkResolver = await registerLinkResolver(
     vcUrl,
-    digitalConformityCredential.dlrIdentificationKeyType,
+    aiData.primary.ai as IdentificationKeyType,
     identifier,
     digitalConformityCredential.dlrLinkTitle,
     LinkType.certificationLinkType,

@@ -716,7 +716,6 @@
                     ],
                     "type": ["VerifiableCredential", "DigitalProductPassport"],
                     "dlrLinkTitle": "Cherries Product Passport",
-                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
@@ -905,7 +904,6 @@
                     ],
                     "type": ["VerifiableCredential", "DigitalTraceabilityEvent"],
                     "dlrLinkTitle": "Object Event",
-                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
@@ -1122,7 +1120,6 @@
                     ],
                     "type": ["VerifiableCredential", "DigitalIdentityAnchor"],
                     "dlrLinkTitle": "DigitalIdentityAnchor",
-                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
@@ -2789,7 +2786,6 @@
                     ],
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Transaction Event",
-                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
@@ -3541,7 +3537,6 @@
                     ],
                     "type": ["VerifiableCredential", "DigitalProductPassport"],
                     "dlrLinkTitle": "Cherries Product Passport",
-                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
@@ -4024,7 +4019,6 @@
                     ],
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Transaction Event",
-                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
@@ -4776,7 +4770,6 @@
                     ],
                     "type": ["VerifiableCredential", "DigitalProductPassport"],
                     "dlrLinkTitle": "Cherries Product Passport",
-                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
@@ -5259,7 +5252,6 @@
                     ],
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Transaction Event",
-                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {

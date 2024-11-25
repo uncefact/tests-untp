@@ -137,7 +137,6 @@ export const contextDPP = {
     renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
     type: ['DigitalProductPassport'],
     dlrLinkTitle: 'Livestock Passport',
-    dlrIdentificationKeyType: '01',
     dlrVerificationPage: 'https://web.example.com/verify',
   },
   dlr: {
@@ -223,7 +222,6 @@ export const traceabilityEventContext = {
         '@type': 'WebRenderingTemplate2022',
       },
     ],
-    dlrIdentificationKeyType: 'gtin',
     dlrLinkTitle: 'Object Event',
     dlrVerificationPage: 'https://verify.example.com',
   },
@@ -252,7 +250,6 @@ export const digitalIdentityAnchorContext = {
     renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
     type: ['DigitalIdentityAnchor'],
     dlrLinkTitle: 'DigitalIdentityAnchor',
-    dlrIdentificationKeyType: 'gtin',
     dlrVerificationPage: 'https://web.example.com/verify',
   },
   dlr: {
@@ -280,7 +277,6 @@ export const digitalFacilityRecordContext = {
     renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
     type: ['DigitalFacilityRecord'],
     dlrLinkTitle: 'DigitalFacilityRecord',
-    dlrIdentificationKeyType: 'gln',
     dlrVerificationPage: 'https://web.example.com/verify',
   },
   dlr: {
@@ -308,7 +304,6 @@ export const digitalConformityCredentialContext = {
     renderTemplate: [{ template: '<p>Render dcc template</p>', '@type': 'WebRenderingTemplate2022' }],
     type: ['DigitalConformityCredential'],
     dlrLinkTitle: 'DigitalConformityCredential',
-    dlrIdentificationKeyType: 'gtin',
     dlrVerificationPage: 'https://web.example.com/verify',
   },
   dlr: {

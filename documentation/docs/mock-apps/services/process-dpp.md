@@ -73,7 +73,6 @@ P-->>C: Return VC and resolver URL
         ],
         "type": ["DigitalProductPassport"],
         "dlrLinkTitle": "Steel Passport",
-        "dlrIdentificationKeyType": "gtin",
         "dlrVerificationPage": "http://localhost:3332/verify"
       },
       "dlr": {

@@ -57,7 +57,7 @@ export const constructQualifierPath = (qualifiers: { ai: string; value: string }
 };
 
 const parseLinkResolverURLToAIs = (url: string): AIData => {
-  const regex = /\/(\d{2})\/([^/]+)/g;
+  const regex = /\/(\d{2}|\d{3})\/([^/]+)/g;
   const matches = [...url.matchAll(regex)];
 
   if (!matches.length) {

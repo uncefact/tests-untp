@@ -54,7 +54,6 @@ describe('processTransactionEvent', () => {
       context: ['https://example.sh/TransactionEvent.jsonld'],
       type: ['DigitalTraceabilityEvent'],
       dlrLinkTitle: 'Transaction Event',
-      dlrIdentificationKeyType: linkResolverService.IdentificationKeyType.nlisid,
       dlrVerificationPage: 'http://exampleUI.com/verify',
     },
     dlr: { dlrAPIUrl: 'http://exampleDLR.com', dlrAPIKey: 'test-key' },

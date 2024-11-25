@@ -104,7 +104,7 @@ describe('processDPP', () => {
       const dlrContext = contextDPP.dlr;
       expect(registerLinkResolver).toHaveBeenCalledWith(
         expect.any(String),
-        dppContext.dlrIdentificationKeyType,
+        '01',
         dataDPP.data.herd.identifier,
         dppContext.dlrLinkTitle,
         LinkType.certificationLinkType,

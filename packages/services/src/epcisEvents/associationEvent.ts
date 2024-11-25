@@ -1,5 +1,5 @@
 import { VerifiableCredential } from '@vckit/core-types';
-import { registerLinkResolver, LinkType } from '../linkResolver.service.js';
+import { registerLinkResolver, LinkType, IdentificationKeyType } from '../linkResolver.service.js';
 import { uploadData } from '../storage.service.js';
 import { IService } from '../types/IService.js';
 import { generateUUID } from '../utils/helpers.js';
@@ -52,7 +52,7 @@ export const processAssociationEvent: IService = async (
 
   const associationEventLinkResolver = await registerLinkResolver(
     associationEventVcUrl,
-    traceabilityEvent.dlrIdentificationKeyType,
+    aiData.primary.ai as IdentificationKeyType,
     identifier,
     traceabilityEvent.dlrLinkTitle,
     LinkType.epcisLinkType,

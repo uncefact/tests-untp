@@ -3,7 +3,7 @@ import { IService, ITraceabilityEvent, ITraceabilityEventContext } from '../type
 import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
 import { generateUUID } from '../utils/helpers.js';
-import { LinkType, registerLinkResolver } from '../linkResolver.service.js';
+import { IdentificationKeyType, LinkType, registerLinkResolver } from '../linkResolver.service.js';
 import { validateTraceabilityEventContext } from '../validateContext.js';
 import { deleteValuesFromLocalStorageByKeyPath } from './helpers.js';
 import { constructIdentifierData, constructQualifierPath } from '../identifierSchemes/identifierSchemeServices.js';
@@ -44,7 +44,7 @@ export const processTransactionEvent: IService = async (
 
   const linkResolver = await registerLinkResolver(
     vcUrl,
-    traceabilityEvent.dlrIdentificationKeyType,
+    aiData.primary.ai as IdentificationKeyType,
     identifier,
     traceabilityEvent.dlrLinkTitle,
     LinkType.epcisLinkType,
