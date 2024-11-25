@@ -21,6 +21,7 @@ jest.mock('../linkResolver.service', () => ({
     verificationLinkType: 'gs1:verificationService',
     certificationLinkType: 'gs1:certificationInfo',
     epcisLinkType: 'gs1:epcis',
+    sustainabilityInfo: 'sustainabilityInfo',
   },
 }));
 
@@ -103,13 +104,13 @@ describe('processDPP', () => {
         '01',
         dataDPP.data.herd.identifier,
         dppContext.dlrLinkTitle,
-        LinkType.certificationLinkType,
+        LinkType.sustainabilityInfo,
         dppContext.dlrVerificationPage,
         dlrContext.dlrAPIUrl,
         dlrContext.dlrAPIKey,
         dlrContext.namespace,
         dataDPP.qualifierPath,
-        LinkType.certificationLinkType,
+        LinkType.sustainabilityInfo,
       );
     });
 
