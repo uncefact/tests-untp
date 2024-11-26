@@ -116,7 +116,7 @@
                   "id": "did:web:example-farm.com.au",
                   "_gs1-id": "0122133840322659",
                   "name": "Green Valley Station",
-                  "registeredId": "QBIX0987",
+                  "registeredId": "QBIX0987XBS01234",
                   "idScheme": {
                     "type": ["IdentifierScheme"],
                     "id": "https://www.integritysystems.com.au/identification--traceability/property-identification-code-pic/",
