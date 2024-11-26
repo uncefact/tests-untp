@@ -3,7 +3,7 @@ sidebar_position: 27
 title: Merge To Local Storage
 ---
 
-import Disclaimer from '../../_disclaimer.mdx';
+import Disclaimer from '../../\_disclaimer.mdx';
 
 <Disclaimer />
 
@@ -49,3 +49,9 @@ sequenceDiagram
 |----------|----------|-------------|------|
 | storageKey | Yes | The key used to access the specific data in local storage | String |
 | objectKeyPath | Yes | JSON path to the unique identifier within the object to be stored | String |
+
+## Function type
+
+| Type | Description                                                       |
+| ---- | ----------------------------------------------------------------- |
+| Void | Performs an operation without returning any data after execution. |

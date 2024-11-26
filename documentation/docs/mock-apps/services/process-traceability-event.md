@@ -89,3 +89,10 @@ P-->>C: Return event VC and resolver URL
 | dlr               | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/mock-apps/common/idr)                               |
 | identifierKeyPath | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/mock-apps/common/identifier-key-path) |
 | eventTypePath     | Yes      | JSON path to the event type in the credential subject                                                                               | String                                                          |
+
+## Function type
+
+| Type       | Description                                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------ |
+| ReturnData | It processes the input data or generates data independently and returns the processed result after successful execution. |
+

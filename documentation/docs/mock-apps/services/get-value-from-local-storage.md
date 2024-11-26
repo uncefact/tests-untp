@@ -48,3 +48,9 @@ sequenceDiagram
 | storageKey | Yes      | The key used to locate the specific data in local storage                                        | String |
 | key        | No       | The key to retrieve a specific value within the stored object. If not provided, returns all data | String |
 | stateKey   | No       | The key used to update the provided state object with the retrieved data                         | String |
+
+## Function type
+
+| Type       | Description                                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------ |
+| ReturnData | It processes the input data or generates data independently and returns the processed result after successful execution. |
