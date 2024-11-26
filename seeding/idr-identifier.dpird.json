@@ -1,0 +1,14 @@
+{
+  "namespace": "dpird",
+  "applicationIdentifiers": [
+    {
+      "title": "PIC",
+      "label": "Property Identification Code",
+      "shortcode": "pic",
+      "ai": "01",
+      "type": "I",
+      "regex": "^[A-Z][A-Z0-9]{7}$",
+      "qualifiers": []
+    }
+  ]
+}
