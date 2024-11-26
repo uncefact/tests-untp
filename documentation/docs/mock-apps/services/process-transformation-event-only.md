@@ -57,7 +57,6 @@ P-->>C: Return transformation event VC and resolver URL
             "@type": "WebRenderingTemplate2022"
           }
         ],
-        "dlrIdentificationKeyType": "gtin",
         "dlrLinkTitle": "Transformation Event",
         "dlrVerificationPage": "https://verify.example.com"
       },

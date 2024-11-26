@@ -1,11 +1,12 @@
 import { VerifiableCredential } from '@vckit/core-types';
-import { registerLinkResolver, LinkType, getLinkResolverIdentifier } from './linkResolver.service.js';
+import { registerLinkResolver, LinkType } from './linkResolver.service.js';
 import { uploadData } from './storage.service.js';
 import { IService } from './types/IService.js';
-import { constructIdentifierString, generateUUID } from './utils/helpers.js';
+import { generateUUID } from './utils/helpers.js';
 import { decodeEnvelopedVC, issueVC } from './vckit.service.js';
 import { ITraceabilityEvent, IDigitalIdentityAnchorContext } from './types/index.js';
 import { validateDigitalIdentityAnchorContext } from './validateContext.js';
+import { constructIdentifierData, constructQualifierPath } from './identifierSchemes/identifierSchemeServices.js';
 
 /**
  * Processes a digital identity anchor by issuing a verifiable credential, storing it in a storage service and registering a link resolver.
@@ -26,12 +27,10 @@ export const processDigitalIdentityAnchor: IService = async (
 
   const { vckit, digitalIdentityAnchor, dlr, storage, identifierKeyPath } = context;
 
-  const identifierString = constructIdentifierString(digitalIdentityAnchorData.data, identifierKeyPath);
-  if (!identifierString) {
-    throw new Error('Identifier not found');
-  }
-
-  const { identifier, qualifierPath } = getLinkResolverIdentifier(identifierString);
+  const aiData = constructIdentifierData(identifierKeyPath, digitalIdentityAnchorData.data);
+  if (!aiData.primary.ai || !aiData.primary.value) throw new Error('Identifier not found');
+  const qualifierPath = constructQualifierPath(aiData.qualifiers);
+  const identifier = aiData.primary.value;
 
   const credentialId = generateUUID();
 
@@ -53,16 +52,16 @@ export const processDigitalIdentityAnchor: IService = async (
 
   const linkResolver = await registerLinkResolver(
     vcUrl,
-    digitalIdentityAnchor.dlrIdentificationKeyType,
+    aiData.primary.ai,
     identifier,
     digitalIdentityAnchor.dlrLinkTitle,
-    LinkType.certificationLinkType,
+    LinkType.registryEntry,
     digitalIdentityAnchor.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
     dlr.namespace,
     qualifierPath,
-    LinkType.certificationLinkType,
+    LinkType.registryEntry,
   );
 
   return { vc, decodedEnvelopedVC, linkResolver };

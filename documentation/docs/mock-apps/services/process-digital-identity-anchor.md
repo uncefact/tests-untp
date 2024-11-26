@@ -55,7 +55,6 @@ P-->>C: Return digital identity anchor VC and resolver URL
             "@type": "WebRenderingTemplate2022"
           }
         ],
-        "dlrIdentificationKeyType": "gtin",
         "dlrLinkTitle": "DigitalIdentityAnchor",
         "dlrVerificationPage": "https://verify.example.com"
       },

@@ -14,7 +14,7 @@ services:
       - /app/node_modules
 
   vckit-api:
-    image: ghcr.io/uncefact/project-vckit:sha-01c07b8@sha256:c8b3f93f7351e4bc55da55a0125b89f12bdd3b5a866b9fb3cdd32abfdf82450c
+    image: ghcr.io/uncefact/project-vckit:sha-8a1a7ea@sha256:21414e4cdfd6b045f57667408256d4951c1d14d0648151ededf3107716b67b5f
     env_file:
       - local.env
     ports:
@@ -35,7 +35,7 @@ services:
     restart: always
 
   storage-service:
-    image: ghcr.io/uncefact/project-identity-resolver:sha-40264dd@sha256:aa3edd2f142f0edabfa9c7b1e16b6a69835913cc1fc345f3e478c7801c0eb060
+    image: ghcr.io/uncefact/project-identity-resolver:sha-e87d4fc@sha256:54ee7f3adaab9650052b99dbe19b3f5bbd2aa2fe7588410c5f66d1941e3752ce
     ports:
       - 3334:3334
     environment:
@@ -48,7 +48,7 @@ services:
 
   identity-resolver-service:
     # Replace with local or deployed image
-    image: ghcr.io/pyx-industries/pyx-identity-resolver:sha-fa017fb-local@sha256:cd514863bdaf65ab1b47b8e71669a0245b041c861285a83fa7cf0a65789d4e58
+    image: ghcr.io/pyx-industries/pyx-identity-resolver:sha-3b4ce08-local@sha256:91b2a9b324d8253e217b6501bf7c715b725551a744891eb24e7e71b9e9a1d69a
     ports:
       - '3000:3000'
     environment:

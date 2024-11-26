@@ -57,7 +57,6 @@ P-->>C: Return VC and resolver URL
             "template": "<div><h2>Transaction Event</h2><p>ID: {{transactionId}}</p></div>"
           }
         ],
-        "dlrIdentificationKeyType": "gtin",
         "dlrLinkTitle": "Transaction Event",
         "dlrVerificationPage": "https://verify.example.com"
       },

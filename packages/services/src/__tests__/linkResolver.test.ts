@@ -1,10 +1,4 @@
-import {
-  IdentificationKeyType,
-  LinkType,
-  createLinkResolver,
-  getLinkResolverIdentifier,
-  registerLinkResolver,
-} from '../linkResolver.service';
+import { LinkType, createLinkResolver, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service';
 import { privateAPI } from '../utils/httpService';
 
 jest.mock('../utils/httpService', () => ({
@@ -30,7 +24,7 @@ describe('create link resolve service', () => {
 
     const mockValue = {
       eventLink: 'https://localhost/epcis-transformation-event/1234',
-      identificationKeyType: IdentificationKeyType.nlisid,
+      identificationKeyType: '01',
       identificationKey: 'gtin-key',
       itemDescription: 'EPCIS transformation event VC',
       verificationPage: 'https://verify.com/dev/verifyCredential',
@@ -73,7 +67,7 @@ describe('create link resolve service', () => {
 
     const mockValue = {
       eventLink: 'https://localhost/epcis-transformation-event/1234',
-      identificationKeyType: IdentificationKeyType.nlisid,
+      identificationKeyType: '01',
       identificationKey: 'gtin-key',
       itemDescription: 'EPCIS transformation event VC',
       verificationPage: 'https://verify.com/dev/verifyCredential',
@@ -117,7 +111,7 @@ describe('create link resolve service', () => {
 
     const mockValue = {
       eventLink: 'https://localhost/epcis-transformation-event/1234',
-      identificationKeyType: IdentificationKeyType.nlisid,
+      identificationKeyType: '01',
       identificationKey: 'gtin-key',
       itemDescription: 'EPCIS transformation event VC',
       verificationPage: 'https://verify.com/dev/verifyCredential',
@@ -153,7 +147,7 @@ describe('create link resolve service', () => {
       privateAPI.post = jest.fn().mockRejectedValueOnce(new Error(errorMessage));
       await createLinkResolver({
         linkResolver: {
-          identificationKeyType: IdentificationKeyType.nlisid,
+          identificationKeyType: '01',
           identificationKey: 'gtin-key',
           itemDescription: 'EPCIS transformation event VC',
         },

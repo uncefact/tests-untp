@@ -49,7 +49,6 @@ P-->>C: Return event VC and resolver URL
             "@type": "WebRenderingTemplate2022"
           }
         ],
-        "dlrIdentificationKeyType": "gtin",
         "dlrLinkTitle": "Traceability Event",
         "dlrVerificationPage": "https://verify.example.com"
       },

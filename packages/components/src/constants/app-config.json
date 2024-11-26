@@ -1422,14 +1422,6 @@
                   }
                 }
               ]
-            },
-            {
-              "name": "getValueFromLocalStorage",
-              "parameters": [
-                {
-                  "storageKey": "orchard_facility_dpps"
-                }
-              ]
             }
           ]
         },
@@ -1441,7 +1433,7 @@
               "name": "LocalStorageLoader",
               "type": "EntryData",
               "props": {
-                "storageKey": "orchard_facility_dpps",
+                "storageKey": "CherriesFarm_dpps",
                 "nestedComponents": [
                   {
                     "name": "JsonForm",
@@ -1642,14 +1634,6 @@
                 {
                   "storageKey": "orchard_facility_transaction_event",
                   "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/0/id"
-                }
-              ]
-            },
-            {
-              "name": "getValueFromLocalStorage",
-              "parameters": [
-                {
-                  "storageKey": "orchard_facility_transaction_event"
                 }
               ]
             }
@@ -4266,7 +4250,7 @@
               "name": "LocalStorageLoader",
               "type": "EntryData",
               "props": {
-                "storageKey": "packhouse_facility_transaction_event",
+                "storageKey": "orchard_facility_transaction_event",
                 "nestedComponents": [
                   {
                     "name": "JsonForm",
@@ -4908,16 +4892,8 @@
               "name": "mergeToLocalStorage",
               "parameters": [
                 {
-                  "storageKey": "packhouse_facility_dpps",
+                  "storageKey": "CherriesFarm_dpps",
                   "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/id"
-                }
-              ]
-            },
-            {
-              "name": "getValueFromLocalStorage",
-              "parameters": [
-                {
-                  "storageKey": "packhouse_facility_dpps"
                 }
               ]
             }
@@ -4931,7 +4907,7 @@
               "name": "LocalStorageLoader",
               "type": "EntryData",
               "props": {
-                "storageKey": "packhouse_facility_dpps",
+                "storageKey": "CherriesFarm_dpps",
                 "nestedComponents": [
                   {
                     "name": "JsonForm",
@@ -5130,16 +5106,8 @@
               "name": "mergeToLocalStorage",
               "parameters": [
                 {
-                  "storageKey": "packhouse_facility_transaction_event",
+                  "storageKey": "orchard_facility_transaction_event",
                   "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/0/id"
-                }
-              ]
-            },
-            {
-              "name": "getValueFromLocalStorage",
-              "parameters": [
-                {
-                  "storageKey": "packhouse_facility_transaction_event"
                 }
               ]
             }
@@ -5810,16 +5778,8 @@
               "name": "mergeToLocalStorage",
               "parameters": [
                 {
-                  "storageKey": "fumigation_and_freight_forwarding_facility_dpps",
+                  "storageKey": "CherriesFarm_dpps",
                   "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/id"
-                }
-              ]
-            },
-            {
-              "name": "getValueFromLocalStorage",
-              "parameters": [
-                {
-                  "storageKey": "fumigation_and_freight_forwarding_facility_dpps"
                 }
               ]
             }
@@ -5833,7 +5793,7 @@
               "name": "LocalStorageLoader",
               "type": "EntryData",
               "props": {
-                "storageKey": "fumigation_and_freight_forwarding_facility_dpps",
+                "storageKey": "CherriesFarm_dpps",
                 "nestedComponents": [
                   {
                     "name": "JsonForm",
@@ -6032,16 +5992,8 @@
               "name": "mergeToLocalStorage",
               "parameters": [
                 {
-                  "storageKey": "fumigation_and_freight_forwarding_facility_transaction_event",
+                  "storageKey": "orchard_facility_transaction_event",
                   "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/0/id"
-                }
-              ]
-            },
-            {
-              "name": "getValueFromLocalStorage",
-              "parameters": [
-                {
-                  "storageKey": "fumigation_and_freight_forwarding_facility_transaction_event"
                 }
               ]
             }
@@ -6712,16 +6664,8 @@
               "name": "mergeToLocalStorage",
               "parameters": [
                 {
-                  "storageKey": "airport_terminal_facility_dpps",
+                  "storageKey": "CherriesFarm_dpps",
                   "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/id"
-                }
-              ]
-            },
-            {
-              "name": "getValueFromLocalStorage",
-              "parameters": [
-                {
-                  "storageKey": "airport_terminal_facility_dpps"
                 }
               ]
             }
@@ -6735,7 +6679,7 @@
               "name": "LocalStorageLoader",
               "type": "EntryData",
               "props": {
-                "storageKey": "airport_terminal_facility_dpps",
+                "storageKey": "CherriesFarm_dpps",
                 "nestedComponents": [
                   {
                     "name": "JsonForm",
@@ -6934,16 +6878,8 @@
               "name": "mergeToLocalStorage",
               "parameters": [
                 {
-                  "storageKey": "airport_terminal_facility_transaction_event",
+                  "storageKey": "orchard_facility_transaction_event",
                   "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/0/id"
-                }
-              ]
-            },
-            {
-              "name": "getValueFromLocalStorage",
-              "parameters": [
-                {
-                  "storageKey": "airport_terminal_facility_transaction_event"
                 }
               ]
             }

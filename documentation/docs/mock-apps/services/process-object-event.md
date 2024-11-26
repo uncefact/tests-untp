@@ -55,7 +55,6 @@ P-->>C: Return object event VC and resolver URL
             "@type": "WebRenderingTemplate2022"
           }
         ],
-        "dlrIdentificationKeyType": "gtin",
         "dlrLinkTitle": "Object Event",
         "dlrVerificationPage": "https://verify.example.com"
       },

@@ -13,7 +13,7 @@ import { extractDomain } from './utils/helpers.js';
  * @example
  * const arg: ICreateLinkResolver = {
  *  linkResolver: {
- *    identificationKeyType: IdentificationKeyType.nlisid,
+ *    identificationKeyType: '01',
  *    identificationKey: '1234',
  *    itemDescription: 'item',
  *  },
@@ -37,6 +37,11 @@ export enum LinkType {
   verificationLinkType = 'verificationService',
   certificationLinkType = 'certificationInfo',
   epcisLinkType = 'epcis',
+  locationInfo = 'locationInfo',
+  registryEntry = 'registryEntry',
+  sustainabilityInfo = 'sustainabilityInfo',
+  traceability = 'traceability',
+  serviceInfo = 'serviceInfo',
 }
 
 export enum MimeType {
@@ -45,14 +50,8 @@ export enum MimeType {
   applicationJson = 'application/json',
 }
 
-export enum IdentificationKeyType {
-  gtin = 'gtin',
-  nlisid = 'nlisid',
-  consignment_id = 'consignment_id',
-}
-
 export interface ILinkResolver {
-  identificationKeyType: IdentificationKeyType;
+  identificationKeyType: string;
   identificationKey: string;
   itemDescription: string;
 }
@@ -175,7 +174,7 @@ export const constructLinkResolver = (
 
 export const registerLinkResolver = async (
   url: string,
-  identificationKeyType: IdentificationKeyType,
+  identificationKeyType: string,
   identificationKey: string,
   linkTitle: string,
   linkType: LinkType,
@@ -272,11 +271,11 @@ export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
  * This method will convert either a bracketed element string or an unbracketed element string into an associative array.
  * Input could be "(01)05412345000013(3103)000189(3923)2172(10)ABC123";
  * or input could be "3103000189010541234500001339232172"+groupSeparator+"10ABC123";
- * 
+ *
  * @param {string} elementString - The GS1 element string.
  * @returns {{ identifier: string, qualifierPath: string }} - An object containing the identifier and qualifier path.
  * @throws {Error} Throws an error if the element string contains more or less than one primary identification key.
- * 
+ *
  * How to use:
   try {
     const elementString = '(01)09359502000010(10)ABC123';
@@ -360,10 +359,10 @@ export const getLinkResolverIdentifier = (elementString: string): { identifier: 
 
 /**
  * Retrieves the identifier and qualifier path from a URI.
- * 
+ *
  * @param {string} uri - The URI.
  * @returns {{ identifier: string, qualifierPath: string }} - An object containing the identifier and qualifier path.
- * 
+ *
  * How to use:
   try {
     const uri = 'https://idr.com/gs1/01/09359502000010/10/ABC123';

@@ -3,12 +3,7 @@ import _ from 'lodash';
 
 import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
-import {
-  IdentificationKeyType,
-  LinkType,
-  getLinkResolverIdentifier,
-  registerLinkResolver,
-} from '../linkResolver.service.js';
+import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
 
 import { IService } from '../types/IService.js';
 import { IConfigDLR, ICredential, IEntityIssue, ITransformationEventContext, IVCKitContext } from '../types';
@@ -82,13 +77,13 @@ export const processTransformationEvent: IService = async (
           epcisTransformationEventContext.dlrIdentificationKeyType,
           transformationEventIdentifier,
           epcisTransformationEventContext.dlrLinkTitle,
-          LinkType.epcisLinkType,
+          LinkType.traceability,
           epcisTransformationEventContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,
           dlrContext.namespace,
           transformationEventQualifierPath,
-          LinkType.epcisLinkType,
+          LinkType.traceability,
         );
 
         const transformationEventData = {
@@ -107,7 +102,7 @@ export const processTransformationEvent: IService = async (
           dppContext.dlrIdentificationKeyType,
           identifier,
           dppContext.dlrLinkTitle,
-          LinkType.certificationLinkType,
+          LinkType.sustainabilityInfo,
           dppContext.dlrVerificationPage,
           dlrContext.dlrAPIUrl,
           dlrContext.dlrAPIKey,
@@ -153,7 +148,7 @@ export const issueEpcisTransformationEvent = async (
         generateLinkResolver: generateLinkResolver(
           dlrContext.dlrAPIUrl,
           dlrContext.namespace,
-          IdentificationKeyType.gtin,
+          '01',
           `linkType=${dlrContext.namespace}:${LinkType.certificationLinkType}`,
         ),
         generateIdWithBatchLot,
