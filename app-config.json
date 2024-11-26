@@ -1506,7 +1506,7 @@
                   ],
                   "operatedByParty": {
                     "type": ["Identifier"],
-                    "id": "did:web:example-farm.com.au",
+                    "id": "https://idr.aatp.showthething.com/ato/abn/87654321012?linkType=ato:registryEntry",
                     "name": "Green Valley Cattle Co Pty Ltd",
                     "registeredId": "87654321012",
                     "idScheme": {
@@ -1518,7 +1518,7 @@
                   "otherIdentifier": [
                     {
                       "type": ["Identifier"],
-                      "id": "https://id.gs1.org/414/0293456789012",
+                      "id": "https://idr.aatp.showthething.com/gs1/gln/0293456789012?linkType=gs1:registryEntry",
                       "name": "Green Valley Station",
                       "registeredId": "0293456789012",
                       "idScheme": {
@@ -1529,7 +1529,7 @@
                     },
                     {
                       "type": ["Identifier"],
-                      "id": "https://daf.qld.gov.au/pic/QBIX0987",
+                      "id": "https://idr.aatp.showthething.com/dpird/pic/QBIX0987?linkType=dpird:registryEntry",
                       "name": "Green Valley Station",
                       "registeredId": "QBIX0987",
                       "idScheme": {
@@ -2680,7 +2680,7 @@
                   "attestationType": "verification",
                   "issuedToParty": {
                     "type": ["Party"],
-                    "id": "did:web:example-farm.com.au",
+                    "id": "https://idr.aatp.showthething.com/ato/abn/87654321012?linkType=ato:registryEntry",
                     "name": "Green Valley Cattle Co Pty Ltd",
                     "registeredId": "87654321012",
                     "idScheme": {
@@ -2728,7 +2728,7 @@
                       "assessedFacility": [
                         {
                           "type": ["Facility"],
-                          "id": "https://daf.qld.gov.au/pic/QBIX0987",
+                          "id": "https://idr.aatp.showthething.com/dpird/pic/QBIX0987?linkType=dpird:registryEntry",
                           "name": "Green Valley Station",
                           "registeredId": "QBIX0987",
                           "idScheme": {
@@ -3826,7 +3826,7 @@
                   ],
                   "producedByParty": {
                     "type": ["Identifier"],
-                    "id": "did:web:example-farm.com.au",
+                    "id": "https://idr.aatp.showthething.com/ato/abn/87654321012?linkType=ato:registryEntry",
                     "name": "Green Valley Cattle Co Pty Ltd",
                     "registeredId": "87654321012",
                     "idScheme": {
@@ -3837,7 +3837,7 @@
                   },
                   "producedAtFacility": {
                     "type": ["Identifier"],
-                    "id": "https://daf.qld.gov.au/pic/QBIX0987",
+                    "id": "https://idr.aatp.showthething.com/dpird/pic/QBIX0987?linkType=dpird:registryEntry",
                     "name": "Green Valley Station",
                     "registeredId": "QBIX0987",
                     "idScheme": {
