@@ -3901,7 +3901,7 @@
                       "conformityTopic": "environment.deforestation",
                       "conformityEvidence": {
                         "type": ["SecureLink", "Link"],
-                        "linkURL": "https://cibolabs.com.au/attestations/2024/eudr/gv-123456/certificate.pdf",
+                        "linkURL": "https://idr.aatp.showthething.com/dpird/pic/QBIX0987/?linkType=dpird:certificationInfo",
                         "linkName": "EUDR Compliance Certificate",
                         "linkType": "https://vocabulary.uncefact.org/linkTypes/dcc",
                         "hashDigest": "6239119dda5bd4c8a6ffb832fe16feaa5c27b7dba154d24c53d4470a2c69adc2",
