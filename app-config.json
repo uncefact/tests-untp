@@ -3837,7 +3837,7 @@
                   },
                   "producedAtFacility": {
                     "type": ["Identifier"],
-                    "id": "https://idr.aatp.showthething.com/dpird/pic/QBIX0987?linkType=dpird:registryEntry",
+                    "id": "https://idr.aatp.showthething.com/dpird/pic/QBIX0987/?linkType=dpird:locationInfo",
                     "name": "Green Valley Station",
                     "registeredId": "QBIX0987",
                     "idScheme": {
