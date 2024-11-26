@@ -9,7 +9,9 @@ import Disclaimer from '../../_disclaimer.mdx';
 
 ## Description
 
-The CustomButton component renders a button with loading state and optional download functionality. It provides a flexible and reusable button solution for various use cases within the application.
+The CustomButton component renders a button with a loading state and optional download functionality, offering a flexible and reusable solution for various use cases within the application.
+
+This component is used to download data returned by the last service in the services array defined in the application configuration (app-config.json). If the last service does not return any data, the button will not be displayed. For details about the types of services (function types), refer to the `Function Type` section in each service’s documentation.
 
 ## Example
 
