@@ -207,7 +207,7 @@
               "name": "mergeToLocalStorage",
               "parameters": [
                 {
-                  "storageKey": "Green-Valley-Cattle-Co-Pty-Ltd",
+                  "storageKey": "Green-Valley-Cattle-Co-Pty-Ltd-NLISID-DIA",
                   "objectKeyPath": "/decodedEnvelopedVC/id"
                 }
               ]
@@ -317,7 +317,7 @@
                   "registeredId": "QBIX0987",
                   "idScheme": {
                     "type": ["IdentifierScheme"],
-                    "id": "https://daf.qld.gov.au/pic",
+                    "id": "https://daf.qld.gov.au/pic/",
                     "name": "Queensland Property Identification Code (PIC)"
                   },
                   "registerType": "Land",
@@ -407,7 +407,7 @@
               "name": "mergeToLocalStorage",
               "parameters": [
                 {
-                  "storageKey": "Green-Valley-Cattle-Co-Pty-Ltd",
+                  "storageKey": "Green-Valley-Cattle-Co-Pty-Ltd-PIC-DIA",
                   "objectKeyPath": "/decodedEnvelopedVC/id"
                 }
               ]
@@ -602,7 +602,7 @@
               "name": "mergeToLocalStorage",
               "parameters": [
                 {
-                  "storageKey": "Green-Valley-Cattle-Co-Pty-Ltd",
+                  "storageKey": "Green-Valley-Cattle-Co-Pty-Ltd-GLN-DIA",
                   "objectKeyPath": "/decodedEnvelopedVC/id"
                 }
               ]
@@ -797,7 +797,7 @@
               "name": "mergeToLocalStorage",
               "parameters": [
                 {
-                  "storageKey": "EcoCharge-Battery-Systems-Pty-Ltd",
+                  "storageKey": "Green-Valley-Cattle-Co-Pty-Ltd-ABN-DIA",
                   "objectKeyPath": "/decodedEnvelopedVC/id"
                 }
               ]
@@ -1484,15 +1484,14 @@
                 "constructData": {},
                 "data": {
                   "type": ["Facility"],
-                  "_gs1-id": "0122133840322659",
-                  "id": "urn:pic:QBIX0987",
+                  "id": "https://daf.qld.gov.au/pic/QBIX0987",
                   "registeredId": "QBIX0987",
                   "name": "Green Valley Station",
                   "description": "Family-owned cattle breeding property in Central Queensland",
                   "idScheme": {
                     "type": ["IdentifierScheme"],
-                    "id": "https://www.integritysystems.com.au/identification--traceability/national-livestock-identification-system/",
-                    "name": "National Livestock Identification System"
+                    "id": "https://daf.qld.gov.au/pic/",
+                    "name": "Queensland Property Identification Code (PIC)"
                   },
                   "countryOfOperation": "AU",
                   "processCategory": [
@@ -1524,8 +1523,19 @@
                       "registeredId": "0293456789012",
                       "idScheme": {
                         "type": ["IdentifierScheme"],
-                        "id": "https://ref.gs1.org/ai/414",
-                        "name": "Global Location Number"
+                        "id": "https://id.gs1.org/414/",
+                        "name": "Global Location Number (GLN)"
+                      }
+                    },
+                    {
+                      "type": ["Identifier"],
+                      "id": "https://daf.qld.gov.au/pic/QBIX0987",
+                      "name": "Green Valley Station",
+                      "registeredId": "QBIX0987",
+                      "idScheme": {
+                        "type": ["IdentifierScheme"],
+                        "id": "https://daf.qld.gov.au/pic/",
+                        "name": "Queensland Property Identification Code (PIC)"
                       }
                     }
                   ],
@@ -1693,7 +1703,7 @@
               "parameters": [
                 {
                   "objectKeyPath": "/decodedEnvelopedVC/id",
-                  "storageKey": "EcoCharge-Battery-Systems-Pty-Ltd"
+                  "storageKey": "Green-Valley-Station-DFR"
                 }
               ]
             }
