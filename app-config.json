@@ -1661,7 +1661,7 @@
                   "dlr": {
                     "dlrAPIUrl": "https://idr.aatp.showthething.com",
                     "dlrAPIKey": "test123",
-                    "namespace": "pic",
+                    "namespace": "dpird",
                     "linkRegisterPath": "/api/resolver"
                   },
                   "storage": {
