@@ -48,7 +48,7 @@ services:
 
   identity-resolver-service:
     # Replace with local or deployed image
-    image: ghcr.io/pyx-industries/pyx-identity-resolver:sha-fa017fb-local@sha256:cd514863bdaf65ab1b47b8e71669a0245b041c861285a83fa7cf0a65789d4e58
+    image: ghcr.io/pyx-industries/pyx-identity-resolver:sha-3b4ce08-local@sha256:91b2a9b324d8253e217b6501bf7c715b725551a744891eb24e7e71b9e9a1d69a
     ports:
       - '3000:3000'
     environment:
