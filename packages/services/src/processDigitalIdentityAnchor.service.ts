@@ -55,13 +55,13 @@ export const processDigitalIdentityAnchor: IService = async (
     aiData.primary.ai,
     identifier,
     digitalIdentityAnchor.dlrLinkTitle,
-    LinkType.certificationLinkType,
+    LinkType.registryEntry,
     digitalIdentityAnchor.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
     dlr.namespace,
     qualifierPath,
-    LinkType.certificationLinkType,
+    LinkType.registryEntry,
   );
 
   return { vc, decodedEnvelopedVC, linkResolver };

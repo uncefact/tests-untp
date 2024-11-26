@@ -24,6 +24,7 @@ jest.mock('../linkResolver.service', () => ({
     verificationLinkType: 'verificationService',
     certificationLinkType: 'certificationInfo',
     epcisLinkType: 'epcis',
+    registryEntry: 'registryEntry',
   },
 }));
 
