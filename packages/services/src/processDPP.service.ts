@@ -53,13 +53,13 @@ export const processDPP: IService = async (data: any, context: IDppContext): Pro
       aiData.primary.ai,
       identifier,
       dppContext.dlrLinkTitle,
-      LinkType.certificationLinkType,
+      LinkType.sustainabilityInfo,
       dppContext.dlrVerificationPage,
       linkResolverContext.dlrAPIUrl,
       linkResolverContext.dlrAPIKey,
       linkResolverContext.namespace,
       qualifierPath,
-      LinkType.certificationLinkType,
+      LinkType.sustainabilityInfo,
     );
 
     if (context.localStorageParams && context.localStorageParams.storageKey) {

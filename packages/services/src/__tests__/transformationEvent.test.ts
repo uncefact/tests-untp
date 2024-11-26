@@ -27,6 +27,7 @@ jest.mock('../linkResolver.service', () => ({
     verificationLinkType: 'gs1:verificationService',
     certificationLinkType: 'gs1:certificationInfo',
     epcisLinkType: 'gs1:epcis',
+    traceability: 'traceability',
   },
 }));
 

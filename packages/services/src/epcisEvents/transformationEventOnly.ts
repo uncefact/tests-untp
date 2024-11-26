@@ -55,13 +55,13 @@ export const processTransformationEventOnly: IService = async (
     aiData.primary.ai,
     identifier,
     traceabilityEvent.dlrLinkTitle,
-    LinkType.epcisLinkType,
+    LinkType.traceability,
     traceabilityEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
     dlr.namespace,
     qualifierPath,
-    LinkType.epcisLinkType,
+    LinkType.traceability,
   );
 
   return { vc: transformationEventVc, decodedEnvelopedVC, linkResolver: transformationEventLinkResolver };

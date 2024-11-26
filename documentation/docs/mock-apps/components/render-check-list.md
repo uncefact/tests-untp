@@ -47,11 +47,11 @@ The RenderCheckList component is responsible for rendering a list of items with 
 
 ### Props
 
-| Property | Required | Description | Type |
-| ----------------- | -------- | ---------------------------------------------------------- | ------------------------------------------ |String |
-| nestedComponents | Yes | An array of components to be rendered with the loaded data | [Component](/docs/mock-apps/components/)[] |
-| checkBoxLabel | Yes | The label for the checkbox list | String |
-| style | No | The style for the component | Object |
+| Property         | Required | Description                                                | Type                                       |
+| ---------------- | -------- | ---------------------------------------------------------- | ------------------------------------------ |
+| nestedComponents | Yes      | An array of components to be rendered with the loaded data | [Component](/docs/mock-apps/components/)[] |
+| checkBoxLabel    | Yes      | The label for the checkbox list                            | String                                     |
+| style            | No       | The style for the component                                | Object                                     |
 
 ## Response Data
 

@@ -56,13 +56,13 @@ export const processDigitalFacilityRecord: IService = async (
     aiData.primary.ai,
     identifier,
     digitalFacilityRecord.dlrLinkTitle,
-    LinkType.certificationLinkType,
+    LinkType.locationInfo,
     digitalFacilityRecord.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
     dlr.namespace,
     qualifierPath,
-    LinkType.certificationLinkType,
+    LinkType.locationInfo,
   );
 
   return { vc, decodedEnvelopedVC, linkResolver };
