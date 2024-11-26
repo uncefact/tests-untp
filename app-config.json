@@ -2675,7 +2675,6 @@
                 },
                 "data": {
                   "type": ["ConformityAttestation", "Attestation"],
-                  "_gs1-id": "0122133840322659",
                   "id": "https://cibolabs.com.au/attestations/2024/eudr/gv-123456",
                   "name": "EUDR Due Diligence Assessment - Green Valley Station",
                   "description": "Assessment of deforestation risk and geo-location verification for cattle production under EU Deforestation Regulation",
@@ -2732,13 +2731,13 @@
                       "assessedFacility": [
                         {
                           "type": ["Facility"],
-                          "id": "https://www.integrity.gov.au/pic/QBIX0987",
+                          "id": "https://daf.qld.gov.au/pic/QBIX0987",
                           "name": "Green Valley Station",
                           "registeredId": "QBIX0987",
                           "idScheme": {
                             "type": ["IdentifierScheme"],
-                            "id": "https://www.integrity.gov.au/pic",
-                            "name": "Property Identification Code"
+                            "id": "https://daf.qld.gov.au/pic/",
+                            "name": "Queensland Property Identification Code (PIC)"
                           },
                           "locationInformation": {
                             "type": ["Location"],
@@ -2862,17 +2861,14 @@
                         "@type": "WebRenderingTemplate2022"
                       }
                     ],
-                    "validFrom": "2024-03-15",
-                    "validTo": "2027-03-15",
                     "type": ["DigitalConformityCredential"],
                     "dlrLinkTitle": "Digital Conformity Credential",
-                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "https://aatp.showthething.com/verify"
                   },
                   "dlr": {
                     "dlrAPIUrl": "https://idr.aatp.showthething.com",
                     "dlrAPIKey": "test123",
-                    "namespace": "gs1",
+                    "namespace": "dpird",
                     "linkRegisterPath": "/api/resolver"
                   },
                   "storage": {
@@ -2888,12 +2884,12 @@
                       }
                     }
                   },
-                  "identifierKeyPath": {
+                 "identifierKeyPath": {
                     "primary": {
                       "ai": "01",
-                      "path": "/_gs1-id"
+                      "path": "/assessment/0/assessedFacility/0/registeredId"
                     }
-                  }
+                  },
                 }
               ]
             },
@@ -2901,7 +2897,7 @@
               "name": "mergeToLocalStorage",
               "parameters": [
                 {
-                  "storageKey": "EcoCharge-Battery-Systems-Pty-Ltd",
+                  "storageKey": "Green-Valley-Cattle-Co-Pty-Ltd-DCC",
                   "objectKeyPath": "/decodedEnvelopedVC/id"
                 }
               ]
