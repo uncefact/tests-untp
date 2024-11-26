@@ -731,6 +731,23 @@
                   }
                 }
               ]
+            },
+            {
+              "name": "mergeToLocalStorage",
+              "parameters": [
+                {
+                  "storageKey": "orchard_facility_dpps",
+                  "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/id"
+                }
+              ]
+            },
+            {
+              "name": "getValueFromLocalStorage",
+              "parameters": [
+                {
+                  "storageKey": "orchard_facility_dpps"
+                }
+              ]
             }
           ]
         },
@@ -1424,6 +1441,15 @@
               ]
             },
             {
+              "name": "mergeToLocalStorage",
+              "parameters": [
+                {
+                  "storageKey": "orchard_facility_dpps",
+                  "objectKeyPath": "/decodedEnvelopedVC/credentialSubject/id"
+                }
+              ]
+            },
+            {
               "name": "getValueFromLocalStorage",
               "parameters": [
                 {
@@ -1632,7 +1658,7 @@
                     }
                   },
                   "identifierKeyPath": "/0/id",
-                  "localStorageParams": { "storageKey": "CherriesFarm_dpps", "keyPath": "/0/epcList/index/name" }
+                  "localStorageParams": { "storageKey": "orchard_facility_dpps", "keyPath": "/0/epcList/index/name" }
                 }
               ]
             },
@@ -5122,7 +5148,7 @@
                     }
                   },
                   "identifierKeyPath": "/0/id",
-                  "localStorageParams": { "storageKey": "CherriesFarm_dpps", "keyPath": "/0/epcList/index/name" }
+                  "localStorageParams": { "storageKey": "packhouse_facility_dpps", "keyPath": "/0/epcList/index/name" }
                 }
               ]
             },
@@ -6024,7 +6050,7 @@
                     }
                   },
                   "identifierKeyPath": "/0/id",
-                  "localStorageParams": { "storageKey": "CherriesFarm_dpps", "keyPath": "/0/epcList/index/name" }
+                  "localStorageParams": { "storageKey": "fumigation_and_freight_forwarding_facility_dpps", "keyPath": "/0/epcList/index/name" }
                 }
               ]
             },
@@ -6926,7 +6952,7 @@
                     }
                   },
                   "identifierKeyPath": "/0/id",
-                  "localStorageParams": { "storageKey": "CherriesFarm_dpps", "keyPath": "/0/epcList/index/name" }
+                  "localStorageParams": { "storageKey": "airport_terminal_facility_dpps", "keyPath": "/0/epcList/index/name" }
                 }
               ]
             },
