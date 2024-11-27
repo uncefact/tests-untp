@@ -17,12 +17,9 @@ NEXT_PUBLIC_ASSET_PREFIX: /untp-playground
 NEXT_PUBLIC_IMAGE_PATH: /untp-playground/_next/image
 ```
 
-GitHub cicd workflow requires the following secrets:
-
-1. PULUMI_AWS_SECRET_KEY_ID
-1. PULUMI_AWS_SECRET_ACCESS_KEY
-
-AWS credentials will be replaced with OIDC role in AWS account, Pulumi config encryption has be changed to awskms.
+GitHub OIDC is configured in AWS account for GitHub Actions workflow to assume and run the deployment using Pulumi.
+Pulume security prodiver for config is set to awskms.
+The same backend state bucket and kms key are used for both test and prod Pulumi stacks.  
 
 End-points:
 

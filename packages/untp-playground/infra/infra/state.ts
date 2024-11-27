@@ -13,8 +13,7 @@ const stateBucket = new aws.s3.Bucket(s3BucketName, {
         enabled: true, // Enable versioning for backup and recovery
     },
     // Additional settings like server-side encryption, lifecycle rules, etc., could be configured here
-},
-{protect: false});
+}, { ignoreChanges: ["prop"] });
 
 // Construct the S3 backend URL dynamically based on the bucket we've created
 const backendUrl = pulumi.interpolate`s3://${stateBucket.id}`;

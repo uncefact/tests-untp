@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - next
-      - 'cd/*'
+      - 'cd/**'
     paths:
       - 'packages/untp-playground/**'
 
@@ -24,25 +24,27 @@ jobs:
     environment:
       name: test
       url: https://test.uncefact.org/test-untp-playground
-    env:
-      STACK_NAME: test
 
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # TODO: setup a role in AWS account
-      - name: Configure AWS Credentials
+      - name: aws_login_uncefact
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.PULUMI_AWS_SECRET_KEY_ID }}
-          aws-region: ap-southeast-2
-          aws-secret-access-key: ${{ secrets.PULUMI_AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::651690125008:role/tests_untp
+          aws-region: us-east-1
 
-      - name: setup_python
-        uses: actions/setup-python@v5
+
+      - name: Setup Node LTS ✨
+        uses: actions/setup-node@v3
         with:
-          python-version: '3.10'
+          node-version: lts/*
+          cache: yarn
+  
+      - name: Installing dependencies 📦️
+        run: yarn install
+        working-directory: ./packages/untp-playground/infra
 
       - name: Deploy Stack
         uses: pulumi/actions@v5
@@ -54,6 +56,7 @@ jobs:
           NEXT_PUBLIC_BASE_PATH: /test-untp-playground
           NEXT_PUBLIC_ASSET_PREFIX: /test-untp-playground
           NEXT_PUBLIC_IMAGE_PATH: /test-untp-playground/_next/image
+          STACK_NAME: test
 
   deploy_prod:
     if: github.repository_owner == 'uncefact' && github.ref_type == 'tag' && github.event_name == 'workflow_dispatch'
@@ -69,25 +72,26 @@ jobs:
       name: production
       url: https://test.uncefact.org/untp-playground
 
-    env:
-      STACK_NAME: prod
-
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # TODO: setup a role in AWS account
-      - name: Configure AWS Credentials
+      - name: aws_login_uncefact
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.PULUMI_AWS_SECRET_KEY_ID }}
-          aws-region: ap-southeast-2
-          aws-secret-access-key: ${{ secrets.PULUMI_AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::651690125008:role/tests_untp
+          aws-region: us-east-1
 
-      - name: setup_python
-        uses: actions/setup-python@v5
+
+      - name: Setup Node LTS ✨
+        uses: actions/setup-node@v3
         with:
-          python-version: '3.10'
+          node-version: lts/*
+          cache: yarn
+  
+      - name: Installing dependencies 📦️
+        run: yarn install
+        working-directory: ./packages/untp-playground/infra
 
       - name: Deploy Stack
         uses: pulumi/actions@v5
@@ -99,3 +103,4 @@ jobs:
           NEXT_PUBLIC_BASE_PATH: /untp-playground
           NEXT_PUBLIC_ASSET_PREFIX: /untp-playground
           NEXT_PUBLIC_IMAGE_PATH: /untp-playground/_next/image
+          STACK_NAME: prod

@@ -23,13 +23,13 @@ const kmsKey = new aws.kms.Key("base", {
         }],
     }),
 },
-{protect: false});
+{protect: true,ignoreChanges: ["prop"] });
 
 const keyAlias = new aws.kms.Alias("alias", {
     name: "alias/untp-pg-base",
     targetKeyId: kmsKey.keyId,
 },
-{protect: false});
+{protect: true, ignoreChanges: ["prop"] });
 
 const secretProviderURL = `awskms://${keyAlias}?region=${awsRegion}`;
 return secretProviderURL;
