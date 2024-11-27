@@ -1,3 +1,4 @@
-encryptionsalt: v1:s7U8g+h+M9U=:v1:XygF60QEVVwYn3LB:Fhv90G/lKl8k/C6BObepBlMqWY3vgg==
+secretsprovider: awskms://alias/untp-pg-base?region=us-east-1
+encryptedkey: AQICAHiQPtPpMskboX6hzwJRSoxN1ESI7Hg9WiuyfnhBuWLLrAGLJOOpNF5D3yPTR4Dj/T7UAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMKhbr+O8ooFzmePRFAgEQgDt2DMNetQ5kFc7ahK1U4kXiIYwn+zCnoXq0oI6CSK44yjkdFFk5NLwO6M2OTIWvlkbGLLxg8JMK6/yNOA==
 config:
-  domain: "playground.untp.showthething.com"
+  appURL: "https://test.uncefact.org/untp-playground"
