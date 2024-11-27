@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-yarn lint
+# TODO: Uncomment this once memory issue fixed
+# yarn lint

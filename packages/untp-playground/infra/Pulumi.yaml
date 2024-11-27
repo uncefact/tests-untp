@@ -1,0 +1,10 @@
+name: untp-demo
+runtime: nodejs
+description: Pulumi project for UNTP Demo deployments
+backend:
+  url: "s3://untp-demo-state-backend-4eb3960?region=us-east-1"
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: aws-typescript
+  aws:region: us-east-1

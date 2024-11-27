@@ -1,0 +1,101 @@
+name: 'CI/CD UNTP Playgroud'
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - next
+
+jobs:
+  #todo: add running tests job
+  deploy_test:
+    if: github.repository_owner == 'uncefact' && ( github.ref == 'refs/heads/next' || startsWith(github.ref, 'refs/heads/cd/') )
+    concurrency:
+      group: untp-plaground-${{github.ref}}
+
+    permissions:
+      id-token: write
+      contents: read
+
+    name: Deploy to Test
+    environment:
+      name: test
+      url: https://test-playground.untp.showthething.com/untp-playground
+
+    env:
+      STACK_NAME: test
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # TODO: setup a role in AWS account
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.PULUMI_AWS_SECRET_KEY_ID }}
+          aws-region: ap-southeast-2
+          aws-secret-access-key: ${{ secrets.PULUMI_AWS_SECRET_ACCESS_KEY }}
+
+      - name: setup_python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Deploy Stack
+        uses: pulumi/actions@v5
+        with:
+          command: up
+          stack-name: ${{ env.STACK_NAME}}
+          work-dir: ./packages/untp-playground/infra
+        env:
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+          NEXT_PUBLIC_BASE_PATH: /untp-playground
+          NEXT_PUBLIC_ASSET_PREFIX: /untp-playground
+          NEXT_PUBLIC_IMAGE_PATH: /untp-playground/_next/image
+
+  deploy_prod:
+    if: github.repository_owner == 'uncefact' && github.ref_type == 'tag' && github.event_name == 'workflow_dispatch'
+    concurrency:
+      group: untp-plaground-${{github.ref}}
+
+    permissions:
+      id-token: write
+      contents: read
+
+    name: Deploy to Test
+    environment:
+      name: production
+      url: https://test.uncefact.org/untp-playground
+
+    env:
+      STACK_NAME: prod
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # TODO: setup a role in AWS account
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.PULUMI_AWS_SECRET_KEY_ID }}
+          aws-region: ap-southeast-2
+          aws-secret-access-key: ${{ secrets.PULUMI_AWS_SECRET_ACCESS_KEY }}
+
+      - name: setup_python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Deploy Stack
+        uses: pulumi/actions@v5
+        with:
+          command: up
+          stack-name: ${{ env.STACK_NAME}}
+          work-dir: ./packages/untp-playground/infra
+        env:
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+          NEXT_PUBLIC_BASE_PATH: /untp-playground
+          NEXT_PUBLIC_ASSET_PREFIX: /untp-playground
+          NEXT_PUBLIC_IMAGE_PATH: /untp-playground/_next/image

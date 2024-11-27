@@ -6,3 +6,5 @@ scripts
 jest.config.*
 jest.*.config.*
 integration
+node_modules
+.next
