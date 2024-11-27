@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - next
+      - 'cd/*'
+    paths:
+      - 'packages/untp-playground/**'
 
 jobs:
   #todo: add running tests job
