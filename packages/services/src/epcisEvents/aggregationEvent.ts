@@ -3,7 +3,7 @@ import { uploadData } from '../storage.service.js';
 import { LinkType, registerLinkResolver } from '../linkResolver.service.js';
 import { IService } from '../types/IService.js';
 import { ITraceabilityEvent, ITraceabilityEventContext } from '../types';
-import { generateUUID } from '../utils/helpers.js';
+import { constructIdentifierString, constructVerifyURL, generateUUID } from '../utils/helpers.js';
 import { validateTraceabilityEventContext } from '../validateContext.js';
 import { constructIdentifierData, constructQualifierPath } from '../identifierSchemes/identifierSchemeServices.js';
 
@@ -45,10 +45,12 @@ export const processAggregationEvent: IService = async (
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(aggregationVC);
-  const aggregationVCLink = await uploadData(storage, aggregationVC, credentialId);
+  const { uri, key, hash } = await uploadData(storage, aggregationVC, credentialId);
+  const verifyURL = constructVerifyURL({ uri, key, hash });
 
   const aggregationLinkResolver = await registerLinkResolver(
-    aggregationVCLink,
+    uri,
+    verifyURL,
     aiData.primary.ai,
     identifier,
     traceabilityEvent.dlrLinkTitle,

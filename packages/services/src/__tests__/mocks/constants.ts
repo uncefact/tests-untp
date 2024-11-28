@@ -48,7 +48,7 @@ export const contextTransformationEvent = {
   storage: {
     url: 'https://storage.example.com',
     params: {
-      resultPath: '',
+      bucket: 'transformation-event-bucket',
     },
   },
   productTransformation: {
@@ -148,7 +148,7 @@ export const contextDPP = {
   storage: {
     url: 'https://storage.example.com',
     params: {
-      resultPath: '',
+      bucket: 'dpp-bucket',
     },
   },
   identifierKeyPath: '/herd/identifier',
@@ -228,7 +228,7 @@ export const traceabilityEventContext = {
   storage: {
     url: 'https://storage.example.com/upload',
     params: {
-      resultPath: '/url',
+      bucket: 'traceability-event-bucket',
     },
   },
   dlr: {
@@ -260,9 +260,7 @@ export const digitalIdentityAnchorContext = {
   },
   storage: {
     url: 'https://storage.example.com',
-    params: {
-      resultPath: '',
-    },
+    params: {},
   },
   identifierKeyPath: '/id',
 };
@@ -287,9 +285,7 @@ export const digitalFacilityRecordContext = {
   },
   storage: {
     url: 'https://storage.example.com',
-    params: {
-      resultPath: '',
-    },
+    params: {},
   },
   identifierKeyPath: '/id',
 };
@@ -314,9 +310,7 @@ export const digitalConformityCredentialContext = {
   },
   storage: {
     url: 'https://storage.example.com',
-    params: {
-      resultPath: '',
-    },
+    params: {},
   },
   identifierKeyPath: '/id',
 };

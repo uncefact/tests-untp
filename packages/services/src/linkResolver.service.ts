@@ -174,6 +174,7 @@ export const constructLinkResolver = (
 
 export const registerLinkResolver = async (
   url: string,
+  verifyURL: string,
   identificationKeyType: string,
   identificationKey: string,
   linkTitle: string,
@@ -190,9 +191,7 @@ export const registerLinkResolver = async (
     identificationKey: identificationKey,
     itemDescription: linkTitle,
   };
-  const query = encodeURIComponent(JSON.stringify({ payload: { uri: url } }));
-  const queryString = `q=${query}`;
-  const verificationPassportPage = `${verificationPage}/?${queryString}`;
+
   const linkResponses: ILinkResponse[] = [
     {
       linkType: `${namespace}:${LinkType.verificationLinkType}`,
@@ -209,7 +208,7 @@ export const registerLinkResolver = async (
     {
       linkType: `${namespace}:${linkType}`,
       linkTitle: linkTitle,
-      targetUrl: verificationPassportPage,
+      targetUrl: verifyURL,
       mimeType: MimeType.textHtml,
       defaultLinkType: true,
       defaultIanaLanguage: true,
@@ -222,7 +221,6 @@ export const registerLinkResolver = async (
     namespace,
     linkResolver,
     linkResponses,
-    queryString,
     dlrAPIKey,
     qualifierPath: qualifierPath ?? '/',
     responseLinkType,
@@ -256,8 +254,8 @@ export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
     return null;
   }
 
-  // Find DLR passport with MIME type application/json
-  const dlrPassport = dlrPassports.find((passportItem: any) => passportItem?.type === MimeTypeEnum.applicationJson);
+  // Find DLR passport with MIME type text/html
+  const dlrPassport = dlrPassports.find((passportItem: any) => passportItem?.type === MimeTypeEnum.textHtml);
   if (!dlrPassport) {
     return null;
   }

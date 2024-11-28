@@ -2,7 +2,7 @@ import { VerifiableCredential } from '@vckit/core-types';
 import { IService, ITraceabilityEvent, ITraceabilityEventContext } from '../types/index.js';
 import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
-import { generateUUID } from '../utils/helpers.js';
+import { constructVerifyURL, generateUUID } from '../utils/helpers.js';
 import { LinkType, registerLinkResolver } from '../linkResolver.service.js';
 import { validateTraceabilityEventContext } from '../validateContext.js';
 import { deleteValuesFromLocalStorageByKeyPath } from './helpers.js';
@@ -46,10 +46,12 @@ export const processTransactionEvent: IService = async (
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(vc);
-  const vcUrl = await uploadData(storage, vc, credentialId);
+  const { uri, key, hash } = await uploadData(storage, vc, credentialId);
+  const verifyURL = constructVerifyURL({ uri, key, hash });
 
   const linkResolver = await registerLinkResolver(
-    vcUrl,
+    uri,
+    verifyURL,
     aiData.primary.ai,
     identifier,
     traceabilityEvent.dlrLinkTitle,
