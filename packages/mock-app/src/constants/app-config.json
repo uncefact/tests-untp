@@ -687,6 +687,7 @@
                     }
                   },
                   "dpp": {
+                    "validUntil": "2025-11-28T04:47:15.136Z",
                     "context": ["https://vocabulary.uncefact.org/untp/dpp/0.5.0/"],
                     "renderTemplate": [
                       {
@@ -6050,7 +6051,10 @@
                     }
                   },
                   "identifierKeyPath": "/0/id",
-                  "localStorageParams": { "storageKey": "fumigation_and_freight_forwarding_facility_dpps", "keyPath": "/0/epcList/index/name" }
+                  "localStorageParams": {
+                    "storageKey": "fumigation_and_freight_forwarding_facility_dpps",
+                    "keyPath": "/0/epcList/index/name"
+                  }
                 }
               ]
             },
@@ -6952,7 +6956,10 @@
                     }
                   },
                   "identifierKeyPath": "/0/id",
-                  "localStorageParams": { "storageKey": "airport_terminal_facility_dpps", "keyPath": "/0/epcList/index/name" }
+                  "localStorageParams": {
+                    "storageKey": "airport_terminal_facility_dpps",
+                    "keyPath": "/0/epcList/index/name"
+                  }
                 }
               ]
             },
