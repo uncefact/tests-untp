@@ -58,12 +58,13 @@ P-->>C: Return transformation event VC and resolver URL
           }
         ],
         "dlrLinkTitle": "Transformation Event",
-        "dlrVerificationPage": "https://verify.example.com"
+        "dlrVerificationPage": "https://verify.example.com",
+        "validUntil": "2025-11-28T04:47:15.136Z"
       },
       "storage": {
         "url": "https://storage.example.com/upload",
         "params": {
-          "bucket": "bucket-name",
+          "bucket": "bucket-name"
         }
       },
       "dlr": {
@@ -93,4 +94,3 @@ P-->>C: Return transformation event VC and resolver URL
 | Type       | Description                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------ |
 | ReturnData | It processes the input data or generates data independently and returns the processed result after successful execution. |
-

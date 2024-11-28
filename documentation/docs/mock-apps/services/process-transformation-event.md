@@ -64,7 +64,8 @@ P-->>C: Return EPCIS VC
         ],
         "dlrIdentificationKeyType": "gtin",
         "dlrLinkTitle": "Transformation Event",
-        "dlrVerificationPage": "https://verify.example.com"
+        "dlrVerificationPage": "https://verify.example.com",
+        "validUntil": "2025-11-28T04:47:15.136Z"
       },
       "dlr": {
         "dlrAPIUrl": "https://dlr.example.com/api",
@@ -95,7 +96,8 @@ P-->>C: Return EPCIS VC
         ],
         "dlrIdentificationKeyType": "gtin",
         "dlrLinkTitle": "Product DPP",
-        "dlrVerificationPage": "https://verify.example.com"
+        "dlrVerificationPage": "https://verify.example.com",
+        "validUntil": "2025-11-28T04:47:15.136Z"
       },
       "dppCredentials": [
         {
@@ -153,4 +155,3 @@ P-->>C: Return EPCIS VC
 | Type       | Description                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------ |
 | ReturnData | It processes the input data or generates data independently and returns the processed result after successful execution. |
-

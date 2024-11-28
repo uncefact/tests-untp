@@ -73,7 +73,8 @@ P-->>C: Return VC and resolver URL
         ],
         "type": ["DigitalProductPassport"],
         "dlrLinkTitle": "Steel Passport",
-        "dlrVerificationPage": "http://localhost:3332/verify"
+        "dlrVerificationPage": "http://localhost:3332/verify",
+        "validUntil": "2025-11-28T04:47:15.136Z"
       },
       "dlr": {
         "dlrAPIUrl": "https://dlr.example.com",
@@ -114,4 +115,3 @@ P-->>C: Return VC and resolver URL
 | Type       | Description                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------ |
 | ReturnData | It processes the input data or generates data independently and returns the processed result after successful execution. |
-
