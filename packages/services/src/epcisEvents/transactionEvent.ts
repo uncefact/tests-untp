@@ -2,10 +2,11 @@ import { VerifiableCredential } from '@vckit/core-types';
 import { IService, ITraceabilityEvent, ITraceabilityEventContext } from '../types/index.js';
 import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
-import { constructIdentifierString, constructVerifyURL, generateUUID } from '../utils/helpers.js';
-import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
+import { constructVerifyURL, generateUUID } from '../utils/helpers.js';
+import { LinkType, registerLinkResolver } from '../linkResolver.service.js';
 import { validateTraceabilityEventContext } from '../validateContext.js';
 import { deleteValuesFromLocalStorageByKeyPath } from './helpers.js';
+import { constructIdentifierData, constructQualifierPath } from '../identifierSchemes/identifierSchemeServices.js';
 
 export const processTransactionEvent: IService = async (
   transactionEvent: ITraceabilityEvent,
@@ -17,12 +18,11 @@ export const processTransactionEvent: IService = async (
   }
 
   const { vckit, traceabilityEvent, dlr, storage, identifierKeyPath, localStorageParams } = context;
-  const transactionIdentifier = constructIdentifierString(transactionEvent.data, identifierKeyPath);
-  if (!transactionIdentifier) {
-    throw new Error('Identifier not found');
-  }
 
-  const { identifier, qualifierPath } = getLinkResolverIdentifier(transactionIdentifier);
+  const aiData = constructIdentifierData(identifierKeyPath, transactionEvent.data);
+  if (!aiData.primary.ai || !aiData.primary.value) throw new Error('Identifier not found');
+  const qualifierPath = constructQualifierPath(aiData.qualifiers);
+  const identifier = aiData.primary.value;
 
   const credentialId = generateUUID();
 
@@ -46,16 +46,16 @@ export const processTransactionEvent: IService = async (
   const linkResolver = await registerLinkResolver(
     uri,
     verifyURL,
-    traceabilityEvent.dlrIdentificationKeyType,
+    aiData.primary.ai,
     identifier,
     traceabilityEvent.dlrLinkTitle,
-    LinkType.epcisLinkType,
+    LinkType.traceability,
     traceabilityEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
     dlr.namespace,
     qualifierPath,
-    LinkType.epcisLinkType,
+    LinkType.traceability,
   );
 
   deleteValuesFromLocalStorageByKeyPath(

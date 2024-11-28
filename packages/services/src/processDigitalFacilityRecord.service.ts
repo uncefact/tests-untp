@@ -1,11 +1,12 @@
 import { VerifiableCredential } from '@vckit/core-types';
-import { registerLinkResolver, LinkType, getLinkResolverIdentifier } from './linkResolver.service.js';
+import { registerLinkResolver, LinkType } from './linkResolver.service.js';
 import { uploadData } from './storage.service.js';
 import { IService } from './types/IService.js';
 import { constructIdentifierString, constructVerifyURL, generateUUID } from './utils/helpers.js';
 import { decodeEnvelopedVC, issueVC } from './vckit.service.js';
 import { ITraceabilityEvent, IDigitalFacilityRecordContext } from './types/index.js';
 import { validateDigitalFacilityRecordContext } from './validateContext.js';
+import { constructIdentifierData, constructQualifierPath } from './identifierSchemes/identifierSchemeServices.js';
 
 /**
  * Processes a digital facility record by issuing a verifiable credential, storing it in a storage service and registering a link resolver.
@@ -26,12 +27,10 @@ export const processDigitalFacilityRecord: IService = async (
 
   const { vckit, digitalFacilityRecord, dlr, storage, identifierKeyPath } = context;
 
-  const identifierString = constructIdentifierString(digitalFacilityRecordData.data, identifierKeyPath);
-  if (!identifierString) {
-    throw new Error('Identifier not found');
-  }
-
-  const { identifier, qualifierPath } = getLinkResolverIdentifier(identifierString);
+  const aiData = constructIdentifierData(identifierKeyPath, digitalFacilityRecordData.data);
+  if (!aiData.primary.ai || !aiData.primary.value) throw new Error('Identifier not found');
+  const qualifierPath = constructQualifierPath(aiData.qualifiers);
+  const identifier = aiData.primary.value;
 
   const credentialId = generateUUID();
 
@@ -56,16 +55,16 @@ export const processDigitalFacilityRecord: IService = async (
   const linkResolver = await registerLinkResolver(
     uri,
     verifyURL,
-    digitalFacilityRecord.dlrIdentificationKeyType,
+    aiData.primary.ai,
     identifier,
     digitalFacilityRecord.dlrLinkTitle,
-    LinkType.certificationLinkType,
+    LinkType.locationInfo,
     digitalFacilityRecord.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
     dlr.namespace,
     qualifierPath,
-    LinkType.certificationLinkType,
+    LinkType.locationInfo,
   );
 
   return { vc, decodedEnvelopedVC, linkResolver };

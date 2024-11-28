@@ -2,6 +2,7 @@ import * as vckitService from '../vckit.service';
 import * as linkResolverService from '../linkResolver.service';
 import * as validateContext from '../validateContext';
 import { processTransactionEvent } from '../epcisEvents/transactionEvent';
+import * as identifierSchemeServices from '../identifierSchemes/identifierSchemeServices';
 import { uploadData } from '../storage.service';
 import { Result } from '../types/validateContext';
 import { ITraceabilityEventContext } from '../types/types';
@@ -20,12 +21,11 @@ jest.mock('../storage.service', () => ({
 jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
   createLinkResolver: jest.fn(),
-  IdentificationKeyType: jest.fn(),
-  getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' })),
   LinkType: {
     verificationLinkType: 'gs1:verificationService',
     certificationLinkType: 'gs1:certificationInfo',
     epcisLinkType: 'gs1:epcis',
+    traceability: 'traceability',
   },
 }));
 
@@ -60,7 +60,6 @@ describe('processTransactionEvent', () => {
       context: ['https://example.sh/TransactionEvent.jsonld'],
       type: ['DigitalTraceabilityEvent'],
       dlrLinkTitle: 'Transaction Event',
-      dlrIdentificationKeyType: linkResolverService.IdentificationKeyType.nlisid,
       dlrVerificationPage: 'http://exampleUI.com/verify',
     },
     dlr: { dlrAPIUrl: 'http://exampleDLR.com', dlrAPIKey: 'test-key' },
@@ -81,6 +80,16 @@ describe('processTransactionEvent', () => {
     jest
       .spyOn(validateContext, 'validateTraceabilityEventContext')
       .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
+    jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+      primary: { ai: '01', value: '9359502000010' },
+      qualifiers: [
+        {
+          ai: '10',
+          value: 'ABC123',
+        },
+      ],
+    });
+    jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/10/ABC123');
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValueOnce(transactionEventDLRMock);
 
     const transactionVC = await processTransactionEvent(transactionEvent, context);
@@ -118,6 +127,17 @@ describe('processTransactionEvent', () => {
         ...context,
         identifierKeyPath: '/invalid-key',
       };
+
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '', value: '' },
+        qualifiers: [
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
+      });
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/10/ABC123');
       jest
         .spyOn(validateContext, 'validateTraceabilityEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
@@ -136,6 +156,16 @@ describe('processTransactionEvent', () => {
         ...context,
         vckit: { ...context.vckit, issuer: 'invalid-issuer' },
       };
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '9359502000010' },
+        qualifiers: [
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
+      });
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/10/ABC123');
       jest
         .spyOn(validateContext, 'validateTraceabilityEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
@@ -157,6 +187,16 @@ describe('processTransactionEvent', () => {
       };
       (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
       (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue(transactionVCMock);
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '9359502000010' },
+        qualifiers: [
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
+      });
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/10/ABC123');
 
       jest
         .spyOn(validateContext, 'validateTraceabilityEventContext')
@@ -181,6 +221,17 @@ describe('processTransactionEvent', () => {
       (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
       (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
       (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
+
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '9359502000010' },
+        qualifiers: [
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
+      });
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/10/ABC123');
       jest
         .spyOn(validateContext, 'validateTraceabilityEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);

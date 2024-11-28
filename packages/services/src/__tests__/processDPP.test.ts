@@ -1,7 +1,8 @@
 import { processDPP } from '../processDPP.service';
 import { issueVC, contextDefault, decodeEnvelopedVC } from '../vckit.service';
 import { uploadData } from '../storage.service';
-import { registerLinkResolver, IdentificationKeyType, LinkType } from '../linkResolver.service';
+import { registerLinkResolver, LinkType } from '../linkResolver.service';
+import * as identifierSchemeServices from '../identifierSchemes/identifierSchemeServices';
 import { contextDPP, dataDPP } from './mocks/constants';
 import { constructVerifyURL } from '../utils/helpers';
 
@@ -17,15 +18,11 @@ jest.mock('../storage.service', () => ({
 
 jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
-  IdentificationKeyType: {
-    gtin: 'gtin',
-    nlisid: 'nlisid',
-  },
-  getLinkResolverIdentifier: jest.fn(() => ({ identifier: '9359502000010', qualifierPath: '/10/ABC123' })),
   LinkType: {
     verificationLinkType: 'gs1:verificationService',
     certificationLinkType: 'gs1:certificationInfo',
     epcisLinkType: 'gs1:epcis',
+    sustainabilityInfo: 'sustainabilityInfo',
   },
 }));
 jest.mock('../utils/helpers', () => ({
@@ -69,11 +66,22 @@ describe('processDPP', () => {
       (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
       (constructVerifyURL as jest.Mock).mockReturnValueOnce(mockVerifyURL);
 
-      (registerLinkResolver as jest.Mock).mockImplementationOnce(
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '9359502000010' },
+        qualifiers: [
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
+      });
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/10/ABC123');
+
+      (registerLinkResolver as jest.Mock).mockImplementation(
         (
           url,
           verifyURL,
-          identificationKeyType: IdentificationKeyType,
+          identificationKeyType: string,
           identificationKey: string,
           linkTitle,
           verificationPage,
@@ -90,13 +98,7 @@ describe('processDPP', () => {
         decodedEnvelopedVC: {
           credentialSubject: { id: 'https://example.com/123' },
         },
-        linkResolver:
-          contextDPP.dpp.dlrVerificationPage +
-          '/' +
-          contextDPP.dpp.dlrIdentificationKeyType +
-          '/' +
-          dataDPP.data.herd.identifier +
-          '?linkType=all',
+        linkResolver: 'https://web.example.com/verify/01/9359502000010?linkType=all',
       });
       expect(uploadData).toHaveBeenCalled();
       expect(registerLinkResolver).toHaveBeenCalled();
@@ -106,16 +108,16 @@ describe('processDPP', () => {
       expect(registerLinkResolver).toHaveBeenCalledWith(
         expect.any(String),
         mockVerifyURL,
-        dppContext.dlrIdentificationKeyType,
+        '01',
         dataDPP.data.herd.identifier,
         dppContext.dlrLinkTitle,
-        LinkType.certificationLinkType,
+        LinkType.sustainabilityInfo,
         dppContext.dlrVerificationPage,
         dlrContext.dlrAPIUrl,
         dlrContext.dlrAPIKey,
         dlrContext.namespace,
         dataDPP.qualifierPath,
-        LinkType.certificationLinkType,
+        LinkType.sustainabilityInfo,
       );
     });
 
@@ -132,11 +134,17 @@ describe('processDPP', () => {
       (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
       (constructVerifyURL as jest.Mock).mockReturnValueOnce('https://example.com/vc.json');
 
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '0123456789' },
+        qualifiers: [],
+      });
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/');
+
       (registerLinkResolver as jest.Mock).mockImplementation(
         (
           url,
           verifyURL,
-          identificationKeyType: IdentificationKeyType,
+          identificationKeyType: string,
           identificationKey: string,
           linkTitle,
           verificationPage,
@@ -176,6 +184,11 @@ describe('processDPP', () => {
 
     it('should throw error when data is empty', async () => {
       try {
+        jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+          primary: { ai: '', value: '' },
+          qualifiers: [],
+        });
+
         await processDPP({ data: { herd: '' } }, contextDPP);
       } catch (error: any) {
         expect(error.message).toEqual('Identifier not found');

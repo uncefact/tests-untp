@@ -706,7 +706,6 @@
                     ],
                     "type": ["VerifiableCredential", "DigitalProductPassport"],
                     "dlrLinkTitle": "Truffle Product Passport",
-                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3001/verify"
                   },
                   "dlr": {
@@ -1187,7 +1186,6 @@
                     ],
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Transaction Event",
-                    "dlrIdentificationKeyType": "gtin",
                     "dlrVerificationPage": "http://localhost:3001/verify"
                   },
                   "dlr": {

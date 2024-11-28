@@ -101,34 +101,35 @@ The `dataPath` value is the relative location of the credential you want to test
 
 ### URL
 
-The `url` value is the URL of the remote schema you want to test against. If you provide a URL, the `type` and `version` fields will be ignored.
+The `url` property allows you to specify a remote schema URL for testing. When provided, this URL takes precedence and the test suite will use the remote schema instead of looking up the local schema based on `type` and `version`. This is useful when you want to test against schemas hosted elsewhere.
 
 ## Adding test credentials
 
-To test credentials developed or produced by a UNTP implementation against the core UNTP data model:
+Follow these steps to validate your UNTP implementation's credentials against the core UNTP data model specifications:
 
-1. Create a directory to store the credentials you want to test:
+1. Navigate to the test suite directory:
 
 ```bash
 cd packages/untp-test-suite
-mkdir credentials
 ```
 
-2. Add the credentials you want to test to the directory created in the previous step. The files should have unique names and be in JSON format:
+2. Add your credential files to the appropriate subdirectory under `credentials/`. The directory structure should match the credential type:
 
 ```
 packages/
 └── untp-test-suite/
-    ├── credentials/
-        ├── aggregationEvent-sample.json
-        ├── conformityCredential-sample.json
-        ├── objectEvent-sample.json
-        ├── productPassport-sample.json
-        ├── transactionEvent-sample.json
-        └── transformationEvent-sample.json
+    └── credentials/
+        ├── conformityCredential/
+        │   └── DigitalConformityCredential_instance-v0.5.0.
+        ├── digitalFacilityRecord/
+        │   └── DigitalFacilityRecord_instance-v0.5.0.json
+        ├── productPassport/
+        │   └── DigitalProductPassport_instance-v0.5.0.json
+        └── traceabilityEvents/
+            └── DigitalTraceabilityEvent_instance-v0.5.0.json
 ```
 
-3. Update the config file to point to the location of the credential you want to test within the corresponding object and save the file:
+3. Update the config file (`credentials.json`) to point to your credential files:
 
 ```json
 {
@@ -161,46 +162,103 @@ packages/
 }
 ```
 
+Each credential entry in the configuration should specify:
+
+- `type`: The credential type (matching the schema directory name)
+- `version`: The schema version to test against
+- `dataPath`: Relative path to your credential file
+- `url`: Optional URL to a remote schema (leave empty to use local schemas)
+
 You have now successfully configured the Tier 2 test suite to test your credentials against the core UNTP data model.
 
-## Setting Up Configuration for the New Data Model
+## Running the test suite
 
-The Tier 2 test suite currently supports the existing UNTP data model. To test credentials with a new data model that includes the following schemas: Conformity Credential, Digital Facility Record, Traceability Events, and Product Passport, you can generate a configuration file.
+Once your configuration file is set up, run the test suite with the following command:
 
-Running the command `yarn run untp config` will create a configuration file containing the default values, structured as follows:
+```bash
+cd packages/untp-test-suite
+yarn run untp test
+```
+
+## Testing Industry-Specific Extensions of UNTP
+
+The Tier 2 test suite not only supports the core UNTP data model but also allows testing of industry-specific extensions, such as the Australian Agriculture Traceability Protocol (AATP) or the UN Critical Raw Materials Transparency Protocol (CRMTP).
+
+This flexibility enables implementors to verify conformance with both the core UNTP data models and their specific industry extensions.
+
+### Example: Testing the Australian Agriculture Traceability Protocol (AATP) Extension
+
+In this example, we'll demonstrate how to test the Australian Agriculture Traceability Protocol (AATP) extension using a Digital Livestock Passport (DLP). There are two ways to provide your extension schema for testing:
+
+#### Method 1: Local Schema Directory
+
+Add your extension schema to the core schemas directory:
+
+```
+packages/
+└── untp-test-suite/
+    ├── src/
+    │   └── schemas/  # All schemas live here
+    │       ├── digitalProductPassport/
+    │       │   └── v0.5.0/
+    │       │       └── schema.json
+    │       ├── digitalLivestockPassport/ # Your extension
+    │       │   └── v0.5.0/
+    │       │       └── schema.json
+    │       └── ...
+    │
+    ├── credentials/ # Test credentials directory
+    │   └── aatp/
+    │       └── livestock/
+    │           └── DigitalLivestockPassport_instance-v0.5.0.json
+```
+
+Then reference it in your `credentials.json`:
 
 ```json
 {
   "credentials": [
     {
-      "type": "conformityCredential",
+      "type": "digitalLivestockPassport",
       "version": "v0.5.0",
-      "dataPath": "",
-      "url": ""
-    },
-    {
-      "type": "digitalFacilityRecord",
-      "version": "v0.5.0",
-      "dataPath": "",
-      "url": ""
-    },
-    {
-      "type": "traceabilityEvent",
-      "version": "v0.5.0",
-      "dataPath": "",
-      "url": ""
-    },
-    {
-      "type": "productPassport",
-      "version": "v0.5.0",
-      "dataPath": "",
+      "dataPath": "credentials/aatp/livestock/DigitalLivestockPassport_instance-v0.5.0.json",
       "url": ""
     }
   ]
 }
 ```
 
-The default version used will be the latest version of the schema. You can update the version to match the specific version of the schema you want to test against.
+```bash
+cd packages/untp-test-suite
+yarn build
+yarn run untp test
+```
+
+#### Method 2: Remote Schema URL
+
+Alternatively, you can reference a remotely hosted schema:
+
+```json
+{
+  "credentials": [
+    {
+      "type": "digitalLivestockPassport",
+      "version": "v0.5.0",
+      "dataPath": "credentials/aatp/livestock/DigitalLivestockPassport_instance-v0.5.0.json",
+      "url": "https://example.com/schemas/dlp/0.5.0/digitalLivestockPassport.json"
+    }
+  ]
+}
+```
+
+```bash
+cd packages/untp-test-suite
+yarn run untp test
+```
+
+When using a remote URL, the test suite will fetch the schema from the specified location instead of looking in the local schemas directory.
+
+## Developers
 
 ### You can add additional schemas in two ways:
 

@@ -1,11 +1,11 @@
 import { decodeEnvelopedVC, issueVC } from '../vckit.service.js';
 import { uploadData } from '../storage.service.js';
-import { LinkType, getLinkResolverIdentifier, registerLinkResolver } from '../linkResolver.service.js';
+import { LinkType, registerLinkResolver } from '../linkResolver.service.js';
 import { IService } from '../types/IService.js';
 import { ITraceabilityEvent, ITraceabilityEventContext } from '../types';
 import { constructIdentifierString, constructVerifyURL, generateUUID } from '../utils/helpers.js';
 import { validateTraceabilityEventContext } from '../validateContext.js';
-import { EPCISBusinessStepCode, EPCISEventAction, EPCISEventDisposition, EPCISEventType } from '../types/epcis.js';
+import { constructIdentifierData, constructQualifierPath } from '../identifierSchemes/identifierSchemeServices.js';
 
 export const processAggregationEvent: IService = async (
   aggregationEvent: ITraceabilityEvent,
@@ -18,12 +18,10 @@ export const processAggregationEvent: IService = async (
 
   const { vckit, traceabilityEvent, dlr, storage, identifierKeyPath } = context;
 
-  const parentIdentifier = constructIdentifierString(aggregationEvent.data, identifierKeyPath);
-  if (!parentIdentifier) {
-    throw new Error('Identifier not found');
-  }
-
-  const { identifier, qualifierPath } = getLinkResolverIdentifier(parentIdentifier);
+  const aiData = constructIdentifierData(identifierKeyPath, aggregationEvent.data);
+  if (!aiData.primary.ai || !aiData.primary.value) throw new Error('Identifier not found');
+  const qualifierPath = constructQualifierPath(aiData.qualifiers);
+  const identifier = aiData.primary.value;
 
   const credentialId = generateUUID();
 
@@ -47,15 +45,16 @@ export const processAggregationEvent: IService = async (
   const aggregationLinkResolver = await registerLinkResolver(
     uri,
     verifyURL,
-    traceabilityEvent.dlrIdentificationKeyType,
+    aiData.primary.ai,
     identifier,
     traceabilityEvent.dlrLinkTitle,
-    LinkType.epcisLinkType,
+    LinkType.traceability,
     traceabilityEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
     dlr.dlrAPIKey,
     dlr.namespace,
     qualifierPath,
+    LinkType.traceability,
   );
 
   return { vc: aggregationVC, decodedEnvelopedVC, linkResolver: aggregationLinkResolver };

@@ -1,6 +1,7 @@
 import * as vckitService from '../vckit.service';
 import { uploadData } from '../storage.service';
 import * as linkResolverService from '../linkResolver.service';
+import * as identifierSchemeServices from '../identifierSchemes/identifierSchemeServices';
 import { ITraceabilityEventContext } from '../types/types';
 import { Result } from '../types/validateContext';
 import * as validateContext from '../validateContext';
@@ -19,13 +20,11 @@ jest.mock('../storage.service', () => ({
 jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
   createLinkResolver: jest.fn(),
-  IdentificationKeyType: jest.fn(),
-  getLinkResolverIdentifier: jest.fn(),
-  getLinkResolverIdentifierFromURI: jest.fn(),
   LinkType: {
     verificationLinkType: 'gs1:verificationService',
     certificationLinkType: 'gs1:certificationInfo',
     epcisLinkType: 'gs1:epcis',
+    traceability: 'traceability',
   },
 }));
 jest.mock('../utils/helpers', () => ({
@@ -52,7 +51,6 @@ describe('processAggregationEvent', () => {
       type: ['AggregationEventCredential'],
       renderTemplate: [{ template: '<p>Render dpp template</p>', '@type': 'WebRenderingTemplate2022' }],
       dlrLinkTitle: 'Aggregation Event',
-      dlrIdentificationKeyType: linkResolverService.IdentificationKeyType.gtin,
       dlrVerificationPage: 'http://exampleUI.com/verify',
       dlrQualifierPath: '',
     },
@@ -70,14 +68,14 @@ describe('processAggregationEvent', () => {
     jest
       .spyOn(validateContext, 'validateTraceabilityEventContext')
       .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
-    jest
-      .spyOn(linkResolverService, 'getLinkResolverIdentifier')
-      .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
-    jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
-      identifier: '0123456789',
-      qualifierPath: '/10/ABC123',
-      elementString: '01012345678910ABC123',
+    jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+      primary: { ai: '01', value: '0123456789' },
+      qualifiers: [
+        { ai: '21', value: '951350380' },
+        { ai: '10', value: 'ABC123' },
+      ],
     });
+    jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/21/951350380/10/ABC123');
 
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValueOnce(aggregationEventDLRMock);
     const aggregationVC = await processAggregationEvent(aggregationEvent, context);
@@ -118,6 +116,13 @@ describe('processAggregationEvent', () => {
       jest
         .spyOn(validateContext, 'validateTraceabilityEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '' },
+        qualifiers: [
+          { ai: '21', value: '951350380' },
+          { ai: '10', value: 'ABC123' },
+        ],
+      });
 
       await processAggregationEvent(aggregationEvent, invalidIdentifierContent);
     } catch (e) {
@@ -136,15 +141,15 @@ describe('processAggregationEvent', () => {
       jest
         .spyOn(validateContext, 'validateTraceabilityEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
-      jest
-        .spyOn(linkResolverService, 'getLinkResolverIdentifier')
-        .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
-      jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
-        identifier: '0123456789',
-        qualifierPath: '/10/ABC123',
-        elementString: '01012345678910ABC123',
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '0123456789' },
+        qualifiers: [
+          { ai: '21', value: '951350380' },
+          { ai: '10', value: 'ABC123' },
+        ],
       });
       (issueVC as jest.Mock).mockRejectedValueOnce(new Error("Can't issue VC"));
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/21/951350380/10/ABC123');
 
       await processAggregationEvent(aggregationEvent, invalidIssuerContext);
     } catch (e) {
@@ -167,14 +172,14 @@ describe('processAggregationEvent', () => {
       jest
         .spyOn(validateContext, 'validateTraceabilityEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
-      jest
-        .spyOn(linkResolverService, 'getLinkResolverIdentifier')
-        .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
-      jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
-        identifier: '0123456789',
-        qualifierPath: '/10/ABC123',
-        elementString: '01012345678910ABC123',
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '0123456789' },
+        qualifiers: [
+          { ai: '21', value: '951350380' },
+          { ai: '10', value: 'ABC123' },
+        ],
       });
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/21/951350380/10/ABC123');
 
       await processAggregationEvent(aggregationEvent, invalidStorageContext);
     } catch (e) {
@@ -200,14 +205,14 @@ describe('processAggregationEvent', () => {
       jest
         .spyOn(validateContext, 'validateTraceabilityEventContext')
         .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
-      jest
-        .spyOn(linkResolverService, 'getLinkResolverIdentifier')
-        .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
-      jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
-        identifier: '0123456789',
-        qualifierPath: '/10/ABC123',
-        elementString: '01012345678910ABC123',
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '0123456789' },
+        qualifiers: [
+          { ai: '21', value: '951350380' },
+          { ai: '10', value: 'ABC123' },
+        ],
       });
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/21/951350380/10/ABC123');
       jest.spyOn(linkResolverService, 'createLinkResolver').mockRejectedValueOnce('Invalid DLR API link resolver url');
 
       await processAggregationEvent(aggregationEvent, invalidDLRContext);
@@ -234,15 +239,16 @@ describe('processAggregationEvent', () => {
     jest
       .spyOn(validateContext, 'validateTraceabilityEventContext')
       .mockReturnValueOnce({ ok: true, value: contextWithHeaders } as unknown as Result<ITraceabilityEventContext>);
-    jest
-      .spyOn(linkResolverService, 'getLinkResolverIdentifier')
-      .mockReturnValueOnce({ identifier: '0123456789', qualifierPath: '/10/ABC123' });
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValueOnce(aggregationEventDLRMock);
-    jest.spyOn(linkResolverService, 'getLinkResolverIdentifierFromURI').mockReturnValueOnce({
-      identifier: '0123456789',
-      qualifierPath: '/10/ABC123',
-      elementString: '01012345678910ABC123',
+
+    jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+      primary: { ai: '01', value: '0123456789' },
+      qualifiers: [
+        { ai: '21', value: '951350380' },
+        { ai: '10', value: 'ABC123' },
+      ],
     });
+    jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/21/951350380/10/ABC123');
 
     const aggregationVC = await processAggregationEvent(aggregationEvent, contextWithHeaders);
 

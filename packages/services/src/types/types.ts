@@ -1,5 +1,4 @@
 import { CredentialPayload } from '@vckit/core-types';
-import { IdentificationKeyType } from '../linkResolver.service';
 import { StorageServiceConfig } from '../types';
 import { IConstructObjectParameters } from '../utils/helpers';
 
@@ -43,7 +42,7 @@ export interface ICredential {
 }
 
 export interface ILinkResolverContext {
-  dlrIdentificationKeyType: IdentificationKeyType;
+  dlrIdentificationKeyType: string;
   dlrLinkTitle: string;
   dlrVerificationPage: string;
   dlrQualifierPath: '';

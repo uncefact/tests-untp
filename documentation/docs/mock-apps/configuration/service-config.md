@@ -86,6 +86,14 @@ graph TD
           "objectKeyPath": "/vc/credentialSubject/product/itemIdentifiers/0/identifierValue"
         }
       ]
+    },
+    {
+      "name": "getValueFromLocalStorage",
+      "parameters": [
+        {
+          "storageKey": "Steel_Mill_1_dpps"
+        }
+      ]
     }
   ]
 }

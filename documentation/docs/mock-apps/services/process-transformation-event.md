@@ -147,3 +147,10 @@ P-->>C: Return EPCIS VC
 | dppCredentials                | Yes      | Mapping configuration for DPP credentials                                                                                           | [Construct Data](/docs/mock-apps/common/construct-data)[]       |
 | identifierKeyPath             | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/mock-apps/common/identifier-key-path) |
 | transformationEventCredential | Yes      | Mapping and generation configuration for the transformation event credential                                                        | [Construct Data](/docs/mock-apps/common/construct-data)         |
+
+## Function type
+
+| Type       | Description                                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------ |
+| ReturnData | It processes the input data or generates data independently and returns the processed result after successful execution. |
+

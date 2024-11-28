@@ -29,6 +29,12 @@ flowchart TD
 
 ## Definitions
 
-| Property | Required | Description | Type |
-| ----------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | |
-| path | No | The path of the data wants to convert. If the path is undefined, it will convert the whole data. | [IdentifierKeyPath](/docs/mock-apps/common/identifier-key-path) |
+| Property | Required | Description                                                                                      | Type                                                            |
+| -------- | -------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| path     | No       | The path of the data wants to convert. If the path is undefined, it will convert the whole data. | [IdentifierKeyPath](/docs/mock-apps/common/identifier-key-path) |
+
+## Function type
+
+| Type       | Description                                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------ |
+| ReturnData | It processes the input data or generates data independently and returns the processed result after successful execution. |

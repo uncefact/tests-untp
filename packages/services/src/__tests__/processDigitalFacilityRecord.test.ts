@@ -1,6 +1,7 @@
 import * as vckitService from '../vckit.service';
 import { uploadData } from '../storage.service';
 import * as linkResolverService from '../linkResolver.service';
+import * as identifierSchemeServices from '../identifierSchemes/identifierSchemeServices';
 import { Result } from '../types/validateContext';
 import * as validateContext from '../validateContext';
 import { IDigitalFacilityRecordContext } from '../types';
@@ -18,13 +19,13 @@ jest.mock('../storage.service', () => ({
 jest.mock('../linkResolver.service', () => ({
   registerLinkResolver: jest.fn(),
   createLinkResolver: jest.fn(),
-  IdentificationKeyType: jest.fn(),
   getLinkResolverIdentifier: jest.fn(),
   getLinkResolverIdentifierFromURI: jest.fn(),
   LinkType: {
     verificationLinkType: 'verificationService',
     certificationLinkType: 'certificationInfo',
     epcisLinkType: 'epcis',
+    locationInfo: 'locationInfo',
   },
 }));
 jest.mock('../utils/helpers', () => ({
@@ -52,9 +53,11 @@ describe('processDigitalFacilityRecord', () => {
     jest
       .spyOn(validateContext, 'validateDigitalFacilityRecordContext')
       .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<IDigitalFacilityRecordContext>);
-    jest
-      .spyOn(linkResolverService, 'getLinkResolverIdentifier')
-      .mockReturnValue({ identifier: '0123456789', qualifierPath: '/' });
+    jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+      primary: { ai: '01', value: '0123456789' },
+      qualifiers: [],
+    });
+    jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/');
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValue('https://example.com/link-resolver');
 
     const result = await processDigitalFacilityRecord(digitalFacilityRecordData, context);
@@ -81,6 +84,11 @@ describe('processDigitalFacilityRecord', () => {
       ...context,
       identifierKeyPath: '/invalid',
     };
+
+    jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+      primary: { ai: '', value: '' },
+      qualifiers: [],
+    });
 
     jest
       .spyOn(validateContext, 'validateDigitalFacilityRecordContext')
@@ -125,9 +133,11 @@ describe('processDigitalFacilityRecord', () => {
     jest
       .spyOn(validateContext, 'validateDigitalFacilityRecordContext')
       .mockReturnValueOnce({ ok: true, value: contextWithHeaders } as unknown as Result<IDigitalFacilityRecordContext>);
-    jest
-      .spyOn(linkResolverService, 'getLinkResolverIdentifier')
-      .mockReturnValue({ identifier: '0123456789', qualifierPath: '/' });
+    jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+      primary: { ai: '01', value: '0123456789' },
+      qualifiers: [],
+    });
+    jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/');
     jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValue('https://example.com/link-resolver');
 
     await processDigitalFacilityRecord(digitalFacilityRecordData, contextWithHeaders);
