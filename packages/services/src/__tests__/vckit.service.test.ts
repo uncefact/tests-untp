@@ -116,6 +116,29 @@ describe('vckit.service', () => {
       expect(result).toEqual(mockVerifiableCredential);
     });
 
+    it('should issue VC successfully when validUntil exist', async () => {
+      const mockResponse = { verifiableCredential: mockVerifiableCredential };
+      (privateAPI.post as jest.Mock).mockResolvedValue(mockResponse);
+
+      await issueVC({
+        ...defaultParams,
+        restOfVC: {
+          validUntil: '2025-01-01T00:00:00Z',
+        },
+      });
+
+      expect(privateAPI.post).toHaveBeenCalledWith(
+        `${mockVcKitAPIUrl}/credentials/issue`,
+        expect.objectContaining({
+          credential: expect.objectContaining({
+            validUntil: '2025-01-01T00:00:00Z',
+            validFrom: expect.any(String),
+          }),
+        }),
+        { headers: {} },
+      );
+    });
+
     it('should include custom context and type if provided', async () => {
       const customParams = {
         ...defaultParams,
@@ -187,6 +210,36 @@ describe('vckit.service', () => {
         }),
         { headers: {} },
       );
+    });
+
+    it('should throw error when validUntil is a character invalid', async () => {
+      await expect(
+        issueVC({
+          ...defaultParams,
+          restOfVC: {
+            validUntil: 'invalid-date',
+          },
+        }),
+      ).rejects.toThrow(
+        'Invalid validUntil value: Invalid validity period: validUntil must be after or equal to validFrom',
+      );
+
+      expect(privateAPI.post).not.toHaveBeenCalled();
+    });
+
+    it('should throw error when validUntil is before validFrom', async () => {
+      await expect(
+        issueVC({
+          ...defaultParams,
+          restOfVC: {
+            validUntil: '2024-01-01T00:00:00Z',
+          },
+        }),
+      ).rejects.toThrow(
+        'Invalid validUntil value: Invalid validity period: validUntil must be after or equal to validFrom',
+      );
+
+      expect(privateAPI.post).not.toHaveBeenCalled();
     });
   });
 

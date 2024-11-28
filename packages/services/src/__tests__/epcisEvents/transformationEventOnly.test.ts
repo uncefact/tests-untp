@@ -175,6 +175,45 @@ describe('processTransformationEventOnly', () => {
     expect(result.linkResolver).toEqual('https://example.com/link-resolver');
   });
 
+  it('should process transformation event successfully with validUntil', async () => {
+    (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
+      credentialSubject: { id: 'https://example.com/123' },
+    }));
+    (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue({
+      credentialSubject: { id: 'https://example.com/123' },
+    });
+    (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
+
+    jest
+      .spyOn(validateContext, 'validateTraceabilityEventContext')
+      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
+    jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+      primary: { ai: '01', value: '0105012345678900' },
+      qualifiers: [
+        { ai: '21', value: '951350380' },
+        { ai: '10', value: 'ABC123' },
+      ],
+    });
+    jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/21/951350380/10/ABC123');
+    jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValue('https://example.com/link-resolver');
+
+    const newContext = {
+      ...context,
+      traceabilityEvent: { ...context.traceabilityEvent, validUntil: '2025-12-31T23:59:59Z' },
+    };
+    const result = await processTransformationEventOnly(transformationEvent, newContext);
+
+    expect(result.vc).toEqual({ credentialSubject: { id: 'https://example.com/123' } });
+    expect(result.linkResolver).toEqual('https://example.com/link-resolver');
+    expect(vckitService.issueVC).toHaveBeenCalledWith(
+      expect.objectContaining({
+        restOfVC: expect.objectContaining({
+          validUntil: '2025-12-31T23:59:59Z',
+        }),
+      }),
+    );
+  });
+
   it('should throw error when context validation false', async () => {
     const invalidContext: any = { ...context };
     delete invalidContext.traceabilityEvent;

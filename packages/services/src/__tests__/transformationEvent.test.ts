@@ -269,6 +269,68 @@ describe('Transformation event', () => {
         }),
       );
     });
+
+    it('should process transformation event with custom verifiable credential service headers with validUntil', async () => {
+      const mockHeaders = { 'X-Custom-Header': 'test-value' };
+      const mockVcKitContext = {
+        issuer: 'did:example:123',
+        vckitAPIUrl: 'https://api.vckit.example.com',
+        headers: mockHeaders,
+      };
+      const mockEpcisTransformationEvent = {
+        context: ['https://example.com/epcis-context'],
+        type: ['EPCISTransformationEvent'],
+        renderTemplate: {},
+      };
+      const mockDlrContext = {
+        dlrAPIUrl: 'https://dlr.example.com',
+        dlrAPIKey: 'test-api-key',
+        namespace: 'test-namespace',
+      };
+      const mockTransformationEventCredential = {
+        mappingFields: [
+          {
+            sourcePath: '/data/eventID',
+            destinationPath: '/eventID',
+          },
+        ],
+      };
+      const mockData = {
+        data: {
+          eventID: '1234',
+        },
+      };
+      const transformationEventCredentialId = generateUUID();
+
+      (issueVC as jest.Mock).mockResolvedValue({
+        '@context': ['https://www.w3.org/2018/credentials/v1', 'https://example.com/epcis-context'],
+        type: ['VerifiableCredential', 'EPCISTransformationEvent'],
+        issuer: { id: 'did:example:123' },
+        credentialSubject: { eventID: '1234' },
+      });
+
+      const newContext = {
+        ...mockEpcisTransformationEvent,
+        validUntil: '2025-12-31T23:59:59Z',
+      };
+      await issueEpcisTransformationEvent(
+        mockVcKitContext,
+        newContext as IEntityIssue,
+        mockDlrContext,
+        mockTransformationEventCredential,
+        transformationEventCredentialId,
+        mockData,
+      );
+
+      expect(issueVC).toHaveBeenCalledWith(
+        expect.objectContaining({
+          headers: mockHeaders,
+          restOfVC: expect.objectContaining({
+            validUntil: '2025-12-31T23:59:59Z',
+          }),
+        }),
+      );
+    });
   });
 
   describe('error case', () => {

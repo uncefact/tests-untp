@@ -114,6 +114,75 @@ describe('processDPP', () => {
       );
     });
 
+    it('should call process DPP with validUntil', async () => {
+      (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
+        return `${url}/${dataDPP.data.herd.identifier}`;
+      });
+
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '9359502000010' },
+        qualifiers: [
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
+      });
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/10/ABC123');
+
+      (registerLinkResolver as jest.Mock).mockImplementation(
+        (
+          url,
+          identificationKeyType: string,
+          identificationKey: string,
+          linkTitle,
+          verificationPage,
+          dlrAPIUrl: string,
+          dlrAPIKey,
+        ) => {
+          return `${dlrAPIUrl}/${identificationKeyType}/${identificationKey}?linkType=all`;
+        },
+      );
+
+      const newContext = {
+        ...contextDPP,
+        dpp: { ...contextDPP.dpp, validUntil: '2025-12-31T23:59:59Z' },
+      };
+      const vc = await processDPP(dataDPP, newContext);
+      expect(vc).toEqual({
+        vc: expectVCResult,
+        decodedEnvelopedVC: {
+          credentialSubject: { id: 'https://example.com/123' },
+        },
+        linkResolver: 'https://web.example.com/verify/01/9359502000010?linkType=all',
+      });
+      expect(uploadData).toHaveBeenCalled();
+      expect(registerLinkResolver).toHaveBeenCalled();
+
+      const dppContext = contextDPP.dpp;
+      const dlrContext = contextDPP.dlr;
+      expect(registerLinkResolver).toHaveBeenCalledWith(
+        expect.any(String),
+        '01',
+        dataDPP.data.herd.identifier,
+        dppContext.dlrLinkTitle,
+        LinkType.sustainabilityInfo,
+        dppContext.dlrVerificationPage,
+        dlrContext.dlrAPIUrl,
+        dlrContext.dlrAPIKey,
+        dlrContext.namespace,
+        dataDPP.qualifierPath,
+        LinkType.sustainabilityInfo,
+      );
+      expect(issueVC).toHaveBeenCalledWith(
+        expect.objectContaining({
+          restOfVC: expect.objectContaining({
+            validUntil: '2025-12-31T23:59:59Z',
+          }),
+        }),
+      );
+    });
+
     it('should process DPP with custom verifiable credential service headers', async () => {
       const customHeaders = { 'X-Custom-Header': 'test-value' };
       const contextWithHeaders = {
