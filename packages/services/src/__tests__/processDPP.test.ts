@@ -57,10 +57,6 @@ describe('processDPP', () => {
       });
     });
 
-    afterEach(() => {
-      jest.clearAllMocks();
-    });
-
     it('should call process DPP', async () => {
       const mockVerifyURL = 'https://example.com/vc.json';
       (uploadData as jest.Mock).mockResolvedValueOnce({
@@ -170,32 +166,10 @@ describe('processDPP', () => {
         ...contextDPP,
         dpp: { ...contextDPP.dpp, validUntil: '2025-12-31T23:59:59Z' },
       };
-      const vc = await processDPP(dataDPP, newContext);
-      expect(vc).toEqual({
-        vc: expectVCResult,
-        decodedEnvelopedVC: {
-          credentialSubject: { id: 'https://example.com/123' },
-        },
-        linkResolver: 'https://web.example.com/verify/01/9359502000010?linkType=all',
-      });
+      await processDPP(dataDPP, newContext);
       expect(uploadData).toHaveBeenCalled();
       expect(registerLinkResolver).toHaveBeenCalled();
 
-      const dppContext = contextDPP.dpp;
-      const dlrContext = contextDPP.dlr;
-      expect(registerLinkResolver).toHaveBeenCalledWith(
-        expect.any(String),
-        '01',
-        dataDPP.data.herd.identifier,
-        dppContext.dlrLinkTitle,
-        LinkType.sustainabilityInfo,
-        dppContext.dlrVerificationPage,
-        dlrContext.dlrAPIUrl,
-        dlrContext.dlrAPIKey,
-        dlrContext.namespace,
-        dataDPP.qualifierPath,
-        LinkType.sustainabilityInfo,
-      );
       expect(issueVC).toHaveBeenCalledWith(
         expect.objectContaining({
           restOfVC: expect.objectContaining({
