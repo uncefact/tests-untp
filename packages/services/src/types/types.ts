@@ -39,6 +39,7 @@ export interface ICredential {
   context: string[];
   type: string[];
   renderTemplate?: IRenderer[];
+  validUntil?: string;
 }
 
 export interface ILinkResolverContext {

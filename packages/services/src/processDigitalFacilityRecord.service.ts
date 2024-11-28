@@ -34,6 +34,15 @@ export const processDigitalFacilityRecord: IService = async (
 
   const credentialId = generateUUID();
 
+  const restOfVC: any = {
+    id: `urn:uuid:${credentialId}`,
+    render: digitalFacilityRecord.renderTemplate,
+  };
+
+  if (digitalFacilityRecord.validUntil) {
+    restOfVC.validUntil = digitalFacilityRecord.validUntil;
+  }
+
   const vc: VerifiableCredential = await issueVC({
     credentialSubject: digitalFacilityRecordData.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
@@ -41,10 +50,7 @@ export const processDigitalFacilityRecord: IService = async (
     issuer: vckit.issuer,
     context: digitalFacilityRecord.context,
     type: digitalFacilityRecord.type,
-    restOfVC: {
-      id: `urn:uuid:${credentialId}`,
-      render: digitalFacilityRecord.renderTemplate,
-    },
+    restOfVC,
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(vc);

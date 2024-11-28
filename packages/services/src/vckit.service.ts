@@ -71,6 +71,19 @@ export const issueVC = async ({
     _validateVckitHeaders(headers);
   }
 
+  if (restOfVC?.validUntil) {
+    const validUntil = restOfVC.validUntil;
+    const validFrom = new Date().toISOString();
+
+    try {
+      if (!validityPeriod(validFrom, validUntil)) {
+        throw new Error('Invalid validity period: validUntil must be after or equal to validFrom');
+      }
+    } catch (error) {
+      throw new Error(`Invalid validUntil value: ${(error as Error).message}`);
+    }
+  }
+
   // issue credential status if not provided
   if (!_credentialStatus) {
     // issue credential status
@@ -157,6 +170,7 @@ const constructCredentialObject = ({ context, type, issuer, credentialSubject, .
       type: [...(type || []), ...typeDefault],
       issuer: issuer,
       credentialSubject,
+      validFrom: new Date().toISOString(),
       ...restOfVC,
     },
     options: {
@@ -220,4 +234,23 @@ const _validateVckitHeaders = (headers: Record<string, string>) => {
   if (!_.isPlainObject(headers) || !_.every(headers, (value) => _.isString(value))) {
     throw new Error('VcKit headers defined in app config must be a plain object with string values');
   }
+};
+
+/**
+ * Validate the validity period of the credential
+ * @param validFrom - The date-time stamp when the credential was issued
+ * @param validUntil - The date-time stamp when the credential expires
+ * @returns boolean
+ *
+ * @example
+ * const validFrom = '2022-01-01T00:00:00Z';
+ * const validUntil = '2022-01-01T00:00:00Z';
+ * const isValid = validityPeriod(validFrom, validUntil);
+ * console.log(isValid); // Output: true
+ */
+const validityPeriod = (validFrom: string, validUntil: string): boolean => {
+  const validFromDate = new Date(validFrom);
+  const validUntilDate = new Date(validUntil);
+
+  return validFromDate <= validUntilDate;
 };

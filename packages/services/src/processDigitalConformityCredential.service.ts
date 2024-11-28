@@ -34,6 +34,15 @@ export const processDigitalConformityCredential: IService = async (
 
   const credentialId = generateUUID();
 
+  const restOfVC: any = {
+    id: `urn:uuid:${credentialId}`,
+    render: digitalConformityCredential.renderTemplate,
+  };
+
+  if (digitalConformityCredential.validUntil) {
+    restOfVC.validUntil = digitalConformityCredential.validUntil;
+  }
+
   const vc: VerifiableCredential = await issueVC({
     credentialSubject: digitalConformityCredentialData.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
@@ -41,10 +50,7 @@ export const processDigitalConformityCredential: IService = async (
     issuer: vckit.issuer,
     context: digitalConformityCredential.context,
     type: digitalConformityCredential.type,
-    restOfVC: {
-      id: `urn:uuid:${credentialId}`,
-      render: digitalConformityCredential.renderTemplate,
-    },
+    restOfVC,
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(vc);
