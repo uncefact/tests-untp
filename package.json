@@ -14,7 +14,7 @@
     "build:components": "cd packages/components && yarn run build",
     "build:untp-test-suite": "cd packages/untp-test-suite && yarn run build",
     "build-clean": "rimraf --glob ./yarn.lock ./node_modules ./packages/*/tsconfig.tsbuildinfo ./packages/*/build ./packages/*/node_modules",
-    "test": "lerna exec -- yarn jest --passWithNoTests",
+    "test": "lerna exec -- yarn jest",
     "test:coverage": "lerna exec -- yarn jest --coverage && rm -rf coverage && istanbul-merge --out coverage/coverage-final.json packages/*/coverage/coverage-final.json && nyc report --temp-dir=./coverage --reporter=html --reporter=json-summary",
     "test:components": "cd packages/components && yarn run test",
     "test:services": "cd packages/services && yarn run test",

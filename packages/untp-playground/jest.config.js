@@ -34,4 +34,5 @@ module.exports = {
       },
     ],
   },
+  passWithNoTests: true, // TODO: remove this after adding tests
 };
