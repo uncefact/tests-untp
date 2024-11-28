@@ -34,8 +34,7 @@ The `restOfVC` object contains any additional properties that are a part of the 
 
 The `renderer` object contains the render template used in VCkit.
 
-| Property | Required | Description                | Type   |
-| -------- | -------- | -------------------------- | ------ |
-| template     | Yes      | value of template    | String |
-| @type     | Yes      | type of template    | String |
-
+| Property | Required | Description       | Type   |
+| -------- | -------- | ----------------- | ------ |
+| template | Yes      | value of template | String |
+| @type    | Yes      | type of template  | String |
