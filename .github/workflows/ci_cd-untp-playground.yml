@@ -32,8 +32,10 @@ jobs:
       - name: aws_login_uncefact
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::651690125008:role/tests_untp
+          role-to-assume: ${{env.AWS_ROLE_TO_ASSUME}}
           aws-region: us-east-1
+        env:
+          AWS_ROLE_TO_ASSUME: ${{ secrets.UNCEFACT_AWS_ROLE_TO_ASSUME}}
 
 
       - name: Setup Node LTS ✨
@@ -79,8 +81,10 @@ jobs:
       - name: aws_login_uncefact
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::651690125008:role/tests_untp
+          role-to-assume: ${{env.AWS_ROLE_TO_ASSUME}}
           aws-region: us-east-1
+        env:
+          AWS_ROLE_TO_ASSUME: ${{ secrets.UNCEFACT_AWS_ROLE_TO_ASSUME}}
 
 
       - name: Setup Node LTS ✨
