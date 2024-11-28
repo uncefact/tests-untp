@@ -17,7 +17,7 @@ NEXT_PUBLIC_ASSET_PREFIX: /untp-playground
 NEXT_PUBLIC_IMAGE_PATH: /untp-playground/_next/image
 ```
 
-GitHub OIDC is configured in AWS account for GitHub Actions workflow to assume and run the deployment using Pulumi.
+GitHub OIDC is configured in AWS account for GitHub Actions workflow to assume and run the deployment using Pulumi. The role to assume is set as a repository secret `UNCEFACT_AWS_ROLE_TO_ASSUME`.
 Pulume security prodiver for config is set to awskms.
 The same backend state bucket and kms key are used for both test and prod Pulumi stacks.  
 
