@@ -8,6 +8,7 @@ on:
       - 'cd/**'
     paths:
       - 'packages/untp-playground/**'
+      - '.github/workflows/ci_cd-untp-playground.yml'
 
 jobs:
   #todo: add running tests job
