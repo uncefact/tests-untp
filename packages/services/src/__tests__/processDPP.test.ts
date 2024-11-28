@@ -63,8 +63,23 @@ describe('processDPP', () => {
 
     it('should call process DPP', async () => {
       const mockVerifyURL = 'https://example.com/vc.json';
-      (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+      (uploadData as jest.Mock).mockResolvedValueOnce({
+        uri: 'https://exampleStorage.com/vc.json',
+        key: '123',
+        hash: 'ABC123',
+      });
       (constructVerifyURL as jest.Mock).mockReturnValueOnce(mockVerifyURL);
+
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '9359502000010' },
+        qualifiers: [
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
+      });
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/10/ABC123');
 
       jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
         primary: { ai: '01', value: '9359502000010' },
@@ -131,8 +146,18 @@ describe('processDPP', () => {
         },
       };
 
-      (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+      (uploadData as jest.Mock).mockResolvedValueOnce({
+        uri: 'https://exampleStorage.com/vc.json',
+        key: '123',
+        hash: 'ABC123',
+      });
       (constructVerifyURL as jest.Mock).mockReturnValueOnce('https://example.com/vc.json');
+
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '0123456789' },
+        qualifiers: [],
+      });
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/');
 
       jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
         primary: { ai: '01', value: '0123456789' },

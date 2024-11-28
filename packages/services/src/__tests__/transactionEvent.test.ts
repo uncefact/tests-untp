@@ -74,7 +74,11 @@ describe('processTransactionEvent', () => {
   it('should process transaction event', async () => {
     (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
     (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue(transactionVCMock);
-    (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+    (uploadData as jest.Mock).mockResolvedValueOnce({
+      uri: 'https://exampleStorage.com/vc.json',
+      key: '123',
+      hash: 'ABC123',
+    });
     (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
 
     jest
@@ -219,7 +223,11 @@ describe('processTransactionEvent', () => {
         dlr: { ...context.dlr, dlrAPIUrl: 'http://invalid-dlr.com' },
       };
       (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
-      (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+      (uploadData as jest.Mock).mockResolvedValueOnce({
+        uri: 'https://exampleStorage.com/vc.json',
+        key: '123',
+        hash: 'ABC123',
+      });
       (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
 
       jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
@@ -258,7 +266,11 @@ describe('processTransactionEvent', () => {
     };
 
     (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
-    (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+    (uploadData as jest.Mock).mockResolvedValueOnce({
+      uri: 'https://exampleStorage.com/vc.json',
+      key: '123',
+      hash: 'ABC123',
+    });
     (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
     jest
       .spyOn(validateContext, 'validateTraceabilityEventContext')

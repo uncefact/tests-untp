@@ -651,24 +651,6 @@
               "name": "CustomButton",
               "type": "Submit",
               "props": {}
-            },
-            {
-              "name": "BarcodeGenerator",
-              "type": "Result",
-              "props": {
-                "dataPath": {
-                  "primary": {
-                    "ai": "01",
-                    "path": "/decodedEnvelopedVC/credentialSubject/registeredId"
-                  },
-                  "qualifiers": [
-                    {
-                      "ai": "10",
-                      "path": "/decodedEnvelopedVC/credentialSubject/batchNumber"
-                    }
-                  ]
-                }
-              }
             }
           ],
           "services": [
@@ -1370,18 +1352,6 @@
               "name": "CustomButton",
               "type": "Submit",
               "props": {}
-            },
-            {
-              "name": "BarcodeGenerator",
-              "type": "Result",
-              "props": {
-                "dataPath": {
-                  "primary": {
-                    "ai": "01",
-                    "path": "/decodedEnvelopedVC/credentialSubject/registeredId"
-                  }
-                }
-              }
             }
           ],
           "services": [
@@ -6037,7 +6007,10 @@
                     }
                   },
                   "identifierKeyPath": "/0/id",
-                  "localStorageParams": { "storageKey": "fumigation_and_freight_forwarding_facility_dpps", "keyPath": "/0/epcList/index/name" }
+                  "localStorageParams": {
+                    "storageKey": "fumigation_and_freight_forwarding_facility_dpps",
+                    "keyPath": "/0/epcList/index/name"
+                  }
                 }
               ]
             },
@@ -6937,7 +6910,10 @@
                     }
                   },
                   "identifierKeyPath": "/0/id",
-                  "localStorageParams": { "storageKey": "airport_terminal_facility_dpps", "keyPath": "/0/epcList/index/name" }
+                  "localStorageParams": {
+                    "storageKey": "airport_terminal_facility_dpps",
+                    "keyPath": "/0/epcList/index/name"
+                  }
                 }
               ]
             },
