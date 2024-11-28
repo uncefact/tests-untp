@@ -174,6 +174,7 @@ export const constructLinkResolver = (
 
 export const registerLinkResolver = async (
   url: string,
+  verifyURL: string,
   identificationKeyType: string,
   identificationKey: string,
   linkTitle: string,
@@ -190,9 +191,7 @@ export const registerLinkResolver = async (
     identificationKey: identificationKey,
     itemDescription: linkTitle,
   };
-  const query = encodeURIComponent(JSON.stringify({ payload: { uri: url } }));
-  const queryString = `q=${query}`;
-  const verificationPassportPage = `${verificationPage}/?${queryString}`;
+
   const linkResponses: ILinkResponse[] = [
     {
       linkType: `${namespace}:${LinkType.verificationLinkType}`,
@@ -209,7 +208,7 @@ export const registerLinkResolver = async (
     {
       linkType: `${namespace}:${linkType}`,
       linkTitle: linkTitle,
-      targetUrl: verificationPassportPage,
+      targetUrl: verifyURL,
       mimeType: MimeType.textHtml,
       defaultLinkType: true,
       defaultIanaLanguage: true,
@@ -222,7 +221,6 @@ export const registerLinkResolver = async (
     namespace,
     linkResolver,
     linkResponses,
-    queryString,
     dlrAPIKey,
     qualifierPath: qualifierPath ?? '/',
     responseLinkType,

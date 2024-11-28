@@ -1,7 +1,6 @@
 import { W3CVerifiableCredential } from '@vckit/core-types';
 import { IDppContext, IService } from './types/index.js';
-import { generateUUID } from './utils/helpers.js';
-
+import { constructVerifyURL, generateUUID } from './utils/helpers.js';
 import { uploadData } from './storage.service.js';
 import { decodeEnvelopedVC, issueVC } from './vckit.service.js';
 import { validateContextDPP } from './validateContext.js';
@@ -45,11 +44,13 @@ export const processDPP: IService = async (data: any, context: IDppContext): Pro
     const decodedEnvelopedVC = decodeEnvelopedVC(vc);
 
     const storageContext = context.storage;
-    const vcUrl = await uploadData(storageContext, vc, credentialId);
+    const { uri, key, hash } = await uploadData(storageContext, vc, credentialId);
+    const verifyURL = constructVerifyURL({ uri, key, hash });
 
     const linkResolverContext = context.dlr;
     const linkResolver = await registerLinkResolver(
-      vcUrl,
+      uri,
+      verifyURL,
       aiData.primary.ai,
       identifier,
       dppContext.dlrLinkTitle,

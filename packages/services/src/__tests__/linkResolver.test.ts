@@ -24,6 +24,7 @@ describe('create link resolve service', () => {
 
     const mockValue = {
       eventLink: 'https://localhost/epcis-transformation-event/1234',
+      eventVerifyLink: 'https://verify.com/dev/verifyCredential?q=https://localhost/epcis-transformation-event/1234&key=123&hash=abcde123',
       identificationKeyType: '01',
       identificationKey: 'gtin-key',
       itemDescription: 'EPCIS transformation event VC',
@@ -37,6 +38,7 @@ describe('create link resolve service', () => {
 
     const resolverUrl = await registerLinkResolver(
       mockValue.eventLink,
+      mockValue.eventVerifyLink,
       mockValue.identificationKeyType,
       mockValue.identificationKey,
       mockValue.itemDescription,
@@ -67,6 +69,7 @@ describe('create link resolve service', () => {
 
     const mockValue = {
       eventLink: 'https://localhost/epcis-transformation-event/1234',
+      eventVerifyLink: 'https://verify.com/dev/verifyCredential?q=https://localhost/epcis-transformation-event/1234&key=123&hash=abcde123',
       identificationKeyType: '01',
       identificationKey: 'gtin-key',
       itemDescription: 'EPCIS transformation event VC',
@@ -80,6 +83,7 @@ describe('create link resolve service', () => {
 
     const resolverUrl = await registerLinkResolver(
       mockValue.eventLink,
+      mockValue.eventVerifyLink,
       mockValue.identificationKeyType,
       mockValue.identificationKey,
       mockValue.itemDescription,
@@ -111,6 +115,7 @@ describe('create link resolve service', () => {
 
     const mockValue = {
       eventLink: 'https://localhost/epcis-transformation-event/1234',
+      eventVerifyLink: 'https://verify.com/dev/verifyCredential?q=https://localhost/epcis-transformation-event/1234&key=123&hash=abcde123',
       identificationKeyType: '01',
       identificationKey: 'gtin-key',
       itemDescription: 'EPCIS transformation event VC',
@@ -124,6 +129,7 @@ describe('create link resolve service', () => {
 
     const resolverUrl = await registerLinkResolver(
       mockValue.eventLink,
+      mockValue.eventVerifyLink,
       mockValue.identificationKeyType,
       mockValue.identificationKey,
       mockValue.itemDescription,

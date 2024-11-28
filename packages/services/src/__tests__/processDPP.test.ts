@@ -4,6 +4,7 @@ import { uploadData } from '../storage.service';
 import { registerLinkResolver, LinkType } from '../linkResolver.service';
 import * as identifierSchemeServices from '../identifierSchemes/identifierSchemeServices';
 import { contextDPP, dataDPP } from './mocks/constants';
+import { constructVerifyURL } from '../utils/helpers';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
@@ -23,6 +24,10 @@ jest.mock('../linkResolver.service', () => ({
     epcisLinkType: 'gs1:epcis',
     sustainabilityInfo: 'sustainabilityInfo',
   },
+}));
+jest.mock('../utils/helpers', () => ({
+  ...jest.requireActual('../utils/helpers'),
+  constructVerifyURL: jest.fn(),
 }));
 
 describe('processDPP', () => {
@@ -57,9 +62,8 @@ describe('processDPP', () => {
     });
 
     it('should call process DPP', async () => {
-      (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
-        return `${url}/${dataDPP.data.herd.identifier}`;
-      });
+      (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+      (constructVerifyURL as jest.Mock).mockReturnValueOnce('https://example.com/vc.json');
 
       jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
         primary: { ai: '01', value: '9359502000010' },
@@ -72,9 +76,10 @@ describe('processDPP', () => {
       });
       jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/10/ABC123');
 
-      (registerLinkResolver as jest.Mock).mockImplementation(
+      (registerLinkResolver as jest.Mock).mockImplementationOnce(
         (
           url,
+          verifyURL,
           identificationKeyType: string,
           identificationKey: string,
           linkTitle,
@@ -101,6 +106,7 @@ describe('processDPP', () => {
       const dlrContext = contextDPP.dlr;
       expect(registerLinkResolver).toHaveBeenCalledWith(
         expect.any(String),
+        'https://example.com/vc.json',
         '01',
         dataDPP.data.herd.identifier,
         dppContext.dlrLinkTitle,
@@ -124,9 +130,8 @@ describe('processDPP', () => {
         },
       };
 
-      (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
-        return `${url}/${dataDPP.data.herd.identifier}`;
-      });
+      (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+      (constructVerifyURL as jest.Mock).mockReturnValueOnce('https://example.com/vc.json');
 
       jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
         primary: { ai: '01', value: '0123456789' },
@@ -137,6 +142,7 @@ describe('processDPP', () => {
       (registerLinkResolver as jest.Mock).mockImplementation(
         (
           url,
+          verifyURL,
           identificationKeyType: string,
           identificationKey: string,
           linkTitle,

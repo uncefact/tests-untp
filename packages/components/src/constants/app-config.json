@@ -651,24 +651,6 @@
               "name": "CustomButton",
               "type": "Submit",
               "props": {}
-            },
-            {
-              "name": "BarcodeGenerator",
-              "type": "Result",
-              "props": {
-                "dataPath": {
-                  "primary": {
-                    "ai": "01",
-                    "path": "/decodedEnvelopedVC/credentialSubject/registeredId"
-                  },
-                  "qualifiers": [
-                    {
-                      "ai": "10",
-                      "path": "/decodedEnvelopedVC/credentialSubject/batchNumber"
-                    }
-                  ]
-                }
-              }
             }
           ],
           "services": [
@@ -705,9 +687,8 @@
                     "linkRegisterPath": "/api/resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/v1/documents",
+                    "url": "http://localhost:3334/v1/credentials",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -1371,18 +1352,6 @@
               "name": "CustomButton",
               "type": "Submit",
               "props": {}
-            },
-            {
-              "name": "BarcodeGenerator",
-              "type": "Result",
-              "props": {
-                "dataPath": {
-                  "primary": {
-                    "ai": "01",
-                    "path": "/decodedEnvelopedVC/credentialSubject/registeredId"
-                  }
-                }
-              }
             }
           ],
           "services": [
@@ -1421,7 +1390,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -1647,7 +1615,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -2594,7 +2561,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -2771,7 +2737,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -2952,7 +2917,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -3133,7 +3097,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -3335,7 +3298,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -3836,7 +3798,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -4253,7 +4214,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -4916,7 +4876,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -5137,7 +5096,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -5818,7 +5776,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -6039,7 +5996,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -6720,7 +6676,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {
@@ -6941,7 +6896,6 @@
                   "storage": {
                     "url": "http://localhost:3334/v1/documents",
                     "params": {
-                      "resultPath": "/uri",
                       "bucket": "verifiable-credentials"
                     },
                     "options": {

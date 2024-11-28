@@ -8,7 +8,7 @@ import { uploadData } from '../storage.service';
 import { registerLinkResolver } from '../linkResolver.service';
 import { IEntityIssue } from '../types';
 import { contextTransformationEvent, dataTransformationEvent } from './mocks/constants';
-import { generateUUID } from '../utils';
+import { constructVerifyURL, generateUUID } from '../utils';
 
 jest.mock('../vckit.service', () => ({
   issueVC: jest.fn(),
@@ -29,6 +29,10 @@ jest.mock('../linkResolver.service', () => ({
     epcisLinkType: 'gs1:epcis',
     traceability: 'traceability',
   },
+}));
+jest.mock('../utils', () => ({
+  ...jest.requireActual('../utils'),
+  constructVerifyURL: jest.fn(),
 }));
 
 describe('Transformation event', () => {
@@ -52,64 +56,12 @@ describe('Transformation event', () => {
 
         return Promise.resolve(expectResult);
       });
-
-      // (epcisTransformationCrendentialSubject as jest.Mock).mockImplementation((inputItems) => {
-      //   const detailOfProducts: any = contextTransformationEvent.productTransformation.outputItems;
-      //   const convertProductToObj = detailOfProducts.reduce((accumulator: any, item: any) => {
-      //     accumulator[item.productID] = item;
-      //     return accumulator;
-      //   }, {});
-
-      //   const outputItemList = detailOfProducts.map((itemOutput: any) => {
-      //     return {
-      //       productID: itemOutput,
-      //       link: `${contextTransformationEvent.dlr.dlrAPIUrl}/gtin/${itemOutput}?linkType=gs1:certificationInfo`,
-      //       name: convertProductToObj[itemOutput]?.productClass,
-      //     };
-      //   });
-
-      //   const inputItemObj = inputItems?.map((item: string) => {
-      //     return {
-      //       productID: item,
-      //       link: `${contextTransformationEvent.dlr.dlrAPIUrl}/nlisid/${item}?linkType=gs1:certificationInfo`,
-      //       name: 'Cattle',
-      //     };
-      //   });
-
-      //   const countInputItems = fillArray(inputItems, contextTransformationEvent.productTransformation.inputItems);
-
-      //   return {
-      //     eventID: '1234',
-      //     eventType: 'Transformation',
-      //     eventTime: 'Mon, 20 Feb 2023 8:26:54 GMT',
-      //     actionCode: 'observe',
-      //     dispositionCode: 'active',
-      //     businessStepCode: 'packing',
-      //     readPointId: '48585',
-      //     locationId: 'https://plus.codes/4RRG6MJF+C6X',
-      //     inputItemList: inputItemObj,
-      //     inputQuantityList: countInputItems.map((item: IInputItems) => ({
-      //       productClass: item.productClass,
-      //       quantity: item.quantity,
-      //       uom: item.uom,
-      //     })),
-      //     outputItemList,
-      //   };
-      // });
-
-      // const vc = await issueEpcisTransformationEvent(
-      //   contextTransformationEvent.vckit,
-      //   contextTransformationEvent.epcisTransformationEvent as IEntityIssue,
-      //   contextTransformationEvent.dlr,
-      //   contextTransformationEvent.productTransformation,
-      //   contextTransformationEvent.identifierKeyPath,
-      // );
-      // expect(vc).toEqual(expectResult);
     });
 
     it('should upload vc and return link to the uploaded json file', async () => {
-      let expectResult = 'http://localhost/epcis-transformation-event/1234';
-      (uploadData as jest.Mock).mockResolvedValue(expectResult);
+      let expectResult = { uri: 'http://localhost/epcis-transformation-event/1234', key: '123', hash: 'ABC123' };
+      (uploadData as jest.Mock).mockResolvedValueOnce(expectResult);
+      (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
       const mockVc = {
         '@context': ['https://www.w3.org/2018/credentials/v1'],
         type: ['VerifiableCredential', 'MockEvent'],
@@ -150,7 +102,6 @@ describe('Transformation event', () => {
           issuer: {
             id: value.issuer,
           },
-          // credentialSubject: value.credentialSubject, // TODO: currently, the value in credentialSubject will be overwritten by the last identifier
           render: value.render,
         };
 
@@ -160,15 +111,6 @@ describe('Transformation event', () => {
       let vc = {};
       const detailOfOutputProducts = contextTransformationEvent.productTransformation.outputItems;
       detailOfOutputProducts.map(async (outputItem) => {
-        // vc = await issueDPP(
-        //   contextTransformationEvent.vckit,
-        //   contextTransformationEvent.dpp,
-        //   dataTransformationEvent.data.NLIS.length,
-        //   `http://localhost/gtin/${outputItem.productID}?linkType=all`,
-        //   newData,
-        //   outputItem,
-        // );
-
         expect(vc).toEqual(expectResult);
       });
     });
@@ -193,12 +135,14 @@ describe('Transformation event', () => {
     });
 
     it('should call registerLinkResolver transformation event', async () => {
-      (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
-        return `${url}/${path}`;
-      });
+      (uploadData as jest.Mock)
+        .mockResolvedValueOnce({ uri: 'http://localhost/epcis-transformation-event/1234', key: '123', hash: 'ABC123' })
+        .mockResolvedValueOnce({ uri: 'http://localhost/dpp-event/1234', key: '123', hash: 'ABC123' });
+      (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
       (registerLinkResolver as jest.Mock).mockImplementation(
         (
           url,
+          verifyURL,
           identificationKeyType: string,
           identificationKey: string,
           linkTitle,
@@ -364,6 +308,9 @@ describe('Transformation event', () => {
     });
 
     it('should throw error when context is empty productTransformation field', async () => {
+      (uploadData as jest.Mock)
+        .mockResolvedValueOnce({ uri: 'http://localhost/transformation-event/1234', key: '123', hash: 'ABC123' })
+        .mockResolvedValueOnce({ uri: 'http://localhost/dpp/1234', key: '123', hash: 'ABC123' });
       const newContext = {
         ...contextTransformationEvent,
         productTransformation: [],
