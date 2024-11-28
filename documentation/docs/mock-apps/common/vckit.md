@@ -13,8 +13,29 @@ The `VCkit` object contains configuration details for the [Verifiable Credential
 
 ## Definition
 
-| Property    | Required | Description                                                                       | Type   |
-| ----------- | -------- | --------------------------------------------------------------------------------- | ------ |
-| vckitAPIUrl | Yes      | URL for the VCKit API                                                             | String |
-| issuer      | Yes      | Issuer identifier for the Verifiable Credential                                   | String |
-| headers     | No       | Custom headers to be included in the request to the Verifiable Credential service | Object |
+| Property    | Required | Description                                                                       | Type     |
+| ----------- | -------- | --------------------------------------------------------------------------------- | -------- |
+| vckitAPIUrl | Yes      | URL for the VCKit API                                                             | String   |
+| issuer      | Yes      | Issuer identifier for the Verifiable Credential                                   | String   |
+| headers     | No       | Custom headers to be included in the request to the Verifiable Credential service | Object   |
+| restOfVC    | No       | Contain any additional properties that are a part of the standard VC structure    | restOfVC |
+
+### restOfVC
+
+The `restOfVC` object contains any additional properties that are a part of the standard Verifiable Credential structure.
+
+| Property   | Required | Description                                                      | Type          |
+| ---------- | -------- | ---------------------------------------------------------------- | ------------- |
+| id         | No       | values include UUID and DIDs                                     | String        |
+| validUntil | No       | representing the date and time the credential ceases to be valid | DateTimeStamp |
+| render     | No       | render template used in VCkit                                    | renderer      |
+
+### renderer
+
+The `renderer` object contains the render template used in VCkit.
+
+| Property | Required | Description                | Type   |
+| -------- | -------- | -------------------------- | ------ |
+| template     | Yes      | value of template    | String |
+| @type     | Yes      | type of template    | String |
+
