@@ -8,3 +8,4 @@ jest.*.config.*
 integration
 node_modules
 .next
+packages/untp-playground/infra
