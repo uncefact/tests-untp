@@ -4,9 +4,7 @@ describe('checkStoredCredentials', () => {
   it('should return the stored credentials if they are valid', () => {
     const storedCredentials = {
       url: 'https://example.com',
-      params: {
-        resultPath: '',
-      },
+      params: {},
     };
 
     const result = checkStoredCredentialsConfig(storedCredentials);
@@ -23,9 +21,7 @@ describe('checkStoredCredentials', () => {
   it('should throw an error if the stored credentials url is invalid', () => {
     const storedCredentials = {
       url: '',
-      params: {
-        resultPath: '',
-      },
+      params: {},
     };
 
     const result = checkStoredCredentialsConfig(storedCredentials);

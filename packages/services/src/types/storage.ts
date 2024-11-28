@@ -4,7 +4,6 @@ export type StorageServiceOptions = {
 };
 
 export type StorageServiceParams = {
-  resultPath: string;
   [key: string]: any;
 };
 

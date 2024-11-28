@@ -294,6 +294,24 @@ describe('constructVerifyURL', () => {
     expect(result).toBe(expectedURL);
   });
 
+  it('should construct the correct verify URL with URI and hash', () => {
+    const uri = 'http://example.com/credential';
+    const hash = 'someHash';
+    const result = constructVerifyURL({ uri, hash });
+    
+    const expectedURL = 'http://localhost:3000/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22hash%22%3A%22someHash%22%7D%7D';
+    expect(result).toBe(expectedURL);
+  });
+
+  it('should construct the correct verify URL with URI and key', () => {
+    const uri = 'http://example.com/credential';
+    const key = 'someKey';
+    const result = constructVerifyURL({ uri, key });
+    
+    const expectedURL = 'http://localhost:3000/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22key%22%3A%22someKey%22%7D%7D';
+    expect(result).toBe(expectedURL);
+  });
+
   it('should construct the correct verify URL with URI, key, and hash', () => {
     const uri = 'http://example.com/credential';
     const key = 'someKey';

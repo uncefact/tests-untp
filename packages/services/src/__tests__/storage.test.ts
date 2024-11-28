@@ -1,4 +1,4 @@
-import { storageService } from '../storage.service';
+import { storageService, uploadData } from '../storage.service';
 import { publicAPI } from '../utils/httpService';
 
 jest.mock('../utils/httpService', () => ({
@@ -36,7 +36,6 @@ describe('storage service', () => {
       params: {
         data: credentialPayload,
         path: path,
-        resultPath: '',
       },
     });
     expect(url).toEqual({
@@ -55,7 +54,6 @@ describe('storage service', () => {
       params: {
         data: credentialPayload,
         path: path,
-        resultPath: '/url',
       },
       options: {
         method: 'PUT',
@@ -74,7 +72,6 @@ describe('storage service', () => {
         params: {
           data: {},
           path: 'bachelorDegree/vc.json',
-          resultPath: '',
         },
       });
     } catch (error) {
@@ -90,7 +87,6 @@ describe('storage service', () => {
         params: {
           data: {},
           path: 'bachelorDegree/vc.json',
-          resultPath: '',
         },
         options: {
           method: 'PUT',
@@ -107,7 +103,6 @@ describe('storage service', () => {
       await storageService({
         url: 'https://storage.com',
         params: {
-          resultPath: '',
         },
         options: {
           //@ts-ignore

@@ -55,7 +55,6 @@ The ConformityCredential component allows users to request and manage conformity
     "storedCredentialsConfig": {
       "url": "http://localhost:3334/v1/documents",
       "params": {
-        "resultPath": "/uri",
         "bucket": "verifiable-credentials"
       },
       "options": {

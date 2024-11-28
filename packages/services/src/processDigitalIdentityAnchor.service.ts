@@ -2,7 +2,7 @@ import { VerifiableCredential } from '@vckit/core-types';
 import { registerLinkResolver, LinkType } from './linkResolver.service.js';
 import { uploadData } from './storage.service.js';
 import { IService } from './types/IService.js';
-import { generateUUID } from './utils/helpers.js';
+import { constructIdentifierString, constructVerifyURL, generateUUID } from './utils/helpers.js';
 import { decodeEnvelopedVC, issueVC } from './vckit.service.js';
 import { ITraceabilityEvent, IDigitalIdentityAnchorContext } from './types/index.js';
 import { validateDigitalIdentityAnchorContext } from './validateContext.js';
@@ -48,10 +48,13 @@ export const processDigitalIdentityAnchor: IService = async (
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(vc);
-  const vcUrl = await uploadData(storage, vc, credentialId);
+
+  const { uri, key, hash } = await uploadData(storage, vc, credentialId);
+  const verifyURL = constructVerifyURL({ uri, key, hash });
 
   const linkResolver = await registerLinkResolver(
-    vcUrl,
+    uri,
+    verifyURL,
     aiData.primary.ai,
     identifier,
     digitalIdentityAnchor.dlrLinkTitle,

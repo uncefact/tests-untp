@@ -424,7 +424,49 @@ describe('Verify', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Hash invalid')).toBeInTheDocument();
+      expect(screen.getByText('Failed to compare the hash in the verify URL with the VC hash.')).toBeInTheDocument();
+    });
+  });
+
+  it('should show error screen when the key is invalid', async () => {
+    const mockPayloadInvalidKey = {
+      payload: {
+        uri: 'http://localhost:3334/v1/verifiable-credentials/6c70251a-f2e7-48a0-a86c-e1027f0e7143.json',
+        hash: '595d8d20c586c6f55f8a758f294674fa85069db5c518a0f4cbbd3fd61f46522f',
+        key: 'invalid-key',
+      },
+    };
+    const mockEncryptedCredential = {
+      cipherText: '+qygK55Jq2S/VmhI8xxHr6JQZbZpM2UbwwPtXgYAh6Opn8Re0y+VStefzXgk3KVRYeaZd+/WZv/Nm3XXdxouGqk2toWHZtAnYAW',
+      iv: 'HMFLTHEabOowe0pj',
+      tag: '0B6Js19du2TJ0ADdYe2Ipw==',
+      type: 'aes-256-gcm'
+  };
+    // URL-encode the payload for use as a query parameter
+    const encodedPayload = `q=${encodeURIComponent(JSON.stringify(mockPayloadInvalidKey))}`;
+    (useLocation as any).mockImplementation(() => ({
+      search: encodedPayload,
+    }));
+
+    jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockEncryptedCredential);
+
+    (computeHash as any).mockImplementation(() => mockPayloadInvalidKey.payload.hash);
+    (decryptCredential as any).mockImplementation(() => { throw new Error('Failed to decrypt credential') });
+
+    (verifyVC as jest.Mock).mockImplementation(() => ({
+      verified: true,
+    }));
+
+    await act(async () => {
+      render(
+        <RouterDom location={history.location} navigator={history}>
+          <Verify />
+        </RouterDom>,
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to decrypt credential.')).toBeInTheDocument();
     });
   });
 });

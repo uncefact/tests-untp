@@ -43,10 +43,8 @@ const Scanning = () => {
   };
 
   const redirectToVerifyPage = (verifyDlrPassportUri: string) => {
-    const queryPayload = JSON.stringify({ payload: { uri: verifyDlrPassportUri } });
-    const queryString = `q=${encodeURIComponent(queryPayload)}`;
-
-    navigate(`/verify?${queryString}`);
+    const urlComponents = new URL(verifyDlrPassportUri);
+    navigate(`${urlComponents.pathname}${urlComponents.search}`);
   };
 
   React.useEffect(() => {
