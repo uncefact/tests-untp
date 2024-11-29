@@ -46,4 +46,11 @@ curl -X POST \
   -H 'Content-Type: application/json' \
   -d @"$IDENTIFIER_FILE"
 
+curl -X POST \
+  http://${IDR_SERVICE_HOST}:${IDR_SERVICE_PORT}/api/identifiers \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer ${IDR_SERVICE_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d @"$ATO_IDENTIFIER_FILE"
+
 printf "\nSeeding ${SERVICE_NAME} service data complete!\n\n"
