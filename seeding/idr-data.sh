@@ -10,6 +10,9 @@ RETRY_COUNT=0
 # Path to the IDR identifier JSON file
 IDENTIFIER_FILE="./seeding/idr-identifier.json"
 
+# Path to the IDR identifier JSON file for ato namespace
+ATO_IDENTIFIER_FILE="./seeding/idr-identifier.ato.json"
+
 # Wait for the service to be available
 echo "Waiting for ${SERVICE_NAME} service to be ready..."
 
