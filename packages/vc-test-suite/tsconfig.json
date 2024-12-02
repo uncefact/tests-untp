@@ -9,7 +9,7 @@
     "noImplicitThis": false,
     "noImplicitAny": false,
     "resolveJsonModule": true,
-    "moduleResolution": "Node"
+    "moduleResolution": "node"
   },
   "include": [
     "tests/**/*.ts"

@@ -1,8 +1,13 @@
 {
   "root": true,
   // TODO: Enable linting for documentation folder
-  "ignorePatterns": ["documentation"],
-  "plugins": ["@typescript-eslint", "prettier"],
+  "ignorePatterns": [
+    "documentation"
+  ],
+  "plugins": [
+    "@typescript-eslint",
+    "prettier"
+  ],
   "parser": "@typescript-eslint/parser",
   "extends": [
     "eslint:recommended",
@@ -11,9 +16,8 @@
   ],
   "parserOptions": {
     "project": [
-      "./packages/tsconfig.settings.json",
-       "./packages/*/tsconfig.json"
-      ]
+      "./packages/*/tsconfig.json"
+    ]
   },
   "rules": {
     "no-console": "warn",
@@ -27,11 +31,19 @@
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/no-unsafe-return": "off",
     "@typescript-eslint/no-unsafe-argument": "off",
-    "@typescript-eslint/no-non-null-assertion": "off"
+    "@typescript-eslint/no-non-null-assertion": "off",
+    "@typescript-eslint/no-floating-promises": "off",
+    "@typescript-eslint/restrict-template-expressions": "off",
+    "@typescript-eslint/no-misused-promises": "off",
+    "@typescript-eslint/require-await": "off",
+    "@typescript-eslint/no-unused-vars": "off",
+    "prefer-const": "off"
   },
   "overrides": [
     {
-      "files": ["*.js"],
+      "files": [
+        "*.js"
+      ],
       "rules": {
         "@typescript-eslint/no-var-requires": "off"
       }

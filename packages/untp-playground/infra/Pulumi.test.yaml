@@ -1,0 +1,4 @@
+secretsprovider: awskms://alias/untp-pg-base?region=us-east-1
+encryptedkey: AQICAHiQPtPpMskboX6hzwJRSoxN1ESI7Hg9WiuyfnhBuWLLrAFxHhmNJ+lmjYpTAl3664O0AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMr1XsDGUO1y8LDkCEAgEQgDt2zh99T15QUYnynakVTBrJEAKRpniRKBpV2XmI4sasMA4mcRjW15kuyzDmiOqMRPB2n1e1PMX6nPYtKA==
+config:
+  appURL: "https://test.uncefact.org/test-untp-playground"
