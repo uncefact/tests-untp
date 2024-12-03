@@ -137,4 +137,19 @@ describe('Home Component', () => {
       expect(toast.error).not.toHaveBeenCalled();
     });
   });
+
+  it('handles error decoding credential', async () => {
+    (isEnvelopedProof as jest.Mock).mockImplementationOnce(() => {
+      throw new Error('Error decoding credential');
+    });
+
+    render(<Home />);
+
+    const uploader = screen.getByTestId('mock-uploader');
+    fireEvent.click(uploader);
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Failed to process credential');
+    });
+  });
 });
