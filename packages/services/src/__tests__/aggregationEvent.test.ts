@@ -59,6 +59,10 @@ describe('processAggregationEvent', () => {
     identifierKeyPath: '/0/parentItem/itemID',
   };
 
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('should process aggregation event', async () => {
     (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => aggregationVCMock);
     (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue(aggregationVCMock);
@@ -92,6 +96,47 @@ describe('processAggregationEvent', () => {
     expect(uploadData).toHaveBeenCalled();
     expect(validateContext.validateTraceabilityEventContext).toHaveBeenCalled();
     expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
+  });
+
+  it('should process aggregation event with validUntil', async () => {
+    (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => aggregationVCMock);
+    (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue(aggregationVCMock);
+    (uploadData as jest.Mock).mockResolvedValueOnce(aggregationEventDLRMock);
+
+    jest
+      .spyOn(validateContext, 'validateTraceabilityEventContext')
+      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
+    jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+      primary: { ai: '01', value: '0123456789' },
+      qualifiers: [
+        { ai: '21', value: '951350380' },
+        { ai: '10', value: 'ABC123' },
+      ],
+    });
+    jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/21/951350380/10/ABC123');
+
+    jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValueOnce(aggregationEventDLRMock);
+    const newContext = {
+      ...context,
+      traceabilityEvent: { ...context.traceabilityEvent, validUntil: '2025-12-31T23:59:59Z' },
+    };
+    const aggregationVC = await processAggregationEvent(aggregationEvent, newContext);
+
+    expect(aggregationVC).toEqual({
+      vc: aggregationVCMock,
+      decodedEnvelopedVC: aggregationVCMock,
+      linkResolver: aggregationEventDLRMock,
+    });
+    expect(uploadData).toHaveBeenCalled();
+    expect(validateContext.validateTraceabilityEventContext).toHaveBeenCalled();
+    expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
+    expect(vckitService.issueVC).toHaveBeenCalledWith(
+      expect.objectContaining({
+        restOfVC: expect.objectContaining({
+          validUntil: '2025-12-31T23:59:59Z',
+        }),
+      }),
+    );
   });
 
   it('should throw error if context validation throws an error', async () => {

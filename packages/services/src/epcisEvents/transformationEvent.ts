@@ -141,10 +141,15 @@ export const issueEpcisTransformationEvent = async (
   transformationEventCredentialId: string,
   data: any,
 ) => {
-  const restOfVC = {
+  const restOfVC: any = {
     id: `urn:uuid:${transformationEventCredentialId}`,
     render: epcisTransformationEvent.renderTemplate,
   };
+
+  if (epcisTransformationEvent.validUntil) {
+    restOfVC.validUntil = epcisTransformationEvent.validUntil;
+  }
+
   const values = Object.values(data);
 
   const credentialSubject: any = values.reduce((acc, item, index) => {
@@ -206,7 +211,11 @@ export const issueDPP = async (
   dppId: string,
   transformationEventData: { vc: VerifiableCredential; linkResolver: string },
 ) => {
-  const restOfVC = { id: `urn:uuid:${dppId}`, render: dppContext.renderTemplate };
+  const restOfVC: any = { id: `urn:uuid:${dppId}`, render: dppContext.renderTemplate };
+
+  if (dppContext.validUntil) {
+    restOfVC.validUntil = dppContext.validUntil;
+  }
 
   const dppCredentialSubject = constructObject({}, transformationEventData, dppCredential);
   const result: VerifiableCredential = await issueVC({

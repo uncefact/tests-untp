@@ -50,7 +50,8 @@ P-->>C: Return event VC and resolver URL
           }
         ],
         "dlrLinkTitle": "Traceability Event",
-        "dlrVerificationPage": "https://verify.example.com"
+        "dlrVerificationPage": "https://verify.example.com",
+        "validUntil": "2025-11-28T04:47:15.136Z"
       },
       "storage": {
         "url": "http://localhost:3334/v1/documents",
@@ -93,4 +94,3 @@ P-->>C: Return event VC and resolver URL
 | Type       | Description                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------ |
 | ReturnData | It processes the input data or generates data independently and returns the processed result after successful execution. |
-

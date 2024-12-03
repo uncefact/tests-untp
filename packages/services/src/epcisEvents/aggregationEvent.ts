@@ -25,6 +25,15 @@ export const processAggregationEvent: IService = async (
 
   const credentialId = generateUUID();
 
+  const restOfVC: any = {
+    id: `urn:uuid:${credentialId}`,
+    render: traceabilityEvent.renderTemplate,
+  };
+
+  if (traceabilityEvent.validUntil) {
+    restOfVC.validUntil = traceabilityEvent.validUntil;
+  }
+
   const aggregationVC = await issueVC({
     credentialSubject: aggregationEvent.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
@@ -32,10 +41,7 @@ export const processAggregationEvent: IService = async (
     issuer: vckit.issuer,
     context: traceabilityEvent.context,
     type: traceabilityEvent.type,
-    restOfVC: {
-      id: `urn:uuid:${credentialId}`,
-      render: traceabilityEvent.renderTemplate,
-    },
+    restOfVC,
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(aggregationVC);

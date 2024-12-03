@@ -58,12 +58,13 @@ P-->>C: Return association event VC and resolver URL
           }
         ],
         "dlrLinkTitle": "Association Event",
-        "dlrVerificationPage": "https://verify.example.com"
+        "dlrVerificationPage": "https://verify.example.com",
+        "validUntil": "2025-11-28T04:47:15.136Z"
       },
       "storage": {
         "url": "https://storage.example.com/upload",
         "params": {
-          "bucket": "bucket-name",
+          "bucket": "bucket-name"
         }
       },
       "dlr": {

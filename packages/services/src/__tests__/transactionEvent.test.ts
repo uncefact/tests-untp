@@ -108,6 +108,51 @@ describe('processTransactionEvent', () => {
     expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
   });
 
+  it('should process transaction event with validUntil', async () => {
+    (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
+    (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue(transactionVCMock);
+    (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
+      return `${url}/${path}`;
+    });
+
+    jest
+      .spyOn(validateContext, 'validateTraceabilityEventContext')
+      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<ITraceabilityEventContext>);
+    jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+      primary: { ai: '01', value: '9359502000010' },
+      qualifiers: [
+        {
+          ai: '10',
+          value: 'ABC123',
+        },
+      ],
+    });
+    jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/10/ABC123');
+    jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValueOnce(transactionEventDLRMock);
+
+    const newContext = {
+      ...context,
+      traceabilityEvent: { ...context.traceabilityEvent, validUntil: '2025-12-31T23:59:59Z' },
+    };
+    const transactionVC = await processTransactionEvent(transactionEvent, newContext);
+
+    expect(transactionVC).toEqual({
+      vc: transactionVCMock,
+      decodedEnvelopedVC: transactionVCMock,
+      linkResolver: transactionEventDLRMock,
+    });
+    expect(uploadData).toHaveBeenCalled();
+    expect(validateContext.validateTraceabilityEventContext).toHaveBeenCalled();
+    expect(linkResolverService.registerLinkResolver).toHaveBeenCalled();
+    expect(vckitService.issueVC).toHaveBeenCalledWith(
+      expect.objectContaining({
+        restOfVC: expect.objectContaining({
+          validUntil: '2025-12-31T23:59:59Z',
+        }),
+      }),
+    );
+  });
+
   it('should throw error if context validation throws an error', async () => {
     try {
       const invalidContext = {

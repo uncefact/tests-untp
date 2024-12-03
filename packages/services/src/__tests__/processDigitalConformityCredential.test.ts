@@ -65,6 +65,39 @@ describe('processDigitalConformityCredential', () => {
     expect(result.linkResolver).toEqual('https://example.com/link-resolver');
   });
 
+  it('should process digital conformity credential successfully with validUntil', async () => {
+    (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
+      credentialSubject: { id: 'https://example.com/123' },
+    }));
+    (uploadData as jest.Mock).mockResolvedValue('https://exampleStorage.com/vc.json');
+
+    jest
+      .spyOn(validateContext, 'validateDigitalConformityCredentialContext')
+      .mockReturnValueOnce({ ok: true, value: context } as unknown as Result<IDigitalConformityCredentialContext>);
+    jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+      primary: { ai: '01', value: '0123456789' },
+      qualifiers: [],
+    });
+    jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/');
+    jest.spyOn(linkResolverService, 'registerLinkResolver').mockResolvedValue('https://example.com/link-resolver');
+
+    const newContext = {
+      ...context,
+      digitalConformityCredential: { ...context.digitalConformityCredential, validUntil: '2025-12-31T23:59:59Z' },
+    };
+    const result = await processDigitalConformityCredential(digitalConformityCredentialData, newContext);
+
+    expect(result.vc).toEqual({ credentialSubject: { id: 'https://example.com/123' } });
+    expect(result.linkResolver).toEqual('https://example.com/link-resolver');
+    expect(vckitService.issueVC).toHaveBeenCalledWith(
+      expect.objectContaining({
+        restOfVC: expect.objectContaining({
+          validUntil: '2025-12-31T23:59:59Z',
+        }),
+      }),
+    );
+  });
+
   it('should throw error when context validation false', async () => {
     const invalidContext: any = { ...context };
     delete invalidContext.digitalConformityCredential;

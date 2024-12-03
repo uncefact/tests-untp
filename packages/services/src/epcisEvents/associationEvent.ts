@@ -34,6 +34,15 @@ export const processAssociationEvent: IService = async (
 
   const credentialId = generateUUID();
 
+  const restOfVC: any = {
+    id: `urn:uuid:${credentialId}`,
+    render: traceabilityEvent.renderTemplate,
+  };
+
+  if (traceabilityEvent.validUntil) {
+    restOfVC.validUntil = traceabilityEvent.validUntil;
+  }
+
   const associationEventVc: VerifiableCredential = await issueVC({
     credentialSubject: associationEvent.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
@@ -41,10 +50,7 @@ export const processAssociationEvent: IService = async (
     issuer: vckit.issuer,
     context: traceabilityEvent.context,
     type: traceabilityEvent.type,
-    restOfVC: {
-      id: `urn:uuid:${credentialId}`,
-      render: traceabilityEvent.renderTemplate,
-    },
+    restOfVC,
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(associationEventVc);

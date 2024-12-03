@@ -57,10 +57,6 @@ describe('processDPP', () => {
       });
     });
 
-    afterEach(() => {
-      jest.clearAllMocks();
-    });
-
     it('should call process DPP', async () => {
       const mockVerifyURL = 'https://example.com/vc.json';
       (uploadData as jest.Mock).mockResolvedValueOnce({
@@ -133,6 +129,53 @@ describe('processDPP', () => {
         dlrContext.namespace,
         dataDPP.qualifierPath,
         LinkType.sustainabilityInfo,
+      );
+    });
+
+    it('should call process DPP with validUntil', async () => {
+      (uploadData as jest.Mock).mockImplementation(({ url, _data, path }) => {
+        return `${url}/${dataDPP.data.herd.identifier}`;
+      });
+
+      jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
+        primary: { ai: '01', value: '9359502000010' },
+        qualifiers: [
+          {
+            ai: '10',
+            value: 'ABC123',
+          },
+        ],
+      });
+      jest.spyOn(identifierSchemeServices, 'constructQualifierPath').mockReturnValue('/10/ABC123');
+
+      (registerLinkResolver as jest.Mock).mockImplementation(
+        (
+          url,
+          identificationKeyType: string,
+          identificationKey: string,
+          linkTitle,
+          verificationPage,
+          dlrAPIUrl: string,
+          dlrAPIKey,
+        ) => {
+          return `${dlrAPIUrl}/${identificationKeyType}/${identificationKey}?linkType=all`;
+        },
+      );
+
+      const newContext = {
+        ...contextDPP,
+        dpp: { ...contextDPP.dpp, validUntil: '2025-12-31T23:59:59Z' },
+      };
+      await processDPP(dataDPP, newContext);
+      expect(uploadData).toHaveBeenCalled();
+      expect(registerLinkResolver).toHaveBeenCalled();
+
+      expect(issueVC).toHaveBeenCalledWith(
+        expect.objectContaining({
+          restOfVC: expect.objectContaining({
+            validUntil: '2025-12-31T23:59:59Z',
+          }),
+        }),
       );
     });
 

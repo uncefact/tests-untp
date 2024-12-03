@@ -34,6 +34,15 @@ export const processDigitalIdentityAnchor: IService = async (
 
   const credentialId = generateUUID();
 
+  const restOfVC: any = {
+    id: `urn:uuid:${credentialId}`,
+    render: digitalIdentityAnchor.renderTemplate,
+  };
+
+  if (digitalIdentityAnchor.validUntil) {
+    restOfVC.validUntil = digitalIdentityAnchor.validUntil;
+  }
+
   const vc: VerifiableCredential = await issueVC({
     credentialSubject: digitalIdentityAnchorData.data,
     vcKitAPIUrl: vckit.vckitAPIUrl,
@@ -41,10 +50,7 @@ export const processDigitalIdentityAnchor: IService = async (
     issuer: vckit.issuer,
     context: digitalIdentityAnchor.context,
     type: digitalIdentityAnchor.type,
-    restOfVC: {
-      id: `urn:uuid:${credentialId}`,
-      render: digitalIdentityAnchor.renderTemplate,
-    },
+    restOfVC,
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(vc);

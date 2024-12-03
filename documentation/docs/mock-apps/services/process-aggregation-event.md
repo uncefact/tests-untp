@@ -56,7 +56,8 @@ P-->>C: Return VC and resolver URL
           }
         ],
         "dlrLinkTitle": "Aggregation Event",
-        "dlrVerificationPage": "https://verify.example.com"
+        "dlrVerificationPage": "https://verify.example.com",
+        "validUntil": "2025-11-28T04:47:15.136Z"
       },
       "storage": {
         "url": "http://localhost:3334/v1/documents",
