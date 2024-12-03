@@ -22,6 +22,7 @@
     "test:untp-test-suite": "cd packages/untp-test-suite && yarn run test",
     "test:vc-test-suite": "cd packages/vc-test-suite && yarn run test",
     "test:integration:untp-test-suite": "cd packages/untp-test-suite && yarn run test:integration",
+    "test:untp-playground": "cd packages/untp-playground && yarn run test",
     "storybook:components": "cd packages/components && yarn run storybook",
     "storybook:mock-app": "cd packages/mock-app && yarn run storybook",
     "untp": "node ./packages/untp-test-suite/build/interfaces/cli/cli.js",

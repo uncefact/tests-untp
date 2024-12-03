@@ -49,6 +49,7 @@ jobs:
             Services, ./packages/services/coverage/coverage-summary.json
             UNTP test suite, ./packages/untp-test-suite/coverage/coverage-summary.json
             VC test suite, ./packages/vc-test-suite/coverage/coverage-summary.json
+            UNTP Playground, ./packages/untp-playground/coverage/coverage-summary.json
 
   build_docs:
     runs-on: ubuntu-latest

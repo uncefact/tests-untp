@@ -2,8 +2,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { toast } from 'sonner';
 import { decodeEnvelopedCredential, isEnvelopedProof } from '@/lib/credentialService';
 import { CredentialUploader } from '@/components/CredentialUploader';
-import Home from '../src/app/page';
-import { mockCredential } from './mocks/vc';
+import Home from '../../src/app/page';
+import { mockCredential } from '../mocks/vc';
 
 // Mock the dependencies
 jest.mock('sonner', () => ({
