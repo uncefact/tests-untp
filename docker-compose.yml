@@ -14,7 +14,8 @@ services:
       - /app/node_modules
 
   untp-playground:
-    build: packages/untp-playground
+    build:
+      context: packages/untp-playground
     ports:
       - '4000:3000'
     volumes:
