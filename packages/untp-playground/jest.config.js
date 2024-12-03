@@ -21,6 +21,7 @@ const config = {
   testEnvironment: 'jsdom',
   testMatch: ['**/__tests__/**/*.(spec|test).[jt]s?(x)', '**/?(*.)+(spec|test).[tj]s?(x)'],
   testPathIgnorePatterns: ['/node_modules/'],
+  modulePathIgnorePatterns: ['<rootDir>/build', '<rootDir>/dist', '<rootDir>/.next'],
 };
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
