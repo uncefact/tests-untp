@@ -615,8 +615,7 @@
             </div>
             <div class="data-two-columns border-bottom-gray-500">
               <div class="label">Geolocation</div>
-              {{!-- TODO: confirm --}}
-              <a href="https://www.google.com/maps/?q={{#each credentialSubject.locationInformation.geoLocation.coordinates}}{{this}},{{/each}}&ll={{#each credentialSubject.locationInformation.geoLocation.coordinates}}{{this}},{{/each}}&z=13" class="data-data-link" target="_blank">
+              <a href="https://www.google.com/maps?q={{lookup credentialSubject.locationInformation.geoLocation.coordinates 0}},{{lookup credentialSubject.locationInformation.geoLocation.coordinates 1}}&ll={{lookup credentialSubject.locationInformation.geoLocation.coordinates 0}},{{lookup credentialSubject.locationInformation.geoLocation.coordinates 1}}&z=13" class="data-data-link" target="_blank">
                 <div class="line-4">
                   <div class="line-2">Show on map</div>
                 </div>
