@@ -126,13 +126,13 @@ const appImage = new docker_build.Image(`app-image-${stack}`, {
   },
   // Use the pushed image as a cache source.
   cacheFrom: [{
-      /* registry: {
+      registry: {
           ref: pulumi.interpolate`${appRepository.repositoryUrl}:latest`,
-      }, */
+      },
   }],
   // Include an inline cache with our pushed image.
   cacheTo: [{
-      /* inline: {}, */
+      inline: {},
   }],
   platforms: [
       "linux/amd64",
