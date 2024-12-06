@@ -17,12 +17,12 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dfr/0.4.2/"]
+        "enum": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dfr/0.4.2/"]
       },
       "description": "A list of JSON-LD context URIs that define the semantic meaning of properties within the credential. ",
       "readOnly": true,
-      "const": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dfr/0.4.2/"],
-      "default": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/dfr/0.4.2/"]
+      "const": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dfr/0.4.2/"],
+      "default": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dfr/0.4.2/"]
     },
     "id": {
       "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",

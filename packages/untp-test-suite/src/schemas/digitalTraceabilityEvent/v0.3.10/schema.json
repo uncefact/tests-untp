@@ -1,6 +1,6 @@
 {
   "type": "object",
-  "additionalProperties": true,
+  "additionalProperties": false,
   "properties": {
     "type": {
       "type": "array",
@@ -23,16 +23,16 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dte/0.4.2/"]
+        "enum": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dte/0.3.10"]
       },
-      "description": "A list of JSON-LD context URIs that define the semantic meaning of properties within the credential. ",
+      "description": "A list of JSON-LD context URIs that define the seamntic meaning of prperties within the credential. ",
       "readOnly": true,
-      "const": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dte/0.4.2/"],
-      "default": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dte/0.4.2/"]
+      "const": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dte/0.3.10"],
+      "default": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dte/0.3.10"]
     },
     "issuer": {
       "$ref": "#/$defs/CredentialIssuer",
-      "description": "The organisation that is the issuer of this VC. Note that the \"id\" property MUST be a W3C DID.  Other identifiers such as tax registration numbers can be listed in the \"otherIdentifiers\" property."
+      "description": "The organisation that is the isuer of this VC. Note that the \"id\" property MUST be a W3C DID.  Other identifiers such as tax registration numbers can be listed in the \"otherIdentifiers\" property."
     },
     "validFrom": {
       "example": "2024-03-15T12:00:00",
@@ -48,7 +48,7 @@
       "description": "VC subject is the transaction event structure"
     }
   },
-  "description": "An array of Traceability Events as a VC",
+  "description": "Traceability Event as a VC",
   "required": ["id", "@context", "issuer"],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
@@ -77,29 +77,29 @@
           "type": "string",
           "description": "The name of the issuer person or organisation"
         },
-        "otherIdentifier": {
+        "otherIdentifiers": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/Identifier"
+            "$ref": "#/$defs/Entity"
           },
           "description": "An optional list of other registered identifiers for this credential issuer "
         }
       },
-      "description": "The issuer party (person or organisation) of a verifiable credential.",
+      "description": "The issuer party ()person or orgnaition) of a verifiable credential.",
       "required": ["id", "name"]
     },
-    "Identifier": {
+    "Entity": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": ["Identifier"],
-          "default": ["Identifier"],
+          "const": ["Entity"],
+          "default": ["Entity"],
           "items": {
             "type": "string",
-            "enum": ["Identifier"]
+            "enum": ["Entity"]
           }
         },
         "id": {
@@ -111,7 +111,7 @@
         "name": {
           "example": "EV battery 300Ah.",
           "type": "string",
-          "description": "The registered name of the entity within the identifier scheme.  Examples: product - EV battery 300Ah, Party - Sample Company Pty Ltd,  Facility - Green Acres battery factory"
+          "description": "The registered name of the entity within the identifier scheme.  Examplesproduct - EV battery 300Ahparty - Sample Company Pty Ltd. facility - Greenacres battery factory"
         },
         "registeredId": {
           "example": "90664869327",
@@ -120,10 +120,10 @@
         },
         "idScheme": {
           "$ref": "#/$defs/IdentifierScheme",
-          "description": "The identifier scheme.  Examples : Product - id.gs1.org/01,  Party - business.gov.au/abn,  Facility - did:web:facilities.acme.com. "
+          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
         }
       },
-      "description": "The ID and Name of an identified entity such as a product, facility, party, standard, etc.  If the identifier is a W3C DID then the corresponding DID document SHOULD include a serviceEndpoint of type \"IdentityResolver\". If the identifier is not a W3C DID then the id property SHOULD be an identity resolver URL.",
+      "description": "The ID and Name of an identified entity such qs a product, facility, party, standard, etc.  If the identifier is a W3C DID then the corresponding DID document SHOULD include a serviceEndpoint of type \"IdentityResolver\". If the identifier is not a W3C DID then the id peroperty SHOULD be an identity resolver URL.",
       "required": ["id", "name"]
     },
     "IdentifierScheme": {
@@ -152,7 +152,7 @@
           "description": "The name of the identifier scheme. "
         }
       },
-      "description": "An identifier registration scheme for products, facilities, or organisations. Typically operated by a state, national or global authority."
+      "description": "An identifier registration scheme for products, facilities, or organisations. Typically operated by a state, national or gloabl authority."
     },
     "TransformationEvent": {
       "type": "object",
@@ -175,11 +175,6 @@
           "format": "uri",
           "description": "The unique identifier of this event - SHOULD be a UUID"
         },
-        "processType": {
-          "example": "Weaving",
-          "type": "string",
-          "description": "A human readable name for industry specific process represented by this event."
-        },
         "eventTime": {
           "example": "2024-09-01T12:00:00",
           "type": "string",
@@ -190,7 +185,7 @@
           "type": "string",
           "enum": ["observe", "add", "delete"],
           "example": "observe",
-          "description": "Code describing how an event relates to the life-cycle of the entity impacted by the event."
+          "description": "Code describing how an event relates to the lifecycle of the entity impacted by the event."
         },
         "disposition": {
           "type": "string",
@@ -206,7 +201,7 @@
           "example": "https://id.gs1.org/414/9520123456788",
           "type": "string",
           "format": "uri",
-          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an event until it is reported to be at a different Business Location by a subsequent event. The bizLocation must be a resolvable URI that links to facility information and geo-location data."
+          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an EPCIS event until it is reported to be at a different Business Location by a subsequent EPCIS event. The bizLocation must be a resolvable URI that links to facility information and geolocation data."
         },
         "sensorElementList": {
           "type": "array",
@@ -242,6 +237,12 @@
             "$ref": "#/$defs/QuantityElement"
           },
           "description": "The quantified list of product classes that are the output of this transformation event - used when each item does not have a unique identity.  for example a count of the bales of cleaned cotton that are the output of a ginning process."
+        },
+        "processType": {
+          "example": "https://textileIndustry.org/spinning",
+          "type": "string",
+          "format": "uri",
+          "description": "An industry specific process type code.  "
         }
       },
       "description": "Transformation represents an event in which input objects are fully or partially consumed and output objects are produced, such that any of the input objects may have contributed to all of the output objects - for example consuming bales of cotton to produce yarn."
@@ -313,26 +314,35 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": ["Item"],
-          "default": ["Item"],
+          "const": ["Item", "Entity"],
+          "default": ["Item", "Entity"],
           "items": {
             "type": "string",
-            "enum": ["Item"]
+            "enum": ["Item", "Entity"]
           }
         },
         "id": {
           "example": "https://id.gs1.org/01/09520123456788/21/12345",
           "type": "string",
           "format": "uri",
-          "description": "The globally unique ID of the product as a URI. Ideally as a resolvable URL according to ISO 18975. "
+          "description": "The globally unique ID of the entity as a resolvable URL according to ISO 18975. ExamplesProduct - id.gs1.org/01/09520123456788/21/12345  Party - abr.business.gov.au/ABN/View?abn=90664869327. Facility - did:web:facilities.example-company.com:123. "
         },
         "name": {
           "example": "EV battery 300Ah.",
           "type": "string",
           "description": "The name of the product class to which the product item belongs.  "
+        },
+        "registeredId": {
+          "example": "90664869327",
+          "type": "string",
+          "description": "The registration number (alphanumeric) of the entity within the register. Unique within the register."
+        },
+        "idScheme": {
+          "$ref": "#/$defs/IdentifierScheme",
+          "description": "The identifier scheme.  Exampleproduct - id.gs1.org/01. party - business.gov.au/abn  facility - did:web:facilities.acme.com. "
         }
       },
-      "description": "A specific serialised trade item which is an instance of a more generic product. ",
+      "description": "A specific serilaised trade item which is a type of a more generic product. Typically an SGTIN",
       "required": ["id", "name"]
     },
     "SensorData": {
@@ -388,16 +398,9 @@
             "enum": ["QuantityElement"]
           }
         },
-        "productId": {
-          "example": "https://id.gs1.org/01/09520123456788/21/12345",
-          "type": "string",
-          "format": "uri",
+        "product": {
+          "$ref": "#/$defs/Entity",
           "description": "THe identifier of a product class (as opposed to a product instance) such as a GTIN code for a manufactured product."
-        },
-        "productName": {
-          "example": "EV battery 300Ah.",
-          "type": "string",
-          "description": "The registered name of the product within the identifier scheme. "
         },
         "quantity": {
           "example": 20,
@@ -410,8 +413,8 @@
           "description": "The unit of measure for the quantity value (eg Kg or meters etc) using the UNECE Rec 20 unit of measure codelist.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
         }
       },
-      "description": "The quantity element is used to define the quantity (eg 100 kg of a product class. Used when serialised items are not applicable.",
-      "required": ["productId", "productName", "quantity"]
+      "description": "The quantity element is used to define the quantities (eg 100), units of measure (eg Kg) and product class (eg GTIN or other class identifier) of products that are inputs or outputs or the subject of supply chain events.  ",
+      "required": ["product", "quantity"]
     },
     "ObjectEvent": {
       "type": "object",
@@ -434,11 +437,6 @@
           "format": "uri",
           "description": "The unique identifier of this event - SHOULD be a UUID"
         },
-        "processType": {
-          "example": "Weaving",
-          "type": "string",
-          "description": "A human readable name for industry specific process represented by this event."
-        },
         "eventTime": {
           "example": "2024-09-01T12:00:00",
           "type": "string",
@@ -449,7 +447,7 @@
           "type": "string",
           "enum": ["observe", "add", "delete"],
           "example": "observe",
-          "description": "Code describing how an event relates to the life-cycle of the entity impacted by the event."
+          "description": "Code describing how an event relates to the lifecycle of the entity impacted by the event."
         },
         "disposition": {
           "type": "string",
@@ -465,7 +463,7 @@
           "example": "https://id.gs1.org/414/9520123456788",
           "type": "string",
           "format": "uri",
-          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an event until it is reported to be at a different Business Location by a subsequent event. The bizLocation must be a resolvable URI that links to facility information and geo-location data."
+          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an EPCIS event until it is reported to be at a different Business Location by a subsequent EPCIS event. The bizLocation must be a resolvable URI that links to facility information and geolocation data."
         },
         "sensorElementList": {
           "type": "array",
@@ -512,11 +510,6 @@
           "format": "uri",
           "description": "The unique identifier of this event - SHOULD be a UUID"
         },
-        "processType": {
-          "example": "Weaving",
-          "type": "string",
-          "description": "A human readable name for industry specific process represented by this event."
-        },
         "eventTime": {
           "example": "2024-09-01T12:00:00",
           "type": "string",
@@ -527,7 +520,7 @@
           "type": "string",
           "enum": ["observe", "add", "delete"],
           "example": "observe",
-          "description": "Code describing how an event relates to the life-cycle of the entity impacted by the event."
+          "description": "Code describing how an event relates to the lifecycle of the entity impacted by the event."
         },
         "disposition": {
           "type": "string",
@@ -543,7 +536,7 @@
           "example": "https://id.gs1.org/414/9520123456788",
           "type": "string",
           "format": "uri",
-          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an event until it is reported to be at a different Business Location by a subsequent event. The bizLocation must be a resolvable URI that links to facility information and geo-location data."
+          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an EPCIS event until it is reported to be at a different Business Location by a subsequent EPCIS event. The bizLocation must be a resolvable URI that links to facility information and geolocation data."
         },
         "sensorElementList": {
           "type": "array",
@@ -556,7 +549,7 @@
           "$ref": "#/$defs/Item",
           "description": "The unique item identifier that is the result of this aggregation. Typically a packaging ID used in shipments that represents a box/ pallet / container of contained items."
         },
-        "childEPCList": {
+        "childEPCs": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/Item"
@@ -568,7 +561,7 @@
           "items": {
             "$ref": "#/$defs/QuantityElement"
           },
-          "description": "List of quantified product classes that have been aggregated into the parent.  Used when the child items do not have unique identifiers (eg 100 Kg of cotton bales)"
+          "description": "List of quantified product classes that have been aggregated into the parent.  Used whwn the child items do not have unique identifiers (eg 100 Kg of cotton bales)"
         }
       },
       "description": "Aggregation represents an event that happened to one or more objects that are physically aggregated together (physically constrained to be in the same place at the same time, as when cases are aggregated to a pallet).  This event is also used to represent de-aggregation (eg unpacking) when businessStepCode is unpacking."
@@ -594,11 +587,6 @@
           "format": "uri",
           "description": "The unique identifier of this event - SHOULD be a UUID"
         },
-        "processType": {
-          "example": "Weaving",
-          "type": "string",
-          "description": "A human readable name for industry specific process represented by this event."
-        },
         "eventTime": {
           "example": "2024-09-01T12:00:00",
           "type": "string",
@@ -609,7 +597,7 @@
           "type": "string",
           "enum": ["observe", "add", "delete"],
           "example": "observe",
-          "description": "Code describing how an event relates to the life-cycle of the entity impacted by the event."
+          "description": "Code describing how an event relates to the lifecycle of the entity impacted by the event."
         },
         "disposition": {
           "type": "string",
@@ -625,7 +613,7 @@
           "example": "https://id.gs1.org/414/9520123456788",
           "type": "string",
           "format": "uri",
-          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an event until it is reported to be at a different Business Location by a subsequent event. The bizLocation must be a resolvable URI that links to facility information and geo-location data."
+          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an EPCIS event until it is reported to be at a different Business Location by a subsequent EPCIS event. The bizLocation must be a resolvable URI that links to facility information and geolocation data."
         },
         "sensorElementList": {
           "type": "array",
@@ -634,16 +622,12 @@
           },
           "description": "An array (one for each sensor) of sensor device data sets associated with the event. "
         },
-        "sourcePartyId": {
-          "example": "https://abr.business.gov.au/ABN/View?abn=90664869327",
-          "type": "string",
-          "format": "uri",
+        "sourceParty": {
+          "$ref": "#/$defs/Entity",
           "description": "The source party for this supply chain transaction - typically the seller party"
         },
-        "destinationPartyId": {
-          "example": "https://abr.business.gov.au/ABN/View?abn=90664869327",
-          "type": "string",
-          "format": "uri",
+        "destinationParty": {
+          "$ref": "#/$defs/Entity",
           "description": "The destination party for this supply chain transaction - typically the buyer party."
         },
         "bizTransaction": {
@@ -666,8 +650,7 @@
           "description": "List of quantified product classes that are included in this transaction.  Used when the trade items do not have unique identifiers (eg 100 reels of yarn)"
         }
       },
-      "description": "Transaction represents an event in which one or more objects become associated or disassociated with one or more identified business transactions - such as the purchase / shipment of goods between buyer and seller.",
-      "required": ["sourcePartyId", "destinationPartyId"]
+      "description": "Transaction represents an event in which one or more objects become associated or disassociated with one or more identified business transactions - such as the purchase / shipment of goods between buyer and seller."
     },
     "AssociationEvent": {
       "type": "object",
@@ -690,11 +673,6 @@
           "format": "uri",
           "description": "The unique identifier of this event - SHOULD be a UUID"
         },
-        "processType": {
-          "example": "Weaving",
-          "type": "string",
-          "description": "A human readable name for industry specific process represented by this event."
-        },
         "eventTime": {
           "example": "2024-09-01T12:00:00",
           "type": "string",
@@ -705,7 +683,7 @@
           "type": "string",
           "enum": ["observe", "add", "delete"],
           "example": "observe",
-          "description": "Code describing how an event relates to the life-cycle of the entity impacted by the event."
+          "description": "Code describing how an event relates to the lifecycle of the entity impacted by the event."
         },
         "disposition": {
           "type": "string",
@@ -721,7 +699,7 @@
           "example": "https://id.gs1.org/414/9520123456788",
           "type": "string",
           "format": "uri",
-          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an event until it is reported to be at a different Business Location by a subsequent event. The bizLocation must be a resolvable URI that links to facility information and geo-location data."
+          "description": "A Business Location is a uniquely identified and discretely recorded geospatial location that is meant to designate the specific place where an object is assumed to be following an EPCIS event until it is reported to be at a different Business Location by a subsequent EPCIS event. The bizLocation must be a resolvable URI that links to facility information and geolocation data."
         },
         "sensorElementList": {
           "type": "array",
@@ -734,7 +712,7 @@
           "$ref": "#/$defs/Item",
           "description": "The unique item identifier that is the parent of this association. Typically an assembled product ID such as a desktop computer that is built from the associated child components."
         },
-        "childEPCList": {
+        "childEPCs": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/Item"
@@ -770,8 +748,7 @@
           "$ref": "#/$defs/AssociationEvent"
         }
       ],
-      "description": "This abstract event structure provides a common language to describe supply chain events such as shipments, inspections, manufacturing processes, etc. There are four types of EPCIS event but this is an abstract class representing all common properties of an EPCIS event.",
-      "additionalProperties": true
+      "description": "This abstract event structure provides a common language to describe supply chain events such as shipments, inspections, manufacturing processes, etc. There are four types of EPCIS event but this is an abstract class representing all common properties of an EPCIS event.  "
     }
   }
 }
