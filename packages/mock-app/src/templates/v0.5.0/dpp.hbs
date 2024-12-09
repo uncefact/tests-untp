@@ -69,7 +69,6 @@
       column-gap: 16px;
       align-items: center;
       padding-bottom: 10px;
-
       border-bottom: 1px solid #d4d6d8;
     }
 
@@ -95,7 +94,6 @@
 
     .item-title {
       display: flex;
-
       font-size: 16px;
       font-weight: 400;
       line-height: 17.44px;
@@ -105,7 +103,6 @@
     .item-value {
       display: flex;
       flex-direction: column;
-
       font-size: 16px;
       font-weight: 500;
       line-height: 17.44px;
@@ -120,7 +117,6 @@
     .annotation {
       display: flex;
       gap: 4px;
-
       font-size: 14px;
       font-weight: 400;
       line-height: 15.26px;
@@ -158,7 +154,6 @@
       position: absolute;
       top: 25px;
       left: 15px;
-
       font-weight: 500;
       font-size: 16px;
       line-height: 22px;
@@ -181,7 +176,6 @@
     .header-batch {
       padding: 12px 16px 16px 16px;
       background-color: #F7FAFD;
-
       display: grid;
       grid-template-columns: 1.2fr 1fr;
       grid-auto-flow: row;
@@ -226,7 +220,6 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-
       font-size: 14px;
       font-weight: 500;
       line-height: 22px;
@@ -251,7 +244,6 @@
     .passport-box {
       display: grid;
       grid-template-columns: 1fr 1fr;
-
       border: #D4D6D8 1px dotted;
       border-radius: 5px;
       overflow: hidden;
@@ -262,9 +254,7 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-
       padding: 12px 16px 12px 16px;
-
       border: #D4D6D8 1px dotted;
       outline-offset: -1px;
       min-height: 94px;
@@ -327,7 +317,6 @@
       grid-template-columns: 3fr 1fr;
       justify-content: space-between;
       align-items: center;
-
       min-height: 40px;
       text-decoration: none;
     }
@@ -336,7 +325,6 @@
       display: flex;
       align-items: center;
       gap: 8px;
-
       font-size: 16px;
       font-weight: 400;
       line-height: 17.44px;
@@ -414,7 +402,6 @@
       flex-direction: column;
       align-items: flex-start;
       gap: 8px;
-
       min-width: 336px;
       padding: 16px 18px 16px 16px;
       position: relative;
@@ -692,7 +679,6 @@
       display: grid;
       grid-template-columns: 1fr auto;
       justify-content: space-between;
-
       border: 1px solid #d4d6d8;
       border-radius: 4px;
       padding: 16px;
@@ -773,7 +759,6 @@
     .history-item {
       border-bottom: 1px solid #d4d6d8;
       padding: 10px 0 12px 0;
-
       display: grid;
       grid-template-columns: 1fr auto;
       gap: 16px;
@@ -822,7 +807,6 @@
       align-items: flex-start;
       gap: 10px;
       display: inline-flex;
-
       text-decoration-line: underline;
       text-decoration-thickness: 2px;
       text-decoration-color: #4F95DD;
@@ -872,13 +856,11 @@
     /* Media Queries for Desktops */
     @media (min-width: 1440px) {
       .container {
-        min-width: 1040px;
-        min-height: 3000px;
+        min-width: 100%;
         display: flex;
         align-items: flex-start;
         gap: 10px;
         background-color: #ffffff;
-        width: 100%;
       }
 
       .mobile {
@@ -906,9 +888,6 @@
         align-items: flex-start;
         gap: 10px;
         background-color: #ffffff;
-        width: 100%;
-        min-width: 1440px;
-        min-height: 3000px;
       }
 
       .container .contents {
@@ -1042,7 +1021,6 @@
         gap: 10px;
         display: inline-flex;
         align-items: flex-start;
-
         text-decoration: underline;
         text-decoration-thickness: 2px;
         text-decoration-color: var(--primary-colorsblue-400);
@@ -1513,7 +1491,6 @@
         display: grid;
         grid-template-columns: 1fr 1fr 1fr;
         gap: 16px;
-
         width: 100%;
       }
 
@@ -1521,7 +1498,6 @@
         display: flex;
         align-items: center;
         gap: 8px;
-
         color: var(--black);
       }
 
@@ -1533,7 +1509,6 @@
 
       .container .contents .history-information {
         width: 100%;
-
         display: flex;
         flex-direction: column;
         gap: 16px;
@@ -1541,19 +1516,23 @@
 
       .container .contents .history-value-chain-item {
         margin-top: 8px;
-
         display: flex;
         flex-direction: column;
         gap: 16px;
       }
+
       .container .contents .history-value-chain {
         display: flex;
         flex-direction: row;
         gap: 16px;
       }
+
       .container .contents .verified-ratio {}
+
       .container .contents .history-event {}
+
       .container .contents .history-item {}
+
       .container .contents .view-more-button {
         align-self: baseline;
       }
@@ -1827,13 +1806,22 @@
         font-size: 14px;
         line-height: 19.2px;
       }
+
+      div:has(.container) .container .frame {
+        padding: 56px 0px 0px;
+      }
+
+      div:has(.container) .container .div-2,
+      div:has(.container) .container .frame-24,
+      div:has(.container) .container .this-digital-product-wrapper {
+        padding: 0px; /* Override padding */
+      }
     }
   </style>
 </head>
 
 <body>
-  <div class="container">
-    <!-- Mobile width 390px-->
+  <div class="container"> <!-- Mobile width 390px-->
     <div class="mobile">
       <header class="header">
         <div class="header-image">
@@ -1842,68 +1830,83 @@
             <h1>{{credentialSubject.name}}</h1>
           </div>
         </div>
-
         <div>
           <div class="header-batch">
-            <div class="header-batch-item">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <div class="header-batch-item"> <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+                xmlns="http://www.w3.org/2000/svg">
                 <path
                   d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
                   fill="#1F5A95" />
-              </svg>
-              <a href="{{credentialSubject.idScheme.id}}" class="blue-bottom-line-thick">ID: {{credentialSubject.registeredId}}</a>
-            </div>
-            <div class="header-batch-item">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              </svg> <a href="{{credentialSubject.idScheme.id}}" class="blue-bottom-line-thick">ID:
+                {{credentialSubject.registeredId}}</a> </div>
+            <div class="header-batch-item"> <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+                xmlns="http://www.w3.org/2000/svg">
                 <path
                   d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
                   fill="#1F5A95" />
-              </svg>
-              <a>Batch: {{credentialSubject.batchNumber}}</a>
-            </div>
-            <div class="header-batch-item">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              </svg> <a>Batch: {{credentialSubject.batchNumber}}</a> </div>
+            <div class="header-batch-item"> <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+                xmlns="http://www.w3.org/2000/svg">
                 <path
                   d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
                   fill="#1F5A95" />
-              </svg>
-              <a>Serial: {{credentialSubject.serialNumber}}</a>
-            </div>
+              </svg> <a>Serial: {{credentialSubject.serialNumber}}</a> </div>
           </div>
         </div>
       </header>
-
       <section class="information">
-        <div class="information-text">
-          {{credentialSubject.description}}
-        </div>
-        <div class="information-show-more">
-          {{#each credentialSubject.furtherInformation}}
-          <a href="{{linkURL}}" class="blue-bottom-line-thick">{{linkName}}</a>
-          {{/each}}
-        </div>
+        <div class="information-text"> {{credentialSubject.description}} </div>
+        <div class="information-show-more"> {{#each credentialSubject.furtherInformation}} <a href="{{linkURL}}"
+            class="blue-bottom-line-thick">{{linkName}}</a> {{/each}} </div>
       </section>
-
-      {{#if credentialSubject.characteristic}}
-      <section class="production">
+      {{#if credentialSubject.characteristic}} <section class="production">
         <div class="production-title">Characteristics</div>
-        <div class="product-table table">
-        {{#each credentialSubject.characteristic}}
-        <div class="table-item">
-          <span class="item-title">{{@key}}</span>
-          <p class="item-value">{{this}}</p>
-        </div>
-        {{/each}}
-        </div>
+        <div class="product-table table"> {{#each credentialSubject.characteristic}} <div class="table-item"> <span
+              class="item-title">{{@key}}</span>
+            <p class="item-value">{{this}}</p>
+          </div> {{/each}} </div>
       </section>
       {{/if}}
-
+      <section class="production">
+        <div class="production-title">Production</div>
+        <div class="product-table table">
+          <div class="table-item"> <span class="item-title">Product category</span>
+            <p class="item-value">{{#each credentialSubject.productCategory}}{{name}}{{#unless @last}},{{/unless}}
+              {{/each}}</p>
+          </div>
+          <div class="table-item"> <span class="item-title">Produced by</span> <a
+              href="{{credentialSubject.producedByParty.id}}"
+              class="blue-bottom-line-thick">{{credentialSubject.producedByParty.name}}</a> </div>
+          <div class="table-item"> <span class="item-title">Produced at</span>
+            <div class="item-value"> <a href="{{credentialSubject.producedAtFacility.id}}"
+                class="blue-bottom-line-thick">{{credentialSubject.producedAtFacility.name}}</a> </div>
+          </div>
+          <div class="table-item"> <span class="item-title">Date produced</span>
+            <p class="item-value">{{credentialSubject.productionDate}}</p>
+          </div>
+          <div class="table-item"> <span class="item-title">Country</span>
+            <p class="item-value">{{credentialSubject.countryOfProduction}}</p>
+          </div>
+          <div class="table-item"> <span class="item-title">Dimensions</span>
+            <p class="item-value"> <span>Weight:
+                {{credentialSubject.dimensions.weight.value}}{{credentialSubject.dimensions.weight.unit}}</span>
+              <span>Length:
+                {{credentialSubject.dimensions.length.value}}{{credentialSubject.dimensions.length.unit}}</span>
+              <span>Width:
+                {{credentialSubject.dimensions.width.value}}{{credentialSubject.dimensions.width.unit}}</span>
+              <span>Height:
+                {{credentialSubject.dimensions.height.value}}{{credentialSubject.dimensions.height.unit}}</span>
+              <span>Volume:
+                {{credentialSubject.dimensions.volume.value}}{{credentialSubject.dimensions.volume.unit}}</span> </p>
+          </div>
+        </div>
+      </section>
       <section class="passport">
         <div class="passport-issued-by-header">
           <h3>Circularity Scorecard</h3>
-          <p>The circularity Scorecard provides a simple high level summary of circularity performance of the product.</p>
+          <p>The circularity Scorecard provides a simple high level summary of circularity performance of the product.
+          </p>
         </div>
-
         <div class="passport-box">
           <div class="passport-box-item">
             <h3>{{credentialSubject.circularityScorecard.recyclableContent}}%</h3>
@@ -1922,48 +1925,41 @@
             <p>Material circularity*</p>
           </div>
         </div>
-
         <div class="passport-annotation">
-          <p>*The Material Circularity Indicator provides an overall circularity score which is a function of all three of
-            the earlier measures.</p>
+          <p>*The Material Circularity Indicator provides an overall circularity score which is a function of all three
+            of the earlier measures.</p>
         </div>
-
-        <div class="traceability-cards">
-          <a href="{{credentialSubject.circularityScorecard.recyclingInformation.linkURL}}" class="traceability-card">
-            <div class="traceability-card-text">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <div class="traceability-cards"> <a
+            href="{{credentialSubject.circularityScorecard.recyclingInformation.linkURL}}" class="traceability-card">
+            <div class="traceability-card-text"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                xmlns="http://www.w3.org/2000/svg">
                 <path
                   d="M21.82 15.42L19.32 19.75C18.83 20.61 17.92 21.06 17 21H15V23L12.5 18.5L15 14V16H17.82L15.6 12.15L19.93 9.65L21.73 12.77C22.25 13.54 22.32 14.57 21.82 15.42ZM9.21003 3.06H14.21C15.19 3.06 16.04 3.63 16.45 4.45L17.45 6.19L19.18 5.19L16.54 9.6L11.39 9.69L13.12 8.69L11.71 6.24L9.50003 10.09L5.16003 7.59L6.96003 4.47C7.37003 3.64 8.22003 3.06 9.21003 3.06ZM5.05003 19.76L2.55003 15.43C2.06003 14.58 2.13003 13.56 2.64003 12.79L3.64003 11.06L1.91003 10.06L7.05003 10.14L9.70003 14.56L7.97003 13.56L6.56003 16H11V21H7.40003C6.93154 21.0339 6.46293 20.9357 6.0475 20.7165C5.63206 20.4973 5.28648 20.1659 5.05003 19.76Z"
                   fill="#1F5A95" />
               </svg>
               <p>Recycling instructions</p>
             </div>
-            <div class="traceability-card-view-details">
-              <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <div class="traceability-card-view-details"> <svg width="10" height="15" viewBox="0 0 10 15" fill="none"
+                xmlns="http://www.w3.org/2000/svg">
                 <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round"
                   stroke-linejoin="round" />
-              </svg>
-            </div>
-          </a>
-          <a href="{{credentialSubject.circularityScorecard.repairInformation.linkURL}}" class="traceability-card">
-            <div class="traceability-card-text">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              </svg> </div>
+          </a> <a href="{{credentialSubject.circularityScorecard.repairInformation.linkURL}}" class="traceability-card">
+            <div class="traceability-card-text"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                xmlns="http://www.w3.org/2000/svg">
                 <path
                   d="M18.85 21.975C18.7167 21.975 18.5917 21.9543 18.475 21.913C18.3583 21.8717 18.25 21.8007 18.15 21.7L13.05 16.6C12.95 16.5 12.879 16.3917 12.837 16.275C12.795 16.1583 12.7743 16.0333 12.775 15.9C12.7757 15.7667 12.7967 15.6417 12.838 15.525C12.8793 15.4083 12.95 15.3 13.05 15.2L15.175 13.075C15.275 12.975 15.3833 12.9043 15.5 12.863C15.6167 12.8217 15.7417 12.8007 15.875 12.8C16.0083 12.7993 16.1333 12.8203 16.25 12.863C16.3667 12.9057 16.475 12.9763 16.575 13.075L21.675 18.175C21.775 18.275 21.846 18.3833 21.888 18.5C21.93 18.6167 21.9507 18.7417 21.95 18.875C21.9493 19.0083 21.9287 19.1333 21.888 19.25C21.8473 19.3667 21.7763 19.475 21.675 19.575L19.55 21.7C19.45 21.8 19.3417 21.871 19.225 21.913C19.1083 21.955 18.9833 21.9757 18.85 21.975ZM18.85 19.6L19.575 18.875L15.9 15.2L15.175 15.925L18.85 19.6ZM5.125 22C4.99167 22 4.86267 21.975 4.738 21.925C4.61333 21.875 4.50067 21.8 4.4 21.7L2.3 19.6C2.2 19.5 2.125 19.3873 2.075 19.262C2.025 19.1367 2 19.008 2 18.876C2 18.744 2.025 18.619 2.075 18.501C2.125 18.383 2.2 18.2747 2.3 18.176L7.6 12.876H9.725L10.575 12.026L6.45 7.9H5.025L2 4.875L4.825 2.05L7.85 5.075V6.5L11.975 10.625L14.875 7.725L13.8 6.65L15.2 5.25H12.375L11.675 4.55L15.225 1L15.925 1.7V4.525L17.325 3.125L20.875 6.675C21.1583 6.95833 21.375 7.27933 21.525 7.638C21.675 7.99667 21.75 8.37567 21.75 8.775C21.75 9.17433 21.675 9.55767 21.525 9.925C21.375 10.2923 21.1583 10.6173 20.875 10.9L18.75 8.775L17.35 10.175L16.3 9.125L11.125 14.3V16.4L5.825 21.7C5.725 21.8 5.61667 21.875 5.5 21.925C5.38333 21.975 5.25833 22 5.125 22ZM5.125 19.6L9.375 15.35V14.625H8.65L4.4 18.875L5.125 19.6ZM5.125 19.6L4.4 18.875L4.775 19.225L5.125 19.6Z"
                   fill="#1F5A95" />
               </svg>
               <p>Repair instructions</p>
             </div>
-            <div class="traceability-card-view-details">
-              <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <div class="traceability-card-view-details"> <svg width="10" height="15" viewBox="0 0 10 15" fill="none"
+                xmlns="http://www.w3.org/2000/svg">
                 <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round"
                   stroke-linejoin="round" />
-              </svg>
-            </div>
-          </a>
-        </div>
+              </svg> </div>
+          </a> </div>
       </section>
-
       <section class="emission-score-card">
         <h3 class="mission-score-title">Emissions Scorecard</h3>
         <p class="mission-score-description">The Emissions Scorecard gives a clear snapshot of the product's greenhouse
@@ -1975,38 +1971,29 @@
           <p class="score-name">Co2Eq</p>
         </div>
         <div class="table">
-          <div class="table-item">
-            <span class="item-title">Scope includes</span>
+          <div class="table-item"> <span class="item-title">Scope includes</span>
             <p class="item-value">{{credentialSubject.emissionsScorecard.operationalScope}}</p>
           </div>
-          <div class="table-item">
-            <span class="item-title">Primary sourced ratio*</span>
+          <div class="table-item"> <span class="item-title">Primary sourced ratio*</span>
             <p class="item-value">{{credentialSubject.emissionsScorecard.primarySourcedRatio}}% primary sources</p>
           </div>
-          <div class="table-item">
-            <span class="item-title">Reporting standard</span>
-            <div class="item-value">
-              <a href="{{credentialSubject.emissionsScorecard.reportingStandard.id}}"
+          <div class="table-item"> <span class="item-title">Reporting standard</span>
+            <div class="item-value"> <a href="{{credentialSubject.emissionsScorecard.reportingStandard.id}}"
                 class="blue-bottom-line-thick">{{credentialSubject.emissionsScorecard.reportingStandard.name}}</a>
             </div>
           </div>
-          <div class="table-item">
-            <span class="item-title">Issue date</span>
+          <div class="table-item"> <span class="item-title">Issue date</span>
             <p class="item-value">{{credentialSubject.emissionsScorecard.reportingStandard.issueDate}}</p>
           </div>
         </div>
-        <div class="annotation">
-          <span>*</span>
+        <div class="annotation"> <span>*</span>
           <p>The Primary Sourced Ratio shows the percentage of scope 3 emissions data that is directly collected from
             actual sources, rather than being based on estimates.</p>
         </div>
       </section>
-
       <section class="declarations">
         <div class="declaration-title">Declarations</div>
-        <div class="cards-conformities">
-          {{#each credentialSubject.conformityClaim}}
-          <div class="cards-conformity">
+        <div class="cards-conformities"> {{#each credentialSubject.conformityClaim}} <div class="cards-conformity">
             <div class="frame">
               <div class="div">
                 <div class="company-name">Conformance:</div>
@@ -2018,30 +2005,24 @@
             </div>
             <div class="frame-2">
               <div class="text-wrapper">{{conformityEvidence.linkName}}</div>
-              <p class="p">
-                <span class="span">{{referenceRegulation.name}} administered in {{referenceRegulation.jurisdictionCountry}} by </span>
-                <a href="{{referenceRegulation.administeredBy.id}}" class="text-wrapper-2 gray-bottom-line">{{referenceRegulation.administeredBy.name}}</a>
-              </p>
-              <p class="p">
-                <span class="span">{{referenceStandard.name}} issued by </span>
-                <a href="{{referenceStandard.issuingParty.id}}" class="text-wrapper-2 gray-bottom-line">{{referenceStandard.issuingParty.name}}</a>
-              </p>
+              <p class="p"> <span class="span">{{referenceRegulation.name}} administered in
+                  {{referenceRegulation.jurisdictionCountry}} by </span> <a
+                  href="{{referenceRegulation.administeredBy.id}}"
+                  class="text-wrapper-2 gray-bottom-line">{{referenceRegulation.administeredBy.name}}</a> </p>
+              <p class="p"> <span class="span">{{referenceStandard.name}} issued by </span> <a
+                  href="{{referenceStandard.issuingParty.id}}"
+                  class="text-wrapper-2 gray-bottom-line">{{referenceStandard.issuingParty.name}}</a> </p>
             </div>
-            <div class="frame-3">
-              {{#each declaredValue}}
-              <div class="frame-4">
+            <div class="frame-3"> {{#each declaredValue}} <div class="frame-4">
                 <div class="typography-heading">
                   <p class="heading">{{metricName}} is {{metricValue.value}}{{metricValue.unit}}</p>
                 </div>
                 <div class="typography-heading">
                   <p class="heading-2">Score: {{score}} | Accuracy {{accuracy}}</p>
                 </div>
-              </div>
-              {{/each}}
-            </div>
-            <a href="{{conformityEvidence.linkURL}}" class="cards-traceability">
-              <div class="frame-5">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              </div> {{/each}} </div> <a href="{{conformityEvidence.linkURL}}" class="cards-traceability">
+              <div class="frame-5"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                  xmlns="http://www.w3.org/2000/svg">
                   <path
                     d="M5 21C4.45 21 3.97933 20.8043 3.588 20.413C3.19667 20.0217 3.00067 19.5507 3 19V5C3 4.45 3.196 3.97933 3.588 3.588C3.98 3.19667 4.45067 3.00067 5 3H19C19.55 3 20.021 3.196 20.413 3.588C20.805 3.98 21.0007 4.45067 21 5V19C21 19.55 20.8043 20.021 20.413 20.413C20.0217 20.805 19.5507 21.0007 19 21H5ZM5 5V19H19V5H17V12L14.5 10.5L12 12V5H5Z"
                     fill="#1F5A95"></path>
@@ -2049,69 +2030,21 @@
                 <div class="company-name-wrapper">
                   <div class="company-name-2">Evidence</div>
                 </div>
-              </div>
-              <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                </path>
+              </div> <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round"> </path>
               </svg>
             </a>
-          </div>
-          {{/each}}
-        </div>
-      </section>
-
-      <section class="production">
-        <div class="production-title">Production</div>
-        <div class="product-table table">
-          <div class="table-item">
-            <span class="item-title">Product category</span>
-            <p class="item-value">{{#each credentialSubject.productCategory}}{{name}}{{#unless @last}},{{/unless}}
-              {{/each}}</p>
-          </div>
-          <div class="table-item">
-            <span class="item-title">Produced by</span>
-            <a href="{{credentialSubject.producedByParty.id}}"
-              class="blue-bottom-line-thick">{{credentialSubject.producedByParty.name}}</a>
-          </div>
-          <div class="table-item">
-            <span class="item-title">Produced at</span>
-            <div class="item-value">
-              <a href="{{credentialSubject.producedAtFacility.id}}"
-                class="blue-bottom-line-thick">{{credentialSubject.producedAtFacility.name}}</a>
-            </div>
-          </div>
-          <div class="table-item">
-            <span class="item-title">Date produced</span>
-            <p class="item-value">{{credentialSubject.productionDate}}</p>
-          </div>
-          <div class="table-item">
-            <span class="item-title">Country</span>
-            <p class="item-value">{{credentialSubject.countryOfProduction}}</p>
-          </div>
-          <div class="table-item">
-            <span class="item-title">Dimensions</span>
-            <p class="item-value">
-              <span>Weight: {{credentialSubject.dimensions.weight.value}}{{credentialSubject.dimensions.weight.unit}}</span>
-              <span>Length: {{credentialSubject.dimensions.length.value}}{{credentialSubject.dimensions.length.unit}}</span>
-              <span>Width: {{credentialSubject.dimensions.width.value}}{{credentialSubject.dimensions.width.unit}}</span>
-              <span>Height: {{credentialSubject.dimensions.height.value}}{{credentialSubject.dimensions.height.unit}}</span>
-              <span>Volume: {{credentialSubject.dimensions.volume.value}}{{credentialSubject.dimensions.volume.unit}}</span>
-            </p>
-          </div>
-        </div>
+          </div> {{/each}} </div>
       </section>
 
       <section class="composition">
         <div>
           <p class="section-title">Product composition</p>
-          <p class="section-description">
-            A complete list of materials that make up the composition of this product.
+          <p class="section-description"> A complete list of materials that make up the composition of this product.
           </p>
         </div>
-
-        <div class="composition-box">
-          {{#each credentialSubject.materialsProvenance}}
-          <div class="composition-box-item">
+        <div class="composition-box"> {{#each credentialSubject.materialsProvenance}} <div class="composition-box-item">
             <div class="composition-box-first-column">
               <p class="composition-percent">{{massFraction}}%</p>
               <div class="composition-box-second-column">
@@ -2119,29 +2052,22 @@
                 <div class="composition-tag">
                   <p class="composition-tag-item">Recycled {{recycledAmount}}%</p>
                   <p class="composition-tag-item">Hazard {{#if hazardous}}Yes{{else}}No{{/if}}</p>
-                </div>
-                <a href="{{materialSafetyInformation.linkURL}}"
+                </div> <a href="{{materialSafetyInformation.linkURL}}"
                   class="blue-bottom-line-thick">{{materialSafetyInformation.linkName}}</a>
               </div>
             </div>
-
             <div class="composition-box-third-column">
               <div class="country-code">{{originCountry}}</div>
             </div>
-          </div>
-          {{/each}}
-        </div>
+          </div> {{/each}} </div>
       </section>
-
       <section class="history">
         <div>
           <p class="section-title">History</p>
-        </div>
-
-        {{!-- start: Supply chain due diligence report --}}
-        <a href="{{credentialSubject.dueDiligenceDeclaration.linkURL}}" class="cards-traceability">
-          <div class="frame-5">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        </div> {{!-- start: Supply chain due diligence report --}} <a
+          href="{{credentialSubject.dueDiligenceDeclaration.linkURL}}" class="cards-traceability">
+          <div class="frame-5"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+              xmlns="http://www.w3.org/2000/svg">
               <path
                 d="M5 21C4.45 21 3.97933 20.8043 3.588 20.413C3.19667 20.0217 3.00067 19.5507 3 19V5C3 4.45 3.196 3.97933 3.588 3.588C3.98 3.19667 4.45067 3.00067 5 3H19C19.55 3 20.021 3.196 20.413 3.588C20.805 3.98 21.0007 4.45067 21 5V19C21 19.55 20.8043 20.021 20.413 20.413C20.0217 20.805 19.5507 21.0007 19 21H5ZM5 5V19H19V5H17V12L14.5 10.5L12 12V5H5Z"
                 fill="#1F5A95"></path>
@@ -2149,15 +2075,11 @@
             <div class="company-name-wrapper">
               <div class="company-name-2">Supply chain due diligence report</div>
             </div>
-          </div>
-          <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+          </div> <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             </path>
           </svg>
-        </a>
-        {{!-- end: Supply chain due diligence report --}}
-
-        <div class="history-information">
+        </a> {{!-- end: Supply chain due diligence report --}} <div class="history-information">
           <div class="history-value-chain-item">
             <div class="history-value-chain">
               <p>{{credentialSubject.traceabilityInformation.valueChainProcess}}</p>
@@ -2165,71 +2087,53 @@
                 <p>Verified ratio {{credentialSubject.traceabilityInformation.verifiedRatio}}</p>
               </div>
             </div>
-
-            <div id="history-items-390px" class="history-event">
-              {{#each credentialSubject.traceabilityInformation.traceabilityEvent}}
-              <div class="history-item">
-                <span>{{linkName}}</span>
-                <a href="{{linkURL}}" class="blue-bottom-line-thick">View</a>
-              </div>
-              {{/each}}
+            <div id="history-items-390px" class="history-event"> {{#each
+              credentialSubject.traceabilityInformation.traceabilityEvent}} <div class="history-item">
+                <span>{{linkName}}</span> <a href="{{linkURL}}" class="blue-bottom-line-thick">View</a> </div> {{/each}}
             </div>
           </div>
         </div>
-
       </section>
-
       <section class="passport-issued-by">
         <div>
           <h2 class="section-title">Passport issued by</h2>
         </div>
         <div class="table">
-          <div class="table-item">
-            <span>Organisation</span>
+          <div class="table-item"> <span>Organisation</span>
             <p>{{issuer.name}}</p>
           </div>
-          <div class="table-item">
-            <span>Registered ID</span>
-            <a href="{{issuer.id}}" class="blue-bottom-line-thick">{{issuer.id}}</a>
-          </div>
-          <div class="table-item">
-            <span>Valid from</span>
+          <div class="table-item"> <span>Registered ID</span> <a href="{{issuer.id}}"
+              class="blue-bottom-line-thick">{{issuer.id}}</a> </div>
+          <div class="table-item"> <span>Valid from</span>
             <p>{{validFrom}}</p>
           </div>
-          <div class="table-item">
-            <span>Valid to</span>
+          <div class="table-item"> <span>Valid to</span>
             <p>{{validUntil}}</p>
           </div>
         </div>
       </section>
-
       <footer>
         <p>This Digital Product Passport (DPP) is a digital record of the product's sustainability and environmental
-          performance, ensuring transparency and accountability in line with UNTP standards. The DPP can be verified at
-          any time using the QR code or visiting <a href="https://www.untp-certification.org"
-            class="gray-bottom-line">www.untp-certification.org</a> with the passport ID.</p>
+          performance, ensuring transparency and accountability in line with UNTP standards. For more information visit
+          <a href="https://uncefact.github.io/spec-untp/" class="gray-bottom-line">uncefact.github.io/spec-untp/</a>.
+        </p>
       </footer>
-    </div>
-    <!-- End mobile -->
-
-    <!-- Desktop width 1440px -->
+    </div> <!-- End mobile --> <!-- Desktop width 1440px -->
     <div class="contents">
       <div class="frame">
         <div class="PP-title">PRODUCT PASSPORT</div>
         <div class="text-wrapper">{{credentialSubject.name}}</div>
         <div class="product-ID-ALT">
-          <div class="div">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <div class="div"> <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+              xmlns="http://www.w3.org/2000/svg">
               <path
                 d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
                 fill="#1F5A95" />
-            </svg>
-            <a href="{{credentialSubject.id}}" class="line">
+            </svg> <a href="{{credentialSubject.id}}" class="line">
               <div class="text-wrapper-2">ID: {{credentialSubject.id}}</div>
-            </a>
-          </div>
-          <div class="div">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            </a> </div>
+          <div class="div"> <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+              xmlns="http://www.w3.org/2000/svg">
               <path
                 d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
                 fill="#1F5A95" />
@@ -2238,8 +2142,8 @@
               <div class="text-wrapper-2">Batch: {{credentialSubject.batchNumber}}</div>
             </div>
           </div>
-          <div class="div">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <div class="div"> <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+              xmlns="http://www.w3.org/2000/svg">
               <path
                 d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z"
                 fill="#1F5A95" />
@@ -2254,44 +2158,83 @@
             <div class="frame-3"></div>
           </div>
           <div class="frame-4">
-            <p class="p">
-              {{credentialSubject.description}}
-            </p>
-            {{#each credentialSubject.furtherInformation}}
-            <a href="{{linkURL}}" class="line">
+            <p class="p"> {{credentialSubject.description}} </p> {{#each credentialSubject.furtherInformation}} <a
+              href="{{linkURL}}" class="line">
               <div class="text-wrapper-16">{{linkName}}</div>
-            </a>
-            {{/each}}
+            </a> {{/each}}
           </div>
         </div>
       </div>
-
       {{#if credentialSubject.characteristic}}
       <div class="frame-24">
         <div class="heading-wrapper">
           <div class="heading">Characteristics</div>
         </div>
-        <div class="div-5">
-          {{#each credentialSubject.characteristic}}
-          <div class="data-two-columns">
+        <div class="div-5"> {{#each credentialSubject.characteristic}} <div class="data-two-columns">
             <div class="text-wrapper-12">{{@key}}</div>
             <div class="data-wrapper">
               <div class="data">{{this}}</div>
             </div>
-          </div>
-          {{/each}}
-        </div>
+          </div> {{/each}} </div>
       </div>
       {{/if}}
-
+      <div class="div-2">
+        <div class="typography-heading">
+          <div class="text-wrapper-4">Production</div>
+        </div>
+        <div class="div-5">
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Product category</div>
+            <div class="data-data">
+              <div class="data-2">{{#each credentialSubject.productCategory}}{{name}}{{#unless @last}},{{/unless}}
+                {{/each}}</div>
+            </div>
+          </div>
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Produced by</div>
+            <div class="data-data-link"> <a href="{{credentialSubject.producedByParty.id}}" class="line">
+                <p class="text-wrapper-2">{{credentialSubject.producedByParty.name}}</p>
+              </a> </div>
+          </div>
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Produced at</div>
+            <div class="data-data-link"> <a href="{{credentialSubject.producedAtFacility.id}}" class="line">
+                <p class="text-wrapper-2">{{credentialSubject.producedAtFacility.name}}</p>
+              </a> </div>
+          </div>
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Date produced</div>
+            <div class="data-wrapper">
+              <div class="data">{{credentialSubject.productionDate}}</div>
+            </div>
+          </div>
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Country</div>
+            <div class="data-data">
+              <div class="data">{{credentialSubject.countryOfProduction}}</div>
+            </div>
+          </div>
+          <div class="data-two-columns">
+            <div class="text-wrapper-12">Dimensions</div>
+            <div class="list"> <span>Weight:
+                {{credentialSubject.dimensions.weight.value}}{{credentialSubject.dimensions.weight.unit}}</span>
+              <span>Length:
+                {{credentialSubject.dimensions.length.value}}{{credentialSubject.dimensions.length.unit}}</span>
+              <span>Width:
+                {{credentialSubject.dimensions.width.value}}{{credentialSubject.dimensions.width.unit}}</span>
+              <span>Height:
+                {{credentialSubject.dimensions.height.value}}{{credentialSubject.dimensions.height.unit}}</span>
+              <span>Volume:
+                {{credentialSubject.dimensions.volume.value}}{{credentialSubject.dimensions.volume.unit}}</span> </div>
+          </div>
+        </div>
+      </div>
       <div class="div-2">
         <div class="typography-heading">
           <div class="text-wrapper-4">Circularity Scorecard</div>
         </div>
-        <p class="text-wrapper-5">
-          The circularity Scorecard provides a simple high level summary of circularity
-          performance of the product.
-        </p>
+        <p class="text-wrapper-5"> The circularity Scorecard provides a simple high level summary of circularity
+          performance of the product. </p>
         <div class="div-3">
           <div class="frame-5">
             <div class="frame-6">
@@ -2313,16 +2256,13 @@
                 <div class="text-wrapper-7">Material circularity*</div>
               </div>
             </div>
-            <p class="text-wrapper-8">
-              *The Material Circularity Indicator provides an overall circularity score which is a function of all three
-              of the earlier measures.
-            </p>
+            <p class="text-wrapper-8"> *The Material Circularity Indicator provides an overall circularity score which
+              is a function of all three of the earlier measures. </p>
           </div>
-          <div class="frame-9">
-            <a href="{{credentialSubject.circularityScorecard.recyclingInformation.linkURL}}"
+          <div class="frame-9"> <a href="{{credentialSubject.circularityScorecard.recyclingInformation.linkURL}}"
               class="cards-traceability">
-              <div class="div-4">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <div class="div-4"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                  xmlns="http://www.w3.org/2000/svg">
                   <path
                     d="M21.82 15.42L19.32 19.75C18.83 20.61 17.92 21.06 17 21H15V23L12.5 18.5L15 14V16H17.82L15.6 12.15L19.93 9.65L21.73 12.77C22.25 13.54 22.32 14.57 21.82 15.42ZM9.21003 3.06H14.21C15.19 3.06 16.04 3.63 16.45 4.45L17.45 6.19L19.18 5.19L16.54 9.6L11.39 9.69L13.12 8.69L11.71 6.24L9.50003 10.09L5.16003 7.59L6.96003 4.47C7.37003 3.64 8.22003 3.06 9.21003 3.06ZM5.05003 19.76L2.55003 15.43C2.06003 14.58 2.13003 13.56 2.64003 12.79L3.64003 11.06L1.91003 10.06L7.05003 10.14L9.70003 14.56L7.97003 13.56L6.56003 16H11V21H7.40003C6.93154 21.0339 6.46293 20.9357 6.0475 20.7165C5.63206 20.4973 5.28648 20.1659 5.05003 19.76Z"
                     fill="#1F5A95" />
@@ -2331,16 +2271,15 @@
                   <div class="text-wrapper-9">Recycling instructions</div>
                 </div>
               </div>
-              <div class="div-4">
-                <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <div class="div-4"> <svg width="10" height="15" viewBox="0 0 10 15" fill="none"
+                  xmlns="http://www.w3.org/2000/svg">
                   <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round"
                     stroke-linejoin="round" />
-                </svg>
-              </div>
-            </a>
-            <a href="{{credentialSubject.circularityScorecard.repairInformation.linkURL}}" class="cards-traceability">
-              <div class="div-4">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                </svg> </div>
+            </a> <a href="{{credentialSubject.circularityScorecard.repairInformation.linkURL}}"
+              class="cards-traceability">
+              <div class="div-4"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                  xmlns="http://www.w3.org/2000/svg">
                   <path
                     d="M18.85 21.975C18.7167 21.975 18.5917 21.9543 18.475 21.913C18.3583 21.8717 18.25 21.8007 18.15 21.7L13.05 16.6C12.95 16.5 12.879 16.3917 12.837 16.275C12.795 16.1583 12.7743 16.0333 12.775 15.9C12.7757 15.7667 12.7967 15.6417 12.838 15.525C12.8793 15.4083 12.95 15.3 13.05 15.2L15.175 13.075C15.275 12.975 15.3833 12.9043 15.5 12.863C15.6167 12.8217 15.7417 12.8007 15.875 12.8C16.0083 12.7993 16.1333 12.8203 16.25 12.863C16.3667 12.9057 16.475 12.9763 16.575 13.075L21.675 18.175C21.775 18.275 21.846 18.3833 21.888 18.5C21.93 18.6167 21.9507 18.7417 21.95 18.875C21.9493 19.0083 21.9287 19.1333 21.888 19.25C21.8473 19.3667 21.7763 19.475 21.675 19.575L19.55 21.7C19.45 21.8 19.3417 21.871 19.225 21.913C19.1083 21.955 18.9833 21.9757 18.85 21.975ZM18.85 19.6L19.575 18.875L15.9 15.2L15.175 15.925L18.85 19.6ZM5.125 22C4.99167 22 4.86267 21.975 4.738 21.925C4.61333 21.875 4.50067 21.8 4.4 21.7L2.3 19.6C2.2 19.5 2.125 19.3873 2.075 19.262C2.025 19.1367 2 19.008 2 18.876C2 18.744 2.025 18.619 2.075 18.501C2.125 18.383 2.2 18.2747 2.3 18.176L7.6 12.876H9.725L10.575 12.026L6.45 7.9H5.025L2 4.875L4.825 2.05L7.85 5.075V6.5L11.975 10.625L14.875 7.725L13.8 6.65L15.2 5.25H12.375L11.675 4.55L15.225 1L15.925 1.7V4.525L17.325 3.125L20.875 6.675C21.1583 6.95833 21.375 7.27933 21.525 7.638C21.675 7.99667 21.75 8.37567 21.75 8.775C21.75 9.17433 21.675 9.55767 21.525 9.925C21.375 10.2923 21.1583 10.6173 20.875 10.9L18.75 8.775L17.35 10.175L16.3 9.125L11.125 14.3V16.4L5.825 21.7C5.725 21.8 5.61667 21.875 5.5 21.925C5.38333 21.975 5.25833 22 5.125 22ZM5.125 19.6L9.375 15.35V14.625H8.65L4.4 18.875L5.125 19.6ZM5.125 19.6L4.4 18.875L4.775 19.225L5.125 19.6Z"
                     fill="#1F5A95" />
@@ -2349,33 +2288,26 @@
                   <div class="text-wrapper-9">Repair instructions</div>
                 </div>
               </div>
-              <div class="div-4">
-                <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <div class="div-4"> <svg width="10" height="15" viewBox="0 0 10 15" fill="none"
+                  xmlns="http://www.w3.org/2000/svg">
                   <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round"
                     stroke-linejoin="round" />
-                </svg>
-              </div>
-            </a>
-          </div>
+                </svg> </div>
+            </a> </div>
         </div>
       </div>
-
       <div class="div-2">
         <div class="typography-heading">
           <div class="text-wrapper-4">Emissions Scorecard</div>
         </div>
-        <p class="text-wrapper-5">
-          The Emissions Scorecard gives a clear snapshot of the product's greenhouse gas (GHG) emissions performance,
-          providing a single indicator to assess its overall environmental impact.
-        </p>
+        <p class="text-wrapper-5"> The Emissions Scorecard gives a clear snapshot of the product's greenhouse gas (GHG)
+          emissions performance, providing a single indicator to assess its overall environmental impact. </p>
         <div class="div-7">
           <div class="frame-11">
             <div class="text-wrapper-10">
               {{credentialSubject.emissionsScorecard.carbonFootprint}}{{credentialSubject.emissionsScorecard.declaredUnit}}
             </div>
-            <p class="co-eq">
-              <span class="span">Co2Eq</span>
-            </p>
+            <p class="co-eq"> <span class="span">Co2Eq</span> </p>
           </div>
           <div class="frame-9">
             <div class="div-3">
@@ -2395,15 +2327,13 @@
                     </div>
                   </div>
                 </div>
-                <p class="text-wrapper-8">
-                  The Primary Sourced Ratio shows the percentage of scope 3 emissions data that is
-                  directly collected from actual sources, rather than being based on estimates.
-                </p>
+                <p class="text-wrapper-8"> The Primary Sourced Ratio shows the percentage of scope 3 emissions data that
+                  is directly collected from actual sources, rather than being based on estimates. </p>
               </div>
               <div class="frame-12">
                 <div class="data-two-columns-3">
-                  <div class="text-wrapper-12">Reporting standard</div>
-                  <a href="{{credentialSubject.emissionsScorecard.reportingStandard.id}}" class="line">
+                  <div class="text-wrapper-12">Reporting standard</div> <a
+                    href="{{credentialSubject.emissionsScorecard.reportingStandard.id}}" class="line">
                     <div class="text-wrapper-2">{{credentialSubject.emissionsScorecard.reportingStandard.name}}</div>
                   </a>
                 </div>
@@ -2421,12 +2351,9 @@
           </div>
         </div>
       </div>
-
       <section class="div-2">
         <div class="text-wrapper-14">Declarations</div>
-        <div class="cards-conformities">
-          {{#each credentialSubject.conformityClaim}}
-          <div class="cards-conformity">
+        <div class="cards-conformities"> {{#each credentialSubject.conformityClaim}} <div class="cards-conformity">
             <div class="cards-conformity-header">
               <div class="cards-conformity-conformance">
                 <div class="conformance">Conformance:</div>
@@ -2438,26 +2365,20 @@
             </div>
             <div class="cards-conformity-body">
               <div class="cards-conformity-title">{{conformityEvidence.linkName}}</div>
-              <p class="cards-conformity-description">
-                <span>{{referenceRegulation.name}} administered in {{referenceRegulation.jurisdictionCountry}} by </span>
-                <a href="{{referenceRegulation.administeredBy.id}}" class="gray-bottom-line">{{referenceRegulation.administeredBy.name}}</a>
-              </p>
-              <p class="cards-conformity-description">
-                <span>{{referenceStandard.name}} issued by </span>
-                <a href="{{referenceStandard.issuingParty.id}}" class="gray-bottom-line">{{referenceStandard.issuingParty.name}}</a>
-              </p>
+              <p class="cards-conformity-description"> <span>{{referenceRegulation.name}} administered in
+                  {{referenceRegulation.jurisdictionCountry}} by </span> <a
+                  href="{{referenceRegulation.administeredBy.id}}"
+                  class="gray-bottom-line">{{referenceRegulation.administeredBy.name}}</a> </p>
+              <p class="cards-conformity-description"> <span>{{referenceStandard.name}} issued by </span> <a
+                  href="{{referenceStandard.issuingParty.id}}"
+                  class="gray-bottom-line">{{referenceStandard.issuingParty.name}}</a> </p>
             </div>
-            <div class="declared-values">
-              {{#each declaredValue}}
-              <div class="declared-value">
+            <div class="declared-values"> {{#each declaredValue}} <div class="declared-value">
                 <h3>{{metricName}} is {{metricValue.value}}{{metricValue.unit}}</h3>
                 <p class="heading-2">Score: {{score}} | Accuracy {{accuracy}}</p>
-              </div>
-              {{/each}}
-            </div>
-            <a href="{{conformityEvidence.linkURL}}" class="cards-traceability-2">
-              <div class="frame-21">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              </div> {{/each}} </div> <a href="{{conformityEvidence.linkURL}}" class="cards-traceability-2">
+              <div class="frame-21"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                  xmlns="http://www.w3.org/2000/svg">
                   <path
                     d="M5 21C4.45 21 3.97933 20.8043 3.588 20.413C3.19667 20.0217 3.00067 19.5507 3 19V5C3 4.45 3.196 3.97933 3.588 3.588C3.98 3.19667 4.45067 3.00067 5 3H19C19.55 3 20.021 3.196 20.413 3.588C20.805 3.98 21.0007 4.45067 21 5V19C21 19.55 20.8043 20.021 20.413 20.413C20.0217 20.805 19.5507 21.0007 19 21H5ZM5 5V19H19V5H17V12L14.5 10.5L12 12V5H5Z"
                     fill="#1F5A95"></path>
@@ -2466,132 +2387,62 @@
                   <div class="company-name-2">Evidence</div>
                 </div>
               </div>
-              <div class="div-4">
-                <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  </path>
-                </svg>
-              </div>
+              <div class="div-4"> <svg width="10" height="15" viewBox="0 0 10 15" fill="none"
+                  xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round"> </path>
+                </svg> </div>
             </a>
-          </div>
-          {{/each}}
-        </div>
+          </div> {{/each}} </div>
       </section>
-
-      <div class="div-2">
-        <div class="typography-heading">
-          <div class="text-wrapper-4">Production</div>
-        </div>
-        <div class="div-5">
-          <div class="data-two-columns">
-            <div class="text-wrapper-12">Product category</div>
-            <div class="data-data">
-              <div class="data-2">{{#each credentialSubject.productCategory}}{{name}}{{#unless @last}},{{/unless}}
-                {{/each}}</div>
-            </div>
-          </div>
-          <div class="data-two-columns">
-            <div class="text-wrapper-12">Produced by</div>
-            <div class="data-data-link">
-              <a href="{{credentialSubject.producedByParty.id}}" class="line">
-                <p class="text-wrapper-2">{{credentialSubject.producedByParty.name}}</p>
-              </a>
-            </div>
-          </div>
-          <div class="data-two-columns">
-            <div class="text-wrapper-12">Produced at</div>
-            <div class="data-data-link">
-              <a href="{{credentialSubject.producedAtFacility.id}}" class="line">
-                <p class="text-wrapper-2">{{credentialSubject.producedAtFacility.name}}</p>
-              </a>
-            </div>
-          </div>
-          <div class="data-two-columns">
-            <div class="text-wrapper-12">Date produced</div>
-            <div class="data-wrapper">
-              <div class="data">{{credentialSubject.productionDate}}</div>
-            </div>
-          </div>
-          <div class="data-two-columns">
-            <div class="text-wrapper-12">Country</div>
-            <div class="data-data">
-              <div class="data">{{credentialSubject.countryOfProduction}}</div>
-            </div>
-          </div>
-          <div class="data-two-columns">
-            <div class="text-wrapper-12">Dimensions</div>
-            <div class="list">
-              <span>Weight: {{credentialSubject.dimensions.weight.value}}{{credentialSubject.dimensions.weight.unit}}</span>
-              <span>Length: {{credentialSubject.dimensions.length.value}}{{credentialSubject.dimensions.length.unit}}</span>
-              <span>Width: {{credentialSubject.dimensions.width.value}}{{credentialSubject.dimensions.width.unit}}</span>
-              <span>Height: {{credentialSubject.dimensions.height.value}}{{credentialSubject.dimensions.height.unit}}</span>
-              <span>Volume: {{credentialSubject.dimensions.volume.value}}{{credentialSubject.dimensions.volume.unit}}</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div class="div-2">
         <div class="typography-heading">
           <div class="text-wrapper-4">Composition</div>
         </div>
-        <p class="text-wrapper-5">
-          The Product Composition List details the materials and components used in the product,
-          providing transparency on the origin and nature of each element.
-        </p>
-        <div class="cards">
-          {{#each credentialSubject.materialsProvenance}}
-          <div class="cards-composition">
+        <p class="text-wrapper-5"> The Product Composition List details the materials and components used in the
+          product, providing transparency on the origin and nature of each element. </p>
+        <div class="cards"> {{#each credentialSubject.materialsProvenance}} <div class="cards-composition">
             <div class="first-column">
               <div class="percentage">{{massFraction}}%</div>
               <div class="details">
                 <div class="text-wrapper-9">{{massAmount.value}}{{massAmount.unit}} {{name}}</div>
                 <div class="frame-25">
                   <div class="frame-26">
-                    <div class="text-wrapper-19">Recycled {{#if recycledAmount}}{{recycledAmount}}{{else}}0{{/if}}%</div>
+                    <div class="text-wrapper-19">Recycled {{#if recycledAmount}}{{recycledAmount}}{{else}}0{{/if}}%
+                    </div>
                   </div>
                   <div class="frame-27">
                     <div class="text-wrapper-19">Hazard {{#if hazardous}}Yes{{else}}No{{/if}}</div>
                   </div>
                 </div>
-                <div class="data-data-link-2">
-                  <a href="{{materialSafetyInformation.linkURL}}" class="line">
+                <div class="data-data-link-2"> <a href="{{materialSafetyInformation.linkURL}}" class="line">
                     <div class="text-wrapper-2">{{materialSafetyInformation.linkName}}</div>
-                  </a>
-                </div>
+                  </a> </div>
               </div>
             </div>
             <div class="div-4">
               <div class="text-wrapper-19">{{originCountry}}</div>
             </div>
-          </div>
-          {{/each}}
-        </div>
+          </div> {{/each}} </div>
       </div>
-
       <div class="div-2">
         <div class="typography-heading">
           <div class="text-wrapper-4">History</div>
-        </div>
-
-        {{!-- start: Supply chain due diligence report --}}
-        <a href="{{credentialSubject.dueDiligenceDeclaration.linkURL}}" class="cards-traceability">
-          <div class="history-due-diligence">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        </div> {{!-- start: Supply chain due diligence report --}} <a
+          href="{{credentialSubject.dueDiligenceDeclaration.linkURL}}" class="cards-traceability">
+          <div class="history-due-diligence"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+              xmlns="http://www.w3.org/2000/svg">
               <path
                 d="M5 21C4.45 21 3.97933 20.8043 3.588 20.413C3.19667 20.0217 3.00067 19.5507 3 19V5C3 4.45 3.196 3.97933 3.588 3.588C3.98 3.19667 4.45067 3.00067 5 3H19C19.55 3 20.021 3.196 20.413 3.588C20.805 3.98 21.0007 4.45067 21 5V19C21 19.55 20.8043 20.021 20.413 20.413C20.0217 20.805 19.5507 21.0007 19 21H5ZM5 5V19H19V5H17V12L14.5 10.5L12 12V5H5Z"
                 fill="#1F5A95"></path>
             </svg>
             <div>Supply chain due diligence report</div>
-          </div>
-          <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+          </div> <svg width="10" height="15" viewBox="0 0 10 15" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M1 1L8 8L1 15" stroke="#1F5A95" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             </path>
           </svg>
-        </a>
-        {{!-- end: Supply chain due diligence report --}}
-
-        <div class="history-information">
+        </a> {{!-- end: Supply chain due diligence report --}} <div class="history-information">
           <div class="history-value-chain-item">
             <div class="history-value-chain">
               <p>{{credentialSubject.traceabilityInformation.valueChainProcess}}</p>
@@ -2599,19 +2450,13 @@
                 <p>Verified ratio {{credentialSubject.traceabilityInformation.verifiedRatio}}</p>
               </div>
             </div>
-
-            <div id="history-items-1440px" class="history-event">
-              {{#each credentialSubject.traceabilityInformation.traceabilityEvent}}
-              <div class="history-item">
-                <span>{{linkName}}</span>
-                <a href="{{linkURL}}" class="blue-bottom-line-thick">View</a>
-              </div>
-              {{/each}}
+            <div id="history-items-1440px" class="history-event"> {{#each
+              credentialSubject.traceabilityInformation.traceabilityEvent}} <div class="history-item">
+                <span>{{linkName}}</span> <a href="{{linkURL}}" class="blue-bottom-line-thick">View</a> </div> {{/each}}
             </div>
           </div>
         </div>
       </div>
-
       <div class="div-2">
         <div class="text-wrapper-4">Passport issued by</div>
         <div class="div-5">
@@ -2623,11 +2468,9 @@
           </div>
           <div class="data-two-columns">
             <div class="text-wrapper-12">Registered ID</div>
-            <div class="data-data-link">
-              <a href="{{issuer.id}}" class="line">
+            <div class="data-data-link"> <a href="{{issuer.id}}" class="line">
                 <div class="text-wrapper-2">{{issuer.id}}</div>
-              </a>
-            </div>
+              </a> </div>
           </div>
           <div class="data-two-columns">
             <div class="text-wrapper-12">Valid from</div>
@@ -2643,21 +2486,14 @@
           </div>
         </div>
       </div>
-
       <div class="this-digital-product-wrapper">
-        <p class="this-digital-product">
-          <span class="text-wrapper-17">This Digital Product Passport (DPP) is a digital record of the product’s
-            sustainability and environmental performance, ensuring transparency and accountability
-            in line with UNTP standards. The DPP can be verified at any time using the QR code or
-            visiting
-          </span>
-          <a href="https://www.untp-certification.org" class="black-line" target="_blank"
-            rel="noopener noreferrer"><span>www.untp-certification.org</span></a>
-          <span class="text-wrapper-17"> with the passport ID.</span>
-        </p>
+        <p class="this-digital-product"> <span class="text-wrapper-17">This Digital Product Passport (DPP) is a digital
+            record of the product’s sustainability and environmental performance, ensuring transparency and
+            accountability in line with UNTP standards. For more information visit <a
+              href="https://uncefact.github.io/spec-untp/"
+              class="gray-bottom-line">uncefact.github.io/spec-untp/</a>.</span> </p>
       </div>
-    </div>
-    <!-- End desktop -->
+    </div> <!-- End desktop -->
   </div>
 </body>
 
