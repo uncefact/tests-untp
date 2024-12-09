@@ -1,7 +1,7 @@
 import * as aws from '@pulumi/aws';
 import * as awsx from '@pulumi/awsx';
 import * as pulumi from '@pulumi/pulumi';
-
+import * as docker_build from "@pulumi/docker-build";
 
 export function deployApp(){
 
@@ -110,17 +110,46 @@ const lb = new awsx.lb.ApplicationLoadBalancer(
 
 const cluster = new aws.ecs.Cluster(`app-cluster-${stack}`);
 
-const appRepository = new awsx.ecr.Repository(`app-ecr-${stack}`);
+const appRepository = new aws.ecr.Repository(`app-ecr-${stack}`);
+const authToken = aws.ecr.getAuthorizationTokenOutput({
+  registryId: appRepository.registryId,
+});
 
-const appImage = new awsx.ecr.Image(`app-image-${stack}`, {
-  repositoryUrl: appRepository.url,
-  platform: 'linux/amd64',
-  context: '../',
-  args: {
+const appImage = new docker_build.Image(`app-image-${stack}`, {
+  // Tag our image with our ECR repository's address.
+  tags: [pulumi.interpolate`${appRepository.repositoryUrl}:latest`],
+  /* dockerfile: {
+    location: '../../../packages/untp-playground/Dockerfile',
+  }, */
+  context: {
+      location: '../',
+  },
+  // Use the pushed image as a cache source.
+  cacheFrom: [{
+      registry: {
+          ref: pulumi.interpolate`${appRepository.repositoryUrl}:latest`,
+      },
+  }],
+  // Include an inline cache with our pushed image.
+  cacheTo: [{
+      inline: {},
+  }],
+  platforms: [
+      "linux/amd64",
+  ],
+  buildArgs: {
     ...(process.env.NEXT_PUBLIC_BASE_PATH && { NEXT_PUBLIC_BASE_PATH: process.env.NEXT_PUBLIC_BASE_PATH }),
     ...(process.env.NEXT_PUBLIC_ASSET_PREFIX && { NEXT_PUBLIC_ASSET_PREFIX: process.env.NEXT_PUBLIC_ASSET_PREFIX }),
     ...(process.env.NEXT_PUBLIC_IMAGE_PATH && { NEXT_PUBLIC_IMAGE_PATH: process.env.NEXT_PUBLIC_IMAGE_PATH }),
   },
+  // Push the final result to ECR.
+  push: true,
+  // Provide our ECR credentials.
+  registries: [{
+      address: appRepository.repositoryUrl,
+      password: authToken.password,
+      username: authToken.userName,
+  }],
 });
 
 const service = new awsx.ecs.FargateService(
@@ -131,7 +160,7 @@ const service = new awsx.ecs.FargateService(
     taskDefinitionArgs: {
       container: {
         name: `app-${stack}`,
-        image: appImage.imageUri,
+        image: appImage.ref,
         cpu: 128,
         memory: 512,
         essential: true,
