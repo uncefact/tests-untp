@@ -74,7 +74,18 @@ export async function validateCredentialSchema(credential: any): Promise<{
 
   const schemaUrl = schemaURLConstructor(credentialType, version);
 
-  return validateCredentialOnSchemaUrl(credential, schemaUrl, ['type', '@context']);
+  if (extension?.core.type === 'DigitalProductPassport' && extension?.core.version === '0.5.0') {
+    const relaxFunction = (schema: any) => {
+      delete schema?.properties?.type?.const;
+      delete schema?.properties?.type?.items?.enum;
+      delete schema?.properties?.['@context']?.const;
+      delete schema?.properties?.['@context']?.items?.enum;
+      return schema;
+    };
+    return validateCredentialOnSchemaUrl(credential, schemaUrl, relaxFunction);
+  }
+
+  return validateCredentialOnSchemaUrl(credential, schemaUrl);
 }
 
 export async function validateExtension(credential: any): Promise<{
@@ -114,8 +125,11 @@ export function detectExtension(credential: any):
   };
 }
 
+async function validateCredentialOnSchemaUrl(credential: any, schemaUrl: string, relaxFunction?: (schema: any) => any) {
+  try {
     if (!schemaCache.has(schemaUrl)) {
-      const proxyUrl = `/untp-playground/api/schema?url=${encodeURIComponent(schemaUrl)}`;
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      const proxyUrl = `${baseUrl}/api/schema?url=${encodeURIComponent(schemaUrl)}`;
       const schemaResponse = await fetch(proxyUrl);
 
       if (!schemaResponse.ok) {
@@ -126,7 +140,11 @@ export function detectExtension(credential: any):
       schemaCache.set(schemaUrl, schema);
     }
 
-    const schema = schemaCache.get(schemaUrl);
+    let schema = schemaCache.get(schemaUrl);
+    if (relaxFunction) {
+      schema = relaxFunction(schema);
+    }
+
     const validate = ajv.compile(schema);
     const isValid = validate(credential);
     const errors = validate.errors || [];
