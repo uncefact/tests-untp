@@ -35,18 +35,18 @@ describe('credentialService', () => {
 
       const envelopedCredential = {
         type: 'EnvelopedVerifiableCredential',
-        id: 'did:example:123,eyJhbGciOiJFUzI1NksifQ',
+        id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsIm',
       };
 
       const result = decodeEnvelopedCredential(envelopedCredential);
       expect(result).toEqual(mockDecodedCredential);
-      expect(jwtDecode).toHaveBeenCalledWith('eyJhbGciOiJFUzI1NksifQ');
+      expect(jwtDecode).toHaveBeenCalledWith('eyJhbGciOiJFZERTQSIsIm');
     });
 
     it('should handle missing JWT part', () => {
       const envelopedCredential = {
         type: 'EnvelopedVerifiableCredential',
-        id: 'did:example:123',
+        id: 'data:application/vc+jwt',
       };
 
       const result = decodeEnvelopedCredential(envelopedCredential);
@@ -60,7 +60,7 @@ describe('credentialService', () => {
 
       const envelopedCredential = {
         type: 'EnvelopedVerifiableCredential',
-        id: 'did:example:123,invalid-jwt',
+        id: 'data:application/vc+jwt,invalid-jwt',
       };
 
       const result = decodeEnvelopedCredential(envelopedCredential);
@@ -139,7 +139,7 @@ describe('credentialService', () => {
     it('should detect enveloped proof', () => {
       const credential = {
         type: 'EnvelopedVerifiableCredential',
-        id: 'did:example:123,jwt',
+        id: 'data:application/vc+jwt,eyJhbGciOiJFZERTQSIsIm',
       };
 
       expect(isEnvelopedProof(credential)).toBe(true);
@@ -149,7 +149,7 @@ describe('credentialService', () => {
       const credential = {
         verifiableCredential: {
           type: 'EnvelopedVerifiableCredential',
-          id: 'did:example:123,jwt',
+          id: 'data:application/vc+jwt,eyJhbGciOiJFZERTQSIsIm',
         },
       };
 

@@ -11,23 +11,29 @@ addFormats(ajv);
 
 const schemaCache = new Map<string, any>();
 
-const SCHEMA_URLS = {
-  DigitalProductPassport: 'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.5.0.json',
-  DigitalConformityCredential: 'https://test.uncefact.org/vocabulary/untp/dcc/untp-dcc-schema-0.5.0.json',
-  DigitalTraceabilityEvent: 'https://test.uncefact.org/vocabulary/untp/dte/untp-dte-schema-0.5.0.json',
-  DigitalFacilityRecord: 'https://test.uncefact.org/vocabulary/untp/dfr/untp-dfr-schema-0.5.0.json',
-  DigitalIdentityAnchor: 'https://test.uncefact.org/vocabulary/untp/dia/untp-dia-schema-0.2.1.json',
-};
+interface CoreVersion {
+  type: string;
+  version: string;
+}
 
-const EXTENSION_VERSIONS: Record<
-  string,
-  { domain: string; versions: { version: string; core: { type: string; version: string } }[] }
-> = {
+interface ExtensionVersion {
+  version: string;
+  schema: string;
+  core: CoreVersion;
+}
+
+interface ExtensionConfig {
+  domain: string;
+  versions: ExtensionVersion[];
+}
+
+const EXTENSION_VERSIONS: Record<string, ExtensionConfig> = {
   DigitalLivestockPassport: {
     domain: 'aatp.foodagility.com',
     versions: [
       {
         version: '0.4.0',
+        schema: 'https://aatp.foodagility.com/assets/files/aatp-dlp-schema-0.4.0-9c0ad2b1ca6a9e497dedcfd8b87f35f1.json',
         core: { type: 'DigitalProductPassport', version: '0.5.0' },
       },
     ],
@@ -45,14 +51,8 @@ const schemaURLConstructor = (type: string, version: string) => {
   return `https://test.uncefact.org/vocabulary/untp/${shortCredentialTypes[type]}/untp-${shortCredentialTypes[type]}-schema-${version}.json`;
 };
 
-const extensionSchemaURLConstructor = (type: string, version: string) => {
-  const shortCredentialTypes: Record<string, string> = {
-    DigitalLivestockPassport: 'dlp',
-  };
-  if (type === 'DigitalLivestockPassport' && version === '0.4.0') {
-    return 'https://aatp.foodagility.com/assets/files/aatp-dlp-schema-0.4.0-9c0ad2b1ca6a9e497dedcfd8b87f35f1.json';
-  }
-  return `https://aatp.foodagility.com/vocabulary/aatp/${shortCredentialTypes[type]}/aatp-${shortCredentialTypes[type]}-schema-${version}.json`;
+const findExtensionSchemaURL = (type: string, version: string) => {
+  return EXTENSION_VERSIONS[type].versions.find((v) => v.version === version)?.schema;
 };
 
 export async function validateCredentialSchema(credential: any): Promise<{
@@ -97,7 +97,11 @@ export async function validateExtension(credential: any): Promise<{
     throw new Error('Unknown extension');
   }
 
-  const schemaUrl = extensionSchemaURLConstructor(extension.extension.type, extension.extension.version);
+  const schemaUrl = findExtensionSchemaURL(extension.extension.type, extension.extension.version);
+
+  if (!schemaUrl) {
+    throw new Error('Unsupported extension version');
+  }
 
   return validateCredentialOnSchemaUrl(credential, schemaUrl);
 }
