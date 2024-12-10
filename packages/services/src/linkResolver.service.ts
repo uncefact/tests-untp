@@ -242,14 +242,14 @@ export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
 
   // Find certificate passports in the DLR data
   const certificatePassports = dlrData?.linkset?.find(
-    (linkSetItem: any) => linkSetItem[`${rootDlrDomain}/${GS1ServiceEnum.certificationInfo}`],
+    (linkSetItem: any) => linkSetItem[`${rootDlrDomain}/${GS1ServiceEnum.sustainabilityInfo}`],
   );
   if (!certificatePassports) {
     return null;
   }
 
   // Extract passport infos from certificate passports
-  const dlrPassports = certificatePassports[`${rootDlrDomain}/${GS1ServiceEnum.certificationInfo}`];
+  const dlrPassports = certificatePassports[`${rootDlrDomain}/${GS1ServiceEnum.sustainabilityInfo}`];
   if (!dlrPassports) {
     return null;
   }

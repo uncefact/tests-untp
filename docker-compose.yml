@@ -117,7 +117,7 @@ services:
 
   mock-global-gs1-resolver-object-store:
     image: quay.io/minio/minio:RELEASE.2024-08-17T01-24-54Z-cpuv1
-    command: server /data --console-address ":9091"
+    command: server /data --console-address ":9090"
     ports:
       - '9001:9000'
       - '9091:9090'
