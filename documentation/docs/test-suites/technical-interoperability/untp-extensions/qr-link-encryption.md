@@ -31,6 +31,11 @@ To test your QR Link / Encryption implementation, follow these steps:
            headers: {},
            method: 'GET',
          },
+         QrLinkUnencrypted: {
+           url: 'https://example.com/credential-verifier?q=%7B%22payload%22%3A%7B%22uri%22%3A%22https%3A%2F%2Fapi.vckit.showthething.com%2Fencrypted-storage%2Fencrypted-data%2F0a6031a9-2740-49cd-b12b-1ed02820f01d%22%7D%7D',
+           headers: {},
+           method: 'GET',
+         },
        },
      };
      ```

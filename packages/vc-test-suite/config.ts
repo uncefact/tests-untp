@@ -1,8 +1,13 @@
 export default {
-  implementationName: 'VCkit',
+  implementationName: 'Tier 1 Test Suite',
   testSuites: {
     QrLinkEncrypted: {
-      url: 'http://localhost:3001/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Flocalhost%3A3334%2Fv1%2Fverifiable-credentials%2Fc2eb5fee-da3b-411b-9b03-e8f7fb20dc3d.json%22%2C%22key%22%3A%22e5e0d20e35e2786773720cbba011ca26cca0d6fd279a6c3fd00980a5ed1fb5c8%22%2C%22hash%22%3A%2231e96f8b6896b9fc6f9b86267574b2926b5637e1f65027b437119cfd2033f3d7%22%7D%7D',
+      url: 'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Flocalhost%3A3334%2Fv1%2Fverifiable-credentials%2F7a07aa7c-c961-4c74-a714-a6188cadd8f6.json%22%2C%22key%22%3A%222e2a9af227350b73733988ccb93581a5449cafa64394c13ffc7142b3b0b280b6%22%2C%22hash%22%3A%22a813f8aa1cdb5f391ec227d5a1f76a2764df7112bb26cd035b547a30ade03c8e%22%7D%7D',
+      headers: {},
+      method: 'GET',
+    },
+    QrLinkUnencrypted: {
+      url: 'http://localhost:3003/verify/?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Flocalhost%3A3334%2Fv1%2Fverifiable-credentials%2F61bdef77-0bcf-47d8-a6e6-00074e530e31.json%22%2C%20%22hash%22%3A%229db052ff7b36aa3be34c4a92fb9444314b786380815984d7aba81af97123ce16%22%7D%7D',
       headers: {},
       method: 'GET',
     },
