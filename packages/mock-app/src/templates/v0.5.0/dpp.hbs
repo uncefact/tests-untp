@@ -845,7 +845,7 @@
     /* Media Queries for Mobiles */
     @media (min-width: 50px) {
       .container {
-        min-width: 375px;
+        min-width: 100%;
       }
 
       .contents {
@@ -1806,22 +1806,28 @@
         font-size: 14px;
         line-height: 19.2px;
       }
+    }
 
-      div:has(.container) .container .frame {
-        padding: 56px 0px 0px;
-      }
+    /* Mobile adjustments */
+    div:has(.container) .mobile section{
+      padding: 0px;
+    }
 
-      div:has(.container) .container .div-2,
-      div:has(.container) .container .frame-24,
-      div:has(.container) .container .this-digital-product-wrapper {
-        padding: 0px; /* Override padding */
-      }
+    /* Desktop adjustments */
+    div:has(.container) .contents .frame {
+      padding: 56px 0px 0px;
+    }
+    div:has(.container) .contents .div-2,
+    div:has(.container) .contents .frame-24,
+    div:has(.container) .contents .this-digital-product-wrapper {
+      padding: 0px;
     }
   </style>
 </head>
 
 <body>
-  <div class="container"> <!-- Mobile width 390px-->
+  <div class="container">
+    <!-- Mobile width 390px-->
     <div class="mobile">
       <header class="header">
         <div class="header-image">
