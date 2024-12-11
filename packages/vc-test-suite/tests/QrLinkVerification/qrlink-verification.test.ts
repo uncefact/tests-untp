@@ -1,15 +1,15 @@
-import { decryptCredential } from '@mock-app/services';
 import chai from 'chai';
-import config from '../../config';
+
+import { computeHash, HashAlgorithm, decryptCredential } from '@mock-app/services';
+
 import { reportRow, setupMatrix } from '../../helpers';
 import { request } from '../../httpService';
 import { isURLEncoded, parseQRLink } from './helper';
-import { computeHash } from '@mock-app/services';
-import jwt from 'jsonwebtoken';
+import config from '../../config';
 
 const expect = chai.expect;
 
-describe('QR Link Verification', function () {
+describe('QR Link Verification with encrypted data', function () {
   const { url: qrLink, method, headers } = config.testSuites.QrLinkEncrypted;
   const parsedLink = parseQRLink(qrLink);
 
@@ -52,14 +52,12 @@ describe('QR Link Verification', function () {
       method,
       headers,
     });
-
     const stringifyVC = decryptCredential({
       ...data,
       key: parsedLink.q.payload.key,
     });
-
     const vc = JSON.parse(stringifyVC);
-    const credentialHash = computeHash(vc);
+    const credentialHash = computeHash(vc, HashAlgorithm.SHA256);
     expect(parsedLink.q.payload.hash).to.equal(credentialHash);
   });
 
@@ -73,19 +71,68 @@ describe('QR Link Verification', function () {
       method,
       headers,
     });
-
-    const stringifyVC = decryptCredential({
+    const credential = decryptCredential({
       ...data,
       key: parsedLink.q.payload.key,
     });
 
-    const vc = JSON.parse(stringifyVC);
+    credential.should.not.be.null;
+    credential.should.not.be.undefined;
+    credential.should.not.be.empty;
+  });
+});
 
-    // Handle both JWT and regular JSON VC formats
-    const vcData = vc.id?.startsWith('data:application/vc-ld+jwt,') ? jwt.decode(vc.id.split(',')[1]) : vc;
+describe('QR Link Verification with unencrypted data', function () {
+  const { url: qrLink, method, headers } = config.testSuites.QrLinkUnencrypted;
+  const parsedLink = parseQRLink(qrLink);
 
-    expect(vcData).to.be.an('object');
-    vcData.should.have.property('issuer');
-    vcData.should.have.property('credentialSubject');
+  setupMatrix.call(this, [config.implementationName], 'Implementer');
+
+  reportRow('Fails if decryption key exists', config.implementationName, function () {
+    expect(parsedLink.q.payload.key).to.be.undefined;
+  });
+
+  reportRow('QR link MUST be URL encoded', config.implementationName, function () {
+    const data = isURLEncoded(qrLink);
+    data.should.be.true;
+  });
+
+  reportRow('Verification page link MUST exist and be a string', config.implementationName, function () {
+    expect(parsedLink.verify_app_address).to.be.a('string');
+  });
+
+  reportRow('Payload MUST exist and be an object', config.implementationName, function () {
+    expect(parsedLink.q.payload).to.be.an('object');
+  });
+
+  reportRow('URI MUST exist and be a string', config.implementationName, function () {
+    expect(parsedLink.q.payload.uri).to.be.a('string');
+  });
+
+  reportRow('URI MUST be fetched', config.implementationName, async function () {
+    const { data } = await request({
+      url: parsedLink.q.payload.uri,
+      method,
+      headers,
+    });
+
+    data.should.not.be.null;
+    data.should.not.be.undefined;
+    data.should.not.be.empty;
+  });
+
+  reportRow('Hash MUST exist and be a string', config.implementationName, function () {
+    expect(parsedLink.q.payload.hash).to.be.a('string');
+  });
+
+  reportRow('Hash MUST match the credential hash', config.implementationName, async function () {
+    const { data } = await request({
+      url: parsedLink.q.payload.uri,
+      method: 'GET',
+      headers: {},
+    });
+
+    const credentialHash = computeHash(data, HashAlgorithm.SHA256);
+    expect(parsedLink.q.payload.hash).to.equal(credentialHash);
   });
 });

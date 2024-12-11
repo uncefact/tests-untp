@@ -1,5 +1,6 @@
 import addFormats from 'ajv-formats';
 import Ajv2020 from 'ajv/dist/2020';
+import { detectCredentialType, detectVersion } from './credentialService';
 
 const ajv = new Ajv2020({
   allErrors: true,
@@ -10,29 +11,129 @@ addFormats(ajv);
 
 const schemaCache = new Map<string, any>();
 
-const SCHEMA_URLS = {
-  DigitalProductPassport: 'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.5.0.json',
-  DigitalConformityCredential: 'https://test.uncefact.org/vocabulary/untp/dcc/untp-dcc-schema-0.5.0.json',
-  DigitalTraceabilityEvent: 'https://test.uncefact.org/vocabulary/untp/dte/untp-dte-schema-0.5.0.json',
-  DigitalFacilityRecord: 'https://test.uncefact.org/vocabulary/untp/dfr/untp-dfr-schema-0.5.0.json',
-  DigitalIdentityAnchor: 'https://test.uncefact.org/vocabulary/untp/dia/untp-dia-schema-0.2.1.json',
+interface CoreVersion {
+  type: string;
+  version: string;
+}
+
+interface ExtensionVersion {
+  version: string;
+  schema: string;
+  core: CoreVersion;
+}
+
+interface ExtensionConfig {
+  domain: string;
+  versions: ExtensionVersion[];
+}
+
+const EXTENSION_VERSIONS: Record<string, ExtensionConfig> = {
+  DigitalLivestockPassport: {
+    domain: 'aatp.foodagility.com',
+    versions: [
+      {
+        version: '0.4.0',
+        schema: 'https://aatp.foodagility.com/assets/files/aatp-dlp-schema-0.4.0-9c0ad2b1ca6a9e497dedcfd8b87f35f1.json',
+        core: { type: 'DigitalProductPassport', version: '0.5.0' },
+      },
+    ],
+  },
+};
+
+const schemaURLConstructor = (type: string, version: string) => {
+  const shortCredentialTypes: Record<string, string> = {
+    DigitalProductPassport: 'dpp',
+    DigitalConformityCredential: 'dcc',
+    DigitalTraceabilityEvent: 'dte',
+    DigitalFacilityRecord: 'dfr',
+    DigitalIdentityAnchor: 'dia',
+  };
+  return `https://test.uncefact.org/vocabulary/untp/${shortCredentialTypes[type]}/untp-${shortCredentialTypes[type]}-schema-${version}.json`;
+};
+
+const findExtensionSchemaURL = (type: string, version: string) => {
+  return EXTENSION_VERSIONS[type].versions.find((v) => v.version === version)?.schema;
 };
 
 export async function validateCredentialSchema(credential: any): Promise<{
   valid: boolean;
   errors?: any[];
 }> {
-  try {
-    const credentialType = credential.type.find((t: string) => Object.keys(SCHEMA_URLS).includes(t));
+  const extension = detectExtension(credential);
+  const credentialType = extension ? extension.core.type : detectCredentialType(credential);
 
-    if (!credentialType) {
-      throw new Error('Unsupported credential type');
+  if (credentialType === 'Unknown') {
+    throw new Error('Unsupported credential type');
+  }
+
+  const version = extension?.core?.version || detectVersion(credential);
+
+  if (!version) {
+    throw new Error('Unsupported version');
+  }
+
+  const schemaUrl = schemaURLConstructor(credentialType, version);
+
+  if (extension?.core.type === 'DigitalProductPassport' && extension?.core.version === '0.5.0') {
+    const relaxFunction = (schema: any) => {
+      delete schema?.properties?.type?.const;
+      delete schema?.properties?.type?.items?.enum;
+      delete schema?.properties?.['@context']?.const;
+      delete schema?.properties?.['@context']?.items?.enum;
+      return schema;
+    };
+    return validateCredentialOnSchemaUrl(credential, schemaUrl, relaxFunction);
+  }
+
+  return validateCredentialOnSchemaUrl(credential, schemaUrl);
+}
+
+export async function validateExtension(credential: any): Promise<{
+  valid: boolean;
+  errors?: any[];
+}> {
+  const extension = detectExtension(credential);
+  if (!extension) {
+    throw new Error('Unknown extension');
+  }
+
+  const schemaUrl = findExtensionSchemaURL(extension.extension.type, extension.extension.version);
+
+  if (!schemaUrl) {
+    throw new Error('Unsupported extension version');
+  }
+
+  return validateCredentialOnSchemaUrl(credential, schemaUrl);
+}
+
+export function detectExtension(credential: any):
+  | {
+      core: { type: string; version: string };
+      extension: { type: string; version: string };
     }
+  | undefined {
+  const credentialType = detectCredentialType(credential);
+  const extension = EXTENSION_VERSIONS[credentialType];
+  if (!extension) {
+    return undefined;
+  }
+  const version = detectVersion(credential, extension.domain);
+  const extensionVersion = extension.versions.find((v) => v.version === version);
+  if (!extensionVersion) {
+    return undefined;
+  }
 
-    const schemaUrl = SCHEMA_URLS[credentialType as keyof typeof SCHEMA_URLS];
+  return {
+    core: extensionVersion.core,
+    extension: { type: credentialType, version },
+  };
+}
 
+async function validateCredentialOnSchemaUrl(credential: any, schemaUrl: string, relaxFunction?: (schema: any) => any) {
+  try {
     if (!schemaCache.has(schemaUrl)) {
-      const proxyUrl = `/untp-playground/api/schema?url=${encodeURIComponent(schemaUrl)}`;
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      const proxyUrl = `${baseUrl}/api/schema?url=${encodeURIComponent(schemaUrl)}`;
       const schemaResponse = await fetch(proxyUrl);
 
       if (!schemaResponse.ok) {
@@ -43,7 +144,11 @@ export async function validateCredentialSchema(credential: any): Promise<{
       schemaCache.set(schemaUrl, schema);
     }
 
-    const schema = schemaCache.get(schemaUrl);
+    let schema = schemaCache.get(schemaUrl);
+    if (relaxFunction) {
+      schema = relaxFunction(schema);
+    }
+
     const validate = ajv.compile(schema);
     const isValid = validate(credential);
     const errors = validate.errors || [];

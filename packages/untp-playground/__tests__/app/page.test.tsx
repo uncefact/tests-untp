@@ -1,8 +1,14 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { toast } from 'sonner';
-import { decodeEnvelopedCredential, isEnvelopedProof } from '@/lib/credentialService';
+import {
+  decodeEnvelopedCredential,
+  isEnvelopedProof,
+  detectCredentialType,
+  detectVersion,
+} from '@/lib/credentialService';
+import { detectExtension, validateCredentialSchema } from '@/lib/schemaValidation';
 import { CredentialUploader } from '@/components/CredentialUploader';
-import Home from '../../src/app/page';
+import Home from '@/app/page';
 import { mockCredential } from '../mocks/vc';
 
 // Mock the dependencies
@@ -15,6 +21,13 @@ jest.mock('sonner', () => ({
 jest.mock('@/lib/credentialService', () => ({
   isEnvelopedProof: jest.fn(),
   decodeEnvelopedCredential: jest.fn(),
+  detectCredentialType: jest.fn(),
+  detectVersion: jest.fn(),
+}));
+
+jest.mock('@/lib/schemaValidation', () => ({
+  detectExtension: jest.fn(),
+  validateCredentialSchema: jest.fn(),
 }));
 
 // Mock child components
@@ -68,6 +81,10 @@ describe('Home Component', () => {
 
   it('handles valid credential upload', async () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectVersion as jest.Mock).mockReturnValue('0.5.0');
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    (validateCredentialSchema as jest.Mock).mockReturnValue({ valid: true });
 
     render(<Home />);
 
@@ -108,6 +125,9 @@ describe('Home Component', () => {
     );
 
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    (detectCredentialType as jest.Mock).mockReturnValue('Unknown');
+    (detectVersion as jest.Mock).mockReturnValue('0.1.0');
 
     render(<Home />);
 
@@ -126,6 +146,10 @@ describe('Home Component', () => {
 
     (isEnvelopedProof as jest.Mock).mockReturnValue(true);
     (decodeEnvelopedCredential as jest.Mock).mockReturnValue(mockEnvelopedCredential);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectVersion as jest.Mock).mockReturnValue('0.5.0');
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    (validateCredentialSchema as jest.Mock).mockReturnValue({ valid: true });
 
     render(<Home />);
 

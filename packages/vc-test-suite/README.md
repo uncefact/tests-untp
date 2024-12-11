@@ -8,10 +8,14 @@ yarn install
 
 ## Setup
 
-There are two parts of the test suite: `Render Template 2024` and `QR Link Encryption`. To add your implementation to this test suite you will need to add 2 endpoints to your implementation manifest in `config.ts`:
+There are three parts of the test suite: `Render Template 2024`, `QR Link Verification` and `Storage`. To add your implementation to this test suite you will need to add some endpoints to your implementation manifest in `config.ts`:
 
 - A Render Template 2024 endpoint in the `RenderTemplate2024` property.
 - An Encrypted QR Link in the `QrLinkEncrypted` property.
+- An Unencrypted QR Link in the `QrLinkUnencrypted` property.
+- A Storage endpoint in the `Storage` property.
+
+> **IMPORTANT**: Please change the url in the `config.ts` file to match your implementation.
 
 ## Usage
 
@@ -40,3 +44,8 @@ Open the generated report HTML file in the reports folder to check the results.
 ```bash
 yarn test:package
 ```
+
+### Additional Documentation
+
+- [Technical Interoperability](https://uncefact.github.io/tests-untp/docs/test-suites/technical-interoperability/)
+- [Verify Link](https://uncefact.github.io/tests-untp/docs/mock-apps/common/verify-link)
