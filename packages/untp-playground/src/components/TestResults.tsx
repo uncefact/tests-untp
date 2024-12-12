@@ -185,7 +185,6 @@ export function TestResults({
   }>({});
   const validatedCredentialsRef = useRef<CredentialCache>({});
   const previousCredentialsRef = useRef(credentials);
-  console.log({ previousCredentialsRef });
 
   const initializeTestSteps = (credential?: { original: any; decoded: Credential }) => {
     if (!credential) {
@@ -247,8 +246,6 @@ export function TestResults({
       const credential = credentials[type];
       const previousCredential = previousCredentialsRef.current[type];
 
-      console.log({ credential, previousCredential });
-
       // Only initialize or update if the credential has changed
       if (credential !== previousCredential) {
         setTestResults((prev) => ({
@@ -274,27 +271,13 @@ export function TestResults({
 
       const verifyAndValidate = async () => {
         try {
-          setTestResults((prev) => {
-            // Get current steps or initialize new ones if they don't exist
-            const currentSteps = prev[type as CredentialType] || initializeTestSteps(credential);
-
-            const updatedSteps = currentSteps.map((step) =>
+          // Set in-progress state
+          setTestResults((prev) => ({
+            ...prev,
+            [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
               step.id === 'verification' || step.id === 'schema' ? { ...step, status: 'in-progress' } : step,
-            );
-
-            // console.log('Previous state:', prev);
-            // console.log('Credential type:', type);
-            // console.log('Current steps:', currentSteps);
-            // console.log('Updated steps:', updatedSteps);
-
-            const newState = {
-              ...prev,
-              [type as CredentialType]: updatedSteps,
-            };
-
-            // console.log('New state:', newState);
-            return newState;
-          });
+            ),
+          }));
 
           // Verification
           const verificationResult = await verifyCredential(credential.original);
@@ -451,6 +434,7 @@ export function TestResults({
           console.log('Error processing credential:', error);
         }
       };
+
       verifyAndValidate();
     });
   }, [credentials]);
