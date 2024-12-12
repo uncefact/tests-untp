@@ -402,7 +402,7 @@
       flex-direction: column;
       align-items: flex-start;
       gap: 8px;
-      min-width: 336px;
+      min-width: 100%;
       padding: 16px 18px 16px 16px;
       position: relative;
       background-color: var(--white);
@@ -563,7 +563,8 @@
     }
 
     .cards-traceability {
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr auto;
       align-items: center;
       justify-content: space-between;
       padding: 8px 0px;
@@ -624,7 +625,7 @@
     .company-name-wrapper {
       display: flex;
       flex-direction: column;
-      width: 260px;
+      width: 100%;
       align-items: flex-start;
       gap: 4px;
       position: relative;
