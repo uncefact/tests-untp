@@ -70,13 +70,3 @@ The following environment variables are set in the Dockerfile:
 - `DOCS_BASE_URL`: / (The base URL for the documentation site)
 
 You can override these variables when running the container if needed.
-
-### Versioning
-
-To increment the version of the documentation, follow the guidelines below:
-
-1. Change the MINOR version:
-
-```bash
-npm run update-minor-version
-```
