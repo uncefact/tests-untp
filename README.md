@@ -111,3 +111,15 @@ When documentation changes, the repository version should be incremented. Becaus
 
 - PATCH version will be changed when the documentation is updated. It does not mean the code version is updated.
 - For example, when a typo is fixed in the documentation, the PATCH version is updated.
+
+To increment the MAJOR or MINOR version, update the `package.json` file in the root directory. Then run the following command to update the documentation version:
+
+```bash
+yarn run version:doc
+```
+
+To increment the PATCH version, run the following command:
+
+```bash
+yarn run version:doc:patch
+```
