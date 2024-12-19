@@ -7,6 +7,7 @@ The UNTP Test Suite is a comprehensive set of tools designed to ensure conforman
 3. Documentation Site: Providing detailed information on setup, configuration, and usage.
 
 The Mock Apps are structured into three main packages:
+
 - Components: Contains the UI components.
 - Core: Handles rendering and interaction between components and services.
 - Services: Contains the business logic.
@@ -24,11 +25,13 @@ These tools allow implementers to model value chains, test UNTP functionality in
 To set up and run the mock app:
 
 1. Install dependencies:
+
    ```bash
    yarn install
    ```
 
 2. Build the package:
+
    ```bash
    yarn build
    ```
@@ -60,7 +63,7 @@ The `SEEDING` environment variable acts as a flag to seed the Identity Resolver 
 
 ## Documentation
 
-For detailed information about the configuration, services, and how to use the mock app, please refer to the documentation site. 
+For detailed information about the configuration, services, and how to use the mock app, please refer to the documentation site.
 
 The documentation site is available at [`http://localhost:3002`](http://localhost:3002) after starting the services with Docker Compose.
 
@@ -93,3 +96,18 @@ export MOCK_GS1_SERVICE_API_KEY=test456 # Mock GS1 service API key
 ./seeding/idr-data.sh
 ./seeding/mock-gs1-data.sh
 ```
+
+## Versioning
+
+### Documentation Version
+
+When documentation changes, the repository version should be incremented. Because the documentation is the child of the repository:
+
+- MAJOR version will be changed when the code version is changed.
+- For example breaking changes in the code, like changing the API, will result in a new MAJOR version.
+
+- MINOR version will be changed when the documentation and code version are updated. In some cases, the documentation is not updated, but the code is updated. For example, when a new feature like management of a new type of resource is added, the documentation is not updated, but the code is updated.
+- For example, when a new feature is added, the code version is updated, and the documentation is updated to reflect the new feature.
+
+- PATCH version will be changed when the documentation is updated. It does not mean the code version is updated.
+- For example, when a typo is fixed in the documentation, the PATCH version is updated.
