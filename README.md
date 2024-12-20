@@ -93,3 +93,11 @@ export MOCK_GS1_SERVICE_API_KEY=test456 # Mock GS1 service API key
 ./seeding/idr-data.sh
 ./seeding/mock-gs1-data.sh
 ```
+
+## End-to-end testing
+```bash
+# Run end-to-end testing scripts
+docker-compose up -d
+yarn start:e2e-test
+yarn cypress run
+```
