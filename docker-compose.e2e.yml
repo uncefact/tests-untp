@@ -129,28 +129,6 @@ services:
     depends_on:
       - identity-resolver-service
       - mock-global-gs1-resolver
-  # Mock App
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        CONFIG_FILE: app-config.e2e.json
-    ports:
-      - "3003:80"
-
-  cypress:
-    image: cypress/included:13.16.1
-    depends_on:
-      - app
-    environment:
-      - CYPRESS_baseUrl=http://app:3003 # Base URL for Cypress to test
-    volumes:
-      - ./cypress:/e2e/cypress # Mount the Cypress test files
-      - ./cypress.config.ts:/e2e/cypress.config.ts # Mount Cypress config file
-      - ./packages/mock-app:/app/packages/mock-app # Mount the mock-app for context
-    working_dir: /e2e
-    entrypoint: ["sh", "-c", "npx wait-on http://app:3003 && npx cypress run"]
 
 volumes:
   vckit-data:
