@@ -130,5 +130,14 @@ services:
       - identity-resolver-service
       - mock-global-gs1-resolver
 
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        CONFIG_FILE: app-config.e2e.json
+    ports:
+      - "3003:80"
+
 volumes:
   vckit-data:
