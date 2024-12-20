@@ -7,7 +7,6 @@ describe('Facility Links Test', () => {
   });
 
   it('should verify all <a> tags from the second match the expected texts', () => {
-    // Danh sách các text mong đợi, tương ứng với từ thẻ <a> thứ 2 trở đi
     const expectedTexts = [
       'Orchard Facility',
       'Packhouse Facility',
@@ -17,24 +16,18 @@ describe('Facility Links Test', () => {
       'General features',
     ];
 
-    // Truy cập trang
     cy.visit('/');
 
-    // Lấy tất cả các thẻ <a> (trừ thẻ đầu tiên)
     cy.get('a').then(($aTags) => {
-      // Đảm bảo tổng số thẻ (trừ thẻ đầu) bằng với danh sách expectedTexts
       expect($aTags.length - 1).to.equal(expectedTexts.length);
 
-      // Lặp qua từng thẻ từ index = 1 (thẻ thứ 2 trở đi)
       $aTags.each((index, el) => {
-        if (index === 0) return; // Bỏ qua thẻ đầu tiên
+        if (index === 0) return;
 
-        // Lấy nội dung text của thẻ hiện tại
         cy.wrap(el)
           .invoke('text')
           .then((text) => {
-            // So sánh text với giá trị tương ứng trong expectedTexts
-            expect(text.trim()).to.equal(expectedTexts[index - 1]); // Trừ đi 1 vì bỏ qua thẻ đầu tiên
+            expect(text.trim()).to.equal(expectedTexts[index - 1]);
           });
       });
     });

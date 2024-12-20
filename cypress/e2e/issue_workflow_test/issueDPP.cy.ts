@@ -1,5 +1,5 @@
 
-describe('Facility Links Test', () => {
+describe('Issue DPP end-to-end testing flow', () => {
   beforeEach(() => {
     // Load app config JSON
     cy.fixture('app-config.json').then((data) => {
