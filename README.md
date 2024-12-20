@@ -98,6 +98,5 @@ export MOCK_GS1_SERVICE_API_KEY=test456 # Mock GS1 service API key
 ```bash
 # Run end-to-end testing scripts
 SEEDING=true docker compose -f docker-compose.e2e.yml up -d
-yarn start:e2e-test
 yarn cypress run
 ```
