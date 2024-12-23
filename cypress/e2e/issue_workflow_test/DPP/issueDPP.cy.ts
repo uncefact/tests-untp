@@ -1,3 +1,4 @@
+import { LinkType } from "@mock-app/services";
 
 describe('Issue DPP end-to-end testing flow', () => {
   beforeEach(() => {
@@ -67,8 +68,12 @@ describe('Issue DPP end-to-end testing flow', () => {
 
     // await API issue VC
     cy.wait('@issueCredentials').then((interception) => {
+      const credential = interception.request.body.credential;
+      cy.log('interception: request: ', JSON.stringify(interception.request.body.credential));
       expect(interception?.response?.statusCode).to.eq(201);
-      cy.log('Completed: issueCredentials');
+      // Write the credential to a file
+      cy.task('writeToFile', { fileName: 'DigitalProductPassport_instance-v0.5.0.json', data: credential });
+      cy.log('Completed: issueCredentials and written to file');
     });
 
     // await API storage VC
@@ -88,8 +93,13 @@ describe('Issue DPP end-to-end testing flow', () => {
 
     // await API register link
     cy.wait('@linkResolverRegister').then((interception) => {
+      cy.log('linkResolverRegister Request Body:', JSON.stringify(interception.request.body));
       expect(interception?.response?.statusCode).to.eq(201);
       cy.log('Completed: linkResolverRegister');
+      const checkLinkTypeURL = 'http://localhost:3000/gs1/gtin/09359502000034?linkType=gs1:' + LinkType.sustainabilityInfo
+      cy.request('GET', checkLinkTypeURL).then((response) => {
+        expect(response.status).to.eq(200);
+      });
     });
 
     // Verify toast appears, using react-toastify
@@ -102,5 +112,21 @@ describe('Issue DPP end-to-end testing flow', () => {
       const rawData = win.localStorage.getItem('orchard_facility_dpps');
       expect(rawData).to.not.be.null;
     });
+  });
+
+  it('Runs testing UNTP V0.5.0', () => {
+    cy.exec('pwd').then((result) => {
+      cy.log('Current directory:', result.stdout);
+    });
+    cy.task('runShellScript', { scriptPath: './cypress/e2e/issue_workflow_test/DPP/test-untp-dpp-scripts.sh' })
+      .then((output: any) => {
+        // Loại bỏ mã ANSI từ output
+        const cleanedOutput = output.replace(/\x1b\[[0-9;]*m/g, '');
+        cy.log('Shell Script Output:', cleanedOutput);
+        // Expect the output to include success message
+        expect(cleanedOutput).to.include('Script completed successfully!');
+        expect(cleanedOutput).to.include('Testing Credential: digitalProductPassport');
+        expect(cleanedOutput).to.include('Result: PASS');
+      });
   });
 });

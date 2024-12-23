@@ -1,5 +1,10 @@
 import { defineConfig } from 'cypress';
+import fs from 'fs';
+import path from 'path';
+import { exec } from 'child_process';
+import util from 'util';
 
+const execPromise = util.promisify(exec);
 export default defineConfig({
   e2e: {
     baseUrl: 'http://localhost:3003', // Replace with your application's base URL
@@ -12,6 +17,22 @@ export default defineConfig({
       openMode: 0, // No retries in interactive mode
     },
     defaultCommandTimeout: 4000,
-    defaultBrowser: "chrome"
+    defaultBrowser: "chrome",
+    setupNodeEvents(on) {
+      on('task', {
+        writeToFile({ fileName, data }: { fileName: string; data: any }) {
+          const filePath = path.resolve('cypress/fixtures/credentials-e2e', fileName);
+          fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+          return null; // Indicates success
+        },
+        runShellScript({ scriptPath }: { scriptPath: string }) {
+          return execPromise(`bash ${scriptPath}`)
+            .then(({ stdout }) => stdout)
+            .catch(({ stderr }) => {
+              throw new Error(stderr);
+            });
+        },
+      });
+    },
   },
 });
