@@ -1,4 +1,4 @@
-import { LinkType } from "@mock-app/services";
+import { LinkType } from "../../../../packages/services/src/linkResolver.service";
 
 describe('Issue DPP end-to-end testing flow', () => {
   beforeEach(() => {
