@@ -14,6 +14,7 @@ RUN yarn build
 
 ARG CONFIG_FILE
 COPY ${CONFIG_FILE} packages/mock-app/src/constants/app-config.json
+COPY ${CONFIG_FILE} packages/components/src/constants/app-config.json
 WORKDIR /app/packages/mock-app
 RUN yarn build
 

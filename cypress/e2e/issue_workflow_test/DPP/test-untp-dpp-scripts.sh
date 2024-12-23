@@ -2,8 +2,8 @@
 
 echo "Current working directory: $(pwd)"
 # Set variables
-SOURCE_FILE="credentials.json"
-DEST_FOLDER="../../../../packages/untp-test-suite"
+SOURCE_FILE="cypress/e2e/issue_workflow_test/DPP/credentials.json"
+DEST_FOLDER="packages/untp-test-suite"
 
 # Verify paths
 if [ ! -f "$SOURCE_FILE" ]; then

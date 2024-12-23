@@ -23,15 +23,17 @@ export default defineConfig({
         writeToFile({ fileName, data }: { fileName: string; data: any }) {
           const filePath = path.resolve('cypress/fixtures/credentials-e2e', fileName);
           fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-          return null; // Indicates success
+          return null;
         },
-        runShellScript({ scriptPath }: { scriptPath: string }) {
-          return execPromise(`bash ${scriptPath}`)
-            .then(({ stdout }) => stdout)
-            .catch(({ stderr }) => {
-              throw new Error(stderr);
-            });
-        },
+        async runShellScript({ scriptPath }: { scriptPath: string }) {
+          const absolutePath = path.resolve(process.cwd(), scriptPath);
+          try {
+            const { stdout } = await execPromise(`bash ${absolutePath}`);
+            return stdout;
+          } catch (error: any) {
+            throw error;
+          }
+        }        
       });
     },
   },
