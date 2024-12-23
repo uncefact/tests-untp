@@ -1,4 +1,4 @@
-import { LinkType } from "../../../../packages/services/src/linkResolver.service";
+import { LinkType } from "../../../../packages/services/build/linkResolver.service";
 
 describe('Issue DPP end-to-end testing flow', () => {
   beforeEach(() => {
