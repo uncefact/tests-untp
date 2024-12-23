@@ -93,13 +93,8 @@ describe('Issue DPP end-to-end testing flow', () => {
 
     // await API register link
     cy.wait('@linkResolverRegister').then((interception) => {
-      cy.log('linkResolverRegister Request Body:', JSON.stringify(interception.request.body));
       expect(interception?.response?.statusCode).to.eq(201);
       cy.log('Completed: linkResolverRegister');
-      const checkLinkTypeURL = 'http://localhost:3000/gs1/gtin/09359502000034?linkType=gs1:' + LinkType.sustainabilityInfo
-      cy.request('GET', checkLinkTypeURL).then((response) => {
-        expect(response.status).to.eq(200);
-      });
     });
 
     // Verify toast appears, using react-toastify
@@ -111,6 +106,13 @@ describe('Issue DPP end-to-end testing flow', () => {
     cy.window().then((win) => {
       const rawData = win.localStorage.getItem('orchard_facility_dpps');
       expect(rawData).to.not.be.null;
+    });
+  });
+
+  it('Verify linkType', () => {
+    const checkLinkTypeURL = 'http://localhost:3000/gs1/01/09359502000034/10/6789?linkType=gs1:' + LinkType.sustainabilityInfo
+    cy.request('GET', checkLinkTypeURL).then((response) => {
+      expect(response.status).to.eq(200);
     });
   });
 

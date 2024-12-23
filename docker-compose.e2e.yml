@@ -65,7 +65,7 @@ services:
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
     volumes:
-      - ./minio_data/identity-resolver-service-object-store:/data
+      - ./minio_data/identity-resolver-service-object-store/data-test:/data
 
   mock-global-gs1-resolver:
     # Replace with local or deployed image
