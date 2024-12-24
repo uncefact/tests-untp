@@ -6,7 +6,6 @@ if [ -d "$TARGET_DIR" ]; then
   echo "Found folder: $TARGET_DIR"
   echo "Deleting folder..."
   
-  # Xóa folder
   rm -rf "$TARGET_DIR"
   
   if [ $? -eq 0 ]; then
