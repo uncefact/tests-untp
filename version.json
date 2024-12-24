@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "apiVersion": "1.0.0",
+  "docVersion": "1.0.0",
+  "dependencies": {
+    "vckit": {
+      "repoUrl": "https://github.com/uncefact/project-vckit.git",
+      "versions": ["1.0.0"]
+    },
+    "storage-service": {
+      "repoUrl": "https://github.com/uncefact/project-identity-resolver.git",
+      "versions": ["1.0.0"]
+    },
+    "idr": {
+      "repoUrl": "https://github.com/pyx-industries/pyx-identity-resolver.git",
+      "versions": ["1.0.0"]
+    }
+  }
+}
