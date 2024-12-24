@@ -22,3 +22,6 @@ appspec.yml
 logs
 aws
 .DS_Store
+
+packages/mock-app/src/constants/app-config.json
+packages/components/src/constants/app-config.json
