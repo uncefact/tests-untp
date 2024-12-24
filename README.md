@@ -97,29 +97,19 @@ export MOCK_GS1_SERVICE_API_KEY=test456 # Mock GS1 service API key
 ./seeding/mock-gs1-data.sh
 ```
 
-## Versioning
+## Documentation Versioning
 
-### Documentation Version
+The project uses Docusaurus for documentation management. Documentation versions are managed through a release script and automated pipeline.
 
-When documentation changes, the repository version should be incremented. Because the documentation is the child of the repository:
+### Release Script
 
-- MAJOR version will be changed when the code version is changed.
-- For example breaking changes in the code, like changing the API, will result in a new MAJOR version.
+The `scripts/release-doc.js` script automates the process of creating new documentation versions:
 
-- MINOR version will be changed when the documentation and code version are updated. In some cases, the documentation is not updated, but the code is updated. For example, when a new feature like management of a new type of resource is added, the documentation is not updated, but the code is updated.
-- For example, when a new feature is added, the code version is updated, and the documentation is updated to reflect the new feature.
-
-- PATCH version will be changed when the documentation is updated. It does not mean the code version is updated.
-- For example, when a typo is fixed in the documentation, the PATCH version is updated.
-
-To increment the MAJOR or MINOR version, update the `package.json` file in the root directory. Then run the following command to update the documentation version:
+- Reads the documentation version from `version.json`
+- Creates Docusaurus version using `docVersion` value from `version.json` file
+  To manually create a new documentation version:
 
 ```bash
-yarn run version:doc
-```
-
-To increment the PATCH version, run the following command:
-
-```bash
-yarn run version:doc:patch
+# Run the release script
+yarn release:doc
 ```
