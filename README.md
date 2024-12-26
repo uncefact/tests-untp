@@ -7,6 +7,7 @@ The UNTP Test Suite is a comprehensive set of tools designed to ensure conforman
 3. Documentation Site: Providing detailed information on setup, configuration, and usage.
 
 The Mock Apps are structured into three main packages:
+
 - Components: Contains the UI components.
 - Core: Handles rendering and interaction between components and services.
 - Services: Contains the business logic.
@@ -24,11 +25,13 @@ These tools allow implementers to model value chains, test UNTP functionality in
 To set up and run the mock app:
 
 1. Install dependencies:
+
    ```bash
    yarn install
    ```
 
 2. Build the package:
+
    ```bash
    yarn build
    ```
@@ -60,7 +63,7 @@ The `SEEDING` environment variable acts as a flag to seed the Identity Resolver 
 
 ## Documentation
 
-For detailed information about the configuration, services, and how to use the mock app, please refer to the documentation site. 
+For detailed information about the configuration, services, and how to use the mock app, please refer to the documentation site.
 
 The documentation site is available at [`http://localhost:3002`](http://localhost:3002) after starting the services with Docker Compose.
 
@@ -92,4 +95,21 @@ export MOCK_GS1_SERVICE_API_KEY=test456 # Mock GS1 service API key
 # Run seeding scripts
 ./seeding/idr-data.sh
 ./seeding/mock-gs1-data.sh
+```
+
+## Documentation Versioning
+
+The project uses Docusaurus for documentation management. Documentation versions are managed through a release script and automated pipeline.
+
+### Release Script
+
+The `scripts/release-doc.js` script automates the process of creating new documentation versions:
+
+- Reads the documentation version from `version.json`
+- Creates Docusaurus version using `docVersion` value from `version.json` file
+  To manually create a new documentation version:
+
+```bash
+# Run the release script
+yarn release:doc
 ```

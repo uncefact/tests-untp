@@ -29,7 +29,8 @@
     "upgrade:packages": "yarn -r --stream upgrade --latest",
     "version": "lerna version",
     "prepare": "husky install",
-    "lint": "cross-env NODE_OPTIONS=--max-old-space-size=8192 yarn eslint packages"
+    "lint": "cross-env NODE_OPTIONS=--max-old-space-size=8192 yarn eslint packages",
+    "release:doc": "node scripts/release-doc.js"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",

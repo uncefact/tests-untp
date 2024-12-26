@@ -70,4 +70,3 @@ The following environment variables are set in the Dockerfile:
 - `DOCS_BASE_URL`: / (The base URL for the documentation site)
 
 You can override these variables when running the container if needed.
-
