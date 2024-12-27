@@ -30,6 +30,8 @@
     "@docusaurus/module-type-aliases": "3.4.0",
     "@docusaurus/tsconfig": "3.4.0",
     "@docusaurus/types": "3.4.0",
+    "axios": "^1.7.9",
+    "handlebars": "^4.7.8",
     "typescript": "~5.2.2"
   },
   "browserslist": {
