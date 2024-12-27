@@ -103,6 +103,24 @@ The project uses Docusaurus for documentation management. Documentation versions
 
 ### Release Script
 
+#### Generate Version Mapping Documentation
+
+The version mapping documentation is a page on the documentation site, so it needs to generated before releasing a new version of the documentation. Therefore, the versions in the `version.json` file are the upcoming versions for the upcoming release.
+The process of generating the version mapping documentation are as follows:
+
+- Read the versions from `version.json` file
+- Fetch the dependent versions from the `version.json` file
+- Map the versions data to the template
+- Append the generated markdown to the `_version-mapping.mdx` file
+
+To generate the version mapping documentation:
+
+```bash
+yarn generate-version-mapping
+```
+
+#### Creating a New Documentation Version
+
 The `scripts/release-doc.js` script automates the process of creating new documentation versions:
 
 - Reads the documentation version from `version.json`
