@@ -3,7 +3,7 @@ name: package
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+      - '[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
 
 env:
@@ -47,5 +47,3 @@ jobs:
           target: build
           build-args: |
             CONFIG_FILE=./app-config.json
-
-      
