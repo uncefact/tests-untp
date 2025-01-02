@@ -63,6 +63,7 @@ jobs:
           DOCS_URL: ${{ vars.DOCS_URL }}
 
   release:
+    needs: [test_and_build, build_docs]
     runs-on: ubuntu-latest
     outputs:
       new_version: ${{ steps.retrieve_version.outputs.new_version }}
