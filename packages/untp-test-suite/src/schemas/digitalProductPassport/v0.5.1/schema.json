@@ -5,38 +5,46 @@
     "type": {
       "type": "array",
       "readOnly": true,
-      "const": [
-        "DigitalProductPassport",
-        "VerifiableCredential"
+      "allOf": [
+        {
+          "contains": {
+            "const": "VerifiableCredential"
+          }
+        },
+        {
+          "contains": {
+            "const": "DigitalProductPassport"
+          }
+        }
       ],
       "default": [
         "DigitalProductPassport",
         "VerifiableCredential"
       ],
       "items": {
-        "type": "string",
-        "enum": [
-          "DigitalProductPassport",
-          "VerifiableCredential"
-        ]
+        "type": "string"
       }
     },
     "@context": {
       "example": "https://test.uncefact.org/vocabulary/untp/dpp/dpp-context.jsonld",
       "type": "array",
+      "allOf": [
+        {
+          "contains": {
+            "const": "https://www.w3.org/ns/credentials/v2"
+          }
+        },
+        {
+          "contains": {
+            "const": "https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/"
+          }
+        }
+      ],
       "items": {
-        "type": "string",
-        "enum": [
-          "https://www.w3.org/ns/credentials/v2",
-          "https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/"
-        ]
+        "type": "string"
       },
       "description": "A list of JSON-LD context URIs that define the semantic meaning of properties within the credential. ",
       "readOnly": true,
-      "const": [
-        "https://www.w3.org/ns/credentials/v2",
-        "https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/"
-      ],
       "default": [
         "https://www.w3.org/ns/credentials/v2",
         "https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/"
@@ -210,17 +218,14 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Product"
-          ],
+          "contains": {
+            "const": "Product"
+          },
           "default": [
             "Product"
           ],
           "items": {
-            "type": "string",
-            "enum": [
-              "Product"
-            ]
+            "type": "string"
           }
         },
         "id": {
