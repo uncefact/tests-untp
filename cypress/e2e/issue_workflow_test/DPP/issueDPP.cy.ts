@@ -1,5 +1,4 @@
-import { LinkType } from "../../../../packages/services/build/linkResolver.service";
-
+import { LinkType } from '../../../../packages/services/build/linkResolver.service';
 describe('Issue DPP end-to-end testing flow', () => {
   beforeEach(() => {
     // Load app config JSON
@@ -29,8 +28,7 @@ describe('Issue DPP end-to-end testing flow', () => {
     // Intercept API call triggered by clicking "ISSUE DPP"
     const shemaDPP = AppConfig.apps[0]?.features[0]?.components[0].props?.schema?.url;
     const appService = AppConfig.apps[0]?.features[0]?.services[0]?.parameters[0];
-    cy.intercept('GET', shemaDPP)
-      .as('getProductSchema'); // Create an alias for this request
+    cy.intercept('GET', shemaDPP).as('getProductSchema'); // Create an alias for this request
 
     // Check if "ISSUE DPP" button appears and is interactable
     cy.contains('a', 'Issue DPP') // Find button by text
@@ -44,7 +42,7 @@ describe('Issue DPP end-to-end testing flow', () => {
     });
 
     const API_ENDPOINT = {
-      ISSUE_BITSTRING_STATUS_LIST: "/agent/issueBitstringStatusList",
+      ISSUE_BITSTRING_STATUS_LIST: '/agent/issueBitstringStatusList',
       VCKit_URL: appService?.vckit?.vckitAPIUrl + '/credentials/issue',
       STORAGE_URL: appService?.storage?.url,
       IDR_URL: appService?.dlr?.dlrAPIUrl + appService?.dlr?.linkRegisterPath,
@@ -55,10 +53,7 @@ describe('Issue DPP end-to-end testing flow', () => {
     cy.intercept('POST', API_ENDPOINT.IDR_URL).as('linkResolverRegister');
 
     // Check if "Submit" button appears after API response
-    cy.contains('button', 'Submit')
-      .should('be.visible')
-      .and('not.be.disabled')
-      .click();
+    cy.contains('button', 'Submit').should('be.visible').and('not.be.disabled').click();
 
     // await API create credential status
     cy.wait('@issueBitStringStatusList').then((interception) => {
@@ -98,9 +93,7 @@ describe('Issue DPP end-to-end testing flow', () => {
     });
 
     // Verify toast appears, using react-toastify
-    cy.get('.Toastify__toast')
-      .should('be.visible')
-      .and('contain', 'Action Successful');
+    cy.get('.Toastify__toast').should('be.visible').and('contain', 'Action Successful');
 
     // Validate localStorage
     cy.window().then((win) => {
@@ -110,7 +103,8 @@ describe('Issue DPP end-to-end testing flow', () => {
   });
 
   it('Verify linkType', () => {
-    const checkLinkTypeURL = 'http://localhost:3000/gs1/01/09359502000034/10/6789?linkType=gs1:' + LinkType.sustainabilityInfo
+    const checkLinkTypeURL =
+      'http://localhost:3000/gs1/01/09359502000034/10/6789?linkType=gs1:' + LinkType.sustainabilityInfo;
     cy.request('GET', checkLinkTypeURL).then((response) => {
       expect(response.status).to.eq(200);
     });
@@ -120,15 +114,15 @@ describe('Issue DPP end-to-end testing flow', () => {
     cy.exec('pwd').then((result) => {
       cy.log('Current directory:', result.stdout);
     });
-    cy.task('runShellScript', { scriptPath: './cypress/e2e/issue_workflow_test/DPP/test-untp-dpp-scripts.sh' })
-      .then((output: any) => {
-        // Loại bỏ mã ANSI từ output
+    cy.task('runShellScript', { scriptPath: './cypress/e2e/issue_workflow_test/DPP/test-untp-dpp-scripts.sh' }).then(
+      (output: any) => {
         const cleanedOutput = output.replace(/\x1b\[[0-9;]*m/g, '');
         cy.log('Shell Script Output:', cleanedOutput);
         // Expect the output to include success message
         expect(cleanedOutput).to.include('Script completed successfully!');
         expect(cleanedOutput).to.include('Testing Credential: digitalProductPassport');
         expect(cleanedOutput).to.include('Result: PASS');
-      });
+      },
+    );
   });
 });
