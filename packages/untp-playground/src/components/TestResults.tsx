@@ -42,6 +42,12 @@ interface TestGroupProps {
   onToggle: () => void;
 }
 
+export const confettiConfig = {
+  particleCount: 200,
+  spread: 90,
+  origin: { y: 0.7 },
+};
+
 const TestGroup = ({
   credentialType,
   version,
@@ -314,11 +320,14 @@ export function TestResults({
             validated: true,
           };
 
+          let allChecksPass = verificationResult.verified;
           const extension = detectExtension(credential.decoded);
 
           // Schema validation
           try {
             const validationResult = await validateCredentialSchema(credential.decoded);
+            allChecksPass = allChecksPass && validationResult.valid;
+
             setTestResults((prev) => ({
               ...prev,
               [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
@@ -331,22 +340,8 @@ export function TestResults({
                   : step,
               ),
             }));
-
-            if (!extension && validationResult.valid) {
-              if (!validatedCredentialsRef.current[credentialType]?.confettiShown) {
-                confetti({
-                  particleCount: 200,
-                  spread: 90,
-                  origin: { y: 0.7 },
-                });
-
-                validatedCredentialsRef.current[credentialType] = {
-                  ...validatedCredentialsRef.current[credentialType]!,
-                  confettiShown: true,
-                };
-              }
-            }
           } catch (error) {
+            allChecksPass = false;
             console.log('Schema validation error:', error);
             toast.error('Failed to fetch schema. Please try again.');
 
@@ -377,6 +372,8 @@ export function TestResults({
           if (extension) {
             try {
               const extensionValidationResult = await validateExtension(credential.decoded);
+              allChecksPass = allChecksPass && extensionValidationResult.valid;
+
               setTestResults((prev) => ({
                 ...prev,
                 [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
@@ -389,21 +386,8 @@ export function TestResults({
                     : step,
                 ),
               }));
-              if (extensionValidationResult.valid) {
-                if (!validatedCredentialsRef.current[credentialType]?.confettiShown) {
-                  confetti({
-                    particleCount: 200,
-                    spread: 90,
-                    origin: { y: 0.7 },
-                  });
-
-                  validatedCredentialsRef.current[credentialType] = {
-                    ...validatedCredentialsRef.current[credentialType]!,
-                    confettiShown: true,
-                  };
-                }
-              }
             } catch (error) {
+              allChecksPass = false;
               console.log('Extension schema validation error:', error);
               toast.error('Failed to fetch extension schema. Please try again.');
 
@@ -429,6 +413,16 @@ export function TestResults({
                 ),
               }));
             }
+          }
+
+          // Trigger confetti only if all checks pass
+          if (allChecksPass && !validatedCredentialsRef.current[credentialType]?.confettiShown) {
+            confetti(confettiConfig);
+
+            validatedCredentialsRef.current[credentialType] = {
+              ...validatedCredentialsRef.current[credentialType]!,
+              confettiShown: true,
+            };
           }
         } catch (error) {
           console.log('Error processing credential:', error);

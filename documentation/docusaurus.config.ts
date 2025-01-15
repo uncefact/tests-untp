@@ -94,6 +94,9 @@ const config: Config = {
           className: 'navbar-github-link',
           position: 'right',
         },
+         {
+            type: 'docsVersionDropdown',
+          },
       ],
     },
     footer: {

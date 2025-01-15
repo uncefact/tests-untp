@@ -21,7 +21,13 @@ const config = {
   testMatch: ['**/__tests__/**/*.(spec|test).[jt]s?(x)', '**/?(*.)+(spec|test).[tj]s?(x)'],
   testPathIgnorePatterns: ['/node_modules/', '__tests__/mocks/*.ts'],
   modulePathIgnorePatterns: ['<rootDir>/build', '<rootDir>/dist', '<rootDir>/.next'],
-  collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/**/index', '!src/**/types'],
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/**/index',
+    '!src/**/types',
+    '!src/components/ui/**',
+  ],
 };
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
