@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "baseUrl": "./",
+    "target": "es6",
+    "lib": [
+      "es6",
+      "dom"
+    ],
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "types": [
+      "cypress"
+    ]
+  },
+  "include": [
+    "**/*.ts",
+    "cypress/**/*.ts"
+  ], // Include test files
+  "exclude": [
+    "node_modules"
+  ]
+}

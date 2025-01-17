@@ -19,8 +19,8 @@ describe('cryptoService', () => {
 
       const decryptionParams = {
         cipherText,
-        key: Buffer.from(key).toString('hex'),
-        iv: Buffer.from(iv).toString('base64'),
+        key: key.toString('hex'),
+        iv: iv.toString('base64'),
         tag,
         type: EncryptionAlgorithm.AES_256_GCM,
       };

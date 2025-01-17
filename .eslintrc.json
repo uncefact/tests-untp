@@ -2,7 +2,8 @@
   "root": true,
   // TODO: Enable linting for documentation folder
   "ignorePatterns": [
-    "documentation"
+    "documentation",
+    "cypress"
   ],
   "plugins": [
     "@typescript-eslint",

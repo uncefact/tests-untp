@@ -131,3 +131,20 @@ The `scripts/release-doc.js` script automates the process of creating new docume
 # Run the release script
 yarn release:doc
 ```
+
+## End-to-end testing
+
+```bash
+# Run end-to-end testing scripts
+yarn build-clean
+yarn install
+yarn build
+SEEDING=true docker compose -f docker-compose.e2e.yml up -d
+
+# Reset data
+chmod +x run-e2e-tests.sh
+./run-e2e-tests.sh
+
+# Run Cypress tests
+yarn cypress run
+```
