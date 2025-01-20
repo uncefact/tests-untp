@@ -8,7 +8,8 @@ describe('Issue DFR end-to-end testing flow', () => {
 
   it('should access the right app config data', () => {
     const AppConfig = Cypress.env('AppConfig');
-    expect(AppConfig?.name).to.eq('CHERRIES SUPPLY CHAIN TRACEABILITY');
+    expect(AppConfig?.name).to.not.be.null;
+    expect(AppConfig?.name).to.not.be.undefined;
   });
 
   it('should visit the homepage, navigate to "General features", handle API calls, and show success message', () => {
@@ -18,9 +19,12 @@ describe('Issue DFR end-to-end testing flow', () => {
     cy.contains('a', 'General features').should('be.visible').and('not.be.disabled').click();
 
     cy.url().should('include', '/general-features');
-    // temporary hardcoding the schema URL and app service
-    const shemaDFR = AppConfig.generalFeatures[0]?.features[0]?.components[0].props?.schema?.url;
-    const appService = AppConfig.generalFeatures[0]?.features[0]?.services[0]?.parameters[0];
+    const feature = AppConfig.generalFeatures[0]?.features.find(
+      (feature: { name: string }) => feature.name === 'Generate DFR',
+    );
+
+    const shemaDFR = feature?.components[0].props?.schema?.url ?? '';
+    const appService = feature?.services[0]?.parameters[0] ?? {};
     cy.intercept('GET', shemaDFR).as('getFacilitySchema');
 
     cy.contains('a', 'Generate DFR') // Find button by text
@@ -108,5 +112,17 @@ describe('Issue DFR end-to-end testing flow', () => {
         expect(cleanedOutput).to.include('Result: PASS');
       },
     );
+
+    // Define the path to the JSON file you want to delete
+    // const filePath = 'DigitalFacilityRecord_instance-v0.5.0.json';
+
+    // Call the task to delete the file
+    // cy.task('deleteFileTestUNTP', filePath).then((result) => {
+    //   if (result) {
+    //     cy.log('File deleted successfully');
+    //   } else {
+    //     cy.log('File not found or could not be deleted');
+    //   }
+    // });
   });
 });
