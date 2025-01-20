@@ -100,9 +100,6 @@ describe('Issue DCC end-to-end testing flow', () => {
   });
 
   it('Runs testing UNTP V0.5.0', () => {
-    cy.exec('pwd').then((result) => {
-      cy.log('Current directory:', result.stdout);
-    });
     cy.task('runShellScript', { scriptPath: './cypress/e2e/issue_workflow_test/DCC/test-untp-dcc-scripts.sh' }).then(
       (output: any) => {
         const cleanedOutput = output.replace(/\x1b\[[0-9;]*m/g, '');
