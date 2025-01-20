@@ -17,7 +17,7 @@ export default defineConfig({
       openMode: 0, // No retries in interactive mode
     },
     defaultCommandTimeout: 4000,
-    defaultBrowser: "chrome",
+    defaultBrowser: 'chrome',
     setupNodeEvents(on) {
       on('task', {
         writeToFile({ fileName, data }: { fileName: string; data: any }) {
@@ -33,7 +33,18 @@ export default defineConfig({
           } catch (error: any) {
             throw error;
           }
-        }        
+        },
+        deleteFileTestUNTP(fileName: string) {
+          const filePath = path.resolve('cypress/fixtures/credentials-e2e', fileName);
+          return new Promise((resolve, reject) => {
+            fs.unlink(filePath, (err) => {
+              if (err) {
+                return reject(err);
+              }
+              resolve(null);
+            });
+          });
+        },
       });
     },
   },
