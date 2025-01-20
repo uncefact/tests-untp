@@ -24,8 +24,8 @@ describe('Issue DCC end-to-end testing flow', () => {
       (feature: { name: string }) => feature.name === 'Generate DCC',
     );
 
-    const shemaDCC = feature?.components[0].props?.schema?.url;
-    const appService = feature.services[0]?.parameters[0];
+    const shemaDCC = feature?.components[0].props?.schema?.url ?? '';
+    const appService = feature?.services[0]?.parameters[0] ?? {};
     cy.intercept('GET', shemaDCC).as('getConformityCredential');
 
     cy.contains('a', 'Generate DCC') // Find button by text
