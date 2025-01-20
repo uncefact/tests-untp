@@ -6,7 +6,7 @@ describe('Issue DFR end-to-end testing flow', () => {
     });
   });
 
-  it('should access the right the app config data', () => {
+  it('should access the right app config data', () => {
     const AppConfig = Cypress.env('AppConfig');
     expect(AppConfig?.name).to.eq('CHERRIES SUPPLY CHAIN TRACEABILITY');
   });
