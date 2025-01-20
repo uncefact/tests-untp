@@ -14,7 +14,98 @@
         "secondaryColor": "black",
         "tertiaryColor": "black"
       },
-      "features": []
+      "features": [
+        {
+          "name": "Generate DIA",
+          "id": "produce_product",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "url": "https://jargon.sh/user/unece/DigitalIdentityAnchor/v/working/artefacts/jsonSchemas/RegisteredIdentity.json?class=RegisteredIdentity"
+                },
+                "data": {
+                  "type": ["RegisteredIdentity", "Identifier"],
+                  "id": "https://id.gs1.org/01/09359502000010",
+                  "name": "Sample business Ltd",
+                  "registeredId": "0109359502000010",
+                  "idScheme": {
+                    "type": ["IdentifierScheme"],
+                    "id": "https://id.gs1.org/01/",
+                    "name": "Global Trade Identification Number (GTIN)"
+                  },
+                  "registerType": "Business",
+                  "registrationScopeList": ["https://jargon.sh", "https://jargon.sh"]
+                },
+                "style": {},
+                "className": "",
+                "constructData": {
+                  "mappingFields": [],
+                  "dummyFields": [],
+                  "generationFields": []
+                }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {}
+            }
+          ],
+          "services": [
+            {
+              "name": "processDigitalIdentityAnchor",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": {
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                      "name": "Orchard Facility"
+                    },
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
+                  },
+                  "digitalIdentityAnchor": {
+                    "context": ["https://test.uncefact.org/vocabulary/untp/dia/0.2.1/"],
+                    "renderTemplate": [
+                      {
+                        "template": "<!DOCTYPE html> <html lang=\"en\"> <head> <meta charset=\"UTF-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" /> <link href=\"https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap\" rel=\"stylesheet\"> <title>Digital Identity Anchor</title> <style> :root { --primary-colorsblue-10: rgba(247, 250, 253, 1); --primary-colorsgray-100: rgba(250, 250, 250, 1); --white: rgba(255, 255, 255, 1); --black: rgba(0, 0, 0, 1); --primary-colorsgray-300: rgba(237, 239, 240, 1); --primary-colorsgray-500: rgba(169, 177, 183, 1); --primary-colorsgray-600: rgba(85, 96, 110, 1); --primary-colorsblue-700: rgba(31, 90, 149, 1); --primary-colorsgray-700: rgba(35, 46, 61, 1); --primary-colorsblue-100: rgba(181, 213, 245, 0.5); --primary-colorsblue-100-full: rgba(181, 213, 245, 1); --primary-colorsblue-200: rgba(148, 196, 245, 1); --primary-colorsblue-400: rgba(79, 149, 221, 1); --primary-colorsblue-600: rgba(0, 110, 181, 1); --primary-colorsgray-400: rgba(212, 214, 216, 1); --primary-colorsgray-300: rgba(237, 239, 240, 1); --accent-colorslight-green: rgba(184, 236, 182, 1); --text-color-green: rgba(8, 50, 0, 1); --accent-colorslight-red: rgba(255, 188, 183, 1); --text-color-red: rgba(50, 0, 0, 1); } /* Globals CSS */ * { margin: 0; box-sizing: border-box; } body { font-family: 'Lato', sans-serif; } section { padding: 0 16px 0 16px; } a { text-decoration: none; } .facility-record { width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 32px; word-break: break-word; } .facility-record .contents { display: flex; flex-direction: column; gap: 24px; } .facility-record .traceability-header { display: flex; flex-direction: column; width: 100%; align-items: center; } .facility-record .TRACE-header { display: flex; flex-direction: column; width: 100%; align-items: flex-start; gap: 12px; padding: 32px 16px 20px 16px; background-color: var(--primary-colorsgray-700); } .facility-record .PP-title { width: 100%; font-weight: 500; color: var(--white); font-size: 16px; line-height: 22px; text-transform: uppercase; } .facility-record .name-description { display: flex; flex-direction: column; gap: 8px; } .facility-record .name-description h1 { font-weight: 900; color: var(--white); font-size: 30px; line-height: 32.5px; } .facility-record .name-description p { font-weight: 500; color: var(--white); font-size: 16px; line-height: 17.4px; } .facility-record .text-wrapper { align-self: stretch; font-weight: 900; color: var(--white); font-size: 30px; line-height: 32.5px; } .facility-record .issuing-organisation { padding: 0px 16px 16px; align-self: stretch; width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; background-color: var(--primary-colorsgray-600); } .facility-record .data-two-columns { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; padding: 10px 0px 12px; width: 100%; border-bottom-width: 1px; border-bottom-style: solid; } .facility-record .data-two-columns:last-child { border-bottom: none; } .facility-record .table-line { border-bottom: 1px solid #d4d6d8; } .facility-record .item-value a { color: #232E3D; } .facility-record .declarations { display: flex; flex-direction: column; gap: 12px; padding: 0px 16px; width: 100%; } .facility-record .declaration-title { font-size: 20px; font-weight: 700; line-height: 21.8px; color: var(--primary-colorsgray-700); } .facility-record .cards-conformities { display: flex; flex-direction: column; gap: 8px; } .facility-record .cards-conformity { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 100%; padding: 16px 18px 16px 16px; position: relative; background-color: var(--white); border-radius: 4px; border: 1px solid; border-color: var(--primary-colorsgray-400); } .facility-record .frame { display: flex; align-items: center; justify-content: space-between; position: relative; align-self: stretch; width: 100%; flex: 0 0 auto; } .facility-record .div-2 { display: inline-flex; align-items: center; gap: 4px; position: relative; flex: 0 0 auto; } .facility-record .company-name { position: relative; width: fit-content; font-weight: 400; color: var(--primary-colorsgray-600); font-size: 14px; line-height: 19.2px; } .facility-record .tags-VC-badge-red { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 4px 8px; flex: 0 0 auto; background-color: var(--accent-colorslight-red); color: var(--text-color-red); border-radius: 8px; overflow: hidden; } .facility-record .tags-VC-badge-green { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 4px 8px; flex: 0 0 auto; background-color: var(--accent-colorslight-green); color: var(--text-color-green); border-radius: 8px; overflow: hidden; } .facility-record .verifiable { width: fit-content; font-weight: 600; font-size: 14px; line-height: 15.3px; } .facility-record .frame-2 { display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative; align-self: stretch; width: 100%; flex: 0 0 auto; } .facility-record .text-wrapper { position: relative; align-self: stretch; margin-top: -1px; font-weight: 400; color: var(--primary-colorsblue-700); font-size: 18px; line-height: 21.2px; } .facility-record .p { color: var(--primary-colorsgray-600); font-size: 14px; line-height: 19.2px; align-self: stretch; font-weight: 400; color: #55606e; } .facility-record .span { font-weight: 400; font-size: 14px; line-height: 19.2px; } .facility-record .text-wrapper-3 { color: #55606e; } .facility-record .gray-bottom-line { border-bottom: 1px #55606E solid; width: fit-content; text-decoration: none; } .facility-record .frame-3 { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 8px; align-self: stretch; width: 100%; } .facility-record .frame-4 { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; flex: 1; flex-grow: 1; } .facility-record .typography-heading { display: inline-flex; align-items: center; justify-content: center; gap: 10px; } .facility-record .heading { flex: 1; color: var(--primary-colorsgray-700); font-size: 16px; font-weight: 400; line-height: 17.44px; } .facility-record .heading-2 { flex: 1; font-weight: 400; color: var(--primary-colorsgray-600); font-size: 14px; line-height: 19.2px; } .facility-record .cards-traceability { display: flex; align-items: center; justify-content: space-between; padding: 8px 0px; position: relative; align-self: stretch; width: 100%; flex: 0 0 auto; border-radius: 4px; } .facility-record .frame-5 { display: inline-flex; align-items: center; gap: 8px; position: relative; flex: 0 0 auto; } .facility-record .company-name-wrapper { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; } .facility-record .company-name-2 { color: var(--black); font-size: 16px; line-height: 17.4px; align-self: stretch; font-weight: 400; } .facility-record .issuing-details { width: 100%; padding: 24px 16px 36px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; } .facility-record .typography-heading { display: inline-flex; align-items: center; justify-content: center; gap: 10px; } .facility-record .text-wrapper-2 { width: fit-content; font-weight: 700; color: var(--black); font-size: 20px; line-height: 21.8px; } .facility-record .div { display: inline-flex; flex-direction: column; align-items: flex-start; width: 100%; } .facility-record .data-two-columns-2 { display: grid; grid-template-columns: 1.4fr 3fr; gap: 16px; padding: 10px 0px 12px; width: 100%; border-bottom-width: 1px; border-bottom-style: solid; } .facility-record .border-bottom-gray-400 { border-color: var(--primary-colorsgray-400); } .facility-record .border-bottom-gray-500 { border-color: var(--primary-colorsgray-500); } .facility-record .border-bottom-blue-100 { border-color: var(--primary-colorsblue-100-full); } .facility-record .border-bottom-blue-200 { border-color: var(--primary-colorsblue-200); } .facility-record .label { font-weight: 400; color: var(--primary-colorsgray-300); font-size: 16px; line-height: 22px; } .facility-record .label-2 { font-weight: 400; color: var(--primary-colorsgray-600); font-size: 16px; line-height: 22px; } .facility-record .data-data-link { flex-direction: column; align-items: flex-start; gap: 6px; align-self: stretch; display: flex; flex: 1; flex-grow: 1; } .facility-record .div-wrapper { gap: 10px; display: inline-flex; align-items: flex-start; text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--primary-colorsblue-400); text-underline-offset: 3px; } .facility-record .line { display: inline-flex; align-items: flex-start; gap: 10px; border-bottom-width: 2px; border-bottom-style: solid; border-color: var(--primary-colorsblue-200); } .facility-record .line-2 { width: fit-content; font-weight: 500; color: var(--white); font-size: 16px; line-height: 17.4px; } .facility-record .line-3 { width: fit-content; font-weight: 500; color: var(--primary-colorsgray-700); font-size: 16px; line-height: 22px; } .facility-record .line-4 { display: inline-flex; align-items: flex-start; gap: 10px; border-bottom-width: 2px; border-bottom-style: solid; border-color: var(--primary-colorsblue-400); } .facility-record .data-data { display: flex; align-items: center; gap: 10px; align-self: stretch; flex-grow: 1; flex: 1; } .facility-record .data-data a { line-height: 22px; } .facility-record .data-data-2 a { margin-right: 10px; } .facility-record .data { flex: 1; font-weight: 500; color: var(--white); font-size: 16px; line-height: 17.4px; } .facility-record .data-2 { font-weight: 500; color: var(--primary-colorsgray-700); font-size: 16px; line-height: 17.4px; flex: 1; } .blue-bottom-line, .blue-bottom-line:link { border-bottom: 2px hsl(210, 68%, 59%) solid; width: fit-content; justify-content: flex-start; align-items: flex-start; gap: 10px; display: inline-flex; cursor: pointer; text-decoration: none; color: #232E3D; } .blue-bottom-line-2, .blue-bottom-line-2:link { width: fit-content; color: var(--white); text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--primary-colorsblue-200); text-underline-offset: 3px; } /* Media Queries for Mobiles */ @media (min-width: 50px) { .facility-record { min-width: 100%; } } div:has(.facility-record) .facility-record .declarations, div:has(.facility-record) .facility-record section { padding: 0px; } </style> </head> <body> <div class=\"facility-record\"> <div class=\"contents\"> <div class=\"traceability-header\"> <div class=\"TRACE-header\"> <div class=\"PP-title\">DIGITAL IDENTITY ANCHOR</div> <div class=\"name-description\"> <h1>{{credentialSubject.name}}</h1> <p>{{credentialSubject.id}}</p> </div> </div> <div class=\"issuing-organisation\"> <div class=\"div\"> <div class=\"data-two-columns border-bottom-gray-500\"> <div class=\"label\">{{credentialSubject.idScheme.name}}</div> <div class=\"label\"> <p>{{credentialSubject.registeredId}}</p> </div> </div> <div class=\"data-two-columns border-bottom-gray-500\"> <div class=\"label\">Type</div> <div class=\"label\"> <p>{{credentialSubject.registerType}}</p> </div> </div> </div> </div> </div> </div> <div class=\"issuing-details\"> <div class=\"typography-heading\"> <div class=\"text-wrapper-2\">Issuing details</div> </div> <div class=\"div\"> <div class=\"data-two-columns-2 border-bottom-gray-400\"> <div class=\"label-2\">Issued by</div> <div class=\"data-data-link\"> <div class=\"div-wrapper\"> <a href=\"{{issuer.id}}\" class=\"line-3\">{{issuer.name}}</a> </div> </div> </div> <div class=\"data-two-columns-2 border-bottom-gray-400\"> <div class=\"label-2\">Valid from</div> <div class=\"data-data\"> <div class=\"data-2\">{{validFrom}}</div> </div> </div> <div class=\"data-two-columns-2 border-bottom-gray-400\"> <div class=\"label-2\">Valid until</div> <div class=\"data-data\"> <div class=\"data-2\">{{validUntil}}</div> </div> </div> </div> </div> </div> </body> </html>",
+                        "@type": "WebRenderingTemplate2022"
+                      }
+                    ],
+                    "type": ["DigitalIdentityAnchor"],
+                    "dlrLinkTitle": "DigitalIdentityAnchor",
+                    "dlrVerificationPage": "http://localhost:3003/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIKey": "test123",
+                    "namespace": "gs1",
+                    "linkRegisterPath": "/api/resolver"
+                  },
+                  "storage": {
+                    "url": "http://localhost:3334/v1/documents",
+                    "params": {
+                      "bucket": "verifiable-credentials"
+                    },
+                    "options": {
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
+                    }
+                  },
+                  "identifierKeyPath": "/id"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "apps": [
@@ -4243,25 +4334,17 @@
                   "url": "https://jargon.sh/user/unece/DigitalIdentityAnchor/v/working/artefacts/jsonSchemas/RegisteredIdentity.json?class=RegisteredIdentity"
                 },
                 "data": {
-                  "type": [
-                    "RegisteredIdentity",
-                    "Identifier"
-                  ],
+                  "type": ["RegisteredIdentity", "Identifier"],
                   "id": "https://id.gs1.org/01/09359502000010",
                   "name": "Sample business Ltd",
                   "registeredId": "0109359502000010",
                   "idScheme": {
-                  "type": [
-                    "IdentifierScheme"
-                  ],
-                  "id": "https://id.gs1.org/01/",
-                  "name": "Global Trade Identification Number (GTIN)"
+                    "type": ["IdentifierScheme"],
+                    "id": "https://id.gs1.org/01/",
+                    "name": "Global Trade Identification Number (GTIN)"
                   },
                   "registerType": "Business",
-                  "registrationScopeList": [
-                    "https://jargon.sh",
-                    "https://jargon.sh"
-                  ]
+                  "registrationScopeList": ["https://jargon.sh", "https://jargon.sh"]
                 },
                 "style": {},
                 "className": "",
