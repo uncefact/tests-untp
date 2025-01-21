@@ -12,14 +12,13 @@ describe('Issue DCC end-to-end testing flow', () => {
     expect(AppConfig?.name).to.not.be.undefined;
   });
 
-  it('should visit the homepage, navigate to "General features", handle API calls, and show success message', () => {
+  it('should visit the homepage, navigate to "Generate DIA" through "General features", handle API calls, and show success message', () => {
     const AppConfig = Cypress.env('AppConfig');
     cy.visit('/');
 
     cy.contains('a', 'General features').should('be.visible').and('not.be.disabled').click();
 
     cy.url().should('include', '/general-features');
-    // temporary hardcoding the schema URL and app service
     const feature = AppConfig.generalFeatures[0]?.features.find(
       (feature: { name: string }) => feature.name === 'Generate DCC',
     );
@@ -28,12 +27,11 @@ describe('Issue DCC end-to-end testing flow', () => {
     const appService = feature?.services[0]?.parameters[0] ?? {};
     cy.intercept('GET', shemaDCC).as('getConformityCredential');
 
-    cy.contains('a', 'Generate DCC') // Find button by text
+    cy.contains('a', 'Generate DCC')
       .should('be.visible')
       .and('not.be.disabled')
       .click();
 
-    // Wait for the API call
     cy.wait('@getConformityCredential', { timeout: 20000 }).then((interception) => {
       expect(interception?.response?.statusCode).to.eq(200);
     });
@@ -49,7 +47,6 @@ describe('Issue DCC end-to-end testing flow', () => {
     cy.intercept('POST', API_ENDPOINT.STORAGE_URL).as('storeVC');
     cy.intercept('POST', API_ENDPOINT.IDR_URL).as('linkResolverRegister');
 
-    // Check if "Submit" button appears after API response
     cy.contains('button', 'Submit').should('be.visible').and('not.be.disabled').click();
 
     // await API create credential status
