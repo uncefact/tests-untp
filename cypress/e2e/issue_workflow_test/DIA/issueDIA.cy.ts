@@ -105,5 +105,17 @@ describe('Issue DIA end-to-end testing flow', () => {
         expect(cleanedOutput).to.include('Result: WARN');
       },
     );
+
+    // Define the path to the JSON file you want to delete
+    const filePath = 'DigitalIdentityAnchor_instance-v0.5.0.json';
+
+    // Call the task to delete the file
+    cy.task('deleteFileCredentialE2E', filePath).then((result) => {
+      if (result) {
+        cy.log('File deleted successfully');
+      } else {
+        cy.log('File not found or could not be deleted');
+      }
+    });
   });
 });
