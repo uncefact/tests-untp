@@ -34,7 +34,7 @@ export default defineConfig({
             throw error;
           }
         },
-        deleteFileTestUNTP(fileName: string) {
+        deleteFileCredentialE2E(fileName: string) {
           const filePath = path.resolve('cypress/fixtures/credentials-e2e', fileName);
           return new Promise((resolve, reject) => {
             fs.unlink(filePath, (err) => {

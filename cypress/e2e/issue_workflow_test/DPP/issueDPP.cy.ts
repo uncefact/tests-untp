@@ -129,7 +129,7 @@ describe('Issue DPP end-to-end testing flow', () => {
     const filePath = 'DigitalProductPassport_instance-v0.5.0.json';
 
     // Call the task to delete the file
-    cy.task('deleteFileTestUNTP', filePath).then((result) => {
+    cy.task('deleteFileCredentialE2E', filePath).then((result) => {
       if (result) {
         cy.log('File deleted successfully');
       } else {
