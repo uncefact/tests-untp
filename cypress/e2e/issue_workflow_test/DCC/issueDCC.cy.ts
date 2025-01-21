@@ -12,7 +12,7 @@ describe('Issue DCC end-to-end testing flow', () => {
     expect(AppConfig?.name).to.not.be.undefined;
   });
 
-  it('should visit the homepage, navigate to "Generate DIA" through "General features", handle API calls, and show success message', () => {
+  it('should visit the homepage, navigate to "Generate DCC" through "General features", handle API calls, and show success message', () => {
     const AppConfig = Cypress.env('AppConfig');
     cy.visit('/');
 
