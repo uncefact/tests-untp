@@ -12,7 +12,7 @@ describe('Issue DFR end-to-end testing flow', () => {
     expect(AppConfig?.name).to.not.be.undefined;
   });
 
-  it('should visit the homepage, navigate to "General features", handle API calls, and show success message', () => {
+  it('should visit the homepage, navigate to "Generate DFR" through "General features", handle API calls, and show success message', () => {
     const AppConfig = Cypress.env('AppConfig');
     cy.visit('/');
 
@@ -114,15 +114,15 @@ describe('Issue DFR end-to-end testing flow', () => {
     );
 
     // Define the path to the JSON file you want to delete
-    // const filePath = 'DigitalFacilityRecord_instance-v0.5.0.json';
+    const filePath = 'DigitalFacilityRecord_instance-v0.5.0.json';
 
     // Call the task to delete the file
-    // cy.task('deleteFileTestUNTP', filePath).then((result) => {
-    //   if (result) {
-    //     cy.log('File deleted successfully');
-    //   } else {
-    //     cy.log('File not found or could not be deleted');
-    //   }
-    // });
+    cy.task('deleteFileCredentialE2E', filePath).then((result) => {
+      if (result) {
+        cy.log('File deleted successfully');
+      } else {
+        cy.log('File not found or could not be deleted');
+      }
+    });
   });
 });
