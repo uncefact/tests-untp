@@ -12,7 +12,7 @@ describe('Issue DIA end-to-end testing flow', () => {
     expect(AppConfig?.name).to.not.be.undefined;
   });
 
-  it('should visit the homepage, navigate to "Generate DIA", handle API calls, and show success message', () => {
+  it('should visit the homepage, navigate to "Generate DIA" thought "General features", handle API calls, and show success message', () => {
     const AppConfig = Cypress.env('AppConfig');
     cy.visit('/');
 
@@ -29,7 +29,6 @@ describe('Issue DIA end-to-end testing flow', () => {
 
     cy.contains('a', 'Generate DIA').should('be.visible').and('not.be.disabled').click();
 
-    // Wait for the API call
     cy.wait('@getIdentityAnchor', { timeout: 20000 }).then((interception) => {
       expect(interception?.response?.statusCode).to.eq(200);
     });
@@ -66,7 +65,7 @@ describe('Issue DIA end-to-end testing flow', () => {
       cy.log('Completed: storeVC');
 
       // Extract the URI from the response
-      const { uri, hash, key } = interception?.response?.body;
+      const { uri, hash } = interception?.response?.body;
       expect(uri).to.not.be.undefined;
       expect(hash).to.not.be.undefined;
       cy.request('GET', uri).then((response) => {
