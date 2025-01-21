@@ -14,7 +14,508 @@
         "secondaryColor": "black",
         "tertiaryColor": "black"
       },
-      "features": []
+      "features": [
+        {
+          "name": "Generate DCC",
+          "id": "11tE2M0NwAPFJO0biCDwO",
+          "components": [
+            {
+              "name": "JsonForm",
+              "type": "EntryData",
+              "props": {
+                "schema": {
+                  "url": "https://jargon.sh/user/unece/ConformityCredential/v/working/artefacts/jsonSchemas/ConformityAttestation.json?class=ConformityAttestation"
+                },
+                "data": {
+                  "type": ["ConformityAttestation", "Attestation"],
+                  "id": "https://exampleCAB.com/01/09359502000034",
+                  "name": "Conformity attestation Name e.g. Product GHG Footprint certificate in accordance with GBA Rulebook.",
+                  "assessorLevel": "Self",
+                  "assessmentLevel": "GovtApproval",
+                  "attestationType": "certification",
+                  "description": "Attestation description SampleCAB Inc attests that the product class LiFePO4 EV batteries manufactured at Sample battery facility have reported GHG foorptint that conform to the GBA rulebook version 1.5.",
+                  "issuedToParty": {
+                    "type": ["Party"],
+                    "id": "https://abr.business.gov.au/ABN/View?abn=90664869327",
+                    "name": "ABC Example Company PTY LTD",
+                    "registeredId": "90664869327",
+                    "idScheme": {
+                      "type": ["IdentifierScheme"],
+                      "id": "https://id.gs1.org/01/",
+                      "name": "Global Trade Identification Number (GTIN)"
+                    },
+                    "description": "A leading electric energy storage company"
+                  },
+                  "authorisation": [
+                    {
+                      "type": ["Endorsement"],
+                      "id": "https://authority.gov/schemeABC/123456789",
+                      "name": "Endorsement name e.g. Accreditation of certifiers.com under the Australian National Greenhouse and Energy Reporting scheme (NGER)",
+                      "trustmark": {
+                        "type": ["BinaryFile"],
+                        "fileName": "GHG protocol trust mark",
+                        "fileType": "image/png",
+                        "file": "iVBORw0KGgoAAAANSUhEUgAAADkAAAA2CAYAAAB9TjFQAAAABGdBTUEAAi/9H3pWy6vI9uFdAAAAAElFTkSuQmCC"
+                      },
+                      "issuingAuthority": {
+                        "type": ["Identifier"],
+                        "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                        "name": "Authorising Entity",
+                        "registeredId": "12345",
+                        "idScheme": {
+                          "type": ["IdentifierScheme"],
+                          "id": "https://id.gs1.org/01/",
+                          "name": "Global Trade Identification Number (GTIN)"
+                        }
+                      },
+                      "endorsementEvidence": {
+                        "type": ["Link"],
+                        "linkURL": "https://files.example-certifier.com/1234567.json",
+                        "linkName": "GBA rule book conformity certificate",
+                        "linkType": "https://test.uncefact.org/vocabulary/linkTypes/dcc"
+                      }
+                    },
+                    {
+                      "type": ["Endorsement"],
+                      "id": "https://authority.gov/schemeABC/123456789",
+                      "name": "Endorsement name e.g. Accreditation of certifiers.com under the Australian National Greenhouse and Energy Reporting scheme (NGER)",
+                      "trustmark": {
+                        "type": ["BinaryFile"],
+                        "fileName": "GHG protocol trust mark",
+                        "fileType": "image/png",
+                        "file": "iVBORw0KGgoAAAANSUhEUgAAADkAAAA2CAYAAAB9TjFQAAAABGdBTUEAAi/9H3pWy6vI9uFdAAAAAElFTkSuQmCC"
+                      },
+                      "issuingAuthority": {
+                        "type": ["Identifier"],
+                        "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                        "name": "Authorising Entity",
+                        "registeredId": "12345",
+                        "idScheme": {
+                          "type": ["IdentifierScheme"],
+                          "id": "https://id.gs1.org/01/",
+                          "name": "Global Trade Identification Number (GTIN)"
+                        }
+                      },
+                      "endorsementEvidence": {
+                        "type": ["Link"],
+                        "linkURL": "https://files.example-certifier.com/1234567.json",
+                        "linkName": "GBA rule book conformity certificate",
+                        "linkType": "https://test.uncefact.org/vocabulary/linkTypes/dcc"
+                      }
+                    }
+                  ],
+                  "conformityCertificate": {
+                    "type": ["SecureLink", "Link"],
+                    "linkURL": "https://files.example-certifier.com/1234567.json",
+                    "linkName": "GBA rule book conformity certificate",
+                    "linkType": "https://test.uncefact.org/vocabulary/linkTypes/dcc",
+                    "hashDigest": "6239119dda5bd4c8a6ffb832fe16feaa5c27b7dba154d24c53d4470a2c69adc2",
+                    "hashMethod": "SHA-256",
+                    "encryptionMethod": "none"
+                  },
+                  "auditableEvidence": {
+                    "type": ["SecureLink", "Link"],
+                    "linkURL": "https://files.example-certifier.com/1234567.json",
+                    "linkName": "GBA rule book conformity certificate",
+                    "linkType": "https://test.uncefact.org/vocabulary/linkTypes/dcc",
+                    "hashDigest": "6239119dda5bd4c8a6ffb832fe16feaa5c27b7dba154d24c53d4470a2c69adc2",
+                    "hashMethod": "SHA-256",
+                    "encryptionMethod": "none"
+                  },
+                  "scope": {
+                    "type": ["ConformityAssessmentScheme", "Standard"],
+                    "id": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf",
+                    "name": "GBA Battery Passport Greenhouse Gas Rulebook - V.2.0",
+                    "issuingParty": {
+                      "type": ["Identifier"],
+                      "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                      "name": "EV battery 300Ah.",
+                      "registeredId": "12345",
+                      "idScheme": {
+                        "type": ["IdentifierScheme"],
+                        "id": "https://id.gs1.org/01/",
+                        "name": "Global Trade Identification Number (GTIN)"
+                      }
+                    },
+                    "issueDate": "2023-12-05",
+                    "trustmark": {
+                      "type": ["BinaryFile"],
+                      "fileName": "GHG protocol trust mark",
+                      "fileType": "image/png",
+                      "file": "iVBORw0KGgoAAAANSUhEUgAAADkAAAA2CAYAAAB9TjFQAAAABGdBTUEAAi/9H3pWy6vI9uFdAAAAAElFTkSuQmCC"
+                    }
+                  },
+                  "assessment": [
+                    {
+                      "type": ["ConformityAssessment", "Declaration"],
+                      "assessmentDate": "2024-04-25",
+                      "id": "https://exampleCAB.com/38f73303-a39e-45a7-b8b7-e73517548f27/01",
+                      "referenceStandard": {
+                        "type": ["Standard"],
+                        "id": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf",
+                        "name": "GBA Battery Passport",
+                        "issuingParty": {
+                          "type": ["Identifier"],
+                          "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                          "name": "EV battery 300Ah.",
+                          "registeredId": "12345",
+                          "idScheme": {
+                            "type": ["IdentifierScheme"],
+                            "id": "https://id.gs1.org/01/",
+                            "name": "Global Trade Identification Number (GTIN)"
+                          }
+                        },
+                        "issueDate": "2023-12-05"
+                      },
+                      "referenceRegulation": {
+                        "type": ["Regulation"],
+                        "id": "https://www.legislation.gov.au/F2008L02309/latest/versions",
+                        "name": "National Greenhouse",
+                        "jurisdictionCountry": "AU",
+                        "administeredBy": {
+                          "type": ["Identifier"],
+                          "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                          "name": "EV battery 300Ah.",
+                          "registeredId": "12345",
+                          "idScheme": {
+                            "type": ["IdentifierScheme"],
+                            "id": "https://id.gs1.org/01/",
+                            "name": "Global Trade Identification Number (GTIN)"
+                          }
+                        },
+                        "effectiveDate": "2024-03-20"
+                      },
+                      "assessmentCriteria": [
+                        {
+                          "type": ["Criterion"],
+                          "id": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf#BatteryAssembly",
+                          "name": "GBA Battery rule book v2.0 battery assembly guidelines",
+                          "thresholdValues": [
+                            {
+                              "type": ["Metric"],
+                              "metricName": "emissions intensity",
+                              "metricValue": {
+                                "type": ["Measure"],
+                                "value": 1.8,
+                                "unit": "kg"
+                              },
+                              "score": "BB",
+                              "accuracy": 0.05
+                            },
+                            {
+                              "type": ["Metric"],
+                              "metricName": "emissions footprint",
+                              "metricValue": {
+                                "type": ["Measure"],
+                                "value": 12,
+                                "unit": "kg"
+                              },
+                              "score": "BB",
+                              "accuracy": 0.05
+                            }
+                          ]
+                        },
+                        {
+                          "type": ["Criterion"],
+                          "id": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf#BatteryAssembly",
+                          "name": "Other battery assessment criteria rulebook",
+                          "thresholdValues": [
+                            {
+                              "type": ["Metric"],
+                              "metricName": "emissions intensity",
+                              "metricValue": {
+                                "type": ["Measure"],
+                                "value": 1.8,
+                                "unit": "kg"
+                              },
+                              "score": "BB",
+                              "accuracy": 0.05
+                            },
+                            {
+                              "type": ["Metric"],
+                              "metricName": "emissions footprint",
+                              "metricValue": {
+                                "type": ["Measure"],
+                                "value": 12,
+                                "unit": "kg"
+                              },
+                              "score": "BB",
+                              "accuracy": 0.05
+                            }
+                          ]
+                        }
+                      ],
+                      "declaredValue": [
+                        {
+                          "type": ["Metric"],
+                          "metricName": "emissions intensity",
+                          "metricValue": {
+                            "type": ["Measure"],
+                            "value": 10,
+                            "unit": "kg"
+                          },
+                          "score": "BB",
+                          "accuracy": 0.05
+                        },
+                        {
+                          "type": ["Metric"],
+                          "metricName": "emissions footprint",
+                          "metricValue": {
+                            "type": ["Measure"],
+                            "value": 10,
+                            "unit": "kg"
+                          },
+                          "score": "BB",
+                          "accuracy": 0.05
+                        }
+                      ],
+                      "conformance": true,
+                      "conformityTopic": "environment.energy",
+                      "assessedProduct": [
+                        {
+                          "type": ["Product"],
+                          "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                          "name": "EV battery 300Ah.",
+                          "registeredId": "09520123456788.21.12345",
+                          "idScheme": {
+                            "type": ["IdentifierScheme"],
+                            "id": "https://id.gs1.org/01/",
+                            "name": "Global Trade Identification Number (GTIN)"
+                          },
+                          "serialNumber": "12345678",
+                          "batchNumber": "6789",
+                          "IDverifiedByCAB": true
+                        },
+                        {
+                          "type": ["Product"],
+                          "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                          "name": "EV battery 300Ah.",
+                          "registeredId": "09520123456788.21.12345",
+                          "idScheme": {
+                            "type": ["IdentifierScheme"],
+                            "id": "https://id.gs1.org/01/",
+                            "name": "Global Trade Identification Number (GTIN)"
+                          },
+                          "serialNumber": "12345678",
+                          "batchNumber": "6789",
+                          "IDverifiedByCAB": true
+                        },
+                        {
+                          "type": ["Product"],
+                          "id": "https://id.gs1.org/01/09520123456788/21/12345",
+                          "name": "EV battery 300Ah.",
+                          "registeredId": "09520123456788.21.12345",
+                          "idScheme": {
+                            "type": ["IdentifierScheme"],
+                            "id": "https://id.gs1.org/01/",
+                            "name": "Global Trade Identification Number (GTIN)"
+                          },
+                          "serialNumber": "12345678",
+                          "batchNumber": "6789",
+                          "IDverifiedByCAB": true
+                        }
+                      ],
+                      "assessedFacility": [
+                        {
+                          "type": ["Facility"],
+                          "id": "https://sample-facility-register.com/1234567",
+                          "name": "Greenacres battery factory",
+                          "registeredId": "1234567",
+                          "idScheme": {
+                            "type": ["IdentifierScheme"],
+                            "id": "https://id.gs1.org/01/",
+                            "name": "Global Trade Identification Number (GTIN)"
+                          },
+                          "locationInformation": {
+                            "type": ["Location"],
+                            "plusCode": "https://plus.codes/8CGRC78W+MM",
+                            "geoLocation": {
+                              "type": "Point",
+                              "coordinates": [12.34, 56.78, 90.12]
+                            },
+                            "geoBoundary": {
+                              "type": "Polygon",
+                              "coordinates": [[[12.34, 56.78, 90.12]]]
+                            }
+                          },
+                          "address": {
+                            "type": ["Address"],
+                            "streetAddress": "level 11, 15 London Circuit",
+                            "postalCode": "2601",
+                            "addressLocality": "Acton",
+                            "addressRegion": "ACT",
+                            "addressCountry": "AU"
+                          },
+                          "IDverifiedByCAB": true
+                        },
+                        {
+                          "type": ["Facility"],
+                          "id": "https://sample-facility-register.com/1234567",
+                          "name": "Greenacres battery factory",
+                          "registeredId": "1234567",
+                          "idScheme": {
+                            "type": ["IdentifierScheme"],
+                            "id": "https://id.gs1.org/01/",
+                            "name": "Global Trade Identification Number (GTIN)"
+                          },
+                          "locationInformation": {
+                            "type": ["Location"],
+                            "plusCode": "https://plus.codes/8CGRC78W+MM",
+                            "geoLocation": {
+                              "type": "Point",
+                              "coordinates": [12.34, 56.78, 90.12]
+                            },
+                            "geoBoundary": {
+                              "type": "Polygon",
+                              "coordinates": [[[12.34, 56.78, 90.12]]]
+                            }
+                          },
+                          "address": {
+                            "type": ["Address"],
+                            "streetAddress": "level 11, 15 London Circuit",
+                            "postalCode": "2601",
+                            "addressLocality": "Acton",
+                            "addressRegion": "ACT",
+                            "addressCountry": "AU"
+                          },
+                          "IDverifiedByCAB": true
+                        },
+                        {
+                          "type": ["Facility"],
+                          "id": "https://sample-facility-register.com/1234567",
+                          "name": "Greenacres battery factory",
+                          "registeredId": "1234567",
+                          "idScheme": {
+                            "type": ["IdentifierScheme"],
+                            "id": "https://id.gs1.org/01/",
+                            "name": "Global Trade Identification Number (GTIN)"
+                          },
+                          "locationInformation": {
+                            "type": ["Location"],
+                            "plusCode": "https://plus.codes/8CGRC78W+MM",
+                            "geoLocation": {
+                              "type": "Point",
+                              "coordinates": [12.34, 56.78, 90.12]
+                            },
+                            "geoBoundary": {
+                              "type": "Polygon",
+                              "coordinates": [[[12.34, 56.78, 90.12]]]
+                            }
+                          },
+                          "address": {
+                            "type": ["Address"],
+                            "streetAddress": "level 11, 15 London Circuit",
+                            "postalCode": "2601",
+                            "addressLocality": "Acton",
+                            "addressRegion": "ACT",
+                            "addressCountry": "AU"
+                          },
+                          "IDverifiedByCAB": true
+                        }
+                      ],
+                      "assessedOrganisation": {
+                        "type": ["Party"],
+                        "id": "https://abr.business.gov.au/ABN/View?abn=90664869327",
+                        "name": "Sample Company Pty Ltd.",
+                        "registeredId": "90664869327",
+                        "idScheme": {
+                          "type": ["IdentifierScheme"],
+                          "id": "https://id.gs1.org/01/",
+                          "name": "Global Trade Identification Number (GTIN)"
+                        },
+                        "description": "A leading electric energy storage company"
+                      },
+                      "auditor": {
+                        "type": ["Party"],
+                        "id": "https://abr.business.gov.au/ABN/View?abn=90664869327",
+                        "name": "Auditor Name",
+                        "registeredId": "90664869327",
+                        "idScheme": {
+                          "type": ["IdentifierScheme"],
+                          "id": "https://id.gs1.org/01/",
+                          "name": "Global Trade Identification Number (GTIN)"
+                        },
+                        "description": "A leading electric energy storage company"
+                      }
+                    }
+                  ]
+                },
+                "constructData": {
+                  "mappingFields": [],
+                  "dummyFields": [],
+                  "generationFields": [
+                    {
+                      "path": "/eventID",
+                      "handler": "generateIdWithSerialNumber"
+                    }
+                  ]
+                },
+                "className": "json-form",
+                "style": {
+                  "margin": "40px auto",
+                  "paddingTop": "40px",
+                  "width": "80%"
+                }
+              }
+            },
+            {
+              "name": "CustomButton",
+              "type": "Submit",
+              "props": {}
+            }
+          ],
+          "services": [
+            {
+              "name": "processDigitalConformityCredential",
+              "parameters": [
+                {
+                  "vckit": {
+                    "vckitAPIUrl": "http://localhost:3332/v2",
+                    "issuer": {
+                      "id": "did:web:uncefact.github.io:project-vckit:test-and-development",
+                      "name": "Orchard Facility"
+                    },
+                    "headers": {
+                      "Authorization": "Bearer test123"
+                    }
+                  },
+                  "digitalConformityCredential": {
+                    "context": ["https://test.uncefact.org/vocabulary/untp/dcc/0.5.0/"],
+                    "renderTemplate": [
+                      {
+                        "template": "<!DOCTYPE html> <html> <head> <meta charset=\"UTF-8\"> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"> <title>DigitalConformityCredential</title> <meta charset=\"utf-8\" /> <link href=\"https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap\" rel=\"stylesheet\"> <style> /* Style variables */ :root { --primary-colorsblue-10: rgba(247, 250, 253, 1); --white: rgba(255, 255, 255, 1); --black: rgba(0, 0, 0, 1); --primary-colorsgray-600: rgba(85, 96, 110, 1); --primary-colorsblue-700: rgba(31, 90, 149, 1); --primary-colorsgray-700: rgba(35, 46, 61, 1); --primary-colorsblue-400: rgba(79, 149, 221, 1); --primary-colorsgray-400: rgba(212, 214, 216, 1); --primary-colorsgray-300: rgba(237, 239, 240, 1); } /* Globals CSS */ * { margin: 0; box-sizing: border-box; } body { font-family: 'Lato', sans-serif; } a { text-decoration: none; } /* Style CSS */ .container { margin: 0 auto; display: flex; flex-direction: column; gap: 32px; word-break: break-word; } .container .contents { display: flex; flex-direction: column; align-items: center; gap: 32px; background-color: #ffffff; } .container .frame { display: flex; flex-direction: column; gap: 12px; width: 100%; } .container .TRACE-header-wrapper { display: flex; flex-direction: column; align-items: center; } .container .TRACE-header { display: flex; flex-direction: column; align-items: flex-start; gap: 24px; padding: 20px 16px; background-color: var(--primary-colorsgray-700); width: 100%; } .container .div { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; width: 100%; } .container .frame-2 { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 8px; align-self: stretch; } .container .PP-title { font-weight: 500; color: #ffffff; font-size: 16px; letter-spacing: 0; line-height: 22px; } .container .text-wrapper { font-weight: 900; color: var(--white); font-size: 30px; line-height: 32.5px; align-self: stretch; letter-spacing: 0; margin: 0; } .container .p { display: flex; flex-direction: column; font-weight: 400; color: var(--white); font-size: 16px; letter-spacing: 0; line-height: 22px; } .container .p span { font-size: 14px; font-weight: 400; line-height: 19.25px; } .container .p a { font-size: 16px; font-weight: 700; line-height: 22px; } .container .p p { color: var(--primary-colorsgray-400); font-size: 14px; font-weight: 400; line-height: 19.25px; } .container .p div { font-size: 16px; font-weight: 700; line-height: 22px; color: var(--white); text-transform: capitalize; } .container .text-wrapper-2 { color: var(--white); text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--white); text-underline-offset: 3px; } .container .text-wrapper-3 { align-self: stretch; font-weight: 400; color: var(--white); font-size: 16px; letter-spacing: 0; line-height: 18.9px; } .container .cards-traceability { display: flex; align-items: center; justify-content: space-between; align-self: stretch; padding: 8px 0px; } .container .frame-3 { display: flex; align-items: center; gap: 12px; } .container .company-name-wrapper { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; } .container .company-name { align-self: stretch; margin-top: -1px; font-weight: 600; color: var(--white); font-size: 16px; letter-spacing: 0; line-height: 17.4px; } .container .img { margin-right: -1px; } .container .frame-4 { display: flex; flex-direction: column; align-items: center; gap: 32px; align-self: stretch; padding: 0 16px; } .container .text-wrapper-4 { font-weight: 700; color: var(--black); font-size: 20px; letter-spacing: 0; line-height: 21.8px; } .container .text-wrapper-5 { align-self: stretch; font-weight: 400; color: #000000; font-size: 16px; letter-spacing: 0; line-height: 18.9px; } .container .frame-5 { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; padding: 16px; align-self: stretch; background-color: var(--primary-colorsblue-10); border-radius: 4px; } .container .PP-title-2 { margin-top: -1px; font-weight: 400; color: var(--primary-colorsgray-600); font-size: 14px; line-height: 15.2px; align-self: stretch; letter-spacing: 0; text-transform: uppercase; } .container .criterion-name { align-self: stretch; font-weight: 400; color: var(--primary-colorsblue-700); font-size: 18px; letter-spacing: 0; line-height: 21.2px; margin: 0; } .container .frame-6 { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; width: 100%; } .container .typography-heading { display: flex; height: 20px; align-items: center; justify-content: center; gap: 10px; } .container .heading { font-weight: 500; color: var(--primary-colorsgray-700); font-size: 16px; } .container .frame-wrapper { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; } .container .div-2 { display: flex; flex-direction: column; align-items: flex-start; align-self: stretch; } .container .data-two-columns { display: grid; grid-template-columns: 1fr auto; gap: 16px; padding: 10px 0px 12px; border-bottom-width: 1px; border-bottom-style: solid; border-color: var(--primary-colorsgray-400); width: 100%; } .container .text-wrapper-6 { font-weight: 400; color: var(--primary-colorsgray-600); font-size: 16px; line-height: 22px; } .container .data-data { display: flex; align-items: center; justify-content: center; gap: 10px; flex-grow: 1; flex: 1; } .container .text-wrapper-7 { flex: 1; font-weight: 500; color: var(--primary-colorsgray-700); font-size: 16px; line-height: 22px; } .container .frame-8 { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; } .container .industry-average { margin-top: -1px; font-weight: 400; color: var(--primary-colorsgray-700); font-size: 16px; letter-spacing: 0; line-height: 17.4px; margin: 0; } .container .text-wrapper-8 { font-weight: 300; color: var(--black); font-size: 16px; line-height: 18.88px; } .container .text-wrapper-9 { font-weight: 400; font-size: 16px; line-height: 17.4px; color: var(--primary-colorsgray-700); } .container .text-wrapper-9 span { font-weight: 700; } .container .data-data-link { flex-direction: column; align-items: flex-end; gap: 6px; display: flex; } .container .line { display: flex; align-items: flex-start; gap: 10px; width: fit-content; height: fit-content; text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--primary-colorsblue-400); text-underline-offset: 3px; } .container .line-2 { color: var(--black); font-weight: 400; font-size: 14px; line-height: 15.3px; width: fit-content; margin-top: -2px; letter-spacing: 0; } .container .data-traceability { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; align-self: stretch; } .container .heading-wrapper { display: flex; align-self: stretch; align-items: center; justify-content: center; gap: 10px; } .container .text-wrapper-10 { font-weight: 400; font-size: 16px; line-height: 17.4px; color: var(--primary-colorsgray-700); } .container .text-wrapper-11 { font-weight: 700; color: var(--black); font-size: 16px; line-height: 17.4px; } .container .line-wrapper { display: flex; flex-direction: column; align-items: self-end; gap: 6px; } .container .line-3 { font-weight: 500; font-size: 16px; line-height: 17.4px; width: fit-content; margin-top: -2px; color: var(--primary-colorsgray-700); letter-spacing: 0; } .container .cards-traceability-2 { display: flex; align-items: center; justify-content: space-between; padding: 8px 0px; align-self: stretch; border-radius: 4px; } .container .company-name-2 { align-self: stretch; margin-top: -1px; font-weight: 600; color: var(--black); font-size: 16px; letter-spacing: 0; line-height: 17.4px; } .container .div-wrapper { display: flex; align-items: center; justify-content: center; gap: 10px; } .container .heading-2 { width: fit-content; font-weight: 700; color: var(--black); font-size: 20px; line-height: 21.8px; } .container .frame-9 { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; align-self: stretch; } .container .data-data-link-2 { display: flex; flex: 1; align-self: stretch; flex-grow: 1; flex-direction: column; align-items: flex-start; gap: 6px; } .container .data-wrapper { align-items: center; justify-content: center; gap: 10px; flex: 1; flex-grow: 1; display: flex; align-self: stretch; } .container .issuing-details { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 24px 16px 36px; background-color: var(--primary-colorsgray-300); } .container .frame-10 { display: flex; flex-direction: column; align-items: flex-start; width: 100%; } .container .frame-11 { display: flex; justify-content: flex-end; } .container .frame-12 { margin: 0; padding-left: 25px; display: flex; flex-direction: column; gap: 10px; } .container .data-two-columns-2 { display: grid; grid-template-columns: 1fr 3fr; gap: 16px; padding: 10px 0px 12px; border-bottom-width: 1px; border-bottom-style: solid; border-color: var(--primary-colorsgray-400); width: 100%; } .container .data-two-columns-3 { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; padding: 10px 0px 12px; border-bottom-width: 1px; border-bottom-style: solid; border-color: var(--primary-colorsgray-400); width: 100%; } .container .frame-13 { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; width: 100%; } .container .trustmark { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; } .container .trustmark-item { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; position: relative; } .container .trustmark-box { width: 110px; height: 50px; padding: 16px 27.35px 7.93px 12px; gap: 0px; opacity: 0px; background-color: var(--primary-colorsgray-400); } .container .trustmark-text { position: absolute; font-size: 16px; font-weight: 500; line-height: 17.44px; color: rgba(135, 2, 99, 1); transform: rotate(-7.68deg); top: 22px; left: 12px; } .container .trustmark-description { color: var(--primary-colorsgray-700); font-weight: 500; font-size: 16px; line-height: 17.4px; } .container .trustmark-description a { color: var(--primary-colorsgray-700); text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: var(--primary-colorsgray-700); text-underline-offset: 3px; } /* Media Queries for Mobiles */ @media (min-width: 50px) { .container { min-width: 100%; } } </style> </head> <body> <div class=\"container\"> <div class=\"contents\"> <div class=\"frame\"> <div class=\"TRACE-header-wrapper\"> <div class=\"TRACE-header\"> <div class=\"div\"> <div class=\"frame-2\"> <div class=\"PP-title\">CONFORMITY CREDENTIAL</div> <p class=\"text-wrapper\">{{credentialSubject.name}}</p> </div> <div class=\"p\"> <span>Issued to:</span> <a href=\"{{credentialSubject.issuedToParty.id}}\" class=\"text-wrapper-2\">{{credentialSubject.issuedToParty.name}}</a> </div> <p class=\"text-wrapper-3\"> {{credentialSubject.description}} </p> <div class=\"p\"> <p>Level of independent assurance:</p> <div>{{credentialSubject.assessorLevel}}</div> </div> <div class=\"p\"> <p>Type of authority endorsement:</p> <div>{{credentialSubject.assessmentLevel}}</div> </div> <div class=\"p\"> <p>Type of the attestation credential:</p> <div>{{credentialSubject.attestationType}}</div> </div> </div> <div class=\"div\"> <a href=\"{{credentialSubject.auditableEvidence.linkURL}}\" class=\"cards-traceability\"> <div class=\"frame-3\"> <svg width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <path d=\"M2 18C1.45 18 0.979333 17.8043 0.588 17.413C0.196667 17.0217 0.000666667 16.5507 0 16V2C0 1.45 0.196 0.979333 0.588 0.588C0.98 0.196667 1.45067 0.000666667 2 0H16C16.55 0 17.021 0.196 17.413 0.588C17.805 0.98 18.0007 1.45067 18 2V16C18 16.55 17.8043 17.021 17.413 17.413C17.0217 17.805 16.5507 18.0007 16 18H2ZM2 2V16H16V2H14V9L11.5 7.5L9 9V2H2Z\" fill=\"#94C4F5\" /> </svg> <div class=\"company-name-wrapper\"> <div class=\"company-name\">Auditable evidence</div> </div> </div> <div class=\"frame-11\"> <svg width=\"9\" height=\"16\" viewBox=\"0 0 9 16\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <path d=\"M1 1L8 8L1 15\" stroke=\"#94C4F5\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" /> </svg> </div> </a> <a href=\"{{credentialSubject.scope.id}}\" class=\"cards-traceability\"> <div class=\"frame-3\"> <svg width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <path d=\"M2 18C1.45 18 0.979333 17.8043 0.588 17.413C0.196667 17.0217 0.000666667 16.5507 0 16V2C0 1.45 0.196 0.979333 0.588 0.588C0.98 0.196667 1.45067 0.000666667 2 0H16C16.55 0 17.021 0.196 17.413 0.588C17.805 0.98 18.0007 1.45067 18 2V16C18 16.55 17.8043 17.021 17.413 17.413C17.0217 17.805 16.5507 18.0007 16 18H2ZM2 2V16H16V2H14V9L11.5 7.5L9 9V2H2Z\" fill=\"#94C4F5\" /> </svg> <div class=\"company-name-wrapper\"> <div class=\"company-name\">Conformity Assessment Scheme</div> </div> </div> <div class=\"frame-11\"> <svg width=\"9\" height=\"16\" viewBox=\"0 0 9 16\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <path d=\"M1 1L8 8L1 15\" stroke=\"#94C4F5\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" /> </svg> </div> </a> <a href=\"{{credentialSubject.conformityCertificate.linkURL}}\" class=\"cards-traceability\"> <div class=\"frame-3\"> <svg width=\"20\" height=\"18\" viewBox=\"0 0 20 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <path d=\"M16 4H4V0H16V4ZM16 9.5C16.2833 9.5 16.521 9.404 16.713 9.212C16.905 9.02 17.0007 8.78267 17 8.5C16.9993 8.21733 16.9033 7.98 16.712 7.788C16.5207 7.596 16.2833 7.5 16 7.5C15.7167 7.5 15.4793 7.596 15.288 7.788C15.0967 7.98 15.0007 8.21733 15 8.5C14.9993 8.78267 15.0953 9.02033 15.288 9.213C15.4807 9.40567 15.718 9.50133 16 9.5ZM14 16V12H6V16H14ZM16 18H4V14H0V8C0 7.15 0.291667 6.43767 0.875 5.863C1.45833 5.28833 2.16667 5.00067 3 5H17C17.85 5 18.5627 5.28767 19.138 5.863C19.7133 6.43833 20.0007 7.15067 20 8V14H16V18Z\" fill=\"#94C4F5\" /> </svg> <div class=\"company-name-wrapper\"> <div class=\"company-name\">Printable certificate</div> </div> </div> <div class=\"frame-11\"> <svg width=\"9\" height=\"16\" viewBox=\"0 0 9 16\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <path d=\"M1 1L8 8L1 15\" stroke=\"#94C4F5\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" /> </svg> </div> </a> </div> </div> </div> </div> <div class=\"frame-4\"> <div class=\"div\"> <div class=\"div\"> <div class=\"text-wrapper-4\">Assessments</div> <p class=\"text-wrapper-5\">The list of specific assessments made within this conformity attestation.</p> </div> {{#each credentialSubject.assessment}} <div class=\"frame-5\"> <p class=\"criterion-name\">{{conformityTopic}}</p> <div class=\"frame-6\"> <div class=\"typography-heading\"> <div class=\"heading\">Declared values</div> </div> <div class=\"frame-wrapper\"> <div class=\"div-2\"> {{#each declaredValue}} <div class=\"data-two-columns-2\"> <div class=\"text-wrapper-6\">Name</div> <div class=\"data-data\"> <div class=\"text-wrapper-7\">{{metricName}}</div> </div> </div> <div class=\"data-two-columns-2\"> <div class=\"text-wrapper-6\">Value</div> <div class=\"data-data\"> <div class=\"text-wrapper-7\">{{metricValue.value}}{{metricValue.unit}}</div> </div> </div> <div class=\"data-two-columns-2\"> <div class=\"text-wrapper-6\">Accuracy</div> <div class=\"data-data\"> <div class=\"text-wrapper-7\">{{accuracy}}</div> </div> </div> {{/each}} </div> </div> </div> <div class=\"frame-6\"> <div class=\"typography-heading\"> <div class=\"heading\">Assessment Criteria</div> </div> {{#each assessmentCriteria}} <div class=\"text-wrapper-8\">{{name}}</div> <div class=\"data-data-link\"> <div class=\"line\"><a href=\"{{id}}\" class=\"line-2\">Assessment criteria</a></div> </div> <ul class=\"frame-12\"> {{#each thresholdValues}} <li> <div class=\"frame-8\"> <p class=\"industry-average\"> <span class=\"text-wrapper-9\">Industry average {{metricName}} is <span>{{metricValue.value}}{{metricValue.unit}}</span>.</span> </p> </div> </li> {{/each}} </ul> {{/each}} </div> <div class=\"data-traceability\"> <div class=\"heading-wrapper\"> <div class=\"text-wrapper-7\">Assessed facilities</div> </div> <div class=\"div-2\"> {{#each assessedFacility}} <div class=\"data-two-columns\"> <p class=\"text-wrapper-10\"> {{name}} </p> <div class=\"line-wrapper\"> <a href=\"{{id}}\" class=\"line\"> <div class=\"line-3\">View</div> </a> </div> </div> {{/each}} </div> </div> <div class=\"data-traceability\"> <div class=\"heading-wrapper\"> <div class=\"text-wrapper-7\">Assessed products</div> </div> <div class=\"div-2\"> {{#each assessedProduct}} <div class=\"data-two-columns\"> <div class=\"text-wrapper-10\">{{name}}</div> <div class=\"line-wrapper\"> <a href=\"{{id}}\" class=\"line\"> <div class=\"line-3\">View</div> </a> </div> </div> {{/each}} </div> </div> <div class=\"frame-6\"> <div class=\"typography-heading\"> <div class=\"heading\">Other details</div> </div> <div class=\"frame-wrapper\"> <div class=\"div-2\"> <div class=\"data-two-columns-3\"> <div class=\"text-wrapper-6\">Assessed</div> <div class=\"data-data\"> <div class=\"text-wrapper-7\">{{assessmentDate}}</div> </div> </div> <div class=\"data-two-columns-3\"> <div class=\"text-wrapper-6\">Organisation assessed</div> <a href=\"{{assessedOrganisation.id}}\" class=\"line\"> <div class=\"text-wrapper-7\">{{assessedOrganisation.name}}</div> </a> </div> <div class=\"data-two-columns-3\"> <div class=\"text-wrapper-6\">Auditor</div> <a href=\"{{auditor.id}}\" class=\"line\"> <div class=\"text-wrapper-7\">{{auditor.name}}</div> </a> </div> <div class=\"data-two-columns-3\"> <div class=\"text-wrapper-6\">Standard</div> <a href=\"{{referenceStandard.id}}\" class=\"line\"> <div class=\"text-wrapper-7\">{{referenceStandard.name}}</div> </a> </div> <div class=\"data-two-columns-3\"> <div class=\"text-wrapper-6\">Regulation</div> <a href=\"{{referenceRegulation.id}}\" class=\"line\"> <div class=\"text-wrapper-7\">{{referenceRegulation.name}}</div> </a> </div> </div> </div> </div> </div> {{/each}} </div> <div class=\"frame-13\"> <div class=\"div-wrapper\"> <div class=\"heading-2\">Issuer endorsement</div> </div> <div class=\"frame-9\"> <div class=\"div-2\"> <div class=\"trustmark\"> {{#each credentialSubject.authorisation}} <div class=\"trustmark-item\"> <div class=\"trustmark-box\"> <div class=\"trustmark-text\">trustmark</div> </div> <div class=\"trustmark-description\"> {{name}} is accredited by <a href=\"{{issuingAuthority.id}}\" class=\"\">{{issuingAuthority.name}}</a>. </div> </div> {{/each}} </div> </div> </div> </div> </div> </div> <div class=\"issuing-details\"> <div class=\"div-wrapper\"> <div class=\"heading-2\">Issuing details</div> </div> <div class=\"frame-10\"> <div class=\"data-two-columns-2\"> <div class=\"text-wrapper-6\">Issued by</div> <div class=\"data-data-link-2\"> <a href=\"{{issuer.id}}\" class=\"line\"> <div class=\"line-3\">{{issuer.name}}</div> </a> </div> </div> <div class=\"data-two-columns-2\"> <div class=\"text-wrapper-6\">Valid from</div> <div class=\"data-wrapper\"> <div class=\"text-wrapper-7\">{{validFrom}}</div> </div> </div> <div class=\"data-two-columns-2\"> <div class=\"text-wrapper-6\">Valid until</div> <div class=\"data-wrapper\"> <div class=\"text-wrapper-7\">{{validUntil}}</div> </div> </div> </div> </div> </div> </body> </html>",
+                        "@type": "WebRenderingTemplate2022"
+                      }
+                    ],
+                    "type": ["DigitalConformityCredential"],
+                    "dlrLinkTitle": "DigitalConformityCredential",
+                    "dlrVerificationPage": "http://localhost:3003/verify"
+                  },
+                  "dlr": {
+                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIKey": "test123",
+                    "namespace": "gs1",
+                    "linkRegisterPath": "/api/resolver"
+                  },
+                  "storage": {
+                    "url": "http://localhost:3334/v1/documents",
+                    "params": {
+                      "bucket": "verifiable-credentials"
+                    },
+                    "options": {
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
+                    }
+                  },
+                  "identifierKeyPath": "/id"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "apps": [
@@ -4243,25 +4744,17 @@
                   "url": "https://jargon.sh/user/unece/DigitalIdentityAnchor/v/working/artefacts/jsonSchemas/RegisteredIdentity.json?class=RegisteredIdentity"
                 },
                 "data": {
-                  "type": [
-                    "RegisteredIdentity",
-                    "Identifier"
-                  ],
+                  "type": ["RegisteredIdentity", "Identifier"],
                   "id": "https://id.gs1.org/01/09359502000010",
                   "name": "Sample business Ltd",
                   "registeredId": "0109359502000010",
                   "idScheme": {
-                  "type": [
-                    "IdentifierScheme"
-                  ],
-                  "id": "https://id.gs1.org/01/",
-                  "name": "Global Trade Identification Number (GTIN)"
+                    "type": ["IdentifierScheme"],
+                    "id": "https://id.gs1.org/01/",
+                    "name": "Global Trade Identification Number (GTIN)"
                   },
                   "registerType": "Business",
-                  "registrationScopeList": [
-                    "https://jargon.sh",
-                    "https://jargon.sh"
-                  ]
+                  "registrationScopeList": ["https://jargon.sh", "https://jargon.sh"]
                 },
                 "style": {},
                 "className": "",
