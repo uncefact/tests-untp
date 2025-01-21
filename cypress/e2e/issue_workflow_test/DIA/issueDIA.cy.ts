@@ -107,7 +107,7 @@ describe('Issue DIA end-to-end testing flow', () => {
     );
 
     // Define the path to the JSON file you want to delete
-    const filePath = 'DigitalIdentityAnchor_instance-v0.5.0.json';
+    const filePath = 'DigitalIdentityAnchor_instance-v0.2.1.json';
 
     // Call the task to delete the file
     cy.task('deleteFileCredentialE2E', filePath).then((result) => {
