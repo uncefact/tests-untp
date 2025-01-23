@@ -651,6 +651,18 @@
               "name": "CustomButton",
               "type": "Submit",
               "props": {}
+            },
+            {
+              "name": "BarcodeGenerator",
+              "type": "Result",
+              "props": {
+                "dataPath": {
+                  "primary": {
+                    "ai": "01",
+                    "path": "/registeredId"
+                  }
+                }
+              }
             }
           ],
           "services": [
@@ -728,6 +740,14 @@
               "parameters": [
                 {
                   "storageKey": "orchard_facility_dpps"
+                }
+              ]
+            },
+            {
+              "name": "findFirstMatchingKeyValue",
+              "parameters": [
+                {
+                  "targetKey": "credentialSubject"
                 }
               ]
             }

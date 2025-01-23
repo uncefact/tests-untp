@@ -19,6 +19,7 @@ Services are units of business logic that perform specific operations or interac
 - [Process Transformation Event](./process-transformation-event)
 - [Process Aggregation Event](./process-aggregation-event)
 - [Merge To Local Storage](./merge-to-local-storage)
+- [Find First Matching Key Value](./find-first-matching-key-value)
 
 ## Diagram
 
