@@ -21,7 +21,7 @@ describe('templateMapper', () => {
       {
         "fieldName": "{{instancePath}}",
         "errorType": "{{keyword}}",
-        "message": "{{instancePath}} field {{message}}.{{#if params.allowedValues}} Allowed values: {{{jsonStringify params.allowedValues}}}.{{/if}}"
+        "message": "{{instancePath}} field {{jsonStringify message}}.{{#if params.allowedValues}} Allowed values: {{{jsonStringify params.allowedValues}}}.{{/if}}"
       }
       {{#unless @last}},{{/unless}}
       {{/each}}
@@ -84,6 +84,45 @@ describe('templateMapper', () => {
         "fieldName": "/eventType",
         "errorType": "enum",
         "message": "/eventType field must be equal to one of the allowed values. Allowed values: object, transaction, aggregation, transformation."
+      }
+      
+    ]
+  }`,
+    );
+  });
+
+  it('should escape the message of any error reports to maintain valid JSON', async () => {
+    jest.spyOn(path, 'join').mockReturnValueOnce('../../src/templates/templateMessages/error.hbs');
+    jest.spyOn(fs, 'readFile').mockResolvedValue(errorTemplate);
+
+    const testSuiteResult = {
+      type: 'testEvent',
+      version: 'v0.0.1',
+      dataPath: 'test/data/path.json',
+      errors: [
+        {
+          instancePath: '/validFrom',
+          schemaPath: '#/properties/validFrom/pattern',
+          keyword: 'pattern',
+          params: {},
+          message: 'must match pattern "(Z|\\+|-))"',
+        },
+      ],
+      warnings: [],
+    };
+
+    const mappedJsonString = await templateMapper('error', testSuiteResult);
+
+    expect(mappedJsonString).toEqual(
+      `{
+    "testingCredential": "testEvent v0.0.1",
+    "path": "test/data/path.json",
+    "result": "FAIL",
+    "errors": [
+      {
+        "fieldName": "/validFrom",
+        "errorType": "pattern",
+        "message": "/validFrom field must match pattern \\&quot;(Z|\\\\+|-))\\&quot;."
       }
       
     ]
