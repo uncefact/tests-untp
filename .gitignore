@@ -78,3 +78,9 @@ packages/untp-test-suite/data
 # vc-test-suite
 packages/vc-test-suite/suite.log
 packages/vc-test-suite/reports
+
+# cypress
+cypress/screenshots
+cypress/downloads
+cypress/fixtures/credentials-e2e/*
+!cypress/fixtures/credentials-e2e/.gitkeep
