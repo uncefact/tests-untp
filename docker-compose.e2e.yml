@@ -135,9 +135,9 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        CONFIG_FILE: app-config.e2e.json
+        CONFIG_FILE: ./cypress/fixtures/app-config.json
     ports:
-      - "3003:80"
+      - '3003:80'
 
 volumes:
   vckit-data:
