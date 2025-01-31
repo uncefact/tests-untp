@@ -14,9 +14,8 @@ The UNTP Playground has two environments:
 
 - **Production Environment**
   - URL: https://test.uncefact.org/untp-playground
-  - Deployed when:
-    - Repo owner is `uncefact`
-    - A new tag is created, associated with the next branch and the [workflow](../../../.github/workflows/ci_cd-untp-playground.yml) is triggered manually
+  - Deployed when the repo owner is `uncefact` and:
+    - A new tag is created, associated with the next branch and the [workflow](../../../.github/workflows/ci_cd-untp-playground.yml) is manually triggered
   - Uses Pulumi stack: `prod`(static - defined in workflow file)
 
 ## Deployment Process
