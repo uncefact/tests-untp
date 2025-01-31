@@ -7,8 +7,7 @@ The UNTP Playground has two environments:
 - **Test Environment**
 
   - URL: https://test.uncefact.org/test-untp-playground
-  - Deployed when:
-    - Repo owner is `uncefact`
+  - Deployed when the repo owner is `uncefact` and either:
     - Pushes to the `next` branch or branches under the `cd/` prefix where code within `packages/untp-playground` has changed, or the [workflow file](../../../.github/workflows/ci_cd-untp-playground.yml) has changed, or
     - Manually trigger [workflow](../../../.github/workflows/ci_cd-untp-playground.yml)
   - Uses Pulumi stack: `test` (static - defined in workflow file)
