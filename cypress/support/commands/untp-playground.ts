@@ -1,39 +1,3 @@
-declare global {
-  namespace Cypress {
-    interface Chainable<Subject = any> {
-      /**
-       * Uploads a credential file.
-       * Accepts either an object (which will be stringified) or a path to a fixture file.
-       */
-      uploadCredential(credential: object | string): Chainable<Subject>;
-      /**
-       * Expands a validation group. Defaults to the DigitalProductPassport group.
-       */
-      expandGroup(groupTestId?: string): Chainable<Subject>;
-      /**
-       * Checks that the validation status icon for a given step is visible.
-       * The status can be either 'success', 'failure', 'in progress', or 'missing'.
-       */
-      checkValidationStatus(
-        stepName: string,
-        status: 'success' | 'failure' | 'in progress' | 'missing',
-      ): Chainable<Subject>;
-      /**
-       * Opens the error details draw.
-       */
-      openErrorDetails(): Chainable<Subject>;
-      /**
-       * Validates that the confetti is visible.
-       */
-      validateConfetti(): Chainable<Subject>;
-      /**
-       * Checks the color of the VCDM version badge.
-       */
-      checkVCDMVersionColor(credentialType: string, expectedColor: 'green' | 'red'): Chainable<Subject>;
-    }
-  }
-}
-
 // Command to upload a credential file (object data or fixture path)
 Cypress.Commands.add('uploadCredential', (credential: object | string) => {
   cy.get('[data-testid="credential-upload"]').should('be.visible');
@@ -89,5 +53,3 @@ Cypress.Commands.add('checkVCDMVersionColor', (credentialType: string, expectedC
     .should('have.class', colorClasses[expectedColor][0])
     .and('have.class', colorClasses[expectedColor][1]);
 });
-
-export {};
