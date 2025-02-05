@@ -134,17 +134,48 @@ yarn release:doc
 
 ## End-to-end testing
 
+We use Cypress for end-to-end testing with Docker Compose to run the services required for testing. The end-to-end tests are located in the `cypress` folder.
+
+### To run the end-to-end tests, follow these steps:
+
+1. Install dependencies:
+
+   ```bash
+   yarn install
+   ```
+
+2. Start the services with Docker Compose:
+
 ```bash
-# Run end-to-end testing scripts
-yarn build-clean
-yarn install
-yarn build
 SEEDING=true docker compose -f docker-compose.e2e.yml up -d
-
-# Reset data
-chmod +x run-e2e-tests.sh
-./run-e2e-tests.sh
-
-# Run Cypress tests
-yarn cypress run
 ```
+
+3. Run the end-to-end tests:
+
+   - To run all tests:
+
+   ```bash
+   yarn cypress run
+   ```
+
+   - To open Cypress Test Runner:
+
+   ```bash
+   yarn cypress open
+   ```
+
+### Cypress Architecture
+
+Structure
+
+- Cypress Configuration:
+  - `cypress.config.js`: Contains the configuration for Cypress.
+  - `tsconfig.json`: Contains the TypeScript configuration for Cypress.
+- Test Files:
+  - Tests are organized under cypress/e2e/ . For example:
+    - cypress/e2e/issue_workflow_test/DFR/ for DFR related tests.
+- Support Files:
+  - `commands.ts`: Contains custom commands for Cypress.
+  - `index.ts`: Contains the setup for Cypress.
+- Fixtures:
+  - JSON files for test data are stored in cypress/fixtures/.
