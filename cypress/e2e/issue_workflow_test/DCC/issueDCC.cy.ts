@@ -1,43 +1,43 @@
-describe('Issue DCC end-to-end testing flow', () => {
-  beforeEach(() => {
-    // Load app config JSON
-    cy.loadAppConfig();
-  });
+import IssuePage from 'cypress/page/issuePage';
 
-  it('should access the right app config data', () => {
-    cy.verifyAppConfig();
-  });
-
-  it('should visit the homepage, navigate to "Generate DCC" through "General features", handle API calls, and show success message', () => {
-    cy.generateWorkflow(
+class DCCIssueFlow extends IssuePage {
+  testGenerateDCCWorkflow() {
+    this.generateWorkflow(
       'General features',
       'Generate DCC',
       'getConformityCredential',
       'DigitalConformityCredential_instance-v0.5.0.json',
       'generalFeatures',
     );
+  }
+
+  testUNTPV050() {
+    this.logCurrentDir();
+    this.runShellScript('./cypress/e2e/issue_workflow_test/DCC/test-untp-dcc-scripts.sh');
+    this.deleteFile('DigitalConformityCredential_instance-v0.5.0.json');
+  }
+}
+
+describe('Issue DCC end-to-end testing flow', () => {
+  const dccTest = new DCCIssueFlow();
+
+  beforeEach(() => {
+    dccTest.beforeAll();
   });
 
-  it('Verify linkType', () => {
-    const checkLinkTypeURL = 'http://localhost:3000/gs1/01/09359502000034';
-    cy.verifyLinkType(checkLinkTypeURL);
+  it('should access the right app config data', () => {
+    dccTest.testAppConfig();
   });
 
-  it('Runs testing UNTP V0.5.0', () => {
-    cy.runShellScript('./cypress/e2e/issue_workflow_test/DCC/test-untp-dcc-scripts.sh').then((output: any) => {
-      const cleanedOutput = output.replace(/\x1b\[[0-9;]*m/g, '');
-      cy.log('Shell Script Output:', cleanedOutput);
-      expect(cleanedOutput).to.include('Script completed successfully!');
-      expect(cleanedOutput).to.include('Testing Credential: digitalConformityCredential');
-      expect(cleanedOutput).to.include('Result: PASS');
-    });
+  it('should generate DCC', () => {
+    dccTest.testGenerateDCCWorkflow();
+  });
 
-    cy.deleteFile('DigitalConformityCredential_instance-v0.5.0.json').then((result) => {
-      if (result) {
-        cy.log('File deleted successfully');
-      } else {
-        cy.log('File not found or could not be deleted');
-      }
-    });
+  it('Verify linkType for DCC', () => {
+    dccTest.verifyLinkType('http://localhost:3000/gs1/01/09359502000034');
+  });
+
+  it('Runs testing UNTP for DCC', () => {
+    dccTest.testUNTPV050();
   });
 });

@@ -1,53 +1,43 @@
-describe('Issue DFR end-to-end testing flow', () => {
-  beforeEach(() => {
-    // Load app config JSON
-    cy.loadAppConfig();
-  });
+import IssuePage from 'cypress/page/issuePage';
 
-  it('should access the right app config data', () => {
-    cy.verifyAppConfig();
-  });
-
-  it('should visit the homepage, navigate to "Generate DFR" through "General features", handle API calls, and show success message', () => {
-    cy.generateWorkflow(
+class DFRIssueFlow extends IssuePage {
+  testGenerateDFRWorkflow() {
+    this.generateWorkflow(
       'General features',
       'Generate DFR',
       'DigitalFacilityRecord',
       'DigitalFacilityRecord_instance-v0.5.0.json',
       'generalFeatures',
     );
+  }
+
+  testUNTPV050() {
+    this.logCurrentDir();
+    this.runShellScript('./cypress/e2e/issue_workflow_test/DFR/test-untp-dfr-scripts.sh');
+    this.deleteFile('DigitalFacilityRecord_instance-v0.5.0.json');
+  }
+}
+
+describe('Issue DFR end-to-end testing flow', () => {
+  const dfrTest = new DFRIssueFlow();
+
+  beforeEach(() => {
+    dfrTest.beforeAll();
   });
 
-  it('Verify linkType', () => {
-    const checkLinkTypeURL = 'http://localhost:3000/gs1/gln/9359502000034';
-    cy.verifyLinkType(checkLinkTypeURL);
+  it('should access the right app config data', () => {
+    dfrTest.testAppConfig();
   });
 
-  it('Runs testing UNTP V0.5.0', () => {
-    cy.exec('pwd').then((result) => {
-      cy.log('Current directory:', result.stdout);
-    });
-    cy.task('runShellScript', { scriptPath: './cypress/e2e/issue_workflow_test/DFR/test-untp-dfr-scripts.sh' }).then(
-      (output: any) => {
-        const cleanedOutput = output.replace(/\x1b\[[0-9;]*m/g, '');
-        cy.log('Shell Script Output:', cleanedOutput);
-        // Expect the output to include success message
-        expect(cleanedOutput).to.include('Script completed successfully!');
-        expect(cleanedOutput).to.include('Testing Credential: digitalFacilityRecord');
-        expect(cleanedOutput).to.include('Result: PASS');
-      },
-    );
+  it('should generate DFR', () => {
+    dfrTest.testGenerateDFRWorkflow();
+  });
 
-    // Define the path to the JSON file you want to delete
-    const filePath = 'DigitalFacilityRecord_instance-v0.5.0.json';
+  it('Verify linkType for DFR', () => {
+    dfrTest.verifyLinkType('http://localhost:3000/gs1/gln/9359502000034');
+  });
 
-    // Call the task to delete the file
-    cy.task('deleteFileCredentialE2E', filePath).then((result) => {
-      if (result) {
-        cy.log('File deleted successfully');
-      } else {
-        cy.log('File not found or could not be deleted');
-      }
-    });
+  it('Runs testing UNTP for DFR', () => {
+    dfrTest.testUNTPV050();
   });
 });
