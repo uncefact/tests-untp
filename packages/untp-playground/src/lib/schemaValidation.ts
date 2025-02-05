@@ -1,5 +1,6 @@
 import addFormats from 'ajv-formats';
 import Ajv2020 from 'ajv/dist/2020';
+import { VCDM_SCHEMA_URLS, VCDMVersion } from '../../constants';
 import { detectCredentialType, detectVersion } from './credentialService';
 
 const ajv = new Ajv2020({
@@ -9,7 +10,7 @@ const ajv = new Ajv2020({
 });
 addFormats(ajv);
 
-const schemaCache = new Map<string, any>();
+export const schemaCache = new Map<string, any>();
 
 interface CoreVersion {
   type: string;
@@ -166,4 +167,23 @@ async function validateCredentialOnSchemaUrl(credential: any, schemaUrl: string,
     console.log('Schema validation error:', error);
     throw error;
   }
+}
+
+/**
+ * Validates a VerifiableCredential against the VCDM schema for a specific version.
+ * @param credential - The VerifiableCredential to validate.
+ * @param version - The VCDM version to use for validation.
+ * @returns A Promise that resolves to an object containing the validation result.
+ */
+export async function validateVerifiableCredentialAgainstSchema(
+  credential: any,
+  version: Exclude<VCDMVersion, VCDMVersion.UNKNOWN>,
+) {
+  const schemaUrl = VCDM_SCHEMA_URLS[version];
+
+  if (!schemaUrl) {
+    throw new Error(`Schema URL for VCDM version: ${version} not found.`);
+  }
+
+  return validateCredentialOnSchemaUrl(credential, schemaUrl);
 }

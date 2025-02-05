@@ -1,14 +1,14 @@
+import { exec } from 'child_process';
 import { defineConfig } from 'cypress';
 import fs from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
 import util from 'util';
 
 const execPromise = util.promisify(exec);
 export default defineConfig({
   e2e: {
     baseUrl: 'http://localhost:3003', // Replace with your application's base URL
-    supportFile: false, // Disable the default support file if not needed
+    supportFile: 'cypress/support/e2e.ts',
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}', // Specifies the test file pattern
     video: false, // Disable video recording (optional)
     chromeWebSecurity: false, // Helps bypass security restrictions (if needed)

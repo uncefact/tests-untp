@@ -1,5 +1,12 @@
-import { validateCredentialSchema, validateExtension, detectExtension } from '@/lib/schemaValidation';
 import { detectCredentialType, detectVersion } from '@/lib/credentialService';
+import {
+  detectExtension,
+  schemaCache,
+  validateCredentialSchema,
+  validateExtension,
+  validateVerifiableCredentialAgainstSchema,
+} from '@/lib/schemaValidation';
+import { VCDMVersion } from '../../constants';
 
 // Mock the global fetch
 global.fetch = jest.fn();
@@ -15,6 +22,7 @@ describe('schemaValidation', () => {
     (global.fetch as jest.Mock).mockClear();
     (detectCredentialType as jest.Mock).mockClear();
     (detectVersion as jest.Mock).mockClear();
+    schemaCache.clear(); // Clear the cache so that fetch will be called
   });
 
   describe('validateCredentialSchema', () => {
@@ -24,6 +32,7 @@ describe('schemaValidation', () => {
         properties: {
           type: { type: 'string' },
           '@context': { type: 'array' },
+          version: { type: 'string' },
         },
       };
 
@@ -47,6 +56,20 @@ describe('schemaValidation', () => {
     });
 
     it('should validate a valid DLP credential', async () => {
+      const mockSchema = {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        properties: {
+          type: { type: 'string' },
+          '@context': { type: 'array' },
+          version: { type: 'string' },
+        },
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockSchema),
+      });
+
       const validCredential = {
         type: 'DigitalLivestockPassport',
         '@context': ['https://aatp.foodagility.com/vocabulary/aatp/dlp/0.4.0'],
@@ -167,6 +190,136 @@ describe('schemaValidation', () => {
 
       const result = detectExtension(credential);
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe('validateVerifiableCredentialAgainstSchema', () => {
+    it('should validate a valid verifiable credential', async () => {
+      const mockSchema = {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        required: ['@context', 'type', 'issuer'],
+        properties: {
+          '@context': {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          type: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          issuer: { type: 'string' },
+        },
+        additionalProperties: false,
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockSchema),
+      });
+
+      const validCredential = {
+        '@context': ['https://www.w3.org/2018/credentials/v1', 'https://w3id.org/security/suites/jws-2020/v1'],
+        type: ['VerifiableCredential'],
+        issuer: 'did:example:123',
+      };
+
+      const result = await validateVerifiableCredentialAgainstSchema(validCredential, VCDMVersion.V1);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
+
+    it('should handle schema validation failures', async () => {
+      const mockSchema = {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        required: ['@context', 'type', 'issuer'],
+        properties: {
+          '@context': {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          type: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          issuer: { type: 'string' },
+        },
+        additionalProperties: false,
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockSchema),
+      });
+
+      const invalidCredential = {
+        '@context': ['https://www.w3.org/2018/credentials/v1'],
+        type: ['VerifiableCredential'],
+        // missing required issuer field
+        invalidField: 'should not be here',
+      };
+
+      const result = await validateVerifiableCredentialAgainstSchema(invalidCredential, VCDMVersion.V1);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toBeDefined();
+      expect(
+        result.errors?.some((error) => error.keyword === 'required' && error.params.missingProperty === 'issuer'),
+      ).toBe(true);
+      expect(
+        result.errors?.some(
+          (error) => error.keyword === 'additionalProperties' && error.params.additionalProperty === 'invalidField',
+        ),
+      ).toBe(true);
+    });
+
+    it('should handle schema fetch failures', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        statusText: 'Not Found',
+      });
+
+      const credential = {
+        '@context': ['https://www.w3.org/2018/credentials/v1'],
+        type: ['VerifiableCredential'],
+      };
+
+      await expect(validateVerifiableCredentialAgainstSchema(credential, VCDMVersion.V1)).rejects.toThrow(
+        'Failed to fetch schema: Not Found',
+      );
+    });
+
+    it('should handle network errors during schema fetch', async () => {
+      const mockToast = { error: jest.fn() };
+      jest.mock('sonner', () => ({ toast: mockToast }));
+
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+
+      const credential = {
+        '@context': ['https://www.w3.org/2018/credentials/v1'],
+        type: ['VerifiableCredential'],
+      };
+
+      await expect(validateVerifiableCredentialAgainstSchema(credential, VCDMVersion.V1)).rejects.toThrow(
+        'Network error',
+      );
+    });
+
+    it('should throw error when schema URL is not found for version', async () => {
+      const VCDM_SCHEMA_URLS = {};
+      jest.mock('../../constants', () => ({
+        ...jest.requireActual('../../constants'),
+        VCDM_SCHEMA_URLS,
+      }));
+
+      const credential = {
+        '@context': ['https://www.w3.org/2018/credentials/v1'],
+        type: ['VerifiableCredential'],
+      };
+
+      await expect(validateVerifiableCredentialAgainstSchema(credential, VCDMVersion.UNKNOWN as any)).rejects.toThrow(
+        'Schema URL for VCDM version: unknown not found.',
+      );
     });
   });
 });
