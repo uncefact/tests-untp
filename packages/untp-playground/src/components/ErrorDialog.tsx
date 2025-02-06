@@ -14,6 +14,7 @@ const getReadableKeyword = (keyword: string) => {
     minLength: "too short",
     maxLength: "too long",
     additionalProperties: "unexpected field",
+    conflictingProperties: "conflicting field",
   };
   return keywords[keyword] || keyword;
 };
@@ -150,6 +151,19 @@ export const ErrorDialog = ({ errors = [], className = "" }) => {
                       {isExpanded && (
                         <div className="p-4 border-t bg-gray-50">
                           <div className="mb-3 text-sm">
+                            {mainError.keyword === "const" && (
+                              <div>
+                                <p>
+                                  Incorrect value:{" "}
+                                  <code className="px-1 py-0.5 bg-gray-100 rounded">
+                                    {mainError.instancePath}
+                                  </code>
+                                </p>
+                                <p>
+                                  Error: {mainError.message}
+                                </p>
+                              </div>
+                            )}
                             {mainError.keyword === "required" && (
                               <p>
                                 Missing field:{" "}
@@ -173,6 +187,19 @@ export const ErrorDialog = ({ errors = [], className = "" }) => {
                                   {mainError.params.type}
                                 </code>
                               </p>
+                            )}
+                            {mainError.keyword === "conflictingProperties" && (
+                              <div>
+                                <p>
+                                  Conflicting field:{" "}
+                                  <code className="px-1 py-0.5 bg-gray-100 rounded">
+                                    {mainError.params.conflictingProperty}
+                                  </code>
+                                </p>
+                                <p>
+                                  Error: {mainError.message}
+                                </p>
+                              </div>
                             )}
                           </div>
 
@@ -205,13 +232,15 @@ export const ErrorDialog = ({ errors = [], className = "" }) => {
                           <div className="mt-3 text-sm text-blue-800 bg-blue-50 p-3 rounded">
                             <strong>Tip:</strong>{" "}
                             {mainError.keyword === "const"
-                              ? "This value must match exactly as shown above."
+                              ? "Update the value to the correct one or remove the field."
                               : mainError.keyword === "enum"
                               ? "Choose one of the values shown above."
                               : mainError.keyword === "required"
                               ? `Add the missing "${mainError.params.missingProperty}" field.`
                               : mainError.keyword === "type"
                               ? `Change the value to match the expected type: ${mainError.params.type}.`
+                              : mainError.keyword === "conflictingProperties"
+                              ? `Resolve the conflict by removing the conflicting field or updating it to a unique one.`
                               : "Make sure your input matches the required format."}
                           </div>
                         </div>

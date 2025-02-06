@@ -7,6 +7,7 @@ import { detectVersion, isEnvelopedProof } from '@/lib/credentialService';
 import { detectExtension, validateCredentialSchema, validateExtension } from '@/lib/schemaValidation';
 import { verifyCredential } from '@/lib/verificationService';
 import type { Credential, CredentialType, TestStep } from '@/types/credential';
+import { validateContext } from '@/lib/contextValidation';
 import confetti from 'canvas-confetti';
 import { AlertCircle, Check, ChevronDown, ChevronRight, Loader2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -130,7 +131,7 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
           <span>{step.name}</span>
         </div>
         {step.details &&
-          (step.id === 'schema' || step.id === 'extension-schema') &&
+          (step.id === 'schema' || step.id === 'context' || step.id === 'extension-schema') &&
           (step.details.errors?.[0]?.message === 'Failed to fetch schema' ? (
             <span className='text-sm text-red-500'>Failed to load schema</span>
           ) : shouldShowDetails ? (
@@ -210,6 +211,11 @@ export function TestResults({
           name: 'Schema Validation',
           status: 'missing',
         },
+        {
+          id: 'context',
+          name: 'JSON-LD Document Expansion and Context Validation',
+          status: 'missing',
+        },
       ];
     }
 
@@ -230,6 +236,11 @@ export function TestResults({
       {
         id: 'schema',
         name: 'Schema Validation',
+        status: 'pending',
+      },
+      {
+        id: 'context',
+        name: 'JSON-LD Document Expansion and Context Validation',
         status: 'pending',
       },
     ];
@@ -281,7 +292,7 @@ export function TestResults({
           setTestResults((prev) => ({
             ...prev,
             [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
-              step.id === 'verification' || step.id === 'schema' ? { ...step, status: 'in-progress' } : step,
+              step.id === 'verification' || step.id === 'schema' || step.id === 'context' ? { ...step, status: 'in-progress' } : step,
             ),
           }));
 
@@ -367,6 +378,30 @@ export function TestResults({
               ),
             }));
           }
+
+          // JSON-LD Document Expansion and Context Validation
+          const validateContextResult = await validateContext(credential.decoded);
+          const contextTestResult = { status: 'success', details: validateContextResult.data };
+
+          if (!validateContextResult.valid) {
+            allChecksPass = false;
+            toast.error(validateContextResult.error!.message);
+            contextTestResult.status = 'failure';
+            contextTestResult.details = { errors: [validateContextResult.error] };
+          }
+
+          setTestResults((prev) => ({
+            ...prev,
+            [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
+              step.id === 'context'
+                ? {
+                    ...step,
+                    status: contextTestResult.status,
+                    details: contextTestResult.details,
+                  }
+                : step,
+            ),
+          }));
 
           // Extension schema validation
           if (extension) {
