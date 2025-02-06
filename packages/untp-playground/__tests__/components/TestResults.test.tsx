@@ -10,6 +10,9 @@ jest.mock('@/lib/verificationService');
 jest.mock('@/lib/schemaValidation');
 jest.mock('@/lib/credentialService');
 jest.mock('canvas-confetti');
+jest.mock('jsonld', () => ({
+  expand: jest.fn(),
+}));
 jest.mock('sonner', () => ({
   toast: {
     error: jest.fn(),

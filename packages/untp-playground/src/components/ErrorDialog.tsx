@@ -240,7 +240,7 @@ export const ErrorDialog = ({ errors = [], className = "" }) => {
                               : mainError.keyword === "type"
                               ? `Change the value to match the expected type: ${mainError.params.type}.`
                               : mainError.keyword === "conflictingProperties"
-                              ? `Resolve the conflict by removing the conflicting field or updating it to a unique one.`
+                              ? "Resolve the conflict by removing the conflicting field or updating it to a unique one."
                               : "Make sure your input matches the required format."}
                           </div>
                         </div>
