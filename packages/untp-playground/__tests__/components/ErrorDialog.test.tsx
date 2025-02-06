@@ -115,7 +115,7 @@ describe('ErrorDialog', () => {
     expect(screen.getByText(/copied!/i)).toBeInTheDocument();
   });
 
-  it('displays correct tips based on error type "const', () => {
+  it('displays correct tips based on error type "const"', () => {
     const errors = [
       {
         keyword: 'const',
@@ -134,7 +134,7 @@ describe('ErrorDialog', () => {
     expect(screen.getByText(/Update the value to the correct one or remove the field/i)).toBeInTheDocument();
   });
 
-  it('displays correct tips based on error type "conflictingProperties', () => {
+  it('displays correct tips based on error type "conflictingProperties"', () => {
     const errors = [
       {
         keyword: 'conflictingProperties',
