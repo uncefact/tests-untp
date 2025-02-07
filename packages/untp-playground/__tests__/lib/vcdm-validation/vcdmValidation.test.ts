@@ -1,4 +1,4 @@
-import { validateVerifiableCredentialAgainstSchema } from '@/lib/schemaValidation';
+import { validateVcAgainstSchema } from '@/lib/schemaValidation';
 import { detectVcdmVersion } from '@/lib/utils';
 import { validateVcdmRules } from '@/lib/vcdm-validation/vcdmValidation';
 import { VCDM_CONTEXT_URLS, VCDMVersion } from '../../../constants';
@@ -20,7 +20,7 @@ describe('vcdmValidation', () => {
       };
 
       (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V2);
-      (validateVerifiableCredentialAgainstSchema as jest.Mock).mockResolvedValue({
+      (validateVcAgainstSchema as jest.Mock).mockResolvedValue({
         valid: true,
         errors: [],
       });
@@ -159,7 +159,7 @@ describe('vcdmValidation', () => {
       };
 
       (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V2);
-      (validateVerifiableCredentialAgainstSchema as jest.Mock).mockResolvedValue({
+      (validateVcAgainstSchema as jest.Mock).mockResolvedValue({
         valid: false,
         errors: [
           {
@@ -188,7 +188,7 @@ describe('vcdmValidation', () => {
       };
 
       (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V2);
-      (validateVerifiableCredentialAgainstSchema as jest.Mock).mockResolvedValue({
+      (validateVcAgainstSchema as jest.Mock).mockResolvedValue({
         valid: false,
         errors: [
           {

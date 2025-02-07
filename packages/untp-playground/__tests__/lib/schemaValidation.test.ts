@@ -4,7 +4,7 @@ import {
   schemaCache,
   validateCredentialSchema,
   validateExtension,
-  validateVerifiableCredentialAgainstSchema,
+  validateVcAgainstSchema,
 } from '@/lib/schemaValidation';
 import { VCDMVersion } from '../../constants';
 
@@ -193,7 +193,7 @@ describe('schemaValidation', () => {
     });
   });
 
-  describe('validateVerifiableCredentialAgainstSchema', () => {
+  describe('validateVcAgainstSchema', () => {
     it('should validate a valid verifiable credential', async () => {
       const mockSchema = {
         $schema: 'https://json-schema.org/draft/2020-12/schema',
@@ -224,7 +224,7 @@ describe('schemaValidation', () => {
         issuer: 'did:example:123',
       };
 
-      const result = await validateVerifiableCredentialAgainstSchema(validCredential, VCDMVersion.V2);
+      const result = await validateVcAgainstSchema(validCredential, VCDMVersion.V2);
       expect(result.valid).toBe(true);
       expect(result.errors).toEqual([]);
     });
@@ -260,7 +260,7 @@ describe('schemaValidation', () => {
         invalidField: 'should not be here',
       };
 
-      const result = await validateVerifiableCredentialAgainstSchema(invalidCredential, VCDMVersion.V2);
+      const result = await validateVcAgainstSchema(invalidCredential, VCDMVersion.V2);
       expect(result.valid).toBe(false);
       expect(result.errors).toBeDefined();
       expect(
@@ -284,7 +284,7 @@ describe('schemaValidation', () => {
         type: ['VerifiableCredential'],
       };
 
-      await expect(validateVerifiableCredentialAgainstSchema(credential, VCDMVersion.V2)).rejects.toThrow(
+      await expect(validateVcAgainstSchema(credential, VCDMVersion.V2)).rejects.toThrow(
         'Failed to fetch schema: Not Found',
       );
     });
@@ -300,9 +300,7 @@ describe('schemaValidation', () => {
         type: ['VerifiableCredential'],
       };
 
-      await expect(validateVerifiableCredentialAgainstSchema(credential, VCDMVersion.V2)).rejects.toThrow(
-        'Network error',
-      );
+      await expect(validateVcAgainstSchema(credential, VCDMVersion.V2)).rejects.toThrow('Network error');
     });
 
     it('should throw error when schema URL is not found for version', async () => {
@@ -317,7 +315,7 @@ describe('schemaValidation', () => {
         type: ['VerifiableCredential'],
       };
 
-      await expect(validateVerifiableCredentialAgainstSchema(credential, VCDMVersion.UNKNOWN as any)).rejects.toThrow(
+      await expect(validateVcAgainstSchema(credential, VCDMVersion.UNKNOWN as any)).rejects.toThrow(
         'Schema URL for VCDM version: unknown not found.',
       );
     });

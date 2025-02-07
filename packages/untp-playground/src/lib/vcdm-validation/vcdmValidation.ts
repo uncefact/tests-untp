@@ -1,6 +1,6 @@
 import { validateWithRules } from '@/lib/validationHelpers';
-import { permittedVcdmContextUrls, permittedVcdmVersions } from '../../../constants';
-import { validateVerifiableCredentialAgainstSchema } from '../schemaValidation';
+import { permittedVcdmContextUrls, permittedVcdmVersions, VCDMVersion } from '../../../constants';
+import { validateVcAgainstSchema } from '../schemaValidation';
 import { detectVcdmVersion } from '../utils';
 import { vcdmContextRules } from './rules';
 
@@ -36,7 +36,7 @@ export async function validateVcdmRules(credential: any) {
     };
   }
 
-  const { errors } = (await validateVerifiableCredentialAgainstSchema(credential, version)) || { errors: [] };
+  const { errors } = (await validateVcAgainstSchema(credential, version as VCDMVersion.V2)) || { errors: [] };
 
   const allErrors = [...contextErrors, ...errors];
   return {

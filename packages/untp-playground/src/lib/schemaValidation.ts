@@ -175,10 +175,7 @@ async function validateCredentialOnSchemaUrl(credential: any, schemaUrl: string,
  * @param version - The VCDM version to use for validation.
  * @returns A Promise that resolves to an object containing the validation result.
  */
-export async function validateVerifiableCredentialAgainstSchema(
-  credential: any,
-  version: Exclude<VCDMVersion, VCDMVersion.UNKNOWN | VCDMVersion.V1>,
-) {
+export async function validateVcAgainstSchema(credential: any, version: Extract<VCDMVersion, VCDMVersion.V2>) {
   const schemaUrl = VCDM_SCHEMA_URLS[version];
 
   if (!schemaUrl) {
