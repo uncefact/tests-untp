@@ -36,11 +36,16 @@
     "generate-version-mapping": "node documentation/version-mapping/script.js"
   },
   "devDependencies": {
+    "@babel/core": "^7.26.7",
+    "@babel/preset-env": "^7.26.7",
+    "@cypress/webpack-preprocessor": "^6.0.2",
     "@jest/globals": "^29.7.0",
+    "@types/cypress": "^1.1.6",
     "@types/fs-extra": "11.0.4",
     "@types/jest": "29.5.11",
-    "@types/node": "20.10.6",
+    "@types/node": "^22.13.1",
     "@types/uuid": "^9.0.7",
+    "babel-loader": "^9.2.1",
     "cross-env": "^7.0.3",
     "cypress": "^13.16.1",
     "eslint-plugin-prettier": "^5.1.3",
@@ -51,11 +56,14 @@
     "jest-environment-node": "29.7.0",
     "lerna": "8.0.1",
     "lerna-changelog": "2.2.0",
+    "node-polyfill-webpack-plugin": "^4.1.0",
     "prettier": "3.1.1",
     "pretty-quick": "3.1.3",
     "ts-jest": "29.1.1",
+    "ts-loader": "^9.5.2",
     "ts-node": "10.9.2",
-    "typescript": "^4"
+    "typescript": "^4",
+    "webpack": "^5.97.1"
   },
   "publishConfig": {
     "access": "public"
@@ -71,6 +79,7 @@
   "dependencies": {
     "istanbul-merge": "2.0.0",
     "nyc": "17.1.0",
-    "rimraf": "^5.0.5"
+    "rimraf": "^5.0.5",
+    "untp-test-suite": "0.1.0-beta"
   }
 }

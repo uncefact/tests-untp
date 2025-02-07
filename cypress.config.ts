@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
 import util from 'util';
+import webpackPreprocessor from '@cypress/webpack-preprocessor';
 
 const execPromise = util.promisify(exec);
 export default defineConfig({
@@ -46,6 +47,13 @@ export default defineConfig({
           });
         },
       });
-    },
+
+      const options = {
+        webpackOptions: require('cypress/webpack.config'),
+        watchOptions: {},
+      };
+
+      on('file:preprocessor', webpackPreprocessor(options));
+    }
   },
 });
