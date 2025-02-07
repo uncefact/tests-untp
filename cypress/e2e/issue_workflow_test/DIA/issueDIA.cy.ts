@@ -11,7 +11,7 @@ class DIAIssueFlow extends IssuePage {
     );
   }
 
-  testUNTPV050() {
+  testUNTPTestSuite() {
     this.logCurrentDir();
     this.runShellScript('./cypress/e2e/issue_workflow_test/DIA/test-untp-dia-scripts.sh');
     this.deleteFile('DigitalIdentityAnchor_instance-v0.2.1.json');
@@ -37,7 +37,7 @@ describe('Issue DIA end-to-end testing flow', () => {
     diaTest.verifyLinkType('http://localhost:3000/gs1/01/09359502000010');
   });
 
-  it('Runs testing UNTP for DCC', () => {
-    diaTest.testUNTPV050();
+  it('Runs testing UNTP test suite for DCC', () => {
+    diaTest.testUNTPTestSuite();
   });
 });

@@ -11,7 +11,7 @@ class DFRIssueFlow extends IssuePage {
     );
   }
 
-  testUNTPV050() {
+  testUNTPTestSuite() {
     this.logCurrentDir();
     this.runShellScript('./cypress/e2e/issue_workflow_test/DFR/test-untp-dfr-scripts.sh');
     this.deleteFile('DigitalFacilityRecord_instance-v0.5.0.json');
@@ -37,7 +37,7 @@ describe('Issue DFR end-to-end testing flow', () => {
     dfrTest.verifyLinkType('http://localhost:3000/gs1/gln/9359502000034');
   });
 
-  it('Runs testing UNTP for DFR', () => {
-    dfrTest.testUNTPV050();
+  it('Runs testing UNTP test suite for DFR', () => {
+    dfrTest.testUNTPTestSuite();
   });
 });

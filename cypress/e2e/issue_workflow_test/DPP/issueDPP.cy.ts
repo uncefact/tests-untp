@@ -11,7 +11,7 @@ class DPPIssueFlow extends IssuePage {
     );
   }
 
-  testUNTPV050() {
+  testUNTPTestSuite() {
     this.logCurrentDir();
     this.runShellScript('./cypress/e2e/issue_workflow_test/DPP/test-untp-dpp-scripts.sh');
     this.deleteFile('DigitalProductPassport_instance-v0.5.0.json');
@@ -38,7 +38,7 @@ describe('Issue DPP end-to-end testing flow', () => {
     dppTest.verifyLinkType(checkLinkTypeURL);
   });
 
-  it('Runs testing UNTP V0.5.0', () => {
-    dppTest.testUNTPV050();
+  it('Runs testing UNTP test suite for DPP', () => {
+    dppTest.testUNTPTestSuite();
   });
 });

@@ -11,7 +11,7 @@ class DCCIssueFlow extends IssuePage {
     );
   }
 
-  testUNTPV050() {
+  testUNTPTestSuite() {
     this.logCurrentDir();
     this.runShellScript('./cypress/e2e/issue_workflow_test/DCC/test-untp-dcc-scripts.sh');
     this.deleteFile('DigitalConformityCredential_instance-v0.5.0.json');
@@ -37,7 +37,7 @@ describe('Issue DCC end-to-end testing flow', () => {
     dccTest.verifyLinkType('http://localhost:3000/gs1/01/09359502000034');
   });
 
-  it('Runs testing UNTP for DCC', () => {
-    dccTest.testUNTPV050();
+  it('Runs testing UNTP test suite for DCC', () => {
+    dccTest.testUNTPTestSuite();
   });
 });
