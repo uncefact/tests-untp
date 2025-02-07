@@ -6,8 +6,8 @@ describe('VCDM Schema Validation', () => {
     cy.visit('http://localhost:4000');
   });
 
-  const validV1Credential = {
-    '@context': [VCDM_CONTEXT_URLS.v1],
+  const validCredential = {
+    '@context': [VCDM_CONTEXT_URLS.v2],
     type: ['VerifiableCredential', 'DigitalProductPassport'],
     issuer: 'did:example:123',
     validFrom: '2024-01-01T00:00:00Z',
@@ -16,35 +16,16 @@ describe('VCDM Schema Validation', () => {
       name: 'John Doe',
       email: 'john.doe@example.com',
     },
-    proof: {
-      type: 'Ed25519Signature2020',
-      created: '2024-01-01T00:00:00Z',
-      verificationMethod: 'did:example:123#key-1',
-      proofPurpose: 'assertionMethod',
-      proofValue: 'z3FXQhkW9X8X...',
-    },
   };
 
-  const validV2Credential = {
-    '@context': [VCDM_CONTEXT_URLS.v2],
+  const v1VcdmCredential = {
+    '@context': [VCDM_CONTEXT_URLS.v1],
     type: ['VerifiableCredential', 'DigitalProductPassport'],
     issuer: 'did:example:123',
-    credentialSubject: {
-      id: 'did:example:123',
-      name: 'John Doe',
-      email: 'john.doe@example.com',
-    },
-    proof: {
-      type: 'Ed25519Signature2020',
-      created: '2024-01-01T00:00:00Z',
-      verificationMethod: 'did:example:123#key-1',
-      proofPurpose: 'assertionMethod',
-      proofValue: 'z3FXQhkW9X8X...',
-    },
   };
 
   const invalidVcdmVersionCredential = {
-    '@context': ['https://invalid.context.url'],
+    '@context': ['https://example.com/vcdm-context.json'],
     type: ['VerifiableCredential', 'DigitalProductPassport'],
     issuer: 'did:example:123',
   };
@@ -54,33 +35,47 @@ describe('VCDM Schema Validation', () => {
     issuer: 'did:example:123',
   };
 
-  it('should validate a VCDM v1 credential successfully', () => {
-    cy.uploadCredential(validV1Credential);
-    cy.contains('VCDM v1').should('be.visible');
+  it('should validate a VCDM v2` credential successfully', () => {
+    cy.uploadCredential(validCredential);
+
+    cy.contains('VCDM v2').should('be.visible');
+    cy.checkVCDMVersionColor('DigitalProductPassport', 'green');
+
     cy.expandGroup();
     cy.checkValidationStatus('VCDM Version Detection', 'success');
     cy.checkValidationStatus('VCDM Schema Validation', 'success');
   });
 
-  it('should validate a VCDM v2 credential successfully', () => {
-    cy.uploadCredential(validV2Credential);
-    cy.contains('VCDM v2').should('be.visible');
+  it('should show error for v1 VCDM version', () => {
+    cy.uploadCredential(v1VcdmCredential);
+
+    cy.contains('VCDM v1').should('be.visible');
+    cy.checkVCDMVersionColor('DigitalProductPassport', 'red');
+
     cy.expandGroup();
     cy.checkValidationStatus('VCDM Version Detection', 'success');
-    cy.checkValidationStatus('VCDM Schema Validation', 'success');
+    cy.checkValidationStatus('VCDM Schema Validation', 'failure');
   });
 
   it('should show error for unsupported VCDM version', () => {
     cy.uploadCredential(invalidVcdmVersionCredential);
+
     cy.contains('Unsupported VCDM version').should('be.visible');
+    cy.checkVCDMVersionColor('DigitalProductPassport', 'red');
+
     cy.expandGroup();
     cy.checkValidationStatus('VCDM Version Detection', 'failure');
   });
 
   it('should show validation errors for missing @context', () => {
     cy.uploadCredential(missingContextCredential);
+
+    cy.contains('Unsupported VCDM version').should('be.visible');
+    cy.checkVCDMVersionColor('DigitalProductPassport', 'red');
+
     cy.expandGroup();
     cy.checkValidationStatus('VCDM Schema Validation', 'failure');
+
     cy.openErrorDetails();
     cy.contains('Fix validation error').click();
     cy.contains('Missing field: @context').should('be.visible');
@@ -94,7 +89,13 @@ describe('VCDM Schema Validation', () => {
     };
 
     cy.uploadCredential(invalidCredential);
+
+    cy.contains('VCDM v2').should('be.visible');
+    cy.checkVCDMVersionColor('DigitalProductPassport', 'green');
+
     cy.expandGroup();
+    cy.checkValidationStatus('VCDM Schema Validation', 'failure');
+
     cy.openErrorDetails();
     cy.contains('Fix validation error').click();
     cy.contains('Missing field: issuer').should('be.visible');
@@ -107,13 +108,21 @@ describe('VCDM Schema Validation', () => {
       body: 'Schema fetch failed',
     }).as('schemaFetch');
 
-    cy.uploadCredential(validV1Credential);
+    cy.uploadCredential(validCredential);
+
+    cy.contains('VCDM v2').should('be.visible');
+    cy.checkVCDMVersionColor('DigitalProductPassport', 'green');
+
     cy.wait('@schemaFetch');
     cy.get('[data-sonner-toast]').contains('Failed to fetch the VCDM schema').should('exist');
   });
 
   it('should show confetti for fully valid credential', () => {
     cy.uploadCredential('cypress/fixtures/credentials-e2e/valid-v2-enveloped-dpp.json');
+
+    cy.contains('VCDM v2').should('be.visible');
+    cy.checkVCDMVersionColor('DigitalProductPassport', 'green');
+
     cy.expandGroup();
     cy.checkValidationStatus('VCDM Schema Validation', 'success');
     cy.validateConfetti();

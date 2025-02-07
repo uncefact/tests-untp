@@ -105,6 +105,7 @@ const TestGroup = ({
               className={`text-xs px-2 py-1 rounded-full ${
                 proofType === VCProofType.ENVELOPING ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
               }`}
+              data-testid={`${credentialType}-proof-type`}
             >
               {proofType} proof
             </span>
@@ -112,8 +113,9 @@ const TestGroup = ({
           {hasCredential && vcdmVersion && (
             <span
               className={`text-xs px-2 py-1 rounded-full ${
-                vcdmVersion === VCDMVersion.UNKNOWN ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                vcdmVersion === VCDMVersion.V2 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
               }`}
+              data-testid={`${credentialType}-vcdm-version`}
             >
               {vcdmVersion === VCDMVersion.UNKNOWN ? 'Unsupported VCDM version' : `VCDM ${vcdmVersion}`}
             </span>
@@ -136,10 +138,13 @@ const TestGroup = ({
 const TestStepItem = ({ step }: { step: TestStep }) => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-  const shouldShowDetails =
-    step.details &&
-    ((step.details.errors && step.details.errors.length > 0) ||
-      (step.details.additionalProperties && Object.keys(step.details.additionalProperties).length > 0));
+  const shouldShowDetails = useMemo(() => {
+    return (
+      step.details &&
+      ((step.details.errors && step.details.errors.length > 0) ||
+        (step.details.additionalProperties && Object.keys(step.details.additionalProperties).length > 0))
+    );
+  }, [step.details]);
 
   return (
     <div className='py-2'>
@@ -154,29 +159,31 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
             step.id === TestCaseStepId.VCDM_SCHEMA_VALIDATION) &&
           (step.details.errors?.[0]?.message === 'Failed to fetch schema' ? (
             <span className='text-sm text-red-500'>Failed to load schema</span>
-          ) : shouldShowDetails ? (
-            <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-              <SheetTrigger asChild>
-                <Button variant='ghost' size='sm'>
-                  View Details
-                </Button>
-              </SheetTrigger>
-              <SheetContent className='sm:max-w-[600px]'>
-                <SheetHeader>
-                  <SheetTitle>Validation Details</SheetTitle>
-                </SheetHeader>
-                <div className='mt-4 overflow-y-auto max-h-[calc(100vh-8rem)]'>
-                  {step.details.errors && step.details.errors.length > 0 ? (
-                    <ErrorDialog errors={step.details.errors} className='w-full max-w-none' />
-                  ) : (
-                    <div className='text-yellow-600'>
-                      <p>⚠️ Additional properties found in credential</p>
-                    </div>
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
-          ) : null)}
+          ) : (
+            shouldShowDetails && (
+              <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+                <SheetTrigger asChild>
+                  <Button variant='ghost' size='sm'>
+                    View Details
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className='sm:max-w-[600px]'>
+                  <SheetHeader>
+                    <SheetTitle>Validation Details</SheetTitle>
+                  </SheetHeader>
+                  <div className='mt-4 overflow-y-auto max-h-[calc(100vh-8rem)]'>
+                    {step.details.errors && step.details.errors.length > 0 ? (
+                      <ErrorDialog errors={step.details.errors} className='w-full max-w-none' />
+                    ) : (
+                      <div className='text-yellow-600'>
+                        <p>⚠️ Additional properties found in credential</p>
+                      </div>
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )
+          ))}
       </div>
     </div>
   );

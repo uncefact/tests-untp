@@ -26,6 +26,10 @@ declare global {
        * Validates that the confetti is visible.
        */
       validateConfetti(): Chainable<Subject>;
+      /**
+       * Checks the color of the VCDM version badge.
+       */
+      checkVCDMVersionColor(credentialType: string, expectedColor: 'green' | 'red'): Chainable<Subject>;
     }
   }
 }
@@ -72,6 +76,18 @@ Cypress.Commands.add('validateConfetti', () => {
     .and('include', 'position: fixed')
     .and('include', 'pointer-events: none')
     .and('include', 'z-index: 100');
+});
+
+// Command to check VCDM version badge color
+Cypress.Commands.add('checkVCDMVersionColor', (credentialType: string, expectedColor: 'green' | 'red') => {
+  const colorClasses = {
+    green: ['bg-green-100', 'text-green-800'],
+    red: ['bg-red-100', 'text-red-800'],
+  };
+
+  cy.get(`[data-testid="${credentialType}-vcdm-version"]`)
+    .should('have.class', colorClasses[expectedColor][0])
+    .and('have.class', colorClasses[expectedColor][1]);
 });
 
 export {};

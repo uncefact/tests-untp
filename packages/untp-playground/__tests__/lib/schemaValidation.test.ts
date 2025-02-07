@@ -219,12 +219,12 @@ describe('schemaValidation', () => {
       });
 
       const validCredential = {
-        '@context': ['https://www.w3.org/2018/credentials/v1', 'https://w3id.org/security/suites/jws-2020/v1'],
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://w3id.org/security/suites/jws-2020/v1'],
         type: ['VerifiableCredential'],
         issuer: 'did:example:123',
       };
 
-      const result = await validateVerifiableCredentialAgainstSchema(validCredential, VCDMVersion.V1);
+      const result = await validateVerifiableCredentialAgainstSchema(validCredential, VCDMVersion.V2);
       expect(result.valid).toBe(true);
       expect(result.errors).toEqual([]);
     });
@@ -254,13 +254,13 @@ describe('schemaValidation', () => {
       });
 
       const invalidCredential = {
-        '@context': ['https://www.w3.org/2018/credentials/v1'],
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
         // missing required issuer field
         invalidField: 'should not be here',
       };
 
-      const result = await validateVerifiableCredentialAgainstSchema(invalidCredential, VCDMVersion.V1);
+      const result = await validateVerifiableCredentialAgainstSchema(invalidCredential, VCDMVersion.V2);
       expect(result.valid).toBe(false);
       expect(result.errors).toBeDefined();
       expect(
@@ -280,11 +280,11 @@ describe('schemaValidation', () => {
       });
 
       const credential = {
-        '@context': ['https://www.w3.org/2018/credentials/v1'],
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
       };
 
-      await expect(validateVerifiableCredentialAgainstSchema(credential, VCDMVersion.V1)).rejects.toThrow(
+      await expect(validateVerifiableCredentialAgainstSchema(credential, VCDMVersion.V2)).rejects.toThrow(
         'Failed to fetch schema: Not Found',
       );
     });
@@ -296,11 +296,11 @@ describe('schemaValidation', () => {
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
       const credential = {
-        '@context': ['https://www.w3.org/2018/credentials/v1'],
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
       };
 
-      await expect(validateVerifiableCredentialAgainstSchema(credential, VCDMVersion.V1)).rejects.toThrow(
+      await expect(validateVerifiableCredentialAgainstSchema(credential, VCDMVersion.V2)).rejects.toThrow(
         'Network error',
       );
     });
@@ -313,7 +313,7 @@ describe('schemaValidation', () => {
       }));
 
       const credential = {
-        '@context': ['https://www.w3.org/2018/credentials/v1'],
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
       };
 

@@ -1,5 +1,5 @@
 import { validateWithRules } from '@/lib/validationHelpers';
-import { VCDM_CONTEXT_URLS, VCDMVersion } from '../../../constants';
+import { permittedVcdmContextUrls, permittedVcdmVersions } from '../../../constants';
 import { validateVerifiableCredentialAgainstSchema } from '../schemaValidation';
 import { detectVcdmVersion } from '../utils';
 import { vcdmContextRules } from './rules';
@@ -22,7 +22,7 @@ export async function validateVcdmRules(credential: any) {
 
   const version = detectVcdmVersion(credential);
 
-  if (version === VCDMVersion.UNKNOWN) {
+  if (!permittedVcdmVersions.includes(version)) {
     return {
       valid: false,
       errors: [
@@ -30,7 +30,7 @@ export async function validateVcdmRules(credential: any) {
           keyword: 'missingValue',
           instancePath: '@context[0]',
           message: `The first element of "@context" must be one of the following:`,
-          params: { allowedValues: Object.values(VCDM_CONTEXT_URLS) },
+          params: { allowedValues: permittedVcdmContextUrls },
         },
       ],
     };

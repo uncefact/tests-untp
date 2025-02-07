@@ -177,7 +177,7 @@ async function validateCredentialOnSchemaUrl(credential: any, schemaUrl: string,
  */
 export async function validateVerifiableCredentialAgainstSchema(
   credential: any,
-  version: Exclude<VCDMVersion, VCDMVersion.UNKNOWN>,
+  version: Exclude<VCDMVersion, VCDMVersion.UNKNOWN | VCDMVersion.V1>,
 ) {
   const schemaUrl = VCDM_SCHEMA_URLS[version];
 

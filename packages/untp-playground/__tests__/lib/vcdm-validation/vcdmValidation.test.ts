@@ -14,12 +14,12 @@ describe('vcdmValidation', () => {
   describe('validateVcdmRules', () => {
     it('should validate a valid credential', async () => {
       const validCredential = {
-        '@context': [VCDM_CONTEXT_URLS[VCDMVersion.V1], 'https://w3id.org/security/suites/jws-2020/v1'],
+        '@context': [VCDM_CONTEXT_URLS[VCDMVersion.V2], 'https://w3id.org/security/suites/jws-2020/v1'],
         type: ['VerifiableCredential'],
         issuer: 'did:example:123',
       };
 
-      (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V1);
+      (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V2);
       (validateVerifiableCredentialAgainstSchema as jest.Mock).mockResolvedValue({
         valid: true,
         errors: [],
@@ -153,12 +153,12 @@ describe('vcdmValidation', () => {
 
     it('should combine errors from context validation and schema validation', async () => {
       const invalidCredential = {
-        '@context': [VCDM_CONTEXT_URLS[VCDMVersion.V1]],
+        '@context': [VCDM_CONTEXT_URLS[VCDMVersion.V2]],
         // missing issuer
         type: ['VerifiableCredential'],
       };
 
-      (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V1);
+      (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V2);
       (validateVerifiableCredentialAgainstSchema as jest.Mock).mockResolvedValue({
         valid: false,
         errors: [
@@ -182,12 +182,12 @@ describe('vcdmValidation', () => {
 
     it('should handle schema validation errors', async () => {
       const credential = {
-        '@context': [VCDM_CONTEXT_URLS[VCDMVersion.V1]],
+        '@context': [VCDM_CONTEXT_URLS[VCDMVersion.V2]],
         type: ['VerifiableCredential'],
         issuer: 123, // invalid type for issuer
       };
 
-      (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V1);
+      (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V2);
       (validateVerifiableCredentialAgainstSchema as jest.Mock).mockResolvedValue({
         valid: false,
         errors: [
