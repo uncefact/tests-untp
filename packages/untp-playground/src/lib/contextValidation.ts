@@ -26,6 +26,7 @@ export async function validateContext(credential: Record<string, any>): Promise<
       };
     }
 
+    // Expand the credential to validate the context
     const expanded = await jsonld.expand(credential, { safe: true } as jsonld.Options.Expand);
 
     return { valid: true, data: expanded };
@@ -57,14 +58,14 @@ export async function validateContext(credential: Record<string, any>): Promise<
       };
     }
 
-    const checkInvalidPropertyResult = checkInvalidProperty(error);
-    if (!checkInvalidPropertyResult.valid) {
+    const checkInvalidPropertiesResult = await checkInvalidProperties(error, credential);
+    if (!checkInvalidPropertiesResult.valid) {
       return {
         valid: false,
         error: {
           keyword: 'const',
-          message: checkInvalidPropertyResult!.errorMessage as string,
-          instancePath: checkInvalidPropertyResult.invalidValue as string,
+          message: checkInvalidPropertiesResult.errorMessage as string,
+          instancePath: checkInvalidPropertiesResult.invalidValues as string,
         },
       }
     }
@@ -122,17 +123,54 @@ export function checkInvalidContext(error: { name: string, [key: string]: any })
   return { valid: true };
 }
 
-export function checkInvalidProperty(error: { name: string, [key: string]: any }): { valid: boolean, invalidValue?: string, errorMessage?: string } {
-  // Check if the property in the credential is invalid
+export async function checkInvalidProperties(
+  error: { name: string, [key: string]: any },
+  credential: Record<string, any>
+): Promise<{ valid: boolean, invalidValues?: string, errorMessage?: string }> {
+  // Check if properties in the credential are invalid
   if (error && error.name === 'jsonld.ValidationError') {
-    const invalidProperty = error?.details?.event?.details?.property;
+    // Expand the credential and compact it to validate the properties
+    const expandedProperties = await jsonld.expand(credential);
+    const compacted = await jsonld.compact(expandedProperties, credential['@context']);
+
+    // Get the dropped properties from the original object
+    const droppedProperties = getDroppedProperties(credential, compacted);
+    const invalidPropertiesString = droppedProperties.join(', ');
 
     return { 
       valid: false,
-      invalidValue: invalidProperty || 'unknown',
-      errorMessage: invalidProperty ? `Invalid Property: "${invalidProperty}" in the credential.` : 'Failed to validate properties in the credential.'
+      invalidValues: invalidPropertiesString || 'unknown',
+      errorMessage: invalidPropertiesString ? `Properties "${invalidPropertiesString}" are defined in the credential but missing from the context.` : 'Failed to validate properties in the credential.'
     };
   }
 
   return { valid: true };
+}
+
+// Get the dropped properties from the original object
+export function getDroppedProperties(originalObject: Record<string, any>, compactedObject: Record<string, any>, excludeField = '@context'): string[] {
+  let uniqueKeys: string[] = [];
+
+  // Recursively find unique keys in the original object
+  function findUniqueKeys(objectA: any, objectB: any, path: string[] = []) {
+    if (typeof objectA !== 'object' || objectA === null) return;
+
+    for (const key of Object.keys(objectA)) {
+      const currentPath = path.concat(key);
+
+      if (key === excludeField) continue;
+
+      // If key does not exist in objB, record it
+      if (!(key in objectB)) {
+        uniqueKeys.push(currentPath.join('/'));
+      } else if (typeof objectA[key] === 'object' && objectA[key] !== null) {
+        // Recursively search for unique keys
+        findUniqueKeys(objectA[key], objectB[key], currentPath);
+      }
+    }
+  }
+
+  // Start the recursive search
+  findUniqueKeys(originalObject, compactedObject);
+  return uniqueKeys;
 }

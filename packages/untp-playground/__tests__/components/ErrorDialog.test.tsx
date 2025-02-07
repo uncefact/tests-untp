@@ -131,7 +131,7 @@ describe('ErrorDialog', () => {
     fireEvent.click(expandButton);
 
     // Verify tip content
-    expect(screen.getByText(/Update the value to the correct one or remove the field/i)).toBeInTheDocument();
+    expect(screen.getByText(/Update the value\(s\) to the correct one\(s\) or remove the field\(s\)/i)).toBeInTheDocument();
   });
 
   it('displays correct tips based on error type "conflictingProperties"', () => {

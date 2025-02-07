@@ -12,6 +12,7 @@ jest.mock('@/lib/credentialService');
 jest.mock('canvas-confetti');
 jest.mock('jsonld', () => ({
   expand: jest.fn(),
+  compact: jest.fn(),
 }));
 jest.mock('sonner', () => ({
   toast: {

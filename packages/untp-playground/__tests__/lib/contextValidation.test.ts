@@ -1,8 +1,9 @@
 import jsonld from 'jsonld';
-import { validateRequiredFields, checkSyntaxError, checkInvalidContext, checkInvalidProperty, validateContext } from '@/lib/contextValidation';
+import { validateRequiredFields, checkSyntaxError, checkInvalidContext, checkInvalidProperties, validateContext, getDroppedProperties } from '@/lib/contextValidation';
 
 jest.mock('jsonld', () => ({
   expand: jest.fn(),
+  compact: jest.fn(),
 }));
 
 describe('contextValidation', () => {
@@ -121,56 +122,120 @@ describe('contextValidation', () => {
     });
   });
 
-  describe('checkInvalidProperty', () => {
-    it('should return valid: false with invalidValue and errorMessage for jsonld.ValidationError with event details', () => {
-      const error = {
-        name: 'jsonld.ValidationError',
-        details: {
-          event: {
-            code: 'invalid-property',
-            details: { property: 'name' }
-          }
-        }
-      };
-      const result = checkInvalidProperty(error);
+  describe('checkInvalidProperties', () => {
+    it('should return valid: false with dropped properties and errorMessage for jsonld.ValidationError', async () => {
+      const credential = { '@context': 'https://schema.org', name: 'Test', age: 25 };
+      const compacted = { '@context': 'https://schema.org', name: 'Test' };
+  
+      (jsonld.expand as jest.Mock).mockResolvedValue(credential);
+      (jsonld.compact as jest.Mock).mockResolvedValue(compacted);
+  
+      const error = { name: 'jsonld.ValidationError' };
+      const result = await checkInvalidProperties(error, credential);
+  
       expect(result).toEqual({
         valid: false,
-        invalidValue: 'name',
-        errorMessage: 'Invalid Property: "name" in the credential.'
+        invalidValues: 'age',
+        errorMessage: 'Properties "age" are defined in the credential but missing from the context.'
       });
     });
   
-    it('should return valid: false with unknown invalidValue when property is not provided', () => {
+    it('should handle multiple dropped properties', async () => {
+      const credential = { '@context': 'https://schema.org', name: 'Test', age: 25, gender: 'male' };
+      const compacted = { '@context': 'https://schema.org', name: 'Test' };
+  
+      (jsonld.expand as jest.Mock).mockResolvedValue(credential);
+      (jsonld.compact as jest.Mock).mockResolvedValue(compacted);
+  
       const error = { name: 'jsonld.ValidationError' };
-      const result = checkInvalidProperty(error);
+      const result = await checkInvalidProperties(error, credential);
+  
       expect(result).toEqual({
         valid: false,
-        invalidValue: 'unknown',
+        invalidValues: 'age, gender',
+        errorMessage: 'Properties "age, gender" are defined in the credential but missing from the context.'
+      });
+    });
+  
+    it('should return valid: false with unknown invalidValues when no properties are dropped', async () => {
+      const credential = { '@context': 'https://schema.org', name: 'Test' };
+      const compacted = { '@context': 'https://schema.org', name: 'Test' };
+  
+      (jsonld.expand as jest.Mock).mockResolvedValue(credential);
+      (jsonld.compact as jest.Mock).mockResolvedValue(compacted);
+  
+      const error = { name: 'jsonld.ValidationError' };
+      const result = await checkInvalidProperties(error, credential);
+  
+      expect(result).toEqual({
+        valid: false,
+        invalidValues: 'unknown',
         errorMessage: 'Failed to validate properties in the credential.'
       });
     });
   
-    it('should return valid: true for non-jsonld.ValidationError errors', () => {
+    it('should return valid: true for non-jsonld.ValidationError errors', async () => {
+      const credential = { '@context': 'https://schema.org', name: 'Test' };
       const error = { name: 'TypeError' };
-      const result = checkInvalidProperty(error);
+  
+      const result = await checkInvalidProperties(error, credential);
       expect(result).toEqual({ valid: true });
     });
   
-    it('should return valid: true when error is undefined or null', () => {
-      expect(checkInvalidProperty(undefined as unknown as  { name: string, [key: string]: any })).toEqual({ valid: true });
-      expect(checkInvalidProperty(null as unknown as  { name: string, [key: string]: any })).toEqual({ valid: true });
+    it('should return valid: true when error is undefined or null', async () => {
+      const credential = { '@context': 'https://schema.org', name: 'Test' };
+  
+      expect(await checkInvalidProperties(undefined as any, credential)).toEqual({ valid: true });
+      expect(await checkInvalidProperties(null as any, credential)).toEqual({ valid: true });
+    });
+  });
+  
+  // Tests for getDroppedProperties
+  describe('getDroppedProperties', () => {
+    it('should return dropped properties correctly', () => {
+      const original = { name: 'Alice', age: 30, address: { city: 'Wonderland', zip: '12345' } };
+      const compacted = { name: 'Alice', address: { city: 'Wonderland' } };
+  
+      const result = getDroppedProperties(original, compacted);
+      expect(result).toEqual(['age', 'address/zip']);
+    });
+  
+    it('should return an empty array when no properties are dropped', () => {
+      const original = { name: 'Alice', age: 30 };
+      const compacted = { name: 'Alice', age: 30 };
+  
+      const result = getDroppedProperties(original, compacted);
+      expect(result).toEqual([]);
+    });
+  
+    it('should exclude specified fields like @context', () => {
+      const original = { '@context': 'https://schema.org', name: 'Alice', age: 30 };
+      const compacted = { name: 'Alice' };
+  
+      const result = getDroppedProperties(original, compacted);
+      expect(result).toEqual(['age']);
     });
   });
 
   describe('validateContext', () => {
     it('should return valid when the credential is correct', async () => {
-      const credential = { '@context': 'https://www.w3.org/2018/credentials/v1' };
+      const credential = {
+        '@context': [{
+          name: 'https://schema.org/name',
+          phone: 'https://schema.org/telephone',
+          address: 'https://schema.org/address',
+        }],
+        name: 'Test'
+      };
 
       const result = await validateContext(credential);
 
       expect(result).toEqual({
         valid: true,
-        data: jsonld.expand(credential)
+        data: {
+          '@context': 'https://schema.org',
+          name: 'Test'
+        }
       });
     });
 
@@ -236,7 +301,8 @@ describe('contextValidation', () => {
     it('should return invalid due to invalid property', async () => {
       const invalidPropertyCredential = {
         '@context': ['https://www.w3.org/2018/credentials/v2'],
-        invalid: 'invalid-value'
+        invalid1: 'invalid-value-1',
+        invalid2: 'invalid-value-2'
       };
       (jsonld.expand as jest.Mock).mockImplementationOnce(() => {
         throw { name: 'jsonld.ValidationError', details: { event: { details: { property: 'invalid' } } } };
@@ -248,8 +314,8 @@ describe('contextValidation', () => {
         valid: false,
         error: {
           keyword: 'const',
-          message: 'Invalid Property: "invalid" in the credential.',
-          instancePath: 'invalid',
+          message: 'Properties "invalid1, invalid2" are defined in the credential but missing from the context.',
+          instancePath: 'invalid1, invalid2',
         }
       });
     });

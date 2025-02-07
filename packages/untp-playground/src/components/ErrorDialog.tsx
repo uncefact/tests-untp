@@ -152,7 +152,7 @@ export const ErrorDialog = ({ errors = [], className = "" }) => {
                         <div className="p-4 border-t bg-gray-50">
                           <div className="mb-3 text-sm">
                             {mainError.keyword === "const" && (
-                              <div>
+                              <div className='flex flex-col gap-2'>
                                 <p>
                                   Incorrect value:{" "}
                                   <code className="px-1 py-0.5 bg-gray-100 rounded">
@@ -160,7 +160,7 @@ export const ErrorDialog = ({ errors = [], className = "" }) => {
                                   </code>
                                 </p>
                                 <p>
-                                  Error: {mainError.message}
+                                  {mainError.message}
                                 </p>
                               </div>
                             )}
@@ -189,7 +189,7 @@ export const ErrorDialog = ({ errors = [], className = "" }) => {
                               </p>
                             )}
                             {mainError.keyword === "conflictingProperties" && (
-                              <div>
+                              <div className='flex flex-col gap-2'>
                                 <p>
                                   Conflicting field:{" "}
                                   <code className="px-1 py-0.5 bg-gray-100 rounded">
@@ -197,7 +197,7 @@ export const ErrorDialog = ({ errors = [], className = "" }) => {
                                   </code>
                                 </p>
                                 <p>
-                                  Error: {mainError.message}
+                                  {mainError.message}
                                 </p>
                               </div>
                             )}
@@ -232,7 +232,7 @@ export const ErrorDialog = ({ errors = [], className = "" }) => {
                           <div className="mt-3 text-sm text-blue-800 bg-blue-50 p-3 rounded">
                             <strong>Tip:</strong>{" "}
                             {mainError.keyword === "const"
-                              ? "Update the value to the correct one or remove the field."
+                              ? "Update the value(s) to the correct one(s) or remove the field(s)."
                               : mainError.keyword === "enum"
                               ? "Choose one of the values shown above."
                               : mainError.keyword === "required"
