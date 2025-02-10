@@ -46,14 +46,11 @@ export default defineConfig({
             });
           });
         },
+        async runUntpTest({ type, version, testData }) {
+          const { testCredentialHandler } = await import('untp-test-suite/src/interfaces/lib/testSuiteHandler');
+          return testCredentialHandler({ type, version }, testData);
+        },
       });
-
-      const options = {
-        webpackOptions: require('cypress/webpack.config'),
-        watchOptions: {},
-      };
-
-      on('file:preprocessor', webpackPreprocessor(options));
-    }
+    },
   },
 });

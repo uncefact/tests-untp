@@ -1,5 +1,6 @@
 import { LinkType } from '../../../../packages/services/build/linkResolver.service';
 describe('Issue DPP end-to-end testing flow', () => {
+  let DPPCredential = {};
   beforeEach(() => {
     // Load app config JSON
     cy.fixture('app-config.json').then((data) => {
@@ -64,11 +65,9 @@ describe('Issue DPP end-to-end testing flow', () => {
     // await API issue VC
     cy.wait('@issueCredentials').then((interception) => {
       const credential = interception.request.body.credential;
-      cy.log('interception: request: ', JSON.stringify(interception.request.body.credential));
+      cy.log('interception: request: ', JSON.stringify(credential));
       expect(interception?.response?.statusCode).to.eq(201);
-      // Write the credential to a file
-      cy.task('writeToFile', { fileName: 'DigitalProductPassport_instance-v0.5.0.json', data: credential });
-      cy.log('Completed: issueCredentials and written to file');
+      DPPCredential = credential;
     });
 
     // await API storage VC
@@ -110,31 +109,13 @@ describe('Issue DPP end-to-end testing flow', () => {
     });
   });
 
-  it('Runs testing UNTP V0.5.0', () => {
-    cy.exec('pwd').then((result) => {
-      cy.log('Current directory:', result.stdout);
-    });
-    cy.task('runShellScript', { scriptPath: './cypress/e2e/issue_workflow_test/DPP/test-untp-dpp-scripts.sh' }).then(
-      (output: any) => {
-        const cleanedOutput = output.replace(/\x1b\[[0-9;]*m/g, '');
-        cy.log('Shell Script Output:', cleanedOutput);
-        // Expect the output to include success message
-        expect(cleanedOutput).to.include('Script completed successfully!');
-        expect(cleanedOutput).to.include('Testing Credential: digitalProductPassport');
-        expect(cleanedOutput).to.include('Result: PASS');
+  it('Runs testing UNTP', () => {
+    cy.task('runUntpTest', { type: 'digitalProductPassport', version: 'v0.5.0', testData: DPPCredential }).then(
+      (result: any) => {
+        expect(result).to.not.be.undefined;
+        expect(result).to.not.be.null;
+        expect(result.result).to.eq('PASS');
       },
     );
-
-    // Define the path to the JSON file you want to delete
-    const filePath = 'DigitalProductPassport_instance-v0.5.0.json';
-
-    // Call the task to delete the file
-    cy.task('deleteFileCredentialE2E', filePath).then((result) => {
-      if (result) {
-        cy.log('File deleted successfully');
-      } else {
-        cy.log('File not found or could not be deleted');
-      }
-    });
   });
 });

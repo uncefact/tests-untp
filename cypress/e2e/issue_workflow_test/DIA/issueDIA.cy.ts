@@ -1,4 +1,5 @@
 describe('Issue DIA end-to-end testing flow', () => {
+  let DIACredential = {};
   beforeEach(() => {
     // Load app config JSON
     cy.fixture('app-config.json').then((data) => {
@@ -55,8 +56,7 @@ describe('Issue DIA end-to-end testing flow', () => {
       const credential = interception.request.body.credential;
       cy.log('interception: request: ', JSON.stringify(credential));
       expect(interception?.response?.statusCode).to.eq(201);
-      cy.task('writeToFile', { fileName: 'DigitalIdentityAnchor_instance-v0.2.1.json', data: credential });
-      cy.log('Completed: issueCredentials and written to file');
+      DIACredential = credential;
     });
 
     // await API storage VC
@@ -90,32 +90,14 @@ describe('Issue DIA end-to-end testing flow', () => {
     });
   });
 
-  it('Runs testing UNTP V0.2.1', () => {
-    cy.exec('pwd').then((result) => {
-      cy.log('Current directory:', result.stdout);
-    });
-    cy.task('runShellScript', { scriptPath: './cypress/e2e/issue_workflow_test/DIA/test-untp-dia-scripts.sh' }).then(
-      (output: any) => {
-        const cleanedOutput = output.replace(/\x1b\[[0-9;]*m/g, '');
-        cy.log('Shell Script Output:', cleanedOutput);
-        // Expect the output to include success message
-        expect(cleanedOutput).to.include('Script completed successfully!');
-        expect(cleanedOutput).to.include('Testing Credential: digitalIdentityAnchor');
-        // render method warning
-        expect(cleanedOutput).to.include('Result: WARN');
+  it('Runs testing UNTP', () => {
+    cy.task('runUntpTest', { type: 'digitalIdentityAnchor', version: 'v0.2.1', testData: DIACredential }).then(
+      (result: any) => {
+        cy.log('UNTP test result: ', result);
+        expect(result).to.not.be.undefined;
+        expect(result).to.not.be.null;
+        expect(result.result).to.eq('WARN');
       },
     );
-
-    // Define the path to the JSON file you want to delete
-    const filePath = 'DigitalIdentityAnchor_instance-v0.2.1.json';
-
-    // Call the task to delete the file
-    cy.task('deleteFileCredentialE2E', filePath).then((result) => {
-      if (result) {
-        cy.log('File deleted successfully');
-      } else {
-        cy.log('File not found or could not be deleted');
-      }
-    });
   });
 });
