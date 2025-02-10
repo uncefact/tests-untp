@@ -3,7 +3,6 @@ import { defineConfig } from 'cypress';
 import fs from 'fs';
 import path from 'path';
 import util from 'util';
-import webpackPreprocessor from '@cypress/webpack-preprocessor';
 
 const execPromise = util.promisify(exec);
 export default defineConfig({
