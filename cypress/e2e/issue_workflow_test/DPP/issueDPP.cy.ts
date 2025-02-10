@@ -1,121 +1,47 @@
-import { LinkType } from '../../../../packages/services/build/linkResolver.service';
+import IssuePage from 'cypress/page/issuePage';
+
+class DPPIssueFlow extends IssuePage {
+  testGenerateDPPWorkflow() {
+    this.generateWorkflow(
+      'Orchard Facility',
+      'Issue DPP',
+      'DigitalProductPassport',
+      'DigitalProductPassport_instance-v0.5.0.json',
+      'apps',
+    );
+  }
+
+  testUNTPTestSuite() {
+    this.runUntpTest('digitalProductPassport', 'v0.5.0');
+  }
+}
+
 describe('Issue DPP end-to-end testing flow', () => {
-  let DPPCredential = {};
+  before(() => {
+    // Clear the lastCredential from Cypress environment after each test
+    Cypress.env('lastCredential', undefined);
+  });
+
+  const dppTest = new DPPIssueFlow();
+
   beforeEach(() => {
-    // Load app config JSON
-    cy.fixture('app-config.json').then((data) => {
-      Cypress.env('AppConfig', data);
-    });
+    dppTest.beforeAll();
   });
 
   it('should access the right the app config data', () => {
-    const AppConfig = Cypress.env('AppConfig');
-    expect(AppConfig?.name).to.eq('CHERRIES SUPPLY CHAIN TRACEABILITY');
+    dppTest.testAppConfig();
   });
 
   it('should visit the homepage, navigate to "Orchard Facility", handle API calls, and show success message', () => {
-    const AppConfig = Cypress.env('AppConfig');
-    // Visit the homepage
-    cy.visit('/');
-
-    // Verify the "Orchard Facility" link exists and contains the correct text
-    cy.contains('a', 'Orchard Facility') // Find <a> tag by text
-      .should('be.visible') // Ensure it's visible
-      .and('not.be.disabled') // Ensure it's clickable
-      .click(); // Click the link
-
-    // Verify navigation to the correct page
-    cy.url().should('include', '/orchard-facility');
-    // Intercept API call triggered by clicking "ISSUE DPP"
-    const shemaDPP = AppConfig.apps[0]?.features[0]?.components[0].props?.schema?.url;
-    const appService = AppConfig.apps[0]?.features[0]?.services[0]?.parameters[0];
-    cy.intercept('GET', shemaDPP).as('getProductSchema'); // Create an alias for this request
-
-    // Check if "ISSUE DPP" button appears and is interactable
-    cy.contains('a', 'Issue DPP') // Find button by text
-      .should('be.visible')
-      .and('not.be.disabled')
-      .click();
-
-    // Wait for the API call
-    cy.wait('@getProductSchema', { timeout: 20000 }).then((interception) => {
-      expect(interception?.response?.statusCode).to.eq(200);
-    });
-
-    const API_ENDPOINT = {
-      ISSUE_BITSTRING_STATUS_LIST: '/agent/issueBitstringStatusList',
-      VCKit_URL: appService?.vckit?.vckitAPIUrl + '/credentials/issue',
-      STORAGE_URL: appService?.storage?.url,
-      IDR_URL: appService?.dlr?.dlrAPIUrl + appService?.dlr?.linkRegisterPath,
-    };
-    cy.intercept('POST', API_ENDPOINT.ISSUE_BITSTRING_STATUS_LIST).as('issueBitStringStatusList');
-    cy.intercept('POST', API_ENDPOINT.VCKit_URL).as('issueCredentials');
-    cy.intercept('POST', API_ENDPOINT.STORAGE_URL).as('storeVC');
-    cy.intercept('POST', API_ENDPOINT.IDR_URL).as('linkResolverRegister');
-
-    // Check if "Submit" button appears after API response
-    cy.contains('button', 'Submit').should('be.visible').and('not.be.disabled').click();
-
-    // await API create credential status
-    cy.wait('@issueBitStringStatusList').then((interception) => {
-      expect(interception?.response?.statusCode).to.eq(200);
-      cy.log('Completed: issueBitstringStatusList');
-    });
-
-    // await API issue VC
-    cy.wait('@issueCredentials').then((interception) => {
-      const credential = interception.request.body.credential;
-      cy.log('interception: request: ', JSON.stringify(credential));
-      expect(interception?.response?.statusCode).to.eq(201);
-      DPPCredential = credential;
-    });
-
-    // await API storage VC
-    cy.wait('@storeVC').then((interception) => {
-      expect(interception?.response?.statusCode).to.eq(201);
-      cy.log('Completed: storeVC');
-
-      // Extract the URI from the response
-      const { uri, hash, key } = interception?.response?.body;
-      expect(uri).to.not.be.undefined;
-      expect(hash).to.not.be.undefined;
-      expect(key).to.not.be.undefined;
-      cy.request('GET', uri).then((response) => {
-        expect(response.status).to.eq(200);
-      });
-    });
-
-    // await API register link
-    cy.wait('@linkResolverRegister').then((interception) => {
-      expect(interception?.response?.statusCode).to.eq(201);
-      cy.log('Completed: linkResolverRegister');
-    });
-
-    // Verify toast appears, using react-toastify
-    cy.get('.Toastify__toast').should('be.visible').and('contain', 'Action Successful');
-
-    // Validate localStorage
-    cy.window().then((win) => {
-      const rawData = win.localStorage.getItem('orchard_facility_dpps');
-      expect(rawData).to.not.be.null;
-    });
+    dppTest.testGenerateDPPWorkflow();
   });
 
   it('Verify linkType', () => {
-    const checkLinkTypeURL =
-      'http://localhost:3000/gs1/01/09359502000034/10/6789?linkType=gs1:' + LinkType.sustainabilityInfo;
-    cy.request('GET', checkLinkTypeURL).then((response) => {
-      expect(response.status).to.eq(200);
-    });
+    const checkLinkTypeURL = 'http://localhost:3000/gs1/01/09359502000034/10/6789?linkType=gs1:sustainabilityInfo';
+    dppTest.verifyLinkType(checkLinkTypeURL);
   });
 
-  it('Runs testing UNTP', () => {
-    cy.task('runUntpTest', { type: 'digitalProductPassport', version: 'v0.5.0', testData: DPPCredential }).then(
-      (result: any) => {
-        expect(result).to.not.be.undefined;
-        expect(result).to.not.be.null;
-        expect(result.result).to.eq('PASS');
-      },
-    );
+  it('Runs testing UNTP test suite for DPP', () => {
+    dppTest.testUNTPTestSuite();
   });
 });

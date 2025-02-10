@@ -1,30 +1,22 @@
-"use client";
+'use client';
 
-import { Card } from "@/components/ui/card";
-import { jwtDecode } from "jwt-decode";
-import { useCallback } from "react";
-import { useDropzone } from "react-dropzone";
-import { toast } from "sonner";
+import { Card } from '@/components/ui/card';
+import { jwtDecode } from 'jwt-decode';
+import { useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { toast } from 'sonner';
 
-export function CredentialUploader({
-  onCredentialUpload,
-}: {
-  onCredentialUpload: (credential: any) => void;
-}) {
+export function CredentialUploader({ onCredentialUpload }: { onCredentialUpload: (credential: any) => void }) {
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
-      const validExtensions = [".json", ".jwt", ".txt"];
+      const validExtensions = ['.json', '.jwt', '.txt'];
 
-      console.log("acceptedFiles", acceptedFiles);
       const invalidFiles = acceptedFiles.filter(
-        (file) =>
-          !validExtensions.some((ext) => file.name.toLowerCase().endsWith(ext))
+        (file: File) => !validExtensions.some((ext) => file.name.toLowerCase().endsWith(ext)),
       );
 
       if (invalidFiles.length > 0 || acceptedFiles.length === 0) {
-        toast.error(
-          `Invalid file format. Please upload only .json, .jwt, or .txt files.`
-        );
+        toast.error(`Invalid file format. Please upload only .json, .jwt, or .txt files.`);
         return;
       }
 
@@ -36,14 +28,12 @@ export function CredentialUploader({
             let json;
 
             // Only try JWT parsing if the file extension is .jwt or .txt
-            if (file.name.endsWith(".jwt") || file.name.endsWith(".txt")) {
+            if (file.name.endsWith('.jwt') || file.name.endsWith('.txt')) {
               try {
                 json = jwtDecode(text);
               } catch (jwtError) {
-                console.log("Error decoding JWT:", jwtError);
-                toast.error(
-                  "Invalid JWT format - Please provide a file containing a valid JWT token"
-                );
+                console.log('Error decoding JWT:', jwtError);
+                toast.error('Invalid JWT format - Please provide a file containing a valid JWT token');
                 return;
               }
             } else {
@@ -51,44 +41,45 @@ export function CredentialUploader({
               try {
                 json = JSON.parse(text);
               } catch (jsonError) {
-                console.log("Error parsing JSON:", jsonError);
-                toast.error("Invalid format - File must contain valid JSON");
+                console.log('Error parsing JSON:', jsonError);
+                toast.error('Invalid format - File must contain valid JSON');
                 return;
               }
             }
 
             onCredentialUpload(json);
           } catch (error) {
-            console.log("Error processing credential:", error);
-            toast.error(
-              "Failed to process credential - Please ensure the file contains valid data"
-            );
+            console.log('Error processing credential:', error);
+            toast.error('Failed to process credential - Please ensure the file contains valid data');
           }
         };
         reader.readAsText(file);
       });
     },
-    [onCredentialUpload]
+    [onCredentialUpload],
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      "application/json": [".json"],
-      "text/plain": [".txt", ".jwt"],
+      'application/json': ['.json'],
+      'text/plain': ['.txt', '.jwt'],
     },
   });
 
   return (
     <Card
       {...getRootProps()}
-      className="h-full p-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors flex items-center justify-center"
+      className='h-full p-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors flex items-center justify-center'
+      data-testid='credential-upload'
     >
-      <input {...getInputProps()} />
+      <input {...getInputProps()} data-testid='credential-upload-input' />
       {isDragActive ? (
-        <p className="text-center">Drop the credentials here...</p>
+        <p className='text-center' data-testid='credential-upload-drop-text'>
+          Drop the credentials here...
+        </p>
       ) : (
-        <p className="text-center">
+        <p className='text-center' data-testid='credential-upload-drag-text'>
           Drag and drop credentials here, or click to select files
         </p>
       )}

@@ -1,3 +1,5 @@
+import { TestCaseStatus, TestCaseStepId } from '../../constants';
+
 type CredentialType =
   | 'DigitalProductPassport'
   | 'DigitalConformityCredential'
@@ -19,9 +21,9 @@ interface Credential {
 }
 
 interface TestStep {
-  id: string;
+  id: TestCaseStepId;
   name: string;
-  status: 'pending' | 'in-progress' | 'success' | 'failure' | 'missing';
+  status: TestCaseStatus;
   details?: any;
 }
 
