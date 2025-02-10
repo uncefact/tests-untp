@@ -2,9 +2,8 @@
  * @jest-environment jsdom
  */
 
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
 import { ErrorDialog } from '@/components/ErrorDialog';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 // Mock clipboard API
 Object.assign(navigator, {
@@ -185,5 +184,66 @@ describe('ErrorDialog', () => {
 
     const { container } = render(<ErrorDialog errors={errors} className='custom-class' />);
     expect(container.firstChild).toHaveClass('custom-class');
+  });
+
+  it('displays missingValue error details correctly', () => {
+    const errors = [
+      {
+        keyword: 'missingValue',
+        instancePath: '@context[0]',
+        message: 'The first element of "@context" must be one of the following:',
+        params: { allowedValues: ['https://www.w3.org/2018/credentials/v1', 'https://www.w3.org/ns/credentials/v2'] },
+      },
+    ] as any;
+
+    render(<ErrorDialog errors={errors} />);
+
+    expect(screen.getByText(/we found 1 issue/i)).toBeInTheDocument();
+
+    const button = screen.getByRole('button');
+    fireEvent.click(button);
+
+    expect(screen.getByText(/the first element of "@context" must be one of the following:/i)).toBeInTheDocument();
+
+    expect(
+      screen.getByText((content, element) => {
+        return (
+          content.includes('https://www.w3.org/2018/credentials/v1') &&
+          content.includes('https://www.w3.org/ns/credentials/v2')
+        );
+      }),
+    ).toBeInTheDocument();
+
+    const copyButton = screen.getByRole('button', { name: /copy/i });
+    fireEvent.click(copyButton);
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      JSON.stringify(['https://www.w3.org/2018/credentials/v1', 'https://www.w3.org/ns/credentials/v2'], null, 2),
+    );
+
+    expect(screen.getByText(/missing value/i)).toBeInTheDocument();
+  });
+
+  it('displays minItems error details correctly', () => {
+    const errors = [
+      {
+        keyword: 'minItems',
+        instancePath: '@context',
+        message: 'The "@context" array must contain at least one item.',
+        params: { minItems: 1 },
+      },
+    ] as any;
+
+    render(<ErrorDialog errors={errors} />);
+
+    expect(screen.getByText(/we found 1 issue/i)).toBeInTheDocument();
+
+    const button = screen.getByRole('button');
+    fireEvent.click(button);
+
+    expect(screen.getByText(/expected minimum number of items:/i)).toBeInTheDocument();
+    expect(screen.getByText('1')).toBeInTheDocument();
+
+    expect(screen.getByText(/to few items/i)).toBeInTheDocument();
   });
 });

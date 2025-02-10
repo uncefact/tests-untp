@@ -33,7 +33,7 @@ export function detectCredentialType(credential: Credential): string {
 }
 
 export function detectVersion(credential: Credential, domain?: string): string {
-  const contextUrl = credential['@context'].find((ctx) => ctx.includes(domain || 'test.uncefact.org'));
+  const contextUrl = credential['@context']?.find((ctx) => ctx.includes(domain || 'test.uncefact.org'));
 
   if (!contextUrl) return 'unknown';
 
