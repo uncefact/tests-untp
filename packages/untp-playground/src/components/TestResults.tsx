@@ -147,6 +147,13 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
     );
   }, [step.details]);
 
+  const isAllowedTestCase = [
+    TestCaseStepId.UNTP_SCHEMA_VALIDATION,
+    TestCaseStepId.EXTENSION_SCHEMA_VALIDATION,
+    TestCaseStepId.VCDM_SCHEMA_VALIDATION,
+    TestCaseStepId.CONTEXT_VALIDATION
+  ].includes(step.id);
+
   return (
     <div className='py-2'>
       <div className='flex items-center justify-between'>
@@ -154,11 +161,7 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
           <StatusIcon status={step.status} testId={`${step.id}`} />
           <span>{step.name}</span>
         </div>
-        {step.details &&
-          (step.id === TestCaseStepId.UNTP_SCHEMA_VALIDATION ||
-            step.id === TestCaseStepId.EXTENSION_SCHEMA_VALIDATION ||
-            step.id === TestCaseStepId.VCDM_SCHEMA_VALIDATION ||
-            step.id === TestCaseStepId.CONTEXT_VALIDATION) &&
+        {step.details && isAllowedTestCase &&
           (step.details.errors?.[0]?.message === 'Failed to fetch schema' ? (
             <span className='text-sm text-red-500'>Failed to load schema</span>
           ) : (
