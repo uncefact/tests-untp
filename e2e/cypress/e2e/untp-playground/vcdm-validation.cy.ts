@@ -1,4 +1,4 @@
-import { VCDM_CONTEXT_URLS } from '../../../packages/untp-playground/constants';
+import { VCDM_CONTEXT_URLS } from '../../../../packages/untp-playground/constants';
 
 describe('VCDM Schema Validation', () => {
   // TODO: Use endpoint defined in e2e config

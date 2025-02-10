@@ -2,7 +2,6 @@
   "name": "mock-app",
   "version": "0.1.0-beta",
   "private": true,
-  "type": "module",
   "workspaces": [
     "packages/*"
   ],
@@ -26,6 +25,8 @@
     "test:vc-test-suite": "cd packages/vc-test-suite && yarn run test",
     "test:untp-playground": "cd packages/untp-playground && yarn run test",
     "test:integration:untp-test-suite": "cd packages/untp-test-suite && yarn run test:integration",
+    "test:run-cypress":"cd e2e && yarn cypress run",
+    "test:open-cypress":"cd e2e && yarn cypress open",
     "storybook:components": "cd packages/components && yarn run storybook",
     "storybook:mock-app": "cd packages/mock-app && yarn run storybook",
     "untp": "node ./packages/untp-test-suite/build/interfaces/cli/cli.js",
@@ -72,7 +73,6 @@
   "dependencies": {
     "istanbul-merge": "2.0.0",
     "nyc": "17.1.0",
-    "rimraf": "^5.0.5",
-    "untp-test-suite": "0.1.0-beta"
+    "rimraf": "^5.0.5"
   }
 }
