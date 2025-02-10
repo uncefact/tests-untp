@@ -147,7 +147,7 @@ We use Cypress for end-to-end testing with Docker Compose to run the services re
 2. Start the services with Docker Compose:
 
 ```bash
-SEEDING=true docker compose -f docker-compose.e2e.yml up -d
+SEEDING=true docker compose -f docker-compose.e2e.yml up -d --build
 ```
 
 3. Run the end-to-end tests:
