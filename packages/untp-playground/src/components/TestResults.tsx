@@ -280,9 +280,9 @@ export function TestResults({
           status: TestCaseStatus.PENDING,
         },
         {
-          id: 'context',
+          id: TestCaseStepId.CONTEXT_VALIDATION,
           name: 'JSON-LD Document Expansion and Context Validation',
-          status: 'missing',
+          status: TestCaseStatus.PENDING,
         },
       ];
     }
@@ -323,9 +323,9 @@ export function TestResults({
         status: TestCaseStatus.PENDING,
       },
       {
-        id: 'context',
+        id: TestCaseStepId.CONTEXT_VALIDATION,
         name: 'JSON-LD Document Expansion and Context Validation',
-        status: 'pending',
+        status: TestCaseStatus.PENDING,
       },
     ];
 
@@ -506,19 +506,19 @@ export function TestResults({
 
           // JSON-LD Document Expansion and Context Validation
           const validateContextResult = await validateContext(credential.decoded);
-          const contextTestResult = { status: 'success', details: validateContextResult.data };
+          const contextTestResult = { status: TestCaseStatus.SUCCESS, details: validateContextResult.data };
 
           if (!validateContextResult.valid) {
             allChecksPass = false;
             toast.error(validateContextResult.error!.message);
-            contextTestResult.status = 'failure';
+            contextTestResult.status = TestCaseStatus.FAILURE;
             contextTestResult.details = { errors: [validateContextResult.error] };
           }
 
           setTestResults((prev) => ({
             ...prev,
             [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
-              step.id === 'context'
+              step.id === TestCaseStepId.CONTEXT_VALIDATION
                 ? {
                     ...step,
                     status: contextTestResult.status,

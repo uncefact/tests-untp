@@ -51,7 +51,7 @@ describe('contextValidation', () => {
       expect(result).toEqual({
         valid: false,
         term: 'id',
-        errorMessage: 'Invalid JSON-LD syntax: redefine-protected-term; "id" is a protected term.'
+        errorMessage: 'Invalid JSON-LD syntax: redefine-protected-term. "id" is a protected term.'
       });
     });
   
@@ -271,7 +271,7 @@ describe('contextValidation', () => {
         valid: false,
         error: {
           keyword: 'conflictingProperties',
-          message: 'Invalid JSON-LD syntax: redefine protected term; "name" is a protected term.',
+          message: 'Invalid JSON-LD syntax: redefine protected term. "name" is a protected term.',
           instancePath: '@context',
           params: {
             conflictingProperty: 'name'

@@ -102,7 +102,7 @@ export function checkSyntaxError(error: { name: string, [key: string]: any }): {
     return { 
       valid: false,
       term: error?.details?.term || 'unknown',
-      errorMessage: existingDetailErrors ? `Invalid JSON-LD syntax: ${error?.details?.code}; "${error?.details?.term}" is a protected term.` : 'Failed to validate JSON-LD syntax.'
+      errorMessage: existingDetailErrors ? `Invalid JSON-LD syntax: ${error?.details?.code}. "${error?.details?.term}" is a protected term.` : 'Failed to validate JSON-LD syntax.'
     };
   }
 
