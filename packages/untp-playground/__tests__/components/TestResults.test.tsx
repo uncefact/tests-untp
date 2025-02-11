@@ -15,6 +15,10 @@ jest.mock('@/lib/vcdm-validation');
 jest.mock('@/lib/utils');
 jest.mock('@/lib/credentialService');
 jest.mock('canvas-confetti');
+jest.mock('jsonld', () => ({
+  expand: jest.fn(),
+  compact: jest.fn(),
+}));
 jest.mock('sonner', () => ({
   toast: {
     error: jest.fn(),

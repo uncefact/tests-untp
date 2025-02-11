@@ -114,7 +114,7 @@ describe('ErrorDialog', () => {
     expect(screen.getByText(/copied!/i)).toBeInTheDocument();
   });
 
-  it('displays correct tips based on error type', () => {
+  it('displays correct tips based on error type "const"', () => {
     const errors = [
       {
         keyword: 'const',
@@ -130,7 +130,26 @@ describe('ErrorDialog', () => {
     fireEvent.click(expandButton);
 
     // Verify tip content
-    expect(screen.getByText(/this value must match exactly as shown above/i)).toBeInTheDocument();
+    expect(screen.getByText(/Update the value\(s\) to the correct one\(s\) or remove the field\(s\)/i)).toBeInTheDocument();
+  });
+
+  it('displays correct tips based on error type "conflictingProperties"', () => {
+    const errors = [
+      {
+        keyword: 'conflictingProperties',
+        instancePath: '@context',
+        params: { conflictingProperty: 'name' },
+      },
+    ] as any;
+
+    render(<ErrorDialog errors={errors} />);
+
+    // Expand the error details
+    const expandButton = screen.getByRole('button', { name: /Fix validation error/i });
+    fireEvent.click(expandButton);
+
+    // Verify tip content
+    expect(screen.getByText(/Resolve the conflict by removing the conflicting field or updating it to a unique one/i)).toBeInTheDocument();
   });
 
   it('groups multiple errors for the same path', () => {
