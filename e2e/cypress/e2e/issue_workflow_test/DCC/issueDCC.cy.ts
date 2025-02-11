@@ -12,9 +12,7 @@ class DCCIssueFlow extends IssuePage {
   }
 
   testUNTPTestSuite() {
-    this.logCurrentDir();
-    this.runShellScript('./cypress/e2e/issue_workflow_test/DCC/test-untp-dcc-scripts.sh');
-    this.deleteFile('DigitalConformityCredential_instance-v0.5.0.json');
+    this.runUntpTest('digitalConformityCredential', 'v0.5.0');
   }
 }
 

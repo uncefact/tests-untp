@@ -12,9 +12,7 @@ class DPPIssueFlow extends IssuePage {
   }
 
   testUNTPTestSuite() {
-    this.logCurrentDir();
-    this.runShellScript('./cypress/e2e/issue_workflow_test/DPP/test-untp-dpp-scripts.sh');
-    this.deleteFile('DigitalProductPassport_instance-v0.5.0.json');
+    this.runUntpTest('digitalProductPassport', 'v0.5.0');
   }
 }
 

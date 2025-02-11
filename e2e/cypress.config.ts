@@ -45,6 +45,12 @@ export default defineConfig({
             });
           });
         },
+        async runUntpTest({ type, version, testData }) {
+          const { testCredentialHandler } = await import('untp-test-suite/src/interfaces/lib/testSuiteHandler');
+          const result = await testCredentialHandler({ type, version }, testData);
+
+          return result;
+        },
       });
     },
   },

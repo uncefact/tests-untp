@@ -45,6 +45,7 @@ interface IssueChainable {
     configPath: string,
     successMessage?: string,
   ): Cypress.Chainable<void>;
+  runUntpTest(type: string, version: string, testData: any, expectResult?: string): Cypress.Chainable<void>;
 }
 
 declare namespace Cypress {
@@ -56,7 +57,5 @@ declare namespace Cypress {
     verifySuccessToast(successMessage: string): Chainable<JQuery<HTMLElement>>;
     writeToFile(fileName: string, data: any): Chainable<void>;
     verifyLinkType(url: string): Chainable<any>;
-    runShellScript(scriptPath: string): Chainable<string>;
-    deleteFile(filePath: string): Chainable<boolean>;
   }
 }

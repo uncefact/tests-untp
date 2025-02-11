@@ -12,9 +12,7 @@ class DIAIssueFlow extends IssuePage {
   }
 
   testUNTPTestSuite() {
-    this.logCurrentDir();
-    this.runShellScript('./cypress/e2e/issue_workflow_test/DIA/test-untp-dia-scripts.sh');
-    this.deleteFile('DigitalIdentityAnchor_instance-v0.2.1.json');
+    this.runUntpTest('digitalIdentityAnchor', 'v0.2.1', {}, 'WARN');
   }
 }
 

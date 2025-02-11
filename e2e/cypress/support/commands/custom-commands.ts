@@ -40,13 +40,3 @@ Cypress.Commands.add('verifyLinkType', (url) => {
     expect(response.status).to.eq(200);
   });
 });
-
-// Run shell script
-Cypress.Commands.add('runShellScript', (scriptPath) => {
-  return cy.task('runShellScript', { scriptPath });
-});
-
-// Delete file
-Cypress.Commands.add('deleteFile', (filePath) => {
-  return cy.task('deleteFileCredentialE2E', filePath);
-});

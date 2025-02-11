@@ -49,8 +49,7 @@ Cypress.Commands.add(
     cy.waitForAPIResponse('issueCredentials', 201).then((interception: any) => {
       const credential = interception.request.body.credential;
       cy.log('interception: request: ', JSON.stringify(credential));
-      cy.writeToFile(fileName, credential);
-      cy.log(`Completed: issueCredentials for ${workflowName} and written to file`);
+      Cypress.env('lastCredential', credential);
     });
 
     cy.waitForAPIResponse('storeVC', 201).then((interception: any) => {
@@ -70,3 +69,16 @@ Cypress.Commands.add(
     cy.verifySuccessToast(successMessage);
   },
 );
+
+Cypress.Commands.add('runUntpTest', (type: string, version: string, testData: any, expectResult?: string) => {
+  cy.task('runUntpTest', { type, version, testData }).then((result: any) => {
+    expect(result).to.not.be.undefined;
+    expect(result).to.not.be.null;
+
+    if (expectResult) {
+      expect(result.result).to.eq(expectResult);
+    } else {
+      expect(result.result).to.eq('PASS');
+    }
+  });
+});

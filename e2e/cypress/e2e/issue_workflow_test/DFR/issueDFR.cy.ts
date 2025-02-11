@@ -12,9 +12,7 @@ class DFRIssueFlow extends IssuePage {
   }
 
   testUNTPTestSuite() {
-    this.logCurrentDir();
-    this.runShellScript('./cypress/e2e/issue_workflow_test/DFR/test-untp-dfr-scripts.sh');
-    this.deleteFile('DigitalFacilityRecord_instance-v0.5.0.json');
+    this.runUntpTest('digitalFacilityRecord', 'v0.5.0');
   }
 }
 
