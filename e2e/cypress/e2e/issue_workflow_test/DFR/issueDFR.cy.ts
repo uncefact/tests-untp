@@ -17,11 +17,6 @@ class DFRIssueFlow extends IssuePage {
 }
 
 describe('Issue DFR end-to-end testing flow', () => {
-  before(() => {
-    // Clear the lastCredential from Cypress environment after each test
-    Cypress.env('lastCredential', undefined);
-  });
-
   const dfrTest = new DFRIssueFlow();
 
   beforeEach(() => {

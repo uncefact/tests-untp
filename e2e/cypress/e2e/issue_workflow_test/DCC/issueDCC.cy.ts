@@ -17,11 +17,6 @@ class DCCIssueFlow extends IssuePage {
 }
 
 describe('Issue DCC end-to-end testing flow', () => {
-  before(() => {
-    // Clear the lastCredential from Cypress environment after each test
-    Cypress.env('lastCredential', undefined);
-  });
-
   const dccTest = new DCCIssueFlow();
 
   beforeEach(() => {

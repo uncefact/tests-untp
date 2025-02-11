@@ -17,11 +17,6 @@ class DPPIssueFlow extends IssuePage {
 }
 
 describe('Issue DPP end-to-end testing flow', () => {
-  before(() => {
-    // Clear the lastCredential from Cypress environment after each test
-    Cypress.env('lastCredential', undefined);
-  });
-
   const dppTest = new DPPIssueFlow();
 
   beforeEach(() => {

@@ -17,11 +17,6 @@ class DIAIssueFlow extends IssuePage {
 }
 
 describe('Issue DIA end-to-end testing flow', () => {
-  before(() => {
-    // Clear the lastCredential from Cypress environment after each test
-    Cypress.env('lastCredential', undefined);
-  });
-
   const diaTest = new DIAIssueFlow();
 
   beforeEach(() => {

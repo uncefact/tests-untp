@@ -141,6 +141,7 @@ We use Cypress for end-to-end testing with Docker Compose to run the services re
 1. Install dependencies:
 
    ```bash
+   cd e2e
    yarn install
    ```
 
