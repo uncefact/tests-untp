@@ -39,4 +39,5 @@ export enum TestCaseStepId {
   VERIFICATION = 'verification',
   UNTP_SCHEMA_VALIDATION = 'untp-schema-validation',
   EXTENSION_SCHEMA_VALIDATION = 'extension-schema-validation',
+  CONTEXT_VALIDATION = 'context',
 }

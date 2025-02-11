@@ -9,6 +9,7 @@ import { detectVcdmVersion } from '@/lib/utils';
 import { validateVcdmRules } from '@/lib/vcdm-validation';
 import { verifyCredential } from '@/lib/verificationService';
 import type { Credential, CredentialType, TestStep } from '@/types/credential';
+import { validateContext } from '@/lib/contextValidation';
 import confetti from 'canvas-confetti';
 import { AlertCircle, Check, ChevronDown, ChevronRight, Loader2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -146,6 +147,13 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
     );
   }, [step.details]);
 
+  const isAllowedTestCase = [
+    TestCaseStepId.UNTP_SCHEMA_VALIDATION,
+    TestCaseStepId.EXTENSION_SCHEMA_VALIDATION,
+    TestCaseStepId.VCDM_SCHEMA_VALIDATION,
+    TestCaseStepId.CONTEXT_VALIDATION
+  ].includes(step.id);
+
   return (
     <div className='py-2'>
       <div className='flex items-center justify-between'>
@@ -153,10 +161,7 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
           <StatusIcon status={step.status} testId={`${step.id}`} />
           <span>{step.name}</span>
         </div>
-        {step.details &&
-          (step.id === TestCaseStepId.UNTP_SCHEMA_VALIDATION ||
-            step.id === TestCaseStepId.EXTENSION_SCHEMA_VALIDATION ||
-            step.id === TestCaseStepId.VCDM_SCHEMA_VALIDATION) &&
+        {step.details && isAllowedTestCase &&
           (step.details.errors?.[0]?.message === 'Failed to fetch schema' ? (
             <span className='text-sm text-red-500'>Failed to load schema</span>
           ) : (
@@ -277,6 +282,11 @@ export function TestResults({
           name: 'UNTP Schema Validation',
           status: TestCaseStatus.PENDING,
         },
+        {
+          id: TestCaseStepId.CONTEXT_VALIDATION,
+          name: 'JSON-LD Document Expansion and Context Validation',
+          status: TestCaseStatus.PENDING,
+        },
       ];
     }
 
@@ -313,6 +323,11 @@ export function TestResults({
       {
         id: TestCaseStepId.UNTP_SCHEMA_VALIDATION,
         name: 'UNTP Schema Validation',
+        status: TestCaseStatus.PENDING,
+      },
+      {
+        id: TestCaseStepId.CONTEXT_VALIDATION,
+        name: 'JSON-LD Document Expansion and Context Validation',
         status: TestCaseStatus.PENDING,
       },
     ];
@@ -366,7 +381,8 @@ export function TestResults({
             [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
               step.id === TestCaseStepId.VERIFICATION ||
               step.id === TestCaseStepId.UNTP_SCHEMA_VALIDATION ||
-              step.id === TestCaseStepId.VCDM_SCHEMA_VALIDATION
+              step.id === TestCaseStepId.VCDM_SCHEMA_VALIDATION ||
+              step.id === TestCaseStepId.CONTEXT_VALIDATION
                 ? { ...step, status: TestCaseStatus.IN_PROGRESS }
                 : step,
             ),
@@ -490,6 +506,30 @@ export function TestResults({
               ),
             }));
           }
+
+          // JSON-LD Document Expansion and Context Validation
+          const validateContextResult = await validateContext(credential.decoded);
+          const contextTestResult = { status: TestCaseStatus.SUCCESS, details: validateContextResult.data };
+
+          if (!validateContextResult.valid) {
+            allChecksPass = false;
+            toast.error(validateContextResult.error!.message);
+            contextTestResult.status = TestCaseStatus.FAILURE;
+            contextTestResult.details = { errors: [validateContextResult.error] };
+          }
+
+          setTestResults((prev) => ({
+            ...prev,
+            [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
+              step.id === TestCaseStepId.CONTEXT_VALIDATION
+                ? {
+                    ...step,
+                    status: contextTestResult.status,
+                    details: contextTestResult.details,
+                  }
+                : step,
+            ),
+          }));
 
           // Extension schema validation
           if (extension) {
