@@ -35,14 +35,11 @@ export default defineConfig({
           }
         },
         resetData(file?: string) {
-          let targetDir;
 
-          if (file) {
-            targetDir = path.resolve(process.cwd(), `../minio_data/identity-resolver-service-object-store/data-test/idr-bucket-1/gs1/${file}`);
-          } else {
-            targetDir = path.resolve(process.cwd(), '../minio_data/identity-resolver-service-object-store/data-test/idr-bucket-1/gs1');
-          }
-
+          const targetDir = path.resolve(
+            process.cwd(),
+            `../minio_data/identity-resolver-service-object-store/data-test/idr-bucket-1/gs1${file ? `/${file}` : ''}`
+          );
 
           if (fs.existsSync(targetDir)) {
             console.log(`Found folder: ${targetDir}`);
