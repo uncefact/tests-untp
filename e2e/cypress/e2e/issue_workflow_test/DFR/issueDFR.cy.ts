@@ -6,7 +6,6 @@ class DFRIssueFlow extends IssuePage {
       'General features',
       'Generate DFR',
       'DigitalFacilityRecord',
-      'DigitalFacilityRecord_instance-v0.5.0.json',
       'generalFeatures',
     );
   }
@@ -19,7 +18,7 @@ class DFRIssueFlow extends IssuePage {
 describe('Issue DFR end-to-end testing flow', () => {
   const dfrTest = new DFRIssueFlow();
 
-  beforeEach(() => {
+  before(() => {
     dfrTest.beforeAll();
   });
 

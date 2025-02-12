@@ -3,6 +3,9 @@ class IssuePage {
 
   beforeAll() {
     cy.loadAppConfig();
+    Cypress.env('lastCredential', undefined);
+    Cypress.env('uniqueQualifierPath', undefined);
+    cy.task('resetData');
   }
 
   testAppConfig() {
@@ -14,10 +17,9 @@ class IssuePage {
     featureCategory: string,
     featureName: string,
     credentialType: string,
-    instanceFile: string,
     featurePath: string,
   ): void {
-    cy.generateWorkflow(featureCategory, featureName, credentialType, instanceFile, featurePath);
+    cy.generateWorkflow(featureCategory, featureName, credentialType, featurePath);
   }
 
   // General method to verify link type. URL can be passed dynamically

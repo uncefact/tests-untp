@@ -6,7 +6,6 @@ class DCCIssueFlow extends IssuePage {
       'General features',
       'Generate DCC',
       'getConformityCredential',
-      'DigitalConformityCredential_instance-v0.5.0.json',
       'generalFeatures',
     );
   }
@@ -19,7 +18,7 @@ class DCCIssueFlow extends IssuePage {
 describe('Issue DCC end-to-end testing flow', () => {
   const dccTest = new DCCIssueFlow();
 
-  beforeEach(() => {
+  before(() => {
     dccTest.beforeAll();
   });
 

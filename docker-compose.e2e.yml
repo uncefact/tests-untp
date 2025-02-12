@@ -144,7 +144,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        CONFIG_FILE: ./cypress/fixtures/app-config.json
+        CONFIG_FILE: ./e2e/cypress/fixtures/app-config.json
     ports:
       - '3003:80'
 

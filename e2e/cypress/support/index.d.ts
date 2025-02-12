@@ -41,7 +41,6 @@ interface IssueChainable {
     page: string,
     workflowName: string,
     schemaName: string,
-    fileName: string,
     configPath: string,
     successMessage?: string,
   ): Cypress.Chainable<void>;

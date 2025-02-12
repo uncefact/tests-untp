@@ -1,3 +1,3 @@
-before(() => {
-  Cypress.env('lastCredential', undefined);
-});
+after(() => {
+    cy.task('resetData');
+})

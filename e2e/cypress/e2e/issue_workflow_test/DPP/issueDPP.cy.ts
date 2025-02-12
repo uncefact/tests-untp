@@ -6,7 +6,6 @@ class DPPIssueFlow extends IssuePage {
       'Orchard Facility',
       'Issue DPP',
       'DigitalProductPassport',
-      'DigitalProductPassport_instance-v0.5.0.json',
       'apps',
     );
   }
@@ -19,7 +18,7 @@ class DPPIssueFlow extends IssuePage {
 describe('Issue DPP end-to-end testing flow', () => {
   const dppTest = new DPPIssueFlow();
 
-  beforeEach(() => {
+  before(() => {
     dppTest.beforeAll();
   });
 

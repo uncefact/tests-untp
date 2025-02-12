@@ -6,7 +6,6 @@ class DIAIssueFlow extends IssuePage {
       'General features',
       'Generate DIA',
       'DigitalIdentityAnchor',
-      'DigitalIdentityAnchor_instance-v0.2.1.json',
       'generalFeatures',
     );
   }
@@ -19,7 +18,7 @@ class DIAIssueFlow extends IssuePage {
 describe('Issue DIA end-to-end testing flow', () => {
   const diaTest = new DIAIssueFlow();
 
-  beforeEach(() => {
+  before(() => {
     diaTest.beforeAll();
   });
 

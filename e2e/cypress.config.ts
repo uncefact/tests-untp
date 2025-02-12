@@ -34,16 +34,33 @@ export default defineConfig({
             throw error;
           }
         },
-        deleteFileCredentialE2E(fileName: string) {
-          const filePath = path.resolve('cypress/fixtures/credentials-e2e', fileName);
-          return new Promise((resolve, reject) => {
-            fs.unlink(filePath, (err) => {
-              if (err) {
-                return reject(err);
-              }
-              resolve(null);
-            });
-          });
+        resetData(file?: string) {
+          let targetDir;
+
+          if (file) {
+            targetDir = path.resolve(process.cwd(), `../minio_data/identity-resolver-service-object-store/data-test/idr-bucket-1/gs1/${file}`);
+          } else {
+            targetDir = path.resolve(process.cwd(), '../minio_data/identity-resolver-service-object-store/data-test/idr-bucket-1/gs1');
+          }
+
+
+          if (fs.existsSync(targetDir)) {
+            console.log(`Found folder: ${targetDir}`);
+            console.log('Deleting folder...');
+
+            fs.rmdirSync(targetDir, { recursive: true });
+
+            if (!fs.existsSync(targetDir)) {
+              console.log('Folder deleted successfully.');
+              return { success: true };
+            } else {
+              console.log('Failed to delete the folder.');
+              return { success: false };
+            }
+          } else {
+            console.log(`Folder not found: ${targetDir}`);
+            return { success: true };
+          }
         },
         async runUntpTest({ type, version, testData }) {
           const { testCredentialHandler } = await import('untp-test-suite/src/interfaces/lib/testSuiteHandler');
