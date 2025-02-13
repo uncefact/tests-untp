@@ -5,7 +5,6 @@ class IssuePage {
     cy.loadAppConfig();
     Cypress.env('lastCredential', undefined);
     Cypress.env('uniqueQualifierPath', undefined);
-    cy.task('resetData');
   }
 
   testAppConfig() {
