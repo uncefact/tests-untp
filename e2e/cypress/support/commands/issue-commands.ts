@@ -21,11 +21,16 @@ Cypress.Commands.add(
     const schemaURL = feature?.components[0].props?.schema?.url ?? '';
     const appService = feature?.services[0]?.parameters[0] ?? {};
 
-    cy.interceptAPI('GET', schemaURL, `get${schemaName}`);
+    if (schemaURL) {
+      cy.interceptAPI('GET', schemaURL, `get${schemaName}`);
 
-    cy.navigateTo(workflowName);
+      // Wait for the API response, then render the page
+      cy.navigateTo(workflowName);
 
-    cy.waitForAPIResponse(`get${schemaName}`, 200);
+      cy.waitForAPIResponse(`get${schemaName}`, 200);
+    } else {
+      cy.navigateTo(workflowName);
+    }
 
     const API_ENDPOINT = {
       ISSUE_BITSTRING_STATUS_LIST: '/agent/issueBitstringStatusList',
