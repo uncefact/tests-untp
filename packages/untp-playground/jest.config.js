@@ -15,10 +15,13 @@ const config = {
   coverageReporters: ['text', 'lcov', 'json', 'json-summary'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^lucide-react$': '<rootDir>/node_modules/lucide-react/dist/cjs/lucide-react.js',
+    '^react$': '<rootDir>/node_modules/react',
+    '^react-dom$': '<rootDir>/node_modules/react-dom',
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testEnvironment: 'jsdom',
-  testMatch: ['**/__tests__/**/*.(spec|test).[jt]s?(x)', '**/?(*.)+(spec|test).[tj]s?(x)'],
+  testMatch: ['**/__tests__/**/*.(spec|test).[jt]s?(x)'],
   testPathIgnorePatterns: ['/node_modules/', '__tests__/mocks/*.ts'],
   modulePathIgnorePatterns: ['<rootDir>/build', '<rootDir>/dist', '<rootDir>/.next'],
   collectCoverageFrom: [
@@ -28,6 +31,7 @@ const config = {
     '!src/**/types',
     '!src/components/ui/**',
   ],
+  transformIgnorePatterns: ['/node_modules/(?!lucide-react)'],
 };
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async

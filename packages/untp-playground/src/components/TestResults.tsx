@@ -1,42 +1,45 @@
 'use client';
 
+import { TooltipWrapper } from '@/components/TooltipWrapper';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { useTestReport } from '@/contexts/TestReportContext';
+import { validateContext } from '@/lib/contextValidation';
 import { detectVersion, isEnvelopedProof } from '@/lib/credentialService';
 import { detectExtension, validateCredentialSchema, validateExtension } from '@/lib/schemaValidation';
 import { detectVcdmVersion } from '@/lib/utils';
 import { validateVcdmRules } from '@/lib/vcdm-validation';
 import { verifyCredential } from '@/lib/verificationService';
-import type { Credential, CredentialType, TestStep } from '@/types/credential';
-import { validateContext } from '@/lib/contextValidation';
+import { Credential, PermittedCredentialType, TestStep } from '@/types';
 import confetti from 'canvas-confetti';
 import { AlertCircle, Check, ChevronDown, ChevronRight, Loader2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { TestCaseStatus, TestCaseStepId, VCDMVersion, VCProofType } from '../../constants';
+import {
+  CredentialType,
+  permittedCredentialTypes,
+  TestCaseStatus,
+  TestCaseStepId,
+  VCDMVersion,
+  VCProofType,
+} from '../../constants';
 import { ErrorDialog } from './ErrorDialog';
-
-// Define all possible credential types
-const ALL_CREDENTIAL_TYPES: CredentialType[] = [
-  'DigitalProductPassport',
-  'DigitalConformityCredential',
-  'DigitalFacilityRecord',
-  'DigitalIdentityAnchor',
-  'DigitalTraceabilityEvent',
-];
+import { GenerateReportDialog } from './GenerateReportDialog';
+import { SectionHeader } from './SectionHeader';
 
 // Add this type to help with tracking previous credentials
-type CredentialCache = {
-  [key in CredentialType]?: {
+type CredentialCache = Record<
+  PermittedCredentialType,
+  {
     credential: {
       original: any;
       decoded: Credential;
     };
     validated: boolean;
     confettiShown?: boolean;
-  };
-};
+  }
+>;
 
 interface TestGroupProps {
   credentialType: string;
@@ -151,7 +154,7 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
     TestCaseStepId.UNTP_SCHEMA_VALIDATION,
     TestCaseStepId.EXTENSION_SCHEMA_VALIDATION,
     TestCaseStepId.VCDM_SCHEMA_VALIDATION,
-    TestCaseStepId.CONTEXT_VALIDATION
+    TestCaseStepId.CONTEXT_VALIDATION,
   ].includes(step.id);
 
   return (
@@ -161,7 +164,8 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
           <StatusIcon status={step.status} testId={`${step.id}`} />
           <span>{step.name}</span>
         </div>
-        {step.details && isAllowedTestCase &&
+        {step.details &&
+          isAllowedTestCase &&
           (step.details.errors?.[0]?.message === 'Failed to fetch schema' ? (
             <span className='text-sm text-red-500'>Failed to load schema</span>
           ) : (
@@ -240,19 +244,19 @@ const StatusIcon = ({
   }
 };
 
-export function TestResults({
-  credentials,
-}: {
-  credentials: {
-    [key in CredentialType]?: { original: any; decoded: Credential };
-  };
-}) {
+interface TestResultsProps {
+  credentials: Partial<Record<PermittedCredentialType, { original: any; decoded: Credential }>>;
+  testResults: Partial<Record<PermittedCredentialType, TestStep[]>>;
+  setTestResults: React.Dispatch<React.SetStateAction<Partial<Record<PermittedCredentialType, TestStep[]>>>>;
+}
+
+export function TestResults({ credentials, testResults, setTestResults }: TestResultsProps) {
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
-  const [testResults, setTestResults] = useState<{
-    [key in CredentialType]?: TestStep[];
-  }>({});
-  const validatedCredentialsRef = useRef<CredentialCache>({});
-  const previousCredentialsRef = useRef<Partial<Record<CredentialType, { original: any; decoded: Credential }>>>({});
+  const validatedCredentialsRef = useRef<CredentialCache | Record<string, never>>({});
+  const previousCredentialsRef = useRef<
+    Partial<Record<PermittedCredentialType, { original: any; decoded: Credential }>>
+  >({});
+  const { canDownloadReport, downloadReport } = useTestReport();
 
   const initializeTestSteps = (credential?: { original: any; decoded: Credential }) => {
     if (!credential) {
@@ -346,7 +350,7 @@ export function TestResults({
 
   // First useEffect for initializing test steps
   useEffect(() => {
-    ALL_CREDENTIAL_TYPES.forEach((type) => {
+    permittedCredentialTypes.forEach((type) => {
       const credential = credentials[type];
       const previousCredential = previousCredentialsRef.current[type];
 
@@ -360,12 +364,12 @@ export function TestResults({
     });
 
     previousCredentialsRef.current = credentials;
-  }, [credentials]);
+  }, [credentials, setTestResults]);
 
   // Validation useEffect
   useEffect(() => {
     Object.entries(credentials).forEach(([type, credential]) => {
-      const credentialType = type as CredentialType;
+      const credentialType = type as PermittedCredentialType;
       const cached = validatedCredentialsRef.current[credentialType];
 
       // Skip if this credential has already been validated
@@ -378,7 +382,7 @@ export function TestResults({
           // Set in-progress state
           setTestResults((prev) => ({
             ...prev,
-            [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
+            [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
               step.id === TestCaseStepId.VERIFICATION ||
               step.id === TestCaseStepId.UNTP_SCHEMA_VALIDATION ||
               step.id === TestCaseStepId.VCDM_SCHEMA_VALIDATION ||
@@ -392,12 +396,15 @@ export function TestResults({
           const verificationResult = await verifyCredential(credential.original);
           setTestResults((prev) => ({
             ...prev,
-            [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
+            [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
               step.id === TestCaseStepId.VERIFICATION
                 ? {
                     ...step,
                     status: verificationResult.verified ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
-                    details: verificationResult,
+                    details: {
+                      verified: verificationResult.verified,
+                      ...(verificationResult.error && { error: verificationResult.error }),
+                    },
                   }
                 : step,
             ),
@@ -434,7 +441,7 @@ export function TestResults({
 
             setTestResults((prev) => ({
               ...prev,
-              [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
+              [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
                 step.id === TestCaseStepId.VCDM_SCHEMA_VALIDATION
                   ? {
                       ...step,
@@ -451,7 +458,7 @@ export function TestResults({
 
             setTestResults((prev) => ({
               ...prev,
-              [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
+              [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
                 step.id === TestCaseStepId.VCDM_SCHEMA_VALIDATION
                   ? {
                       ...step,
@@ -469,7 +476,7 @@ export function TestResults({
 
             setTestResults((prev) => ({
               ...prev,
-              [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
+              [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
                 step.id === TestCaseStepId.UNTP_SCHEMA_VALIDATION
                   ? {
                       ...step,
@@ -487,7 +494,7 @@ export function TestResults({
             // Only update the schema validation step
             setTestResults((prev) => ({
               ...prev,
-              [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
+              [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
                 step.id === TestCaseStepId.UNTP_SCHEMA_VALIDATION
                   ? {
                       ...step,
@@ -539,7 +546,7 @@ export function TestResults({
 
               setTestResults((prev) => ({
                 ...prev,
-                [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
+                [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
                   step.id === TestCaseStepId.EXTENSION_SCHEMA_VALIDATION
                     ? {
                         ...step,
@@ -557,7 +564,7 @@ export function TestResults({
               // Only update the schema validation step
               setTestResults((prev) => ({
                 ...prev,
-                [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
+                [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
                   step.id === TestCaseStepId.EXTENSION_SCHEMA_VALIDATION
                     ? {
                         ...step,
@@ -594,7 +601,7 @@ export function TestResults({
 
       verifyAndValidate();
     });
-  }, [credentials]);
+  }, [credentials, setTestResults]);
 
   const toggleGroup = (groupId: string) => {
     setExpandedGroups((prev) => (prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]));
@@ -602,7 +609,22 @@ export function TestResults({
 
   return (
     <div className='space-y-4 h-full overflow-y-auto'>
-      {ALL_CREDENTIAL_TYPES.map((type) => {
+      <SectionHeader title='Your Credentials'>
+        <GenerateReportDialog />
+        <TooltipWrapper
+          content={
+            !canDownloadReport
+              ? 'Generate a conformance report first to enable download'
+              : 'Download the generated conformance report'
+          }
+          dataTestId='download-report-button'
+        >
+          <Button onClick={downloadReport} disabled={!canDownloadReport}>
+            Download Report
+          </Button>
+        </TooltipWrapper>
+      </SectionHeader>
+      {permittedCredentialTypes.map((type) => {
         const credential = credentials[type];
         const steps = testResults[type] || [];
         const hasCredential = !!credential;

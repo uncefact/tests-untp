@@ -2,9 +2,9 @@
  * @jest-environment jsdom
  */
 
-import React from 'react';
-import { render, screen } from '@testing-library/react';
 import { Header } from '@/components/Header';
+import { render, screen } from '@testing-library/react';
+import { testSuiteVersion } from '../../config';
 
 describe('Header', () => {
   it('renders correctly', () => {
@@ -28,6 +28,13 @@ describe('Header', () => {
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveTextContent('UNTP Playground');
     expect(heading).toHaveClass('text-2xl', 'font-bold');
+  });
+
+  it('renders the header with correct title and version', () => {
+    render(<Header />);
+
+    expect(screen.getByText('UNTP Playground')).toBeInTheDocument();
+    expect(screen.getByText(`v${testSuiteVersion}`)).toBeInTheDocument();
   });
 
   // If we uncomment the Image component in the future

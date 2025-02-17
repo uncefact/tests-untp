@@ -35,10 +35,9 @@ export default defineConfig({
           }
         },
         resetData(file?: string) {
-
           const targetDir = path.resolve(
             process.cwd(),
-            `../minio_data/identity-resolver-service-object-store/data-test/idr-bucket-1/gs1${file ? `/${file}` : ''}`
+            `../minio_data/identity-resolver-service-object-store/data-test/idr-bucket-1/gs1${file ? `/${file}` : ''}`,
           );
 
           if (fs.existsSync(targetDir)) {
