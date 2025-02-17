@@ -37,7 +37,7 @@ export function detectVersion(credential: Credential, domain?: string): string {
 
   if (!contextUrl) return 'unknown';
 
-  const versionMatch = contextUrl.match(/(\d+\.\d+\.\d+)/);
+  const versionMatch = contextUrl.match(/(\d+\.\d+\.\d+(?:-[a-zA-Z0-9]+)?)/);
   return versionMatch ? versionMatch[1] : 'unknown';
 }
 

@@ -107,6 +107,15 @@ describe('credentialService', () => {
       expect(detectVersion(credential)).toBe('0.5.0');
     });
 
+    it('should detect pre-release version from UNTP context', () => {
+      const credential = {
+        type: ['DigitalProductPassport'],
+        '@context': ['https://test.uncefact.org/vocabulary/untp/dpp/0.6.0-alpha2'],
+      };
+
+      expect(detectVersion(credential)).toBe('0.6.0-alpha2');
+    });
+
     it('should detect version from custom domain', () => {
       const credential = {
         type: ['DigitalLivestockPassport'],
