@@ -3,8 +3,6 @@ class IssuePage {
 
   beforeAll() {
     cy.loadAppConfig();
-    Cypress.env('lastCredential', undefined);
-    Cypress.env('uniqueQualifierPath', undefined);
   }
 
   testAppConfig() {

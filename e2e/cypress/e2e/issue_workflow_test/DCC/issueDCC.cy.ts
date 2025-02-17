@@ -18,7 +18,7 @@ class DCCIssueFlow extends IssuePage {
 describe('Issue DCC end-to-end testing flow', () => {
   const dccTest = new DCCIssueFlow();
 
-  before(() => {
+  beforeEach(() => {
     dccTest.beforeAll();
   });
 

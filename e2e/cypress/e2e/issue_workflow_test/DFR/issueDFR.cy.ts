@@ -18,7 +18,7 @@ class DFRIssueFlow extends IssuePage {
 describe('Issue DFR end-to-end testing flow', () => {
   const dfrTest = new DFRIssueFlow();
 
-  before(() => {
+  beforeEach(() => {
     dfrTest.beforeAll();
   });
 

@@ -18,7 +18,7 @@ class DPPIssueFlow extends IssuePage {
 describe('Issue DPP end-to-end testing flow', () => {
   const dppTest = new DPPIssueFlow();
 
-  before(() => {
+  beforeEach(() => {
     dppTest.beforeAll();
   });
 

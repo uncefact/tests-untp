@@ -18,7 +18,7 @@ class DIAIssueFlow extends IssuePage {
 describe('Issue DIA end-to-end testing flow', () => {
   const diaTest = new DIAIssueFlow();
 
-  before(() => {
+  beforeEach(() => {
     diaTest.beforeAll();
   });
 
