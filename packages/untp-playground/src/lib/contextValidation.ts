@@ -31,43 +31,49 @@ export async function validateContext(credential: Record<string, any>): Promise<
 
     return { valid: true, data: expanded };
   } catch (error: any) {
-    const checkSyntaxErrorResult = checkSyntaxError(error);
-    if (!checkSyntaxErrorResult.valid) {
-      return {
-        valid: false,
-        error: {
-          keyword: 'conflictingProperties',
-          message: checkSyntaxErrorResult.errorMessage as string,
-          instancePath: '@context',
-          params: {
-            conflictingProperty: checkSyntaxErrorResult.term,
-          }
-        },
-      }
-    }
+    console.log('Expand JSON-LD error:', error);
 
-    const checkInvalidContextResult = checkInvalidContext(error);
-    if (!checkInvalidContextResult.valid) {
-      return {
-        valid: false,
-        error: {
-          keyword: 'const',
-          message: checkInvalidContextResult.errorMessage as string,
-          instancePath: '@context',
-        },
-      };
-    }
-
-    const checkInvalidPropertiesResult = await checkInvalidProperties(error, credential);
-    if (!checkInvalidPropertiesResult.valid) {
-      return {
-        valid: false,
-        error: {
-          keyword: 'const',
-          message: checkInvalidPropertiesResult.errorMessage as string,
-          instancePath: checkInvalidPropertiesResult.invalidValues as string,
-        },
+    try {
+      const checkSyntaxErrorResult = checkSyntaxError(error);
+      if (!checkSyntaxErrorResult.valid) {
+        return {
+          valid: false,
+          error: {
+            keyword: 'conflictingProperties',
+            message: checkSyntaxErrorResult.errorMessage as string,
+            instancePath: '@context',
+            params: {
+              conflictingProperty: checkSyntaxErrorResult.term,
+            }
+          },
+        }
       }
+  
+      const checkInvalidContextResult = checkInvalidContext(error);
+      if (!checkInvalidContextResult.valid) {
+        return {
+          valid: false,
+          error: {
+            keyword: 'const',
+            message: checkInvalidContextResult.errorMessage as string,
+            instancePath: '@context',
+          },
+        };
+      }
+  
+      const checkInvalidPropertiesResult = await checkInvalidProperties(error, credential);
+      if (!checkInvalidPropertiesResult.valid) {
+        return {
+          valid: false,
+          error: {
+            keyword: 'const',
+            message: checkInvalidPropertiesResult.errorMessage as string,
+            instancePath: checkInvalidPropertiesResult.invalidValues as string,
+          },
+        }
+      }
+    } catch (error) {
+      console.log('Context validation error:', error);
     }
 
     return {
@@ -163,7 +169,7 @@ export function getDroppedProperties(originalObject: Record<string, any>, compac
       // If key does not exist in objB, record it
       if (!(key in objectB)) {
         uniqueKeys.push(currentPath.join('/'));
-      } else if (typeof objectA[key] === 'object' && objectA[key] !== null) {
+      } else if (typeof objectA[key] === 'object' && objectA[key] !== null && !Array.isArray(objectA[key])) {
         // Recursively search for unique keys
         findUniqueKeys(objectA[key], objectB[key], currentPath);
       }
