@@ -6,7 +6,6 @@ class DCCIssueFlow extends IssuePage {
       'General features',
       'Generate DCC',
       'getConformityCredential',
-      'DigitalConformityCredential_instance-v0.5.0.json',
       'generalFeatures',
     );
   }

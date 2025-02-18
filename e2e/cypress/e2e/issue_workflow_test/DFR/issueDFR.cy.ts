@@ -6,7 +6,6 @@ class DFRIssueFlow extends IssuePage {
       'General features',
       'Generate DFR',
       'DigitalFacilityRecord',
-      'DigitalFacilityRecord_instance-v0.5.0.json',
       'generalFeatures',
     );
   }
