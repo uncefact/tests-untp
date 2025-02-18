@@ -6,7 +6,6 @@ class DPPIssueFlow extends IssuePage {
       'Orchard Facility',
       'Issue DPP',
       'DigitalProductPassport',
-      'DigitalProductPassport_instance-v0.5.0.json',
       'apps',
     );
   }

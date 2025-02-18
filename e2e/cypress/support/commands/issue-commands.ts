@@ -7,7 +7,7 @@ Cypress.Commands.add('verifyAppConfig', () => {
 
 Cypress.Commands.add(
   'generateWorkflow',
-  (page, workflowName, schemaName, fileName, configPath, successMessage = 'Action Successful') => {
+  (page, workflowName, schemaName, configPath, successMessage = 'Action Successful') => {
     const AppConfig = Cypress.env('AppConfig');
 
     cy.visit('/');

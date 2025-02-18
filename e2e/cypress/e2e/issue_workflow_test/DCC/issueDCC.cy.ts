@@ -5,8 +5,7 @@ class DCCIssueFlow extends IssuePage {
     this.generateWorkflow(
       'General features',
       'Generate DCC',
-      'ConformityCredential',
-      'DigitalConformityCredential_instance-v0.5.0.json',
+      'getConformityCredential',
       'generalFeatures',
     );
   }

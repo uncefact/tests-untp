@@ -6,7 +6,6 @@ class DIAIssueFlow extends IssuePage {
       'General features',
       'Generate DIA',
       'DigitalIdentityAnchor',
-      'DigitalIdentityAnchor_instance-v0.2.1.json',
       'generalFeatures',
     );
   }
