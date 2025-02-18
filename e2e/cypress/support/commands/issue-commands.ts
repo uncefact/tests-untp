@@ -18,8 +18,10 @@ Cypress.Commands.add(
       (feature: { name: string }) => feature.name === workflowName,
     );
 
-    const schemaURL = feature?.components[0].props?.schema?.url ?? '';
-    const appService = feature?.services[0]?.parameters[0] ?? {};
+    const components = feature?.components?.[0]?.props;
+    const urlWithoutStorage = components?.schema?.url || '';
+    const urlWithStorage = components?.nestedComponents?.[0]?.props?.schema?.url || '';
+    const schemaURL = urlWithoutStorage || urlWithStorage || '';
 
     if (schemaURL) {
       cy.interceptAPI('GET', schemaURL, `get${schemaName}`);
@@ -31,6 +33,10 @@ Cypress.Commands.add(
     } else {
       cy.navigateTo(workflowName);
     }
+
+    const findProcessService = feature?.services?.find((service: any) => service.name.includes('process'))
+      ?.parameters?.[0];
+    const appService = findProcessService ?? {};
 
     const API_ENDPOINT = {
       ISSUE_BITSTRING_STATUS_LIST: '/agent/issueBitstringStatusList',

@@ -1,43 +1,32 @@
-import { DIGITAL_TRACEABILITY_EVENT, ISSUE_TRACEABILITY_ASSOCIATION_EVENT, ORCHARD_FACILITY } from 'constant';
+import { APP_CONFIG_FEATURE_APP, DIGITAL_TRACEABILITY_EVENT, ISSUE_TRACEABILITY_ASSOCIATION_EVENT, ORCHARD_FACILITY, TRACEABILITY_LINK_TYPE } from 'constant';
 import IssuePage from 'cypress/page/issuePage';
 
-class TransformationEventIssueFlow extends IssuePage {
-  testGenerateDPPWorkflow() {
-    this.generateWorkflow(
-      ORCHARD_FACILITY,
-      ISSUE_TRACEABILITY_ASSOCIATION_EVENT,
-      DIGITAL_TRACEABILITY_EVENT,
-      'DigitalTraceabilityEvent-v0.5.0.json',
-      'apps',
-    );
-  }
+const associationEvent = new IssuePage();
 
-  testUNTPTestSuite() {
-    this.runUntpTest('digitalTraceabilityEvent', 'v0.5.0');
-  }
-}
-
-describe('Issue Digital Traceability Object Event end-to-end testing flow', () => {
-  const transformationEventTest = new TransformationEventIssueFlow();
-
+describe('Issue Digital Traceability Association Event end-to-end testing flow', () => {
   beforeEach(() => {
-    transformationEventTest.beforeAll();
+    associationEvent.beforeAll();
   });
 
   it('should access the right the app config data', () => {
-    transformationEventTest.testAppConfig();
+    associationEvent.testAppConfig();
   });
 
   it('should visit the homepage, navigate to "Orchard Facility", handle API calls, and show success message', () => {
-    transformationEventTest.testGenerateDPPWorkflow();
+    associationEvent.generateWorkflow(
+      ORCHARD_FACILITY,
+      ISSUE_TRACEABILITY_ASSOCIATION_EVENT,
+      DIGITAL_TRACEABILITY_EVENT,
+      APP_CONFIG_FEATURE_APP,
+    );
+  
   });
 
   it('Verify linkType', () => {
-    const checkLinkTypeURL = 'http://localhost:3000/gs1/01/09359502000034/21/123456';
-    transformationEventTest.verifyLinkType(checkLinkTypeURL);
+    associationEvent.verifyLinkType(TRACEABILITY_LINK_TYPE);
   });
 
-  it('Runs testing UNTP test suite for Digital Traceability Object Event', () => {
-    transformationEventTest.testUNTPTestSuite();
+  it('Runs testing UNTP test suite for Digital Traceability Association Event', () => {
+    associationEvent.runUntpTest('digitalTraceabilityEvent', 'v0.5.0');
   });
 });
