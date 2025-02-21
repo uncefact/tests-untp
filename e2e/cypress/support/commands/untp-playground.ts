@@ -33,6 +33,11 @@ Cypress.Commands.add('openErrorDetails', () => {
   cy.contains('View Details').click();
 });
 
+// Command to open error details for a specific step
+Cypress.Commands.add('openErrorDetailsByStepName', (stepName: string) => {
+  cy.contains(stepName).parent().parent().contains('View Details').click();
+});
+
 // Command to validate that the confetti is visible
 Cypress.Commands.add('validateConfetti', () => {
   cy.get('canvas')
@@ -52,4 +57,16 @@ Cypress.Commands.add('checkVCDMVersionColor', (credentialType: string, expectedC
   cy.get(`[data-testid="${credentialType}-vcdm-version"]`)
     .should('have.class', colorClasses[expectedColor][0])
     .and('have.class', colorClasses[expectedColor][1]);
+});
+
+// Command to open validation details
+Cypress.Commands.add('openValidationDetails', (validationTitle: string = 'Fix validation error') => {
+  cy.contains(validationTitle).click();
+});
+
+// Command to check the error messages displayed on the validation errors tab
+Cypress.Commands.add('checkValidationErrorMessages', (errorMessages: string[]) => {
+  errorMessages.forEach((message) => {
+    cy.contains(message).should('be.visible');
+  });
 });
