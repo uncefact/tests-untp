@@ -30,7 +30,7 @@ export const processDPP: IService = async (data: any, context: IDppContext): Pro
     const vckitContext = context.vckit;
     const dppContext = context.dpp;
 
-    const restOfVC: any = { id: `urn:uuid:${credentialId}`, render: dppContext?.renderTemplate ?? [] };
+    const restOfVC: any = { id: `urn:uuid:${credentialId}`, renderMethod: dppContext?.renderTemplate ?? [] };
 
     if (dppContext.validUntil) {
       restOfVC.validUntil = dppContext.validUntil;

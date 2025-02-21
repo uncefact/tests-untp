@@ -36,7 +36,7 @@ export const processDigitalConformityCredential: IService = async (
 
   const restOfVC: any = {
     id: `urn:uuid:${credentialId}`,
-    render: digitalConformityCredential.renderTemplate,
+    renderMethod: digitalConformityCredential.renderTemplate,
   };
 
   if (digitalConformityCredential.validUntil) {

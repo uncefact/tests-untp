@@ -36,7 +36,7 @@ export const processDigitalFacilityRecord: IService = async (
 
   const restOfVC: any = {
     id: `urn:uuid:${credentialId}`,
-    render: digitalFacilityRecord.renderTemplate,
+    renderMethod: digitalFacilityRecord.renderTemplate,
   };
 
   if (digitalFacilityRecord.validUntil) {
