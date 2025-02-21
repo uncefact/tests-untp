@@ -2,8 +2,8 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { CredentialRender } from '../components/CredentialRender';
 
-// Mocking modules from @vckit/renderer
-jest.mock('@vckit/renderer', () => ({
+// Mocking modules from @uncefact/vckit-renderer
+jest.mock('@uncefact/vckit-renderer', () => ({
   Renderer: class MockHtml5Qrcode {
     // Mocking the renderCredential method to return a single document
     async renderCredential() {
@@ -13,8 +13,8 @@ jest.mock('@vckit/renderer', () => ({
   WebRenderingTemplate2022: jest.fn(), // Mocking WebRenderingTemplate2022
 }));
 
-// Mocking VerifiableCredential from @vckit/core-types
-jest.mock('@vckit/core-types', () => ({
+// Mocking VerifiableCredential from @uncefact/vckit-core-types
+jest.mock('@uncefact/vckit-core-types', () => ({
   VerifiableCredential: {}, // Mocking VerifiableCredential to be an empty object
 }));
 
@@ -36,7 +36,7 @@ describe('Credential render', () => {
       id: '',
     },
     credentialSubject: {},
-    render: [
+    renderMethod: [
       {
         template: '<div>Credential render</div>',
         '@type': 'WebRenderingTemplate2022',

@@ -21,7 +21,7 @@ describe('Credential info content', () => {
       id: '',
     },
     credentialSubject: {},
-    render: [],
+    renderMethod: [],
     credentialStatus: {
       id: 'id',
       type: 'RevocationList2020Status',

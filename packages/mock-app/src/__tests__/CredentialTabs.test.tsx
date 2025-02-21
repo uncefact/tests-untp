@@ -2,8 +2,8 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { CredentialTabs } from '../components/CredentialTabs';
 
-// Mocking modules from @vckit/renderer
-jest.mock('@vckit/renderer', () => ({
+// Mocking modules from @uncefact/vckit-renderer
+jest.mock('@uncefact/vckit-renderer', () => ({
   Renderer: jest.fn(), // Mocking Renderer to be a Jest mock function
   WebRenderingTemplate2022: jest.fn(), // Mocking WebRenderingTemplate2022 to be a Jest mock function
 }));
@@ -31,7 +31,7 @@ describe('Credential tabs content', () => {
       id: '',
     },
     credentialSubject: {},
-    render: [],
+    renderMethod: [],
     credentialStatus: {
       id: 'id',
       type: 'RevocationList2020Status',
@@ -56,7 +56,7 @@ describe('Credential tabs content', () => {
     // Creating a new credential object with a rendering template
     const credential2 = {
       ...credential,
-      render: [
+      renderMethod: [
         {
           template: '<div>Credential render</div>',
           '@type': 'WebRenderingTemplate2022',
