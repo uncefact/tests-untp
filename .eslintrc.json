@@ -3,7 +3,7 @@
   // TODO: Enable linting for documentation folder
   "ignorePatterns": [
     "documentation",
-    "cypress"
+    "e2e"
   ],
   "plugins": [
     "@typescript-eslint",
