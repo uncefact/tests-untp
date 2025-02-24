@@ -55,12 +55,12 @@ describe('JSON-LD Expansion and Validation', () => {
     cy.checkValidationStatus('JSON-LD Document Expansion and Context Validation', 'failure');
 
     cy.openErrorDetailsByStepName('JSON-LD Document Expansion and Context Validation');
-    cy.openValidationDetails('Fix validation error');
+    cy.openValidationDetails('Use the correct value');
 
     cy.checkValidationErrorMessages([
-      'Conflicting field: unknown',
-      'Failed to validate JSON-LD syntax.',
-      'Resolve the conflict by removing the conflicting field or updating it to a unique one.',
+      'Incorrect value: @context',
+      'Invalid JSON-LD syntax; a term cannot be an empty string. Context: {"":""}',
+      'Update the value(s) to the correct one(s) or remove the field(s).',
     ]);
   });
 
