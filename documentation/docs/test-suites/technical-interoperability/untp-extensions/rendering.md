@@ -15,7 +15,7 @@ The Render Template is defined within the credential's `renderMethod` property. 
 
 - `name`: An optional identifier for the template
 - `template`: The HTML structure with placeholders for dynamic content
-- `@type`: The type of rendering template (e.g., "RenderTemplate2024")
+- `type`: The type of rendering template (e.g., "RenderTemplate2024")
 - `mediaType`: The MIME type of the rendered output (typically "text/html")
 - `mediaQuery`: Optional CSS media queries for responsive design
 - `digestMultibase`: A hash of the template for integrity verification
@@ -41,7 +41,7 @@ Here's an example of a credential with a render method:
       {
         "name": "template name",
         "template": "<p>{{credentialSubject.name}}</p>",
-        "@type": "RenderTemplate2024",
+        "type": "RenderTemplate2024",
         "mediaType": "text/html",
         "mediaQuery": "@media (min-width: 1024px) {.name {font-weight: bold}}",
         "digestMultibase": "zQmXF936JrjET6pCRdTfs5czN8Ch65NHfsGqKkAwwLkviHA"
