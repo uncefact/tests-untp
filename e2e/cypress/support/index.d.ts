@@ -25,6 +25,11 @@ interface PlaygroundChainable {
   openErrorDetails(): Cypress.Chainable<void>;
 
   /**
+   * Opens the error details for a specific step.
+   */
+  openErrorDetailsByStepName(stepName: string): Cypress.Chainable<void>;
+
+  /**
    * Validates that the confetti is visible.
    */
   validateConfetti(): Cypress.Chainable<void>;
@@ -33,6 +38,16 @@ interface PlaygroundChainable {
    * Checks the color of the VCDM version badge.
    */
   checkVCDMVersionColor(credentialType: string, expectedColor: 'green' | 'red'): Cypress.Chainable<void>;
+
+  /**
+   * Opens the validation details.
+   */
+  openValidationDetails(validationTitle: string): Cypress.Chainable<void>;
+
+  /**
+   * Checks the error messages displayed on validation errors tab.
+   */
+  checkValidationErrorMessages(errorMessages: string[]): Cypress.Chainable<void>;
 }
 
 interface IssueChainable {
