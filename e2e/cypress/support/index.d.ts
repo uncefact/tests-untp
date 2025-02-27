@@ -56,5 +56,6 @@ declare namespace Cypress {
     verifySuccessToast(successMessage: string): Chainable<JQuery<HTMLElement>>;
     writeToFile(fileName: string, data: any): Chainable<void>;
     verifyLinkType(url: string): Chainable<any>;
+    verifyFileDownload(buttonName: string, filePath: string): Chainable<any>;
   }
 }

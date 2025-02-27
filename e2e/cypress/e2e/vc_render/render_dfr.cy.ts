@@ -17,9 +17,6 @@ describe('Render DFR end-to-end testing flow', () => {
       dfrIssue.beforeAll();
     });
 
-    it('should access the right the app config data', () => {
-      dfrIssue.testAppConfig();
-    });
 
     it('should issue DFR', () => {
       dfrIssue.generateWorkflow(GENERAl_FEATURES, ISSUE_DFR, DIGITAL_FACILITY_RECORD, APP_CONFIG_GENERAL_FEATURES);

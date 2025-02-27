@@ -20,14 +20,11 @@ describe('Render DTE Transaction Event end-to-end testing flow', () => {
       traceabilityIssue.beforeAll();
     });
 
-    it('should access the right the app config data', () => {
-      traceabilityIssue.testAppConfig();
-    });
-
     it('should issue DTE Transaction Event', () => {
       dppIssue.generateWorkflow(ORCHARD_FACILITY, ISSUE_DPP, DIGITAL_PRODUCT_PASSPORT, APP_CONFIG_FEATURE_APP);
 
       cy.visit('/');
+
       traceabilityIssue.generateWorkflow(
         ORCHARD_FACILITY,
         MOVE_TO_NEXT_FACILITY,

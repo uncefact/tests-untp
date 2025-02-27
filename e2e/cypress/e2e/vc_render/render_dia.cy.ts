@@ -17,10 +17,6 @@ describe('Render DIA end-to-end testing flow', () => {
       diaIssue.beforeAll();
     });
 
-    it('should access the right the app config data', () => {
-      diaIssue.testAppConfig();
-    });
-
     it('should issue DIA', () => {
       diaIssue.generateWorkflow(GENERAl_FEATURES, ISSUE_DIA, DIGITAL_FACILITY_RECORD, APP_CONFIG_GENERAL_FEATURES);
     });

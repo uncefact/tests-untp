@@ -23,9 +23,7 @@ class RenderPage {
   }
 
   verifyDownloadVC() {
-    cy.contains('button', 'Download').click();
-    cy.readFile('cypress/downloads/vc.json').should('exist');
-    cy.task('deleteFile', 'cypress/downloads/vc.json');
+    cy.verifyFileDownload('Download', 'cypress/downloads/vc.json');
   }
 
   verifyTemplateRenderingWhenContentExists() {

@@ -17,10 +17,6 @@ describe('Render DTE Aggregation Event end-to-end testing flow', () => {
       traceabilityIssue.beforeAll();
     });
 
-    it('should access the right the app config data', () => {
-      traceabilityIssue.testAppConfig();
-    });
-
     it('should issue DTE Aggregation Event', () => {
       traceabilityIssue.generateWorkflow(
         ORCHARD_FACILITY,

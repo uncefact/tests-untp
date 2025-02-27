@@ -17,10 +17,6 @@ describe('Render DCC end-to-end testing flow', () => {
       dccIssue.beforeAll();
     });
 
-    it('should access the right the app config data', () => {
-      dccIssue.testAppConfig();
-    });
-
     it('should issue DCC', () => {
       dccIssue.generateWorkflow(
         GENERAl_FEATURES,

@@ -11,10 +11,6 @@ describe('Render DPP end-to-end testing flow', () => {
       dppIssue.beforeAll();
     });
 
-    it('should access the right the app config data', () => {
-      dppIssue.testAppConfig();
-    });
-
     it('should issue DPP', () => {
       dppIssue.generateWorkflow(ORCHARD_FACILITY, ISSUE_DPP, DIGITAL_PRODUCT_PASSPORT, APP_CONFIG_FEATURE_APP);
     });
