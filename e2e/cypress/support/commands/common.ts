@@ -1,4 +1,4 @@
 after(() => {
-  cy.task('resetData');
+  // cy.task('resetData');
   Cypress.env('lastCredential', undefined);
 });
