@@ -41,6 +41,42 @@ jobs:
       - name: Run tests
         run: yarn test
 
+      - name: Start E2E docker compose
+        run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d
+
+      - name: Wait for IDR service to be ready. Max 10 attempts (Total 60 seconds)
+        run: |
+          attempt_counter=0
+          max_attempts=10
+          
+          until $(curl --output /dev/null --silent --fail http://localhost:3000/health-check); do
+            if [ ${attempt_counter} -eq ${max_attempts} ];then
+              echo "Max attempts reached. Service failed to start"
+              exit 1
+            fi
+            
+            printf '.'
+            attempt_counter=$(($attempt_counter+1))
+            sleep 6
+          done
+
+      - name: Check health endpoint
+        run: |
+          response=$(curl -s http://localhost:3000/health-check)
+          status=$(echo $response | jq -r '.status')
+          
+          if [ "$status" != "OK" ]; then
+            echo "Health check failed. Expected status 'OK' but got '${status}'"
+            exit 1
+          fi
+          echo "Health check passed successfully"
+
+      - name: Run E2E tests
+        run: yarn test:run-cypress
+
+      - name: Stop docker compose
+        run: docker compose -f docker-compose.e2e.yml down
+
   build_docs:
     runs-on: ubuntu-latest
     steps:
