@@ -4,7 +4,6 @@ on:
   pull_request:
     branches:
       - next
-  workflow_dispatch: # TODO: Remove this line after testing
 
 jobs:
   test_and_build:
