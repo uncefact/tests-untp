@@ -54,32 +54,42 @@ jobs:
       - name: Start E2E docker compose
         run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d
 
-      - name: Wait for IDR service to be ready. Max 10 attempts (Total 60 seconds)
+      - name: Ensure IDR Service Readiness and Health
         run: |
-          attempt_counter=0
-          max_attempts=10
-          
-          until $(curl --output /dev/null --silent --fail http://localhost:3000/health-check); do
-            if [ ${attempt_counter} -eq ${max_attempts} ];then
-              echo "Max attempts reached. Service failed to start"
+          HEALTH_ENDPOINT="http://localhost:3000/health-check"
+          MAX_ATTEMPTS=10
+          RETRY_INTERVAL=6
+          ATTEMPT_COUNTER=0
+      
+          echo "Waiting for IDR service to become ready..."
+      
+          while true; do
+            if curl --output /dev/null --silent --fail "$HEALTH_ENDPOINT"; then
+              echo "IDR service is reachable."
+              break
+            fi
+      
+            ATTEMPT_COUNTER=$((ATTEMPT_COUNTER + 1))
+      
+            if [[ "$ATTEMPT_COUNTER" -eq "$MAX_ATTEMPTS" ]]; then
+              echo "Max attempts ($MAX_ATTEMPTS) reached. Service failed to start."
               exit 1
             fi
-            
-            printf '.'
-            attempt_counter=$(($attempt_counter+1))
-            sleep 6
+      
+            echo "Attempt $ATTEMPT_COUNTER/$MAX_ATTEMPTS failed. Retrying in $RETRY_INTERVAL seconds..."
+            sleep "$RETRY_INTERVAL"
           done
-
-      - name: Check health endpoint
-        run: |
-          response=$(curl -s http://localhost:3000/health-check)
-          status=$(echo $response | jq -r '.status')
-          
-          if [ "$status" != "OK" ]; then
-            echo "Health check failed. Expected status 'OK' but got '${status}'"
+      
+          echo "Checking IDR service health status..."
+      
+          HEALTH_STATUS=$(curl -s "$HEALTH_ENDPOINT" | jq -r '.status')
+      
+          if [[ "$HEALTH_STATUS" != "OK" ]]; then
+            echo "Health check failed. Expected status 'OK', but got '$HEALTH_STATUS'."
             exit 1
           fi
-          echo "Health check passed successfully"
+      
+          echo "IDR service health check passed successfully."
 
       - name: Run E2E tests
         run: yarn test:run-cypress
