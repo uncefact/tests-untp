@@ -28,7 +28,7 @@ interface ExtensionConfig {
   versions: ExtensionVersion[];
 }
 
-const EXTENSION_VERSIONS: Record<string, ExtensionConfig> = {
+export const EXTENSION_VERSIONS: Record<string, ExtensionConfig> = {
   DigitalLivestockPassport: {
     domain: 'aatp.foodagility.com',
     versions: [
