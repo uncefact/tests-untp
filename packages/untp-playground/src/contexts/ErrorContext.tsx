@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
 import ValidationDetailsSheet from '@/components/ValidationDetailsSheet';
 import { ValidationError } from '@/types';
 
@@ -24,8 +24,10 @@ export const ErrorProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   }, [isDetailsOpen]);
 
+  const contextValue = useMemo(() => ({ error, dispatchError }), [error, dispatchError]);
+
   return (
-    <ErrorContext.Provider value={{ error, dispatchError }}>
+    <ErrorContext.Provider value={contextValue}>
       {children}
       {error && (
         <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
