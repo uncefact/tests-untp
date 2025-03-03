@@ -8,14 +8,14 @@ import { Client, ClientOptions } from 'minio';
 const execPromise = util.promisify(exec);
 export default defineConfig({
   env: {
-    idrBucketName: process.env.IDR_BUCKET_NAME || 'idr-bucket-1',
-    idrGS1Prefix: process.env.IDR_GS1_PREFIX || 'gs1',
+    idrBucketName: process.env.OBJECT_STORAGE_BUCKET_NAME || 'idr-bucket-1',
+    idrGS1Prefix: process.env.OBJECT_STORAGE_GS1_PREFIX || 'gs1',
     idrMinioConfig: {
-      endPoint: process.env.IDR_MINIO_ENDPOINT || 'localhost',
-      port: parseInt(process.env.IDR_MINIO_PORT || '9000', 10),
-      useSSL: process.env.IDR_MINIO_USE_SSL === 'true',
-      accessKey: process.env.IDR_MINIO_ACCESS_KEY || 'minioadmin',
-      secretKey: process.env.IDR_MINIO_SECRET_KEY || 'minioadmin',
+      endPoint: process.env.APP_ENDPOINT || 'localhost',
+      port: parseInt(process.env.OBJECT_STORAGE_PORT || '9000', 10),
+      useSSL: process.env.OBJECT_STORAGE_USE_SSL === 'true',
+      accessKey: process.env.OBJECT_STORAGE_ACCESS_KEY || 'minioadmin',
+      secretKey: process.env.OBJECT_STORAGE_SECRET_KEY || 'minioadmin',
     },
   },
   e2e: {
