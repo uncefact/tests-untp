@@ -1,7 +1,8 @@
 after(() => {
-  const idrBucketName = Cypress.env('idrBucketName');
-  const idrGS1Prefix = Cypress.env('idrGS1Prefix');
-  const idrMinioConfig = Cypress.env('idrMinioConfig');
-  cy.task('clearObjectStore', { bucketName: idrBucketName, prefix: idrGS1Prefix, minioConfig: idrMinioConfig });
+  cy.task('clearObjectStore', {
+    bucketName: Cypress.env('idrBucketName'),
+    prefix: Cypress.env('idrGS1Prefix'),
+    minioConfig: Cypress.env('idrMinioConfig'),
+  });
   Cypress.env('lastCredential', undefined);
 });
