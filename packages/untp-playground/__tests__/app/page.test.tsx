@@ -10,6 +10,7 @@ import { detectExtension, validateCredentialSchema } from '@/lib/schemaValidatio
 import { CredentialUploader } from '@/components/CredentialUploader';
 import Home from '@/app/page';
 import { mockCredential } from '../mocks/vc';
+import { allowedContextValue } from '../../constants';
 
 // Mock the dependencies
 jest.mock('sonner', () => ({
@@ -28,6 +29,14 @@ jest.mock('@/lib/credentialService', () => ({
 jest.mock('@/lib/schemaValidation', () => ({
   detectExtension: jest.fn(),
   validateCredentialSchema: jest.fn(),
+}));
+
+const mockDispatchError = jest.fn();
+
+jest.mock('@/contexts/ErrorContext', () => ({
+  useError: jest.fn(() => ({
+    dispatchError: mockDispatchError,
+  })),
 }));
 
 // Mock child components
@@ -111,7 +120,18 @@ describe('Home Component', () => {
     fireEvent.click(uploader);
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Invalid credential format');
+      expect(mockDispatchError).toHaveBeenCalledWith([
+        {
+          keyword: 'type',
+          instancePath: '',
+          params: {
+            type: 'object',
+            receivedValue: '',
+            allowedValue: allowedContextValue,
+          },
+          message: '',
+        },
+      ]);
     });
   });
 
@@ -135,7 +155,18 @@ describe('Home Component', () => {
     fireEvent.click(uploader);
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Unknown credential type');
+      expect(mockDispatchError).toHaveBeenCalledWith([
+        {
+          keyword: 'required',
+          instancePath: '',
+          params: {
+            missingProperty: `type array with a supported types:  DigitalProductPassport, DigitalConformityCredential, DigitalFacilityRecord, DigitalIdentityAnchor, DigitalTraceabilityEvent`,
+            receivedValue: mockCredential?.verifiableCredential,
+            allowedValue: { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+          },
+          message: '',
+        },
+      ]);
     });
   });
 
