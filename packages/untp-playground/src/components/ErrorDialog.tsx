@@ -1,6 +1,11 @@
 import { AlertCircle, Check, ChevronRight, Copy } from 'lucide-react';
 import { useState } from 'react';
 
+interface ErrorDialogProps {
+  errors: any[];
+  className?: string;
+}
+
 const getReadableKeyword = (keyword: string) => {
   const keywords: { [key: string]: string } = {
     const: 'incorrect value',
@@ -48,7 +53,7 @@ const groupErrors = (errors: any[]) => {
   };
 };
 
-export const ErrorDialog = ({ errors = [], className = '' }) => {
+export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className = '' }) => {
   const [expandedError, setExpandedError] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -140,18 +145,26 @@ export const ErrorDialog = ({ errors = [], className = '' }) => {
 
                       {isExpanded && (
                         <div className='p-4 border-t bg-gray-50'>
-                          <div className='mb-3 text-sm'>
+                          <div className='mb-3 text-sm overflow-y-scroll'>
+                            {mainError.params?.receivedValue && (
+                              <>
+                                <p>Receive value:</p>
+                                <br />
+                                <pre className='bg-white p-3 rounded border text-sm overflow-x-auto'>
+                                  <code className='text-green-600 block py-4'>
+                                    {JSON.stringify(mainError.params?.receivedValue, null, 2)}
+                                  </code>
+                                </pre>
+                              </>
+                            )}
+                            <br />
                             {mainError.keyword === 'const' && (
                               <div className='flex flex-col gap-2'>
                                 <p>
                                   Incorrect value:{' '}
-                                  <code className='px-1 py-0.5 bg-gray-100 rounded'>
-                                    {mainError.instancePath}
-                                  </code>
+                                  <code className='px-1 py-0.5 bg-gray-100 rounded'>{mainError.instancePath}</code>
                                 </p>
-                                <p>
-                                  {mainError.message}
-                                </p>
+                                <p>{mainError.message}</p>
                               </div>
                             )}
                             {mainError.keyword === 'required' && (
@@ -172,7 +185,7 @@ export const ErrorDialog = ({ errors = [], className = '' }) => {
                             )}
                             {mainError.keyword === 'type' && (
                               <p>
-                                Expected type:{' '}
+                                <b>Expected type: </b>
                                 <code className='px-1 py-0.5 bg-gray-100 rounded'>{mainError.params.type}</code>
                               </p>
                             )}
@@ -191,15 +204,25 @@ export const ErrorDialog = ({ errors = [], className = '' }) => {
                                     {mainError.params.conflictingProperty}
                                   </code>
                                 </p>
+                                <p>{mainError.message}</p>
+                              </div>
+                            )}
+                            {mainError.keyword === 'schema' && (
+                              <div className='flex flex-col gap-2'>
                                 <p>
-                                  {mainError.message}
+                                  Error message:
+                                  <code className='px-1 py-0.5 bg-gray-100 rounded'>
+                                    {mainError.params.missingValue}
+                                  </code>
                                 </p>
+                                <p>{mainError.message}</p>
                               </div>
                             )}
                           </div>
 
                           {fixExample && (
                             <div className='relative mt-2'>
+                              <p className="text-sm">Example: </p>
                               <pre className='bg-white p-3 rounded border text-sm overflow-x-auto'>
                                 <code className='text-green-600 block py-4'>{fixExample}</code>
                               </pre>
@@ -232,9 +255,9 @@ export const ErrorDialog = ({ errors = [], className = '' }) => {
                                   ? `Add the missing "${mainError.params.missingProperty}" field.`
                                   : mainError.keyword === 'type'
                                     ? `Change the value to match the expected type: ${mainError.params.type}.`
-                                      : mainError.keyword === 'conflictingProperties'
-                                        ? 'Resolve the conflict by removing the conflicting field or updating it to a unique one.'
-                                        : 'Make sure your input matches the required format.'}
+                                    : mainError.keyword === 'conflictingProperties'
+                                      ? 'Resolve the conflict by removing the conflicting field or updating it to a unique one.'
+                                      : 'Make sure your input matches the required format.'}
                           </div>
                         </div>
                       )}

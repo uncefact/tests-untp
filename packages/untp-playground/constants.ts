@@ -58,3 +58,7 @@ export enum TestCaseStepId {
   EXTENSION_SCHEMA_VALIDATION = 'extension-schema-validation',
   CONTEXT_VALIDATION = 'context',
 }
+
+export const allowedContextValue = {
+  '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dte/0.5.0/'],
+};

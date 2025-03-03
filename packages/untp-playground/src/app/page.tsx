@@ -10,8 +10,11 @@ import { decodeEnvelopedCredential, detectCredentialType, isEnvelopedProof } fro
 import { detectExtension } from '@/lib/schemaValidation';
 import { isPermittedCredentialType } from '@/lib/utils';
 import type { PermittedCredentialType, StoredCredential, TestStep } from '@/types';
+import { useError } from '@/contexts/ErrorContext';
+import { typeOf } from '@/lib/utils';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { allowedContextValue, permittedCredentialTypes } from '../../constants';
 
 export default function Home() {
   const [credentials, setCredentials] = useState<{
@@ -20,13 +23,25 @@ export default function Home() {
   const [testResults, setTestResults] = useState<{
     [key in PermittedCredentialType]?: TestStep[];
   }>({});
+  const { dispatchError } = useError();
 
   const handleCredentialUpload = async (rawCredential: any) => {
     try {
       const normalizedCredential = rawCredential.verifiableCredential || rawCredential;
 
-      if (!normalizedCredential || typeof normalizedCredential !== 'object') {
-        toast.error('Invalid credential format');
+      if (!normalizedCredential || typeOf(normalizedCredential) !== 'Object') {
+        dispatchError([
+          {
+            keyword: 'type',
+            instancePath: '',
+            params: {
+              type: 'object',
+              receivedValue: normalizedCredential,
+              allowedValue: allowedContextValue,
+            },
+            message: '',
+          },
+        ]);
         return;
       }
 
@@ -37,7 +52,18 @@ export default function Home() {
       let credentialType = extension ? extension.core.type : detectCredentialType(decodedCredential);
 
       if (!credentialType || !isPermittedCredentialType(credentialType as PermittedCredentialType)) {
-        toast.error('Unknown credential type');
+        dispatchError([
+          {
+            keyword: 'required',
+            instancePath: '',
+            params: {
+              missingProperty: `type array with a supported types:  ${permittedCredentialTypes.join(', ')}`,
+              receivedValue: normalizedCredential,
+              allowedValue: { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+            },
+            message: '',
+          },
+        ]);
         return;
       }
 
