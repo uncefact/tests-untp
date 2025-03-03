@@ -48,6 +48,20 @@ interface PlaygroundChainable {
    * Checks the error messages displayed on validation errors tab.
    */
   checkValidationErrorMessages(errorMessages: string[]): Cypress.Chainable<void>;
+
+  /* Performs all steps for a successful validation
+   */
+  performSuccessfulValidation(): Cypress.Chainable<void>;
+
+  /**
+   * Generates a report with the given implementation name
+   */
+  generateReport(implementationName: string): Cypress.Chainable<void>;
+
+  /**
+   * Downloads and verifies the basic structure of a report
+   */
+  downloadAndVerifyReport(implementationName: string, expectedPass: boolean): Cypress.Chainable<any>;
 }
 
 interface IssueChainable {

@@ -1,3 +1,20 @@
+export enum CredentialType {
+  DIGITAL_PRODUCT_PASSPORT = 'DigitalProductPassport',
+  DIGITAL_CONFORMITY_CREDENTIAL = 'DigitalConformityCredential',
+  DIGITAL_FACILITY_RECORD = 'DigitalFacilityRecord',
+  DIGITAL_IDENTITY_ANCHOR = 'DigitalIdentityAnchor',
+  DIGITAL_TRACEABILITY_EVENT = 'DigitalTraceabilityEvent',
+  UNKNOWN = 'Unknown',
+}
+
+export const permittedCredentialTypes = [
+  CredentialType.DIGITAL_PRODUCT_PASSPORT,
+  CredentialType.DIGITAL_CONFORMITY_CREDENTIAL,
+  CredentialType.DIGITAL_FACILITY_RECORD,
+  CredentialType.DIGITAL_IDENTITY_ANCHOR,
+  CredentialType.DIGITAL_TRACEABILITY_EVENT,
+];
+
 export enum VCDMVersion {
   V1 = 'v1',
   V2 = 'v2',

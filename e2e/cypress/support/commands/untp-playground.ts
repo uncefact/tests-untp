@@ -70,3 +70,37 @@ Cypress.Commands.add('checkValidationErrorMessages', (errorMessages: string[]) =
     cy.contains(message).should('be.visible');
   });
 });
+
+// Command to perform successful validation steps
+Cypress.Commands.add('performSuccessfulValidation', () => {
+  cy.expandGroup();
+  cy.checkValidationStatus('Proof Type Detection', 'success');
+  cy.checkValidationStatus('VCDM Version Detection', 'success');
+  cy.checkValidationStatus('VCDM Schema Validation', 'success');
+  cy.checkValidationStatus('Credential Verification', 'success');
+  cy.checkValidationStatus('UNTP Schema Validation', 'success');
+});
+
+// Command to generate and confirm report
+Cypress.Commands.add('generateReport', (implementationName: string) => {
+  cy.get('[data-testid="generate-report-button"]').click();
+  cy.get('[data-testid="implementation-name-input"]').type(implementationName);
+  cy.get('[data-testid="confirm-generate-dialog-button"]').click();
+});
+
+// Command to download and verify basic report structure
+Cypress.Commands.add('downloadAndVerifyReport', (implementationName: string, expectedPass: boolean) => {
+  cy.contains('button', 'Download Report').should('be.enabled');
+  cy.contains('button', 'Download Report').click();
+
+  cy.readFile(`cypress/downloads/untp-test-report-${implementationName.toLowerCase().replace(/\s+/g, '-')}.json`).then(
+    (report) => {
+      expect(report).to.have.property('date');
+      expect(report).to.have.property('testSuite');
+      expect(report.implementation).to.deep.equal({ name: implementationName });
+      expect(report.pass).to.equal(expectedPass);
+      expect(report.results).to.be.an('array');
+      return report;
+    },
+  );
+});
