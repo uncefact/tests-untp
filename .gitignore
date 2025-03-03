@@ -80,8 +80,6 @@ packages/vc-test-suite/suite.log
 packages/vc-test-suite/reports
 
 # cypress
-cypress/screenshots
-cypress/downloads
-cypress/fixtures/credentials-e2e/*
-!cypress/fixtures/credentials-e2e/.gitkeep
+e2e/cypress/screenshots
+e2e/cypress/downloads
 e2e/cypress/screenshots

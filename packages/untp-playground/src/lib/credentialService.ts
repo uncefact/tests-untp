@@ -1,5 +1,6 @@
 import type { Credential } from '@/types/credential';
 import { jwtDecode } from 'jwt-decode';
+import { CredentialType } from '../../constants';
 
 export function decodeEnvelopedCredential(credential: any): Credential {
   if (!isEnvelopedProof(credential)) {
@@ -29,7 +30,7 @@ export function detectCredentialType(credential: Credential): string {
     'DigitalTraceabilityEvent',
   ];
 
-  return credential.type.find((t) => types.includes(t)) || 'Unknown';
+  return (credential.type.find((t) => types.includes(t)) || 'Unknown') as CredentialType;
 }
 
 export function detectVersion(credential: Credential, domain?: string): string {

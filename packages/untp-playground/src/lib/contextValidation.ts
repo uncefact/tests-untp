@@ -11,6 +11,12 @@ interface ValidationResult {
   };
 }
 
+interface ValidationError {
+  valid: boolean;
+  errorMessage?: string;
+  [key: string]: any;
+}
+
 export async function validateContext(credential: Record<string, any>): Promise<ValidationResult> {
   try {
     const validateRequiredFieldsResult = validateRequiredFields(credential);
@@ -19,7 +25,7 @@ export async function validateContext(credential: Record<string, any>): Promise<
         valid: false,
         error: {
           keyword: 'required',
-          message: validateRequiredFieldsResult.errorMessage,
+          message: validateRequiredFieldsResult.errorMessage!,
           instancePath: '',
           params: { missingProperty: '@context' },
         },
@@ -39,7 +45,7 @@ export async function validateContext(credential: Record<string, any>): Promise<
         return {
           valid: false,
           error: {
-            keyword: 'conflictingProperties',
+            keyword: checkSyntaxErrorResult.keyword,
             message: checkSyntaxErrorResult.errorMessage as string,
             instancePath: '@context',
             params: {
@@ -87,7 +93,7 @@ export async function validateContext(credential: Record<string, any>): Promise<
   }
 }
 
-export function validateRequiredFields(credential: Record<string, any>): { valid: boolean, errorMessage: string } {
+export function validateRequiredFields(credential: Record<string, any>): ValidationError {
   // Check if the credential is a JSON object
   if (typeof credential !== 'object' || credential === null) {
     return { valid: false, errorMessage: 'Invalid JSON-LD document: must be a JSON object' };
@@ -101,21 +107,39 @@ export function validateRequiredFields(credential: Record<string, any>): { valid
   return { valid: true, errorMessage: '' };
 }
 
-export function checkSyntaxError(error: { name: string, [key: string]: any }): { valid: boolean, term?: string, errorMessage?: string } {
+export function checkSyntaxError(error: { name: string, [key: string]: any }): ValidationError {
   // Check invalid JSON-LD syntax; tried to redefine a protected term.
-  if (error && error.name === 'jsonld.SyntaxError') {
-    const existingDetailErrors = error?.details?.code && error?.details?.term;
+  if (!error || error.name !== 'jsonld.SyntaxError') {
+    return { valid: true };
+  }
+
+  if (error?.details?.term) {
     return { 
+      keyword: 'conflictingProperties',
       valid: false,
-      term: error?.details?.term || 'unknown',
-      errorMessage: existingDetailErrors ? `Invalid JSON-LD syntax: ${error?.details?.code}. "${error?.details?.term}" is a protected term.` : 'Failed to validate JSON-LD syntax.'
+      term: error?.details?.term,
+      errorMessage: `Invalid JSON-LD syntax: ${error?.details?.code}. "${error?.details?.term}" is a protected term.`
     };
   }
 
-  return { valid: true };
+  if (error?.details?.context) {
+    return { 
+      keyword: 'const',
+      valid: false,
+      term: '@context',
+      errorMessage: `${error.message} Context: ${JSON.stringify(error.details.context)}`
+    };
+  }
+
+  return { 
+    keyword: 'const',
+    valid: false,
+    term: 'unknown',
+    errorMessage: error.message
+  };
 }
 
-export function checkInvalidContext(error: { name: string, [key: string]: any }): { valid: boolean, invalidContextUrl?: string, errorMessage?: string } {
+export function checkInvalidContext(error: { name: string, [key: string]: any }): ValidationError {
   // Check if the context URL is invalid
   if (error && error.name === 'jsonld.InvalidUrl') {
     const invalidContextUrl = error?.url || error?.details?.url;

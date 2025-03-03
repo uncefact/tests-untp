@@ -49,6 +49,7 @@ describe('contextValidation', () => {
       };
       const result = checkSyntaxError(error);
       expect(result).toEqual({
+        keyword: 'conflictingProperties',
         valid: false,
         term: 'id',
         errorMessage: 'Invalid JSON-LD syntax: redefine-protected-term. "id" is a protected term.'
@@ -57,10 +58,12 @@ describe('contextValidation', () => {
   
     it('should return valid: false with unknown term when jsonld.SyntaxError lacks details', () => {
       const error = {
-        name: 'jsonld.SyntaxError'
+        name: 'jsonld.SyntaxError',
+        message: 'Failed to validate JSON-LD syntax.'
       };
       const result = checkSyntaxError(error);
       expect(result).toEqual({
+        keyword: 'const',
         valid: false,
         term: 'unknown',
         errorMessage: 'Failed to validate JSON-LD syntax.'
