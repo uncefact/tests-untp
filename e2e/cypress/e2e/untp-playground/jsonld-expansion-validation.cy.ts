@@ -110,7 +110,7 @@ describe('Display Error Messages', () => {
     cy.contains(JSON.stringify(allowedContextValue, null, 2)).should('be.visible');
   });
 
-  it.only('should view detail of error when `UNTP Schema Validation` failed', () => {
+  it('should view detail of error when `UNTP Schema Validation` failed', () => {
     const invalidContextCredential = {
       '@context': ['https://www.w3.org/ns/credentials/v2'],
       type: ['VerifiableCredential', 'DigitalProductPassport'],
