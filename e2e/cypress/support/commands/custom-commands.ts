@@ -40,3 +40,10 @@ Cypress.Commands.add('verifyLinkType', (url) => {
     expect(response.status).to.eq(200);
   });
 });
+
+// Verify file download
+Cypress.Commands.add('verifyFileDownload', (buttonName, filePath) => {
+  cy.contains('button', buttonName).click();
+  cy.readFile(filePath).should('exist');
+  cy.task('deleteFile', filePath);
+});

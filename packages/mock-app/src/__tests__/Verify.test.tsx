@@ -2,7 +2,7 @@ import * as jose from 'jose';
 import { Router as RouterDom, useLocation } from 'react-router-dom';
 import { createMemoryHistory } from 'history';
 import { act, render, screen, waitFor } from '@testing-library/react';
-import { UnsignedCredential, VerifiableCredential } from '@vckit/core-types';
+import { UnsignedCredential, VerifiableCredential } from '@uncefact/vckit-core-types';
 import { computeHash, decryptCredential, publicAPI, verifyVC } from '@mock-app/services';
 import Verify from '../pages/Verify';
 
@@ -26,7 +26,7 @@ jest.mock('@mock-app/services', () => ({
 jest.mock('jose', () => ({
   decodeJwt: jest.fn(),
 }));
-jest.mock('@vckit/renderer', () => ({
+jest.mock('@uncefact/vckit-renderer', () => ({
   Renderer: jest.fn(),
   WebRenderingTemplate2022: jest.fn(),
 }));
@@ -49,7 +49,7 @@ jest.mock(
       decodedEnvelopedVC?: UnsignedCredential;
     }) => {
       const name = decodedEnvelopedVC?.credentialSubject?.name ?? credential?.credentialSubject?.name;
-      const renderTemplate = decodedEnvelopedVC?.render?.template ?? credential?.render?.template ?? '';
+      const renderTemplate = decodedEnvelopedVC?.renderMethod?.template ?? credential?.renderMethod?.template ?? '';
       // Simulate the rendering of the credential with the name
       const rendered = renderTemplate.replace('{{name}}', name);
       return <div dangerouslySetInnerHTML={{ __html: rendered }} />;
@@ -65,9 +65,17 @@ describe('Verify', () => {
       statusListIndex: 0,
       statusListCredential: 'http://example.com/bitstring-status-list/1',
     },
-    render: { template: '<h1>{{name}}</h1>' },
+    renderMethod: { template: '<h1>{{name}}</h1>', type: 'WebRenderingTemplate2022' },
     type: ['VerifiableCredential'],
     credentialSubject: { name: 'John Doe' },
+    context: [
+      {
+        ex: 'https://www.w3.org/2018/credentials#renderMethod#',
+        renderMethod: 'https://www.w3.org/2018/credentials#renderMethod',
+        template: 'ex:template',
+        url: 'ex:url',
+      },
+    ],
   };
   const history = createMemoryHistory({ initialEntries: ['/verify'] });
 
@@ -440,8 +448,8 @@ describe('Verify', () => {
       cipherText: '+qygK55Jq2S/VmhI8xxHr6JQZbZpM2UbwwPtXgYAh6Opn8Re0y+VStefzXgk3KVRYeaZd+/WZv/Nm3XXdxouGqk2toWHZtAnYAW',
       iv: 'HMFLTHEabOowe0pj',
       tag: '0B6Js19du2TJ0ADdYe2Ipw==',
-      type: 'aes-256-gcm'
-  };
+      type: 'aes-256-gcm',
+    };
     // URL-encode the payload for use as a query parameter
     const encodedPayload = `q=${encodeURIComponent(JSON.stringify(mockPayloadInvalidKey))}`;
     (useLocation as any).mockImplementation(() => ({
@@ -451,7 +459,9 @@ describe('Verify', () => {
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockEncryptedCredential);
 
     (computeHash as any).mockImplementation(() => mockPayloadInvalidKey.payload.hash);
-    (decryptCredential as any).mockImplementation(() => { throw new Error('Failed to decrypt credential') });
+    (decryptCredential as any).mockImplementation(() => {
+      throw new Error('Failed to decrypt credential');
+    });
 
     (verifyVC as jest.Mock).mockImplementation(() => ({
       verified: true,

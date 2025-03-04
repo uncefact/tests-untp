@@ -52,7 +52,7 @@ export interface IArgIssueCredentialStatus {
  * const issuer = 'did:example:123';
  * const credentialSubject = { id: 'did:example:123', name: 'John Doe' };
  * const credentialStatus = { "id": "http://example.com/bitstring-status-list/25#0", "type": "BitstringStatusListEntry", "statusPurpose": "revocation", "statusListIndex": 0, "statusListCredential": "http://example.com/bitstring-status-list/25" }
- * const restOfVC = { render: {}};
+ * const restOfVC = { renderMethod: {}};
  * const vc = await integrateVckitIssueVC({ context, type, issuer, credentialSubject, restOfVC, vcKitAPIUrl });
  */
 export const issueVC = async ({

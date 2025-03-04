@@ -35,7 +35,7 @@ jest.mock('../components/MessageText', () => ({
 }));
 
 // Mocking the Renderer and WebRenderingTemplate2022 components
-jest.mock('@vckit/renderer', () => ({
+jest.mock('@uncefact/vckit-renderer', () => ({
   Renderer: jest.fn(),
   WebRenderingTemplate2022: jest.fn(),
 }));
@@ -56,7 +56,7 @@ describe('Credential content', () => {
         id: '',
       },
       credentialSubject: {},
-      render: [],
+      renderMethod: [],
       credentialStatus: {
         id: 'id',
         type: 'RevocationList2020Status',

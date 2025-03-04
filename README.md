@@ -138,18 +138,18 @@ We use Cypress for end-to-end testing with Docker Compose to run the services re
 
 ### To run the end-to-end tests, follow these steps:
 
-1. Install dependencies:
+1. From the root directory, launch the services with Docker Compose:
+
+   ```bash
+   SEEDING=true docker compose -f docker-compose.e2e.yml up -d --build
+   ```
+
+2. Install dependencies:
 
    ```bash
    cd e2e
    yarn install
    ```
-
-2. Start the services with Docker Compose:
-
-```bash
-SEEDING=true docker compose -f docker-compose.e2e.yml up -d --build
-```
 
 3. Run the end-to-end tests:
 

@@ -28,13 +28,13 @@ The `restOfVC` object contains any additional properties that are a part of the 
 | ---------- | -------- | ---------------------------------------------------------------- | ------------------------------------------------- |
 | id         | No       | values include UUID and DIDs                                     | String                                            |
 | validUntil | No       | representing the date and time the credential ceases to be valid | DateTimeStamp                                     |
-| render     | No       | render template used in VCkit                                    | [renderer](/docs/mock-apps/common/vckit#renderer) |
+| renderMethod     | No       | render template used in VCkit                                    | [renderMethod](/docs/mock-apps/common/vckit#rendermethod) |
 
-### renderer
+### renderMethod
 
-The `renderer` object contains the render template used in VCkit.
+The `renderMethod` object contains the render template used in VCkit.
 
 | Property | Required | Description       | Type   |
 | -------- | -------- | ----------------- | ------ |
 | template | Yes      | value of template | String |
-| @type    | Yes      | type of template  | String |
+| type    | Yes      | type of template  | String |

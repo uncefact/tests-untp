@@ -27,7 +27,7 @@ const CredentialTabs = ({ credential, decodedEnvelopedVC }: CredentialComponentP
   }, [credential]);
 
   const configDefaultTabs = () => {
-    if (decodedEnvelopedVC?.render?.[0]?.template) {
+    if (decodedEnvelopedVC?.renderMethod?.[0]?.template) {
       return setCurrentTabIndex(0);
     }
 

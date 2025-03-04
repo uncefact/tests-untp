@@ -9,4 +9,4 @@ integration
 node_modules
 .next
 packages/untp-playground/infra
-cypress.config.ts
+

@@ -51,7 +51,7 @@ describe('Transformation event', () => {
             id: value.issuer,
           },
           credentialSubject: value.credentialSubject,
-          render: value.render,
+          renderMethod: value.render,
         };
 
         return Promise.resolve(expectResult);
@@ -123,7 +123,7 @@ describe('Transformation event', () => {
         },
         credentialSubject: { id: 'did:example:123', name: 'John Doe' },
         issuanceDate: '2021-06-22T00:00:00Z',
-        render: {},
+        renderMethod: {},
         proof: {
           type: 'JwsSignature2020',
           created: '2021-06-22T00:00:00Z',
@@ -156,7 +156,7 @@ describe('Transformation event', () => {
             id: value.issuer,
           },
           // credentialSubject: value.credentialSubject, // TODO: currently, the value in credentialSubject will be overwritten by the last identifier
-          render: value.render,
+          renderMethod: value.render,
         };
 
         return Promise.resolve({ ...expectResult });

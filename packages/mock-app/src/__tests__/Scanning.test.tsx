@@ -31,7 +31,7 @@ jest.mock('@mock-app/components', () => ({
   ToastMessage: jest.fn(),
 }));
 
-jest.mock('@vckit/renderer', () => ({
+jest.mock('@uncefact/vckit-renderer', () => ({
   Renderer: jest.fn(),
   WebRenderingTemplate2022: jest.fn(),
 }));

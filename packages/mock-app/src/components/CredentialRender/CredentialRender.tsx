@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Renderer, WebRenderingTemplate2022 } from '@vckit/renderer';
-import { UnsignedCredential, VerifiableCredential } from '@vckit/core-types';
+import { Renderer, WebRenderingTemplate2022 } from '@uncefact/vckit-renderer';
+import { IRenderDocument, UnsignedCredential, VerifiableCredential } from '@uncefact/vckit-core-types';
 import { Box, CircularProgress } from '@mui/material';
 import { convertBase64ToString } from '../../utils';
 
@@ -25,11 +25,13 @@ const CredentialRender = ({ credential }: { credential: VerifiableCredential | U
         defaultProvider: 'WebRenderingTemplate2022',
       });
 
-      let { documents }: { documents: string[] } = await renderer.renderCredential({
+      let { documents }: { documents: IRenderDocument[] } = await renderer.renderCredential({
         credential,
       });
-      documents = documents.map((doc) => convertBase64ToString(doc));
-      setDocuments(documents);
+
+      let renderedTemplate: string[] = [];
+      renderedTemplate = documents.map(({ renderedTemplate }) => convertBase64ToString(renderedTemplate));
+      setDocuments(renderedTemplate);
       setIsLoading(false);
     } catch (error) {
       console.log(error);
