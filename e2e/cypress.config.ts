@@ -9,7 +9,6 @@ const execPromise = util.promisify(exec);
 export default defineConfig({
   env: {
     idrBucketName: process.env.OBJECT_STORAGE_BUCKET_NAME || 'idr-bucket-1',
-    idrGS1Prefix: process.env.OBJECT_STORAGE_GS1_PREFIX || 'gs1',
     idrMinioConfig: {
       endPoint: process.env.APP_ENDPOINT || 'localhost',
       port: parseInt(process.env.OBJECT_STORAGE_PORT || '9000', 10),
@@ -28,7 +27,7 @@ export default defineConfig({
       runMode: 2, // Retries in headless mode
       openMode: 0, // No retries in interactive mode
     },
-    defaultCommandTimeout: 10000,
+    defaultCommandTimeout: 4000,
     defaultBrowser: 'chrome',
     setupNodeEvents(on) {
       on('task', {

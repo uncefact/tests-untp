@@ -21,7 +21,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '21'
+          node-version: '22'
           cache: 'yarn'
 
       - name: Install dependencies
@@ -53,43 +53,6 @@ jobs:
 
       - name: Start E2E docker compose
         run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d
-
-      - name: Ensure IDR Service Readiness and Health
-        run: |
-          HEALTH_ENDPOINT="http://localhost:3000/health-check"
-          MAX_ATTEMPTS=10
-          RETRY_INTERVAL=6
-          ATTEMPT_COUNTER=0
-      
-          echo "Waiting for IDR service to become ready..."
-      
-          while true; do
-            if curl --output /dev/null --silent --fail "$HEALTH_ENDPOINT"; then
-              echo "IDR service is reachable."
-              break
-            fi
-      
-            ATTEMPT_COUNTER=$((ATTEMPT_COUNTER + 1))
-      
-            if [[ "$ATTEMPT_COUNTER" -eq "$MAX_ATTEMPTS" ]]; then
-              echo "Max attempts ($MAX_ATTEMPTS) reached. Service failed to start."
-              exit 1
-            fi
-      
-            echo "Attempt $ATTEMPT_COUNTER/$MAX_ATTEMPTS failed. Retrying in $RETRY_INTERVAL seconds..."
-            sleep "$RETRY_INTERVAL"
-          done
-      
-          echo "Checking IDR service health status..."
-      
-          HEALTH_STATUS=$(curl -s "$HEALTH_ENDPOINT" | jq -r '.status')
-      
-          if [[ "$HEALTH_STATUS" != "OK" ]]; then
-            echo "Health check failed. Expected status 'OK', but got '$HEALTH_STATUS'."
-            exit 1
-          fi
-      
-          echo "IDR service health check passed successfully."
 
       - name: Run E2E tests
         run: yarn test:run-cypress
