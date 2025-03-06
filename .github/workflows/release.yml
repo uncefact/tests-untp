@@ -25,7 +25,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '21'
+          node-version: '22'
           cache: 'yarn'
 
       - name: Install dependencies
@@ -40,6 +40,15 @@ jobs:
 
       - name: Run tests
         run: yarn test
+
+      - name: Start E2E docker compose
+        run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d
+
+      - name: Run E2E tests
+        run: yarn test:run-cypress
+
+      - name: Stop docker compose
+        run: docker compose -f docker-compose.e2e.yml down
 
   build_docs:
     runs-on: ubuntu-latest

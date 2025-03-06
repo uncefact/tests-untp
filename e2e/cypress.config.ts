@@ -3,9 +3,20 @@ import { defineConfig } from 'cypress';
 import fs from 'fs';
 import path from 'path';
 import util from 'util';
+import { Client, ClientOptions } from 'minio';
 
 const execPromise = util.promisify(exec);
 export default defineConfig({
+  env: {
+    idrBucketName: process.env.OBJECT_STORAGE_BUCKET_NAME || 'idr-bucket-1',
+    idrMinioConfig: {
+      endPoint: process.env.APP_ENDPOINT || 'localhost',
+      port: parseInt(process.env.OBJECT_STORAGE_PORT || '9000', 10),
+      useSSL: process.env.OBJECT_STORAGE_USE_SSL === 'true',
+      accessKey: process.env.OBJECT_STORAGE_ACCESS_KEY || 'minioadmin',
+      secretKey: process.env.OBJECT_STORAGE_SECRET_KEY || 'minioadmin',
+    },
+  },
   e2e: {
     baseUrl: 'http://localhost:3003', // Replace with your application's base URL
     supportFile: 'cypress/support/e2e.ts',
@@ -34,28 +45,42 @@ export default defineConfig({
             throw error;
           }
         },
-        resetData(file?: string) {
-          const targetDir = path.resolve(
-            process.cwd(),
-            `../minio_data/identity-resolver-service-object-store/data-test/idr-bucket-1/gs1${file ? `/${file}` : ''}`,
-          );
-
-          if (fs.existsSync(targetDir)) {
-            console.log(`Found folder: ${targetDir}`);
-            console.log('Deleting folder...');
-
-            fs.rmdirSync(targetDir, { recursive: true });
-
-            if (!fs.existsSync(targetDir)) {
-              console.log('Folder deleted successfully.');
-              return { success: true };
-            } else {
-              console.log('Failed to delete the folder.');
-              return { success: false };
+        async clearObjectStore({ bucketName, prefix, minioConfig }: { bucketName: string; prefix?: string; minioConfig: ClientOptions }) {
+          try {
+            if (!bucketName) {
+              return {
+                success: false,
+                message: 'Bucket name is required.',
+              }
             }
-          } else {
-            console.log(`Folder not found: ${targetDir}`);
+
+            const minioClient = new Client(minioConfig);
+            const bucketExists = await minioClient.bucketExists(bucketName);
+            if (!bucketExists) {
+              return {
+                success: false,
+                message: `Bucket ${bucketName} does not exist.`,
+              };
+            }
+    
+            const objects: string[] = [];
+            const bucketStream = minioClient.listObjectsV2(bucketName, prefix, true); // true for recursive
+    
+            // Collect all object names
+            await new Promise<void>((resolve, reject) => {
+              bucketStream.on('data', (obj) => obj.name && objects.push(obj.name));
+              bucketStream.on('error', (err) => reject(err));
+              bucketStream.on('end', () => resolve());
+            });
+    
+            if (objects.length > 0) {
+              await minioClient.removeObjects(bucketName, objects);
+            }
+
             return { success: true };
+          } catch (error) {
+            console.log(error);
+            throw error;
           }
         },
         async runUntpTest({ type, version, testData }) {

@@ -3,7 +3,8 @@
   "version": "0.1.0-beta",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "e2e"
   ],
   "scripts": {
     "copy-config": "cp app-config.json packages/mock-app/src/constants/app-config.json && cp app-config.json packages/components/src/constants/app-config.json",
@@ -27,8 +28,8 @@
     "test:vc-test-suite": "cd packages/vc-test-suite && yarn run test",
     "test:untp-playground": "cd packages/untp-playground && yarn run test",
     "test:integration:untp-test-suite": "cd packages/untp-test-suite && yarn run test:integration",
-    "test:run-cypress": "cd e2e && yarn cypress run",
-    "test:open-cypress": "cd e2e && yarn cypress open",
+    "test:run-cypress": "cd e2e && cypress run",
+    "test:open-cypress": "cd e2e && cypress open",
     "storybook:components": "cd packages/components && yarn run storybook",
     "storybook:mock-app": "cd packages/mock-app && yarn run storybook",
     "untp": "node ./packages/untp-test-suite/build/interfaces/cli/cli.js",

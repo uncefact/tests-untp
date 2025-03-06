@@ -8,6 +8,7 @@
     "cypress:open": "cypress open"
   },
   "devDependencies": {
+    "minio": "^8.0.4",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.13.1",
     "ts-node": "10.9.2"

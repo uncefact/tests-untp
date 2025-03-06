@@ -21,7 +21,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '21'
+          node-version: '22'
           cache: 'yarn'
 
       - name: Install dependencies
@@ -50,6 +50,15 @@ jobs:
             UNTP test suite, ./packages/untp-test-suite/coverage/coverage-summary.json
             VC test suite, ./packages/vc-test-suite/coverage/coverage-summary.json
             UNTP Playground, ./packages/untp-playground/coverage/coverage-summary.json
+
+      - name: Start E2E docker compose
+        run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d
+
+      - name: Run E2E tests
+        run: yarn test:run-cypress
+
+      - name: Stop docker compose
+        run: docker compose -f docker-compose.e2e.yml down
 
   build_docs:
     runs-on: ubuntu-latest
