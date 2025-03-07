@@ -68,7 +68,7 @@ Technical interoperability depends on mutual trust—both parties must issue and
 
 ## Troubleshooting with W3C Test Suite
 
-The **[W3C VC Data Model v2 Test Suite](https://w3c.github.io/vc-test-suite/)** provides standardized test cases to debug interoperability issues, such as:
+The **[W3C VC Data Model v2 Test Suite](https://github.com/w3c/vc-data-model-2.0-test-suite)** provides standardized test cases to debug interoperability issues, such as:
 
 - Invalid or expired credentials.
 - Revoked status checks.
