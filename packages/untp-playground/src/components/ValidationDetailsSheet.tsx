@@ -14,11 +14,6 @@ interface ValidationDetailsSheetProps {
 const ValidationDetailsSheet: React.FC<ValidationDetailsSheetProps> = ({ isOpen, onOpenChange, errors }) => {
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetTrigger asChild>
-        <Button variant='ghost' size='sm'>
-          View Details
-        </Button>
-      </SheetTrigger>
       <SheetContent className='sm:max-w-[600px]'>
         <SheetHeader>
           <SheetTitle>Validation Details</SheetTitle>
