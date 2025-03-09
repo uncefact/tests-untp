@@ -1,4 +1,4 @@
-name: Build and Test
+name: E2E Test
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test_and_build:
+  e2e-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -19,6 +19,16 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: |
+          cd e2e && yarn install --immutable
 
       - name: Start E2E docker compose
         run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d

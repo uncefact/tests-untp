@@ -51,15 +51,6 @@ jobs:
             VC test suite, ./packages/vc-test-suite/coverage/coverage-summary.json
             UNTP Playground, ./packages/untp-playground/coverage/coverage-summary.json
 
-      # - name: Start E2E docker compose
-      #   run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d
-
-      # - name: Run E2E tests
-      #   run: yarn test:run-cypress
-
-      # - name: Stop docker compose
-      #   run: docker compose -f docker-compose.e2e.yml down
-
   build_docs:
     runs-on: ubuntu-latest
     steps:
