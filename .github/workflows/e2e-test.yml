@@ -1,0 +1,30 @@
+name: Build and Test
+
+on:
+  pull_request:
+    branches:
+      - next
+  push:
+    branches:
+      - next
+      - main
+  workflow_dispatch:
+
+jobs:
+  test_and_build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Start E2E docker compose
+        run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d
+
+      - name: Run E2E tests
+        run: yarn test:run-cypress
+
+      - name: Stop docker compose
+        run: docker compose -f docker-compose.e2e.yml down
