@@ -21,13 +21,15 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'yarn'
 
       - name: Install dependencies
         run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
           cd e2e && yarn install --immutable
 
       - name: Start E2E docker compose
