@@ -147,6 +147,8 @@ services:
         CONFIG_FILE: ./e2e/cypress/fixtures/app-config.json
     ports:
       - '3003:80'
+    depends_on:
+      - untp-playground
 
 volumes:
   vckit-data:
