@@ -5,7 +5,11 @@ COPY package*.json yarn.lock ./
 
 # ---- Dependencies ----
 FROM base AS dependencies
+RUN df -h
+RUN ls -la
 COPY . .
+RUN df -h
+RUN ls -la
 RUN yarn install && yarn cache clean
 
 # ---- Build ----
