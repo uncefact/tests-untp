@@ -1,7 +1,7 @@
 docker-compose.yaml
 .dockerignore
 **/Dockerfile
-**/node_modules
+**/node_modules/
 **/__test__
 **/coverage
 **/build
@@ -24,6 +24,7 @@ aws
 .DS_Store
 e2e/package.json
 e2e/yarn.lock
+e2e/node_modules/
 
 packages/mock-app/src/constants/app-config.json
 packages/components/src/constants/app-config.json
