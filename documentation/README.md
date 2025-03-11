@@ -13,6 +13,10 @@ This website is built using [Docusaurus](https://docusaurus.io/), a modern stati
 $ yarn
 ```
 
+### Configuration
+
+By default, this project uses placeholder values for all required environment variables. You can start developing right away without any manual configuration. When you're ready to customize, you can adjust environment variables as explained in the [Environment Variables](#environment-variables) section.
+
 ### Local Development
 
 ```
@@ -63,6 +67,8 @@ http://localhost:3002
 
 #### Environment Variables
 
+The site can be configured using environment variables found in the [.env.example](.env.example) file. Create a `.env` file in the same directory or set them directly in your environment.
+
 The following environment variables are set in the Dockerfile:
 
 | Environment Variable             | Description                                    | Default Value                             |
@@ -82,7 +88,6 @@ The following environment variables are set in the Dockerfile:
 | `EDIT_URL_BASE`                  | Base URL for edit links                        | `https://example.com/edit-url`            |
 | `REPOSITORY_LINK`                | URL to the project repository                  | `https://example.com/repo-link`           |
 | `SLACK_COMMUNITY_LINK`           | URL to the Slack community                     | `https://example.com/slack-community-link`|
-| `SLACK_CHANNEL_LINK`             | URL to the specific Slack channel              | `https://example.com/slack-channel-link`  |
 | `ALT_TEXT_IMAGES`                | Default alt text for images                    | `Unnamed alt text images`                 |
 | `EXTENSION_DOCS_LINK`            | URL to extension documentation                 | `https://example.com/extension-docs-link` |
 | `FOOTER_TITLE`                   | Title displayed in the footer                  | `Example Footer`                          |

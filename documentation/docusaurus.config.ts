@@ -13,7 +13,6 @@ const heroImageUrl = process.env.HERO_IMAGE_URL || '/img/placeholder-logo-grey.j
 const navbarTitle = process.env.NAVBAR_TITLE || 'Doc';
 const editUrl = process.env.EDIT_URL_BASE || 'https://example.com/edit-url';
 const slackLink = process.env.SLACK_COMMUNITY_LINK || 'https://example.com/slack-community-link';
-const slackChannel = process.env.SLACK_CHANNEL_LINK || 'https://example.com/slack-channel-link';
 const repoLink = process.env.REPOSITORY_LINK || 'https://example.com/repo-link';
 const altTextImages = process.env.ALT_TEXT_IMAGES || 'Unnamed alt text images';
 const heroImageAlt = process.env.HERO_IMAGE_ALT || 'Hero image';
@@ -103,7 +102,7 @@ const config: Config = {
           position: 'right',
         },
         {
-          href: slackChannel,
+          href: slackLink,
           position: 'right',
           html: '<svg class="icon icon-slack"><use xlink:href="#slack"></use></svg><span class="menu-item-name">Slack</span>',
           className: 'navbar-slack-link',
@@ -165,7 +164,7 @@ const config: Config = {
             },
             {
               label: 'Slack Channel',
-              href: slackChannel,
+              href: slackLink,
             },
           ],
         },
