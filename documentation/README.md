@@ -39,6 +39,16 @@ This documentation site can be run in a Docker container. Below are the instruct
 
 ### Building the Docker Image
 
+By default, the Dockerfile sets these environment variables:
+
+```bash
+ENV PORT=3002 \
+    DOCS_URL=http://0.0.0.0 \
+    DOCS_BASE_URL=/
+```
+
+You can override these variables when running the container if needed.
+
 To build the Docker image, run the following command in the `documentation` directory of the project:
 
 ```bash
@@ -69,8 +79,6 @@ http://localhost:3002
 
 The site can be configured using environment variables found in the [.env.example](.env.example) file. Create a `.env` file in the same directory or set them directly in your environment.
 
-The following environment variables are set in the Dockerfile:
-
 | Environment Variable             | Description                                    | Default Value                             |
 |----------------------------------|------------------------------------------------|-------------------------------------------|
 | `PORT`                           | Port on which the application runs             | `3000`                                    |
@@ -94,5 +102,3 @@ The following environment variables are set in the Dockerfile:
 | `FOOTER_TEXT`                    | Text displayed in the footer                   | `Example Footer`                          |
 | `FOOTER_SPEC_TITLE`              | Title for the specification link in the footer | `Specification`                           |
 | `FOOTER_SPEC_LINK`               | URL to the specification documentation         | `https://example.com/footer-spec-link`    |
-
-You can override these variables when running the container if needed.
