@@ -68,7 +68,7 @@ The following environment variables are set in the Dockerfile:
 | Environment Variable             | Description                                    | Default Value                             |
 |----------------------------------|------------------------------------------------|-------------------------------------------|
 | `PORT`                           | Port on which the application runs             | `3000`                                    |
-| `DOCS_URL`                       | URL for the documentation site                 | `http://0.0.0.0`                          |
+| `DOCS_URL`                       | URL for the documentation site                 | `http://localhost`                          |
 | `DOCS_BASE_URL`                  | Base path for the documentation site           | `/`                                       |
 | `SITE_TITLE`                     | Title of the documentation site                | `Example Organization`                    |
 | `SITE_TAGLINE`                   | Tagline displayed on the site                  | `Example tagline`                         |
