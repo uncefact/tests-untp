@@ -25,7 +25,7 @@ services:
       - NODE_ENV=development
 
   vckit-api:
-    image: ghcr.io/uncefact/project-vckit:sha-8a1a7ea@sha256:21414e4cdfd6b045f57667408256d4951c1d14d0648151ededf3107716b67b5f
+    image: ghcr.io/uncefact/project-vckit:sha-325b7e3@sha256:3623cd45cdb971ba16c6016a1e3ba153fe6920c2053275cd430e76ab75d5a563
     env_file:
       - local.env
     ports:
