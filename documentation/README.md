@@ -65,8 +65,29 @@ http://localhost:3002
 
 The following environment variables are set in the Dockerfile:
 
-- `PORT`: 3002 (The port on which the application will run)
-- `DOCS_URL`: http://0.0.0.0 (The URL for the documentation site)
-- `DOCS_BASE_URL`: / (The base URL for the documentation site)
+| Environment Variable             | Description                                    | Default Value                             |
+|----------------------------------|------------------------------------------------|-------------------------------------------|
+| `PORT`                           | Port on which the application runs             | `3000`                                    |
+| `DOCS_URL`                       | URL for the documentation site                 | `http://0.0.0.0`                          |
+| `DOCS_BASE_URL`                  | Base path for the documentation site           | `/`                                       |
+| `SITE_TITLE`                     | Title of the documentation site                | `Example Organization`                    |
+| `SITE_TAGLINE`                   | Tagline displayed on the site                  | `Example tagline`                         |
+| `SITE_LOGO_URL`                  | URL for the site logo                          | `img/placeholder-logo-grey.jpg`           |
+| `ORGANIZATION_NAME`              | Name of the organization                       | `Example Organization`                    |
+| `PROJECT_NAME`                   | Name of the project                            | `Unnamed Project`                         |
+| `FAVICON_URL`                    | URL for the site favicon                       | `img/placeholder-logo-grey.jpg`           |
+| `HERO_IMAGE_URL`                 | URL for the hero image                         | `img/placeholder-logo-grey.jpg`           |
+| `HERO_IMAGE_ALT`                 | Alt text for the hero image                    | `Hero image`                              |
+| `NAVBAR_TITLE`                   | Title displayed in the navigation bar          | `Doc`                                     |
+| `EDIT_URL_BASE`                  | Base URL for edit links                        | `https://example.com/edit-url`            |
+| `REPOSITORY_LINK`                | URL to the project repository                  | `https://example.com/repo-link`           |
+| `SLACK_COMMUNITY_LINK`           | URL to the Slack community                     | `https://example.com/slack-community-link`|
+| `SLACK_CHANNEL_LINK`             | URL to the specific Slack channel              | `https://example.com/slack-channel-link`  |
+| `ALT_TEXT_IMAGES`                | Default alt text for images                    | `Unnamed alt text images`                 |
+| `EXTENSION_DOCS_LINK`            | URL to extension documentation                 | `https://example.com/extension-docs-link` |
+| `FOOTER_TITLE`                   | Title displayed in the footer                  | `Example Footer`                          |
+| `FOOTER_TEXT`                    | Text displayed in the footer                   | `Example Footer`                          |
+| `FOOTER_SPEC_TITLE`              | Title for the specification link in the footer | `Specification`                           |
+| `FOOTER_SPEC_LINK`               | URL to the specification documentation         | `https://example.com/footer-spec-link`    |
 
 You can override these variables when running the container if needed.
