@@ -4,10 +4,10 @@ import { themes as prismThemes } from 'prism-react-renderer';
 
 const url = process.env.DOCS_URL || 'http://localhost';
 const baseUrl = process.env.DOCS_BASE_URL || '/';
-const title = process.env.SITE_TITLE || 'Unnamed Organization';
+const title = process.env.SITE_TITLE || 'Example Organization';
 const siteLogoUrL = process.env.SITE_LOGO_URL || '/img/placeholder-logo-grey.jpg';
 const favicon = process.env.FAVICON_URL || 'img/placeholder-logo-grey.jpg';
-const organizationName = process.env.ORGANIZATION_NAME || 'uncefact';
+const organizationName = process.env.ORGANIZATION_NAME || 'Example Organization';
 const projectName = process.env.PROJECT_NAME || 'Unnamed Project';
 const heroImageUrl = process.env.HERO_IMAGE_URL || '/img/placeholder-logo-grey.jpg';
 const navbarTitle = process.env.NAVBAR_TITLE || 'Doc';
@@ -16,10 +16,17 @@ const slackLink = process.env.SLACK_COMMUNITY_LINK || 'https://example.com/slack
 const slackChannel = process.env.SLACK_CHANNEL_LINK || 'https://example.com/slack-channel-link';
 const repoLink = process.env.REPOSITORY_LINK || 'https://example.com/repo-link';
 const altTextImages = process.env.ALT_TEXT_IMAGES || 'Unnamed alt text images';
+const heroImageAlt = process.env.HERO_IMAGE_ALT || 'Hero image';
+const tagline = process.env.SITE_TAGLINE || 'Example tagline';
+const extensionDocsLink = process.env.EXTENSION_DOCS_LINK || 'https://example.com/extension-docs-link';
+const footerTitle = process.env.FOOTER_TITLE || 'Example Footer';
+const footerText = process.env.FOOTER_TEXT || 'Example Footer';
+const footerSpecTitle = process.env.FOOTER_SPEC_TITLE || 'Specification';
+const footerSpecLink = process.env.FOOTER_SPEC_LINK || 'https://example.com/footer-spec-link';
 
 const config: Config = {
   title,
-  tagline: 'A comprehensive suite of tools for testing conformance to the UNTP Specification.',
+  tagline,
   favicon,
 
   url,
@@ -66,7 +73,8 @@ const config: Config = {
     colorMode: {
       disableSwitch: true,
     },
-    image: heroImageUrl,
+    heroImage: heroImageUrl,
+    heroImageAlt,
     navbar: {
       title: navbarTitle,
       logo: {
@@ -85,7 +93,7 @@ const config: Config = {
           label: 'Tools and support',
           position: 'right',
         },
-        { to: 'https://uncefact.github.io/spec-untp/docs/extensions/', label: 'Extensions', position: 'right' },
+        { to: extensionDocsLink, label: 'Extensions', position: 'right' },
         {
           to: repoLink,
           label: 'Contribute',
@@ -146,11 +154,11 @@ const config: Config = {
           ],
         },
         {
-          title: 'UN Transparency Protocol',
+          title: footerTitle,
           items: [
             {
-              label: 'UNTP Specification',
-              href: 'https://uncefact.github.io/spec-untp/',
+              label: footerSpecTitle,
+              href: footerSpecLink,
             },
             {
               label: 'Slack Channel',
@@ -168,7 +176,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `© United Nations Economic Commission for Europe`,
+      copyright: `© ${footerText}`,
     },
     prism: {
       theme: prismThemes.github,
