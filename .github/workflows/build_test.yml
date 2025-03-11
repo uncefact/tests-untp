@@ -50,6 +50,12 @@ jobs:
             UNTP test suite, ./packages/untp-test-suite/coverage/coverage-summary.json
             VC test suite, ./packages/vc-test-suite/coverage/coverage-summary.json
             UNTP Playground, ./packages/untp-playground/coverage/coverage-summary.json
+      
+      #https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
+      - name: Free up space on ubuntu runner for E2E tests
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
       - name: Start E2E docker compose
         run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d
