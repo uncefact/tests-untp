@@ -33,7 +33,7 @@ const config: Config = {
   baseUrl,
 
   organizationName,
-  projectName,
+  projectName, 
 
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
@@ -57,9 +57,12 @@ const config: Config = {
         },
         blog: false,
         theme: {
-          customCss: [require.resolve('./src/css/custom.scss'), require.resolve('./src/css/index.scss')],
+          customCss: [
+            require.resolve('./src/css/custom.scss'),
+            require.resolve('./src/css/index.scss'),
+          ],
         },
-      },
+      }
     ],
   ],
 
@@ -82,7 +85,7 @@ const config: Config = {
         src: siteLogoUrL,
       },
       items: [
-        { to: '/docs/introduction', label: 'Introduction', position: 'right' },
+        {to: '/docs/introduction', label: 'Introduction', position: 'right'},
         {
           to: '/docs/mock-apps/',
           label: 'Getting started',
@@ -93,7 +96,7 @@ const config: Config = {
           label: 'Tools and support',
           position: 'right',
         },
-        { to: extensionDocsLink, label: 'Extensions', position: 'right' },
+        {to: extensionDocsLink, label: 'Extensions', position: 'right'},
         {
           to: repoLink,
           label: 'Contribute',
@@ -182,7 +185,7 @@ const config: Config = {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
     },
-  },
+  }
 };
 
 export default config;
