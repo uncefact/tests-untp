@@ -86,11 +86,11 @@ The site can be configured using environment variables found in the [.env.exampl
 | `DOCS_BASE_URL`                  | Base path for the documentation site           | `/`                                       |
 | `SITE_TITLE`                     | Title of the documentation site                | `Example Organization`                    |
 | `SITE_TAGLINE`                   | Tagline displayed on the site                  | `Example tagline`                         |
-| `SITE_LOGO_URL`                  | URL for the site logo                          | `img/placeholder-logo-grey.jpg`           |
+| `SITE_LOGO_URL`                  | URL for the site logo                          | `img/grey-placeholder-image.png`           |
 | `ORGANIZATION_NAME`              | Name of the organization                       | `Example Organization`                    |
 | `PROJECT_NAME`                   | Name of the project                            | `Unnamed Project`                         |
-| `FAVICON_URL`                    | URL for the site favicon                       | `img/placeholder-logo-grey.jpg`           |
-| `HERO_IMAGE_URL`                 | URL for the hero image                         | `img/placeholder-logo-grey.jpg`           |
+| `FAVICON_URL`                    | URL for the site favicon                       | `img/grey-placeholder-image.png`           |
+| `HERO_IMAGE_URL`                 | URL for the hero image                         | `img/grey-placeholder-image.png`           |
 | `HERO_IMAGE_ALT`                 | Alt text for the hero image                    | `Hero image`                              |
 | `NAVBAR_TITLE`                   | Title displayed in the navigation bar          | `Doc`                                     |
 | `EDIT_URL_BASE`                  | Base URL for edit links                        | `https://example.com/edit-url`            |
