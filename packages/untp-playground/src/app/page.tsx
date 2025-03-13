@@ -24,9 +24,19 @@ export default function Home() {
   const [testResults, setTestResults] = useState<{
     [key in PermittedCredentialType]?: TestStep[];
   }>({});
-  const { dispatchError, error, setIsDetailsOpen } = useError();
+  const [fileCount, setFileCount] = useState(0);
+  const { dispatchError, errors, setIsDetailsOpen } = useError();
+
+  const shouldDisplayUploadDetailBtn =
+    errors &&
+    errors.length > 0 && 
+    ((fileCount === 1 && Object.keys(testResults).length === 0) ||
+      (fileCount > 1 && Object.keys(testResults).length !== 0) ||
+      (fileCount > 1 && Object.keys(testResults).length === 0));
 
   const handleCredentialUpload = async (rawCredential: any) => {
+    resetState();
+
     try {
       const normalizedCredential = rawCredential.verifiableCredential || rawCredential;
 
@@ -82,6 +92,11 @@ export default function Home() {
     }
   };
 
+  const resetState = () => {
+    setTestResults({});
+    setCredentials({});
+  };
+
   return (
     <div className='min-h-screen flex flex-col'>
       <Header />
@@ -96,10 +111,10 @@ export default function Home() {
             <div>
               <h2 className='text-xl font-semibold mb-6'>Add New Credential</h2>
               <div className='h-[300px]'>
-                <CredentialUploader onCredentialUpload={handleCredentialUpload} />
+                <CredentialUploader onCredentialUpload={handleCredentialUpload} setFileCount={setFileCount} />
               </div>
             </div>
-            {error && (
+            {shouldDisplayUploadDetailBtn && (
               <div>
                 <h2 className='text-sm font-semibold hover:cursor-pointer'>
                   <Button onClick={() => setIsDetailsOpen(true)}>View Upload Detail</Button>

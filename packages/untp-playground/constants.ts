@@ -60,5 +60,5 @@ export enum TestCaseStepId {
 }
 
 export const allowedContextValue = {
-  '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dte/0.5.0/'],
+  '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/{type}/{version}/'],
 };

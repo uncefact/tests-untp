@@ -6,18 +6,21 @@ import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 
-export function CredentialUploader({ onCredentialUpload }: { onCredentialUpload: (credential: any) => void }) {
+export function CredentialUploader({
+  onCredentialUpload,
+  setFileCount,
+}: {
+  onCredentialUpload: (credential: any) => void;
+  setFileCount: (count: number) => void;
+}) {
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       const validExtensions = ['.json', '.jwt', '.txt'];
 
-      const invalidFiles = acceptedFiles.filter(
-        (file: File) => !validExtensions.some((ext) => file.name.toLowerCase().endsWith(ext)),
-      );
-
-      if (invalidFiles.length > 0 || acceptedFiles.length === 0) {
-        toast.error(`Invalid file format. Please upload only .json, .jwt, or .txt files.`);
-        return;
+      if (acceptedFiles.length > 1) {
+        setFileCount(acceptedFiles.length);
+      } else {
+        setFileCount(1);
       }
 
       acceptedFiles.forEach((file) => {

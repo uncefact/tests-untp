@@ -3,36 +3,38 @@ import ValidationDetailsSheet from '@/components/ValidationDetailsSheet';
 import { ValidationError } from '@/types';
 
 interface ErrorContextType {
-  error: ValidationError[] | null;
+  errors: ValidationError[] | null;
   dispatchError: (error: ValidationError[]) => void;
   setIsDetailsOpen: (isOpen: boolean) => void;
+  setErrors: (error: ValidationError[]) => void;
 }
 
 const ErrorContext = createContext<ErrorContextType | undefined>(undefined);
 
 export const ErrorProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [error, setError] = useState<ValidationError[] | null>(null);
+  const [errors, setErrors] = useState<ValidationError[]>([]);
+
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const dispatchError = useCallback((error: ValidationError[]) => {
     setIsDetailsOpen(true);
-    setError(error);
+    setErrors((prevErrors) => [...prevErrors, ...error]);
   }, []);
 
   const contextValue = useMemo(
-    () => ({ error, dispatchError, setIsDetailsOpen }),
-    [error, dispatchError, setIsDetailsOpen],
+    () => ({ errors, dispatchError, setIsDetailsOpen, setErrors }),
+    [errors, dispatchError, setIsDetailsOpen, setErrors],
   );
 
   return (
     <ErrorContext.Provider value={contextValue}>
       {children}
-      {error && (
+      {errors && (
         <>
-          {error.length > 0 && (
+          {errors.length > 0 && (
             <ValidationDetailsSheet
               isOpen={isDetailsOpen}
-              errors={error}
+              errors={errors}
               onOpenChange={(isOpen) => setIsDetailsOpen(isOpen)}
             />
           )}

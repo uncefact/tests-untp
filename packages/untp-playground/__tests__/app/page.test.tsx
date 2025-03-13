@@ -128,8 +128,9 @@ describe('Home Component', () => {
             type: 'object',
             receivedValue: '',
             allowedValue: allowedContextValue,
+            solution: 'Instead of [credential1, credential2], upload credential1.json and credential2.json.',
           },
-          message: '',
+          message: 'Credentials must be uploaded as separate files, not as an array.',
         },
       ]);
     });
@@ -163,8 +164,9 @@ describe('Home Component', () => {
             missingProperty: `type array with a supported types:  DigitalProductPassport, DigitalConformityCredential, DigitalFacilityRecord, DigitalIdentityAnchor, DigitalTraceabilityEvent`,
             receivedValue: mockCredential?.verifiableCredential,
             allowedValue: { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+            solution: "Add a valid UNTP credential type (e.g., 'DigitalProductPassport', 'ConformityCredential').",
           },
-          message: '',
+          message: 'The credential type is missing or invalid.',
         },
       ]);
     });

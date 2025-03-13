@@ -501,8 +501,11 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
                             message: 'Failed to fetch schema',
                             instancePath: '',
                             params: {
-                              missingValue: 'Unable to access the schema from the constructed URI at test.uncefact.org',
+                              missingValue: 'The schema could not be loaded due to missing UNTP context IRIs.',
+                              solution:
+                                "Ensure the credential includes the required UNTP context IRIs in the '@context' field.",
                               allowedValue: allowedContextValue,
+                              receivedValue: credential
                             },
                           },
                         ],
