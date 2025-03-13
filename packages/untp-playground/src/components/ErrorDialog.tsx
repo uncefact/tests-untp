@@ -1,3 +1,4 @@
+import { ValidationError } from '@/types';
 import { AlertCircle, Check, ChevronRight, Copy } from 'lucide-react';
 import { useState } from 'react';
 
@@ -51,6 +52,27 @@ const groupErrors = (errors: any[]) => {
       errors: [error],
     })),
   };
+};
+
+const getTipMessage = (mainError: ValidationError) => {
+  if (mainError && mainError.params?.solution) {
+    return mainError.params.solution;
+  }
+
+  switch (mainError.keyword) {
+    case 'const':
+      return 'Update the value(s) to the correct one(s) or remove the field(s).';
+    case 'enum':
+      return 'Choose one of the values shown above.';
+    case 'required':
+      return `Add the missing "${mainError?.params?.missingProperty ?? 'property'}" field.`;
+    case 'type':
+      return `Change the value to match the expected type: ${mainError?.params?.type ?? 'type'}.`;
+    case 'conflictingProperties':
+      return 'Resolve the conflict by removing the conflicting field or updating it to a unique one.';
+    default:
+      return 'Make sure your input matches the required format.';
+  }
 };
 
 export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className = '' }) => {
@@ -146,6 +168,8 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                       {isExpanded && (
                         <div className='p-4 border-t bg-gray-50'>
                           <div className='mb-3 text-sm overflow-y-scroll'>
+                            {mainError?.message && <p>Issue: {mainError.message}</p>}
+                            <br />
                             {mainError.params?.receivedValue && (
                               <>
                                 <p>Receive value:</p>
@@ -164,7 +188,6 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                                   Incorrect value:{' '}
                                   <code className='px-1 py-0.5 bg-gray-100 rounded'>{mainError.instancePath}</code>
                                 </p>
-                                <p>{mainError.message}</p>
                               </div>
                             )}
                             {mainError.keyword === 'required' && (
@@ -196,15 +219,14 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                                 <code className='px-1 py-0.5 bg-gray-100 rounded'>{mainError.params.minItems}</code>
                               </p>
                             )}
-                            {mainError.keyword === "conflictingProperties" && (
+                            {mainError.keyword === 'conflictingProperties' && (
                               <div className='flex flex-col gap-2'>
                                 <p>
-                                  Conflicting field:{" "}
-                                  <code className="px-1 py-0.5 bg-gray-100 rounded">
+                                  Conflicting field:{' '}
+                                  <code className='px-1 py-0.5 bg-gray-100 rounded'>
                                     {mainError.params.conflictingProperty}
                                   </code>
                                 </p>
-                                <p>{mainError.message}</p>
                               </div>
                             )}
                             {mainError.keyword === 'schema' && (
@@ -215,14 +237,13 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                                     {mainError.params.missingValue}
                                   </code>
                                 </p>
-                                <p>{mainError.message}</p>
                               </div>
                             )}
                           </div>
 
                           {fixExample && (
                             <div className='relative mt-2'>
-                              <p className="text-sm">Example: </p>
+                              <p className='text-sm'>Example: </p>
                               <pre className='bg-white p-3 rounded border text-sm overflow-x-auto'>
                                 <code className='text-green-600 block py-4'>{fixExample}</code>
                               </pre>
@@ -246,18 +267,8 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                           )}
 
                           <div className='mt-3 text-sm text-blue-800 bg-blue-50 p-3 rounded'>
-                            <strong>Tip:</strong>{' '}
-                            {mainError.keyword === 'const'
-                              ? 'Update the value(s) to the correct one(s) or remove the field(s).'
-                              : mainError.keyword === 'enum'
-                                ? 'Choose one of the values shown above.'
-                                : mainError.keyword === 'required'
-                                  ? `Add the missing "${mainError.params.missingProperty}" field.`
-                                  : mainError.keyword === 'type'
-                                    ? `Change the value to match the expected type: ${mainError.params.type}.`
-                                    : mainError.keyword === 'conflictingProperties'
-                                      ? 'Resolve the conflict by removing the conflicting field or updating it to a unique one.'
-                                      : 'Make sure your input matches the required format.'}
+                            <strong>Tip: </strong>
+                            {getTipMessage(mainError)}
                           </div>
                         </div>
                       )}

@@ -14,7 +14,8 @@ import { useError } from '@/contexts/ErrorContext';
 import { typeOf } from '@/lib/utils';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { allowedContextValue, permittedCredentialTypes } from '../../constants';
+import { Button } from '@/components/ui/button';
+import { permittedCredentialTypes } from '../../constants';
 
 export default function Home() {
   const [credentials, setCredentials] = useState<{
@@ -23,7 +24,7 @@ export default function Home() {
   const [testResults, setTestResults] = useState<{
     [key in PermittedCredentialType]?: TestStep[];
   }>({});
-  const { dispatchError } = useError();
+  const { dispatchError, error, setIsDetailsOpen } = useError();
 
   const handleCredentialUpload = async (rawCredential: any) => {
     try {
@@ -37,9 +38,9 @@ export default function Home() {
             params: {
               type: 'object',
               receivedValue: normalizedCredential,
-              allowedValue: allowedContextValue,
+              solution: 'Instead of [credential1, credential2], upload credential1.json and credential2.json.',
             },
-            message: '',
+            message: 'Credentials must be uploaded as separate files, not as an array.',
           },
         ]);
         return;
@@ -60,8 +61,9 @@ export default function Home() {
               missingProperty: `type array with a supported types:  ${permittedCredentialTypes.join(', ')}`,
               receivedValue: normalizedCredential,
               allowedValue: { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+              solution: "Add a valid UNTP credential type (e.g., 'DigitalProductPassport', 'ConformityCredential').",
             },
-            message: '',
+            message: `The credential type is missing or invalid.`,
           },
         ]);
         return;
@@ -97,6 +99,14 @@ export default function Home() {
                 <CredentialUploader onCredentialUpload={handleCredentialUpload} />
               </div>
             </div>
+            {error && (
+              <div>
+                <h2 className='text-sm font-semibold hover:cursor-pointer'>
+                  <Button onClick={() => setIsDetailsOpen(true)}>View Upload Detail</Button>
+                </h2>
+              </div>
+            )}
+
             <div>
               <h2 className='text-xl font-semibold mb-6'>Download Test Credential</h2>
               <DownloadCredential />

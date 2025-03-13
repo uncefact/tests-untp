@@ -5,6 +5,7 @@ import { ValidationError } from '@/types';
 interface ErrorContextType {
   error: ValidationError[] | null;
   dispatchError: (error: ValidationError[]) => void;
+  setIsDetailsOpen: (isOpen: boolean) => void;
 }
 
 const ErrorContext = createContext<ErrorContextType | undefined>(undefined);
@@ -18,13 +19,10 @@ export const ErrorProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setError(error);
   }, []);
 
-  useEffect(() => {
-    if (!isDetailsOpen) {
-      setError(null);
-    }
-  }, [isDetailsOpen]);
-
-  const contextValue = useMemo(() => ({ error, dispatchError }), [error, dispatchError]);
+  const contextValue = useMemo(
+    () => ({ error, dispatchError, setIsDetailsOpen }),
+    [error, dispatchError, setIsDetailsOpen],
+  );
 
   return (
     <ErrorContext.Provider value={contextValue}>
