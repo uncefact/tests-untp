@@ -7,6 +7,7 @@ interface ErrorContextType {
   dispatchError: (error: ValidationError[]) => void;
   setIsDetailsOpen: (isOpen: boolean) => void;
   setErrors: (error: ValidationError[]) => void;
+  resetErrors(): void;
 }
 
 const ErrorContext = createContext<ErrorContextType | undefined>(undefined);
@@ -21,9 +22,13 @@ export const ErrorProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setErrors((prevErrors) => [...prevErrors, ...error]);
   }, []);
 
+  const resetErrors = () => {
+    setErrors([]);
+  };
+
   const contextValue = useMemo(
-    () => ({ errors, dispatchError, setIsDetailsOpen, setErrors }),
-    [errors, dispatchError, setIsDetailsOpen, setErrors],
+    () => ({ errors, dispatchError, setIsDetailsOpen, setErrors, resetErrors }),
+    [errors, dispatchError, setIsDetailsOpen, setErrors, resetErrors],
   );
 
   return (

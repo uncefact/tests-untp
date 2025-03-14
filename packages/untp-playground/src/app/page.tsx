@@ -1,5 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
 import { CredentialUploader } from '@/components/CredentialUploader';
 import { DownloadCredential } from '@/components/DownloadCredential';
 import { Footer } from '@/components/Footer';
@@ -8,12 +11,9 @@ import { TestResults } from '@/components/TestResults';
 import { TestReportProvider } from '@/contexts/TestReportContext';
 import { decodeEnvelopedCredential, detectCredentialType, isEnvelopedProof } from '@/lib/credentialService';
 import { detectExtension } from '@/lib/schemaValidation';
-import { isPermittedCredentialType } from '@/lib/utils';
+import { isPermittedCredentialType, validateNormalizedCredential } from '@/lib/utils';
 import type { PermittedCredentialType, StoredCredential, TestStep } from '@/types';
 import { useError } from '@/contexts/ErrorContext';
-import { typeOf } from '@/lib/utils';
-import { useState } from 'react';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { permittedCredentialTypes } from '../../constants';
 
@@ -29,7 +29,7 @@ export default function Home() {
 
   const shouldDisplayUploadDetailBtn =
     errors &&
-    errors.length > 0 && 
+    errors.length > 0 &&
     ((fileCount === 1 && Object.keys(testResults).length === 0) ||
       (fileCount > 1 && Object.keys(testResults).length !== 0) ||
       (fileCount > 1 && Object.keys(testResults).length === 0));
@@ -39,20 +39,10 @@ export default function Home() {
 
     try {
       const normalizedCredential = rawCredential.verifiableCredential || rawCredential;
+      const error = validateNormalizedCredential(normalizedCredential);
 
-      if (!normalizedCredential || typeOf(normalizedCredential) !== 'Object') {
-        dispatchError([
-          {
-            keyword: 'type',
-            instancePath: '',
-            params: {
-              type: 'object',
-              receivedValue: normalizedCredential,
-              solution: 'Instead of [credential1, credential2], upload credential1.json and credential2.json.',
-            },
-            message: 'Credentials must be uploaded as separate files, not as an array.',
-          },
-        ]);
+      if (error) {
+        dispatchError([error]);
         return;
       }
 
@@ -66,7 +56,7 @@ export default function Home() {
         dispatchError([
           {
             keyword: 'required',
-            instancePath: '',
+            instancePath: '/type',
             params: {
               missingProperty: `type array with a supported types:  ${permittedCredentialTypes.join(', ')}`,
               receivedValue: normalizedCredential,
@@ -96,6 +86,12 @@ export default function Home() {
     setTestResults({});
     setCredentials({});
   };
+
+  useEffect(() => {
+    if (credentials) {
+      dispatchError([]);
+    }
+  }, [credentials]);
 
   return (
     <div className='min-h-screen flex flex-col'>

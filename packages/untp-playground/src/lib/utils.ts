@@ -72,3 +72,39 @@ export const downloadJson = (data: Record<string, any>, filename: string) => {
  * @returns The type of the value as a string.
  */
 export const typeOf = (value: any) => Object.prototype.toString.call(value).slice(8, -1);
+
+export const validateNormalizedCredential = (normalizedCredential: any) => {
+  if (Array.isArray(normalizedCredential)) {
+    return {
+      keyword: 'type',
+      instancePath: 'array',
+      params: {
+        type: 'object',
+        receivedValue: normalizedCredential,
+        solution: 'Instead of [credential1, credential2], upload credential1.json and credential2.json.',
+      },
+      message: 'Credentials must be uploaded as separate files, not as an array.',
+    };
+  }
+
+  if (!normalizedCredential || typeof normalizedCredential !== 'object') {
+    return {
+      keyword: 'type',
+      instancePath: 'invalid',
+      params: {
+        type: 'object',
+        receivedValue: normalizedCredential,
+        solution: 'Upload a valid credential file.',
+      },
+      message: 'Invalid credential file.',
+    };
+  }
+
+  return null; // No errors
+};
+
+export const findDuplicates = (arr1: Iterable<unknown> | null | undefined, arr2: any[]) => {
+  const set1 = new Set(arr1);
+  const duplicates = arr2.filter((item) => set1.has(item));
+  return duplicates;
+};
