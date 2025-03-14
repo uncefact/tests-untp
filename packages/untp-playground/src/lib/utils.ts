@@ -102,9 +102,3 @@ export const validateNormalizedCredential = (normalizedCredential: any) => {
 
   return null; // No errors
 };
-
-export const findDuplicates = (arr1: Iterable<unknown> | null | undefined, arr2: any[]) => {
-  const set1 = new Set(arr1);
-  const duplicates = arr2.filter((item) => set1.has(item));
-  return duplicates;
-};

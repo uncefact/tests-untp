@@ -27,6 +27,15 @@ export function CredentialUploader({
         setFileCount(1);
       }
 
+      const invalidFiles = acceptedFiles.filter(
+        (file: File) => !validExtensions.some((ext) => file.name.toLowerCase().endsWith(ext)),
+      );
+
+      if (invalidFiles.length > 0 || acceptedFiles.length === 0) {
+        toast.error(`Invalid file format. Please upload only .json, .jwt, or .txt files.`);
+        return;
+      }
+
       acceptedFiles.forEach((file) => {
         const reader = new FileReader();
         reader.onload = async (e) => {
