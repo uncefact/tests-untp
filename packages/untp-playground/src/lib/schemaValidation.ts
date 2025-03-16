@@ -42,6 +42,11 @@ export const EXTENSION_VERSIONS: Record<string, ExtensionConfig> = {
         schema: 'https://aatp.foodagility.com/schema/aatp-dlp-schema-0.4.1-beta1.json',
         core: { type: 'DigitalProductPassport', version: '0.6.0-beta7' },
       },
+      {
+        version: '0.4.2-beta1',
+        schema: 'https://aatp.foodagility.com/schema/aatp-dlp-schema-0.4.2-beta1.json',
+        core: { type: 'DigitalProductPassport', version: '0.6.0-beta9' },
+      },
     ],
   },
 };
