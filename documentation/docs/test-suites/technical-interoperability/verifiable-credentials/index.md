@@ -21,7 +21,7 @@ Technical interoperability requires **two-way verification** between systems. Th
 
 - Credentials issued by one party can be validated by another.
 - Both parties support the same standards (cryptography, DID methods, status checks).
-
+Certain aspects of the technical interoperability, such as DID resolution, can and should be verified by each party before mutual testing, but ultimately it is the mutual verification workflow which will demonstrate the interoperability of two separate systems. 
 ### Mutual Verification Workflow
 
 Technical interoperability depends on mutual trust—both parties must issue and verify credentials seamlessly. Testing this requires simulating the full cycle:
