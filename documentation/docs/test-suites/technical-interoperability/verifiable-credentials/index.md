@@ -27,7 +27,7 @@ Certain aspects of the technical interoperability, such as DID resolution, can a
 Technical interoperability depends on mutual trust — both parties must issue and verify each other's credentials seamlessly. Testing this requires simulating the full cycle:
 
 1. **Setup**:
-   - Agree on standards (e.g., `Ed25519` signatures, `BitstringStatusListEntry`).
+   - Agree on cryptography standards and revocation support (e.g., supporting `Ed25519` cryptographic signatures, or supporting `BitstringStatusListEntry` for credential revocation).
    - _Test_: Confirm both systems support the same DID methods and status mechanisms.
 2. **Phase 1: Party A → Party B**
    - Party A issues a VC (e.g., a business license).
