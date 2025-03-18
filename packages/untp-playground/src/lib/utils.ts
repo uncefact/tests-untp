@@ -71,7 +71,6 @@ export const downloadJson = (data: Record<string, any>, filename: string) => {
  * @param value - The value whose type is to be determined.
  * @returns The type of the value as a string.
  */
-export const typeOf = (value: any) => Object.prototype.toString.call(value).slice(8, -1);
 
 export const validateNormalizedCredential = (normalizedCredential: any) => {
   if (Array.isArray(normalizedCredential)) {
