@@ -48,35 +48,25 @@ describe('Display Error Messages', () => {
   });
 
   it('should display error message when upload multiple files', () => {
-    cy.uploadCredential([
-      [],
-      {
-        '@context': ['https://www.w3.org/ns/credentials/v2'],
-        type: ['VerifiableCredential'],
-        issuer: {
-          id: 'did:example:123',
-          name: 'dev',
+    cy.fixture('credentials-e2e/valid-v2-enveloped-dpp.json').then((credential) => {
+      cy.uploadCredential([
+        [],
+        {
+          '@context': ['https://www.w3.org/ns/credentials/v2'],
+          type: ['VerifiableCredential'],
+          issuer: {
+            id: 'did:example:123',
+            name: 'dev',
+          },
+          credentialSubject: {
+            name: 'John Doe',
+            id: 'did:example:123',
+            type: ['Product'],
+          },
         },
-        credentialSubject: {
-          name: 'John Doe',
-          id: 'did:example:123',
-          type: ['Product'],
-        },
-      },
-      {
-        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/'],
-        type: ['VerifiableCredential', 'DigitalProductPassport'],
-        issuer: {
-          id: 'did:example:123',
-          name: 'dev',
-        },
-        credentialSubject: {
-          name: 'John Doe',
-          id: 'did:example:123',
-          type: ['Product'],
-        },
-      },
-    ]);
+        credential,
+      ]);
+    });
 
     cy.contains('Fix validation error').click();
     cy.contains('Close').click();

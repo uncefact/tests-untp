@@ -27,12 +27,8 @@ export default function Home() {
   const [fileCount, setFileCount] = useState(0);
   const { dispatchError, errors, setIsDetailsOpen } = useError();
 
-  const shouldDisplayUploadDetailBtn =
-    errors &&
-    errors.length > 0 &&
-    ((fileCount === 1 && Object.keys(testResults).length === 0) ||
-      (fileCount > 1 && Object.keys(testResults).length !== 0) ||
-      (fileCount > 1 && Object.keys(testResults).length === 0));
+const shouldDisplayUploadDetailBtn =
+  errors && errors.length > 0 && ((fileCount === 1 && Object.keys(testResults).length === 0) || fileCount > 1);
 
   const handleCredentialUpload = async (rawCredential: any) => {
     resetState();
