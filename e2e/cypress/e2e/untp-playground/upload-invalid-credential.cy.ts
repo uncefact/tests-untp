@@ -47,7 +47,7 @@ describe('Display Error Messages', () => {
     cy.contains('Issue:').should('be.visible');
   });
 
-  it('should display error message when upload multiple files', () => {
+  it('handles multiple file uploads displaying errors or success for each', () => {
     cy.fixture('credentials-e2e/valid-v2-enveloped-dpp.json').then((credential) => {
       cy.uploadCredential([
         [],

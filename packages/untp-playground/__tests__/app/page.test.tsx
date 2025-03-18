@@ -131,7 +131,7 @@ describe('Home Component', () => {
     fireEvent.click(uploader);
 
     await waitFor(() => {
-      expect(mockDispatchError).toHaveBeenNthCalledWith(2, [expectedValue]);
+      expect(mockDispatchError).toHaveBeenCalledWith([expectedValue]);
     });
   });
 

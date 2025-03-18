@@ -21,11 +21,7 @@ export function CredentialUploader({
     (acceptedFiles: File[]) => {
       resetErrors();
       const validExtensions = ['.json', '.jwt', '.txt'];
-      if (acceptedFiles.length > 1) {
-        setFileCount(acceptedFiles.length);
-      } else {
-        setFileCount(1);
-      }
+      setFileCount(acceptedFiles?.length);
 
       const invalidFiles = acceptedFiles.filter(
         (file: File) => !validExtensions.some((ext) => file.name.toLowerCase().endsWith(ext)),
