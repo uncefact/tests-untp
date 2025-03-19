@@ -59,19 +59,6 @@ export const downloadJson = (data: Record<string, any>, filename: string) => {
   }
 };
 
-/**
- * Returns the type of the given value as a string.
- *
- * This function uses `Object.prototype.toString` to get the internal
- * [[Class]] property of the value, which is a more reliable way to
- * determine the type of an object than using `typeof` or `instanceof`.
- *
- * The result is a string such as "String", "Number", "Array", "Object", etc.
- *
- * @param value - The value whose type is to be determined.
- * @returns The type of the value as a string.
- */
-
 export const validateNormalizedCredential = (normalizedCredential: any) => {
   if (Array.isArray(normalizedCredential)) {
     return {
