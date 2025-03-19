@@ -1,5 +1,5 @@
 import { detectVersion } from '@/lib/credentialService';
-import { detectExtension } from '@/lib/schemaValidation';
+import { detectExtension, typeExtensionMapping } from '@/lib/schemaValidation';
 import { StoredCredential, TestReport, TestReportResult, TestReportStep, TestStep } from '@/types';
 import { testSuiteRunner, testSuiteVersion } from '../../config';
 import { CredentialType, TestCaseStatus, TestCaseStepId } from '../../constants';
@@ -21,6 +21,7 @@ export const generateReport = async ({
     ([type, cred]) => [type, cred] as [CredentialType, NonNullable<typeof cred>],
   );
 
+  let extensionName = 'UNTP';
   const results: TestReportResult[] = validCredentials.map(([type, credential]) => {
     const steps = testResults[type] || [];
     const extension = detectExtension(credential.decoded);
@@ -52,6 +53,8 @@ export const generateReport = async ({
         version: extension.extension.version,
         steps: [extensionStep as TestReportStep],
       };
+
+      extensionName = typeExtensionMapping[extension.extension.type];
     }
 
     return result;
@@ -63,6 +66,7 @@ export const generateReport = async ({
 
   return {
     date: new Date().toISOString(),
+    reportName: extensionName,
     testSuite: {
       runner: testSuiteRunner,
       version: testSuiteVersion,

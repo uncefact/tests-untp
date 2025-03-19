@@ -29,6 +29,7 @@ const mockTestResults: Partial<Record<CredentialType, TestStep[]>> = {
 
 const mockReport: TestReport = {
   implementation: { name: 'Test Implementation' },
+  reportName: 'UNTP',
   results: [],
   date: new Date().toISOString(),
   testSuite: {
