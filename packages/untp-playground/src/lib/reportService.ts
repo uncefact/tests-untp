@@ -21,7 +21,7 @@ export const generateReport = async ({
     ([type, cred]) => [type, cred] as [CredentialType, NonNullable<typeof cred>],
   );
 
-  let extensionName = 'UNTP';
+  let reportName = 'UNTP';
   const results: TestReportResult[] = validCredentials.map(([type, credential]) => {
     const steps = testResults[type] || [];
     const extension = detectExtension(credential.decoded);
@@ -54,7 +54,7 @@ export const generateReport = async ({
         steps: [extensionStep as TestReportStep],
       };
 
-      extensionName = typeExtensionMapping[extension.extension.type];
+      reportName = typeExtensionMapping[extension.extension.type];
     }
 
     return result;
@@ -66,7 +66,7 @@ export const generateReport = async ({
 
   return {
     date: new Date().toISOString(),
-    reportName: extensionName,
+    reportName,
     testSuite: {
       runner: testSuiteRunner,
       version: testSuiteVersion,
