@@ -29,6 +29,7 @@ When code is pushed to the `next` or `cd/**` branch:
    - NEXT_PUBLIC_BASE_PATH = /test-untp-playground
    - NEXT_PUBLIC_ASSET_PREFIX = /test-untp-playground
    - NEXT_PUBLIC_IMAGE_PATH = /test-untp-playground/\_next/image
+   - NEXT_PUBLIC_REPORT_NAME=
 
 ### Production Deployment
 
@@ -39,6 +40,7 @@ When a tag is created, associated with the next branch and the workflow is [trig
    - NEXT_PUBLIC_BASE_PATH = /untp-playground
    - NEXT_PUBLIC_ASSET_PREFIX = /untp-playground
    - NEXT_PUBLIC_IMAGE_PATH = /untp-playground/\_next/image
+   - NEXT_PUBLIC_REPORT_NAME=
 
 ## Infrastructure Details
 
@@ -95,7 +97,7 @@ Contact @kshychko for any AWS-related access needs or infrastructure changes
 - Both environments currently share the same domain (test.uncefact.org) with different paths
 - Production URL will change in the future (uncefact.org)
 - [OIDC](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services) is configured to deploy the code to AWS account using GitHub workflows. AWS role to assume is handled via a stored [GitHub secret](https://github.com/uncefact/tests-untp/settings/secrets/actions) (UNCEFACT_AWS_ROLE_TO_ASSUME)
-- The environment variables for base paths (NEXT_PUBLIC_BASE_PATH, NEXT_PUBLIC_ASSET_PREFIX, NEXT_PUBLIC_IMAGE_PATH) are required due to the CloudFront distribution setup
+- The environment variables for base paths (NEXT_PUBLIC_BASE_PATH, NEXT_PUBLIC_ASSET_PREFIX, NEXT_PUBLIC_IMAGE_PATH, NEXT_PUBLIC_REPORT_NAME) are required due to the CloudFront distribution setup
 - Infrastructure is managed via [Pulumi](https://www.pulumi.com/)
 - Pulumi security provider for config is set to AWS KMS.
 - The same backend state bucket (S3) and KMS key are used for both test and production Pulumi stacks
