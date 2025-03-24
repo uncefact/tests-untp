@@ -49,7 +49,7 @@ export const DownloadReport = () => {
         <SelectGroup>
           {downloadOptions.map((option) => (
             <SelectItem key={option.value} value={option.value}>
-              <div className='flex items-center'>
+              <div className='flex items-center' data-testid='download-report-button'>
                 {option.icon} {option.label}
               </div>
             </SelectItem>
