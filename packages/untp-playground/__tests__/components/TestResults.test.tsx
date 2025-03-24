@@ -327,7 +327,8 @@ describe('TestResults Component', () => {
         expect(tooltipContent).toHaveTextContent('Upload and validate a credential to generate a conformance report');
       });
 
-      expect(screen.getByText('Download Report')).toBeDisabled();
+      const button = screen.getByRole('combobox');
+      expect(button).toBeDisabled();
 
       const downloadReportButton = screen.getByTestId('download-report-button-tooltip-trigger');
       userEvent.hover(downloadReportButton);
@@ -399,7 +400,8 @@ describe('TestResults Component', () => {
 
       render(<TestResults credentials={{}} testResults={mockTestResults} setTestResults={mockSetTestResults} />);
 
-      fireEvent.click(screen.getByText('Download Report'));
+      fireEvent.click(screen.getByRole('combobox'));
+      fireEvent.click(screen.getByText('JSON'));
       expect(mockDownloadReport).toHaveBeenCalled();
     });
   });

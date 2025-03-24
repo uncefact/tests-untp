@@ -28,8 +28,6 @@ export const DownloadReport = () => {
     const selectedOption = downloadOptions.find((option) => option.value === value);
     if (selectedOption) {
       selectedOption.action();
-    } else {
-      toast.error('Failed to download report');
     }
   };
 
