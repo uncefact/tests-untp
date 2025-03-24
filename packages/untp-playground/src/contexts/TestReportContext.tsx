@@ -82,10 +82,10 @@ export function TestReportProvider({ children, testResults, credentials }: TestR
     try {
       const filename = `untp-test-report-${report.implementation.name.toLowerCase().replace(/\s+/g, '-')}`;
       switch (format) {
-        case 'json':
+        case DownloadReportFormat.JSON:
           downloadJson(report, filename);
           break;
-        case 'html':
+        case DownloadReportFormat.HTML:
           await downloadHtml(report, filename);
           break;
         default:

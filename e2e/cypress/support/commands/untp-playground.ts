@@ -94,7 +94,7 @@ Cypress.Commands.add(
   (implementationName: string, expectedPass: boolean, format: string = 'json') => {
     cy.contains('button', 'Download Report').should('be.enabled');
     cy.contains('button', 'Download Report').click();
-    cy.get('[data-testid="download-report-button"]').contains(format.toUpperCase()).click();
+    cy.get('[data-testid="download-report-select-item"]').contains(format.toUpperCase()).click();
 
     if (format === 'json') {
       cy.readFile(
