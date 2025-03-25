@@ -1,17 +1,6 @@
-import { join } from 'path';
-import { promises as fs } from 'fs';
 import { detectVcdmVersion, downloadHtml, downloadJson, isPermittedCredentialType, readTemplate } from '@/lib/utils';
 import { CredentialType, VCDM_CONTEXT_URLS, VCDMVersion } from '../../constants';
-
-jest.mock('path', () => ({
-  join: jest.fn(),
-}));
-
-jest.mock('fs', () => ({
-  promises: {
-    readFile: jest.fn(),
-  },
-}));
+import { reportTemplates } from '@/types/templates';
 
 describe('utils', () => {
   beforeAll(() => {
@@ -194,16 +183,13 @@ describe('utils', () => {
     let mockCreateElement: jest.SpyInstance;
     let mockAppendChild: jest.SpyInstance;
     let mockRemoveChild: jest.SpyInstance;
-
     beforeEach(() => {
-      global.fetch = jest.fn();
       mockAnchor = {
         href: '',
         download: '',
         click: jest.fn(),
         remove: jest.fn(),
       };
-
       mockCreateElement = jest.spyOn(document, 'createElement').mockReturnValue(mockAnchor as any);
       mockAppendChild = jest.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
       mockRemoveChild = jest.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
@@ -219,22 +205,8 @@ describe('utils', () => {
     });
 
     const runTest = async (filename: string, expectedFilename: string) => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        text: jest.fn().mockResolvedValue('<html></html>'),
-      });
-
-      const data = { key: 'value' };
-
+      const data = { name: 'John Doe' };
       await downloadHtml(data, filename);
-
-      expect(global.fetch).toHaveBeenCalledWith('/api/render-template', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ credentialSubject: data }),
-      });
       expect(mockAnchor.download).toBe(expectedFilename);
     };
 
@@ -246,53 +218,45 @@ describe('utils', () => {
       await runTest('report.html', 'report.html');
     });
 
-    it('throws an error if fetch fails', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-      });
-
-      const data = { key: 'value' };
+    it('should download HTML file with correct content', async () => {
+      const mockReport = {
+        implementation: { name: 'Test Implementation' },
+        results: [],
+        date: new Date().toISOString(),
+        testSuite: {
+          runner: 'UNTP Playground',
+          version: '1.0.0',
+        },
+        pass: true,
+      };
       const filename = 'report';
-
-      await expect(downloadHtml(data, filename)).rejects.toThrow('Failed to download HTML report');
+      await downloadHtml(mockReport, filename);
+      expect(mockAnchor.download).toBe('report.html');
     });
 
-    it('throws an error if fetch throws an exception', async () => {
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
-
-      const data = { key: 'value' };
+    it('should throw an error if readTemplate fails', async () => {
+      const data = { name: 'John Doe' };
       const filename = 'report';
+      const templateName = 'invalid-name';
 
-      await expect(downloadHtml(data, filename)).rejects.toThrow('Failed to download HTML report');
+      await expect(downloadHtml(data, filename, templateName)).rejects.toThrow('Failed to download HTML report');
     });
   });
 
   describe('readTemplate', () => {
-    const templateName = 'testTemplate';
-    const templatePath = `/mocked/path/${templateName}.hbs`;
-    const templateContent = '<html></html>';
-
-    beforeEach(() => {
-      (join as jest.Mock).mockReturnValue(templatePath);
-      (fs.readFile as jest.Mock).mockResolvedValue(templateContent);
-    });
-
     afterEach(() => {
       jest.clearAllMocks();
     });
 
     it('reads the correct template file and returns its content', async () => {
+      const templateName = 'UNTP_REPORT';
       const result = await readTemplate(templateName);
-
-      expect(join).toHaveBeenCalledWith(process.cwd(), '/public/templates', `${templateName}.hbs`);
-      expect(fs.readFile).toHaveBeenCalledWith(templatePath, 'utf-8');
-      expect(result).toBe(templateContent);
+      expect(result).toBe(reportTemplates[templateName]);
     });
 
     it('throws an error if reading the file fails', async () => {
-      const errorMessage = 'File not found';
-      (fs.readFile as jest.Mock).mockRejectedValue(new Error(errorMessage));
-
+      const templateName = 'invalid-name';
+      const errorMessage = `Template \"${templateName}"\ not found`;
       await expect(readTemplate(templateName)).rejects.toThrow(errorMessage);
     });
   });

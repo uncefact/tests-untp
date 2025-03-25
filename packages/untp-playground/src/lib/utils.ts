@@ -1,9 +1,8 @@
-import { promises as fs } from 'fs';
-import { join } from 'path';
-
+import handlebars from 'handlebars';
 import { PermittedCredentialType } from '@/types';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { reportTemplates } from '@/types/templates';
 import { CredentialType, permittedCredentialTypes, VCDM_CONTEXT_URLS, VCDMVersion } from '../../constants';
 
 export function cn(...inputs: ClassValue[]) {
@@ -71,9 +70,11 @@ export const downloadJson = (data: Record<string, any>, filename: string) => {
  * @returns A promise that resolves to the content of the template file as a string.
  */
 export const readTemplate = async (templateName: string): Promise<string> => {
-  const templatePath = join(process.cwd(), '/public/templates', `${templateName}.hbs`);
-  const templateContent = await fs.readFile(templatePath, 'utf-8');
-  return templateContent;
+  const template = reportTemplates[templateName as keyof typeof reportTemplates];
+  if (!template) {
+    throw new Error(`Template "${templateName}" not found`);
+  }
+  return template;
 };
 
 /**
@@ -81,25 +82,19 @@ export const readTemplate = async (templateName: string): Promise<string> => {
  * @param data The data to display in the report.
  * @param filename The name of the file to download.
  */
-export const downloadHtml = async (data: Record<string, any>, filename: string) => {
+export const downloadHtml = async (
+  data: Record<string, any>,
+  filename: string,
+  templateName: string = 'UNTP_REPORT',
+) => {
   if (!filename.endsWith('.html')) {
     filename = `${filename}.html`;
   }
 
   try {
-    const fetchReport = await fetch('/api/render-template', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ credentialSubject: data }),
-    });
-
-    if (!fetchReport.ok) {
-      throw new Error('Failed to fetch the template');
-    }
-
-    const html = await fetchReport.text();
+    const templateContent = await readTemplate(templateName);
+    const template = handlebars.compile(templateContent);
+    const html = template({ credentialSubject: data });
     downloadFile(html, filename, 'text/html');
   } catch (error) {
     throw new Error('Failed to download HTML report');
