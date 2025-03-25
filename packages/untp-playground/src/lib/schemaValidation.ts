@@ -189,7 +189,3 @@ export async function validateVcAgainstSchema(credential: any, version: Extract<
 
   return validateCredentialOnSchemaUrl(credential, schemaUrl);
 }
-
-export const typeExtensionMapping: { [key: string]: string } = {
-  DigitalLivestockPassport: 'AATP',
-};

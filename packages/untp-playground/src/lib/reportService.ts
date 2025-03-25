@@ -1,5 +1,5 @@
 import { detectVersion } from '@/lib/credentialService';
-import { detectExtension, typeExtensionMapping } from '@/lib/schemaValidation';
+import { detectExtension } from '@/lib/schemaValidation';
 import { StoredCredential, TestReport, TestReportResult, TestReportStep, TestStep } from '@/types';
 import { reportName, testSuiteRunner, testSuiteVersion } from '../../config';
 import { CredentialType, TestCaseStatus, TestCaseStepId } from '../../constants';
