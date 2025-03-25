@@ -2516,7 +2516,7 @@
               "type": "EntryData",
               "props": {
                 "schema": {
-                  "url": "https://jargon.sh/user/unece/DigitalProductPassport/v/0.6.0-beta7/artefacts/jsonSchemas/Product.json?class=Product"
+                  "url": "https://jargon.sh/user/unece/DigitalProductPassport/v/working/artefacts/jsonSchemas/Product.json?class=Product"
                 },
                 "data": {
                   "type": ["Product"],
