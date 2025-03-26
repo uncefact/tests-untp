@@ -1,6 +1,5 @@
-import { detectVcdmVersion, downloadHtml, downloadJson, isPermittedCredentialType, readTemplate } from '@/lib/utils';
+import { detectVcdmVersion, downloadHtml, downloadJson, isPermittedCredentialType } from '@/lib/utils';
 import { CredentialType, VCDM_CONTEXT_URLS, VCDMVersion } from '../../constants';
-import { reportTemplates } from '@/types/templates';
 
 describe('utils', () => {
   beforeAll(() => {
@@ -232,32 +231,6 @@ describe('utils', () => {
       const filename = 'report';
       await downloadHtml(mockReport, filename);
       expect(mockAnchor.download).toBe('report.html');
-    });
-
-    it('should throw an error if readTemplate fails', async () => {
-      const data = { name: 'John Doe' };
-      const filename = 'report';
-      const templateName = 'invalid-name';
-
-      await expect(downloadHtml(data, filename, templateName)).rejects.toThrow('Failed to download HTML report');
-    });
-  });
-
-  describe('readTemplate', () => {
-    afterEach(() => {
-      jest.clearAllMocks();
-    });
-
-    it('reads the correct template file and returns its content', async () => {
-      const templateName = 'UNTP_REPORT';
-      const result = await readTemplate(templateName);
-      expect(result).toBe(reportTemplates[templateName]);
-    });
-
-    it('throws an error if reading the file fails', async () => {
-      const templateName = 'invalid-name';
-      const errorMessage = `Template \"${templateName}"\ not found`;
-      await expect(readTemplate(templateName)).rejects.toThrow(errorMessage);
     });
   });
 });

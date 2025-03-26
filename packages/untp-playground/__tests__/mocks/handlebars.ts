@@ -1,5 +1,5 @@
-export const reportTemplates = {
- UNTP_REPORT: `<html lang="en">
+module.exports = `<html lang="en">
+
  <head>
  <meta charset="UTF-8" />
  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -225,5 +225,5 @@ export const reportTemplates = {
  {{/each}}
  </div>
  </body>
-</html>`,
-};
+
+</html>`;

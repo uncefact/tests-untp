@@ -2,7 +2,7 @@ import handlebars from 'handlebars';
 import { PermittedCredentialType } from '@/types';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { reportTemplates } from '@/types/templates';
+import templateContent from '@/lib/templates/untp-comformance-report-template.hbs';
 import { CredentialType, permittedCredentialTypes, VCDM_CONTEXT_URLS, VCDMVersion } from '../../constants';
 
 export function cn(...inputs: ClassValue[]) {
@@ -65,19 +65,6 @@ export const downloadJson = (data: Record<string, any>, filename: string) => {
 };
 
 /**
- * Reads a Handlebars template file and returns its content as a string.
- * @param {string} templateName - The name of the template file (without the .hbs extension).
- * @returns A promise that resolves to the content of the template file as a string.
- */
-export const readTemplate = async (templateName: string): Promise<string> => {
-  const template = reportTemplates[templateName as keyof typeof reportTemplates];
-  if (!template) {
-    throw new Error(`Template "${templateName}" not found`);
-  }
-  return template;
-};
-
-/**
  * Downloads an HTML report with the provided data.
  * @param data The data to display in the report.
  * @param filename The name of the file to download.
@@ -85,14 +72,12 @@ export const readTemplate = async (templateName: string): Promise<string> => {
 export const downloadHtml = async (
   data: Record<string, any>,
   filename: string,
-  templateName: string = 'UNTP_REPORT',
 ) => {
   if (!filename.endsWith('.html')) {
     filename = `${filename}.html`;
   }
 
   try {
-    const templateContent = await readTemplate(templateName);
     const template = handlebars.compile(templateContent);
     const html = template({ credentialSubject: data });
     downloadFile(html, filename, 'text/html');

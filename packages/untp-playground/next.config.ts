@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
       };
     }
 
+    config.module.rules.push({
+      test: /\.hbs$/,
+      use: 'raw-loader',
+    });
+
     return config;
   },
 };
