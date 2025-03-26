@@ -94,6 +94,7 @@ jobs:
         with:
           node-version: lts/*
           cache: yarn
+  
       - name: Installing dependencies 📦️
         run: yarn install
         working-directory: ./packages/untp-playground/infra
