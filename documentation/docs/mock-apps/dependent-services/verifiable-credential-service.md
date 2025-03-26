@@ -54,3 +54,26 @@ Regardless of which setup option you chose, you'll need to create an identifier 
 To create an identifier, you'll need to use the VCKit API. Refer to the [VCKit documentation](https://uncefact.github.io/project-vckit/docs/get-started/api-server-get-started/basic-operations) for specific instructions on how to create a did:web identifier using their API endpoints.
 
 In the next section, we will discuss the Storage Service and its role in the UNTP ecosystem.
+
+### Important Notice
+
+When updating to a new Docker image in Docker Compose, ensure that you remove the volumes associated with the database server. This step is necessary to maintain data consistency and avoid potential conflicts during the update process.
+
+#### Steps to Remove Volumes and Update Docker Image
+1. Stop the Running Containers
+
+```sh
+docker compose down
+```
+
+2. Remove the vckit-data volume:
+
+```sh
+docker volume rm tests-untp_vckit-data
+```
+
+3. Restart the containers:
+
+```sh
+docker compose up -d
+```
