@@ -1,8 +1,8 @@
 'use client';
 
 import { generateReport } from '@/lib/reportService';
-import { downloadJson } from '@/lib/utils';
-import { StoredCredential, TestReport, TestStep } from '@/types';
+import { downloadHtml, downloadJson } from '@/lib/utils';
+import { DownloadReportFormat, StoredCredential, TestReport, TestStep } from '@/types';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { CredentialType, TestCaseStatus } from '../../constants';
@@ -12,7 +12,7 @@ interface TestReportContextType {
   canDownloadReport: boolean;
   report: TestReport | null;
   generateReport: (implementationName: string) => Promise<void>;
-  downloadReport: () => void;
+  downloadReport: (format: DownloadReportFormat) => void;
 }
 
 const TestReportContext = createContext<TestReportContextType | undefined>(undefined);
@@ -73,7 +73,7 @@ export function TestReportProvider({ children, testResults, credentials }: TestR
     }
   };
 
-  const downloadReport = () => {
+  const downloadReport = async (format: DownloadReportFormat) => {
     if (!report) {
       toast.error('No report available to download');
       return;
@@ -81,7 +81,16 @@ export function TestReportProvider({ children, testResults, credentials }: TestR
 
     try {
       const filename = `untp-test-report-${report.implementation.name.toLowerCase().replace(/\s+/g, '-')}`;
-      downloadJson(report, filename);
+      switch (format) {
+        case DownloadReportFormat.JSON:
+          downloadJson(report, filename);
+          break;
+        case DownloadReportFormat.HTML:
+          await downloadHtml(report, filename);
+          break;
+        default:
+          toast.error('Unsupported report format');
+      }
     } catch (error) {
       console.error('Failed to download report:', error);
       toast.error('Failed to download report');

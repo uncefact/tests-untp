@@ -1,7 +1,7 @@
 import { TestReportProvider, useTestReport } from '@/contexts/TestReportContext';
 import { generateReport } from '@/lib/reportService';
-import { downloadJson } from '@/lib/utils';
-import { Credential, StoredCredential, TestReport, TestStep } from '@/types';
+import { downloadJson, downloadHtml } from '@/lib/utils';
+import { Credential, DownloadReportFormat, StoredCredential, TestReport, TestStep } from '@/types';
 import { act, renderHook } from '@testing-library/react';
 import { toast } from 'sonner';
 import { CredentialType, TestCaseStatus, TestCaseStepId, VCDM_CONTEXT_URLS } from '../../constants';
@@ -135,7 +135,7 @@ describe('TestReportContext', () => {
     expect(result.current.canDownloadReport).toBeFalsy();
   });
 
-  it('downloads report successfully', async () => {
+  it('downloads report with JSON format successfully', async () => {
     const { result } = renderHook(() => useTestReport(), { wrapper });
 
     await act(async () => {
@@ -143,10 +143,24 @@ describe('TestReportContext', () => {
     });
 
     act(() => {
-      result.current.downloadReport();
+      result.current.downloadReport(DownloadReportFormat.JSON);
     });
 
     expect(downloadJson).toHaveBeenCalledWith(mockReport, 'untp-test-report-test-implementation');
+  });
+
+  it('downloads report with HTML format successfully', async () => {
+    const { result } = renderHook(() => useTestReport(), { wrapper });
+
+    await act(async () => {
+      await result.current.generateReport('Test Implementation');
+    });
+
+    act(() => {
+      result.current.downloadReport(DownloadReportFormat.HTML);
+    });
+
+    expect(downloadHtml).toHaveBeenCalledWith(mockReport, 'untp-test-report-test-implementation');
   });
 
   it('handles download failure', async () => {
@@ -162,7 +176,7 @@ describe('TestReportContext', () => {
     });
 
     act(() => {
-      result.current.downloadReport();
+      result.current.downloadReport(DownloadReportFormat.JSON);
     });
 
     expect(toast.error).toHaveBeenCalledWith('Failed to download report');
@@ -172,7 +186,7 @@ describe('TestReportContext', () => {
     const { result } = renderHook(() => useTestReport(), { wrapper });
 
     act(() => {
-      result.current.downloadReport();
+      result.current.downloadReport(DownloadReportFormat.JSON);
     });
 
     expect(toast.error).toHaveBeenCalledWith('No report available to download');
@@ -211,5 +225,20 @@ describe('TestReportContext', () => {
     });
 
     expect(newResult.current.report).toBeNull();
+  });
+
+  it('shows error toast when unsupported report format is selected', async () => {
+    const { result } = renderHook(() => useTestReport(), { wrapper });
+
+    await act(async () => {
+      await result.current.generateReport('Test Implementation');
+    });
+
+    act(() => {
+      // @ts-ignore: Argument of type '""' is not assignable to parameter of type 'DownloadReportFormat'.
+      result.current.downloadReport('');
+    });
+
+    expect(toast.error).toHaveBeenCalledWith('Unsupported report format');
   });
 });

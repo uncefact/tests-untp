@@ -27,6 +27,7 @@ import {
 } from '../../constants';
 import { GenerateReportDialog } from './GenerateReportDialog';
 import { SectionHeader } from './SectionHeader';
+import { DownloadReport } from './DownloadReport';
 import ValidationDetailsSheet from './ValidationDetailsSheet';
 
 // Add this type to help with tracking previous credentials
@@ -619,9 +620,7 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
           }
           dataTestId='download-report-button'
         >
-          <Button onClick={downloadReport} disabled={!canDownloadReport}>
-            Download Report
-          </Button>
+          <DownloadReport />
         </TooltipWrapper>
       </SectionHeader>
       {permittedCredentialTypes.map((type) => {

@@ -1,6 +1,8 @@
+import handlebars from 'handlebars';
 import { PermittedCredentialType } from '@/types';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import templateContent from '@/lib/templates/untp-comformance-report-template.hbs';
 import { CredentialType, permittedCredentialTypes, VCDM_CONTEXT_URLS, VCDMVersion } from '../../constants';
 
 export function cn(...inputs: ClassValue[]) {
@@ -36,6 +38,18 @@ export function isPermittedCredentialType(type: CredentialType): type is Permitt
   return permittedCredentialTypes.includes(type as PermittedCredentialType);
 }
 
+const downloadFile = (content: string, filename: string, mimeType: string) => {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
 export const downloadJson = (data: Record<string, any>, filename: string) => {
   if (!filename.endsWith('.json')) {
     filename = `${filename}.json`;
@@ -43,19 +57,29 @@ export const downloadJson = (data: Record<string, any>, filename: string) => {
 
   try {
     // Verify data is JSON-serializable
-    JSON.stringify(data);
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const jsonContent = JSON.stringify(data, null, 2);
+    downloadFile(jsonContent, filename, 'application/json');
   } catch (error) {
     throw new Error('Data is not JSON-serializable');
+  }
+};
+
+/**
+ * Downloads an HTML report with the provided data.
+ * @param data The data to display in the report.
+ * @param filename The name of the file to download.
+ */
+export const downloadHtml = async (data: Record<string, any>, filename: string) => {
+  if (!filename.endsWith('.html')) {
+    filename = `${filename}.html`;
+  }
+
+  try {
+    const template = handlebars.compile(templateContent);
+    const html = template({ credentialSubject: data });
+    downloadFile(html, filename, 'text/html');
+  } catch (error) {
+    throw new Error('Failed to download HTML report');
   }
 };
 

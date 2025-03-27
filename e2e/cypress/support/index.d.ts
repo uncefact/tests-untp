@@ -61,7 +61,7 @@ interface PlaygroundChainable {
   /**
    * Downloads and verifies the basic structure of a report
    */
-  downloadAndVerifyReport(implementationName: string, expectedPass: boolean): Cypress.Chainable<any>;
+  downloadAndVerifyReport(implementationName: string, expectedPass: boolean, format?: string): Cypress.Chainable<any>;
 }
 
 interface IssueChainable {

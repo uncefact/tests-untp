@@ -1,4 +1,10 @@
-import { detectVcdmVersion, downloadJson, isPermittedCredentialType, validateNormalizedCredential } from '@/lib/utils';
+import {
+  detectVcdmVersion,
+  downloadJson,
+  isPermittedCredentialType,
+  validateNormalizedCredential,
+  downloadHtml,
+} from '@/lib/utils';
 import { CredentialType, VCDM_CONTEXT_URLS, VCDMVersion } from '../../constants';
 
 describe('utils', () => {
@@ -174,6 +180,63 @@ describe('utils', () => {
       circularData.self = circularData;
 
       expect(() => downloadJson(circularData, 'test-file')).toThrow('Data is not JSON-serializable');
+    });
+  });
+
+  describe('downloadHtml', () => {
+    let mockAnchor: { href: string; download: string; click: jest.Mock; remove: jest.Mock };
+    let mockCreateElement: jest.SpyInstance;
+    let mockAppendChild: jest.SpyInstance;
+    let mockRemoveChild: jest.SpyInstance;
+    beforeEach(() => {
+      mockAnchor = {
+        href: '',
+        download: '',
+        click: jest.fn(),
+        remove: jest.fn(),
+      };
+      mockCreateElement = jest.spyOn(document, 'createElement').mockReturnValue(mockAnchor as any);
+      mockAppendChild = jest.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
+      mockRemoveChild = jest.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
+
+      global.Blob = jest.fn().mockImplementation((content) => ({
+        size: content[0].length,
+        type: 'text/html',
+      }));
+    });
+
+    afterEach(() => {
+      jest.clearAllMocks();
+    });
+
+    const runTest = async (filename: string, expectedFilename: string) => {
+      const data = { name: 'John Doe' };
+      await downloadHtml(data, filename);
+      expect(mockAnchor.download).toBe(expectedFilename);
+    };
+
+    it('appends .html to the filename if not present', async () => {
+      await runTest('report', 'report.html');
+    });
+
+    it('does not append .html to the filename if already present', async () => {
+      await runTest('report.html', 'report.html');
+    });
+
+    it('should download HTML file with correct content', async () => {
+      const mockReport = {
+        implementation: { name: 'Test Implementation' },
+        results: [],
+        date: new Date().toISOString(),
+        testSuite: {
+          runner: 'UNTP Playground',
+          version: '1.0.0',
+        },
+        pass: true,
+      };
+      const filename = 'report';
+      await downloadHtml(mockReport, filename);
+      expect(mockAnchor.download).toBe('report.html');
     });
   });
 });

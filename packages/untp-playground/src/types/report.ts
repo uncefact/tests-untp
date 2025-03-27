@@ -41,3 +41,8 @@ export interface TestReportResult {
     steps: TestReportStep[];
   };
 }
+
+export enum DownloadReportFormat {
+  HTML = 'html',
+  JSON = 'json',
+}

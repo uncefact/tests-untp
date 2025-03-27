@@ -104,18 +104,26 @@ Cypress.Commands.add('generateReport', (implementationName: string) => {
 });
 
 // Command to download and verify basic report structure
-Cypress.Commands.add('downloadAndVerifyReport', (implementationName: string, expectedPass: boolean) => {
-  cy.contains('button', 'Download Report').should('be.enabled');
-  cy.contains('button', 'Download Report').click();
+Cypress.Commands.add(
+  'downloadAndVerifyReport',
+  (implementationName: string, expectedPass: boolean, format: string = 'json') => {
+    cy.contains('button', 'Download Report').should('be.enabled');
+    cy.contains('button', 'Download Report').click();
+    cy.get('[data-testid="download-report-select-item"]').contains(format.toUpperCase()).click();
 
-  cy.readFile(`cypress/downloads/untp-test-report-${implementationName.toLowerCase().replace(/\s+/g, '-')}.json`).then(
-    (report) => {
-      expect(report).to.have.property('date');
-      expect(report).to.have.property('testSuite');
-      expect(report.implementation).to.deep.equal({ name: implementationName });
-      expect(report.pass).to.equal(expectedPass);
-      expect(report.results).to.be.an('array');
-      return report;
-    },
-  );
-});
+    if (format === 'json') {
+      cy.readFile(
+        `cypress/downloads/untp-test-report-${implementationName.toLowerCase().replace(/\s+/g, '-')}.${format}`,
+      ).then((report) => {
+        expect(report).to.have.property('date');
+        expect(report).to.have.property('testSuite');
+        expect(report.implementation).to.deep.equal({ name: implementationName });
+        expect(report.pass).to.equal(expectedPass);
+        expect(report.results).to.be.an('array');
+        return report;
+      });
+    } else if (format === 'html') {
+      cy.readFile('cypress/downloads/untp-test-report-core-test-implementation.html').should('exist');
+    }
+  },
+);
