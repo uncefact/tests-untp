@@ -83,7 +83,7 @@ The site can be configured using a `.env` file. Copy the [.env.example](.env.exa
 
 | Environment Variable     | Description                          | Default Value                    |
 | ------------------------ | ------------------------------------ | -------------------------------- |
-| `DOCS_PORT`              | Port on which the application runs   | `3000`                           |
+| `DOCS_PORT`              | Port on which the application runs   | `3002`                           |
 | `DOCS_URL`               | URL for the documentation site       | `http://localhost`               |
 | `DOCS_BASE_URL`          | Base path for the documentation site | `/`                              |
 | `DOCS_SITE_TITLE`        | Title of the documentation site      | `Example Organization`           |
