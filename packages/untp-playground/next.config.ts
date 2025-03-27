@@ -7,14 +7,6 @@ const nextConfig: NextConfig = {
   output: 'standalone',
 
   webpack: (config, { isServer }) => {
-    if (!isServer) {
-      // Provide fallbacks for 'fs' and 'path' modules to prevent errors on the client side
-      config.resolve.fallback = {
-        fs: false,
-        path: false,
-      };
-    }
-
     config.module.rules.push({
       test: /\.hbs$/,
       use: 'raw-loader',
