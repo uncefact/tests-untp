@@ -59,6 +59,15 @@ export enum TestCaseStepId {
   CONTEXT_VALIDATION = 'context',
 }
 
+const commonContextUrls = [
+  'https://www.w3.org/ns/credentials/v2',
+  'https://test.uncefact.org/vocabulary/untp/{type}/{version}/',
+];
+
 export const allowedContextValue = {
-  '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/{type}/{version}/'],
+  '@context': commonContextUrls,
+};
+
+export const allowedExtensionValue = {
+  '@context': [...commonContextUrls, 'https://{extension.domain}/{type}/{version}/'],
 };

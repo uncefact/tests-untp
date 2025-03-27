@@ -2,18 +2,19 @@
 
 import React from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
 import { ErrorDialog } from './ErrorDialog';
 
 interface ValidationDetailsSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   errors: any[];
+  trigger?: React.ReactNode;
 }
 
-const ValidationDetailsSheet: React.FC<ValidationDetailsSheetProps> = ({ isOpen, onOpenChange, errors }) => {
+const ValidationDetailsSheet: React.FC<ValidationDetailsSheetProps> = ({ isOpen, onOpenChange, errors, trigger }) => {
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
+      {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
       <SheetContent className='sm:max-w-[600px]'>
         <SheetHeader>
           <SheetTitle>Validation Details</SheetTitle>
