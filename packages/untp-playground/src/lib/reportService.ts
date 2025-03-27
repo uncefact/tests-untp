@@ -1,7 +1,7 @@
 import { detectVersion } from '@/lib/credentialService';
 import { detectExtension } from '@/lib/schemaValidation';
 import { StoredCredential, TestReport, TestReportResult, TestReportStep, TestStep } from '@/types';
-import { testSuiteRunner, testSuiteVersion } from '../../config';
+import { reportName, testSuiteRunner, testSuiteVersion } from '../../config';
 import { CredentialType, TestCaseStatus, TestCaseStepId } from '../../constants';
 
 interface GenerateReportParams {
@@ -63,6 +63,7 @@ export const generateReport = async ({
 
   return {
     date: new Date().toISOString(),
+    reportName: reportName,
     testSuite: {
       runner: testSuiteRunner,
       version: testSuiteVersion,

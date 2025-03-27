@@ -29,6 +29,7 @@ When code is pushed to the `next` or `cd/**` branch:
    - NEXT_PUBLIC_BASE_PATH = /test-untp-playground
    - NEXT_PUBLIC_ASSET_PREFIX = /test-untp-playground
    - NEXT_PUBLIC_IMAGE_PATH = /test-untp-playground/\_next/image
+   - NEXT_PUBLIC_REPORT_NAME= AATP <!-- Abbreviated UNTP extension name (optional). Defaults to "UNTP". -->
 
 ### Production Deployment
 
@@ -39,6 +40,7 @@ When a tag is created, associated with the next branch and the workflow is [trig
    - NEXT_PUBLIC_BASE_PATH = /untp-playground
    - NEXT_PUBLIC_ASSET_PREFIX = /untp-playground
    - NEXT_PUBLIC_IMAGE_PATH = /untp-playground/\_next/image
+   - NEXT_PUBLIC_REPORT_NAME = AATP <!-- Abbreviated UNTP extension name (optional). Defaults to "UNTP". -->
 
 ## Infrastructure Details
 

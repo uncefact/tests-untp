@@ -29,6 +29,7 @@ const mockTestResults: Partial<Record<CredentialType, TestStep[]>> = {
 
 const mockReport: TestReport = {
   implementation: { name: 'Test Implementation' },
+  reportName: 'UNTP',
   results: [],
   date: new Date().toISOString(),
   testSuite: {
@@ -87,7 +88,9 @@ describe('TestReportContext', () => {
     expect(result.current.canGenerateReport).toBeFalsy();
   });
 
-  it('generates report successfully', async () => {
+  const runGenerateReportTest = async (expectedReport: any) => {
+    (generateReport as jest.Mock).mockResolvedValue(expectedReport);
+
     const { result } = renderHook(() => useTestReport(), { wrapper });
 
     await act(async () => {
@@ -101,8 +104,20 @@ describe('TestReportContext', () => {
       passStatuses: [TestCaseStatus.SUCCESS, TestCaseStatus.WARNING],
     });
     expect(toast.success).toHaveBeenCalledWith('Report generated successfully');
-    expect(result.current.report).toEqual(mockReport);
+    expect(result.current.report).toEqual(expectedReport);
     expect(result.current.canDownloadReport).toBeTruthy();
+  };
+
+  it('generates report successfully', async () => {
+    await runGenerateReportTest(mockReport);
+  });
+
+  it('generates report with extension reportName successfully', async () => {
+    const expectedReport = {
+      ...mockReport,
+      reportName: 'AATP',
+    };
+    await runGenerateReportTest(expectedReport);
   });
 
   it('handles report generation failure', async () => {
