@@ -52,7 +52,7 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          editUrl,
+          editUrl: ({ versionDocsDirPath, docPath }) => `${editUrl}/${versionDocsDirPath}/${docPath}`,
         },
         blog: false,
         theme: {
