@@ -4,24 +4,24 @@ import { themes as prismThemes } from 'prism-react-renderer';
 
 const url = process.env.DOCS_URL || 'http://localhost';
 const baseUrl = process.env.DOCS_BASE_URL || '/';
-const title = process.env.SITE_TITLE || 'Example Organization';
-const siteLogoUrL = process.env.SITE_LOGO_URL || 'img/grey-placeholder-image.png';
-const favicon = process.env.FAVICON_URL || 'img/grey-placeholder-image.png';
-const organizationName = process.env.ORGANIZATION_NAME || 'Example Organization';
-const projectName = process.env.PROJECT_NAME || 'Unnamed Project';
-const heroImageUrl = process.env.HERO_IMAGE_URL || 'img/grey-placeholder-image.png';
-const navbarTitle = process.env.NAVBAR_TITLE || 'Doc';
-const editUrl = process.env.EDIT_URL_BASE || 'https://example.com/edit-url';
-const slackLink = process.env.SLACK_COMMUNITY_LINK || 'https://example.com/slack-community-link';
-const repoLink = process.env.REPOSITORY_LINK || 'https://example.com/repo-link';
-const altTextImages = process.env.ALT_TEXT_IMAGES || 'Unnamed alt text images';
-const heroImageAlt = process.env.HERO_IMAGE_ALT || 'Hero image';
-const tagline = process.env.SITE_TAGLINE || 'Example tagline';
-const extensionDocsLink = process.env.EXTENSION_DOCS_LINK || 'https://example.com/extension-docs-link';
-const footerTitle = process.env.FOOTER_TITLE || 'Example Footer';
-const footerText = process.env.FOOTER_TEXT || 'Example Footer';
-const footerSpecTitle = process.env.FOOTER_SPEC_TITLE || 'Specification';
-const footerSpecLink = process.env.FOOTER_SPEC_LINK || 'https://example.com/footer-spec-link';
+const title = process.env.DOCS_SITE_TITLE || 'Example Organization';
+const siteLogoUrL = process.env.DOCS_SITE_LOGO_URL || 'img/grey-placeholder-image.png';
+const siteLogoAlt = process.env.DOCS_SITE_LOGO_ALT || 'Example alt text';
+const favicon = process.env.DOCS_FAVICON_URL || 'img/grey-placeholder-image.png';
+const organizationName = process.env.DOCS_ORGANIZATION_NAME || 'Example Organization';
+const projectName = process.env.DOCS_PROJECT_NAME || 'Unnamed Project';
+const heroImageUrl = process.env.DOCS_HERO_IMAGE_URL || 'img/grey-placeholder-image.png';
+const navbarTitle = process.env.DOCS_NAVBAR_TITLE || 'Doc';
+const editUrl = process.env.DOCS_EDIT_URL_BASE || 'https://example.com/edit-url';
+const slackLink = process.env.DOCS_SLACK_COMMUNITY_LINK || 'https://example.com/slack-community-link';
+const repoLink = process.env.DOCS_REPOSITORY_LINK || 'https://example.com/repo-link';
+const heroImageAlt = process.env.DOCS_HERO_IMAGE_ALT || 'Hero image';
+const tagline = process.env.DOCS_SITE_TAGLINE || 'Example tagline';
+const extensionsLink = process.env.DOCS_EXTENSIONS_LINK || 'https://example.com/extensions-link';
+const footerTitle = process.env.DOCS_FOOTER_TITLE || 'Example Footer';
+const footerSpecTitle = process.env.DOCS_FOOTER_SPEC_TITLE || 'Specification';
+const footerSpecLink = process.env.DOCS_FOOTER_SPEC_LINK || 'https://example.com/footer-spec-link';
+const copyrightText = process.env.DOCS_COPYRIGHT_TEXT || 'Example Copyright Text';
 
 const config: Config = {
   title,
@@ -32,7 +32,7 @@ const config: Config = {
   baseUrl,
 
   organizationName,
-  projectName, 
+  projectName,
 
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
@@ -56,12 +56,9 @@ const config: Config = {
         },
         blog: false,
         theme: {
-          customCss: [
-            require.resolve('./src/css/custom.scss'),
-            require.resolve('./src/css/index.scss'),
-          ],
+          customCss: [require.resolve('./src/css/custom.scss'), require.resolve('./src/css/index.scss')],
         },
-      }
+      },
     ],
   ],
 
@@ -80,11 +77,11 @@ const config: Config = {
     navbar: {
       title: navbarTitle,
       logo: {
-        alt: altTextImages,
+        alt: siteLogoAlt,
         src: siteLogoUrL,
       },
       items: [
-        {to: '/docs/introduction', label: 'Introduction', position: 'right'},
+        { to: '/docs/introduction', label: 'Introduction', position: 'right' },
         {
           to: '/docs/mock-apps/',
           label: 'Getting started',
@@ -95,7 +92,7 @@ const config: Config = {
           label: 'Tools and support',
           position: 'right',
         },
-        {to: extensionDocsLink, label: 'Extensions', position: 'right'},
+        { to: extensionsLink, label: 'Extensions', position: 'right' },
         {
           to: repoLink,
           label: 'Contribute',
@@ -178,13 +175,13 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `© ${footerText}`,
+      copyright: `© ${copyrightText}`,
     },
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
     },
-  }
+  },
 };
 
 export default config;
