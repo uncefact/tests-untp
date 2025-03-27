@@ -51,6 +51,8 @@ docker-compose up -d
 
 This will start pre-configured instances of the necessary services and the documentation site. The `app-config.json` mock app config file is pre-configured to work with these Docker services.
 
+> **Note**: Elements within the documentation site like the header logo, hero image, etc, are pre-configured to use default values. If you would like to modify these default values, see the configuration guide [here](documentation/README.md#environment-variables).
+
 ### Docker Compose with Seeding Data
 
 If you want to run the Docker Compose along with seeding data, you can use the following command:

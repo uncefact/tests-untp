@@ -5,10 +5,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - 3002:3002
-    environment:
-      - PORT=3002
-      - DOCS_URL=http://0.0.0.0
-      - DOCS_BASE_URL=/
+    env_file:
+      - path: ./documentation/.env
+        required: false
     volumes:
       - ./documentation:/app
       - /app/node_modules

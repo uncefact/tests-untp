@@ -1,19 +1,38 @@
 import type { Config } from '@docusaurus/types';
+import 'dotenv/config';
 import { themes as prismThemes } from 'prism-react-renderer';
 
 const url = process.env.DOCS_URL || 'http://localhost';
 const baseUrl = process.env.DOCS_BASE_URL || '/';
+const title = process.env.DOCS_SITE_TITLE || 'Example Organization';
+const siteLogoUrL = process.env.DOCS_SITE_LOGO_URL || 'img/grey-placeholder-image.png';
+const siteLogoAlt = process.env.DOCS_SITE_LOGO_ALT || 'Example alt text';
+const favicon = process.env.DOCS_FAVICON_URL || 'img/grey-placeholder-image.png';
+const organizationName = process.env.DOCS_ORGANIZATION_NAME || 'Example Organization';
+const projectName = process.env.DOCS_PROJECT_NAME || 'Unnamed Project';
+const heroImageUrl = process.env.DOCS_HERO_IMAGE_URL || 'img/grey-placeholder-image.png';
+const navbarTitle = process.env.DOCS_NAVBAR_TITLE || 'Doc';
+const editUrl = process.env.DOCS_EDIT_URL_BASE || 'https://example.com/edit-url';
+const slackLink = process.env.DOCS_SLACK_COMMUNITY_LINK || 'https://example.com/slack-community-link';
+const repoLink = process.env.DOCS_REPOSITORY_LINK || 'https://example.com/repo-link';
+const heroImageAlt = process.env.DOCS_HERO_IMAGE_ALT || 'Hero image';
+const tagline = process.env.DOCS_SITE_TAGLINE || 'Example tagline';
+const extensionsLink = process.env.DOCS_EXTENSIONS_LINK || 'https://example.com/extensions-link';
+const footerTitle = process.env.DOCS_FOOTER_TITLE || 'Example Footer';
+const footerSpecTitle = process.env.DOCS_FOOTER_SPEC_TITLE || 'Specification';
+const footerSpecLink = process.env.DOCS_FOOTER_SPEC_LINK || 'https://example.com/footer-spec-link';
+const copyrightText = process.env.DOCS_COPYRIGHT_TEXT || 'Example Copyright Text';
 
 const config: Config = {
-  title: 'UN Transparency Protocol Test Suite',
-  tagline: 'A comprehensive suite of tools for testing conformance to the UNTP Specification.',
-  favicon: 'img/favicon.ico',
+  title,
+  tagline,
+  favicon,
 
   url,
   baseUrl,
 
-  organizationName: 'uncefact', // Replace with your GitHub org/user name
-  projectName: 'tests-untp', // Replace with your repo name
+  organizationName,
+  projectName,
 
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
@@ -33,16 +52,13 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/uncefact/tests-untp/tree/main/',
+          editUrl: ({ versionDocsDirPath, docPath }) => `${editUrl}/${versionDocsDirPath}/${docPath}`,
         },
         blog: false,
         theme: {
-          customCss: [
-            require.resolve('./src/css/custom.scss'),
-            require.resolve('./src/css/index.scss'),
-          ],
+          customCss: [require.resolve('./src/css/custom.scss'), require.resolve('./src/css/index.scss')],
         },
-      } 
+      },
     ],
   ],
 
@@ -51,21 +67,21 @@ const config: Config = {
   themes: ['@docusaurus/theme-mermaid'],
 
   themeConfig: {
-    slackLink:
-    'https://join.slack.com/t/uncefact/shared_invite/zt-1d7hd0js1-sS1Xgk8DawQD9VgRvy1QHQ',
-    repoLink: 'https://github.com/uncefact/tests-untp',
+    slackLink,
+    repoLink: repoLink,
     colorMode: {
       disableSwitch: true,
     },
-  image: 'img/un-crm-social-card.png',    
-  navbar: {
-      title: 'TP',
+    heroImage: heroImageUrl,
+    heroImageAlt,
+    navbar: {
+      title: navbarTitle,
       logo: {
-        alt: 'UNTP Test Suite Logo',
-        src: 'img/logo.svg',
+        alt: siteLogoAlt,
+        src: siteLogoUrL,
       },
       items: [
-        {to: '/docs/introduction', label: 'Introduction', position: 'right'},
+        { to: '/docs/introduction', label: 'Introduction', position: 'right' },
         {
           to: '/docs/mock-apps/',
           label: 'Getting started',
@@ -76,27 +92,27 @@ const config: Config = {
           label: 'Tools and support',
           position: 'right',
         },
-        {to: 'https://uncefact.github.io/spec-untp/docs/extensions/', label: 'Extensions', position: 'right'},
+        { to: extensionsLink, label: 'Extensions', position: 'right' },
         {
-          to: 'https://github.com/uncefact/tests-untp',
+          to: repoLink,
           label: 'Contribute',
           position: 'right',
         },
         {
-          href: 'https://app.slack.com/client/T03KNUD7LHZ/C05R8DD2AKZ',
+          href: slackLink,
           position: 'right',
           html: '<svg class="icon icon-slack"><use xlink:href="#slack"></use></svg><span class="menu-item-name">Slack</span>',
           className: 'navbar-slack-link',
         },
         {
-          href: 'https://github.com/uncefact/tests-untp',
+          href: repoLink,
           html: '<svg class="icon"><use xlink:href="#github"></use></svg><span class="menu-item-name">Github</span>',
           className: 'navbar-github-link',
           position: 'right',
         },
-         {
-            type: 'docsVersionDropdown',
-          },
+        {
+          type: 'docsVersionDropdown',
+        },
       ],
     },
     footer: {
@@ -137,15 +153,15 @@ const config: Config = {
           ],
         },
         {
-          title: 'UN Transparency Protocol',
+          title: footerTitle,
           items: [
             {
-              label: 'UNTP Specification',
-              href: 'https://uncefact.github.io/spec-untp/',
+              label: footerSpecTitle,
+              href: footerSpecLink,
             },
             {
               label: 'Slack Channel',
-              href: 'https://app.slack.com/client/T03KNUD7LHZ/C05R8DD2AKZ',
+              href: slackLink,
             },
           ],
         },
@@ -154,18 +170,18 @@ const config: Config = {
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/uncefact/tests-untp',
+              href: repoLink,
             },
           ],
         },
       ],
-      copyright: `© United Nations Economic Commission for Europe`,
+      copyright: `© ${copyrightText}`,
     },
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
     },
-  }
+  },
 };
 
 export default config;

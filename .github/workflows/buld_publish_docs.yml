@@ -1,4 +1,3 @@
-# TODO: Enable once tagging is enabled
 name: Deploy to GitHub Pages
 
 on:
@@ -26,6 +25,25 @@ jobs:
         env:
           DOCS_BASE_URL: ${{ vars.DOCS_BASE_URL }}
           DOCS_URL: ${{ vars.DOCS_URL }}
+          DOCS_SITE_TITLE: ${{ vars.DOCS_SITE_TITLE }}
+          DOCS_SITE_TAGLINE: ${{ vars.DOCS_SITE_TAGLINE }}
+          DOCS_SITE_LOGO_URL: ${{ vars.DOCS_SITE_LOGO_URL }}
+          DOCS_SITE_LOGO_ALT: ${{ vars.DOCS_SITE_LOGO_ALT }}
+          DOCS_ORGANIZATION_NAME: ${{ vars.DOCS_ORGANIZATION_NAME }}
+          DOCS_PROJECT_NAME: ${{ vars.DOCS_PROJECT_NAME }}
+          DOCS_FAVICON_URL: ${{ vars.DOCS_FAVICON_URL }}
+          DOCS_NAVBAR_TITLE: ${{ vars.DOCS_NAVBAR_TITLE }}
+          DOCS_HERO_IMAGE_URL: ${{ vars.DOCS_HERO_IMAGE_URL }}
+          DOCS_HERO_IMAGE_ALT: ${{ vars.DOCS_HERO_IMAGE_ALT }}
+          DOCS_EDIT_URL_BASE: ${{ vars.DOCS_EDIT_URL_BASE }}
+          DOCS_REPOSITORY_LINK: ${{ vars.DOCS_REPOSITORY_LINK }}
+          DOCS_SLACK_COMMUNITY_LINK: ${{ vars.DOCS_SLACK_COMMUNITY_LINK }}
+          DOCS_SOCIAL_MEDIA_PREVIEW_IMAGE_URL: ${{ vars.DOCS_SOCIAL_MEDIA_PREVIEW_IMAGE_URL }}
+          DOCS_EXTENSIONS_LINK: ${{ vars.DOCS_EXTENSIONS_LINK }}
+          DOCS_FOOTER_TITLE: ${{ vars.DOCS_FOOTER_TITLE }}
+          DOCS_FOOTER_SPEC_TITLE: ${{ vars.DOCS_FOOTER_SPEC_TITLE }}
+          DOCS_FOOTER_SPEC_LINK: ${{ vars.DOCS_FOOTER_SPEC_LINK }}
+          DOCS_COPYRIGHT_TEXT: ${{ vars.DOCS_COPYRIGHT_TEXT }}
 
       # Popular action to deploy to GitHub Pages:
       # Docs: https://github.com/peaceiris/actions-gh-pages#%EF%B8%8F-docusaurus
