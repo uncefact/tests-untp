@@ -5,7 +5,7 @@ on:
     branches:
       - next
       - main
-      - docs/parameterise_docs
+      - docs/parameterise_doc
 
 jobs:
   deploy:
