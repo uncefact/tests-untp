@@ -141,6 +141,7 @@ const appImage = new docker_build.Image(`app-image-${stack}`, {
     ...(process.env.NEXT_PUBLIC_BASE_PATH && { NEXT_PUBLIC_BASE_PATH: process.env.NEXT_PUBLIC_BASE_PATH }),
     ...(process.env.NEXT_PUBLIC_ASSET_PREFIX && { NEXT_PUBLIC_ASSET_PREFIX: process.env.NEXT_PUBLIC_ASSET_PREFIX }),
     ...(process.env.NEXT_PUBLIC_IMAGE_PATH && { NEXT_PUBLIC_IMAGE_PATH: process.env.NEXT_PUBLIC_IMAGE_PATH }),
+    ...(process.env.NEXT_PUBLIC_REPORT_NAME && { NEXT_PUBLIC_REPORT_NAME: process.env.NEXT_PUBLIC_REPORT_NAME }),
   },
   // Push the final result to ECR.
   push: true,

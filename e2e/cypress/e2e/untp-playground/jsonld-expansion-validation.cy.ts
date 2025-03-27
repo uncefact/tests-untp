@@ -1,4 +1,4 @@
-import { VCDM_CONTEXT_URLS } from '../../../../packages/untp-playground/constants';
+import { allowedContextValue } from '../../../../packages/untp-playground/constants';
 
 describe('JSON-LD Expansion and Validation', () => {
   beforeEach(() => {

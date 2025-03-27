@@ -6,6 +6,7 @@ import { PermittedCredentialType } from './untp';
 
 export interface TestReport {
   date: string;
+  reportName: string;
   testSuite: {
     runner: string;
     version: string;

@@ -59,6 +59,7 @@ jobs:
           NEXT_PUBLIC_BASE_PATH: /test-untp-playground
           NEXT_PUBLIC_ASSET_PREFIX: /test-untp-playground
           NEXT_PUBLIC_IMAGE_PATH: /test-untp-playground/_next/image
+          NEXT_PUBLIC_REPORT_NAME:
           STACK_NAME: test
 
   deploy_prod:
@@ -108,4 +109,5 @@ jobs:
           NEXT_PUBLIC_BASE_PATH: /untp-playground
           NEXT_PUBLIC_ASSET_PREFIX: /untp-playground
           NEXT_PUBLIC_IMAGE_PATH: /untp-playground/_next/image
+          NEXT_PUBLIC_REPORT_NAME:
           STACK_NAME: prod

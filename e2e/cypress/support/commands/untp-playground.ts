@@ -2,7 +2,22 @@
 Cypress.Commands.add('uploadCredential', (credential: object | string) => {
   cy.get('[data-testid="credential-upload"]').should('be.visible');
 
-  if (typeof credential === 'object') {
+  if (Array.isArray(credential) && credential.length > 0) {
+    const credentials: Cypress.FileReference | Cypress.FileReference[] | {
+      contents: Buffer; fileName: string; // default file name; customize if needed
+      mimeType: string;
+    }[] = [];
+    credential.map((cred) => {
+      const fileObject = {
+        contents: Buffer.from(JSON.stringify(cred)),
+        fileName: 'credential.json', // default file name; customize if needed
+        mimeType: 'application/json',
+      };
+      credentials.push(fileObject);
+    });
+
+    cy.get('[data-testid="credential-upload-input"]').selectFile(credentials, { force: true });
+  } else if (typeof credential === 'object') {
     const fileObject = {
       contents: Buffer.from(JSON.stringify(credential)),
       fileName: 'credential.json', // default file name; customize if needed

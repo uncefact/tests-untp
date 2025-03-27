@@ -69,10 +69,7 @@ export const downloadJson = (data: Record<string, any>, filename: string) => {
  * @param data The data to display in the report.
  * @param filename The name of the file to download.
  */
-export const downloadHtml = async (
-  data: Record<string, any>,
-  filename: string,
-) => {
+export const downloadHtml = async (data: Record<string, any>, filename: string) => {
   if (!filename.endsWith('.html')) {
     filename = `${filename}.html`;
   }
@@ -84,4 +81,34 @@ export const downloadHtml = async (
   } catch (error) {
     throw new Error('Failed to download HTML report');
   }
+};
+
+export const validateNormalizedCredential = (normalizedCredential: any) => {
+  if (Array.isArray(normalizedCredential)) {
+    return {
+      keyword: 'type',
+      instancePath: 'array',
+      params: {
+        type: 'object',
+        receivedValue: normalizedCredential,
+        solution: 'Instead of [credential1, credential2], upload credential1.json and credential2.json.',
+      },
+      message: 'Credentials must be uploaded as separate files, not as an array.',
+    };
+  }
+
+  if (!normalizedCredential || typeof normalizedCredential !== 'object') {
+    return {
+      keyword: 'type',
+      instancePath: 'invalid',
+      params: {
+        type: 'object',
+        receivedValue: normalizedCredential,
+        solution: 'Upload a valid credential file.',
+      },
+      message: 'Invalid credential file.',
+    };
+  }
+
+  return null; // No errors
 };

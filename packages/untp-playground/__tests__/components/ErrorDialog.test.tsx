@@ -130,7 +130,9 @@ describe('ErrorDialog', () => {
     fireEvent.click(expandButton);
 
     // Verify tip content
-    expect(screen.getByText(/Update the value\(s\) to the correct one\(s\) or remove the field\(s\)/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Update the value\(s\) to the correct one\(s\) or remove the field\(s\)/i),
+    ).toBeInTheDocument();
   });
 
   it('displays correct tips based on error type "conflictingProperties"', () => {
@@ -149,7 +151,9 @@ describe('ErrorDialog', () => {
     fireEvent.click(expandButton);
 
     // Verify tip content
-    expect(screen.getByText(/Resolve the conflict by removing the conflicting field or updating it to a unique one/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Resolve the conflict by removing the conflicting field or updating it to a unique one/i),
+    ).toBeInTheDocument();
   });
 
   it('groups multiple errors for the same path', () => {
@@ -203,7 +207,9 @@ describe('ErrorDialog', () => {
     const button = screen.getByRole('button');
     fireEvent.click(button);
 
-    expect(screen.getByText(/the first element of "@context" must be one of the following:/i)).toBeInTheDocument();
+    const errorMessages = screen.getAllByText(/the first element of "@context" must be one of the following:/i);
+    const specificErrorMessage = errorMessages[0];
+    expect(specificErrorMessage).toBeInTheDocument();
 
     expect(
       screen.getByText((content, element) => {

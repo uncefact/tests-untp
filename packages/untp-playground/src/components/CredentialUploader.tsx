@@ -1,15 +1,27 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
+import { useError } from '@/contexts/ErrorContext';
 import { jwtDecode } from 'jwt-decode';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 
-export function CredentialUploader({ onCredentialUpload }: { onCredentialUpload: (credential: any) => void }) {
+export function CredentialUploader({
+  onCredentialUpload,
+  setFileCount,
+}: {
+  onCredentialUpload: (credential: any) => void;
+  setFileCount: (count: number) => void;
+}) {
+  // eslint-disable-next-line @typescript-eslint/unbound-method
+  const { resetErrors } = useError();
+
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
+      resetErrors();
       const validExtensions = ['.json', '.jwt', '.txt'];
+      setFileCount(acceptedFiles?.length);
 
       const invalidFiles = acceptedFiles.filter(
         (file: File) => !validExtensions.some((ext) => file.name.toLowerCase().endsWith(ext)),

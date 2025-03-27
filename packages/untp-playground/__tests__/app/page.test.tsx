@@ -10,6 +10,7 @@ import { detectExtension, validateCredentialSchema } from '@/lib/schemaValidatio
 import { CredentialUploader } from '@/components/CredentialUploader';
 import Home from '@/app/page';
 import { mockCredential } from '../mocks/vc';
+import { permittedCredentialTypes } from '../../constants';
 
 // Mock the dependencies
 jest.mock('sonner', () => ({
@@ -28,6 +29,14 @@ jest.mock('@/lib/credentialService', () => ({
 jest.mock('@/lib/schemaValidation', () => ({
   detectExtension: jest.fn(),
   validateCredentialSchema: jest.fn(),
+}));
+
+const mockDispatchError = jest.fn();
+
+jest.mock('@/contexts/ErrorContext', () => ({
+  useError: jest.fn(() => ({
+    dispatchError: mockDispatchError,
+  })),
 }));
 
 // Mock child components
@@ -98,12 +107,23 @@ describe('Home Component', () => {
 
   it('handles invalid credential format', async () => {
     (CredentialUploader as jest.Mock).mockImplementation(
-      ({ onCredentialUpload }: { onCredentialUpload: (credential: { verifiableCredential: any }) => void }) => (
-        <button data-testid='mock-uploader' onClick={() => onCredentialUpload('' as any)}>
+      ({ onCredentialUpload }: { onCredentialUpload: (credential: any) => void }) => (
+        <button data-testid='mock-uploader' onClick={() => onCredentialUpload([])}>
           Upload
         </button>
       ),
     );
+
+    const expectedValue = {
+      keyword: 'type',
+      instancePath: 'array',
+      params: {
+        type: 'object',
+        receivedValue: [],
+        solution: 'Instead of [credential1, credential2], upload credential1.json and credential2.json.',
+      },
+      message: 'Credentials must be uploaded as separate files, not as an array.',
+    };
 
     render(<Home />);
 
@@ -111,7 +131,7 @@ describe('Home Component', () => {
     fireEvent.click(uploader);
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Invalid credential format');
+      expect(mockDispatchError).toHaveBeenCalledWith([expectedValue]);
     });
   });
 
@@ -135,7 +155,19 @@ describe('Home Component', () => {
     fireEvent.click(uploader);
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Unknown credential type');
+      expect(mockDispatchError).toHaveBeenCalledWith([
+        {
+          keyword: 'required',
+          instancePath: '/type',
+          params: {
+            missingProperty: `type array with a supported types:  ${permittedCredentialTypes.join(', ')}`,
+            receivedValue: mockCredential.verifiableCredential,
+            allowedValue: { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+            solution: "Add a valid UNTP credential type (e.g., 'DigitalProductPassport', 'ConformityCredential').",
+          },
+          message: `The credential type is missing or invalid.`,
+        },
+      ]);
     });
   });
 

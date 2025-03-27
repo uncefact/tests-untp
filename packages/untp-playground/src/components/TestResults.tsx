@@ -3,7 +3,6 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useTestReport } from '@/contexts/TestReportContext';
 import { validateContext } from '@/lib/contextValidation';
 import { detectVersion, isEnvelopedProof } from '@/lib/credentialService';
@@ -17,6 +16,8 @@ import { AlertCircle, Check, ChevronDown, ChevronRight, Loader2, X } from 'lucid
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
+  allowedContextValue,
+  allowedExtensionValue,
   CredentialType,
   permittedCredentialTypes,
   TestCaseStatus,
@@ -24,10 +25,10 @@ import {
   VCDMVersion,
   VCProofType,
 } from '../../constants';
-import { ErrorDialog } from './ErrorDialog';
 import { GenerateReportDialog } from './GenerateReportDialog';
 import { SectionHeader } from './SectionHeader';
 import { DownloadReport } from './DownloadReport';
+import ValidationDetailsSheet from './ValidationDetailsSheet';
 
 // Add this type to help with tracking previous credentials
 type CredentialCache = Record<
@@ -165,35 +166,18 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
           <StatusIcon status={step.status} testId={`${step.id}`} />
           <span>{step.name}</span>
         </div>
-        {step.details &&
-          isAllowedTestCase &&
-          (step.details.errors?.[0]?.message === 'Failed to fetch schema' ? (
-            <span className='text-sm text-red-500'>Failed to load schema</span>
-          ) : (
-            shouldShowDetails && (
-              <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-                <SheetTrigger asChild>
-                  <Button variant='ghost' size='sm'>
-                    View Details
-                  </Button>
-                </SheetTrigger>
-                <SheetContent className='sm:max-w-[600px]'>
-                  <SheetHeader>
-                    <SheetTitle>Validation Details</SheetTitle>
-                  </SheetHeader>
-                  <div className='mt-4 overflow-y-auto max-h-[calc(100vh-8rem)]'>
-                    {step.details.errors && step.details.errors.length > 0 ? (
-                      <ErrorDialog errors={step.details.errors} className='w-full max-w-none' />
-                    ) : (
-                      <div className='text-yellow-600'>
-                        <p>⚠️ Additional properties found in credential</p>
-                      </div>
-                    )}
-                  </div>
-                </SheetContent>
-              </Sheet>
-            )
-          ))}
+        {step.details && isAllowedTestCase && shouldShowDetails && (
+          <ValidationDetailsSheet
+            isOpen={isDetailsOpen}
+            onOpenChange={setIsDetailsOpen}
+            errors={step.details.errors}
+            trigger={
+              <Button variant='ghost' size='sm'>
+                View Details
+              </Button>
+            }
+          />
+        )}
       </div>
     </div>
   );
@@ -506,6 +490,13 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
                             keyword: 'schema',
                             message: 'Failed to fetch schema',
                             instancePath: '',
+                            params: {
+                              missingValue: 'The schema could not be loaded due to missing UNTP context IRIs.',
+                              solution:
+                                "Ensure the credential includes the required UNTP context IRIs in the '@context' field.",
+                              allowedValue: allowedContextValue,
+                              receivedValue: credential,
+                            },
                           },
                         ],
                       },
@@ -521,7 +512,9 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
 
           if (!validateContextResult.valid) {
             allChecksPass = false;
-            toast.error(validateContextResult.error!.message);
+            toast.error(
+              'Validation of the JSON-LD context failed. Please check the View Details for more information.',
+            );
             contextTestResult.status = TestCaseStatus.FAILURE;
             contextTestResult.details = { errors: [validateContextResult.error] };
           }
@@ -576,6 +569,13 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
                               keyword: 'schema',
                               message: 'Failed to fetch extension schema',
                               instancePath: '',
+                              params: {
+                                missingValue: 'The schema could not be loaded due to missing extension context IRIs.',
+                                solution:
+                                  "Ensure the credential includes the required extension context IRIs in the '@context' field.",
+                                allowedValue: allowedExtensionValue,
+                                receivedValue: credential,
+                              },
                             },
                           ],
                         },
