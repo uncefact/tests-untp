@@ -31,7 +31,7 @@ export default function Home() {
   const {siteConfig} = useDocusaurusContext();
   return (
     <Layout
-      title={siteConfig.title}
+      title={`${siteConfig.title} Test Suite`}
       description={siteConfig.tagline}>
       <main className="homepage-content">
         <HomepageHero/>
