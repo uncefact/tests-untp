@@ -1,7 +1,7 @@
 import addFormats from 'ajv-formats';
 import Ajv2020 from 'ajv/dist/2020';
-import { VCDM_SCHEMA_URLS, VCDMVersion } from '../../constants';
-import { detectCredentialType, detectVersion } from './credentialService';
+import { shortCredentialTypes, VCDM_SCHEMA_URLS, VCDMVersion } from '../../constants';
+import { constructExtensionRegistry, detectAllTypes, detectCredentialType, detectVersion } from './credentialService';
 
 const ajv = new Ajv2020({
   allErrors: true,
@@ -52,13 +52,6 @@ export const EXTENSION_VERSIONS: Record<string, ExtensionConfig> = {
 };
 
 const schemaURLConstructor = (type: string, version: string) => {
-  const shortCredentialTypes: Record<string, string> = {
-    DigitalProductPassport: 'dpp',
-    DigitalConformityCredential: 'dcc',
-    DigitalTraceabilityEvent: 'dte',
-    DigitalFacilityRecord: 'dfr',
-    DigitalIdentityAnchor: 'dia',
-  };
   return `https://test.uncefact.org/vocabulary/untp/${shortCredentialTypes[type]}/untp-${shortCredentialTypes[type]}-schema-${version}.json`;
 };
 
@@ -123,8 +116,12 @@ export function detectExtension(credential: any):
       extension: { type: string; version: string };
     }
   | undefined {
+  const credentialTypes = detectAllTypes(credential);
+  const extensionRegistry = constructExtensionRegistry(credentialTypes, credential['@context']);
+
   const credentialType = detectCredentialType(credential);
-  const extension = EXTENSION_VERSIONS[credentialType];
+  const extension = extensionRegistry[credentialType];
+
   if (!extension) {
     return undefined;
   }

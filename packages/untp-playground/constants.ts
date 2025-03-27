@@ -71,3 +71,11 @@ export const allowedContextValue = {
 export const allowedExtensionValue = {
   '@context': [...commonContextUrls, 'https://{extension.domain}/{type}/{version}/'],
 };
+
+export const shortCredentialTypes: Record<string, string> = {
+  DigitalProductPassport: 'dpp',
+  DigitalConformityCredential: 'dcc',
+  DigitalTraceabilityEvent: 'dte',
+  DigitalFacilityRecord: 'dfr',
+  DigitalIdentityAnchor: 'dia',
+};
