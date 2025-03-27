@@ -42,7 +42,7 @@ This documentation site can be run in a Docker container. Below are the instruct
 By default, the Dockerfile sets these environment variables:
 
 ```bash
-ENV PORT=3002 \
+ENV DOCS_PORT=3002 \
     DOCS_URL=http://0.0.0.0 \
     DOCS_BASE_URL=/
 ```
@@ -77,28 +77,28 @@ http://localhost:3002
 
 #### Environment Variables
 
-The site can be configured using environment variables found in the [.env.example](.env.example) file. Create a `.env` file in the same directory or set them directly in your environment.
+The site can be configured using a `.env` file. Copy the [.env.example](.env.example) file and rename it to `.env`. Adjust the values within the file as you need.
 
-| Environment Variable             | Description                                    | Default Value                             |
-|----------------------------------|------------------------------------------------|-------------------------------------------|
-| `PORT`                           | Port on which the application runs             | `3000`                                    |
-| `DOCS_URL`                       | URL for the documentation site                 | `http://localhost`                          |
-| `DOCS_BASE_URL`                  | Base path for the documentation site           | `/`                                       |
-| `SITE_TITLE`                     | Title of the documentation site                | `Example Organization`                    |
-| `SITE_TAGLINE`                   | Tagline displayed on the site                  | `Example tagline`                         |
-| `SITE_LOGO_URL`                  | URL for the site logo                          | `img/grey-placeholder-image.png`           |
-| `ORGANIZATION_NAME`              | Name of the organization                       | `Example Organization`                    |
-| `PROJECT_NAME`                   | Name of the project                            | `Unnamed Project`                         |
-| `FAVICON_URL`                    | URL for the site favicon                       | `img/grey-placeholder-image.png`           |
-| `HERO_IMAGE_URL`                 | URL for the hero image                         | `img/grey-placeholder-image.png`           |
-| `HERO_IMAGE_ALT`                 | Alt text for the hero image                    | `Hero image`                              |
-| `NAVBAR_TITLE`                   | Title displayed in the navigation bar          | `Doc`                                     |
-| `EDIT_URL_BASE`                  | Base URL for edit links                        | `https://example.com/edit-url`            |
-| `REPOSITORY_LINK`                | URL to the project repository                  | `https://example.com/repo-link`           |
-| `SLACK_COMMUNITY_LINK`           | URL to the Slack community                     | `https://example.com/slack-community-link`|
-| `ALT_TEXT_IMAGES`                | Default alt text for images                    | `Unnamed alt text images`                 |
-| `EXTENSION_DOCS_LINK`            | URL to extension documentation                 | `https://example.com/extension-docs-link` |
-| `FOOTER_TITLE`                   | Title displayed in the footer                  | `Example Footer`                          |
-| `FOOTER_TEXT`                    | Text displayed in the footer                   | `Example Footer`                          |
-| `FOOTER_SPEC_TITLE`              | Title for the specification link in the footer | `Specification`                           |
-| `FOOTER_SPEC_LINK`               | URL to the specification documentation         | `https://example.com/footer-spec-link`    |
+| Environment Variable        | Description                                      | Default Value                              |
+| --------------------------- | ------------------------------------------------ | ------------------------------------------ |
+| `DOCS_PORT`                 | Port on which the application runs               | `3000`                                     |
+| `DOCS_URL`                  | URL for the documentation site                   | `http://localhost`                         |
+| `DOCS_BASE_URL`             | Base path for the documentation site             | `/`                                        |
+| `DOCS_SITE_TITLE`           | Title of the documentation site                  | `Example Organization`                     |
+| `DOCS_SITE_TAGLINE`         | Tagline displayed on the site                    | `Example tagline`                          |
+| `DOCS_FAVICON_URL`          | URL for the site favicon                         | `img/grey-placeholder-image.png`           |
+| `DOCS_SITE_LOGO_URL`        | URL for the site logo                            | `img/grey-placeholder-image.png`           |
+| `DOCS_SITE_LOGO_ALT`        | Alt text for site logo                           | `Example alt text`                         |
+| `DOCS_NAVBAR_TITLE`         | Title displayed in the navigation bar            | `Doc`                                      |
+| `DOCS_ORGANIZATION_NAME`    | Name of the organization                         | `Example Organization`                     |
+| `DOCS_PROJECT_NAME`         | Name of the project                              | `Unnamed Project`                          |
+| `DOCS_HERO_IMAGE_URL`       | URL for the hero image                           | `img/grey-placeholder-image.png`           |
+| `DOCS_HERO_IMAGE_ALT`       | Alt text for the hero image                      | `Hero image`                               |
+| `DOCS_EDIT_URL_BASE`        | Base URL for edit links                          | `https://example.com/edit-url`             |
+| `DOCS_REPOSITORY_LINK`      | URL to the project repository                    | `https://example.com/repo-link`            |
+| `DOCS_SLACK_COMMUNITY_LINK` | URL to the Slack community                       | `https://example.com/slack-community-link` |
+| `DOCS_EXTENSIONS_LINK`      | URL to extension documentation                   | `https://example.com/extensions-link`      |
+| `DOCS_FOOTER_TITLE`         | Title displayed in the footer                    | `Example Footer`                           |
+| `DOCS_FOOTER_SPEC_TITLE`    | Title for the specification link in the footer   | `Specification`                            |
+| `DOCS_FOOTER_SPEC_LINK`     | URL to the specification documentation           | `https://example.com/footer-spec-link`     |
+| `DOCS_COPYRIGHT_TEXT`       | Text displayed in the footer's copyright section | `Example copyright text`                   |
