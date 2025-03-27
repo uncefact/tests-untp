@@ -13,17 +13,24 @@ jest.mock('sonner', () => ({
   },
 }));
 
+const mockResetData = jest.fn();
+
+jest.mock('@/contexts/ErrorContext', () => ({
+  useError: jest.fn(() => ({
+    resetErrors: mockResetData,
+  })),
+}));
+
 describe('CredentialUploader component', () => {
   const mockOnCredentialUpload = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.resetAllMocks();
     JSON.parse = JSON.parse;
   });
 
   it('renders the CredentialUploader component', () => {
-    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} />);
+    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} />);
     const dropzoneElement = screen.getByText(/drag and drop credentials here/i);
     expect(dropzoneElement).toBeInTheDocument();
   });
@@ -33,7 +40,7 @@ describe('CredentialUploader component', () => {
       key: 'value',
     };
 
-    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} />);
+    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} />);
     const inputElement = screen.getByRole('presentation').querySelector('input[type="file"]');
 
     const validJsonFile = new File([JSON.stringify(returnValue)], 'valid.json', {
@@ -52,7 +59,7 @@ describe('CredentialUploader component', () => {
 
   it('displays an error for invalid JSON content', async () => {
     // JSON.parse = jest.fn().mockRejectedValue(new Error('Invalid JSON'));
-    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} />);
+    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} />);
     const inputElement = screen.getByRole('presentation').querySelector('input[type="file"]');
 
     const invalidJsonFile = new File(['invalid json'], 'invalid.json', {
@@ -68,7 +75,7 @@ describe('CredentialUploader component', () => {
   });
 
   it('displays an error for invalid file types', async () => {
-    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} />);
+    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} />);
     // Find the input element of type file
     const inputElement = screen.getByRole('presentation').querySelector('input[type="file"]');
     const invalidFile = new File(['content'], 'invalid.pdf', { type: 'application/pdf' });
@@ -81,7 +88,7 @@ describe('CredentialUploader component', () => {
   });
 
   it('displays an error for invalid JWT content', async () => {
-    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} />);
+    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} />);
     const inputElement = screen.getByRole('presentation').querySelector('input[type="file"]');
 
     const invalidJwtFile = new File(['invalid jwt'], 'invalid.jwt', {
@@ -105,7 +112,7 @@ describe('CredentialUploader component', () => {
     const mockOnCredentialUpload = jest.fn().mockImplementation(() => {
       throw new Error('Some unexpected error');
     });
-    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} />);
+    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} />);
 
     const inputElement = screen.getByRole('presentation').querySelector('input[type="file"]');
 

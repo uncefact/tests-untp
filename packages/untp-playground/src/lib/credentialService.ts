@@ -30,7 +30,7 @@ export function detectCredentialType(credential: Credential): string {
     'DigitalTraceabilityEvent',
   ];
 
-  return (credential.type.find((t) => types.includes(t)) || 'Unknown') as CredentialType;
+  return (credential?.type?.find((t) => types.includes(t)) || 'Unknown') as CredentialType;
 }
 
 export function detectVersion(credential: Credential, domain?: string): string {

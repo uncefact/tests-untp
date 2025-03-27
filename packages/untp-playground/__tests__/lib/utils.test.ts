@@ -1,4 +1,4 @@
-import { detectVcdmVersion, downloadJson, isPermittedCredentialType } from '@/lib/utils';
+import { detectVcdmVersion, downloadJson, isPermittedCredentialType, validateNormalizedCredential } from '@/lib/utils';
 import { CredentialType, VCDM_CONTEXT_URLS, VCDMVersion } from '../../constants';
 
 describe('utils', () => {
@@ -175,5 +175,43 @@ describe('utils', () => {
 
       expect(() => downloadJson(circularData, 'test-file')).toThrow('Data is not JSON-serializable');
     });
+  });
+});
+
+describe('validateNormalizedCredential', () => {
+  it('should return an error when normalizedCredential is an array', () => {
+    const normalizedCredential = [1, 2, 3];
+    const result = validateNormalizedCredential(normalizedCredential);
+    expect(result).toEqual({
+      keyword: 'type',
+      instancePath: 'array',
+      params: {
+        type: 'object',
+        receivedValue: normalizedCredential,
+        solution: 'Instead of [credential1, credential2], upload credential1.json and credential2.json.',
+      },
+      message: 'Credentials must be uploaded as separate files, not as an array.',
+    });
+  });
+
+  it('should return an error when normalizedCredential is not an object', () => {
+    const normalizedCredential = 'invalid';
+    const result = validateNormalizedCredential(normalizedCredential);
+    expect(result).toEqual({
+      keyword: 'type',
+      instancePath: 'invalid',
+      params: {
+        type: 'object',
+        receivedValue: normalizedCredential,
+        solution: 'Upload a valid credential file.',
+      },
+      message: 'Invalid credential file.',
+    });
+  });
+
+  it('should return null when normalizedCredential is a valid object', () => {
+    const normalizedCredential = { type: 'VerifiableCredential' };
+    const result = validateNormalizedCredential(normalizedCredential);
+    expect(result).toBeNull();
   });
 });

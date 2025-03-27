@@ -1,5 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
 import { CredentialUploader } from '@/components/CredentialUploader';
 import { DownloadCredential } from '@/components/DownloadCredential';
 import { Footer } from '@/components/Footer';
@@ -8,10 +11,11 @@ import { TestResults } from '@/components/TestResults';
 import { TestReportProvider } from '@/contexts/TestReportContext';
 import { decodeEnvelopedCredential, detectCredentialType, isEnvelopedProof } from '@/lib/credentialService';
 import { detectExtension } from '@/lib/schemaValidation';
-import { isPermittedCredentialType } from '@/lib/utils';
+import { isPermittedCredentialType, validateNormalizedCredential } from '@/lib/utils';
 import type { PermittedCredentialType, StoredCredential, TestStep } from '@/types';
-import { useState } from 'react';
-import { toast } from 'sonner';
+import { useError } from '@/contexts/ErrorContext';
+import { Button } from '@/components/ui/button';
+import { permittedCredentialTypes } from '../../constants';
 
 export default function Home() {
   const [credentials, setCredentials] = useState<{
@@ -20,13 +24,18 @@ export default function Home() {
   const [testResults, setTestResults] = useState<{
     [key in PermittedCredentialType]?: TestStep[];
   }>({});
+  const [fileCount, setFileCount] = useState(0);
+  const { dispatchError, errors, setIsDetailsOpen } = useError();
+
+  const shouldDisplayUploadDetailBtn = errors && errors.length > 0;
 
   const handleCredentialUpload = async (rawCredential: any) => {
     try {
       const normalizedCredential = rawCredential.verifiableCredential || rawCredential;
+      const error = validateNormalizedCredential(normalizedCredential);
 
-      if (!normalizedCredential || typeof normalizedCredential !== 'object') {
-        toast.error('Invalid credential format');
+      if (error) {
+        dispatchError([error]);
         return;
       }
 
@@ -37,7 +46,19 @@ export default function Home() {
       let credentialType = extension ? extension.core.type : detectCredentialType(decodedCredential);
 
       if (!credentialType || !isPermittedCredentialType(credentialType as PermittedCredentialType)) {
-        toast.error('Unknown credential type');
+        dispatchError([
+          {
+            keyword: 'required',
+            instancePath: '/type',
+            params: {
+              missingProperty: `type array with a supported types:  ${permittedCredentialTypes.join(', ')}`,
+              receivedValue: normalizedCredential,
+              allowedValue: { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+              solution: "Add a valid UNTP credential type (e.g., 'DigitalProductPassport', 'ConformityCredential').",
+            },
+            message: `The credential type is missing or invalid.`,
+          },
+        ]);
         return;
       }
 
@@ -68,9 +89,17 @@ export default function Home() {
             <div>
               <h2 className='text-xl font-semibold mb-6'>Add New Credential</h2>
               <div className='h-[300px]'>
-                <CredentialUploader onCredentialUpload={handleCredentialUpload} />
+                <CredentialUploader onCredentialUpload={handleCredentialUpload} setFileCount={setFileCount} />
               </div>
             </div>
+            {shouldDisplayUploadDetailBtn && (
+              <div>
+                <h2 className='text-sm font-semibold hover:cursor-pointer'>
+                  <Button onClick={() => setIsDetailsOpen(true)}>View Upload Detail</Button>
+                </h2>
+              </div>
+            )}
+
             <div>
               <h2 className='text-xl font-semibold mb-6'>Download Test Credential</h2>
               <DownloadCredential />
