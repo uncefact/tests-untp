@@ -10,16 +10,18 @@ export interface StoredCredential {
   decoded: Credential;
 }
 
-interface VersionConfig {
+interface CoreVersion {
+  type: string;
+  version: string;
+}
+
+interface ExtensionVersion {
   version: string;
   schema: string;
-  core: {
-    type: string;
-    version: string;
-  };
+  core: CoreVersion;
 }
 
 export interface ExtensionConfig {
   domain: string;
-  versions: VersionConfig[];
+  versions: ExtensionVersion[];
 }

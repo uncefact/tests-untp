@@ -12,22 +12,6 @@ addFormats(ajv);
 
 export const schemaCache = new Map<string, any>();
 
-interface CoreVersion {
-  type: string;
-  version: string;
-}
-
-interface ExtensionVersion {
-  version: string;
-  schema: string;
-  core: CoreVersion;
-}
-
-interface ExtensionConfig {
-  domain: string;
-  versions: ExtensionVersion[];
-}
-
 const schemaURLConstructor = (type: string, version: string) => {
   return `https://test.uncefact.org/vocabulary/untp/${shortCredentialTypes[type]}/untp-${shortCredentialTypes[type]}-schema-${version}.json`;
 };
