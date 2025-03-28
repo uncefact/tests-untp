@@ -28,35 +28,8 @@ interface ExtensionConfig {
   versions: ExtensionVersion[];
 }
 
-export const EXTENSION_VERSIONS: Record<string, ExtensionConfig> = {
-  DigitalLivestockPassport: {
-    domain: 'aatp.foodagility.com',
-    versions: [
-      {
-        version: '0.4.0',
-        schema: 'https://aatp.foodagility.com/assets/files/aatp-dlp-schema-0.4.0-9c0ad2b1ca6a9e497dedcfd8b87f35f1.json',
-        core: { type: 'DigitalProductPassport', version: '0.5.0' },
-      },
-      {
-        version: '0.4.1-beta1',
-        schema: 'https://aatp.foodagility.com/schema/aatp-dlp-schema-0.4.1-beta1.json',
-        core: { type: 'DigitalProductPassport', version: '0.6.0-beta7' },
-      },
-      {
-        version: '0.4.2-beta1',
-        schema: 'https://aatp.foodagility.com/schema/aatp-dlp-schema-0.4.2-beta1.json',
-        core: { type: 'DigitalProductPassport', version: '0.6.0-beta9' },
-      },
-    ],
-  },
-};
-
 const schemaURLConstructor = (type: string, version: string) => {
   return `https://test.uncefact.org/vocabulary/untp/${shortCredentialTypes[type]}/untp-${shortCredentialTypes[type]}-schema-${version}.json`;
-};
-
-const findExtensionSchemaURL = (type: string, version: string) => {
-  return EXTENSION_VERSIONS[type].versions.find((v) => v.version === version)?.schema;
 };
 
 export async function validateCredentialSchema(credential: any): Promise<{
@@ -101,19 +74,13 @@ export async function validateExtension(credential: any): Promise<{
     throw new Error('Unknown extension');
   }
 
-  const schemaUrl = findExtensionSchemaURL(extension.extension.type, extension.extension.version);
-
-  if (!schemaUrl) {
-    throw new Error('Unsupported extension version');
-  }
-
-  return validateCredentialOnSchemaUrl(credential, schemaUrl);
+  return validateCredentialOnSchemaUrl(credential, extension.extension.schema);
 }
 
 export function detectExtension(credential: any):
   | {
       core: { type: string; version: string };
-      extension: { type: string; version: string };
+      extension: { type: string; version: string; schema: string };
     }
   | undefined {
   const credentialTypes = detectAllTypes(credential);
@@ -133,7 +100,7 @@ export function detectExtension(credential: any):
 
   return {
     core: extensionVersion.core,
-    extension: { type: credentialType, version },
+    extension: { type: credentialType, version, schema: extensionVersion.schema },
   };
 }
 

@@ -75,7 +75,7 @@ export function constructExtensionRegistry(types: string[], urls: string[]): Rec
   const result: Record<string, ExtensionConfig> = {};
 
   const coreVersions: Record<string, string> = {};
-  urls.forEach((url) => {
+  urls?.forEach((url) => {
     const coreMatch = url.match(/https:\/\/([^/]+)\/.*\/(dpp|dcc|dte|dfr|dia)\/([^/]+)\//);
     if (coreMatch) {
       const [, domain, shortType, version] = coreMatch;
@@ -84,12 +84,12 @@ export function constructExtensionRegistry(types: string[], urls: string[]): Rec
     }
   });
 
-  types.forEach((type) => {
+  types?.forEach((type) => {
     if (shortCredentialTypes[type]) return;
 
     const matchingUrls = urls.filter((url) => url.includes(type));
 
-    matchingUrls.forEach((url) => {
+    matchingUrls?.forEach((url) => {
       const versionMatch = url.match(/v\/([^/]+)/);
       if (!versionMatch) return;
 
