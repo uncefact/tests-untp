@@ -142,3 +142,11 @@ export async function validateVcAgainstSchema(credential: any, version: Extract<
 
   return validateCredentialOnSchemaUrl(credential, schemaUrl);
 }
+
+export const validateTypeAndContext = (types: string[], urls: string[]): boolean => {
+  if (types?.length !== urls?.length) {
+    return false;
+  }
+
+  return true;
+};
