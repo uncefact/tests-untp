@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { FileJson, FileTextIcon } from 'lucide-react';
-import { toast } from 'sonner';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTestReport } from '@/contexts/TestReportContext';
 import { DownloadReportFormat } from '@/types';
@@ -29,6 +28,8 @@ export const DownloadReport = () => {
     if (selectedOption) {
       selectedOption.action();
     }
+
+    setSelectedValue('');
   };
 
   useEffect(() => {
