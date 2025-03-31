@@ -41,7 +41,6 @@ describe('DownloadReport', () => {
     });
 
     render(<DownloadReport />);
-    screen.debug();
     const button = screen.getByRole('combobox');
     expect(button).toBeDisabled();
   });
@@ -51,6 +50,7 @@ describe('DownloadReport', () => {
     fireEvent.click(screen.getByRole('combobox'));
     fireEvent.click(screen.getByText('HTML'));
     expect(mockDownloadReport).toHaveBeenCalledWith(DownloadReportFormat.HTML);
+    expect(screen.getByText('Download Report')).not.toBeNull();
   });
 
   it('calls downloadReport with JSON format', () => {
@@ -58,5 +58,6 @@ describe('DownloadReport', () => {
     fireEvent.click(screen.getByRole('combobox'));
     fireEvent.click(screen.getByText('JSON'));
     expect(mockDownloadReport).toHaveBeenCalledWith(DownloadReportFormat.JSON);
+    expect(screen.getByText('Download Report')).not.toBeNull();
   });
 });
