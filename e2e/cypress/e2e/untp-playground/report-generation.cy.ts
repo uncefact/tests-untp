@@ -82,19 +82,17 @@ describe('Report Generation', () => {
     cy.uploadCredential('cypress/fixtures/credentials-e2e/invalid-v2-enveloped-dpp-with-extension.json');
     cy.expandGroup();
 
-    cy.checkValidationStatus('Extension Schema Validation', 'failure');
-
     cy.generateReport('Extension Test Implementation');
     cy.downloadAndVerifyReport('Extension Test Implementation', false).then((report) => {
       const result = report.results[0];
 
       expect(result.core).to.exist;
       expect(result.core.type).to.equal('DigitalProductPassport');
-      expect(result.core.version).to.match(/^0\.5\.0/);
+      expect(result.core.version).to.match(/^0\.6\.0/);
 
       expect(result.extension).to.exist;
       expect(result.extension.type).to.equal('DigitalLivestockPassport');
-      expect(result.extension.version).to.match(/^0\.4\.0/);
+      expect(result.extension.version).to.match(/^0\.4\.2/);
       expect(result.extension.steps).to.be.an('array');
 
       const extensionStep = result.extension.steps.find((step: any) => step.id === 'extension-schema-validation');

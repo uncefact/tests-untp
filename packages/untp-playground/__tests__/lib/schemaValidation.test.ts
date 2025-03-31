@@ -1,4 +1,9 @@
-import { detectCredentialType, detectVersion } from '@/lib/credentialService';
+import {
+  detectCredentialType,
+  detectVersion,
+  constructExtensionRegistry,
+  detectAllTypes,
+} from '@/lib/credentialService';
 import {
   detectExtension,
   schemaCache,
@@ -14,6 +19,8 @@ global.fetch = jest.fn();
 jest.mock('@/lib/credentialService', () => ({
   detectCredentialType: jest.fn(),
   detectVersion: jest.fn(),
+  detectAllTypes: jest.fn(),
+  constructExtensionRegistry: jest.fn(),
 }));
 
 describe('schemaValidation', () => {
@@ -23,6 +30,12 @@ describe('schemaValidation', () => {
     (detectCredentialType as jest.Mock).mockClear();
     (detectVersion as jest.Mock).mockClear();
     schemaCache.clear(); // Clear the cache so that fetch will be called
+    (detectAllTypes as jest.Mock).mockReturnValue(['DigitalProductPassport']);
+    (constructExtensionRegistry as jest.Mock).mockReturnValue({});
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   describe('validateCredentialSchema', () => {
@@ -76,6 +89,19 @@ describe('schemaValidation', () => {
         version: '0.4.0',
       };
 
+      (detectAllTypes as jest.Mock).mockReturnValue(['DigitalProductPassport', 'DigitalLivestockPassport']);
+      (constructExtensionRegistry as jest.Mock).mockReturnValue({
+        DigitalLivestockPassport: {
+          domain: 'example.com',
+          versions: [
+            {
+              version: '0.4.0',
+              schema: 'https://example.com/schema/dlp/0.4.0',
+              core: { type: 'DigitalProductPassport', version: '0.5.0' },
+            },
+          ],
+        },
+      });
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
       (detectVersion as jest.Mock).mockReturnValue('0.4.0');
 
@@ -116,7 +142,7 @@ describe('schemaValidation', () => {
         },
       };
 
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      global.fetch = jest.fn().mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockSchema),
       });
@@ -129,6 +155,19 @@ describe('schemaValidation', () => {
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
       (detectVersion as jest.Mock).mockReturnValue('0.4.0');
+      (detectAllTypes as jest.Mock).mockReturnValue(['DigitalProductPassport', 'DigitalLivestockPassport']);
+      (constructExtensionRegistry as jest.Mock).mockReturnValue({
+        DigitalLivestockPassport: {
+          domain: 'example.com',
+          versions: [
+            {
+              version: '0.4.0',
+              schema: 'https://example.com/schema/dlp/0.4.0',
+              core: { type: 'DigitalProductPassport', version: '0.5.0' },
+            },
+          ],
+        },
+      });
 
       const result = await validateExtension(validExtensionCredential);
       expect(result.valid).toBe(true);
@@ -158,11 +197,28 @@ describe('schemaValidation', () => {
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
       (detectVersion as jest.Mock).mockReturnValue('0.4.0');
+      (detectAllTypes as jest.Mock).mockReturnValue(['DigitalProductPassport', 'DigitalLivestockPassport']);
+      (constructExtensionRegistry as jest.Mock).mockReturnValue({
+        DigitalLivestockPassport: {
+          domain: 'example.com',
+          versions: [
+            {
+              version: '0.4.0',
+              schema: 'https://aatp.foodagility.com/vocabulary/aatp/dlp/0.4.0',
+              core: { type: 'DigitalProductPassport', version: '0.5.0' },
+            },
+          ],
+        },
+      });
 
       const result = detectExtension(credential);
       expect(result).toEqual({
         core: { type: 'DigitalProductPassport', version: '0.5.0' },
-        extension: { type: 'DigitalLivestockPassport', version: '0.4.0' },
+        extension: {
+          type: 'DigitalLivestockPassport',
+          version: '0.4.0',
+          schema: 'https://aatp.foodagility.com/vocabulary/aatp/dlp/0.4.0',
+        },
       });
     });
 
@@ -213,7 +269,7 @@ describe('schemaValidation', () => {
         additionalProperties: false,
       };
 
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      global.fetch = jest.fn().mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockSchema),
       });
@@ -274,7 +330,7 @@ describe('schemaValidation', () => {
     });
 
     it('should handle schema fetch failures', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      global.fetch = jest.fn().mockResolvedValueOnce({
         ok: false,
         statusText: 'Not Found',
       });
@@ -293,11 +349,10 @@ describe('schemaValidation', () => {
       const mockToast = { error: jest.fn() };
       jest.mock('sonner', () => ({ toast: mockToast }));
 
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
-
+      global.fetch = jest.fn().mockRejectedValueOnce(new Error('Network error'));
       const credential = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
-        type: ['VerifiableCredential'],
+        type: ['VerifiableCredential', 'DigitalProductPassport'],
       };
 
       await expect(validateVcAgainstSchema(credential, VCDMVersion.V2)).rejects.toThrow('Network error');
