@@ -20,17 +20,17 @@ Mutual verification in the UNTP Playground is a two-stage process ensuring that 
 - **Stage 1**: Implementers issue and upload their own VC (e.g., a DPP) to the Playground, which tests it against the verification steps outlined in the Verification Process section.
 - **Stage 2**: Implementers download a UNTP-issued test credential (e.g., a DPP) from the Playground and verify it within their own VC implementation, as detailed in the Verifying Your Implementation section.
 
-This two-stage approach promotes interoperability by confirming that both parties adhere to the [W3C Verifiable Credentials Data Model (VCDM) v2](https://www.w3.org/TR/vc-data-model-2.0/) standards, with stricter requirements as defined in the [UNTP Verifiable Credentials specification](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials). Specifically, implementations must use the `did:web` method for Decentralized Identifiers (DIDs), [JOSE](https://www.w3.org/TR/vc-jose-cose/) with the `EdDSA` algorithm using the `Ed25519` curve for securing credentials, and [BitstringStatusListEntry](https://www.w3.org/TR/vc-bitstring-status-list/) for credential revocation, ensuring interoperability across UNTP-compliant ecosystems.
+This two-stage approach promotes interoperability by confirming that both parties adhere to the [W3C Verifiable Credentials Data Model (VCDM) v2](https://www.w3.org/TR/vc-data-model-2.0/) standards, with stricter requirements as defined in the [UNTP Verifiable Credentials specification](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials). Specifically, implementations must use the `did:web` method for Decentralized Identifiers (DIDs), and for securing credentials with an enveloping proof, [JOSE](https://www.w3.org/TR/vc-jose-cose/) with the `EdDSA` algorithm using the `Ed25519` curve, and [BitstringStatusListEntry](https://www.w3.org/TR/vc-bitstring-status-list/) for credential revocation, ensuring interoperability across UNTP-compliant ecosystems.
 
 ### Example Scenario
 
 To illustrate the role of Verifiable Credentials (VCs) in the UNTP ecosystem, consider an assessment company (Party A), a battery assembler (Party B), and a regulator (Party C) in a supply chain:
 
-- **Stage 1**: Party A issues a Digital Conformity Certificate (DCC) as a VC, attesting to the compliance of a battery component, secured according to the [UNTP Verifiable Credentials specification](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials).
-- **Stage 2**: Party B verifies Party A’s DCC to confirm its authenticity and compliance, then issues a Digital Product Passport (DPP) as a VC for the assembled battery, embedding a link to the DCC to provide evidence of compliance, using the same UNTP standards.
+- **Stage 1**: Party A issues a Digital Conformity Credential (DCC) as a VC, attesting to the compliance of the assembled battery to a given standard, secured according to the [UNTP Verifiable Credentials specification](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials).
+- **Stage 2**: Party B verifies Party A’s DCC to confirm its authenticity and compliance with UNTP specification, then issues a Digital Product Passport (DPP) as a VC for the assembled battery. The DPP embeds a link to the DCC to provide evidence of compliance, using the same UNTP standards.
 - **Stage 3**: Party C verifies both the DCC and DPP VCs to confirm their authenticity and ensure the battery meets regulatory and sustainability standards.
 
-This process ensures that Party A’s DCC can be verified by Party B, and Party B’s DPP can be verified by Party C, supporting the UNTP ecosystem’s interoperability requirements. All parties conform to the same UNTP-compliant standards for securing and verifying VCs, using `did:web` for Decentralized Identifiers (DIDs), [JOSE](https://www.w3.org/TR/vc-jose-cose/) with the `EdDSA` algorithm (`Ed25519` curve) for enveloping proofs, and [BitstringStatusListEntry](https://www.w3.org/TR/vc-bitstring-status-list/) for credential revocation.
+This process ensures that Party A's DCC can be verified by Party B, and Party B's DPP can be verified by Party C, supporting the UNTP ecosystem's interoperability requirements. All parties conform to the same UNTP-compliant standards for securing and verifying VCs, using `did:web` for Decentralized Identifiers (DIDs), [JOSE](https://www.w3.org/TR/vc-jose-cose/) with the `EdDSA` algorithm (`Ed25519` curve) for enveloping proofs, and [BitstringStatusListEntry](https://www.w3.org/TR/vc-bitstring-status-list/) for credential revocation.
 
 ## Verification Process
 
@@ -92,7 +92,7 @@ To complete the mutual verification process, implementers must verify the UNTP-i
 3. **Resolve Issues**  
    If verification fails, refer to the Troubleshooting and Resources section for guidance.
 
-Successful verification of both the credential uploaded to the Playground and the UNTP-issued credential within your implementation confirms interoperability with the verifiable credential requirements outlined in the UNTP specification.
+Successful verification of both the credential you upload to the Playground and the test credential provided by the Playground within your own implementation demonstrates that your solution is interoperable with the verifiable credential requirements outlined in the UNTP specification.
 
 ## Troubleshooting and Resources
 
