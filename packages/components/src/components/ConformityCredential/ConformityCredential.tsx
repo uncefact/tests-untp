@@ -116,14 +116,14 @@ export const ConformityCredential: React.FC<IConformityCredentialProps> = ({
     dataObject[appOnly] = credentialAppData;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataObject));
 
-    toastMessage({ status: Status.success, message: 'Conformity credentials have been saved' });
+    toastMessage({ status: Status.success, message: 'Conformity credentials have been saved', linkURL: '' });
     setLoading(false);
     setConformityCredentials(JSON.stringify(dataObject));
   };
 
   const showErrorAndStopLoading = (message: string) => {
     setLoading(false);
-    toastMessage({ status: Status.error, message });
+    toastMessage({ status: Status.error, message, linkURL: '' });
   };
 
   // Handle credential request

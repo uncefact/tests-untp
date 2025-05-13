@@ -7,12 +7,13 @@ describe('Toast Message', () => {
   test('renders ToastMessage component and triggers toast', async () => {
     const status = Status.success;
     const message = 'Test message';
+    const linkURL = '';
 
     // Render the component
     render(<ToastMessage />);
 
     // Call the toastMessage function
-    toastMessage({ status, message });
+    toastMessage({ status, message, linkURL });
 
     // Check that the toast message is correctly.
     await waitFor(() => {
