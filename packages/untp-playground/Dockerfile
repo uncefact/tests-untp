@@ -12,7 +12,7 @@ ENV NEXT_PUBLIC_BASE_PATH=/
 ENV NEXT_PUBLIC_ASSET_PREFIX=/
 
 # Install dependencies based on the preferred package manager
-COPY package.json ../../yarn.lock* ./
+COPY packages/untp-playground/package.json yarn.lock ./
 RUN yarn install
 
 
@@ -20,7 +20,7 @@ RUN yarn install
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY packages/untp-playground/. .
 
 # Add build args without defaults
 ARG NEXT_PUBLIC_BASE_PATH
