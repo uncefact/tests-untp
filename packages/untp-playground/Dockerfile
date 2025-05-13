@@ -12,7 +12,7 @@ ENV NEXT_PUBLIC_BASE_PATH=/
 ENV NEXT_PUBLIC_ASSET_PREFIX=/
 
 # Install dependencies based on the preferred package manager
-COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* .npmrc* ./
+COPY package.json ../../yarn.lock* ./
 RUN yarn install
 
 
