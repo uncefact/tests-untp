@@ -1,7 +1,8 @@
 services:
   untp-playground:
     build:
-      context: packages/untp-playground
+      context: .
+      dockerfile: packages/untp-playground/Dockerfile
     ports:
       - '4000:3000'
     volumes:
