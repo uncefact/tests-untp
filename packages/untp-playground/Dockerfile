@@ -13,7 +13,7 @@ ENV NEXT_PUBLIC_ASSET_PREFIX=/
 
 # Install dependencies based on the preferred package manager
 COPY packages/untp-playground/package.json yarn.lock ./
-RUN yarn install
+RUN yarn install --immutable
 
 
 # Rebuild the source code only when needed
