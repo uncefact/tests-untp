@@ -9,7 +9,7 @@
     "issuerAlsoKnownAs": [
       {
         "id": "https://abr.business.gov.au/ABN/View?abn=90664869327",
-        "name": "Sample Company Pty Ltd.",
+        "name": "Example Company Pty Ltd.",
         "registeredId": "90664869327",
         "idScheme": {
           "type": ["IdentifierScheme"],
@@ -64,7 +64,7 @@
       ],
       "operatedByParty": {
         "id": "https://abr.business.gov.au/ABN/View?abn=90664869327",
-        "name": "Sample Company Pty Ltd.",
+        "name": "Example Company Pty Ltd.",
         "registeredId": "90664869327",
         "idScheme": {
           "type": ["IdentifierScheme"],
@@ -124,7 +124,7 @@
           "name": "GBA Battery Passport Greenhouse Gas Rulebook - V.2.0",
           "issuingParty": {
             "id": "https://abr.business.gov.au/ABN/View?abn=90664869327",
-            "name": "Sample Company Pty Ltd.",
+            "name": "Example Company Pty Ltd.",
             "registeredId": "90664869327",
             "idScheme": {
               "type": ["IdentifierScheme"],
@@ -141,7 +141,7 @@
           "jurisdictionCountry": "AU",
           "administeredBy": {
             "id": "https://abr.business.gov.au/ABN/View?abn=90664869327",
-            "name": "Sample Company Pty Ltd.",
+            "name": "Example Company Pty Ltd.",
             "registeredId": "90664869327",
             "idScheme": {
               "type": ["IdentifierScheme"],
@@ -235,7 +235,7 @@
           "name": "GBA Battery Passport Greenhouse Gas Rulebook - V.2.0",
           "issuingParty": {
             "id": "https://abr.business.gov.au/ABN/View?abn=90664869327",
-            "name": "Sample Company Pty Ltd.",
+            "name": "Example Company Pty Ltd.",
             "registeredId": "90664869327",
             "idScheme": {
               "type": ["IdentifierScheme"],
@@ -252,7 +252,7 @@
           "jurisdictionCountry": "AU",
           "administeredBy": {
             "id": "https://abr.business.gov.au/ABN/View?abn=90664869327",
-            "name": "Sample Company Pty Ltd.",
+            "name": "Example Company Pty Ltd.",
             "registeredId": "90664869327",
             "idScheme": {
               "type": ["IdentifierScheme"],
