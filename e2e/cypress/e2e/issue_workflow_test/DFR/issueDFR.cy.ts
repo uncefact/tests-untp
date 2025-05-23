@@ -11,7 +11,7 @@ class DFRIssueFlow extends IssuePage {
   }
 
   testUNTPTestSuite() {
-    this.runUntpTest('digitalFacilityRecord', 'v0.5.0');
+    this.runUntpTest('digitalFacilityRecord', 'v0.6.0');
   }
 }
 
@@ -31,7 +31,7 @@ describe('Issue DFR end-to-end testing flow', () => {
   });
 
   it('Verify linkType for DFR', () => {
-    dfrTest.verifyLinkType('http://localhost:3000/gs1/gln/9359502000034');
+    dfrTest.verifyLinkType('http://localhost:3000/gs1/gln/1321202290648');
   });
 
   it('Runs testing UNTP test suite for DFR', () => {
