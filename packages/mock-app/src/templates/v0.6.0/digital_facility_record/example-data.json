@@ -13,8 +13,8 @@
         "registeredId": "90664869327",
         "idScheme": {
           "type": ["IdentifierScheme"],
-          "id": "https://id.gs1.org/01/",
-          "name": "Global Trade Identification Number (GTIN)"
+          "id": "https://abr.business.gov.au/ABN/",
+          "name": "Australian Business Number (ABN)"
         }
       }
     ]
@@ -68,32 +68,11 @@
         "registeredId": "90664869327",
         "idScheme": {
           "type": ["IdentifierScheme"],
-          "id": "https://id.gs1.org/01/",
-          "name": "Global Trade Identification Number (GTIN)"
+          "id": "https://abr.business.gov.au/ABN/",
+          "name": "Australian Business Number (ABN)"
         }
       },
-      "facilityAlsoKnownAs": [
-        {
-          "id": "https://sample-facility-register.com/1234567",
-          "name": "Greenacres battery factory",
-          "registeredId": "1234567",
-          "idScheme": {
-            "type": ["IdentifierScheme"],
-            "id": "https://id.gs1.org/01/",
-            "name": "Global Trade Identification Number (GTIN)"
-          }
-        },
-        {
-          "id": "https://sample-facility-register.com/1234567",
-          "name": "Greenacres battery factory",
-          "registeredId": "1234567",
-          "idScheme": {
-            "type": ["IdentifierScheme"],
-            "id": "https://id.gs1.org/01/",
-            "name": "Global Trade Identification Number (GTIN)"
-          }
-        }
-      ],
+      "facilityAlsoKnownAs": [],
       "locationInformation": {
         "plusCode": "https://plus.codes/8CGRC78W+MM",
         "geoLocation": {
@@ -128,8 +107,8 @@
             "registeredId": "90664869327",
             "idScheme": {
               "type": ["IdentifierScheme"],
-              "id": "https://id.gs1.org/01/",
-              "name": "Global Trade Identification Number (GTIN)"
+              "id": "https://abr.business.gov.au/ABN/",
+              "name": "Australian Business Number (ABN)"
             }
           },
           "issueDate": "2023-12-05"
@@ -137,7 +116,7 @@
         "referenceRegulation": {
           "type": ["Regulation"],
           "id": "https://www.legislation.gov.au/F2008L02309/latest/versions",
-          "name": "NNational Greenhouse and Energy Reporting (Measurement) Determination",
+          "name": "National Greenhouse and Energy Reporting (Measurement) Determination",
           "jurisdictionCountry": "AU",
           "administeredBy": {
             "id": "https://abr.business.gov.au/ABN/View?abn=90664869327",
@@ -145,8 +124,8 @@
             "registeredId": "90664869327",
             "idScheme": {
               "type": ["IdentifierScheme"],
-              "id": "https://id.gs1.org/01/",
-              "name": "Global Trade Identification Number (GTIN)"
+              "id": "https://abr.business.gov.au/ABN/",
+              "name": "Australian Business Number (ABN)"
             }
           },
           "effectiveDate": "2024-03-20"
@@ -170,7 +149,7 @@
               "accuracy": 0.05
             },
             "performanceLevel": "\"Category 3 recyclable with 73% recyclability\"",
-            "tags": "The quick brown fox jumps over the lazy dog."
+            "tags": ""
           },
           {
             "type": ["Criterion"],
@@ -190,7 +169,7 @@
               "accuracy": 0.05
             },
             "performanceLevel": "\"Category 3 recyclable with 73% recyclability\"",
-            "tags": "The quick brown fox jumps over the lazy dog."
+            "tags": ""
           }
         ],
         "assessmentDate": "2024-03-15",
@@ -239,8 +218,8 @@
             "registeredId": "90664869327",
             "idScheme": {
               "type": ["IdentifierScheme"],
-              "id": "https://id.gs1.org/01/",
-              "name": "Global Trade Identification Number (GTIN)"
+              "id": "https://abr.business.gov.au/ABN/",
+              "name": "Australian Business Number (ABN)"
             }
           },
           "issueDate": "2023-12-05"
@@ -248,7 +227,7 @@
         "referenceRegulation": {
           "type": ["Regulation"],
           "id": "https://www.legislation.gov.au/F2008L02309/latest/versions",
-          "name": "NNational Greenhouse and Energy Reporting (Measurement) Determination",
+          "name": "National Greenhouse and Energy Reporting (Measurement) Determination",
           "jurisdictionCountry": "AU",
           "administeredBy": {
             "id": "https://abr.business.gov.au/ABN/View?abn=90664869327",
@@ -256,8 +235,8 @@
             "registeredId": "90664869327",
             "idScheme": {
               "type": ["IdentifierScheme"],
-              "id": "https://id.gs1.org/01/",
-              "name": "Global Trade Identification Number (GTIN)"
+              "id": "https://abr.business.gov.au/ABN/",
+              "name": "Australian Business Number (ABN)"
             }
           },
           "effectiveDate": "2024-03-20"
@@ -281,7 +260,7 @@
               "accuracy": 0.05
             },
             "performanceLevel": "\"Category 3 recyclable with 73% recyclability\"",
-            "tags": "The quick brown fox jumps over the lazy dog."
+            "tags": ""
           },
           {
             "type": ["Criterion"],
@@ -301,7 +280,7 @@
               "accuracy": 0.05
             },
             "performanceLevel": "\"Category 3 recyclable with 73% recyclability\"",
-            "tags": "The quick brown fox jumps over the lazy dog."
+            "tags": ""
           }
         ],
         "assessmentDate": "2024-03-15",
