@@ -11,7 +11,7 @@ class DIAIssueFlow extends IssuePage {
   }
 
   testUNTPTestSuite() {
-    this.runUntpTest('digitalIdentityAnchor', 'v0.2.1', {}, 'WARN');
+    this.runUntpTest('digitalIdentityAnchor', 'v0.6.0');
   }
 }
 
@@ -26,15 +26,15 @@ describe('Issue DIA end-to-end testing flow', () => {
     diaTest.testAppConfig();
   });
 
-  it('should generate DCC', () => {
+  it('should generate DIA', () => {
     diaTest.testGenerateDCCWorkflow();
   });
 
-  it('Verify linkType for DCC', () => {
-    diaTest.verifyLinkType('http://localhost:3000/gs1/01/09359502000010');
+  it('Verify linkType for DIA', () => {
+    diaTest.verifyLinkType('http://localhost:3000/gs1/01/09359502000010?linkType=gs1:registryEntry');
   });
 
-  it('Runs testing UNTP test suite for DCC', () => {
+  it('Runs testing UNTP test suite for DIA', () => {
     diaTest.testUNTPTestSuite();
   });
 });
