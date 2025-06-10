@@ -21,6 +21,6 @@ export const MOVE_TO_NEXT_FACILITY = 'Move to Next Facility';
 
 export const TRACEABILITY_LINK_TYPE = 'http://localhost:3000/gs1/01/09359502000034/21/123456';
 export const DPP_LINK_TYPE = 'http://localhost:3000/gs1/01/09359502000034/10/6789?linkType=gs1:sustainabilityInfo';
-export const DCC_LINK_TYPE = 'http://localhost:3000/gs1/01/09359502000034';
-export const DFR_LINK_TYPE = 'http://localhost:3000/gs1/gln/1321202290648';
-export const DIA_LINK_TYPE = 'http://localhost:3000/gs1/01/09359502000010';
+export const DCC_LINK_TYPE = 'http://localhost:3000/gs1/01/09520123456788/10/6789/21/12345678?linkType=gs1:certificationInfo';
+export const DFR_LINK_TYPE = 'http://localhost:3000/gs1/gln/1321202290648?linkType=gs1:locationInfo';
+export const DIA_LINK_TYPE = 'http://localhost:3000/gs1/01/09359502000010?linkType=gs1:registryEntry';
