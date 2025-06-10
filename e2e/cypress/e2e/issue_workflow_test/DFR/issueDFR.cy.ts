@@ -1,3 +1,4 @@
+import { DFR_LINK_TYPE } from 'constant';
 import IssuePage from 'cypress/page/issuePage';
 
 class DFRIssueFlow extends IssuePage {
@@ -31,7 +32,7 @@ describe('Issue DFR end-to-end testing flow', () => {
   });
 
   it('Verify linkType for DFR', () => {
-    dfrTest.verifyLinkType('http://localhost:3000/gs1/gln/1321202290648');
+    dfrTest.verifyLinkType(DFR_LINK_TYPE);
   });
 
   it('Runs testing UNTP test suite for DFR', () => {

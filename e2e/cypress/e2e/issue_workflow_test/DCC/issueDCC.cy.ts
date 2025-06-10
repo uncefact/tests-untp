@@ -1,3 +1,4 @@
+import { DCC_LINK_TYPE } from 'constant';
 import IssuePage from 'cypress/page/issuePage';
 
 class DCCIssueFlow extends IssuePage {
@@ -11,7 +12,7 @@ class DCCIssueFlow extends IssuePage {
   }
 
   testUNTPTestSuite() {
-    this.runUntpTest('digitalConformityCredential', 'v0.5.0');
+    this.runUntpTest('digitalConformityCredential', 'v0.6.0');
   }
 }
 
@@ -31,7 +32,7 @@ describe('Issue DCC end-to-end testing flow', () => {
   });
 
   it('Verify linkType for DCC', () => {
-    dccTest.verifyLinkType('http://localhost:3000/gs1/01/09359502000034');
+    dccTest.verifyLinkType(DCC_LINK_TYPE);
   });
 
   it('Runs testing UNTP test suite for DCC', () => {

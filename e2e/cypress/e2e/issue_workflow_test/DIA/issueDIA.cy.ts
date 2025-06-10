@@ -1,3 +1,4 @@
+import { DIA_LINK_TYPE } from 'constant';
 import IssuePage from 'cypress/page/issuePage';
 
 class DIAIssueFlow extends IssuePage {
@@ -31,7 +32,7 @@ describe('Issue DIA end-to-end testing flow', () => {
   });
 
   it('Verify linkType for DIA', () => {
-    diaTest.verifyLinkType('http://localhost:3000/gs1/01/09359502000010?linkType=gs1:registryEntry');
+    diaTest.verifyLinkType(DIA_LINK_TYPE);
   });
 
   it('Runs testing UNTP test suite for DIA', () => {
