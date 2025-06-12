@@ -1,17 +1,18 @@
 import IssuePage from 'cypress/page/issuePage';
+import { DPP_LINK_TYPE } from '../../../../constant';
 
 class DPPIssueFlow extends IssuePage {
   testGenerateDPPWorkflow() {
     this.generateWorkflow(
       'Orchard Facility',
-      'Issue DPP',
+      'Generate DPP',
       'DigitalProductPassport',
       'apps',
     );
   }
 
   testUNTPTestSuite() {
-    this.runUntpTest('digitalProductPassport', 'v0.5.0');
+    this.runUntpTest('digitalProductPassport', 'v0.6.0');
   }
 }
 
@@ -31,8 +32,7 @@ describe('Issue DPP end-to-end testing flow', () => {
   });
 
   it('Verify linkType', () => {
-    const checkLinkTypeURL = 'http://localhost:3000/gs1/01/09359502000034/10/6789?linkType=gs1:sustainabilityInfo';
-    dppTest.verifyLinkType(checkLinkTypeURL);
+    dppTest.verifyLinkType(DPP_LINK_TYPE);
   });
 
   it('Runs testing UNTP test suite for DPP', () => {
