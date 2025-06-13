@@ -1,0 +1,304 @@
+{
+  "type": ["DigitalTraceabilityEvent", "VerifiableCredential"],
+  "id": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
+  "@context": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dte/0.6.0/"],
+  "issuer": {
+    "type": ["CredentialIssuer"],
+    "id": "did:web:identifiers.example-company.com:12345",
+    "name": "Example Company Pty Ltd",
+    "issuerAlsoKnownAs": [
+      {
+        "id": "https://abr.business.gov.au/ABN/View?abn=90664869327",
+        "name": "Example Company Pty Ltd.",
+        "registeredId": "90664869327"
+      }
+    ]
+  },
+  "validFrom": "2024-03-15T12:00:00Z",
+  "credentialSubject": [
+    {
+      "type": ["TransformationEvent", "Event"],
+      "id": "https://events.example.com/b681df10-c682-454a-b11b-d0b9374c01bd",
+      "processType": "Weaving",
+      "eventTime": "2024-09-01T12:00:00Z",
+      "action": "observe",
+      "disposition": "in_progress",
+      "bizStep": "producing",
+      "bizLocation": "https://id.gs1.org/414/9520123456788",
+      "sensorElementList": [
+        {
+          "type": ["SensorElement"],
+          "sensorMetadata": {
+            "type": ["Sensor"],
+            "device": {
+              "type": ["Item"],
+              "id": "https://id.gs1.org/01/09520123456788/21/54321",
+              "name": "Temperature Sensor"
+            },
+            "dataProcessingMethod": "https://standards.org/sensorMethod#1234"
+          },
+          "sensorReport": [
+            {
+              "type": ["SensorData"],
+              "time": "2024-09-01T12:00:00Z",
+              "sensorType": "https://sensors.example.com/model1234",
+              "value": 25,
+              "uom": "CEL"
+            }
+          ],
+          "sensorIntegrityProof": "https://example.com/proof/123"
+        }
+      ],
+      "outputEPCList": [
+        {
+          "type": ["Item"],
+          "id": "https://id.gs1.org/01/09520123456788/21/12345",
+          "name": "Cotton Fabric"
+        }
+      ],
+      "inputEPCList": [
+        {
+          "type": ["Item"],
+          "id": "https://id.gs1.org/01/09520123456788/21/67890",
+          "name": "Cotton Yarn"
+        }
+      ],
+      "inputQuantityList": [
+        {
+          "type": ["QuantityElement"],
+          "productId": "https://id.gs1.org/01/09520123456788",
+          "productName": "Raw Cotton",
+          "quantity": 100,
+          "uom": "KGM"
+        }
+      ],
+      "outputQuantityList": [
+        {
+          "type": ["QuantityElement"],
+          "productId": "https://id.gs1.org/01/09520123456789",
+          "productName": "Woven Fabric",
+          "quantity": 50,
+          "uom": "MTR"
+        }
+      ]
+    },
+    {
+      "type": ["ObjectEvent", "Event"],
+      "id": "https://events.example.com/c682df10-c682-454a-b11b-d0b9374c02bd",
+      "processType": "Inspection",
+      "eventTime": "2024-09-02T14:00:00Z",
+      "action": "observe",
+      "disposition": "conformant",
+      "bizStep": "inspecting",
+      "bizLocation": "https://id.gs1.org/414/9520123456790",
+      "sensorElementList": [
+        {
+          "type": ["SensorElement"],
+          "sensorMetadata": {
+            "type": ["Sensor"],
+            "device": {
+              "type": ["Item"],
+              "id": "https://id.gs1.org/01/09520123456788/21/54322",
+              "name": "Quality Scanner"
+            },
+            "dataProcessingMethod": "https://standards.org/sensorMethod#5678"
+          },
+          "sensorReport": [
+            {
+              "type": ["SensorData"],
+              "time": "2024-09-02T14:00:00Z",
+              "sensorType": "https://sensors.example.com/model5678",
+              "value": 98,
+              "uom": "PCT"
+            }
+          ],
+          "sensorIntegrityProof": "https://example.com/proof/456"
+        }
+      ],
+      "epcList": [
+        {
+          "type": ["Item"],
+          "id": "https://id.gs1.org/01/09520123456788/21/12345",
+          "name": "Cotton Fabric"
+        }
+      ],
+      "quantityList": [
+        {
+          "type": ["QuantityElement"],
+          "productId": "https://id.gs1.org/01/09520123456789",
+          "productName": "Woven Fabric",
+          "quantity": 50,
+          "uom": "MTR"
+        }
+      ]
+    },
+    {
+      "type": ["AggregationEvent", "Event"],
+      "id": "https://events.example.com/d683df10-c682-454a-b11b-d0b9374c03bd",
+      "processType": "Packing",
+      "eventTime": "2024-09-03T10:00:00Z",
+      "action": "add",
+      "disposition": "container_closed",
+      "bizStep": "packing",
+      "bizLocation": "https://id.gs1.org/414/9520123456791",
+      "sensorElementList": [
+        {
+          "type": ["SensorElement"],
+          "sensorMetadata": {
+            "type": ["Sensor"],
+            "device": {
+              "type": ["Item"],
+              "id": "https://id.gs1.org/01/09520123456788/21/54324",
+              "name": "Weight Sensor"
+            },
+            "dataProcessingMethod": "https://standards.org/sensorMethod#7890"
+          },
+          "sensorReport": [
+            {
+              "type": ["SensorData"],
+              "time": "2024-09-03T10:00:00Z",
+              "sensorType": "https://sensors.example.com/model7890",
+              "value": 500,
+              "uom": "KGM"
+            }
+          ],
+          "sensorIntegrityProof": "https://example.com/proof/789"
+        }
+      ],
+      "parentEPC": {
+        "type": ["Item"],
+        "id": "https://id.gs1.org/01/09520123456788/21/99999",
+        "name": "Pallet"
+      },
+      "childEPCList": [
+        {
+          "type": ["Item"],
+          "id": "https://id.gs1.org/01/09520123456788/21/12345",
+          "name": "Cotton Fabric"
+        }
+      ],
+      "childQuantityList": [
+        {
+          "type": ["QuantityElement"],
+          "productId": "https://id.gs1.org/01/09520123456789",
+          "productName": "Woven Fabric",
+          "quantity": 50,
+          "uom": "MTR"
+        }
+      ]
+    },
+    {
+      "type": ["TransactionEvent", "Event"],
+      "id": "https://events.example.com/e684df10-c682-454a-b11b-d0b9374c04bd",
+      "processType": "Shipment",
+      "eventTime": "2024-09-04T08:00:00Z",
+      "action": "observe",
+      "disposition": "in_transit",
+      "bizStep": "shipping",
+      "bizLocation": "https://id.gs1.org/414/9520123456792",
+      "sensorElementList": [
+        {
+          "type": ["SensorElement"],
+          "sensorMetadata": {
+            "type": ["Sensor"],
+            "device": {
+              "type": ["Item"],
+              "id": "https://id.gs1.org/01/09520123456788/21/54323",
+              "name": "GPS Tracker"
+            },
+            "dataProcessingMethod": "https://standards.org/sensorMethod#9012"
+          },
+          "sensorReport": [
+            {
+              "type": ["SensorData"],
+              "time": "2024-09-04T08:00:00Z",
+              "sensorType": "https://sensors.example.com/model9012",
+              "value": -33.8688,
+              "uom": "DD"
+            }
+          ],
+          "sensorIntegrityProof": "https://example.com/proof/901"
+        }
+      ],
+      "sourceParty": "https://id.example.com/party/seller123",
+      "destinationParty": "https://id.example.com/party/buyer456",
+      "bizTransaction": "po",
+      "epcList": [
+        {
+          "type": ["Item"],
+          "id": "https://id.gs1.org/01/09520123456788/21/99999",
+          "name": "Pallet"
+        }
+      ],
+      "quantityList": [
+        {
+          "type": ["QuantityElement"],
+          "productId": "https://id.gs1.org/01/09520123456789",
+          "productName": "Woven Fabric",
+          "quantity": 50,
+          "uom": "MTR"
+        }
+      ]
+    },
+    {
+      "type": ["AssociationEvent", "Event"],
+      "id": "https://events.example.com/f685df10-c682-454a-b11b-d0b9374c05bd",
+      "processType": "Assembly",
+      "eventTime": "2024-09-05T16:00:00Z",
+      "action": "add",
+      "disposition": "assembled",
+      "bizStep": "assembling",
+      "bizLocation": "https://id.gs1.org/414/9520123456793",
+      "sensorElementList": [
+        {
+          "type": ["SensorElement"],
+          "sensorMetadata": {
+            "type": ["Sensor"],
+            "device": {
+              "type": ["Item"],
+              "id": "https://id.gs1.org/01/09520123456788/21/54325",
+              "name": "Assembly Monitor"
+            },
+            "dataProcessingMethod": "https://standards.org/sensorMethod#3456"
+          },
+          "sensorReport": [
+            {
+              "type": ["SensorData"],
+              "time": "2024-09-05T16:00:00Z",
+              "sensorType": "https://sensors.example.com/model3456",
+              "value": 99,
+              "uom": "PCT"
+            }
+          ],
+          "sensorIntegrityProof": "https://example.com/proof/234"
+        }
+      ],
+      "parentEPC": {
+        "type": ["Item"],
+        "id": "https://id.gs1.org/01/09520123456788/21/88888",
+        "name": "Textile Product"
+      },
+      "childEPCList": [
+        {
+          "type": ["Item"],
+          "id": "https://id.gs1.org/01/09520123456788/21/12345",
+          "name": "Cotton Fabric"
+        },
+        {
+          "type": ["Item"],
+          "id": "https://id.gs1.org/01/09520123456788/21/77777",
+          "name": "Thread"
+        }
+      ],
+      "childQuantityList": [
+        {
+          "type": ["QuantityElement"],
+          "productId": "https://id.gs1.org/01/09520123456790",
+          "productName": "Fasteners",
+          "quantity": 200,
+          "uom": "EA"
+        }
+      ]
+    }
+  ]
+}
