@@ -1,9 +1,15 @@
-import { APP_CONFIG_FEATURE_APP, DIGITAL_TRACEABILITY_EVENT, ISSUE_TRACEABILITY_ASSOCIATION_EVENT, ORCHARD_FACILITY, TRACEABILITY_LINK_TYPE } from 'constant';
+import {
+  APP_CONFIG_FEATURE_APP,
+  ASSOCIATION_EVENT_LINK_TYPE,
+  DIGITAL_TRACEABILITY_EVENT,
+  ISSUE_ASSOCIATION_EVENT,
+  APP_NAME,
+} from 'constant';
 import IssuePage from 'cypress/page/issuePage';
 
 const associationEvent = new IssuePage();
 
-describe('Issue Digital Traceability Association Event end-to-end testing flow', () => {
+describe('Issue Association Event end-to-end testing flow', () => {
   beforeEach(() => {
     associationEvent.beforeAll();
   });
@@ -12,21 +18,20 @@ describe('Issue Digital Traceability Association Event end-to-end testing flow',
     associationEvent.testAppConfig();
   });
 
-  it('should visit the homepage, navigate to "Orchard Facility", handle API calls, and show success message', () => {
+  it('should issue Association Event', () => {
     associationEvent.generateWorkflow(
-      ORCHARD_FACILITY,
-      ISSUE_TRACEABILITY_ASSOCIATION_EVENT,
+      APP_NAME,
+      ISSUE_ASSOCIATION_EVENT,
       DIGITAL_TRACEABILITY_EVENT,
       APP_CONFIG_FEATURE_APP,
     );
-  
   });
 
   it('Verify linkType', () => {
-    associationEvent.verifyLinkType(TRACEABILITY_LINK_TYPE);
+    associationEvent.verifyLinkType(ASSOCIATION_EVENT_LINK_TYPE);
   });
 
-  it('Runs testing UNTP test suite for Digital Traceability Association Event', () => {
-    associationEvent.runUntpTest('digitalTraceabilityEvent', 'v0.5.0');
+  it('Runs testing UNTP test suite for Association Event', () => {
+    associationEvent.runUntpTest('digitalTraceabilityEvent', 'v0.6.0');
   });
 });

@@ -4,7 +4,7 @@ import { DPP_LINK_TYPE } from '../../../../constant';
 class DPPIssueFlow extends IssuePage {
   testGenerateDPPWorkflow() {
     this.generateWorkflow(
-      'Orchard Facility',
+      'Example Company',
       'Generate DPP',
       'DigitalProductPassport',
       'apps',
@@ -27,7 +27,7 @@ describe('Issue DPP end-to-end testing flow', () => {
     dppTest.testAppConfig();
   });
 
-  it('should visit the homepage, navigate to "Orchard Facility", handle API calls, and show success message', () => {
+  it('should issue DPP', () => {
     dppTest.testGenerateDPPWorkflow();
   });
 

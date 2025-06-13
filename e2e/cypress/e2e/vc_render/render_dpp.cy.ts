@@ -1,4 +1,4 @@
-import { APP_CONFIG_FEATURE_APP, DIGITAL_PRODUCT_PASSPORT, DPP_LINK_TYPE, ISSUE_DPP, ORCHARD_FACILITY } from 'constant';
+import { APP_CONFIG_FEATURE_APP, APP_NAME, DIGITAL_PRODUCT_PASSPORT, DPP_LINK_TYPE, ISSUE_DPP } from 'constant';
 import IssuePage from 'cypress/page/issuePage';
 import RenderPage from 'cypress/page/renderPage';
 
@@ -12,7 +12,7 @@ describe('Render DPP end-to-end testing flow', () => {
     });
 
     it('should issue DPP', () => {
-      dppIssue.generateWorkflow(ORCHARD_FACILITY, ISSUE_DPP, DIGITAL_PRODUCT_PASSPORT, APP_CONFIG_FEATURE_APP);
+      dppIssue.generateWorkflow(APP_NAME, ISSUE_DPP, DIGITAL_PRODUCT_PASSPORT, APP_CONFIG_FEATURE_APP);
     });
   });
 
