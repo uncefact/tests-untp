@@ -2,7 +2,7 @@ Cypress.Commands.add('verifyAppConfig', () => {
   const AppConfig = Cypress.env('AppConfig');
   expect(AppConfig?.name).to.not.be.null;
   expect(AppConfig?.name).to.not.be.undefined;
-  expect(AppConfig?.name).to.eq('CHERRIES SUPPLY CHAIN TRACEABILITY');
+  expect(AppConfig?.name).to.eq('UNTP Reference Implementation');
 });
 
 Cypress.Commands.add(
