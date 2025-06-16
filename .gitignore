@@ -35,6 +35,7 @@ yarn-error.log
 testem.log
 /typings
 .env
+minio_data/*
 
 # Yarn
 .yarn/*
@@ -57,6 +58,8 @@ testem.log
 /packages/*/coverage/
 /packages/*/node_modules/
 
+**/uploads/
+
 
 .npmrc
 
@@ -69,3 +72,14 @@ tmp/
 
 # logs
 /logs
+packages/services/tsconfig.tsbuildinfo
+packages/untp-test-suite/credentials.json
+packages/untp-test-suite/data
+# vc-test-suite
+packages/vc-test-suite/suite.log
+packages/vc-test-suite/reports
+
+# cypress
+e2e/cypress/screenshots
+e2e/cypress/downloads
+e2e/cypress/screenshots

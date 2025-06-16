@@ -1,0 +1,373 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "x-jargon-isKey": true,
+      "type": "string",
+      "format": "uri",
+      "description": "The unique identifier of this conformity attestation"
+    },
+    "class": {
+      "type": "string",
+      "enum": ["1A", "2A", "3A", "4A"],
+      "example": "1A",
+      "description": "The type of attestation (formal conformity, industry or communituy, self assessed)"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "test-report",
+        "inspect-report",
+        "product-cert",
+        "service-cert",
+        "process-cert",
+        "management-cert",
+        "verification-report",
+        "validation-report",
+        "declaration"
+      ],
+      "example": "test-report",
+      "description": "The type of criterion (optional or mandatory)."
+    },
+    "description": {
+      "type": "string",
+      "description": "A textual description of the scope or purpose of this confomrity attestation"
+    },
+    "scope": {
+      "$ref": "#/$defs/SchemeOrProgram",
+      "description": "A list of relevant standards and/or regulations against which apply to this attestation (eg AS1163:2016)."
+    },
+    "issuedBy": { "$ref": "#/$defs/Party", "description": "The party that issued the conformity attestation." },
+    "issuedTo": { "$ref": "#/$defs/Party", "description": "The party to whom the conformity attestation was issued." },
+    "validFrom": {
+      "type": "string",
+      "format": "date",
+      "description": "The date from which the conformity attestation is valid."
+    },
+    "validTo": {
+      "type": "string",
+      "format": "date",
+      "description": "The date until which the conformity attestation is valid."
+    },
+    "status": {
+      "type": "string",
+      "description": "The status of this conformity attestation (eg pending, valid, expired, revoked)"
+    },
+    "assessments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ConformityAssessment" },
+      "description": "The list of specific assessments made within this conformity attestation."
+    },
+    "evidence": { "$ref": "#/$defs/ConformityEvidence", "description": "Evidence supporting the assessment" },
+    "accreditation": {
+      "$ref": "#/$defs/Authority",
+      "description": "The accreditation that from a competent authority (ag NATA) that confirms the issuers authorised scope of assessments. "
+    },
+    "regulatoryApproval": {
+      "$ref": "#/$defs/Authority",
+      "description": "The regulatory approval under which this conformity attestation is issued. "
+    },
+    "certificate": { "$ref": "#/$defs/File", "description": "" }
+  },
+  "description": "A conformity attestation issued by a competent body that defines one or more assessments (eg carbon intensity) about a product (eg batttery) against a specification (eg LCA method) defined in a standard or regulation.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "SchemeOrProgram": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "x-jargon-isKey": true,
+          "type": "string",
+          "format": "uri",
+          "description": "THe unique identifier of the formal scheme (eg steelcertification.com/product-certification)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the conformity scheme (eg ACRS structural steel certification)"
+        },
+        "trustmark": {
+          "type": "string",
+          "format": "binary",
+          "description": "The trust mark that represents the conformity assessment scheme."
+        },
+        "issuingBody": { "$ref": "#/$defs/Party", "description": "The issuing body of the conformity scheme." },
+        "dateOfIssue": { "type": "string", "format": "date", "description": "The date of issue of the scheme." }
+      },
+      "description": "A formal governance scheme under which this attestation is issued (eg ACRS structural steel certification)"
+    },
+    "Party": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "x-jargon-isKey": true,
+          "type": "string",
+          "format": "uri",
+          "description": "A unique, resovable and verifiableidentifier for the party (eg abr.business.gov.au/ABN/90664869327)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the party - should match the name in the corresponding formal register."
+        }
+      },
+      "description": "A party in the conformity domain such as the manufacturer, assessment body, standards authority, accreditation authority, etc"
+    },
+    "ConformityAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requirementReference": {
+          "$ref": "#/$defs/StandardOrRegulation",
+          "description": "The reference to the standard or regulation that defines the specification / criteria"
+        },
+        "assessmentCriterion": {
+          "type": "string",
+          "description": "The specification against which the assessment is made.\nThis field is the identifier of Criteria (id). It's definition is:\n\nA unique identifier for the criterion."
+        },
+        "subjectProducts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Product" },
+          "description": "The list of products that are the subject of this conformity assessment"
+        },
+        "subjectFacilities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Facility" },
+          "description": "The list of facilities that are the subject of this conformity assessment."
+        },
+        "measuredResults": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Metric" },
+          "description": "The list of specific values measured as part of this assessment (eg tensile strength)"
+        },
+        "compliance": {
+          "type": "boolean",
+          "description": "An indicator of whether or not the assessment meets the specification."
+        },
+        "ESGtopic": {
+          "type": "string",
+          "x-external-enumeration": "https://vocabulary.uncefact.org/sustainability",
+          "description": "The UN ESG topic category for this assessment (eg vocabulary.uncefact.org/sustainability/emissions)\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/sustainability\n    "
+        }
+      },
+      "description": "A specific assessment about the product or facility against a specific specification.  Eg the carbon intensity of a given product or batch."
+    },
+    "StandardOrRegulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "x-jargon-isKey": true,
+          "type": "string",
+          "format": "uri",
+          "description": "A unique identifier for the standard or regulation."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["Regulation", "NormativeStandard", "IndustryStandard", "Specification"],
+          "example": "Regulation",
+          "description": ""
+        },
+        "name": { "type": "string", "description": "The name of the standard or regulation." },
+        "issuingBody": { "$ref": "#/$defs/Party", "description": "The party that issued the standard or regulation." },
+        "dateOfIssue": {
+          "type": "string",
+          "format": "date",
+          "description": "The date when the standard or regulation was issued."
+        },
+        "criteria": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Criteria" },
+          "description": "The criteria associated with the standard or regulation."
+        }
+      },
+      "description": "A standard (eg ISO 14000) or regulation (eg EU deforestation regulation) that specifies the criteria for conformance."
+    },
+    "Criteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "x-jargon-isKey": true,
+          "type": "string",
+          "format": "uri",
+          "description": "A unique identifier for the criterion."
+        },
+        "thresholdValue": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Metric" },
+          "description": "A conformity threshold defined by the specification (eg minimum compressive strength)"
+        },
+        "description": { "type": "string", "description": "A textual description of the specification / criterion." }
+      },
+      "description": "A specific rule or criterion within a standard or regulation. eg a carbon intensity calculation rule within an emissions standard."
+    },
+    "Metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "type": "string",
+          "format": "uri",
+          "description": "A pointer to the definition of the metric - should be a vocabulary item URI mantained by the standards authority or regulator."
+        },
+        "unit": {
+          "type": "string",
+          "x-external-enumeration": "https://vocabulary.uncefact.org/UnitMeasureCode",
+          "description": "The unit of measurement for the metric from UNECE Rec 20 UoM code list.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://vocabulary.uncefact.org/UnitMeasureCode\n    "
+        },
+        "value": { "type": "number", "description": "The measured value.  " }
+      },
+      "description": "A numric value of the conformity claim - eg this product scope 1 emissions intensity is 5 KgCo2e/Kg"
+    },
+    "Product": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "productId": {
+          "type": "string",
+          "format": "uri",
+          "description": "A unique, resolvable, and verifiable identifier for the product (eg id.gs1.org/gtin/5000127163096)"
+        },
+        "marking": {
+          "type": "string",
+          "description": "Markings or codes on the product that can be used to match the physical product to this confomity assessment. if not provided then the productID MUST be marked on the product."
+        },
+        "name": {
+          "type": "string",
+          "description": "the name of this product as defined by the manuracturer or retailer."
+        },
+        "classification": {
+          "type": "string",
+          "x-external-enumeration": "https://unstats.un.org/unsd/classifications/Econ/Download/In%20Text/CPC_Ver_2_1_english_structure.txt",
+          "description": "The UN CPC product classification code.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://unstats.un.org/unsd/classifications/Econ/Download/In%20Text/CPC_Ver_2_1_english_structure.txt\n    "
+        },
+        "testedBatchId": {
+          "type": "string",
+          "format": "uri",
+          "description": "A unique, resolvable, and verifiable identifier for the product serial number or batch (eg id.gs1.org/gtin/614141123452/lot/ABC1/ser/12345?exp=180426)"
+        },
+        "verfifiedByCAB": {
+          "type": "boolean",
+          "description": "Indicates whether the conformity assessment body has verified the identity of the subject of the assement (a facility or product / batch)."
+        }
+      },
+      "description": "The facility (fatctory, farm, etc) or product or produciton batch that this conformity attestation is about."
+    },
+    "Facility": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "facilityId": {
+          "type": "string",
+          "format": "uri",
+          "description": "A unique, resolvable, and verifiable identifier for the facility (eg https://maps.app.goo.gl/ULJFeVuA75M8cuQc8) "
+        },
+        "name": { "type": "string", "description": "The name of this facility" },
+        "classification": {
+          "type": "string",
+          "x-external-enumeration": "https://unstats.un.org/unsd/classifications/Econ/Download/In%20Text/CPC_Ver_2_1_english_structure.txt",
+          "description": "The UN CPC service calssificaiton for the activities undertaken at this facility.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://unstats.un.org/unsd/classifications/Econ/Download/In%20Text/CPC_Ver_2_1_english_structure.txt\n    "
+        },
+        "location": { "$ref": "#/$defs/Location", "description": "The physical location of this facility." },
+        "verfifiedByCAB": {
+          "type": "boolean",
+          "description": "Indicates whether the conformity assessment body has verified the identity of the subject of the assement (a facility or product / batch)."
+        }
+      },
+      "description": ""
+    },
+    "Location": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "locationId": {
+          "type": "string",
+          "format": "uri",
+          "description": "Identfier of the facility at which the assessment was undertaken. Eg A GLN."
+        },
+        "Geolocation": {
+          "type": "string",
+          "format": "uri",
+          "description": "The geolocated point or area that can be used to place the location on a map. Should be a PlusCode - eg https://plus.codes/4RQGGVGP+"
+        }
+      },
+      "description": "A physical facility at a specified geolocation."
+    },
+    "ConformityEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "evidenceRootHash": {
+          "x-jargon-isKey": true,
+          "type": "string",
+          "description": "An MD5 hash representing the root of the evidence."
+        },
+        "description": { "type": "string", "description": "A textual description of the evidence." },
+        "evidenceData": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/File" },
+          "description": "Files that constitute the evidence."
+        },
+        "decryptionKeyRequest": {
+          "type": "string",
+          "format": "uri",
+          "description": "A URI to request the decryption key for the evidence."
+        }
+      },
+      "description": "The specific collection of evidence that was used to inform the conformity claim. Eg satellite images and supporting declarations in support of a deforestation claim."
+    },
+    "File": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fileHash": { "x-jargon-isKey": true, "type": "string", "description": "The MD5 hash of the file." },
+        "fileLocation": { "type": "string", "format": "uri", "description": "The location of the evidence file." },
+        "fileType": {
+          "type": "string",
+          "x-external-enumeration": "https://mimetype.io/all-types",
+          "description": "The type of file, represented as a MIME type.\n\n    This is an enumerated value, but the list of valid values are too big, or change too often to include here. You can access the list of allowable values at this URL:  https://mimetype.io/all-types\n    "
+        },
+        "EncryptionMethod": {
+          "type": "string",
+          "enum": ["none", "AES"],
+          "example": "none",
+          "description": "A code indicating the encryption method applied to the file."
+        }
+      },
+      "description": "A file representing a data snapshot that is used to infomr the conformity assessment."
+    },
+    "Authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "type": "string",
+          "description": "The reference number for the accreditation - issued by the accreditation body (AB) to the confomrity assessment body (CAB)"
+        },
+        "credential": {
+          "type": "string",
+          "format": "uri",
+          "description": "The pointer to the credential issued by a trust anchor that accredits the party making the assessment."
+        },
+        "credentialType": {
+          "type": "string",
+          "enum": ["VC", "web", "seal"],
+          "example": "VC",
+          "description": "A code specifying the accreditaiotn evidence type (eg VC, web page, DAKKS seal)"
+        },
+        "trustmark": {
+          "type": "string",
+          "format": "binary",
+          "description": "The trust mark image awarded by the AB to the CAB to indicate accrediation."
+        },
+        "authority": {
+          "$ref": "#/$defs/Party",
+          "description": "The competent authority that issued the accreditation."
+        }
+      },
+      "description": "The authority under which a conformity claim is issued.  For example a national accrediation authority may accredit a test lab to issue test certificates about a product against a standard. "
+    }
+  }
+}

@@ -1,3 +1,12 @@
 build
 lib
 coverage
+__tests__
+scripts
+jest.config.*
+jest.*.config.*
+integration
+node_modules
+.next
+packages/untp-playground/infra
+

@@ -1,0 +1,12 @@
+{
+  "credential": {
+    "@context": "invalid",
+    "renderMethod": [
+      {
+        "template": "<p>{{name}}</p>",
+        "@type": "RenderTemplate2024",
+        "mediaType": "text/html"
+      }
+    ]
+  }
+}
