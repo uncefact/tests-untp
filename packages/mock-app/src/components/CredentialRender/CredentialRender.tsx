@@ -45,9 +45,9 @@ const CredentialRender = ({ credential }: { credential: VerifiableCredential | U
 
   return (
     <>
-      {isLoading && <CircularProgress sx={{ margin: 'auto' }} />}
+      {isLoading && <CircularProgress sx={{ margin: 'auto' }} data-testid="loading-indicator" />}
       <Box
-        data-testid='loading-indicator'
+        data-testid='rendered-template-container'
         sx={{
           overflowY: 'scroll',
           margin: '0 auto',
@@ -69,6 +69,7 @@ const CredentialRender = ({ credential }: { credential: VerifiableCredential | U
                   }}
                   key={i}
                   dangerouslySetInnerHTML={{ __html: doc }}
+                  data-testid={"rendered-template"}
                 ></div>
               </>
             ))
