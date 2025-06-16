@@ -3,6 +3,9 @@ services:
     build:
       context: .
       dockerfile: packages/untp-playground/Dockerfile
+      args:
+        NEXT_PUBLIC_VERIFICATION_SERVICE_URL: http://localhost:3332/agent/routeVerificationCredential
+        NEXT_PUBLIC_VERIFICATION_SERVICE_TOKEN: test123
     ports:
       - '4000:3000'
     volumes:
