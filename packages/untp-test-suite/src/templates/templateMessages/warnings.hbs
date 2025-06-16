@@ -1,0 +1,11 @@
+{
+  "warnings": [
+    {{#each warnings}}
+      {
+        "fieldName": "{{params.additionalProperty}}",
+        "message": "Additional property found: '{{params.additionalProperty}}'."
+      }
+      {{#unless @last}},{{/unless}}
+    {{/each}}
+  ]
+}

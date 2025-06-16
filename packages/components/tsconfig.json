@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -13,11 +17,18 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "outDir": "lib",
+    "outDir": "build",
     "declaration": true,
     "jsx": "react-jsx",
     "sourceMap": true,
     "rootDir": "src"
   },
-  "include": ["src"]
+  "types": [
+    "node",
+    "jest",
+    "@testing-library/jest-dom"
+  ],
+  "include": [
+    "src"
+  ]
 }

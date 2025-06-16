@@ -1,0 +1,113 @@
+name: 'CI/CD UNTP Playgroud'
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - next
+      - 'cd/**'
+    paths:
+      - 'packages/untp-playground/**'
+      - '.github/workflows/ci_cd-untp-playground.yml'
+
+jobs:
+  #todo: add running tests job
+  deploy_test:
+    if: github.repository_owner == 'uncefact' && ( github.ref == 'refs/heads/next' || startsWith(github.ref, 'refs/heads/cd/') )
+    concurrency:
+      group: untp-plaground-${{github.ref}}
+
+    permissions:
+      id-token: write
+      contents: read
+
+    name: Deploy to Test
+    environment:
+      name: test
+      url: https://test.uncefact.org/test-untp-playground
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: aws_login_uncefact
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{env.AWS_ROLE_TO_ASSUME}}
+          aws-region: us-east-1
+        env:
+          AWS_ROLE_TO_ASSUME: ${{ secrets.UNCEFACT_AWS_ROLE_TO_ASSUME}}
+
+
+      - name: Setup Node LTS ✨
+        uses: actions/setup-node@v3
+        with:
+          node-version: lts/*
+          cache: yarn
+  
+      - name: Installing dependencies 📦️
+        run: yarn install
+        working-directory: ./packages/untp-playground/infra
+
+      - name: Deploy Stack
+        uses: pulumi/actions@v5
+        with:
+          command: up
+          stack-name: ${{ env.STACK_NAME}}
+          work-dir: ./packages/untp-playground/infra
+        env:
+          NEXT_PUBLIC_BASE_PATH: /test-untp-playground
+          NEXT_PUBLIC_ASSET_PREFIX: /test-untp-playground
+          NEXT_PUBLIC_IMAGE_PATH: /test-untp-playground/_next/image
+          NEXT_PUBLIC_REPORT_NAME:
+          STACK_NAME: test
+
+  deploy_prod:
+    if: github.repository_owner == 'uncefact' && github.ref_type == 'tag' && github.event_name == 'workflow_dispatch'
+    concurrency:
+      group: untp-plaground-${{github.ref}}
+
+    permissions:
+      id-token: write
+      contents: read
+
+    name: Deploy to Prod
+    environment:
+      name: production
+      url: https://test.uncefact.org/untp-playground
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: aws_login_uncefact
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{env.AWS_ROLE_TO_ASSUME}}
+          aws-region: us-east-1
+        env:
+          AWS_ROLE_TO_ASSUME: ${{ secrets.UNCEFACT_AWS_ROLE_TO_ASSUME}}
+
+
+      - name: Setup Node LTS ✨
+        uses: actions/setup-node@v3
+        with:
+          node-version: lts/*
+          cache: yarn
+  
+      - name: Installing dependencies 📦️
+        run: yarn install
+        working-directory: ./packages/untp-playground/infra
+
+      - name: Deploy Stack
+        uses: pulumi/actions@v5
+        with:
+          command: up
+          stack-name: ${{ env.STACK_NAME}}
+          work-dir: ./packages/untp-playground/infra
+        env:
+          NEXT_PUBLIC_BASE_PATH: /untp-playground
+          NEXT_PUBLIC_ASSET_PREFIX: /untp-playground
+          NEXT_PUBLIC_IMAGE_PATH: /untp-playground/_next/image
+          NEXT_PUBLIC_REPORT_NAME:
+          STACK_NAME: prod
