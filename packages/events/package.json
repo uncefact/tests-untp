@@ -1,5 +1,5 @@
 {
-  "name": "@mock-app/services",
+  "name": "@mock-app/events",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
