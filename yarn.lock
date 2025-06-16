@@ -5681,23 +5681,23 @@
     did-jwt-vc "^3.2.15"
     did-resolver "^4.1.0"
 
-"@uncefact/vckit-core-types@^1.0.0-next.58+10c03b02":
-  version "1.0.0-next.58"
-  resolved "https://registry.yarnpkg.com/@uncefact/vckit-core-types/-/vckit-core-types-1.0.0-next.58.tgz#09e415b871cb08d0b296e958db5678c50d1331e4"
-  integrity sha512-XFTdfJL3S8c8D6XKRuZeJN0uGjiEqcCFX4QkG6NUHGIcDSpATEfcuJh+fF0DhSTSVC/GOYWJNoMYv+N0nvXcJw==
+"@uncefact/vckit-core-types@^1.0.0-next.59+5179b95c":
+  version "1.0.0-next.59"
+  resolved "https://registry.yarnpkg.com/@uncefact/vckit-core-types/-/vckit-core-types-1.0.0-next.59.tgz#ed7472258550107501724ede94080c15d952de76"
+  integrity sha512-UzHD4DuGGzFKNZ9LBdZzlwQO/1D9OoULo788p9PNQr6C4fSfeU7ylKBTWG39cYencfDqWxBYNWJHVqmupV3m8A==
   dependencies:
     credential-status "^2.0.6"
     debug "^4.3.4"
     did-jwt-vc "^3.2.15"
     did-resolver "^4.1.0"
 
-"@uncefact/vckit-renderer@^1.0.0-next.50":
-  version "1.0.0-next.58"
-  resolved "https://registry.yarnpkg.com/@uncefact/vckit-renderer/-/vckit-renderer-1.0.0-next.58.tgz#172338893d8ba2f7da01ee5cb9b772bad92040cf"
-  integrity sha512-AQDSIYc/tSkH80DM36iKXMdTbB6fH4GFWlAa85KLKlR0tNLLpxvhksnLqEtWJ1fFrrsxAYx5e/DOVWSaidCAGw==
+"@uncefact/vckit-renderer@^1.0.0-next.59":
+  version "1.0.0-next.59"
+  resolved "https://registry.yarnpkg.com/@uncefact/vckit-renderer/-/vckit-renderer-1.0.0-next.59.tgz#2f2237e87cdfd012d5ee731ad33296c98c244c46"
+  integrity sha512-hhBU/S7uob69uOqBtTG4/jdu8IZH1nEo9iOL22b4g1D+MCalLHlIZSoo7t3RlvsAqvYmpWQpt3hf7e9pIxod1Q==
   dependencies:
     "@digitalcredentials/jsonld" "5.2.1"
-    "@uncefact/vckit-core-types" "^1.0.0-next.58+10c03b02"
+    "@uncefact/vckit-core-types" "^1.0.0-next.59+5179b95c"
     handlebars "^4.7.8"
     jose "^5.9.3"
 
@@ -19950,7 +19950,7 @@ workerpool@^6.5.1:
   resolved "https://registry.yarnpkg.com/workerpool/-/workerpool-6.5.1.tgz#060f73b39d0caf97c6db64da004cd01b4c099544"
   integrity sha512-Fs4dNYcsdpYSAfVxhnl1L5zTksjvOJxtC5hzMNl+1t9B8hTJTdKDyZ5ju7ztgPy+ft9tBFXoOlDNiOT9WUXZlA==
 
-"wrap-ansi-cjs@npm:wrap-ansi@^7.0.0", wrap-ansi@^7.0.0:
+"wrap-ansi-cjs@npm:wrap-ansi@^7.0.0":
   version "7.0.0"
   resolved "https://registry.yarnpkg.com/wrap-ansi/-/wrap-ansi-7.0.0.tgz#67e145cff510a6a6984bdf1152911d69d2eb9e43"
   integrity sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q==
@@ -19963,6 +19963,15 @@ wrap-ansi@^6.0.1, wrap-ansi@^6.2.0:
   version "6.2.0"
   resolved "https://registry.yarnpkg.com/wrap-ansi/-/wrap-ansi-6.2.0.tgz#e9393ba07102e6c91a3b221478f0257cd2856e53"
   integrity sha512-r6lPcBGxZXlIcymEu7InxDMhdW0KDxpLgoFLcguasxCaJ/SOIZwINatK9KY/tf+ZrlywOKU0UDj3ATXUBfxJXA==
+  dependencies:
+    ansi-styles "^4.0.0"
+    string-width "^4.1.0"
+    strip-ansi "^6.0.0"
+
+wrap-ansi@^7.0.0:
+  version "7.0.0"
+  resolved "https://registry.yarnpkg.com/wrap-ansi/-/wrap-ansi-7.0.0.tgz#67e145cff510a6a6984bdf1152911d69d2eb9e43"
+  integrity sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q==
   dependencies:
     ansi-styles "^4.0.0"
     string-width "^4.1.0"
