@@ -69,7 +69,7 @@ P-->>C: Return event VC and resolver URL
         "dlrAPIUrl": "https://dlr.example.com/api",
         "dlrAPIKey": "dlr-api-key-12345",
         "namespace": "gs1",
-        "linkRegisterPath": "/api/resolver"
+        "linkRegisterPath": "resolver"
       },
       "identifierKeyPath": "/0/id",
       "eventTypePath": "/0/type/0"

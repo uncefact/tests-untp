@@ -42,7 +42,7 @@ Cypress.Commands.add(
       ISSUE_BITSTRING_STATUS_LIST: '/agent/issueBitstringStatusList',
       VCKit_URL: appService?.vckit?.vckitAPIUrl + '/credentials/issue',
       STORAGE_URL: appService?.storage?.url,
-      IDR_URL: appService?.dlr?.dlrAPIUrl + appService?.dlr?.linkRegisterPath,
+      IDR_URL: `${appService?.dlr?.dlrAPIUrl}/${appService?.dlr?.linkRegisterPath}`,
     };
 
     cy.interceptAPI('POST', API_ENDPOINT.ISSUE_BITSTRING_STATUS_LIST, 'issueBitStringStatusList');

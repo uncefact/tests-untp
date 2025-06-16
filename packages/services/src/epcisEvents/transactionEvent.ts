@@ -58,6 +58,7 @@ export const processTransactionEvent: IService = async (
     LinkType.traceability,
     traceabilityEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
+    dlr.linkRegisterPath,
     dlr.dlrAPIKey,
     dlr.namespace,
     qualifierPath,

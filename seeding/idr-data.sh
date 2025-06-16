@@ -28,7 +28,7 @@ while true; do
   fi
 
   # Make the health check request and store the status
-  HEALTH_STATUS=$(curl -s http://${IDR_SERVICE_HOST}:${IDR_SERVICE_PORT}/health-check | grep -o '"status":"OK"')
+  HEALTH_STATUS=$(curl -s http://${IDR_SERVICE_HOST}:${IDR_SERVICE_PORT}/api/${IDR_SERVICE_API_VERSION}/health-check | grep -o '"status":"OK"')
   if [ "$HEALTH_STATUS" = '"status":"OK"' ]; then
     echo "${SERVICE_NAME} service is healthy!"
     break
@@ -43,21 +43,21 @@ echo "${SERVICE_NAME} service is seeding data…"
 
 # Execute create identifier request with JSON data from a file
 curl -X POST \
-  http://${IDR_SERVICE_HOST}:${IDR_SERVICE_PORT}/api/identifiers \
+  http://${IDR_SERVICE_HOST}:${IDR_SERVICE_PORT}/api/${IDR_SERVICE_API_VERSION}/identifiers \
   -H 'accept: application/json' \
   -H "Authorization: Bearer ${IDR_SERVICE_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d @"$GS1_IDENTIFIER_FILE"
   
 curl -X POST \
-  http://${IDR_SERVICE_HOST}:${IDR_SERVICE_PORT}/api/identifiers \
+  http://${IDR_SERVICE_HOST}:${IDR_SERVICE_PORT}/api/${IDR_SERVICE_API_VERSION}/identifiers \
   -H 'accept: application/json' \
   -H "Authorization: Bearer ${IDR_SERVICE_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d @"$NLIS_IDENTIFIER_FILE"
 
 curl -X POST \
-  http://${IDR_SERVICE_HOST}:${IDR_SERVICE_PORT}/api/identifiers \
+  http://${IDR_SERVICE_HOST}:${IDR_SERVICE_PORT}/api/${IDR_SERVICE_API_VERSION}/identifiers \
   -H 'accept: application/json' \
   -H "Authorization: Bearer ${IDR_SERVICE_API_KEY}" \
   -H 'Content-Type: application/json' \

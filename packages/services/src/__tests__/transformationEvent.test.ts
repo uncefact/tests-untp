@@ -238,6 +238,7 @@ describe('Transformation event', () => {
         dlrAPIUrl: 'https://dlr.example.com',
         dlrAPIKey: 'test-api-key',
         namespace: 'test-namespace',
+        linkRegisterPath: 'resolver',
       };
       const mockTransformationEventCredential = {
         mappingFields: [
@@ -293,6 +294,7 @@ describe('Transformation event', () => {
         dlrAPIUrl: 'https://dlr.example.com',
         dlrAPIKey: 'test-api-key',
         namespace: 'test-namespace',
+        linkRegisterPath: 'resolver',
       };
       const mockTransformationEventCredential = {
         mappingFields: [

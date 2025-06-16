@@ -67,6 +67,7 @@ export const processDigitalConformityCredential: IService = async (
     LinkType.certificationLinkType,
     digitalConformityCredential.dlrVerificationPage,
     dlr.dlrAPIUrl,
+    dlr.linkRegisterPath,
     dlr.dlrAPIKey,
     dlr.namespace,
     qualifierPath,

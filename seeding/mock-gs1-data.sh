@@ -24,7 +24,7 @@ while true; do
   fi
 
   # Make the health check request
-  HEALTH_STATUS=$(curl -s http://${MOCK_GS1_SERVICE_HOST}:${MOCK_GS1_SERVICE_PORT}/health-check | grep -o '"status":"OK"')
+  HEALTH_STATUS=$(curl -s http://${MOCK_GS1_SERVICE_HOST}:${MOCK_GS1_SERVICE_PORT}/api/${MOCK_GS1_SERVICE_API_VERSION}/health-check | grep -o '"status":"OK"')
   if [ "$HEALTH_STATUS" = '"status":"OK"' ]; then
     echo "${SERVICE_NAME} service is healthy!"
     break
@@ -39,7 +39,7 @@ echo "${SERVICE_NAME} service is seeding data…"
 
 # Execute create identifier request
 curl -X POST \
-  http://${MOCK_GS1_SERVICE_HOST}:${MOCK_GS1_SERVICE_PORT}/api/identifiers \
+  http://${MOCK_GS1_SERVICE_HOST}:${MOCK_GS1_SERVICE_PORT}/api/${MOCK_GS1_SERVICE_API_VERSION}/identifiers \
   -H 'accept: application/json' \
   -H "Authorization: Bearer ${MOCK_GS1_SERVICE_API_KEY}" \
   -H 'Content-Type: application/json' \
@@ -51,7 +51,7 @@ printf "\n"
 # Loop through JSON file and make curl requests for each identification
 jq -c '.[]' "$IDENTIFICATIONS_FILE" | while read -r IDENTIFICATION; do
   curl -X POST \
-    "http://${MOCK_GS1_SERVICE_HOST}:${MOCK_GS1_SERVICE_PORT}/api/resolver" \
+    "http://${MOCK_GS1_SERVICE_HOST}:${MOCK_GS1_SERVICE_PORT}/api/${MOCK_GS1_SERVICE_API_VERSION}/resolver" \
     -H 'accept: application/json' \
     -H "Authorization: Bearer ${MOCK_GS1_SERVICE_API_KEY}" \
     -H 'Content-Type: application/json' \

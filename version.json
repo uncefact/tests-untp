@@ -4,11 +4,11 @@
   "dependencies": {
     "vckit": {
       "repoUrl": "https://github.com/uncefact/project-vckit.git",
-      "versions": ["1.0.0"]
+      "versions": ["1.1.0"]
     },
     "storage-service": {
       "repoUrl": "https://github.com/uncefact/project-identity-resolver.git",
-      "versions": ["1.0.0"]
+      "versions": ["1.0.1"]
     },
     "idr": {
       "repoUrl": "https://github.com/pyx-industries/pyx-identity-resolver.git",

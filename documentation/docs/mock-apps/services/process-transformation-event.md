@@ -71,7 +71,7 @@ P-->>C: Return EPCIS VC
         "dlrAPIUrl": "https://dlr.example.com/api",
         "dlrAPIKey": "dlr-api-key-12345",
         "namespace": "gs1",
-        "linkRegisterPath": "/api/resolver"
+        "linkRegisterPath": "resolver"
       },
       "storage": {
         "url": "http://localhost:3334/v1/documents",

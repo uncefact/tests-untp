@@ -67,6 +67,7 @@ export const processDigitalIdentityAnchor: IService = async (
     LinkType.registryEntry,
     digitalIdentityAnchor.dlrVerificationPage,
     dlr.dlrAPIUrl,
+    dlr.linkRegisterPath,
     dlr.dlrAPIKey,
     dlr.namespace,
     qualifierPath,

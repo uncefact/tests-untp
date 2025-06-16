@@ -125,6 +125,7 @@ describe('processDPP', () => {
         LinkType.sustainabilityInfo,
         dppContext.dlrVerificationPage,
         dlrContext.dlrAPIUrl,
+        dlrContext.linkRegisterPath,
         dlrContext.dlrAPIKey,
         dlrContext.namespace,
         dataDPP.qualifierPath,

@@ -80,7 +80,7 @@ P-->>C: Return VC and resolver URL
         "dlrAPIUrl": "https://dlr.example.com",
         "dlrAPIKey": "5555555555555",
         "namespace": "gs1",
-        "linkRegisterPath": "/api/resolver"
+        "linkRegisterPath": "resolver"
       },
       "storage": {
         "url": "http://localhost:3334/v1/documents",
