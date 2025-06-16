@@ -86,11 +86,13 @@ The Identity Resolver and Mock Global GS1 Resolver services require seed data to
 ```bash
 # Set environment variables
 export IDR_SERVICE_HOST=localhost # IDR service host
+export IDR_SERVICE_API_VERSION=1.0.0 # IDR API version
 export IDR_SERVICE_PORT=3000 # IDR service port
 export IDR_SERVICE_API_KEY=test123 # IDR service API key
 export IDR_SERVICE_DOMAIN=http://localhost:3000 # IDR service domain
 
 export MOCK_GS1_SERVICE_HOST=localhost # Mock GS1 service host
+export MOCK_GS1_SERVICE_API_VERSION=1.0.0 # Mock GS1 service API version
 export MOCK_GS1_SERVICE_PORT=3001 # Mock GS1 service port
 export MOCK_GS1_SERVICE_API_KEY=test456 # Mock GS1 service API key
 

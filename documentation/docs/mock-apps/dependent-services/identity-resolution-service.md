@@ -71,12 +71,14 @@ If you are running the seed script directly on your host machine, set the necess
 ```bash
 # Identity Resolver (IDR) Service Configuration
 export IDR_SERVICE_HOST=localhost # IDR service host
+export IDR_SERVICE_API_VERSION=1.0.0 # IDR API version
 export IDR_SERVICE_PORT=3000 # IDR service port
 export IDR_SERVICE_API_KEY=test123 # IDR service API key
 export IDR_SERVICE_DOMAIN=http://localhost:3000 # IDR service domain
 
 # Mock GS1 Service Configuration
 export MOCK_GS1_SERVICE_HOST=localhost # Mock GS1 service host
+export MOCK_GS1_SERVICE_API_VERSION=1.0.0 # Mock GS1 service API version
 export MOCK_GS1_SERVICE_PORT=3001 # Mock GS1 service port
 export MOCK_GS1_SERVICE_API_KEY=test456 # Mock GS1 service API key
 ```
@@ -102,12 +104,14 @@ services:
     environment:
       # IDR service environment variables
       - IDR_SERVICE_HOST=identity-resolver-service
+      - IDR_SERVICE_API_VERSION=1.0.0
       - IDR_SERVICE_PORT=3000
       - IDR_SERVICE_API_KEY=test123
       - IDR_SERVICE_DOMAIN=http://localhost:3000
 
       # Mock GS1 service environment variables
       - MOCK_GS1_SERVICE_HOST=mock-global-gs1-resolver
+      - MOCK_GS1_SERVICE_API_VERSION=1.0.0
       - MOCK_GS1_SERVICE_PORT=3001
       - MOCK_GS1_SERVICE_API_KEY=test456
 ```

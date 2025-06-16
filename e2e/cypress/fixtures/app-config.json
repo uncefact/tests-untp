@@ -1392,13 +1392,13 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
-                    "linkRegisterPath": "/api/resolver"
+                    "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/v1/documents",
+                    "url": "http://localhost:3334/api/1.0.0/documents",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -1566,13 +1566,13 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
-                    "linkRegisterPath": "/api/resolver"
+                    "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/v1/documents",
+                    "url": "http://localhost:3334/api/1.0.0/documents",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -2850,13 +2850,13 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
-                    "linkRegisterPath": "/api/resolver"
+                    "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/v1/documents",
+                    "url": "http://localhost:3334/api/1.0.0/documents",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -4382,13 +4382,13 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
-                    "linkRegisterPath": "/api/resolver"
+                    "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/v1/credentials",
+                    "url": "http://localhost:3334/api/1.0.0/documents",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -4835,13 +4835,13 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
-                    "linkRegisterPath": "/api/resolver"
+                    "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/v1/documents",
+                    "url": "http://localhost:3334/api/1.0.0/documents",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -5292,13 +5292,13 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
-                    "linkRegisterPath": "/api/resolver"
+                    "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/v1/documents",
+                    "url": "http://localhost:3334/api/1.0.0/documents",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -5727,13 +5727,13 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
-                    "linkRegisterPath": "/api/resolver"
+                    "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/v1/documents",
+                    "url": "http://localhost:3334/api/1.0.0/documents",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -6175,13 +6175,13 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
-                    "linkRegisterPath": "/api/resolver"
+                    "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/v1/documents",
+                    "url": "http://localhost:3334/api/1.0.0/documents",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -6619,13 +6619,13 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000",
+                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
-                    "linkRegisterPath": "/api/resolver"
+                    "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/v1/documents",
+                    "url": "http://localhost:3334/api/1.0.0/documents",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -6648,7 +6648,7 @@
   ],
   "identifyProvider": {
     "type": "gs1",
-    "url": "http://localhost:3001",
+    "url": "http://localhost:3001/api/1.0.0",
     "namespace": "gs1"
   },
   "identifierSchemes": [

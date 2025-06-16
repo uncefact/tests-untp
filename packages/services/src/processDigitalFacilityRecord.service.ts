@@ -67,6 +67,7 @@ export const processDigitalFacilityRecord: IService = async (
     LinkType.locationInfo,
     digitalFacilityRecord.dlrVerificationPage,
     dlr.dlrAPIUrl,
+    dlr.linkRegisterPath,
     dlr.dlrAPIKey,
     dlr.namespace,
     qualifierPath,

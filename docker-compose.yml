@@ -46,7 +46,7 @@ services:
     restart: always
 
   storage-service:
-    image: ghcr.io/uncefact/project-identity-resolver:sha-e87d4fc@sha256:54ee7f3adaab9650052b99dbe19b3f5bbd2aa2fe7588410c5f66d1941e3752ce
+    image: ghcr.io/uncefact/project-identity-resolver:latest@sha256:06a69d27ee0547cc0e3ce56243b0d3fbff164f804e586de4c78e580b61d971ca
     ports:
       - 3334:3334
     environment:
@@ -59,7 +59,7 @@ services:
 
   identity-resolver-service:
     # Replace with local or deployed image
-    image: ghcr.io/pyx-industries/pyx-identity-resolver:sha-3b4ce08-local@sha256:91b2a9b324d8253e217b6501bf7c715b725551a744891eb24e7e71b9e9a1d69a
+    image: ghcr.io/pyx-industries/pyx-identity-resolver:sha-1f21512-local@sha256:af3cb7f2cffdbac501832ee484215cecc8f8d6ac3f571c9f239d61d8cbc74050
     ports:
       - '3000:3000'
     environment:
@@ -74,8 +74,8 @@ services:
       - API_KEY=test123
       - APP_ENDPOINT=http://localhost:3000
       - APP_NAME=IDR-1
-      - RESOLVER_DOMAIN=http://localhost:3000
-      - LINK_TYPE_VOC_DOMAIN=http://localhost:3000/voc
+      - RESOLVER_DOMAIN=http://localhost:3000/api/1.0.0
+      - LINK_TYPE_VOC_DOMAIN=http://localhost:3000/api/1.0.0/voc
       - PORT=3000
     depends_on:
       - identity-resolver-service-object-store
@@ -94,7 +94,7 @@ services:
 
   mock-global-gs1-resolver:
     # Replace with local or deployed image
-    image: ghcr.io/pyx-industries/pyx-identity-resolver:sha-fa017fb-local@sha256:cd514863bdaf65ab1b47b8e71669a0245b041c861285a83fa7cf0a65789d4e58
+    image: ghcr.io/pyx-industries/pyx-identity-resolver:sha-1f21512-local@sha256:af3cb7f2cffdbac501832ee484215cecc8f8d6ac3f571c9f239d61d8cbc74050
     ports:
       - '3001:3001'
     environment:
@@ -109,8 +109,8 @@ services:
       - API_KEY=test456
       - APP_ENDPOINT=http://localhost:3001
       - APP_NAME=IDR-2
-      - RESOLVER_DOMAIN=http://localhost:3001
-      - LINK_TYPE_VOC_DOMAIN=http://localhost:3001/voc
+      - RESOLVER_DOMAIN=http://localhost:3001/api/1.0.0
+      - LINK_TYPE_VOC_DOMAIN=http://localhost:3001/api/1.0.0/voc
       - PORT=3001
     depends_on:
       - mock-global-gs1-resolver-object-store
@@ -132,12 +132,14 @@ services:
     environment:
       # IDR service environment variables
       - IDR_SERVICE_HOST=identity-resolver-service
+      - IDR_SERVICE_API_VERSION=1.0.0
       - IDR_SERVICE_PORT=3000
       - IDR_SERVICE_API_KEY=test123
 
       # Mock GS1 service environment variables
       - IDR_SERVICE_DOMAIN=http://localhost:3000
       - MOCK_GS1_SERVICE_HOST=mock-global-gs1-resolver
+      - MOCK_GS1_SERVICE_API_VERSION=1.0.0
       - MOCK_GS1_SERVICE_PORT=3001
       - MOCK_GS1_SERVICE_API_KEY=test456
     command:
