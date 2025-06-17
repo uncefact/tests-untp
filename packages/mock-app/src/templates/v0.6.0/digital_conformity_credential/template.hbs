@@ -669,7 +669,7 @@
                 </div>
                 <div class="credential-info">
                   <span>Issued to:</span>
-                  <a href="{{credentialSubject.issuedToParty.id}}" class="credential-link">{{credentialSubject.issuedToParty.name}}</a>
+                  <a href="{{credentialSubject.issuedToParty.id}}" class="credential-link" target="_blank">{{credentialSubject.issuedToParty.name}}</a>
                 </div>
                 {{#if credentialSubject.description}}
                 <p class="credential-description">{{credentialSubject.description}}</p>
@@ -689,7 +689,7 @@
               </div>
               <div class="credential-details">
                 {{#if credentialSubject.auditableEvidence.linkURL}}
-                <a href="{{credentialSubject.auditableEvidence.linkURL}}" class="evidence-links">
+                <a href="{{credentialSubject.auditableEvidence.linkURL}}" class="evidence-links" target="_blank">
                   <div class="evidence-link-group">
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path
@@ -707,7 +707,7 @@
                   </div>
                 </a>
                 {{/if}} {{#if credentialSubject.scope.id}}
-                <a href="{{credentialSubject.scope.id}}" class="evidence-links">
+                <a href="{{credentialSubject.scope.id}}" class="evidence-links" target="_blank">
                   <div class="evidence-link-group">
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path
@@ -725,7 +725,7 @@
                   </div>
                 </a>
                 {{/if}} {{#if credentialSubject.conformityCertificate.linkURL}}
-                <a href="{{credentialSubject.conformityCertificate.linkURL}}" class="evidence-links">
+                <a href="{{credentialSubject.conformityCertificate.linkURL}}" class="evidence-links" target="_blank">
                   <div class="evidence-link-group">
                     <svg width="20" height="18" viewBox="0 0 20 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path
@@ -797,7 +797,7 @@
                 <div class="criteria-name">{{name}}</div>
                 <div class="criteria-link">
                   <div class="link-text">
-                    <a href="{{id}}" class="link-label">Assessment criteria</a>
+                    <a href="{{id}}" class="link-label" target="_blank">Assessment criteria</a>
                   </div>
                 </div>
                 <ul class="criteria-list">
@@ -827,7 +827,7 @@
                   <div class="data-row">
                     <p class="facility-name">{{facility.name}}</p>
                     <div class="link-container">
-                      <a href="{{facility.id}}" class="link-text">
+                      <a href="{{facility.id}}" class="link-text" target="_blank">
                         <div class="view-link">View</div>
                       </a>
                     </div>
@@ -845,7 +845,7 @@
                   <div class="data-row">
                     <p class="product-name">{{product.name}}</p>
                     <div class="link-container">
-                      <a href="{{product.id}}" class="link-text">
+                      <a href="{{product.id}}" class="link-text" target="_blank">
                         <div class="view-link">View</div>
                       </a>
                     </div>
@@ -868,29 +868,33 @@
                       </div>
                     </div>
                     {{/if}}
+                    {{#if assessedOrganisation}}
                     <div class="data-row-details">
                       <div class="data-label">Organisation assessed</div>
-                      <a href="{{assessedOrganisation.id}}" class="link-text">
+                      <a href="{{assessedOrganisation.id}}" class="link-text" target="_blank">
                         <div class="data-text">{{assessedOrganisation.name}}</div>
                       </a>
                     </div>
+                    {{/if}}
+                    {{#if auditor}}
                     <div class="data-row-details">
                       <div class="data-label">Auditor</div>
-                      <a href="{{auditor.id}}" class="link-text">
+                      <a href="{{auditor.id}}" class="link-text" target="_blank">
                         <div class="data-text">{{auditor.name}}</div>
                       </a>
                     </div>
+                    {{/if}}
                     {{#if referenceStandard}}
                     <div class="data-row-details">
                       <div class="data-label">Standard</div>
-                      <a href="{{referenceStandard.id}}" class="link-text">
+                      <a href="{{referenceStandard.id}}" class="link-text" target="_blank">
                         <div class="data-text">{{referenceStandard.name}}</div>
                       </a>
                     </div>
                     {{/if}} {{#if referenceRegulation}}
                     <div class="data-row-details">
                       <div class="data-label">Regulation</div>
-                      <a href="{{referenceRegulation.id}}" class="link-text">
+                      <a href="{{referenceRegulation.id}}" class="link-text" target="_blank">
                         <div class="data-text">{{referenceRegulation.name}}</div>
                       </a>
                     </div>
@@ -920,7 +924,7 @@
                     {{/if}}
                     <div class="accreditation-details">
                       {{name}} is accredited by
-                      <a href="{{issuingAuthority.id}}" class="accreditation-authority-link">{{issuingAuthority.name}}</a>
+                      <a href="{{issuingAuthority.id}}" class="accreditation-authority-link" target="_blank">{{issuingAuthority.name}}</a>
                       .
                     </div>
                   </div>
@@ -940,7 +944,7 @@
           <div class="data-row-alt">
             <div class="data-label">Issued by</div>
             <div class="issuing-link">
-              <a href="{{issuer.id}}" class="link-text">
+              <a href="{{issuer.id}}" class="link-text" target="_blank">
                 <div class="view-link">{{issuer.name}}</div>
               </a>
             </div>
