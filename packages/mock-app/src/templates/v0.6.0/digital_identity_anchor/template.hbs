@@ -285,7 +285,7 @@
                 {{#if credentialSubject.idScheme.id}}
                   <a href="{{credentialSubject.idScheme.id}}"
                      class="blue-bottom-line-2"
-                     aria-label="Visit {{credentialSubject.idScheme.name}}">{{credentialSubject.idScheme.name}}</a>
+                     aria-label="Visit {{credentialSubject.idScheme.name}}" target="_blank">{{credentialSubject.idScheme.name}}</a>
                 {{else}}
                   <div class="grid-value-text">{{credentialSubject.idScheme.name}}</div>
                 {{/if}}
@@ -323,7 +323,7 @@
               <div class="div-wrapper">
                 <a href="{{issuer.id}}"
                    class="issuer-link"
-                   aria-label="Visit {{issuer.name}}">{{issuer.name}}</a>
+                   aria-label="Visit {{issuer.name}}" target="_blank">{{issuer.name}}</a>
               </div>
             </div>
           </div>
