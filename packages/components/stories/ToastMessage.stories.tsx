@@ -25,7 +25,7 @@ export const Default: Story = {
     (Story) => (
       <div style={{ minWidth: '500px', height: '40vh' }}>
           <Story />
-          {toastMessage({ status: args.status, message: args.message }) as React.ReactNode}
+          {toastMessage({ status: args.status, message: args.message, linkURL: '' }) as React.ReactNode}
       </div>
     ),
   ],

@@ -45,7 +45,7 @@ export const QRCodeScannerDialogButton = ({
       }
     } catch (error) {
       const e = error as Error;
-      toastMessage({ status: Status.error, message: e.message });
+      toastMessage({ status: Status.error, message: e.message, linkURL: '' });
     } finally {
       setIsOpenScanDialog(false);
     }

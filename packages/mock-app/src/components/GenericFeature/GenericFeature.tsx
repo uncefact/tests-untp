@@ -154,10 +154,10 @@ export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, ser
 
                 handler(result);
                 setResult(result);
-                toastMessage({ status: Status.success, message: 'Action Successful' });
+                toastMessage({ status: Status.success, message: 'Action Successful.', linkURL: state[0]["data"]["id"] });
               } catch (error: any) {
                 console.log(error.message);
-                toastMessage({ status: Status.error, message: 'Something went wrong' });
+                toastMessage({ status: Status.error, message: 'Something went wrong', linkURL: '' });
               }
             };
             break;

@@ -10,17 +10,25 @@ export enum Status {
 };
 
 // The function for displaying toast messages
-export function toastMessage({ status, message }: {
+export function toastMessage({ status, message, linkURL }: {
   status: Status;
   message: string;
+  linkURL: string;
 }): void {
-  toast[status](message, {
+  toast[status](
+  <div style={{display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
+    <div>
+      {message}
+    </div>
+    {linkURL && <a style={{fontSize: '12px'}} href={linkURL} target="_blank">Open VC</a> }
+  </div>, 
+  {
     position: 'top-right',
     hideProgressBar: true,
-    closeOnClick: true,
+    // closeOnClick: true,
     pauseOnHover: true,
     draggable: true,
-    autoClose: 3000,
+    autoClose: 4000,
   });
 }
 

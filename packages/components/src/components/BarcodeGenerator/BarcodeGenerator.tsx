@@ -19,7 +19,7 @@ export const BarcodeGenerator = (props: IBarcodeProps) => {
         const elementString = constructElementString(aiData);
         setValues([constructBarcode(elementString)]);
       } else {
-        toastMessage({ status: Status.warning, message: 'Invalid data for barcode generation' });
+        toastMessage({ status: Status.warning, message: 'Invalid data for barcode generation', linkURL: '' });
       }
     }
   }, [props.data, props.dataPath]);
