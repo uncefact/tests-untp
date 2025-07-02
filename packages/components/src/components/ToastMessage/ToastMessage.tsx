@@ -13,7 +13,7 @@ export enum Status {
 export function toastMessage({ status, message, linkURL }: {
   status: Status;
   message: string;
-  linkURL: string;
+  linkURL?: string;
 }): void {
   toast[status](
   <div style={{display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>

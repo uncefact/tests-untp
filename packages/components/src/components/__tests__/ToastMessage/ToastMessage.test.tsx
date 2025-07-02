@@ -41,12 +41,27 @@ describe('Toast Message', () => {
     expect(link).toHaveAttribute('target', '_blank');
   });
 
+  test('does not render link when linkURL is not provided', async () => {
+    const status = Status.info;
+    const message = 'No link toast';
+  
+    render(<ToastMessage />);
+    toastMessage({ status, message });
+  
+    await waitFor(() => {
+      expect(screen.getByText(message)).toBeInTheDocument();
+    });
+  
+    // Ensure "Open VC" link is not present
+    expect(screen.queryByText('Open VC')).not.toBeInTheDocument();
+  });
+
   test('toast disappears after autoClose duration', async () => {
     jest.useFakeTimers();
     const message = 'Temporary toast';
 
     render(<ToastMessage />);
-    toastMessage({ status: Status.warning, message, linkURL: '' });
+    toastMessage({ status: Status.warning, message });
 
     await waitFor(() => {
       expect(screen.getByText(message)).toBeInTheDocument();

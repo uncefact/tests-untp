@@ -122,15 +122,28 @@ export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, ser
   const [result, setResult] = React.useState<any>();
   const props: Record<string, any> = {};
 
-  const executeServices = async (services: IServiceDefinition[], parameters: any[]) => {
-    const [result] = await services.reduce(async (previousResult: any[] | Promise<any[]>, currentService) => {
-      const prevResult = await previousResult;
-      const service: any = getService(currentService.name);
-      const params = [...prevResult, ...currentService.parameters];
-      const result: any = await service(...params);
-      return [result];
-    }, parameters);
-    return result;
+  const executeServices = async (
+    services: IServiceDefinition[],
+    parameters: any[]
+  ): Promise<[any, any[]]> => {
+    const allResults = await services.reduce(async (previousResult: any[] | Promise<any[]>, currentService) => {
+        const prevResults = await previousResult;
+        const service: any = getService(currentService.name);
+
+        const lastResult = prevResults[prevResults.length - 1];
+        const inputParams = prevResults.length > 0
+          ? [lastResult, ...currentService.parameters]
+          : [...parameters, ...currentService.parameters];
+
+        const result = await service(...inputParams);
+
+        return [...prevResults, result];
+      },
+      Promise.resolve([]) // Start with an empty result list
+    );
+
+    const finalResult = allResults[allResults.length - 1];
+    return [finalResult, allResults];
   };
 
   return (
@@ -150,14 +163,16 @@ export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, ser
           case ComponentType.Submit:
             props.onClick = async (handler: (args: any) => void) => {
               try {
-                const result = await executeServices(services, state);
+                const [finalResult, allResults] = await executeServices(services, state);
 
-                handler(result);
-                setResult(result);
-                toastMessage({ status: Status.success, message: 'Action Successful.', linkURL: state[0]["data"]["id"] });
+                handler(finalResult);
+                setResult(finalResult);
+
+                const resultWithLinkResolver = result?.linkResolver ?? allResults.find((item: any) => item?.linkResolver !== undefined);
+                toastMessage({ status: Status.success, message: 'Action Successful.', linkURL: resultWithLinkResolver?.linkResolver });
               } catch (error: any) {
                 console.log(error.message);
-                toastMessage({ status: Status.error, message: 'Something went wrong', linkURL: '' });
+                toastMessage({ status: Status.error, message: 'Something went wrong' });
               }
             };
             break;

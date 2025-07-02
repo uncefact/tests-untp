@@ -24,12 +24,12 @@ const Scanning = () => {
 
       const dlrUrl = await identityProvider.getDlrUrl(scannedCode, appConfig.identifyProvider.namespace);
       if (!dlrUrl) {
-        return toastMessage({ status: Status.error, message: 'There no DLR url', linkURL: ''});
+        return toastMessage({ status: Status.error, message: 'There no DLR url' });
       }
 
       const dlrPassport = await getDlrPassport<VerifiableCredential>(dlrUrl);
       if (!dlrPassport) {
-        return toastMessage({ status: Status.error, message: 'There no DLR passport', linkURL: '' });
+        return toastMessage({ status: Status.error, message: 'There no DLR passport' });
       }
 
       scannerRef.current?.closeQrCodeScanner();
