@@ -93,7 +93,7 @@ or
 yarn run untp config
 ```
 
-The `credentials.json` file contains configurations for running the test suite, including types and versions of events and their data paths.
+The `credentials.json` file contains configurations for running the test suite, including the version and data path of each credential.
 
 ---
 
@@ -158,14 +158,13 @@ untp config
 
 The `credentials.json` file will be generated in the current directory.
 
-Open the `credentials.json` file and update it with the following structure, including the `type` and `version` fields, along with the `dataPath` field pointing to the file you want to use for running the UNTP test suite:
+Open the `credentials.json` file and update it with the following structure, a `version` field and a `dataPath` field pointing to the file you want to use for running the UNTP test suite:
 
 ```json
 {
-  "type": "aggregationEvent", // Example event schema type
   "version": "v0.0.1", // Example event schema version
   "dataPath": "/path/to/your/data/file", // Example test data path
-  "url": "" // If you want to use a remote schema, provide the URL here, the type and version fields will be ignored
+  "url": "" // If you want to use a remote schema, provide the URL here, the version field will be ignored
 }
 ```
 
@@ -191,7 +190,6 @@ If you want to run UNTP tests with direct credential objects, then you can using
 testCredentialsHandler({
   credentials: [
     {
-      type: 'aggregationEvent',
       version: 'v0.0.1',
       dataPath: '/data/aggregationEvent.json',
       url: '',
@@ -216,7 +214,6 @@ With local schema:
 ```js
 testCredentialHandler(
   {
-    type: 'aggregationEvent',
     version: 'v0.0.1',
   },
   {
@@ -237,7 +234,6 @@ With remote schema:
 ```js
 testCredentialHandler(
   {
-    type: '',
     version: '',
     url: 'https://jargon.sh/user/unece/traceabilityEvents/v/working/artefacts/jsonSchemas/render.json?class=AggregationEvent',
   },
