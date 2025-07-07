@@ -36,7 +36,7 @@ describe('processTestSuiteForConfigPath with local credential type and version',
       return value;
     });
 
-    jest.spyOn(commonUtils, 'loadDataFromDataPath').mockResolvedValue({
+    jest.spyOn(commonUtils, 'loadDataFromDataPath').mockResolvedValueOnce({
       data: {
         type: ['ProductPassport', 'VerifiableCredential'],
         id: 'https://example.com/product-passport/123456',
