@@ -5,7 +5,6 @@ import { getCurrentDirPath, getCurrentFilePath } from '../../utils/path.js';
 
 export interface ICredentialFileData {
   credentials: {
-    type: string;
     version: string | null;
     dataPath: string;
     url?: string | null;
@@ -14,10 +13,10 @@ export interface ICredentialFileData {
 
 // Current UNTP data models.
 const untpDefaultModel = new Set([
-  'digitalTraceabilityEvent',
-  'digitalProductPassport',
-  'digitalFacilityRecord',
-  'digitalConformityCredential',
+  'DigitalTraceabilityEvent',
+  'DigitalProductPassport',
+  'DigitalFacilityRecord',
+  'DigitalConformityCredential',
 ]);
 
 export const getLastestVersionFolder = async (schemasPath: string, eventType: string) => {
@@ -34,7 +33,6 @@ export const getLatestCredentialVersions = async (schemasPath: string) => {
     const latestVersion = await getLastestVersionFolder(schemasPath, eventType);
 
     return {
-      type: eventType,
       version: latestVersion,
       dataPath: '',
       url: '',
@@ -49,7 +47,10 @@ export const generateCredentialFile = async (storePath: string): Promise<ICreden
   const currentDirPath = getCurrentDirPath(getCurrentFilePath());
   const schemasPath = path.resolve(currentDirPath, '../../src/schemas');
   const latestCredentials = await getLatestCredentialVersions(schemasPath);
-  const filteredCredentials = latestCredentials.filter((credential) => untpDefaultModel.has(credential.type));
+  const eventTypeFolders = await readdir(schemasPath);
+  const filteredCredentials = latestCredentials.filter((credential, index) =>
+    untpDefaultModel.has(eventTypeFolders[index]),
+  );
 
   const credentialFileData = {
     credentials: filteredCredentials,

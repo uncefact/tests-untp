@@ -47,7 +47,6 @@ describe('getLatestCredentialVersions', () => {
 
     expect(latestCredentialVersions).toEqual([
       {
-        type: 'aggregationEvent',
         version: 'v0.0.3',
         dataPath: '',
         url: '',
@@ -88,9 +87,10 @@ describe('generateCredentialFile', () => {
   const storePath = './test/credentials.json';
 
   it('should generate latest credential file successfully', async () => {
-    const latestCredentialVersions = [{ type: 'digitalTraceabilityEvent', version: 'v0.5.0', dataPath: '', url: '' }];
+    const latestCredentialVersions = [{ version: 'v0.5.0', dataPath: '', url: '' }];
     jest.spyOn(path, 'resolve').mockReturnValueOnce('../../../src/schemas');
     jest.spyOn(credentials, 'getLatestCredentialVersions').mockResolvedValueOnce(latestCredentialVersions);
+    jest.spyOn(fs, 'readdir').mockResolvedValueOnce(['DigitalTraceabilityEvent'] as any);
     jest.spyOn(fs, 'writeFile').mockResolvedValueOnce();
 
     const credentialFileData = await credentials.generateCredentialFile(storePath);
@@ -103,9 +103,10 @@ describe('generateCredentialFile', () => {
   });
 
   it('should return empty array when unable to filter out default models', async () => {
-    const latestCredentialVersions = [{ type: 'invalidModel', version: 'v0.0.3', dataPath: '', url: '' }];
+    const latestCredentialVersions = [{ version: 'v0.0.3', dataPath: '', url: '' }];
     jest.spyOn(path, 'resolve').mockReturnValueOnce('../../../src/schemas');
     jest.spyOn(credentials, 'getLatestCredentialVersions').mockResolvedValueOnce(latestCredentialVersions);
+    jest.spyOn(fs, 'readdir').mockResolvedValueOnce(['invalidModel'] as any);
     jest.spyOn(fs, 'writeFile').mockResolvedValueOnce();
 
     const credentialFileData = await credentials.generateCredentialFile(storePath);
@@ -118,6 +119,7 @@ describe('generateCredentialFile', () => {
     const latestCredentialVersions = [] as any;
     jest.spyOn(path, 'resolve').mockReturnValueOnce('../../../src/schemas');
     jest.spyOn(credentials, 'getLatestCredentialVersions').mockResolvedValueOnce(latestCredentialVersions);
+    jest.spyOn(fs, 'readdir').mockResolvedValueOnce([] as any);
     jest.spyOn(fs, 'writeFile').mockResolvedValueOnce();
 
     const credentialFileData = await credentials.generateCredentialFile(storePath);
@@ -131,7 +133,8 @@ describe('generateCredentialFile', () => {
       jest.spyOn(path, 'resolve').mockReturnValueOnce('../../../src/schemas');
       jest
         .spyOn(credentials, 'getLatestCredentialVersions')
-        .mockResolvedValueOnce([{ type: 'aggregationEvent', version: 'v0.0.3', dataPath: '', url: '' }]);
+        .mockResolvedValueOnce([{ version: 'v0.0.3', dataPath: '', url: '' }]);
+      jest.spyOn(fs, 'readdir').mockResolvedValueOnce(['aggregationEvent'] as any);
       jest.spyOn(fs, 'writeFile').mockRejectedValueOnce('invalid store path');
       const invalidStorePath = 'invalid-store-path';
 
@@ -145,6 +148,7 @@ describe('generateCredentialFile', () => {
     try {
       jest.spyOn(path, 'resolve').mockReturnValueOnce('../../../src/schemas');
       jest.spyOn(credentials, 'getLatestCredentialVersions').mockRejectedValueOnce('invalid schemas path');
+      jest.spyOn(fs, 'readdir').mockResolvedValueOnce([] as any);
 
       await credentials.generateCredentialFile(storePath);
     } catch (error) {
