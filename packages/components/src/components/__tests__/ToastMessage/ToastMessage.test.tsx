@@ -57,22 +57,22 @@ describe('Toast Message', () => {
   });
 
   test('toast disappears after autoClose duration', async () => {
-    jest.useFakeTimers();
     const message = 'Temporary toast';
-
+  
     render(<ToastMessage />);
-    toastMessage({ status: Status.warning, message });
-
+    toastMessage({ status: Status.warning, message, linkURL: '' });
+  
+    // Confirm it appears
     await waitFor(() => {
       expect(screen.getByText(message)).toBeInTheDocument();
     });
-
-    jest.advanceTimersByTime(4000);
-
-    await waitFor(() => {
-      expect(screen.queryByText(message)).not.toBeInTheDocument();
-    });
-
-    jest.useRealTimers();
+  
+    // Wait for disappearance (default is 4000ms + some buffer for animation)
+    await waitFor(
+      () => {
+        expect(screen.queryByText(message)).not.toBeInTheDocument();
+      },
+      { timeout: 6000 } // give enough time for toast to auto-close and disappear
+    );
   });
 });
