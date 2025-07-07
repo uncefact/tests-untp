@@ -69,10 +69,8 @@ export const validateCredentialConfigs = (
         errors.push(createInvalidFieldError('url', credentialConfigsPath, errorMessage));
       }
     } else {
-      // URL is empty, so validate type/version for local schema
-      if (_.isEmpty(credential.type)) {
-        errors.push(createMissingFieldError('type', credentialConfigsPath));
-      }
+      // URL is empty, so validate version for local schema
+      // Note: type is now optional and will be extracted from credential data
       if (_.isEmpty(credential.version)) {
         errors.push(createMissingFieldError('version', credentialConfigsPath));
       }

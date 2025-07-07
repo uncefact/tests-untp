@@ -16,7 +16,20 @@ describe('loadingSchema.service', () => {
     jest.clearAllMocks();
   });
 
-  it('should throw an error when schema is empty', async () => {
+  it('should throw an error when schema does not exist', async () => {
+    (checkSchemaExists as jest.Mock).mockResolvedValue(false);
+    const credentialConfig = {
+      type: 'DigitalProductPassport',
+      version,
+      url: '',
+      dataPath: '/path/to/schema',
+    };
+
+    const result = await dynamicLoadingSchemaService(credentialConfig);
+    expect(result).toEqual('Schema not found');
+  });
+
+  it('should throw an error when type is empty', async () => {
     const credentialConfig = {
       type: '',
       version,
@@ -25,7 +38,7 @@ describe('loadingSchema.service', () => {
     };
 
     const result = await dynamicLoadingSchemaService(credentialConfig);
-    expect(result).toEqual('Schema not found');
+    expect(result).toEqual('Type is required for local schema loading');
   });
 
   const schema = 'event';

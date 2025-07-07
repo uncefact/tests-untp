@@ -5,7 +5,12 @@ import {
   IValidatedCredentials,
   ITestSuiteResult,
 } from './types/index.js';
-import { createInvalidFieldError, readJsonFile, validateCredentialConfigs } from './utils/common.js';
+import {
+  createInvalidFieldError,
+  readJsonFile,
+  validateCredentialConfigs,
+  loadDataFromDataPath,
+} from './utils/common.js';
 import { dynamicLoadingSchemaService } from './services/dynamic-loading-schemas/loadingSchema.service.js';
 import { hasErrors } from './services/json-schema/validator.service.js';
 import {
@@ -23,37 +28,48 @@ import {
  */
 export const processCheckDataBySchema = async (
   credentialConfig: IConfigContent,
-  data?: object,
+  data: object,
 ): Promise<IValidatedCredentials> => {
   const { dataPath } = credentialConfig;
-  let _data;
 
-  if (!data && !dataPath) {
-    throw new Error('Must provide either data or dataPath to check data by schema.');
+  // Always extract type from credential data, ignoring config type
+  let effectiveType: string | undefined;
+  if (data && typeof data === 'object' && 'type' in data) {
+    const credentialType = (data as any).type;
+    if (Array.isArray(credentialType) && credentialType.length > 0) {
+      // Use the first type from the credential's type array
+      effectiveType = credentialType[0];
+    }
   }
 
-  if (!data && dataPath) {
-    _data = await readJsonFile(dataPath);
+  // Ensure we have a type extracted from credential data
+  if (!effectiveType) {
+    throw new Error('Unable to determine credential type. Credential data must contain a valid type property.');
   }
 
-  if (data && !dataPath) {
-    _data = { ...data };
-  }
+  // Create an effective config with the extracted type
+  const effectiveConfig: IConfigContent = {
+    ...credentialConfig,
+    type: effectiveType,
+  };
 
-  const schema = await dynamicLoadingSchemaService(credentialConfig);
+  const schema = await dynamicLoadingSchemaService(effectiveConfig);
 
   const errors: any = [];
   if (typeof schema === 'string') {
     errors.push(createInvalidFieldError('schema', dataPath, schema));
   } else {
-    const validationErrors = hasErrors(schema, _data);
+    const validationErrors = hasErrors(schema, data);
     if (validationErrors) {
       errors.push(...validationErrors);
     }
   }
 
   return {
-    ...credentialConfig,
+    type: effectiveType,
+    version: credentialConfig.version,
+    dataPath: credentialConfig.dataPath,
+    url: credentialConfig.url,
     errors,
   };
 };
@@ -85,7 +101,10 @@ export const processTestSuite = async (
 
   // Process each config to check data by schema
   const validatedCredentials = await Promise.all(
-    configContentNoError.map((credentialConfig) => processCheckDataBySchema(credentialConfig)),
+    configContentNoError.map(async (credentialConfig) => {
+      const { data: credentialData } = await loadDataFromDataPath(credentialConfig);
+      return processCheckDataBySchema(credentialConfig, credentialData as object);
+    }),
   );
 
   // Add configs with errors
@@ -108,6 +127,7 @@ export const processTestSuiteForCredential = async (
   configContent: IConfigContent,
   data?: object,
 ): Promise<ICredentialTestResult> => {
-  const rawCredentialResult = await processCheckDataBySchema(configContent, data);
+  const { data: credentialData } = await loadDataFromDataPath(configContent, data);
+  const rawCredentialResult = await processCheckDataBySchema(configContent, credentialData as object);
   return constructCredentialTestResult(rawCredentialResult);
 };

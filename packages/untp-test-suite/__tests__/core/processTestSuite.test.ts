@@ -36,14 +36,16 @@ describe('processTestSuiteForConfigPath with local credential type and version',
       return value;
     });
 
-    jest.spyOn(commonUtils, 'loadDataFromDataPath').mockResolvedValueOnce({
+    jest.spyOn(commonUtils, 'loadDataFromDataPath').mockResolvedValue({
       data: {
+        type: ['ProductPassport', 'VerifiableCredential'],
         id: 'https://example.com/product-passport/123456',
         manufacturedDate: '2023-06-15',
       },
     });
 
     jest.spyOn(service, 'dynamicLoadingSchemaService').mockResolvedValueOnce({
+      type: ['ProductPassport', 'VerifiableCredential'],
       id: 'https://example.com/product-passport/123456',
       manufacturedDate: '2023-06-15',
     } as unknown as JSON);
@@ -300,6 +302,7 @@ describe('processTestSuiteForConfigPath with remote schema URL', () => {
 
     const mockData = {
       data: {
+        type: ['ProductPassport', 'VerifiableCredential'],
         id: 'https://example.com/product-passport/123456',
         manufacturedDate: '2023-06-15',
       },
@@ -631,6 +634,7 @@ describe('processTestSuiteForConfigPath with remote schema URL', () => {
 describe('processTestSuiteForCredential', () => {
   const mockData = {
     data: {
+      type: ['ProductPassport', 'VerifiableCredential'],
       id: 'https://example.com/product-passport/123456',
       manufacturedDate: '2023-06-15',
     },

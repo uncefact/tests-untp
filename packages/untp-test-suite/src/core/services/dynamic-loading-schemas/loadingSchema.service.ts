@@ -24,6 +24,10 @@ export const dynamicLoadingSchemaService: IDynamicLoadingSchemaService = async (
     }
 
     // Fetch schema from local content
+    if (!credentialConfig.type) {
+      throw new Error(`Type is required for local schema loading`);
+    }
+
     const isValidSchema = await checkSchemaExists(credentialConfig.type);
     if (!isValidSchema) {
       throw new Error(`Schema not found`);

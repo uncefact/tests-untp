@@ -5,7 +5,7 @@ export interface ICredentialConfigs {
 }
 
 export interface IConfigContent {
-  type: string;
+  type?: string;
   version: string;
   dataPath?: string;
   url?: string;
@@ -22,7 +22,12 @@ export interface ITestErrors {
   errors: ErrorObject[] | ICredentialConfigError[] | null;
 }
 
-export interface IValidatedCredentials extends IConfigContent, ITestErrors {}
+export interface IValidatedCredentials extends ITestErrors {
+  type: string;
+  version: string;
+  dataPath?: string;
+  url?: string;
+}
 
 export interface ICredentialTestResult {
   credentialType: string;

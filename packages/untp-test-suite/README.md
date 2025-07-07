@@ -53,20 +53,6 @@ The UNTP Test Suite is a tool that allows you to test your credentials against t
 - Node.js >= v20.12.2
 - Yarn >= 1.22.17
 
-## Install the dependencies and build the project
-
-```bash
-# Install the dependencies
-$ yarn install
-```
-
-**Note: Please make sure to build the project before running the test suite.**
-
-```bash
-# Build the project
-yarn build
-```
-
 # Usage
 
 ## UNTP Test Suite CLI Tool
@@ -75,10 +61,10 @@ This CLI tool is designed to facilitate the management and execution of the UNTP
 
 ### Installation
 
-Navigate to the `untp-test-suite` package folder. Build the `untp-test-suite` package:
+Navigate to the `untp-test-suite` package folder. Install and build the `untp-test-suite` package:
 
 ```bash
-yarn run build
+yarn install && yarn run build
 ```
 
 Install the UNTP Test Suite CLI Tool:
