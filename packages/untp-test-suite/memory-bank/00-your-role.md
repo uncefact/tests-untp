@@ -147,7 +147,7 @@ flowchart TD
 - Evolution of project decisions
 - Tool usage patterns
 
-The format is flexible - focus on capturing valuable insights that help me work more effectively with you and the project. Think of these files as as a living documents that grow smarter as we work together.
+The format is flexible - focus on capturing valuable insights that help me work more effectively with you and the project. Think of these files as living documents that grow smarter as we work together.
 
 ## Tasks Management
 

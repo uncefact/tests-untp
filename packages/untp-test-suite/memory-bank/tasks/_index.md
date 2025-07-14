@@ -6,7 +6,7 @@ This file maintains a comprehensive list of all tasks in the project, organized 
 *No tasks currently in progress*
 
 ## Pending  
-*No pending tasks*
+- [TASK001] Remove Version Property Dependency from Config File - Remove dependence on version property, infer from credential context (Priority: High, Tags: refactor,config,api-cleanup)
 
 ## Completed
 *No completed tasks yet*
@@ -20,12 +20,12 @@ This file maintains a comprehensive list of all tasks in the project, organized 
 ---
 
 ## Task Statistics
-- **Total Tasks:** 0
-- **Active Tasks:** 0 (In Progress + Pending)
+- **Total Tasks:** 1
+- **Active Tasks:** 1 (In Progress + Pending)
 - **Completion Rate:** 0%
 
 ## Recent Activity
-*No recent task activity*
+- **2025-07-14:** [TASK001] Created - Remove Version Property Dependency from Config File
 
 ---
 
