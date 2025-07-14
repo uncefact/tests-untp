@@ -7,6 +7,7 @@ This file maintains a comprehensive list of all tasks in the project, organized 
 
 ## Pending  
 - [TASK001] Remove Version Property Dependency from Config File - Remove dependence on version property, infer from credential context (Priority: High, Tags: refactor,config,api-cleanup)
+- [TASK002] Replace Pre-commit Hook with CI Task - Remove slow git pre-commit hook and replace with CI workflow (Priority: Low, Tags: developer-experience,ci,git,performance)
 
 ## Completed
 *No completed tasks yet*
@@ -20,11 +21,12 @@ This file maintains a comprehensive list of all tasks in the project, organized 
 ---
 
 ## Task Statistics
-- **Total Tasks:** 1
-- **Active Tasks:** 1 (In Progress + Pending)
+- **Total Tasks:** 2
+- **Active Tasks:** 2 (In Progress + Pending)
 - **Completion Rate:** 0%
 
 ## Recent Activity
+- **2025-07-14:** [TASK002] Created - Replace Pre-commit Hook with CI Task
 - **2025-07-14:** [TASK001] Created - Remove Version Property Dependency from Config File
 
 ---
