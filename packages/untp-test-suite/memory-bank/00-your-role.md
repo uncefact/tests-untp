@@ -117,7 +117,7 @@ Note: When prompted with **update memory bank**, you MUST review every memory ba
 
 ## Project Intelligence (instructions)
 
-The instructions files are my learning journal for each project. It captures important patterns, preferences, and project intelligence that help me work more effectively. As I work with you and the project, I'll discover and document key insights that aren't obvious from the code alone.
+The collection of files in this memory-bank form my learning journal for each project. They capture important patterns, preferences, and project intelligence that help me work more effectively. As I work with you and the project, I'll discover and document key insights that aren't obvious from the code alone.
 
 ```mermaid
 flowchart TD
@@ -147,7 +147,7 @@ flowchart TD
 - Evolution of project decisions
 - Tool usage patterns
 
-The format is flexible - focus on capturing valuable insights that help me work more effectively with you and the project. Think of instructions as a living documents that grows smarter as we work together.
+The format is flexible - focus on capturing valuable insights that help me work more effectively with you and the project. Think of these files as as a living documents that grow smarter as we work together.
 
 ## Tasks Management
 
@@ -187,7 +187,9 @@ Each task file follows this format:
 ```markdown
 # [Task ID] - [Task Name]
 
-**Status:** [Pending/In Progress/Completed/Abandoned]
+**Status:** [Pending/In Progress/Completed/Abandoned/Blocked]
+**Priority:** [Low/Medium/High/Critical]
+**Tags:** [Comma-separated tags like: frontend, backend, testing, documentation]
 **Added:** [Date Added]
 **Updated:** [Date Last Updated]
 
@@ -205,6 +207,12 @@ Each task file follows this format:
 ## Progress Tracking
 
 **Overall Status:** [Not Started/In Progress/Blocked/Completed] - [Completion Percentage]
+
+### Task Metadata
+- **Priority Level:** [Low/Medium/High/Critical] - How urgent/important this task is
+- **Tags:** [List of relevant tags for filtering and organization]
+- **Dependencies:** [List of other tasks that must be completed first]
+- **Estimated Effort:** [Time estimate or complexity rating]
 
 ### Subtasks
 | ID | Description | Status | Updated | Notes |
@@ -257,14 +265,29 @@ To view tasks, the command **show tasks [filter]** will:
    - **pending** - Show only tasks with "Pending" status
    - **completed** - Show only tasks with "Completed" status
    - **blocked** - Show only tasks with "Blocked" status
+   - **abandoned** - Show only tasks with "Abandoned" status
    - **recent** - Show tasks updated in the last week
-   - **tag:[tagname]** - Show tasks with a specific tag
-   - **priority:[level]** - Show tasks with specified priority level
+   - **tag:[tagname]** - Show tasks with a specific tag (e.g., "tag:frontend")
+   - **priority:[level]** - Show tasks with specified priority level (low/medium/high/critical)
 3. The output will include:
    - Task ID and name
    - Current status and completion percentage
    - Last updated date
    - Next pending subtask (if applicable)
-4. Example usage: **show tasks active** or **show tasks tag:frontend**
+   - Priority level and tags
+4. Example usage: **show tasks active** or **show tasks tag:frontend** or **show tasks priority:high**
+
+### Task Tagging System
+Tags help organize and filter tasks effectively. Common tag categories include:
+- **Component tags**: frontend, backend, database, api
+- **Type tags**: feature, bugfix, refactor, documentation, testing
+- **Domain tags**: auth, ui, deployment, performance
+- **Technology tags**: react, node, typescript, docker
+
+### Task Priority Levels
+- **Critical**: Must be completed immediately, blocks other work
+- **High**: Important for project success, should be prioritized
+- **Medium**: Standard priority, complete in normal workflow
+- **Low**: Nice to have, can be deferred if needed
 
 REMEMBER: After every memory reset, I begin completely fresh. The Memory Bank is my only link to previous work. It must be maintained with precision and clarity, as my effectiveness depends entirely on its accuracy.
