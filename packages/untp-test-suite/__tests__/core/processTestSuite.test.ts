@@ -10,7 +10,7 @@ jest.mock('../../src/utils/path', () => ({
   getCurrentFilePath: jest.fn(),
 }));
 
-jest.mock('../../src/core/utils/common');
+// No module-level mocks for common utils - use jest.spyOn instead
 jest.mock('../../src/core/services/dynamic-loading-schemas/loadingSchema.service');
 jest.mock('../../src/core/services/json-schema/validator.service');
 
@@ -38,14 +38,16 @@ describe('processTestSuiteForConfigPath with local credential type and version',
 
     jest.spyOn(commonUtils, 'loadDataFromDataPath').mockResolvedValueOnce({
       data: {
-        type: ['ProductPassport', 'VerifiableCredential'],
+        type: ['DigitalProductPassport', 'VerifiableCredential'],
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/'],
         id: 'https://example.com/product-passport/123456',
         manufacturedDate: '2023-06-15',
       },
     });
 
     jest.spyOn(service, 'dynamicLoadingSchemaService').mockResolvedValueOnce({
-      type: ['ProductPassport', 'VerifiableCredential'],
+      type: ['DigitalProductPassport', 'VerifiableCredential'],
+      '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/'],
       id: 'https://example.com/product-passport/123456',
       manufacturedDate: '2023-06-15',
     } as unknown as JSON);
@@ -302,7 +304,8 @@ describe('processTestSuiteForConfigPath with remote schema URL', () => {
 
     const mockData = {
       data: {
-        type: ['ProductPassport', 'VerifiableCredential'],
+        type: ['DigitalProductPassport', 'VerifiableCredential'],
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/'],
         id: 'https://example.com/product-passport/123456',
         manufacturedDate: '2023-06-15',
       },
@@ -634,7 +637,8 @@ describe('processTestSuiteForConfigPath with remote schema URL', () => {
 describe('processTestSuiteForCredential', () => {
   const mockData = {
     data: {
-      type: ['ProductPassport', 'VerifiableCredential'],
+      type: ['DigitalProductPassport', 'VerifiableCredential'],
+      '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/'],
       id: 'https://example.com/product-passport/123456',
       manufacturedDate: '2023-06-15',
     },

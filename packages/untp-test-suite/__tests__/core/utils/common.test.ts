@@ -5,6 +5,8 @@ import {
   validateUrlField,
   fetchData,
   loadDataFromDataPath,
+  extractVersionFromContext,
+  extractCredentialType,
 } from '../../../src/core/utils/common';
 
 jest.mock('fs/promises', () => ({
@@ -47,14 +49,7 @@ describe('validateCredentialConfigs', () => {
         type: '',
         version: '',
         dataPath: 'path/to/data',
-        errors: [
-          {
-            message: 'should have required property',
-            keyword: 'required',
-            dataPath: 'path/to/credentials',
-            instancePath: 'version',
-          },
-        ],
+        errors: [],
       },
       {
         type: 'objectEvent',
@@ -196,6 +191,90 @@ describe('readFile', () => {
     } catch (error) {
       expect(error).toEqual(new Error('File not found'));
     }
+  });
+});
+
+describe('extractVersionFromContext', () => {
+  it('should extract version from DPP context URL', () => {
+    const credentialData = {
+      '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/'],
+    };
+
+    expect(extractVersionFromContext(credentialData)).toBe('v0.5.0');
+  });
+
+  it('should extract version from DTE context URL', () => {
+    const credentialData = {
+      '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dte/0.4.2/'],
+    };
+
+    expect(extractVersionFromContext(credentialData)).toBe('v0.4.2');
+  });
+
+  it('should handle context as a single string', () => {
+    const credentialData = {
+      '@context': 'https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/',
+    };
+
+    expect(extractVersionFromContext(credentialData)).toBe('v0.5.0');
+  });
+
+  it('should return null when no UNTP context is found', () => {
+    const credentialData = {
+      '@context': ['https://www.w3.org/ns/credentials/v2'],
+    };
+
+    expect(extractVersionFromContext(credentialData)).toBe(null);
+  });
+
+  it('should return null when context is missing', () => {
+    const credentialData = {
+      type: ['DigitalProductPassport', 'VerifiableCredential'],
+    };
+
+    expect(extractVersionFromContext(credentialData)).toBe(null);
+  });
+
+  it('should return null when credentialData is null', () => {
+    expect(extractVersionFromContext(null)).toBe(null);
+  });
+});
+
+describe('extractCredentialType', () => {
+  it('should extract credential type from array of types', () => {
+    const credentialData = {
+      type: ['DigitalProductPassport', 'VerifiableCredential'],
+    };
+
+    expect(extractCredentialType(credentialData)).toBe('DigitalProductPassport');
+  });
+
+  it('should extract credential type from single type', () => {
+    const credentialData = {
+      type: 'DigitalTraceabilityEvent',
+    };
+
+    expect(extractCredentialType(credentialData)).toBe('DigitalTraceabilityEvent');
+  });
+
+  it('should return null when only VerifiableCredential type is present', () => {
+    const credentialData = {
+      type: ['VerifiableCredential'],
+    };
+
+    expect(extractCredentialType(credentialData)).toBe(null);
+  });
+
+  it('should return null when type is missing', () => {
+    const credentialData = {
+      '@context': ['https://www.w3.org/ns/credentials/v2'],
+    };
+
+    expect(extractCredentialType(credentialData)).toBe(null);
+  });
+
+  it('should return null when credentialData is null', () => {
+    expect(extractCredentialType(null)).toBe(null);
   });
 });
 

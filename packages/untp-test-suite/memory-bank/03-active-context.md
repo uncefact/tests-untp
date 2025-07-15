@@ -8,10 +8,25 @@ Note that the [untp-graph-validation-cli POC](https://github.com/absoludity/untp
 
 The refactor to support a list of file-paths as an API (rather than the current config file) should be done in small, reviewable steps, focused on replacing the config file with a simple list of file paths.
 
-The first small step towards the goal of removing the config file was already done in the [pull request](https://github.com/uncefact/tests-untp/pull/307) which removes the dependence on the `type` property of the config file. You can see those changes in this current branch by checking the output of `git diff next..HEAD`, but note that this PR has not yet been merged into main as it's not yet reviewed. The next steps in this new branch (which was created from the PR branch) would be along the lines of:
-- Remove the dependence on the `version` property of the config file - the version can be inferred from the UNTP specific context to which the credential points,
-- Remove the `url` property from the config file (and any tests that used this).
+**Progress Update:**
 
-At that point, the config file is just listing file paths and so should be trivial to replace with a simple list of file paths.
+✅ **TASK001 - Remove Version Property Dependency** (Completed 2025-07-15)
+- Successfully implemented version inference from credential @context field
+- The version property is no longer required in the config file
+- The system now automatically extracts version from URLs like `https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/`
+
+**Next Steps:**
+
+📋 **TASK003 - Replace Config File with Individual File Arguments** (Pending - High Priority)
+- Replace the credential config file on the CLI completely
+- Allow individual files as arguments: `untp test file1.json file2.json`
+- Add `-d` / `--directory` option for directory scanning: `untp test -d ./credentials/`
+- Maintain backward compatibility with existing `--config` option
+
+The remaining steps include:
+- Remove the `url` property from the config file (and any tests that used this)
+- Complete CLI refactor to support direct file arguments and directory scanning
+
+At that point, the config file will be completely replaced with a simple list of file paths, achieving the goal of a more intuitive and reusable API.
 
 Once the API has been updated, we will then look at improving the existing implementation of tier 1 and 2 tests, by comparing with both the similar tests in the [sibling UNTP playground](../../untp-playground) package as well as those in the [untp-graph-validation-cli POC](https://github.com/absoludity/untp-graph-validation-cli), before adding the tier 3 support based on the implementation in the `untp-graph-validation-cli` POC.

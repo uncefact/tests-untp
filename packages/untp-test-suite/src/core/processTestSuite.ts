@@ -10,6 +10,8 @@ import {
   readJsonFile,
   validateCredentialConfigs,
   loadDataFromDataPath,
+  extractVersionFromContext,
+  extractCredentialType,
 } from './utils/common.js';
 import { dynamicLoadingSchemaService } from './services/dynamic-loading-schemas/loadingSchema.service.js';
 import { hasErrors } from './services/json-schema/validator.service.js';
@@ -32,25 +34,25 @@ export const processCheckDataBySchema = async (
 ): Promise<IValidatedCredentials> => {
   const { dataPath } = credentialConfig;
 
-  // Always extract type from credential data, ignoring config type
-  let effectiveType: string | undefined;
-  if (data && typeof data === 'object' && 'type' in data) {
-    const credentialType = (data as any).type;
-    if (Array.isArray(credentialType) && credentialType.length > 0) {
-      // Use the first type from the credential's type array
-      effectiveType = credentialType[0];
-    }
-  }
-
-  // Ensure we have a type extracted from credential data
+  // Extract type from credential data
+  const effectiveType = extractCredentialType(data);
   if (!effectiveType) {
     throw new Error('Unable to determine credential type. Credential data must contain a valid type property.');
   }
 
-  // Create an effective config with the extracted type
+  // Extract version from credential data
+  const effectiveVersion = extractVersionFromContext(data);
+  if (!effectiveVersion) {
+    throw new Error(
+      'Unable to determine credential version. Credential data must contain a valid @context with version information.',
+    );
+  }
+
+  // Create an effective config with the extracted type and version
   const effectiveConfig: IConfigContent = {
     ...credentialConfig,
     type: effectiveType,
+    version: effectiveVersion,
   };
 
   const schema = await dynamicLoadingSchemaService(effectiveConfig);
@@ -67,7 +69,7 @@ export const processCheckDataBySchema = async (
 
   return {
     type: effectiveType,
-    version: credentialConfig.version,
+    version: effectiveVersion,
     dataPath: credentialConfig.dataPath,
     url: credentialConfig.url,
     errors,

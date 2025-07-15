@@ -6,11 +6,11 @@ This file maintains a comprehensive list of all tasks in the project, organized 
 *No tasks currently in progress*
 
 ## Pending  
-- [TASK001] Remove Version Property Dependency from Config File - Remove dependence on version property, infer from credential context (Priority: High, Tags: refactor,config,api-cleanup)
+- [TASK003] Replace Config File with Individual File Arguments - Replace credential config file with individual file args or -d/--directory option (Priority: High, Tags: cli,refactor,api-simplification,user-experience)
 - [TASK002] Replace Pre-commit Hook with CI Task - Remove slow git pre-commit hook and replace with CI workflow (Priority: Low, Tags: developer-experience,ci,git,performance)
 
 ## Completed
-*No completed tasks yet*
+- [TASK001] Remove Version Property Dependency from Config File - Successfully implemented version inference from credential @context (Priority: High, Tags: refactor,config,api-cleanup)
 
 ## Blocked
 *No blocked tasks*
@@ -21,11 +21,14 @@ This file maintains a comprehensive list of all tasks in the project, organized 
 ---
 
 ## Task Statistics
-- **Total Tasks:** 2
+- **Total Tasks:** 3
 - **Active Tasks:** 2 (In Progress + Pending)
-- **Completion Rate:** 0%
+- **Completion Rate:** 33%
 
 ## Recent Activity
+- **2025-07-15:** [TASK003] Created - Replace Config File with Individual File Arguments
+- **2025-07-15:** [TASK001] Status changed to Completed - Successfully implemented version inference from credential @context
+- **2025-07-15:** [TASK001] Status changed to In Progress - Started implementation, completed analysis phase
 - **2025-07-14:** [TASK002] Created - Replace Pre-commit Hook with CI Task
 - **2025-07-14:** [TASK001] Created - Remove Version Property Dependency from Config File
 

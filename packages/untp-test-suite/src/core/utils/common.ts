@@ -69,11 +69,9 @@ export const validateCredentialConfigs = (
         errors.push(createInvalidFieldError('url', credentialConfigsPath, errorMessage));
       }
     } else {
-      // URL is empty, so validate version for local schema
-      // Note: type is now optional and will be extracted from credential data
-      if (_.isEmpty(credential.version)) {
-        errors.push(createMissingFieldError('version', credentialConfigsPath));
-      }
+      // URL is empty, so we'll use local schema
+      // Note: type and version will be extracted from credential data
+      // No need to validate version here since it will be inferred
     }
     if (_.isEmpty(credential.dataPath)) {
       errors.push(createMissingFieldError('dataPath', credentialConfigsPath));
@@ -150,4 +148,54 @@ export const loadDataFromDataPath = async (credentialConfig: IConfigContent, dat
   }
 
   return { data: _data };
+};
+
+/**
+ * Extracts the UNTP version from a credential's @context field.
+ * @param {any} credentialData - The credential data containing the @context field.
+ * @returns {string | null} The extracted version string or null if not found.
+ */
+export const extractVersionFromContext = (credentialData: any): string | null => {
+  if (!credentialData || !credentialData['@context']) {
+    return null;
+  }
+
+  const context = credentialData['@context'];
+  const contextArray = Array.isArray(context) ? context : [context];
+
+  for (const contextItem of contextArray) {
+    if (typeof contextItem === 'string' && contextItem.includes('test.uncefact.org/vocabulary/untp/')) {
+      // Extract version from URLs like:
+      // https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/
+      // https://test.uncefact.org/vocabulary/untp/dte/0.5.0/
+      const match = contextItem.match(/\/untp\/[^\/]+\/([^\/]+)\/?$/);
+      if (match && match[1]) {
+        return `v${match[1]}`;
+      }
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Extracts the UNTP credential type from a credential's type field.
+ * @param {any} credentialData - The credential data containing the type field.
+ * @returns {string | null} The extracted credential type or null if not found.
+ */
+export const extractCredentialType = (credentialData: any): string | null => {
+  if (!credentialData || !credentialData.type) {
+    return null;
+  }
+
+  const types = Array.isArray(credentialData.type) ? credentialData.type : [credentialData.type];
+
+  // Look for UNTP-specific types (not VerifiableCredential)
+  for (const type of types) {
+    if (typeof type === 'string' && type !== 'VerifiableCredential') {
+      return type;
+    }
+  }
+
+  return null;
 };

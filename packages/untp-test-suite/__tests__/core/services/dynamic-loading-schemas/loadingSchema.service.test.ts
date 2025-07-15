@@ -51,7 +51,7 @@ describe('loadingSchema.service', () => {
       dataPath: '/path/to/schema',
     };
     const result = await dynamicLoadingSchemaService(credentialConfig);
-    expect(result).toEqual('Version not found for schema event');
+    expect(result).toEqual('Version is required for local schema loading');
   });
 
   const version = 'v1.0.0';

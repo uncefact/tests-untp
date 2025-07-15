@@ -6,7 +6,7 @@ export interface ICredentialConfigs {
 
 export interface IConfigContent {
   type?: string;
-  version: string;
+  version?: string;
   dataPath?: string;
   url?: string;
 }
