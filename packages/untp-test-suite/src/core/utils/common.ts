@@ -168,7 +168,7 @@ export const extractVersionFromContext = (credentialData: any): string | null =>
       // Extract version from URLs like:
       // https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/
       // https://test.uncefact.org/vocabulary/untp/dte/0.5.0/
-      const match = contextItem.match(/\/untp\/[^\/]+\/([^\/]+)\/?$/);
+      const match = contextItem.match(/\/untp\/[^/]+\/([^/]+)\/?$/);
       if (match && match[1]) {
         return `v${match[1]}`;
       }
