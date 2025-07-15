@@ -7,7 +7,7 @@
 **Updated:** 2025-07-15
 
 ## Original Request
-Replace the credential config file on the CLI completely, instead allowing individual files as args, or a `-d` / `--directory` option for passing a directory to the CLI (so the CLI would construct the list of file paths based on the directory contents, before passing them to the test lib).
+Add support for individual files as args and a `-d` / `--directory` option for passing a directory to the CLI (so the CLI would construct the list of file paths based on the directory contents, before passing them to the test lib). Keep
 
 ## Thought Process
 This task is the next logical step after TASK001 in the larger refactor to make the untp-test-suite more reusable with a simple API. Now that we can infer version and type from credential data, we can eliminate the config file entirely and provide a more intuitive CLI interface.
@@ -29,7 +29,7 @@ This will make the CLI much more user-friendly and align with common CLI pattern
    - Remove the `--config` option requirement
    - Add support for individual file arguments
    - Add `-d` / `--directory` option for directory scanning
-   - Ensure backward compatibility with existing `--config` option
+   - Maintain existing `--config` option for transition period
 
 2. **Implement directory scanning logic**
    - Create utility function to scan directory for credential files
@@ -92,7 +92,7 @@ untp test -d ./credentials/
 # Test directory plus additional files
 untp test -d ./credentials/ extra-credential.json
 
-# Backward compatibility - existing config file approach
+# Transition period - existing config file approach (will be deprecated)
 untp test --config=./credentials.json
 ```
 
@@ -107,7 +107,8 @@ untp test --config=./credentials.json
 - Need to convert CLI arguments to the format expected by the test library
 - Can leverage the version/type inference from TASK001
 
-### Backward Compatibility
-- Keep the `--config` option working for existing users
+### Transition Period Strategy
+- Keep the `--config` option working during transition period
 - Provide clear migration path in documentation
-- Consider deprecation warnings for config file usage
+- Add deprecation warnings for config file usage to encourage migration
+- Plan for eventual removal of config file support in future version

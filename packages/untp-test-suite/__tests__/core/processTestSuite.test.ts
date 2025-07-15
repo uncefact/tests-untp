@@ -10,7 +10,6 @@ jest.mock('../../src/utils/path', () => ({
   getCurrentFilePath: jest.fn(),
 }));
 
-// No module-level mocks for common utils - use jest.spyOn instead
 jest.mock('../../src/core/services/dynamic-loading-schemas/loadingSchema.service');
 jest.mock('../../src/core/services/json-schema/validator.service');
 
