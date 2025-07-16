@@ -6,6 +6,7 @@ This file maintains a comprehensive list of all tasks in the project, organized 
 *No tasks currently in progress*
 
 ## Pending  
+- [TASK006] Update Dynamic Schema Service to Accept Full Credential and Type Parameter - Refactor dynamicLoadingSchemaService to pass full credential and specify schema type for flexible multi-schema validation (Priority: High, Tags: schema-loading,api-improvement,dynamic-loading,credential-type,extensibility)
 - [TASK004] Higher-Level Config and Multi-Schema Validation - Implement user config for credential extensions and multi-schema validation with tiered testing (Priority: High, Tags: config,schema-validation,multi-tier-testing,extensibility)
 - [TASK005] Update API Types for File-Path Based Interface - Update exposed API types in testSuiteHandler.ts for new filepath API with optional extension config (Priority: Medium, Tags: api-types,library-interface,typescript,file-based-api)
 - [TASK002] Replace Pre-commit Hook with CI Task - Remove slow git pre-commit hook and replace with CI workflow (Priority: Low, Tags: developer-experience,ci,git,performance)
@@ -23,11 +24,12 @@ This file maintains a comprehensive list of all tasks in the project, organized 
 ---
 
 ## Task Statistics
-- **Total Tasks:** 5
-- **Active Tasks:** 3 (In Progress + Pending)
-- **Completion Rate:** 40%
+- **Total Tasks:** 6
+- **Active Tasks:** 4 (In Progress + Pending)
+- **Completion Rate:** 33%
 
 ## Recent Activity
+- **2025-07-17:** [TASK006] Created - Update Dynamic Schema Service to Accept Full Credential and Type Parameter
 - **2025-07-16:** [TASK005] Created - Update API Types for File-Path Based Interface
 - **2025-07-16:** [TASK004] Created - Higher-Level Config and Multi-Schema Validation
 - **2025-07-16:** [TASK003] Status changed to Completed - Successfully refactored core functions to use file paths directly, eliminating config file dependency
