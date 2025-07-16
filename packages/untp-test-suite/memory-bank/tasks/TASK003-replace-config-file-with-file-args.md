@@ -73,8 +73,21 @@ This will make the CLI much more user-friendly and align with common CLI pattern
 | 3.4 | Update help text and documentation | Complete | 2025-07-16 | Updated README with new CLI usage patterns |
 | 3.5 | Test and validate changes | Complete | 2025-07-16 | All use cases tested and working after refactoring |
 | 3.6 | Refactor core functions to use file paths | Complete | 2025-07-16 | Core functions now use file paths as primary input |
+| 3.7 | Additional improvements and fixes | Complete | 2025-07-16 | Fixed variable naming, eliminated wrapper functions, improved library interface |
 
 ## Progress Log
+### 2025-07-16 (Additional Improvements)
+- **ADDITIONAL IMPROVEMENTS COMPLETED** - Several code quality and architectural improvements
+- **Fixed misleading variable name**: Changed `credentialPath` to `configPath` in CLI test command for clarity
+- **Improved file validation**: Updated `isCredentialFile` to validate based on VerifiableCredential content instead of filename patterns
+- **Removed file extension restrictions**: Now supports `.jsonld` and other extensions by validating content only
+- **Eliminated wrapper functions**: Removed `processCheckDataBySchemaForConfig` and `processTestSuiteForCredentialConfig` by inlining their logic
+- **Enhanced schema service**: Updated to accept individual parameters (type, version, url) instead of config objects
+- **Fixed library interface**: Updated `TestCredentialHandler` to use full `IConfigContent` instead of omitting `dataPath`
+- **Added URL support**: Enhanced `processTestSuiteForCredential` to accept optional URL parameter
+- **Fixed linting errors**: Removed unnecessary boolean type annotations in fileScanner.ts
+- **Improved architecture**: Core functions now work with file paths directly, config functions are simple wrappers
+
 ### 2025-07-16 (Refactoring Complete)
 - **REFACTORING COMPLETED** - Core functions now use file paths as primary input
 - Implemented proper architecture with file paths as the fundamental API
@@ -144,11 +157,14 @@ The task has been successfully completed with proper architecture that truly eli
 - Eliminated config file dependency from core processing
 - Maintained full backward compatibility for existing users
 - Improved API design with file paths as the fundamental input
-- Smart file filtering to avoid processing non-credential files
+- Smart content-based file filtering using VerifiableCredential validation
+- Extension-agnostic file processing (supports .json, .jsonld, etc.)
 - Comprehensive error handling with helpful error messages
 - Updated documentation with clear usage examples
+- Cleaner codebase with reduced wrapper functions and improved architecture
+- Proper URL support throughout the system for remote schema fetching
 
-The untp-test-suite is now much more reusable and user-friendly, achieving the original project goal of simplifying the API for use in different interfaces.
+The untp-test-suite is now much more reusable and user-friendly, achieving the original project goal of simplifying the API for use in different interfaces while maintaining excellent code quality and architectural integrity.
 
 ## Implementation Notes
 

@@ -23,22 +23,40 @@ The refactor to support a list of file-paths as an API (rather than the current 
 - Added `-d` / `--directory` option for directory scanning: `untp test -d ./credentials/`
 - Added `-r` / `--recursive` option for recursive directory scanning
 - Maintained full backward compatibility with existing `--config` option
-- Created smart file filtering to avoid processing non-credential files
+- Created smart content-based file filtering using VerifiableCredential validation
+- Removed file extension restrictions (supports .json, .jsonld, etc.)
+- Fixed misleading variable names and eliminated unnecessary wrapper functions
+- Enhanced library interface to properly support URL-based schema fetching
 - Updated documentation with comprehensive usage examples
 
 **Next Steps:**
 
-The remaining steps include:
+📋 **TASK004 - Higher-Level Config and Multi-Schema Validation** (Pending - High Priority)
+- Implement optional user config for credential extensions and custom schema mappings
+- Add multi-schema validation (Tier 1: VerifiableCredential + Tier 2: UNTP-specific schemas)
+- Split testing into proper tiered architecture as outlined in project brief
+- Support extensions while keeping standard UNTP credentials config-free
+
+📋 **TASK005 - Update API Types for File-Path Based Interface** (Pending - Medium Priority)
+- Update exposed API types in testSuiteHandler.ts to reflect new file-path based API
+- Create clean, intuitive interfaces that match actual implementation
+- Prepare for optional extension schema mapping integration from TASK004
+- Remove confusing config-based signatures and improve TypeScript support
+
+The remaining steps from previous work include:
 - Remove the `url` property from the config file (and any tests that used this)
 
 The CLI refactor has been completed successfully with proper architecture! The system now supports:
-- **Core API**: File paths as primary input to all core functions
+- **Core API**: File paths as primary input to all core functions with URL support
 - **Individual file arguments**: `untp test file1.json file2.json`
 - **Directory scanning**: `untp test -d ./credentials/`
 - **Recursive scanning**: `untp test -d ./credentials/ -r`
 - **Mixed approach**: `untp test -d ./credentials/ additional-file.json`
 - **Legacy config file support**: Backward compatibility through wrapper functions
+- **Content-based validation**: Smart filtering based on VerifiableCredential type
+- **Extension-agnostic**: Supports .json, .jsonld, and other file extensions
+- **Clean architecture**: Eliminated unnecessary wrapper functions and improved code quality
 
-This achieves the goal of a more intuitive and reusable API that truly eliminates the config file dependency from core processing while maintaining full backward compatibility.
+This achieves the goal of a more intuitive and reusable API that truly eliminates the config file dependency from core processing while maintaining full backward compatibility and excellent code quality.
 
 Once the API has been updated, we will then look at improving the existing implementation of tier 1 and 2 tests, by comparing with both the similar tests in the [sibling UNTP playground](../../untp-playground) package as well as those in the [untp-graph-validation-cli POC](https://github.com/absoludity/untp-graph-validation-cli), before adding the tier 3 support based on the implementation in the `untp-graph-validation-cli` POC.
