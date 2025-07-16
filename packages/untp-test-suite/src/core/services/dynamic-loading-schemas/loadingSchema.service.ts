@@ -1,20 +1,18 @@
-import { IConfigContent } from '../../types/index.js';
 import { fetchData } from '../../utils/common.js';
-import { IDynamicLoadingSchemaService } from './types.js';
 import { checkSchemaExists, checkSchemaVersionExists, getSchemaContent } from './utils.js';
 
 /**
  * Dynamic loading schema service to load schema from URL or from the schema content
- * @param schema - The schema name
+ * @param type - The credential type
  * @param version - The schema version
- * @param url - The URL to fetch the schema from
+ * @param url - Optional URL to fetch the schema from
  * @returns The schema content
  */
-export const dynamicLoadingSchemaService: IDynamicLoadingSchemaService = async (credentialConfig: IConfigContent) => {
+export const dynamicLoadingSchemaService = async (type: string, version: string, url?: string) => {
   try {
     // Fetch schema from URL
-    if (credentialConfig.url) {
-      const { data, error, success } = await fetchData(credentialConfig.url);
+    if (url) {
+      const { data, error, success } = await fetchData(url);
       // Handle fetch failure
       if (!success) {
         throw new Error(error as string);
@@ -24,27 +22,27 @@ export const dynamicLoadingSchemaService: IDynamicLoadingSchemaService = async (
     }
 
     // Fetch schema from local content
-    if (!credentialConfig.type) {
+    if (!type) {
       throw new Error(`Type is required for local schema loading`);
     }
 
-    if (!credentialConfig.version) {
+    if (!version) {
       throw new Error(`Version is required for local schema loading`);
     }
 
-    const isValidSchema = await checkSchemaExists(credentialConfig.type);
+    const isValidSchema = await checkSchemaExists(type);
     if (!isValidSchema) {
       throw new Error(`Schema not found`);
     }
 
-    const isValidVersion = await checkSchemaVersionExists(credentialConfig.type, credentialConfig.version);
+    const isValidVersion = await checkSchemaVersionExists(type, version);
     if (!isValidVersion) {
-      throw new Error(`Version not found for schema ${credentialConfig.type}`);
+      throw new Error(`Version not found for schema ${type}`);
     }
 
-    const content = await getSchemaContent(credentialConfig.type, credentialConfig.version);
+    const content = await getSchemaContent(type, version);
     if (!content) {
-      throw new Error(`Content in ${credentialConfig.type} schema not found`);
+      throw new Error(`Content in ${type} schema not found`);
     }
 
     return JSON.parse(content);

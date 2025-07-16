@@ -15,18 +15,30 @@ The refactor to support a list of file-paths as an API (rather than the current 
 - The version property is no longer required in the config file
 - The system now automatically extracts version from URLs like `https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/`
 
-**Next Steps:**
+✅ **TASK003 - Replace Config File with Individual File Arguments** (Completed 2025-07-16)
+- Successfully refactored core functions to use file paths as primary input
+- Implemented proper architecture where config-based functions are wrapper functions
+- Core functions now work directly with file paths, eliminating config file dependency
+- Implemented individual file arguments: `untp test file1.json file2.json`
+- Added `-d` / `--directory` option for directory scanning: `untp test -d ./credentials/`
+- Added `-r` / `--recursive` option for recursive directory scanning
+- Maintained full backward compatibility with existing `--config` option
+- Created smart file filtering to avoid processing non-credential files
+- Updated documentation with comprehensive usage examples
 
-📋 **TASK003 - Replace Config File with Individual File Arguments** (Pending - High Priority)
-- Replace the credential config file on the CLI completely
-- Allow individual files as arguments: `untp test file1.json file2.json`
-- Add `-d` / `--directory` option for directory scanning: `untp test -d ./credentials/`
-- Maintain backward compatibility with existing `--config` option
+**Next Steps:**
 
 The remaining steps include:
 - Remove the `url` property from the config file (and any tests that used this)
-- Complete CLI refactor to support direct file arguments and directory scanning
 
-At that point, the config file will be completely replaced with a simple list of file paths, achieving the goal of a more intuitive and reusable API.
+The CLI refactor has been completed successfully with proper architecture! The system now supports:
+- **Core API**: File paths as primary input to all core functions
+- **Individual file arguments**: `untp test file1.json file2.json`
+- **Directory scanning**: `untp test -d ./credentials/`
+- **Recursive scanning**: `untp test -d ./credentials/ -r`
+- **Mixed approach**: `untp test -d ./credentials/ additional-file.json`
+- **Legacy config file support**: Backward compatibility through wrapper functions
+
+This achieves the goal of a more intuitive and reusable API that truly eliminates the config file dependency from core processing while maintaining full backward compatibility.
 
 Once the API has been updated, we will then look at improving the existing implementation of tier 1 and 2 tests, by comparing with both the similar tests in the [sibling UNTP playground](../../untp-playground) package as well as those in the [untp-graph-validation-cli POC](https://github.com/absoludity/untp-graph-validation-cli), before adding the tier 3 support based on the implementation in the `untp-graph-validation-cli` POC.

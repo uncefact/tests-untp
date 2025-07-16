@@ -10,5 +10,5 @@ export interface TestCredentialsHandler {
 
 export interface TestCredentialHandler {
   // This library function is used to test a credential that specifies the credential type, version, and the test data that the user wants to test.
-  (credentialSchema: Omit<IConfigContent, 'dataPath'>, testData: object): Promise<ICredentialTestResult>;
+  (credentialConfig: IConfigContent, testData?: object): Promise<ICredentialTestResult>;
 }

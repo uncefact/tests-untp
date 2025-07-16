@@ -4,19 +4,20 @@ import {
   processTestSuite,
   processTestSuiteForConfigPath,
   processTestSuiteForCredential,
+  processTestSuiteForConfigs,
 } from '../../core/processTestSuite.js';
 
 /**
  * The purpose of the `testSuiteHandler` function is to read a JSON credential file specified by
  * the `credentialPath` parameter. This file contains credential settings necessary to run
  * the UNTP (UN Transparency Protocol) test suite.
- * 
+ *
  * The main functionality is to test your JSON data files to ensure they comply with the UNTP data model.
  * @see Please see {@link https://uncefact.github.io/spec-untp/docs/specification/} for more information.
 
  * The credential file typically includes a `credentials` field, which is an array containing JSON objects.
  * Each object within this array describes the data file to be tested.
- * 
+ *
  * For example:
  * {
  *  "credentials": [
@@ -37,7 +38,7 @@ import {
  *    },
  *  ]
  * }
- * 
+ *
  * Here, the `type` field specifies the schema type and the `version` field specifies the schema version
  * to be used for testing the data file located at the `dataPath` field.
  */
@@ -80,14 +81,14 @@ import {
  *   ],
  *   finalStatus: 'FAIL',
  *   finalMessage: 'Your credentials are not UNTP compliant',
- * 
+ *
  *   // finalStatus: 'PASS',
  *   // finalMessage: 'Your credentials are UNTP compliant',
 
  *   // finalStatus: 'WARN',
  *   // finalMessage: 'Your credentials are UNTP compliant, but have extended the data model',
  * }
- * 
+ *
  * After running the UNTP test suite, if the data file located at the specified 'dataPath' field passes validation,
  * the 'finalStatus' will be 'PASS'. This indicates that the data file compies with the UNTP data model.
  * However, if the 'finalStatus' is 'WARN' or 'FAIL', it means that although the data file at 'dataPath' may
@@ -213,7 +214,7 @@ export const testCredentialsHandler: TestCredentialsHandler = async (
   if (typeof credentialConfigsOrCredentialPath === 'string') {
     return processTestSuiteForConfigPath(credentialConfigsOrCredentialPath);
   } else {
-    return processTestSuite(credentialConfigsOrCredentialPath);
+    return processTestSuiteForConfigs(credentialConfigsOrCredentialPath);
   }
 };
 
@@ -258,11 +259,11 @@ export const testCredentialsHandler: TestCredentialsHandler = async (
  *
  * This function is responsible for testing a credential based on a schema or validating test data against a schema.
  *
- * @param {Omit<ConfigContent, 'dataPath'>} credentialSchemaConfig - The credential schema configuration object.
+ * @param {IConfigContent} credentialConfig - The credential configuration object.
  * @param {object} [testData] - The test data to be validated against the schema.
  * @returns {Promise<ICredentialTestResult>} A promise that resolves to the result of the credential test.
  */
 
-export const testCredentialHandler: TestCredentialHandler = (credentialSchemaConfig, testData) => {
-  return processTestSuiteForCredential(credentialSchemaConfig, testData);
+export const testCredentialHandler: TestCredentialHandler = async (credentialConfig, testData) => {
+  return processTestSuiteForCredential(credentialConfig.dataPath || '', testData, credentialConfig.url);
 };

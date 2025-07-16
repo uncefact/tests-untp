@@ -20,20 +20,21 @@ import {
   constructCredentialTestResults,
   constructFinalReport,
 } from '../templates/utils.js';
+import { filterValidFiles } from '../utils/fileScanner.js';
+
 /**
  * Function to validate the provided data against a schema.
  *
- * @param {object} schema - The schema to validate against.
+ * @param {string} filePath - The path to the credential file.
  * @param {object} data - The data to be validated.
- * @param {IConfigContent} credentialConfig - The original credential configuration.
+ * @param {string} [url] - Optional URL to fetch the schema from.
  * @returns {IValidatedCredentials} The result of the validation with any errors.
  */
 export const processCheckDataBySchema = async (
-  credentialConfig: IConfigContent,
+  filePath: string,
   data: object,
+  url?: string,
 ): Promise<IValidatedCredentials> => {
-  const { dataPath } = credentialConfig;
-
   // Extract type from credential data
   const effectiveType = extractCredentialType(data);
   if (!effectiveType) {
@@ -48,18 +49,11 @@ export const processCheckDataBySchema = async (
     );
   }
 
-  // Create an effective config with the extracted type and version
-  const effectiveConfig: IConfigContent = {
-    ...credentialConfig,
-    type: effectiveType,
-    version: effectiveVersion,
-  };
-
-  const schema = await dynamicLoadingSchemaService(effectiveConfig);
+  const schema = await dynamicLoadingSchemaService(effectiveType, effectiveVersion, url);
 
   const errors: any = [];
   if (typeof schema === 'string') {
-    errors.push(createInvalidFieldError('schema', dataPath, schema));
+    errors.push(createInvalidFieldError('schema', filePath, schema));
   } else {
     const validationErrors = hasErrors(schema, data);
     if (validationErrors) {
@@ -70,29 +64,72 @@ export const processCheckDataBySchema = async (
   return {
     type: effectiveType,
     version: effectiveVersion,
-    dataPath: credentialConfig.dataPath,
-    url: credentialConfig.url,
+    dataPath: filePath,
+    url: url || '',
     errors,
   };
 };
 
 /**
- * Process the test suite
- * @param credentialConfigsPath - The path to the credential configs
+ * Process the test suite for a list of file paths (primary function)
+ * @param filePaths - Array of file paths to process
  * @returns The test suite result
  */
-export const processTestSuiteForConfigPath = async (credentialConfigsPath: string): Promise<ITestSuiteResult> => {
+export const processTestSuite = async (filePaths: string[]): Promise<ITestSuiteResult> => {
   try {
-    // Read and validate credential configs
-    const credentialConfigs = await readJsonFile<ICredentialConfigs>(credentialConfigsPath);
-    return processTestSuite(credentialConfigs, credentialConfigsPath);
+    // Filter out invalid file paths
+    const validFilePaths = await filterValidFiles(filePaths);
+
+    if (validFilePaths.length === 0) {
+      throw new Error('No valid credential files found in the provided paths');
+    }
+
+    // Process each file path to check data by schema
+    const validatedCredentials = await Promise.all(
+      validFilePaths.map(async (filePath) => {
+        try {
+          const { data: credentialData } = await loadDataFromDataPath({ dataPath: filePath });
+          return processCheckDataBySchema(filePath, credentialData as object);
+        } catch (error) {
+          // Return validation error for files that can't be loaded
+          return {
+            type: 'Unknown',
+            version: 'Unknown',
+            dataPath: filePath,
+            url: '',
+            errors: [
+              createInvalidFieldError(
+                'file',
+                filePath,
+                `Failed to load file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              ),
+            ],
+          };
+        }
+      }),
+    );
+
+    // Mapping message templates and final report
+    const credentialResults = await constructCredentialTestResults(validatedCredentials);
+    const finalReport = await constructFinalReport(credentialResults);
+
+    return {
+      credentials: credentialResults,
+      ...finalReport,
+    };
   } catch (e) {
     const error = e as Error;
     throw new Error(`Failed to run the test suite. ${error.message}`);
   }
 };
 
-export const processTestSuite = async (
+/**
+ * Process the test suite for config-based input (legacy wrapper function)
+ * @param credentialConfigs - The credential configurations
+ * @param credentialConfigsPath - Optional path to the config file
+ * @returns The test suite result
+ */
+export const processTestSuiteForConfigs = async (
   credentialConfigs: ICredentialConfigs,
   credentialConfigsPath?: string,
 ): Promise<ITestSuiteResult> => {
@@ -105,7 +142,7 @@ export const processTestSuite = async (
   const validatedCredentials = await Promise.all(
     configContentNoError.map(async (credentialConfig) => {
       const { data: credentialData } = await loadDataFromDataPath(credentialConfig);
-      return processCheckDataBySchema(credentialConfig, credentialData as object);
+      return processCheckDataBySchema(credentialConfig.dataPath || '', credentialData as object, credentialConfig.url);
     }),
   );
 
@@ -125,11 +162,35 @@ export const processTestSuite = async (
   };
 };
 
+/**
+ * Process the test suite for a config file path (legacy wrapper function)
+ * @param credentialConfigsPath - The path to the credential configs
+ * @returns The test suite result
+ */
+export const processTestSuiteForConfigPath = async (credentialConfigsPath: string): Promise<ITestSuiteResult> => {
+  try {
+    // Read and validate credential configs
+    const credentialConfigs = await readJsonFile<ICredentialConfigs>(credentialConfigsPath);
+    return processTestSuiteForConfigs(credentialConfigs, credentialConfigsPath);
+  } catch (e) {
+    const error = e as Error;
+    throw new Error(`Failed to run the test suite. ${error.message}`);
+  }
+};
+
+/**
+ * Process a single credential file (primary function)
+ * @param filePath - Path to the credential file
+ * @param data - Optional data override
+ * @param url - Optional URL to fetch schema from
+ * @returns The credential test result
+ */
 export const processTestSuiteForCredential = async (
-  configContent: IConfigContent,
+  filePath: string,
   data?: object,
+  url?: string,
 ): Promise<ICredentialTestResult> => {
-  const { data: credentialData } = await loadDataFromDataPath(configContent, data);
-  const rawCredentialResult = await processCheckDataBySchema(configContent, credentialData as object);
+  const { data: credentialData } = await loadDataFromDataPath({ dataPath: filePath }, data);
+  const rawCredentialResult = await processCheckDataBySchema(filePath, credentialData as object, url);
   return constructCredentialTestResult(rawCredentialResult);
 };

@@ -99,19 +99,53 @@ The `credentials.json` file contains configurations for running the test suite, 
 
 ### Running UNTP Test Suite
 
-This command executes the UNTP test suite using the default `credentials.json` file in the current working directory.
+The UNTP Test Suite CLI supports multiple ways to specify credential files for testing:
+
+#### 1. Individual Files
+
+Test specific credential files directly:
 
 ```bash
-untp test
+untp test file1.json file2.json file3.json
 ```
 
 or
 
 ```bash
-yarn run untp test
+yarn run untp test file1.json file2.json file3.json
 ```
 
-To use a specific configuration file, use the `-c` or `--config` flag followed by the path to the file.
+#### 2. Directory Scanning
+
+Test all credential files in a directory:
+
+```bash
+untp test -d ./credentials/
+```
+
+or
+
+```bash
+yarn run untp test -d ./credentials/
+```
+
+For recursive directory scanning (includes subdirectories):
+
+```bash
+untp test -d ./credentials/ -r
+```
+
+#### 3. Mixed Approach
+
+Combine directory scanning with individual files:
+
+```bash
+untp test -d ./credentials/ additional-file.json
+```
+
+#### 4. Configuration File (Legacy)
+
+Use a configuration file (for backward compatibility):
 
 ```bash
 untp test --config path/to/credentials.json
@@ -122,6 +156,15 @@ or
 ```bash
 yarn run untp test --config path/to/credentials.json
 ```
+
+If no arguments are provided, the CLI will look for a default `credentials.json` file in the current working directory.
+
+#### CLI Options
+
+- `-c, --config <path>`: Configuration file path
+- `-d, --directory <path>`: Directory to scan for credential files
+- `-r, --recursive`: Recursively scan subdirectories when using --directory
+- `-h, --help`: Display help information
 
 ## UNTP Test Suite Library
 
