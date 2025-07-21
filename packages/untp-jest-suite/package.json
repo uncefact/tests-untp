@@ -1,0 +1,42 @@
+{
+  "name": "untp-jest-suite",
+  "version": "0.1.0",
+  "description": "A reusable Jest-based testing library for UNTP (United Nations Transparency Protocol) credentials",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "untp-test": "dist/bin/untp-test.js"
+  },
+  "files": [
+    "dist/**/*",
+    "example-credentials/**/*"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "untp",
+    "verifiable-credentials",
+    "testing",
+    "jest",
+    "w3c",
+    "json-ld",
+    "transparency"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.5",
+    "commander": "^11.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "@types/node": "^20.8.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
