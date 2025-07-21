@@ -1,0 +1,124 @@
+{
+  "type": [
+    "DigitalProductPassport",
+    "VerifiableCredential"
+  ],
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://test.uncefact.org/vocabulary/untp/dpp/0.6.0-beta12/"
+  ],
+  "id": "http://localhost/credentials/untp-dpp-simple.json",
+  "issuer": {
+    "type": [
+      "CredentialIssuer"
+    ],
+    "id": "did:web:battery-company.com",
+    "name": "Battery Company Pty Ltd",
+    "issuerAlsoKnownAs": [
+      {
+        "id": "https://abr.business.gov.au/ABN/View?abn=90664869327",
+        "name": "Battery Company Pty Ltd",
+        "registeredId": "90664869327",
+        "idScheme": {
+          "type": [
+            "IdentifierScheme"
+          ],
+          "id": "https://id.gs1.org/01/",
+          "name": "Global Trade Identification Number (GTIN)"
+        }
+      }
+    ]
+  },
+  "validFrom": "2024-03-15T12:00:00Z",
+  "validUntil": "2034-03-15T12:00:00Z",
+  "credentialSubject": {
+    "type": [
+      "ProductPassport"
+    ],
+    "product": {
+      "type": ["Product"],
+      "id": "https://id.gs1.org/01/09520123456788/21/12345",
+      "name": "EV battery 300Ah",
+      "registeredId": "09520123456788.21.12345",
+      "idScheme": {
+        "type": [
+          "IdentifierScheme"
+        ],
+        "id": "https://id.gs1.org/01/",
+        "name": "Global Trade Identification Number (GTIN)"
+      },
+      "description": "A lot more product information here."
+    },
+    "conformityClaim": [
+      {
+        "type": [
+          "Claim",
+          "Declaration"
+        ],
+        "id": "example:product:1:claim:1",
+        "conformance": true,
+        "conformityTopic": "environment.emissions",
+        "assessmentCriteria": [
+          {
+            "type": [
+              "Criterion"
+            ],
+            "id": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf#BatteryAssembly",
+            "name": "GBA Battery rule book v2.0 battery assembly guidelines",
+            "description": "The battery assembly guidelines from the Global Battery Alliance rule book v2.0",
+            "thresholdValue": [
+              {
+                "metricName": "GHG emissions intensity",
+                "metricValue": {
+                  "value": 10,
+                  "unit": "KGM"
+                },
+                "score": "BB",
+                "accuracy": 0.06
+              }
+            ]
+          },
+          {
+            "type": [
+              "Criterion"
+            ],
+            "id": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf#BatteryPackaging",
+            "name": "GBA Battery rule book v2.0 battery packaging guidelines",
+            "description": "The battery packaging guidelines from the Global Battery Alliance rule book v2.0"
+          }
+        ],
+        "conformityEvidence": {
+          "linkURL": "http://localhost/credentials/untp-dcc-simple.json",
+          "linkName": "GBA rule book conformity certificate"
+        }
+      },
+      {
+        "type": [
+          "Claim",
+          "Declaration"
+        ],
+        "id": "example:product:1:claim:2",
+        "conformance": true,
+        "conformityTopic": "environment.waste",
+        "assessmentCriteria": [
+          {
+            "type": [
+              "Criterion"
+            ],
+            "id": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf#BatteryDisposal",
+            "name": "GBA Battery rule book v2.0 battery disposal guidelines",
+            "description": "The battery disposal guidelines from the Global Battery Alliance rule book v2.0"
+          },
+          {
+            "type": [
+              "Criterion"
+            ],
+            "id": "https://www.globalbattery.org/media/publications/gba-rulebook-v2.0-master.pdf#BatteryRecycling",
+            "name": "GBA Battery rule book v2.0 battery recycling guidelines",
+            "description": "The battery recycling guidelines from the Global Battery Alliance rule book v2.0"
+          }
+        ]
+      }
+    ]
+  }
+}

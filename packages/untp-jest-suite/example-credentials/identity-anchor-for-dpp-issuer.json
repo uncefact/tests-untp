@@ -1,0 +1,27 @@
+{
+  "type": [
+    "DigitalIdentityAnchor",
+    "VerifiableCredential"
+  ],
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://test.uncefact.org/vocabulary/untp/dia/0.6.0-beta12/"
+  ],
+  "id": "http://localhost/credentials/identity-anchor-for-dia-issuer.json",
+  "issuer": {
+    "type": [
+      "CredentialIssuer"
+    ],
+    "id": "did:web:abr.business.gov.au",
+    "name": "Government Department"
+  },
+  "validFrom": "2024-03-15T12:00:00Z",
+  "validUntil": "2034-03-15T12:00:00Z",
+  "credentialSubject": {
+    "type": [
+      "RegisteredIdentity"
+    ],
+    "id": "did:web:battery-company.com",
+    "name": "Battery Company Pty Ltd"
+  }
+}
