@@ -1,34 +1,34 @@
 /**
- * UNTP Jest Runner - Executes Jest tests for UNTP credential validation
+ * UNTP Mocha Runner - Executes Mocha tests for UNTP credential validation
  */
 
 import { UNTPTestOptions } from './types';
 
 /**
- * Executes Jest tests for UNTP credential validation
+ * Executes Mocha tests for UNTP credential validation
+ *
+ * This class provides programmatic access to run UNTP validation tests
+ * in both Node.js and browser environments using Mocha.
  */
-export class UNTPJestRunner {
+export class UNTPMochaRunner {
   /**
-   * Run Jest tests against UNTP credentials
+   * Run Mocha tests against UNTP credentials
    *
-   * This is a stub implementation that will be expanded to:
-   * 1. Configure Jest with UNTP-specific test patterns
-   * 2. Execute Jest against credential files
-   * 3. Return Jest's native test results
+   * This is a stub implementation for programmatic access.
+   * The CLI executes Mocha directly for better performance and output.
    */
   async run(options: UNTPTestOptions): Promise<any> {
-    // Stub implementation - will execute Jest programmatically
-    console.log('UNTPJestRunner.run() called with options:', options);
-    console.log('Credential paths to test:', options.credentialPaths);
+    console.log('UNTPMochaRunner.run() called with options:', options);
+    console.log('Credential file paths to test:', options.credentialFilePaths);
 
-    // TODO: Use Jest's runCLI or other APIs to execute tests
-    // TODO: Configure Jest to find and run UNTP validation tests
-    // TODO: Return Jest's native AggregatedResult
+    // TODO: Implement programmatic Mocha execution for web UIs
+    // TODO: This will use Mocha's programmatic API for both Node.js and browser
+    // TODO: Return structured results suitable for web applications
 
     return {
       success: true,
-      message: 'Stub implementation - Jest execution will be implemented here',
-      fileCount: options.credentialPaths.length,
+      message: 'Programmatic Mocha execution - to be implemented',
+      fileCount: options.credentialFilePaths.length,
     };
   }
 }

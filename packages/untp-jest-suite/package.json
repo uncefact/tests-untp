@@ -1,7 +1,7 @@
 {
-  "name": "untp-jest-suite",
+  "name": "untp-test-suite-mocha",
   "version": "0.1.0",
-  "description": "A reusable Jest-based testing library for UNTP (United Nations Transparency Protocol) credentials",
+  "description": "A reusable Mocha-based testing library for UNTP (United Nations Transparency Protocol) credentials",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -20,7 +20,7 @@
     "untp",
     "verifiable-credentials",
     "testing",
-    "jest",
+    "mocha",
     "w3c",
     "json-ld",
     "transparency"
@@ -28,8 +28,10 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "jest": "^29.7.0",
-    "@types/jest": "^29.5.5",
+    "mocha": "^10.2.0",
+    "@types/mocha": "^10.0.3",
+    "chai": "^4.3.10",
+    "@types/chai": "^4.3.6",
     "commander": "^11.1.0"
   },
   "devDependencies": {

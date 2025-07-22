@@ -1,11 +1,11 @@
 /**
- * Type definitions for UNTP Jest Suite
+ * Type definitions for UNTP Test Suite Mocha
  */
 
 // Configuration for UNTP testing
 export interface UNTPTestOptions {
   /** File paths of credentials to test */
-  credentialPaths: string[];
-  /** Additional test directories (for extensions) */
-  extensionPaths?: string[];
+  credentialFilePaths: string[];
+  /** Additional test directory (for extensions or other additional tests) */
+  additionalTestsDir?: string;
 }

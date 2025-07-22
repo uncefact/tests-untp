@@ -257,6 +257,16 @@ For existing tasks, the prompt **update task [ID]** is asking you to:
 4. Update the _index.md file to reflect any status changes
 5. Integrate any new decisions into the thought process
 
+## Task Status Update Rules
+
+**Important**: You may update task or subtask status when you BEGIN work (e.g., changing from "Not Started" to "In Progress"), but you MUST NOT mark any task or subtask as "Complete" or "Finished" until I explicitly tell you it's complete. Only I can determine when work meets the completion criteria.
+
+This rule applies to:
+- Overall task status
+- Individual subtask status in the progress tracking table
+- Progress percentages (don't increase beyond work actually accepted)
+- Status updates in the _index.md file
+
 To view tasks, the command **show tasks [filter]** will:
 1. Display a filtered list of tasks based on the specified criteria
 2. Valid filters include:
