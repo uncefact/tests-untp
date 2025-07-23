@@ -5,4 +5,5 @@
  */
 
 export * from './types';
-export { UNTPMochaRunner } from './validator';
+export { UNTPMochaRunner, UNTPTestResults } from './validator';
+export { StreamReporter, StreamEvent } from './stream-reporter';

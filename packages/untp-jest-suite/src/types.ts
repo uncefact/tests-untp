@@ -6,6 +6,8 @@
 export interface UNTPTestOptions {
   /** File paths of credentials to test */
   credentialFilePaths: string[];
-  /** Additional test directory (for extensions or other additional tests) */
+  /** Additional test directory (for extensions) */
   additionalTestsDir?: string;
+  /** Tags to include (run only tests with these tags) */
+  tags?: string[];
 }
