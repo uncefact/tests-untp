@@ -41,7 +41,7 @@ This foundational task establishes the basic package structure and CLI wrapper a
 | ID | Description | Status | Updated | Notes |
 |----|-------------|--------|---------|-------|
 | 1.1 | Initialize package.json and TypeScript config | Complete | 2025-07-21 | Mocha added as production dependency, TypeScript config working |
-| 1.2 | Create basic CLI entry point (bin/untp-test) | In Progress | 2025-07-21 | CLI executes Mocha against untp-tests directory |
+| 1.2 | Create basic CLI entry point (bin/untp-test) | Complete | 2025-07-23 | CLI executes Mocha with streaming results and tag filtering |
 | 1.3 | Implement credential directory scanning logic | Not Started | 2025-07-21 | Accept user-provided directory path |
 | 1.6 | Set up TypeScript build process | Complete | 2025-07-21 | Build process working, compiles to dist/ |
 | 1.7 | Test CLI wrapper functionality | Complete | 2025-07-21 | CLI stub runs successfully with Commander |
@@ -57,4 +57,4 @@ This foundational task establishes the basic package structure and CLI wrapper a
 - **Completed subtask 1.7**: CLI wrapper working with Commander integration, accepts file paths and --directory option
 - **Removed subtasks 1.4 and 1.5**: Mocha configuration will be handled internally, example credentials already provided
 - **Updated interfaces**: Simplified UNTPTestOptions to use credentialPaths array, removed mochaConfig option
-- **In Progress subtask 1.2**: Switching from Jest to Mocha for universal test execution (Node.js + browser support)
+- **Completed subtask 1.2 (2025-07-23)**: CLI now uses UNTPMochaRunner with custom StreamReporter for real-time test results, supports --tag filtering with word boundaries, switched from Jest to Mocha for universal Node.js/browser compatibility
