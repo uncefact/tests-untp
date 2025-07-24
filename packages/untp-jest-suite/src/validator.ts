@@ -2,8 +2,6 @@
  * UNTP Mocha Runner - Executes Mocha tests for UNTP credential validation
  */
 
-import Mocha from 'mocha';
-import * as path from 'path';
 import { UNTPTestOptions } from './types';
 import { StreamReporter, StreamEvent } from './stream-reporter';
 
@@ -24,19 +22,21 @@ export interface UNTPTestResults {
  *
  * This class provides programmatic access to run UNTP validation tests
  * in both Node.js and browser environments using a custom streaming reporter.
+ * Credential data should be set via credential-state module before calling run().
  */
-export class UNTPMochaRunner {
+export class UNTPTestRunner {
   /**
    * Run Mocha tests against UNTP credentials with streaming results
    *
    * Uses custom reporter to provide real-time test results that are
    * streamed to the onStream callback as they happen.
    * Works in both Node.js and browser environments.
+   * Credential data should be set via credential-state module before calling run().
    */
   async run(options: UNTPTestOptions, onStream?: (event: StreamEvent) => void): Promise<UNTPTestResults> {
     return new Promise((resolve, reject) => {
       try {
-        // Create Mocha instance with custom streaming reporter and grep support
+        // Create Mocha options with custom streaming reporter and grep support
         const mochaOptions: any = {
           reporter: StreamReporter as any,
           timeout: 5000,
@@ -52,25 +52,8 @@ export class UNTPMochaRunner {
           mochaOptions.grep = tagPattern;
         }
 
-        const mocha = new Mocha(mochaOptions);
-
-        // Add test files from the untp-tests directory
-        // In Node.js, use path.join. In browser, tests would be pre-loaded
-        if (typeof (globalThis as any).window === 'undefined') {
-          // Node.js environment
-          const testsDir = path.join(__dirname, '../untp-tests');
-          mocha.addFile(path.join(testsDir, 'tier1/dummy.test.js'));
-
-          // If additional tests directory is specified, add those tests too
-          if (options.additionalTestsDir) {
-            // TODO: Implement additional test directory scanning
-            console.log(`Would scan additional tests in: ${options.additionalTestsDir}`);
-          }
-        } else {
-          // Browser environment - tests would need to be pre-loaded via script tags
-          // or bundled. For now, assume they're already available globally
-          console.log('Browser environment: tests should be pre-loaded');
-        }
+        // Get configured Mocha instance from callback
+        const mocha = options.mochaSetupCallback(mochaOptions);
 
         // Track results for final summary
         const results: UNTPTestResults = {
@@ -86,7 +69,7 @@ export class UNTPMochaRunner {
         };
 
         // Run the tests
-        const runner = mocha.run((failures) => {
+        const runner = mocha.run((failures: any) => {
           results.success = failures === 0;
           resolve(results);
         });
@@ -105,7 +88,7 @@ export class UNTPMochaRunner {
           }
         });
 
-        runner.on('error', (error) => {
+        runner.on('error', (error: any) => {
           reject(error);
         });
       } catch (error) {

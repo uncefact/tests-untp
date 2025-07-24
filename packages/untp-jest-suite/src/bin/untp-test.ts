@@ -6,8 +6,11 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { UNTPMochaRunner } from '../validator';
+import { UNTPTestRunner } from '../validator';
 import { StreamEvent } from '../stream-reporter';
+import { setCredentialData } from '../credential-state';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const program = new Command();
 
@@ -114,16 +117,66 @@ program
     console.log(`Testing credential files: ${allFiles.join(', ')}`);
 
     try {
-      // Use UNTPMochaRunner with streaming callback - same API that web applications will use
-      const runner = new UNTPMochaRunner();
+      // Read credential files directly and populate credential state
+      const credentialData = new Map<string, string>();
+
+      for (const filePath of allFiles) {
+        try {
+          const stats = await fs.promises.stat(filePath);
+
+          if (!stats.isFile()) {
+            console.warn(`Skipping ${filePath}: not a file`);
+            continue;
+          }
+
+          const content = await fs.promises.readFile(filePath, 'utf8');
+          const fileName = path.basename(filePath);
+
+          // Validate JSON format
+          JSON.parse(content);
+
+          credentialData.set(fileName, content);
+        } catch (error) {
+          console.warn(`Skipping invalid JSON file ${filePath}:`, error);
+        }
+      }
+
+      if (credentialData.size === 0) {
+        console.error('No valid JSON credential files found');
+        process.exit(1);
+      }
+
+      // Set credential data for tests
+      setCredentialData(credentialData);
+
+      // Use UNTPTestRunner with streaming callback
+      const runner = new UNTPTestRunner();
       const results = await runner.run(
         {
-          credentialFilePaths: allFiles,
-          additionalTestsDir: options.additionalTestsDir,
           tags: options.tag,
+          mochaSetupCallback: (mochaOptions) => {
+            // Create Mocha instance with Node.js import
+            const Mocha = require('mocha');
+            const mocha = new Mocha(mochaOptions);
+
+            // Set up test helpers globally before adding test files
+            require('../test-helpers');
+
+            // Add test files from the untp-tests directory
+            const testsDir = path.join(__dirname, '../../untp-tests');
+            mocha.addFile(path.join(testsDir, 'tier1/dummy.test.js'));
+
+            // If additional tests directory is specified, add those tests too
+            if (options.additionalTestsDir) {
+              // TODO: Implement additional test directory scanning
+              console.log(`Would scan additional tests in: ${options.additionalTestsDir}`);
+            }
+
+            return mocha;
+          },
         },
         handleStreamEvent,
-      ); // Pass streaming callback
+      );
 
       // Exit with appropriate code based on test results
       process.exit(results.success ? 0 : 1);

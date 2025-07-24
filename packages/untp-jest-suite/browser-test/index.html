@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UNTP Test Suite - Browser Testing</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+
+      .container {
+        background: white;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+
+      h1 {
+        color: #2c3e50;
+        border-bottom: 3px solid #3498db;
+        padding-bottom: 10px;
+      }
+
+      .upload-section {
+        border: 2px dashed #3498db;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        margin: 20px 0;
+        background-color: #f8f9fa;
+      }
+
+      .upload-section.dragover {
+        border-color: #27ae60;
+        background-color: #e8f5e8;
+      }
+
+      #credentialFiles {
+        margin: 10px 0;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        width: 100%;
+        max-width: 400px;
+      }
+
+      .file-list {
+        margin: 15px 0;
+        text-align: left;
+      }
+
+      .file-item {
+        background: #ecf0f1;
+        padding: 8px 12px;
+        margin: 5px 0;
+        border-radius: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .file-remove {
+        background: #e74c3c;
+        color: white;
+        border: none;
+        padding: 2px 8px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      .controls {
+        margin: 20px 0;
+      }
+
+      .tag-input {
+        margin: 10px 0;
+      }
+
+      .tag-input input {
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-right: 5px;
+      }
+
+      .tag-list {
+        margin: 10px 0;
+      }
+
+      .tag {
+        display: inline-block;
+        background: #3498db;
+        color: white;
+        padding: 4px 8px;
+        margin: 2px;
+        border-radius: 12px;
+        font-size: 12px;
+      }
+
+      .tag .remove {
+        margin-left: 5px;
+        cursor: pointer;
+        font-weight: bold;
+      }
+
+      button {
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        margin: 5px;
+      }
+
+      button:hover {
+        background: #2980b9;
+      }
+
+      button:disabled {
+        background: #bdc3c7;
+        cursor: not-allowed;
+      }
+
+      .results {
+        background: #2c3e50;
+        color: #ecf0f1;
+        padding: 20px;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        max-height: 400px;
+        overflow-y: auto;
+        margin-top: 20px;
+      }
+
+      .results ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .results .suite-title {
+        font-weight: bold;
+        margin: 10px 0 5px 0;
+        color: #ecf0f1;
+      }
+
+      .results .test-pass {
+        color: #2ecc71;
+        margin: 2px 0;
+        padding-left: 20px;
+      }
+
+      .results .test-fail {
+        color: #e74c3c;
+        margin: 2px 0;
+        padding-left: 20px;
+      }
+
+      .results .test-pending {
+        color: #f39c12;
+        margin: 2px 0;
+        padding-left: 20px;
+      }
+
+      .results .test-error {
+        color: #e74c3c;
+        font-size: 12px;
+        padding-left: 40px;
+        margin: 2px 0;
+      }
+
+      .results .summary {
+        margin-top: 15px;
+        padding-top: 10px;
+        border-top: 1px solid #34495e;
+      }
+
+      .status {
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+        font-weight: bold;
+      }
+
+      .status.success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+
+      .status.error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+
+      .status.running {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>UNTP Test Suite - Browser Testing</h1>
+      <p>Upload UNTP credential files (.json) to test them against the built-in validation suites.</p>
+
+      <div class="upload-section" id="uploadSection">
+        <h3>📁 Upload Credential Files</h3>
+        <p>Drag and drop JSON credential files here, or click to select files</p>
+        <input type="file" id="credentialFiles" accept=".json,application/json" multiple />
+        <div class="file-list" id="fileList"></div>
+      </div>
+
+      <div class="controls">
+        <h3>🏷️ Test Filtering (Optional)</h3>
+        <div class="tag-input">
+          <input type="text" id="tagInput" placeholder="Enter tag name (e.g., tier1, smoke, validation)" />
+          <button onclick="addTag()">Add Tag</button>
+        </div>
+        <div class="tag-list" id="tagList"></div>
+
+        <div style="margin-top: 20px">
+          <button id="runTestsBtn" onclick="runTests()" disabled>🚀 Run Tests</button>
+          <button onclick="clearResults()">🗑️ Clear Results</button>
+        </div>
+      </div>
+
+      <div id="status"></div>
+      <div id="results" class="results" style="display: none"></div>
+    </div>
+
+    <!-- Hidden div for Mocha's default output (prevents warnings) -->
+    <div id="mocha" style="display: none"></div>
+
+    <!-- Load Mocha and dependencies -->
+    <script src="https://unpkg.com/mocha@10.2.0/mocha.js"></script>
+    <script src="https://unpkg.com/chai@4.3.10/chai.js"></script>
+
+    <!-- Initialize Mocha for browser -->
+    <script>
+      // Set up Mocha for browser environment
+      mocha.setup('bdd');
+    </script>
+
+    <!-- Load our test files (these will be bundled or served statically) -->
+    <script src="browser-bundle.js"></script>
+
+    <script>
+      // Global state
+      let selectedFiles = [];
+      let selectedTags = [];
+      let isRunning = false;
+
+      // File upload handling
+      const fileInput = document.getElementById('credentialFiles');
+      const fileList = document.getElementById('fileList');
+      const uploadSection = document.getElementById('uploadSection');
+      const runTestsBtn = document.getElementById('runTestsBtn');
+
+      // Drag and drop handlers
+      uploadSection.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadSection.classList.add('dragover');
+      });
+
+      uploadSection.addEventListener('dragleave', () => {
+        uploadSection.classList.remove('dragover');
+      });
+
+      uploadSection.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadSection.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+      });
+
+      // File input change handler
+      fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+      });
+
+      // Handle selected files
+      function handleFiles(files) {
+        for (let file of files) {
+          if (file.type === 'application/json' || file.name.endsWith('.json')) {
+            selectedFiles.push(file);
+          }
+        }
+        updateFileList();
+        updateRunButton();
+      }
+
+      // Update file list display
+      function updateFileList() {
+        fileList.innerHTML = '';
+        selectedFiles.forEach((file, index) => {
+          const fileItem = document.createElement('div');
+          fileItem.className = 'file-item';
+          fileItem.innerHTML = `
+                    <span>📄 ${file.name} (${(file.size / 1024).toFixed(1)} KB)</span>
+                    <button class="file-remove" onclick="removeFile(${index})">✕</button>
+                `;
+          fileList.appendChild(fileItem);
+        });
+      }
+
+      // Remove file from selection
+      function removeFile(index) {
+        selectedFiles.splice(index, 1);
+        updateFileList();
+        updateRunButton();
+      }
+
+      // Tag management
+      function addTag() {
+        const tagInput = document.getElementById('tagInput');
+        const tag = tagInput.value.trim();
+        if (tag && !selectedTags.includes(tag)) {
+          selectedTags.push(tag);
+          updateTagList();
+          tagInput.value = '';
+        }
+      }
+
+      function removeTag(tag) {
+        selectedTags = selectedTags.filter((t) => t !== tag);
+        updateTagList();
+      }
+
+      function updateTagList() {
+        const tagList = document.getElementById('tagList');
+        tagList.innerHTML = '';
+        selectedTags.forEach((tag) => {
+          const tagSpan = document.createElement('span');
+          tagSpan.className = 'tag';
+          tagSpan.innerHTML = `${tag} <span class="remove" onclick="removeTag('${tag}')">✕</span>`;
+          tagList.appendChild(tagSpan);
+        });
+      }
+
+      // Enable/disable run button
+      function updateRunButton() {
+        runTestsBtn.disabled = selectedFiles.length === 0 || isRunning;
+      }
+
+      // Tag input enter key support
+      document.getElementById('tagInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          addTag();
+        }
+      });
+
+      // Status display
+      function showStatus(message, type = 'info') {
+        const status = document.getElementById('status');
+        status.className = `status ${type}`;
+        status.textContent = message;
+        status.style.display = 'block';
+      }
+
+      function hideStatus() {
+        document.getElementById('status').style.display = 'none';
+      }
+
+      // Results display
+      function showResults() {
+        document.getElementById('results').style.display = 'block';
+      }
+
+      function appendResult(text, className = '') {
+        const results = document.getElementById('results');
+        if (className) {
+          const div = document.createElement('div');
+          div.className = className;
+          div.textContent = text;
+          results.appendChild(div);
+        } else {
+          const div = document.createElement('div');
+          div.textContent = text;
+          results.appendChild(div);
+        }
+        results.scrollTop = results.scrollHeight;
+      }
+
+      function clearResults() {
+        document.getElementById('results').innerHTML = '';
+        document.getElementById('results').style.display = 'none';
+        hideStatus();
+      }
+
+      // Main test execution function
+      async function runTests() {
+        if (selectedFiles.length === 0) {
+          showStatus('Please select at least one credential file', 'error');
+          return;
+        }
+
+        isRunning = true;
+        updateRunButton();
+
+        // Track which suite we're currently in to avoid duplicating suite titles
+        let currentSuite = null;
+
+        try {
+          showStatus('Running tests...', 'running');
+
+          // Clear previous results and show the results div
+          document.getElementById('results').innerHTML = '';
+          showResults();
+
+          appendResult('📁 Files: ' + selectedFiles.map((f) => f.name).join(', '));
+
+          if (selectedTags.length > 0) {
+            appendResult('🏷️  Tags: ' + selectedTags.join(', '));
+          }
+
+          appendResult('');
+
+          // Read credential files and set credential state
+          const credentialData = new Map();
+
+          for (const file of selectedFiles) {
+            try {
+              const content = await file.text();
+              const fileName = file.name;
+
+              // Validate JSON format
+              JSON.parse(content);
+
+              credentialData.set(fileName, content);
+            } catch (error) {
+              appendResult(`❌ Skipping invalid JSON file ${file.name}: ${error.message}`);
+            }
+          }
+
+          if (credentialData.size === 0) {
+            throw new Error('No valid JSON credential files found');
+          }
+
+          // Set credential data for tests
+          if (typeof window.setCredentialData === 'undefined') {
+            throw new Error(
+              'Credential state functions not loaded. Please ensure the browser bundle is built correctly.',
+            );
+          }
+          window.setCredentialData(credentialData);
+
+          // Check if UNTPTestRunner is available
+          if (typeof window.UNTPTestRunner === 'undefined') {
+            throw new Error('UNTPTestRunner not loaded. Please ensure the browser bundle is built correctly.');
+          }
+
+          // Run tests using UNTPTestRunner
+          const runner = new window.UNTPTestRunner();
+          const results = await runner.run(
+            {
+              tags: selectedTags.length > 0 ? selectedTags : undefined,
+              mochaSetupCallback: (mochaOptions) => {
+                // Use the global mocha instance
+                if (typeof window.mocha === 'undefined') {
+                  throw new Error('Global mocha instance not found. Ensure Mocha script is loaded.');
+                }
+
+                // Configure with our options
+                window.mocha.reporter(mochaOptions.reporter, mochaOptions.reporterOptions);
+                if (mochaOptions.timeout) window.mocha.timeout(mochaOptions.timeout);
+                if (mochaOptions.bail) window.mocha.bail(mochaOptions.bail);
+                if (mochaOptions.grep) window.mocha.grep(mochaOptions.grep);
+
+                // Disable cleanup to allow reuse
+                window.mocha.cleanReferencesAfterRun(false);
+
+                return window.mocha;
+              },
+            },
+            (event) => {
+              // Stream results in real-time with formatting similar to CLI
+              switch (event.type) {
+                case 'start':
+                  appendResult('🚀 Running UNTP validation tests...');
+                  break;
+                case 'pass':
+                  const suiteTitle = event.data.fullTitle.replace(` ${event.data.title}`, '');
+                  if (currentSuite !== suiteTitle) {
+                    currentSuite = suiteTitle;
+                    appendResult(suiteTitle, 'suite-title');
+                  }
+                  const testDuration = event.data.duration ? ` (${event.data.duration}ms)` : '';
+                  appendResult(`✔ ${event.data.title}${testDuration}`, 'test-pass');
+                  break;
+                case 'fail':
+                  const failSuiteTitle = event.data.fullTitle.replace(` ${event.data.title}`, '');
+                  if (currentSuite !== failSuiteTitle) {
+                    currentSuite = failSuiteTitle;
+                    appendResult(failSuiteTitle, 'suite-title');
+                  }
+                  appendResult(`✖ ${event.data.title}`, 'test-fail');
+                  if (event.data.err && event.data.err.message) {
+                    appendResult(event.data.err.message, 'test-error');
+                  }
+                  break;
+                case 'pending':
+                  const pendingSuiteTitle = event.data.fullTitle.replace(` ${event.data.title}`, '');
+                  if (currentSuite !== pendingSuiteTitle) {
+                    currentSuite = pendingSuiteTitle;
+                    appendResult(pendingSuiteTitle, 'suite-title');
+                  }
+                  appendResult(`- ${event.data.title}`, 'test-pending');
+                  break;
+                case 'end':
+                  const stats = event.data;
+                  let summaryText = '';
+                  if (stats.passes > 0) {
+                    summaryText += `${stats.passes} passing`;
+                  }
+                  if (stats.failures > 0) {
+                    if (summaryText) summaryText += ', ';
+                    summaryText += `${stats.failures} failing`;
+                  }
+                  if (stats.pending > 0) {
+                    if (summaryText) summaryText += ', ';
+                    summaryText += `${stats.pending} pending`;
+                  }
+                  if (summaryText) {
+                    summaryText += ` (${stats.duration || 0}ms)`;
+                    appendResult(summaryText, 'summary');
+                  }
+                  break;
+                default:
+                  // Fallback for any other event types
+                  appendResult(event.message || event.toString());
+              }
+            },
+          );
+
+          if (results.success) {
+            showStatus('All tests passed! ✅', 'success');
+          } else {
+            showStatus(`Tests completed with ${results.stats.failures} failures`, 'error');
+          }
+        } catch (error) {
+          console.error('Test execution error:', error);
+          appendResult(`❌ Error: ${error.message}`);
+          showStatus(`Test execution failed: ${error.message}`, 'error');
+        } finally {
+          isRunning = false;
+          updateRunButton();
+        }
+      }
+
+      // Initialize page
+      document.addEventListener('DOMContentLoaded', () => {
+        appendResult('UNTP Test Suite Browser Environment Ready');
+        appendResult('Upload credential files to begin testing...');
+      });
+    </script>
+  </body>
+</html>
