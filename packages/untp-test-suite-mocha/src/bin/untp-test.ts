@@ -14,53 +14,57 @@ import * as path from 'path';
 
 const program = new Command();
 
-// Track which test suite we're currently in
-let currentSuite: string | null = null;
+// Track displayed suites to show proper hierarchy
+const displayedSuites = new Set<string>();
 
 function handleStreamEvent(event: StreamEvent): void {
   switch (event.type) {
     case 'start':
       console.log('\nRunning UNTP validation tests...\n');
+      displayedSuites.clear();
       break;
 
     case 'pass':
-      // Print suite title if this is the first test in a new suite
-      const suiteTitle = event.data.fullTitle.replace(` ${event.data.title}`, '');
-      if (currentSuite !== suiteTitle) {
-        currentSuite = suiteTitle;
-        console.log(`  ${chalk.bold(suiteTitle)}`);
-      }
+      // Show hierarchical suite structure
+      showSuiteHierarchy(event.data.suiteHierarchy);
 
-      // Print passing test
+      // Print passing test with tags
       const testDuration = event.data.duration ? ` ${chalk.gray(`(${event.data.duration}ms)`)}` : '';
-      console.log(`    ${chalk.green('✔')} ${chalk.gray(event.data.title)}${testDuration}`);
+      const indent = event.data.suiteHierarchy.length * 2 + 2;
+      const { cleanTitle: cleanTestTitle, tags: testTags } = (global as any).untpTestSuite.formatTags(event.data.title);
+      const formattedTestTags = testTags ? ` ${chalk.dim(testTags)}` : '';
+      console.log(
+        `${' '.repeat(indent)}${chalk.green('✔')} ${chalk.gray(cleanTestTitle)}${formattedTestTags}${testDuration}`,
+      );
       break;
 
     case 'fail':
-      // Print suite title if this is the first test in a new suite
-      const failSuiteTitle = event.data.fullTitle.replace(` ${event.data.title}`, '');
-      if (currentSuite !== failSuiteTitle) {
-        currentSuite = failSuiteTitle;
-        console.log(`  ${chalk.bold(failSuiteTitle)}`);
-      }
+      // Show hierarchical suite structure
+      showSuiteHierarchy(event.data.suiteHierarchy);
 
-      // Print failing test
-      console.log(`    ${chalk.red('✖')} ${event.data.title}`);
+      // Print failing test with tags
+      const failIndent = event.data.suiteHierarchy.length * 2 + 2;
+      const { cleanTitle: cleanFailTitle, tags: failTestTags } = (global as any).untpTestSuite.formatTags(
+        event.data.title,
+      );
+      const formattedFailTestTags = failTestTags ? ` ${chalk.dim(failTestTags)}` : '';
+      console.log(`${' '.repeat(failIndent)}${chalk.red('✖')} ${cleanFailTitle}${formattedFailTestTags}`);
       if (event.data.err && event.data.err.message) {
-        console.log(`      ${chalk.red(event.data.err.message)}`);
+        console.log(`${' '.repeat(failIndent + 2)}${chalk.red(event.data.err.message)}`);
       }
       break;
 
     case 'pending':
-      // Print suite title if this is the first test in a new suite
-      const pendingSuiteTitle = event.data.fullTitle.replace(` ${event.data.title}`, '');
-      if (currentSuite !== pendingSuiteTitle) {
-        currentSuite = pendingSuiteTitle;
-        console.log(`  ${chalk.bold(pendingSuiteTitle)}`);
-      }
+      // Show hierarchical suite structure
+      showSuiteHierarchy(event.data.suiteHierarchy);
 
-      // Print pending test
-      console.log(`    ${chalk.cyan('-')} ${event.data.title}`);
+      // Print pending test with tags
+      const pendingIndent = event.data.suiteHierarchy.length * 2 + 2;
+      const { cleanTitle: cleanPendingTitle, tags: pendingTestTags } = (global as any).untpTestSuite.formatTags(
+        event.data.title,
+      );
+      const formattedPendingTestTags = pendingTestTags ? ` ${chalk.dim(pendingTestTags)}` : '';
+      console.log(`${' '.repeat(pendingIndent)}${chalk.cyan('-')} ${cleanPendingTitle}${formattedPendingTestTags}`);
       break;
 
     case 'end':
@@ -85,6 +89,21 @@ function handleStreamEvent(event: StreamEvent): void {
       console.log(''); // Empty line after summary
       break;
   }
+}
+
+/**
+ * Show suite hierarchy using shared function with CLI-specific output
+ */
+function showSuiteHierarchy(suiteHierarchy: string[]): void {
+  (global as any).untpTestSuite.showSuiteHierarchy(
+    suiteHierarchy,
+    displayedSuites,
+    (suiteTitle: string, cleanTitle: string, tags: string, indentLevel: number) => {
+      const indent = ' '.repeat(indentLevel * 2);
+      const formattedTags = tags ? ` ${chalk.dim(tags)}` : '';
+      console.log(`${indent}${chalk.bold(cleanTitle)}${formattedTags}`);
+    },
+  );
 }
 
 program
@@ -162,15 +181,21 @@ program
             // Set up test helpers globally before adding test files
             require('../test-helpers');
 
-            // Add test files from the untp-tests directory
+            // Require test files directly to trigger registration
             const testsDir = path.join(__dirname, '../../untp-tests');
-            mocha.addFile(path.join(testsDir, 'tier1/dummy.test.js'));
+            require(path.join(testsDir, 'tier1/dummy.test.js'));
 
             // If additional tests directory is specified, add those tests too
             if (options.additionalTestsDir) {
               // TODO: Implement additional test directory scanning
               console.log(`Would scan additional tests in: ${options.additionalTestsDir}`);
             }
+
+            // Set up BDD interface globals (describe, it, before, etc.)
+            mocha.suite.emit('pre-require', global, null, mocha);
+
+            // Execute registered test suites after test files are loaded and BDD is available
+            (global as any).untpTestSuite.executeRegisteredTestSuites();
 
             return mocha;
           },

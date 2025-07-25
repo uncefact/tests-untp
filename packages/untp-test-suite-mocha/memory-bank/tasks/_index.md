@@ -4,9 +4,11 @@
 - [TASK001] Create initial package with untp-test CLI wrapper - 80% complete, subtask 1.3 (directory scanning) still pending
 
 ## Pending
-- [TASK002] Browser Compatibility Verification - Verify UNTPMochaRunner works in web browser environment with test loading
+- [TASK004] Implement Actual Tier 1 and Tier 2 Tests - Implement real UNTP validation logic from existing codebase
 
 ## Completed
+- [TASK002] Browser Compatibility Verification - Completed - Successfully verified universal compatibility with credential file uploads
+- [TASK003] Dynamic Test Loading Architecture - Completed - Successfully implemented per-credential test suites with universal CLI/browser compatibility
 
 
 

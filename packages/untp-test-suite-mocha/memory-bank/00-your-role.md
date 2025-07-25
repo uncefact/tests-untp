@@ -244,11 +244,12 @@ These detailed progress updates ensure that after memory resets, I can quickly u
 ### Task Commands
 
 When I prompt you with **add task** or use the command **create task**, can you:
-1. Create a new task file with a unique Task ID in the tasks/ folder
-2. Document our thought process about the approach
-3. Develop an implementation plan
-4. Set an initial status
-5. Update the _index.md file to include the new task
+1. Confirm the current date with me before proceeding
+2. Create a new task file with a unique Task ID in the tasks/ folder
+3. Document our thought process about the approach
+4. Develop an implementation plan
+5. Set an initial status with the correct date
+6. Update the _index.md file to include the new task
 
 For existing tasks, the prompt **update task [ID]** is asking you to:
 1. Open the specific task file

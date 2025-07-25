@@ -43,6 +43,8 @@ export class StreamReporter {
             speed: test.speed,
             file: test.file,
             currentRetry: test.currentRetry,
+            parent: test.parent,
+            suiteHierarchy: this.getSuiteHierarchy(test),
           },
         });
       }
@@ -58,6 +60,8 @@ export class StreamReporter {
             duration: test.duration,
             file: test.file,
             currentRetry: test.currentRetry,
+            parent: test.parent,
+            suiteHierarchy: this.getSuiteHierarchy(test),
             err: {
               message: err.message,
               stack: err.stack,
@@ -75,6 +79,8 @@ export class StreamReporter {
             title: test.title,
             fullTitle: test.fullTitle(),
             file: test.file,
+            parent: test.parent,
+            suiteHierarchy: this.getSuiteHierarchy(test),
           },
         });
       }
@@ -98,5 +104,21 @@ export class StreamReporter {
         });
       }
     });
+  }
+
+  /**
+   * Extract suite hierarchy from Mocha test object
+   * Returns array of suite titles from root to immediate parent
+   */
+  private getSuiteHierarchy(test: any): string[] {
+    const hierarchy: string[] = [];
+    let current = test.parent;
+
+    while (current && current.title) {
+      hierarchy.unshift(current.title);
+      current = current.parent;
+    }
+
+    return hierarchy;
   }
 }

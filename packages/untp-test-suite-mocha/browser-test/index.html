@@ -378,18 +378,15 @@
         document.getElementById('results').style.display = 'block';
       }
 
-      function appendResult(text, className = '') {
+      function appendResult(text, className = '', indentLevel = 0) {
         const results = document.getElementById('results');
+        const div = document.createElement('div');
         if (className) {
-          const div = document.createElement('div');
           div.className = className;
-          div.textContent = text;
-          results.appendChild(div);
-        } else {
-          const div = document.createElement('div');
-          div.textContent = text;
-          results.appendChild(div);
         }
+        div.textContent = text;
+        div.style.paddingLeft = `${indentLevel * 20}px`;
+        results.appendChild(div);
         results.scrollTop = results.scrollHeight;
       }
 
@@ -409,8 +406,8 @@
         isRunning = true;
         updateRunButton();
 
-        // Track which suite we're currently in to avoid duplicating suite titles
-        let currentSuite = null;
+        // Track displayed suites to show proper hierarchy
+        const displayedSuites = new Set();
 
         try {
           showStatus('Running tests...', 'running');
@@ -449,74 +446,91 @@
           }
 
           // Set credential data for tests
-          if (typeof window.setCredentialData === 'undefined') {
+          if (typeof window.untpTestSuite.setCredentialData === 'undefined') {
             throw new Error(
               'Credential state functions not loaded. Please ensure the browser bundle is built correctly.',
             );
           }
-          window.setCredentialData(credentialData);
+          window.untpTestSuite.setCredentialData(credentialData);
 
           // Check if UNTPTestRunner is available
-          if (typeof window.UNTPTestRunner === 'undefined') {
+          if (typeof window.untpTestSuite.UNTPTestRunner === 'undefined') {
             throw new Error('UNTPTestRunner not loaded. Please ensure the browser bundle is built correctly.');
           }
 
           // Run tests using UNTPTestRunner
-          const runner = new window.UNTPTestRunner();
+          const runner = new window.untpTestSuite.UNTPTestRunner();
           const results = await runner.run(
             {
               tags: selectedTags.length > 0 ? selectedTags : undefined,
               mochaSetupCallback: (mochaOptions) => {
-                // Use the global mocha instance
-                if (typeof window.mocha === 'undefined') {
-                  throw new Error('Global mocha instance not found. Ensure Mocha script is loaded.');
+                // Create fresh Mocha instance like CLI does
+                if (typeof window.Mocha === 'undefined') {
+                  throw new Error('Mocha constructor not found. Ensure Mocha script is loaded.');
                 }
 
-                // Configure with our options
-                window.mocha.reporter(mochaOptions.reporter, mochaOptions.reporterOptions);
-                if (mochaOptions.timeout) window.mocha.timeout(mochaOptions.timeout);
-                if (mochaOptions.bail) window.mocha.bail(mochaOptions.bail);
-                if (mochaOptions.grep) window.mocha.grep(mochaOptions.grep);
+                // Create new Mocha instance with options (like CLI)
+                const freshMocha = new window.Mocha(mochaOptions);
 
-                // Disable cleanup to allow reuse
-                window.mocha.cleanReferencesAfterRun(false);
+                // Set up BDD interface globals (describe, it, before, etc.)
+                freshMocha.suite.emit('pre-require', window, null, freshMocha);
 
-                return window.mocha;
+                // Execute registered test suites after fresh Mocha is set up
+                // Execute registered test suites after credentials are loaded
+                if (typeof window.untpTestSuite.executeRegisteredTestSuites === 'function') {
+                  window.untpTestSuite.executeRegisteredTestSuites();
+                } else {
+                  throw new Error('executeRegisteredTestSuites not available. Ensure browser bundle is loaded.');
+                }
+
+                return freshMocha;
               },
             },
             (event) => {
+              // Helper function to show hierarchical suite structure using shared function
+              function showSuiteHierarchy(suiteHierarchy) {
+                window.untpTestSuite.showSuiteHierarchy(
+                  suiteHierarchy,
+                  displayedSuites,
+                  (suiteTitle, cleanTitle, tags, indentLevel) => {
+                    appendResult(cleanTitle + tags, 'suite-title', indentLevel);
+                  },
+                );
+              }
+
               // Stream results in real-time with formatting similar to CLI
               switch (event.type) {
                 case 'start':
                   appendResult('🚀 Running UNTP validation tests...');
+                  displayedSuites.clear();
                   break;
                 case 'pass':
-                  const suiteTitle = event.data.fullTitle.replace(` ${event.data.title}`, '');
-                  if (currentSuite !== suiteTitle) {
-                    currentSuite = suiteTitle;
-                    appendResult(suiteTitle, 'suite-title');
-                  }
+                  showSuiteHierarchy(event.data.suiteHierarchy);
                   const testDuration = event.data.duration ? ` (${event.data.duration}ms)` : '';
-                  appendResult(`✔ ${event.data.title}${testDuration}`, 'test-pass');
+                  const passIndent = event.data.suiteHierarchy.length;
+                  const { cleanTitle: cleanTestTitle, tags: testTags } = window.untpTestSuite.formatTags(
+                    event.data.title,
+                  );
+                  appendResult(`✔ ${cleanTestTitle}${testTags}${testDuration}`, 'test-pass', passIndent);
                   break;
                 case 'fail':
-                  const failSuiteTitle = event.data.fullTitle.replace(` ${event.data.title}`, '');
-                  if (currentSuite !== failSuiteTitle) {
-                    currentSuite = failSuiteTitle;
-                    appendResult(failSuiteTitle, 'suite-title');
-                  }
-                  appendResult(`✖ ${event.data.title}`, 'test-fail');
+                  showSuiteHierarchy(event.data.suiteHierarchy);
+                  const failIndent = event.data.suiteHierarchy.length;
+                  const { cleanTitle: cleanFailTitle, tags: failTestTags } = window.untpTestSuite.formatTags(
+                    event.data.title,
+                  );
+                  appendResult(`✖ ${cleanFailTitle}${failTestTags}`, 'test-fail', failIndent);
                   if (event.data.err && event.data.err.message) {
-                    appendResult(event.data.err.message, 'test-error');
+                    appendResult(event.data.err.message, 'test-error', failIndent + 1);
                   }
                   break;
                 case 'pending':
-                  const pendingSuiteTitle = event.data.fullTitle.replace(` ${event.data.title}`, '');
-                  if (currentSuite !== pendingSuiteTitle) {
-                    currentSuite = pendingSuiteTitle;
-                    appendResult(pendingSuiteTitle, 'suite-title');
-                  }
-                  appendResult(`- ${event.data.title}`, 'test-pending');
+                  showSuiteHierarchy(event.data.suiteHierarchy);
+                  const pendingIndent = event.data.suiteHierarchy.length;
+                  const { cleanTitle: cleanPendingTitle, tags: pendingTestTags } = window.untpTestSuite.formatTags(
+                    event.data.title,
+                  );
+                  appendResult(`- ${cleanPendingTitle}${pendingTestTags}`, 'test-pending', pendingIndent);
                   break;
                 case 'end':
                   const stats = event.data;

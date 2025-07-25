@@ -10,16 +10,19 @@ import { StreamReporter, StreamEvent } from './stream-reporter';
 import { setCredentialData, hasCredentials, getAllCredentials } from './credential-state';
 import './test-helpers';
 
-// Import test files explicitly so esbuild includes them in the bundle
-// Note: These are JavaScript files that will be executed when the bundle loads
+// Import test files to register them with registerUNTPTestSuite
+// The actual test suites will be executed after credentials are loaded
 import '../untp-tests/tier1/dummy.test.js';
 
-// Make classes and functions available globally for browser
-(window as any).UNTPTestRunner = UNTPTestRunner;
-(window as any).StreamReporter = StreamReporter;
-(window as any).setCredentialData = setCredentialData;
-(window as any).hasCredentials = hasCredentials;
-(window as any).getAllCredentials = getAllCredentials;
+// Make classes and functions available under untpTestSuite namespace
+(window as any).untpTestSuite = {
+  ...(window as any).untpTestSuite, // Preserve existing namespace from test-helpers
+  UNTPTestRunner,
+  StreamReporter,
+  setCredentialData,
+  hasCredentials,
+  getAllCredentials,
+};
 
 // Export types for TypeScript users
 export { UNTPTestRunner, StreamReporter, StreamEvent, setCredentialData, hasCredentials, getAllCredentials };
