@@ -48,7 +48,7 @@ export class UNTPTestRunner {
 
         // Add tag filtering using grep if specified
         if (options.tags && options.tags.length > 0) {
-          const tagPattern = options.tags.map((tag) => `\\btag:${tag}\\b`).join('|');
+          const tagPattern = options.tags.map((tag: string) => `\\btag:${tag}\\b`).join('|');
           mochaOptions.grep = tagPattern;
         }
 

@@ -4,6 +4,4 @@
  * A reusable Mocha-based testing library for UNTP (United Nations Transparency Protocol) credentials
  */
 
-export * from './types';
-export { UNTPTestRunner, UNTPTestResults } from './validator';
-export { StreamReporter, StreamEvent } from './stream-reporter';
+export * from './untp-test';

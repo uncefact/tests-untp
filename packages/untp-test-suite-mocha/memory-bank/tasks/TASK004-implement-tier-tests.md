@@ -62,7 +62,7 @@ The untp-graph-validation-cli likely contains:
 ### Subtasks
 | ID | Description | Status | Updated | Notes |
 |----|-------------|--------|---------|-------|
-| 4.1 | Research untp-graph-validation-cli codebase | Not Started | 2025-07-25 | Identify reusable validation components |
+| 4.1 | Research untp-graph-validation-cli codebase | In Progress | 2025-07-28 | Code reorganized, ready to analyze validation components |
 | 4.2 | Extract and adapt validation utilities | Not Started | 2025-07-25 | Create shared validation helpers |
 | 4.3 | Implement actual Tier 1 W3C VC validation tests | Not Started | 2025-07-25 | Replace dummy tests with real validation |
 | 4.4 | Create Tier 2 UNTP schema validation tests | Not Started | 2025-07-25 | New test files for UNTP-specific validation |
@@ -72,6 +72,19 @@ The untp-graph-validation-cli likely contains:
 | 4.8 | Update test tags and documentation | Not Started | 2025-07-25 | Reflect actual validation categories in tags |
 
 ## Progress Log
+### 2025-07-28
+- Started subtask 4.1 - Research untp-graph-validation-cli codebase
+- Completed code reorganization to prepare for validation implementation
+- Moved core files to src/untp-test/ directory for cleaner structure:
+  - test-helpers.ts → utils.ts
+  - validator.ts, stream-reporter.ts, credential-state.ts, browser-bundle.ts
+  - Consolidated type definitions in main src/types.ts
+- **Important lesson learned**: Should use `git mv` instead of move_path tool to preserve git history
+- Updated all import paths and verified TypeScript compilation
+- Fixed browser test script to use new browser-bundle.ts location
+- Verified `npm run browser-test` works correctly after reorganization
+- Clean structure now ready for validation logic integration
+
 ### 2025-07-25
 - Task created to implement actual UNTP validation logic
 - Current dummy tests provide good foundation but need real validation

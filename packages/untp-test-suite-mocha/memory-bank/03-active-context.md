@@ -30,10 +30,15 @@ untp-test credentials/ --directory extensions/
 - ✅ Core infrastructure, CLI, streaming, tag filtering
 - ❌ **Remaining**: Subtask 1.3 - Directory scanning for `--directory` option
 
-### **TASK002 - Browser Compatibility (Pending)**
-- **Goal**: Verify same `UNTPMochaRunner` works in browsers with credential uploads
-- **Key Feature**: Users upload credential files, test against built-in test suites with same API
-- **Priority**: High - validates universal compatibility decision
+### **TASK002 - Browser Compatibility (Completed)**
+- ✅ **Goal**: Verify same `UNTPMochaRunner` works in browsers with credential uploads
+- ✅ **Key Feature**: Users upload credential files, test against built-in test suites with same API
+- ✅ **Result**: Universal compatibility validated
+
+### **TASK004 - Implement Tier Tests (In Progress)**
+- **Current**: Subtask 4.1 - Research untp-graph-validation-cli codebase
+- **Status**: Code reorganization completed, ready to analyze validation components
+- **Priority**: High - Core functionality for UNTP validation
 
 ## **Technical Decisions Made**
 
@@ -54,9 +59,9 @@ untp-test credentials/ --directory extensions/
 
 ## **Next Priorities**
 
-1. **Complete TASK001**: Implement directory scanning for `--directory` option
-2. **Validate Browser Support**: Execute TASK002 to prove universal compatibility
-3. **File Upload Integration**: Ensure web apps can upload credentials + tests
+1. **Complete TASK004 Subtask 4.1**: Analyze untp-graph-validation-cli validation components
+2. **Extract Validation Logic**: Implement real W3C VC and UNTP schema validation
+3. **Complete TASK001**: Implement directory scanning for `--directory` option
 4. **Extension Framework**: Design how extensions integrate with the tag system
 
 ## **Key Architecture Insights**
@@ -79,12 +84,25 @@ const results = await runner.run({
 - **Additional Tests**: User-provided via `--directory` (CLI) - browser support to be considered later
 - **Tag Compatibility**: Extensions use same `tag:name` format for filtering
 
+## **Recent Insights**
+
+### **Code Organization (2025-07-28)**
+- **Structure Cleanup**: Reorganized files into clean `src/untp-test/` directory
+- **Important Learning**: Should use `git mv` instead of file move tools to preserve git history
+- **Clean Architecture**: Top-level files now focused on library user interface
+
+### **Progress Update**
+- **TASK002**: ✅ Browser compatibility proven
+- **TASK004**: 🔄 Started - code reorganized, ready for validation logic
+
 ## **Success Metrics**
 
 - ✅ **API Consistency**: Same runner interface everywhere
 - ✅ **Real-time Results**: Streaming test output working
 - ✅ **Tag Filtering**: Precise test selection working
-- 🔄 **Browser Compatibility**: To be validated in TASK002
+- ✅ **Browser Compatibility**: Validated with credential file uploads
+- ✅ **Code Organization**: Clean structure for library users
+- 🔄 **Real Validation Logic**: Next major milestone
 - 🔄 **UNTP Playground Integration**: Planned consumer of this library
 
-The foundation is solid - now proving browser compatibility will validate the entire architectural approach.
+The foundation is solid and browser compatibility is proven. Now implementing actual UNTP validation logic to replace dummy tests.

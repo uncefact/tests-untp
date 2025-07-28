@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "build:browser": "npm run build && esbuild src/browser-bundle.ts --bundle --outfile=browser-test/browser-bundle.js --format=iife --platform=browser --external:chai --external:mocha",
+    "build:browser": "npm run build && esbuild src/untp-test/browser-bundle.ts --bundle --outfile=browser-test/browser-bundle.js --format=iife --platform=browser --external:chai --external:mocha",
     "browser-test": "npm run build:browser && http-server browser-test -p 8080 -o",
     "prepublishOnly": "npm run build"
   },

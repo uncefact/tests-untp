@@ -6,9 +6,9 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { UNTPTestRunner } from '../validator';
-import { StreamEvent } from '../stream-reporter';
-import { setCredentialData } from '../credential-state';
+import { UNTPTestRunner } from '../untp-test/validator';
+import { StreamEvent } from '../untp-test/stream-reporter';
+import { setCredentialData } from '../untp-test/credential-state';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -179,11 +179,11 @@ program
             const mocha = new Mocha(mochaOptions);
 
             // Set up test helpers globally before adding test files
-            require('../test-helpers');
+            require('../untp-test/utils');
 
             // Require test files directly to trigger registration
             const testsDir = path.join(__dirname, '../../untp-tests');
-            require(path.join(testsDir, 'tier1/dummy.test.js'));
+            require(path.join(testsDir, 'tier1.test.js'));
 
             // If additional tests directory is specified, add those tests too
             if (options.additionalTestsDir) {

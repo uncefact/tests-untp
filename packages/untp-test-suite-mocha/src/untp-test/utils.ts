@@ -79,7 +79,17 @@ function executeRegisteredTestSuites(): void {
  */
 function setupUNTPTests() {
   // Handle chai dependency
-  const { expect } = typeof window !== 'undefined' ? (window as any).chai : require('chai');
+  const chai = typeof window !== 'undefined' ? (window as any).chai : require('chai');
+  const { expect } = chai;
+
+  // Handle jsonld dependency
+  const jsonld = typeof window !== 'undefined' ? (window as any).jsonld : require('jsonld');
+
+  // Set up custom UNTP Chai assertions
+  const { setupUNTPChaiAssertions } =
+    typeof window !== 'undefined' ? (window as any).untpTestSuite : require('./test-utils');
+
+  setupUNTPChaiAssertions(chai, jsonld);
 
   // Handle credential state dependency
   const credentialState =
@@ -89,10 +99,11 @@ function setupUNTPTests() {
           getAllCredentials: () => (window as any).untpTestSuite.getAllCredentials(),
           setCredentialData: (data: any) => (window as any).untpTestSuite.setCredentialData(data),
         }
-      : require('../dist/credential-state');
+      : require('./credential-state');
 
   return {
     expect,
+    jsonld,
     credentialState,
     registerUNTPTestSuite,
     executeRegisteredTestSuites,
