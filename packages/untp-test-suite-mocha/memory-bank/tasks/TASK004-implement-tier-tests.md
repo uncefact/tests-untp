@@ -65,8 +65,8 @@ The untp-graph-validation-cli likely contains:
 | 4.1 | Research untp-graph-validation-cli codebase | Completed | 2025-07-29 | Code reorganized, validation components analyzed |
 | 4.2 | Extract and adapt validation utilities | Completed | 2025-07-29 | Created shared validation helpers and AJV setup |
 | 4.3 | Implement actual Tier 1 W3C VC validation tests | Completed | 2025-07-29 | Replaced dummy tests with real JSON-LD and schema validation |
-| 4.4 | Create Tier 2 UNTP schema validation tests | Not Started | 2025-07-25 | New test files for UNTP-specific validation |
-| 4.5 | Add credential type detection logic | Not Started | 2025-07-25 | Determine credential type for proper schema selection |
+| 4.4 | Create Tier 2 UNTP schema validation tests | Completed | 2025-07-29 | New test files for UNTP-specific validation |
+| 4.5 | Add credential type detection logic | Completed | 2025-07-29 | Determine credential type for proper schema selection |
 | 4.6 | Test with comprehensive credential samples | Not Started | 2025-07-25 | Validate against variety of credential types |
 | 4.7 | Refine error messages and user experience | Not Started | 2025-07-25 | Ensure clear, actionable validation feedback |
 | 4.8 | Update test tags and documentation | Not Started | 2025-07-25 | Reflect actual validation categories in tags |
@@ -85,6 +85,13 @@ The untp-graph-validation-cli likely contains:
 - **Resolved browser issues**: Fixed AJV constructor access, function naming conflicts, and execution order
 - **Code organization**: Moved createAjvInstance to utils.ts for better separation of concerns
 - **Tests working**: Real tier 1 validation replacing dummy tests, actual W3C VC schema validation
+- **Completed subtasks 4.4-4.5**: Implemented Tier 2 UNTP schema validation tests
+  - `getUNTPSchemaUrlForCredential()` function for automatic schema URL generation
+  - `getUNTPCredentialType()` function for credential type detection
+  - Real tier 2 tests validating against UNTP schemas (DPP, DCC, etc.)
+  - Clean API integration via `setupUNTPTests()` without environment detection
+  - Browser and CLI compatibility with proper error handling
+  - Tests validate actual UNTP schemas and required field structures
 
 ### 2025-07-28
 - Started subtask 4.1 - Research untp-graph-validation-cli codebase
