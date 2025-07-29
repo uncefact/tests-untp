@@ -15,4 +15,10 @@ export {
   formatTags,
   showSuiteHierarchy,
 } from './utils';
-export { extractUNTPVersion, validateJSONLD, setupUNTPChaiAssertions } from './test-utils';
+export {
+  extractUNTPVersion,
+  validateJSONLD,
+  validateJsonAgainstSchema,
+  setupUNTPChaiAssertions,
+  createAjvInstance,
+} from './test-utils';

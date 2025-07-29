@@ -12,6 +12,12 @@ import { setCredentialData } from '../untp-test/credential-state';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Set up global fetch for Node.js environment
+if (typeof (global as any).fetch === 'undefined') {
+  const nodeFetch = require('node-fetch');
+  (global as any).fetch = nodeFetch;
+}
+
 const program = new Command();
 
 // Track displayed suites to show proper hierarchy

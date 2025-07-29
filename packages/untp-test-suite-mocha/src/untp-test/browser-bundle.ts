@@ -8,12 +8,8 @@
 import { UNTPTestRunner } from './validator';
 import { StreamReporter, StreamEvent } from './stream-reporter';
 import { setCredentialData, hasCredentials, getAllCredentials } from './credential-state';
-import { setupUNTPChaiAssertions } from './test-utils';
+import { setupUNTPChaiAssertions, createAjvInstance } from './test-utils';
 import './utils';
-
-// Import test files to register them with registerUNTPTestSuite
-// The actual test suites will be executed after credentials are loaded
-import '../../untp-tests/tier1.test.js';
 
 // Make classes and functions available under untpTestSuite namespace
 (window as any).untpTestSuite = {
@@ -25,6 +21,13 @@ import '../../untp-tests/tier1.test.js';
   getAllCredentials,
   setupUNTPChaiAssertions,
 };
+
+// Set up AJV instance for browser using the same function as Node.js
+(window as any).ajv = createAjvInstance();
+
+// Import test files to register them with registerUNTPTestSuite after setup is complete
+// The actual test suites will be executed after credentials are loaded
+import('../../untp-tests/tier1.test.js' as any);
 
 // Export types for TypeScript users
 export {

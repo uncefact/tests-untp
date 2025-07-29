@@ -85,11 +85,20 @@ function setupUNTPTests() {
   // Handle jsonld dependency
   const jsonld = typeof window !== 'undefined' ? (window as any).jsonld : require('jsonld');
 
-  // Set up custom UNTP Chai assertions
-  const { setupUNTPChaiAssertions } =
-    typeof window !== 'undefined' ? (window as any).untpTestSuite : require('./test-utils');
+  // Handle ajv dependency for schema validation
+  const { createAjvInstance } = typeof window !== 'undefined' ? (window as any).untpTestSuite : require('./test-utils');
+  const ajv = typeof window !== 'undefined' ? (window as any).ajv : createAjvInstance();
 
-  setupUNTPChaiAssertions(chai, jsonld);
+  // Set up custom Chai assertions
+  if (typeof window !== 'undefined') {
+    // Browser environment - get function from global namespace
+    const chaiAssertionsSetup = (window as any).untpTestSuite.setupUNTPChaiAssertions;
+    chaiAssertionsSetup(chai, jsonld, ajv);
+  } else {
+    // Node.js environment
+    const { setupUNTPChaiAssertions } = require('./test-utils');
+    setupUNTPChaiAssertions(chai, jsonld, ajv);
+  }
 
   // Handle credential state dependency
   const credentialState =
@@ -104,6 +113,7 @@ function setupUNTPTests() {
   return {
     expect,
     jsonld,
+    ajv,
     credentialState,
     registerUNTPTestSuite,
     executeRegisteredTestSuites,
