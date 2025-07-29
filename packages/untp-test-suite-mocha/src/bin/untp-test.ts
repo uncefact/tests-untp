@@ -187,9 +187,21 @@ program
             // Set up test helpers globally before adding test files
             require('../untp-test/utils');
 
-            // Require test files directly to trigger registration
+            // Load all UNTP test files by scanning the untp-tests directory
+            const path = require('path');
+            const fs = require('fs');
             const testsDir = path.join(__dirname, '../../untp-tests');
-            require(path.join(testsDir, 'tier1.test.js'));
+
+            try {
+              const files = fs.readdirSync(testsDir);
+              files
+                .filter((file: string) => file.endsWith('.test.js'))
+                .forEach((file: string) => {
+                  require(path.join(testsDir, file));
+                });
+            } catch (error) {
+              console.error('Error loading UNTP test files:', error);
+            }
 
             // If additional tests directory is specified, add those tests too
             if (options.additionalTestsDir) {

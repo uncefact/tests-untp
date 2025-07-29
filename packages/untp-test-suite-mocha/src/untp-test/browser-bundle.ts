@@ -8,27 +8,43 @@
 import { UNTPTestRunner } from './validator';
 import { StreamReporter, StreamEvent } from './stream-reporter';
 import { setCredentialData, hasCredentials, getAllCredentials } from './credential-state';
-import { setupUNTPChaiAssertions } from './test-utils';
+import { setupUNTPChaiAssertions, getUNTPSchemaUrlForCredential } from './test-utils';
 import { createAjvInstance } from './utils';
 import './utils';
 
+// Set up AJV instance for browser using the same function as Node.js
+const ajvInstance = createAjvInstance();
+(window as any).ajv = ajvInstance;
+
+// Set up Chai assertions directly in browser bundle
+const chai = (window as any).chai;
+const jsonld = (window as any).jsonld;
+
+if (!chai) {
+  throw new Error('Chai library not found. Ensure Chai script is loaded before the UNTP bundle.');
+}
+
+if (!jsonld) {
+  throw new Error('JSON-LD library not found. Ensure JSON-LD script is loaded before the UNTP bundle.');
+}
+
+setupUNTPChaiAssertions(chai, jsonld, ajvInstance);
+
 // Make classes and functions available under untpTestSuite namespace
 (window as any).untpTestSuite = {
-  ...(window as any).untpTestSuite, // Preserve existing namespace from test-helpers
+  ...(window as any).untpTestSuite, // Preserve existing namespace from utils
   UNTPTestRunner,
   StreamReporter,
   setCredentialData,
   hasCredentials,
   getAllCredentials,
   setupUNTPChaiAssertions,
+  getUNTPSchemaUrlForCredential,
 };
 
-// Set up AJV instance for browser using the same function as Node.js
-(window as any).ajv = createAjvInstance();
-
-// Import test files to register them with registerUNTPTestSuite after setup is complete
+// Load all UNTP test files to register them with registerUNTPTestSuite after setup is complete
 // The actual test suites will be executed after credentials are loaded
-import('../../untp-tests/tier1.test.js' as any);
+import '../generated/test-file-list';
 
 // Export types for TypeScript users
 export {

@@ -12,7 +12,7 @@
     "example-credentials/**/*"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "node scripts/generate-test-list.js && tsc",
     "dev": "tsc --watch",
     "build:browser": "npm run build && esbuild src/untp-test/browser-bundle.ts --bundle --outfile=browser-test/browser-bundle.js --format=iife --platform=browser --external:chai --external:mocha --external:ajv --external:ajv-formats",
     "browser-test": "npm run build:browser && http-server browser-test -p 8080 -o",

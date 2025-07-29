@@ -185,3 +185,46 @@ export function extractUNTPVersion(credential: any): string | null {
 
   return null;
 }
+
+/**
+ * Gets the UNTP credential type from a parsed credential
+ * @param credential - The credential object
+ * @returns The UNTPCredentialType enum value or undefined if not a recognized UNTP type
+ */
+export function getUNTPCredentialType(credential: any): UNTPCredentialType | undefined {
+  if (!credential.type || !Array.isArray(credential.type)) {
+    return undefined;
+  }
+
+  // Get all possible credential types from the enum
+  const credentialTypes = Object.values(UNTPCredentialType);
+
+  // Find the first matching credential type in the credential's type array
+  for (const type of credential.type) {
+    if (credentialTypes.includes(type as UNTPCredentialType)) {
+      return type as UNTPCredentialType;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Gets the schema URL for a UNTP credential based on its type and version
+ * @param credential - The credential object
+ * @returns The schema URL or null if type/version couldn't be determined
+ */
+export function getUNTPSchemaUrlForCredential(credential: any): string | null {
+  const credentialType = getUNTPCredentialType(credential);
+  if (!credentialType) {
+    return null;
+  }
+
+  const version = extractUNTPVersion(credential);
+  if (!version) {
+    return null;
+  }
+
+  const abbreviation = UNTP_CREDENTIAL_TYPE_ABBREVIATIONS[credentialType];
+  return `https://test.uncefact.org/vocabulary/untp/${abbreviation}/untp-${abbreviation}-schema-${version}.json`;
+}

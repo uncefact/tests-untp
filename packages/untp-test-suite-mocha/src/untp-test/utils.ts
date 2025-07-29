@@ -5,6 +5,8 @@
  * without needing to handle environment detection (Node.js vs browser) themselves.
  */
 
+import { getUNTPSchemaUrlForCredential } from './test-utils';
+
 /**
  * Creates and configures an AJV instance for universal use with JSON Schema 2020-12 support
  * Assumes fetch is globally available (native in browser, set up in Node.js CLI)
@@ -198,23 +200,24 @@ function setupUNTPTests() {
 
   // Set up custom Chai assertions
   if (typeof window !== 'undefined') {
-    // Browser environment - get function from global namespace
-    const chaiAssertionsSetup = (window as any).untpTestSuite.setupUNTPChaiAssertions;
-    chaiAssertionsSetup(chai, jsonld, ajv);
+    // Browser environment - chai assertions are set up directly in browser bundle
+    // No action needed here
   } else {
     // Node.js environment
     const { setupUNTPChaiAssertions } = require('./test-utils');
     setupUNTPChaiAssertions(chai, jsonld, ajv);
   }
 
+  // Handle UNTP validation utilities
+  const getUNTPSchemaUrlForCredentialFn =
+    typeof window !== 'undefined'
+      ? (window as any).untpTestSuite?.getUNTPSchemaUrlForCredential
+      : getUNTPSchemaUrlForCredential;
+
   return {
     expect,
-    jsonld,
-    ajv,
     registerUNTPTestSuite,
-    executeRegisteredTestSuites,
-    formatTags,
-    showSuiteHierarchy,
+    getUNTPSchemaUrlForCredential: getUNTPSchemaUrlForCredentialFn,
   };
 }
 
@@ -227,6 +230,7 @@ if (typeof window !== 'undefined') {
     executeRegisteredTestSuites,
     formatTags,
     showSuiteHierarchy,
+    getUNTPSchemaUrlForCredential,
   };
 } else {
   // Node.js environment

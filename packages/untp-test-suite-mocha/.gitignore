@@ -6,3 +6,6 @@ node_modules/
 
 # Generated browser bundle
 browser-test/browser-bundle.js
+
+# Generated files
+src/generated/

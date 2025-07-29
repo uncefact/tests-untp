@@ -1,16 +1,13 @@
 /**
- * Dummy test for Tier 1 UNTP validation
- * This is a placeholder test to verify Mocha execution works with grep tags
- * Uses registerUNTPTestSuite to defer test registration until after credentials are loaded
+ * Tier 1 UNTP validation tests
+ * Validates credentials as valid JSON-LD as well as valid W3C Verifiable Credentials.
  */
 
-// Use global test helper from namespace - no environment detection needed
 const { expect, registerUNTPTestSuite } = untpTestSuite.setupUNTPTests();
 
 const VERIFIABLE_CREDENTIAL_SCHEMA_URL =
   'https://raw.githubusercontent.com/w3c/vc-data-model/refs/heads/main/schema/verifiable-credential/verifiable-credential-schema.json';
 
-// Register test suite to be executed after credentials are loaded
 registerUNTPTestSuite((credentialState) => {
   describe('Tier 1 - W3C Verifiable Credential Validation tag:tier1 tag:w3c', () => {
     it('should have access to credential state tag:basic tag:integration', () => {
