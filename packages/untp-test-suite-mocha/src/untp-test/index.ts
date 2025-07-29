@@ -14,11 +14,6 @@ export {
   executeRegisteredTestSuites,
   formatTags,
   showSuiteHierarchy,
-} from './utils';
-export {
-  extractUNTPVersion,
-  validateJSONLD,
-  validateJsonAgainstSchema,
-  setupUNTPChaiAssertions,
   createAjvInstance,
-} from './test-utils';
+} from './utils';
+export { extractUNTPVersion, validateJSONLD, validateJsonAgainstSchema, setupUNTPChaiAssertions } from './test-utils';

@@ -62,9 +62,9 @@ The untp-graph-validation-cli likely contains:
 ### Subtasks
 | ID | Description | Status | Updated | Notes |
 |----|-------------|--------|---------|-------|
-| 4.1 | Research untp-graph-validation-cli codebase | In Progress | 2025-07-28 | Code reorganized, ready to analyze validation components |
-| 4.2 | Extract and adapt validation utilities | Not Started | 2025-07-25 | Create shared validation helpers |
-| 4.3 | Implement actual Tier 1 W3C VC validation tests | Not Started | 2025-07-25 | Replace dummy tests with real validation |
+| 4.1 | Research untp-graph-validation-cli codebase | Completed | 2025-07-29 | Code reorganized, validation components analyzed |
+| 4.2 | Extract and adapt validation utilities | Completed | 2025-07-29 | Created shared validation helpers and AJV setup |
+| 4.3 | Implement actual Tier 1 W3C VC validation tests | Completed | 2025-07-29 | Replaced dummy tests with real JSON-LD and schema validation |
 | 4.4 | Create Tier 2 UNTP schema validation tests | Not Started | 2025-07-25 | New test files for UNTP-specific validation |
 | 4.5 | Add credential type detection logic | Not Started | 2025-07-25 | Determine credential type for proper schema selection |
 | 4.6 | Test with comprehensive credential samples | Not Started | 2025-07-25 | Validate against variety of credential types |
@@ -72,6 +72,20 @@ The untp-graph-validation-cli likely contains:
 | 4.8 | Update test tags and documentation | Not Started | 2025-07-25 | Reflect actual validation categories in tags |
 
 ## Progress Log
+### 2025-07-29
+- **Completed subtasks 4.1-4.3**: Implemented actual tier 1 validation tests
+- **Added real validation logic**: Extracted and adapted validation components from untp-graph-validation-cli
+  - `extractUNTPVersion()` function for all UNTP credential types  
+  - `validateJSONLD()` function with proper JSON-LD expansion validation
+  - `validateJsonAgainstSchema()` function with AJV and JSON Schema 2020-12 support
+- **Custom Chai assertions**: Created expressive test syntax
+  - `expect(credential).to.be.a.validJSONLDDocument`
+  - `expect(credential).to.match.schema(schemaUrl)`
+- **Universal compatibility**: All validation works in both Node.js and browser environments
+- **Resolved browser issues**: Fixed AJV constructor access, function naming conflicts, and execution order
+- **Code organization**: Moved createAjvInstance to utils.ts for better separation of concerns
+- **Tests working**: Real tier 1 validation replacing dummy tests, actual W3C VC schema validation
+
 ### 2025-07-28
 - Started subtask 4.1 - Research untp-graph-validation-cli codebase
 - Completed code reorganization to prepare for validation implementation

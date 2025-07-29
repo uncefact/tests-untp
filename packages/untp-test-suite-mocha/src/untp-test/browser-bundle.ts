@@ -8,7 +8,8 @@
 import { UNTPTestRunner } from './validator';
 import { StreamReporter, StreamEvent } from './stream-reporter';
 import { setCredentialData, hasCredentials, getAllCredentials } from './credential-state';
-import { setupUNTPChaiAssertions, createAjvInstance } from './test-utils';
+import { setupUNTPChaiAssertions } from './test-utils';
+import { createAjvInstance } from './utils';
 import './utils';
 
 // Make classes and functions available under untpTestSuite namespace
