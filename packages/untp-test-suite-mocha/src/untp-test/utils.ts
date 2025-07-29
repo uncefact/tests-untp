@@ -104,7 +104,7 @@ function createAjvInstance(): any {
 }
 
 // Storage for deferred test suite registration functions
-const registeredTestSuites: Array<() => void> = [];
+const registeredTestSuites: Array<(credentialState: any) => void> = [];
 
 /**
  * Extract and format tags from a title
@@ -155,7 +155,7 @@ function showSuiteHierarchy(
  * This allows test files to defer their describe block registration
  * until after credentials are loaded and available
  */
-function registerUNTPTestSuite(testSuiteFunction: () => void): void {
+function registerUNTPTestSuite(testSuiteFunction: (credentialState: any) => void): void {
   registeredTestSuites.push(testSuiteFunction);
 }
 
@@ -166,8 +166,18 @@ function registerUNTPTestSuite(testSuiteFunction: () => void): void {
  * no cleanup is needed - each instance starts clean.
  */
 function executeRegisteredTestSuites(): void {
+  // Get credential state for passing to test suites
+  const credentialState =
+    typeof window !== 'undefined'
+      ? {
+          hasCredentials: () => (window as any).untpTestSuite.hasCredentials(),
+          getAllCredentials: () => (window as any).untpTestSuite.getAllCredentials(),
+          setCredentialData: (data: any) => (window as any).untpTestSuite.setCredentialData(data),
+        }
+      : require('./credential-state');
+
   // Execute all registered test suites with current credential state
-  registeredTestSuites.forEach((testSuite) => testSuite());
+  registeredTestSuites.forEach((testSuite) => testSuite(credentialState));
 
   // Keep registered test suites for potential re-execution
 }
@@ -197,21 +207,10 @@ function setupUNTPTests() {
     setupUNTPChaiAssertions(chai, jsonld, ajv);
   }
 
-  // Handle credential state dependency
-  const credentialState =
-    typeof window !== 'undefined'
-      ? {
-          hasCredentials: () => (window as any).untpTestSuite.hasCredentials(),
-          getAllCredentials: () => (window as any).untpTestSuite.getAllCredentials(),
-          setCredentialData: (data: any) => (window as any).untpTestSuite.setCredentialData(data),
-        }
-      : require('./credential-state');
-
   return {
     expect,
     jsonld,
     ajv,
-    credentialState,
     registerUNTPTestSuite,
     executeRegisteredTestSuites,
     formatTags,
