@@ -47,7 +47,7 @@ From the project brief, the library should support extension testing by allowing
 
 ## Progress Tracking
 
-**Overall Status:** In Progress - 50%
+**Overall Status:** In Progress - 87.5%
 
 ### Task Metadata
 - **Priority Level:** Medium - Important for ecosystem extensibility
@@ -63,9 +63,9 @@ From the project brief, the library should support extension testing by allowing
 | 5.3 | Extend schema URL resolution for custom schemas | Complete | 2025-07-30 | Implemented `getSchemaUrlForCredential()` with configurable mappings |
 | 5.4 | Add configuration loading mechanism | Complete | 2025-07-30 | Created `SchemaMappingsManager` with browser/Node.js support |
 | 5.5 | Add CLI support for extension configuration | Complete | 2025-07-30 | Added --extension-schema-map CLI option |
-| 5.6 | Create example extension and documentation | In Progress | 2025-07-30 | Created simplified DigitalLivestockPassport example |
+| 5.6 | Create example extension and documentation | Complete | 2025-07-30 | Created DigitalLivestockPassport example with full test integration |
 | 5.7 | Add browser support for extension configuration | Not Started | 2025-07-30 | Runtime configuration in browser environment |
-| 5.8 | Test with real extension scenarios | In Progress | 2025-07-30 | Testing with DigitalLivestockPassport extension |
+| 5.8 | Test with real extension scenarios | Complete | 2025-07-30 | Successfully tested DigitalLivestockPassport with extension validation |
 
 ## Progress Log
 ### 2025-07-29
@@ -89,6 +89,11 @@ From the project brief, the library should support extension testing by allowing
 - **Fixed AJV validation**: Resolved JSON Schema validation issues in schema mappings loader
 - **Tested successfully**: Verified digital livestock passport extension works with new CLI option
 - **CLI Usage**: `untp-test --extension-schema-map digital-livestock-mapping.json credentials.json`
+- **Completed subtask 5.6 - Extension example**: Created complete DigitalLivestockPassport example with proper schema mapping
+- **Added getExtensionTypes utility**: New function to extract extension types from credential type arrays
+- **Completed subtask 5.8 - Extension validation tests**: Added automatic tier 2 validation for each extension type found
+- **Enhanced test reporting**: Both UNTP and extension tests now show specific credential types in test names
+- **Individual extension tests**: Each extension type gets its own dedicated validation test for better isolation and reporting
 - **Completed configuration loader implementation**: Built `schema-mappings-loader.ts` with universal browser/Node.js compatibility
 - **Integrated with existing architecture**: Follows same patterns as `utils.ts` for environment detection
 - **Added caching and validation**: Configuration files are cached and validated before use
