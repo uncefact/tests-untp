@@ -390,10 +390,27 @@
         if (className) {
           div.className = className;
         }
-        div.textContent = text;
+
+        // Always use HTML for error messages, textContent for others
+        if (className === 'test-error') {
+          div.innerHTML = formatErrorForHtml(text);
+        } else {
+          div.textContent = text;
+        }
+
         div.style.paddingLeft = `${indentLevel * 20}px`;
         results.appendChild(div);
         results.scrollTop = results.scrollHeight;
+      }
+
+      function formatErrorForHtml(errorMessage) {
+        // Escape HTML characters using browser's built-in escaping
+        const div = document.createElement('div');
+        div.textContent = errorMessage;
+        const escaped = div.innerHTML;
+
+        // Convert newlines to HTML breaks and preserve indentation
+        return escaped.replace(/\n/g, '<br>').replace(/ {6}/g, '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;');
       }
 
       function clearResults() {

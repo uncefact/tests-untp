@@ -136,15 +136,20 @@ export function setupUNTPChaiAssertions(chai: any, jsonld: any, ajv: any): void 
 
       return validateJsonAgainstSchema(obj, schemaUrl, ajv)
         .then((result) => {
-          assertion.assert(
-            result.valid,
-            `expected #{this} to match schema ${schemaUrl} but got errors: ${result.errors
-              .map((e) => e.message)
-              .join(', ')}`,
-            `expected #{this} not to match schema ${schemaUrl}`,
-            true,
-            result.valid,
-          );
+          if (result.valid) {
+            assertion.assert(true, '', '', true, true);
+          } else {
+            // Format errors for better readability
+            const formattedErrors = result.errors.map((e) => `      - ${e.message}`).join('\n');
+
+            assertion.assert(
+              false,
+              `Schema validation failed:\n${formattedErrors}`,
+              `expected credential not to match schema`,
+              true,
+              false,
+            );
+          }
         })
         .catch((error) => {
           // Handle any errors in schema validation

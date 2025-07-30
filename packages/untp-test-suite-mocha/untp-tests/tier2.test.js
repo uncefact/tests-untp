@@ -36,7 +36,7 @@ registerUNTPTestSuite((credentialState) => {
           expect(schemaUrl, 'Should be able to determine UNTP schema URL for credential').to.be.a('string');
 
           // Validate the credential against its specific UNTP schema
-          await expect(parsedCredential, `${fileName} did not match schema ${schemaUrl}`).to.match.schema(schemaUrl);
+          await expect(parsedCredential).to.match.schema(schemaUrl);
         });
       });
     });
