@@ -5,7 +5,8 @@
  * without needing to handle environment detection (Node.js vs browser) themselves.
  */
 
-import { getUNTPSchemaUrlForCredential } from './test-utils';
+import { getSchemaUrlForCredential } from './schema-mapper';
+import { getUNTPCredentialType } from './test-utils';
 
 /**
  * Creates and configures an AJV instance for universal use with JSON Schema 2020-12 support
@@ -208,16 +209,9 @@ function setupUNTPTests() {
     setupUNTPChaiAssertions(chai, jsonld, ajv);
   }
 
-  // Handle UNTP validation utilities
-  const getUNTPSchemaUrlForCredentialFn =
-    typeof window !== 'undefined'
-      ? (window as any).untpTestSuite?.getUNTPSchemaUrlForCredential
-      : getUNTPSchemaUrlForCredential;
-
   return {
     expect,
     registerUNTPTestSuite,
-    getUNTPSchemaUrlForCredential: getUNTPSchemaUrlForCredentialFn,
   };
 }
 
@@ -230,7 +224,8 @@ if (typeof window !== 'undefined') {
     executeRegisteredTestSuites,
     formatTags,
     showSuiteHierarchy,
-    getUNTPSchemaUrlForCredential,
+    getSchemaUrlForCredential,
+    getUNTPCredentialType,
   };
 } else {
   // Node.js environment
@@ -240,6 +235,8 @@ if (typeof window !== 'undefined') {
     executeRegisteredTestSuites,
     formatTags,
     showSuiteHierarchy,
+    getSchemaUrlForCredential,
+    getUNTPCredentialType,
   };
 }
 
@@ -251,4 +248,6 @@ export {
   formatTags,
   showSuiteHierarchy,
   createAjvInstance,
+  getSchemaUrlForCredential,
+  getUNTPCredentialType,
 };

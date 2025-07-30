@@ -8,9 +8,17 @@
 import { UNTPTestRunner } from './validator';
 import { StreamReporter, StreamEvent } from './stream-reporter';
 import { setCredentialData, hasCredentials, getAllCredentials } from './credential-state';
-import { setupUNTPChaiAssertions, getUNTPSchemaUrlForCredential } from './test-utils';
+import { setupUNTPChaiAssertions, getUNTPCredentialType } from './test-utils';
 import { createAjvInstance } from './utils';
+import { SchemaMappingsManager, getSchemaUrlForCredential } from './schema-mapper';
 import './utils';
+import './schema-mapper';
+
+// Embed default schema mappings and schema definition for browser environment
+import * as defaultMappings from './schema-mapper/default-mappings.json';
+import * as schemaDefinition from './schema-mapper/schema-mappings.schema.json';
+(window as any).untpDefaultSchemaMappings = defaultMappings;
+(window as any).untpSchemaMappingsSchema = schemaDefinition;
 
 // Set up AJV instance for browser using the same function as Node.js
 const ajvInstance = createAjvInstance();
@@ -39,7 +47,9 @@ setupUNTPChaiAssertions(chai, jsonld, ajvInstance);
   hasCredentials,
   getAllCredentials,
   setupUNTPChaiAssertions,
-  getUNTPSchemaUrlForCredential,
+  getUNTPCredentialType,
+  SchemaMappingsManager,
+  getSchemaUrlForCredential,
 };
 
 // Load all UNTP test files to register them with registerUNTPTestSuite after setup is complete
@@ -55,6 +65,9 @@ export {
   hasCredentials,
   getAllCredentials,
   setupUNTPChaiAssertions,
+  getUNTPCredentialType,
+  SchemaMappingsManager,
+  getSchemaUrlForCredential,
 };
 
 console.log('UNTP Test Suite browser bundle loaded');

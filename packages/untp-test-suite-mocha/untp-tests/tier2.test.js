@@ -3,7 +3,7 @@
  * Validates credentials against UNTP-specific schemas.
  */
 
-const { expect, registerUNTPTestSuite, getUNTPSchemaUrlForCredential } = untpTestSuite.setupUNTPTests();
+const { expect, registerUNTPTestSuite } = untpTestSuite.setupUNTPTests();
 
 registerUNTPTestSuite((credentialState) => {
   describe('Tier 2 - UNTP Schema Validation tag:tier2 tag:untp', () => {
@@ -23,8 +23,14 @@ registerUNTPTestSuite((credentialState) => {
         });
 
         it('should validate against the related UNTP schema tag:schema tag:untp-validation', async () => {
-          // Get the appropriate UNTP schema URL for this credential
-          const schemaUrl = getUNTPSchemaUrlForCredential(parsedCredential);
+          // Use the existing utility function to determine UNTP credential type
+          const untpType = untpTestSuite.getUNTPCredentialType(parsedCredential);
+
+          // Assert that we can determine a UNTP credential type
+          expect(untpType, 'Should be able to determine UNTP credential type').to.be.a('string');
+
+          // Get the appropriate UNTP schema URL for this credential type
+          const schemaUrl = await untpTestSuite.getSchemaUrlForCredential(parsedCredential, untpType);
 
           // Assert that we can determine a UNTP schema URL for this credential
           expect(schemaUrl, 'Should be able to determine UNTP schema URL for credential').to.be.a('string');

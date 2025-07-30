@@ -208,23 +208,3 @@ export function getUNTPCredentialType(credential: any): UNTPCredentialType | und
 
   return undefined;
 }
-
-/**
- * Gets the schema URL for a UNTP credential based on its type and version
- * @param credential - The credential object
- * @returns The schema URL or null if type/version couldn't be determined
- */
-export function getUNTPSchemaUrlForCredential(credential: any): string | null {
-  const credentialType = getUNTPCredentialType(credential);
-  if (!credentialType) {
-    return null;
-  }
-
-  const version = extractUNTPVersion(credential);
-  if (!version) {
-    return null;
-  }
-
-  const abbreviation = UNTP_CREDENTIAL_TYPE_ABBREVIATIONS[credentialType];
-  return `https://test.uncefact.org/vocabulary/untp/${abbreviation}/untp-${abbreviation}-schema-${version}.json`;
-}

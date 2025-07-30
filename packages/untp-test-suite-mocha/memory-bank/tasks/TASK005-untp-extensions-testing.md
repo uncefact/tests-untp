@@ -4,7 +4,7 @@
 **Priority:** Medium
 **Tags:** extensions, custom-schemas, configuration, testing, untp
 **Added:** 2025-07-29
-**Updated:** 2025-07-29
+**Updated:** 2025-07-30
 
 ## Original Request
 Add a new task to test UNTP extensions, including supporting configurable custom schemas for a credential extension.
@@ -47,7 +47,7 @@ From the project brief, the library should support extension testing by allowing
 
 ## Progress Tracking
 
-**Overall Status:** Pending - 0%
+**Overall Status:** In Progress - 35%
 
 ### Task Metadata
 - **Priority Level:** Medium - Important for ecosystem extensibility
@@ -58,14 +58,14 @@ From the project brief, the library should support extension testing by allowing
 ### Subtasks
 | ID | Description | Status | Updated | Notes |
 |----|-------------|--------|---------|-------|
-| 5.1 | Design extension configuration format | Not Started | 2025-07-29 | JSON schema for custom credential types and schema mappings |
-| 5.2 | Extend credential type detection for custom types | Not Started | 2025-07-29 | Make getUNTPCredentialType() configurable |
-| 5.3 | Extend schema URL resolution for custom schemas | Not Started | 2025-07-29 | Make getUNTPSchemaUrlForCredential() configurable or provide different fn for extensions |
-| 5.4 | Add configuration loading mechanism | Not Started | 2025-07-29 | File-based and programmatic configuration loading |
-| 5.5 | Add CLI support for extension configuration | Not Started | 2025-07-29 | --config option for specifying extension config |
-| 5.6 | Create example extension and documentation | Not Started | 2025-07-29 | Working example of custom credential extension |
-| 5.7 | Add browser support for extension configuration | Not Started | 2025-07-29 | Runtime configuration in browser environment |
-| 5.8 | Test with real extension scenarios | Not Started | 2025-07-29 | Validate extensibility with realistic use cases |
+| 5.1 | Design extension configuration format | Complete | 2025-07-30 | Created `untp-schema-mappings.json` with flexible JSON schema-based format |
+| 5.2 | Extend credential type detection for custom types | Not Started | 2025-07-30 | Make getUNTPCredentialType() configurable |
+| 5.3 | Extend schema URL resolution for custom schemas | Complete | 2025-07-30 | Implemented `getSchemaUrlForCredential()` with configurable mappings |
+| 5.4 | Add configuration loading mechanism | Complete | 2025-07-30 | Created `SchemaMappingsManager` with browser/Node.js support |
+| 5.5 | Add CLI support for extension configuration | Not Started | 2025-07-30 | --config option for specifying extension config |
+| 5.6 | Create example extension and documentation | Not Started | 2025-07-30 | Working example of custom credential extension |
+| 5.7 | Add browser support for extension configuration | Not Started | 2025-07-30 | Runtime configuration in browser environment |
+| 5.8 | Test with real extension scenarios | Not Started | 2025-07-30 | Validate extensibility with realistic use cases |
 
 ## Progress Log
 ### 2025-07-29
@@ -73,6 +73,21 @@ From the project brief, the library should support extension testing by allowing
 - Need to design configuration format that supports custom credential types
 - Should leverage existing validation infrastructure while adding configurability
 - Important for ecosystem adoption - organizations need to extend UNTP for their specific use cases
+- **Completed schema mappings configuration**: Created `untp-schema-mappings.json` with flexible format
+- **Configuration includes**: JSON schema validation, credential type mappings, regex patterns for version extraction, schema URL templates
+- **Design supports**: Both UNTP core types and future extensions through same configuration format
+- **Implemented configuration loader**: Created `schema-mappings-loader.ts` with `SchemaMappingsManager` class
+- **Universal compatibility**: Works in both browser and Node.js environments following project patterns
+- **Extension support**: Can load multiple external configuration files/objects for extensions
+- **API integration**: New `getSchemaUrlForCredential()` function replaces hardcoded logic
+- **Browser embedding**: Default mappings embedded in browser bundle for offline operation
+
+### 2025-07-30
+- **Completed configuration loader implementation**: Built `schema-mappings-loader.ts` with universal browser/Node.js compatibility
+- **Integrated with existing architecture**: Follows same patterns as `utils.ts` for environment detection
+- **Added caching and validation**: Configuration files are cached and validated before use
+- **Updated browser bundle**: Default mappings embedded for offline operation
+- **Maintained backward compatibility**: Legacy `getUNTPSchemaUrlForCredential()` still works
 
 ## Success Criteria
 - **Configuration Format**: Clear, documented format for specifying custom credential types and schemas

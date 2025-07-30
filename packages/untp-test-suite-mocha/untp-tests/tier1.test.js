@@ -5,9 +5,6 @@
 
 const { expect, registerUNTPTestSuite } = untpTestSuite.setupUNTPTests();
 
-const VERIFIABLE_CREDENTIAL_SCHEMA_URL =
-  'https://raw.githubusercontent.com/w3c/vc-data-model/refs/heads/main/schema/verifiable-credential/verifiable-credential-schema.json';
-
 registerUNTPTestSuite((credentialState) => {
   describe('Tier 1 - W3C Verifiable Credential Validation tag:tier1 tag:w3c', () => {
     it('should have access to credential state tag:basic tag:integration', () => {
@@ -30,7 +27,13 @@ registerUNTPTestSuite((credentialState) => {
         });
 
         it('should match the VerifiableCredential 1.1 schema tag:jsonschema', async () => {
-          await expect(parsedCredential).to.match.schema(VERIFIABLE_CREDENTIAL_SCHEMA_URL);
+          // Get the W3C VerifiableCredential schema URL
+          const schemaUrl = await untpTestSuite.getSchemaUrlForCredential(parsedCredential, 'VerifiableCredential');
+
+          // Assert that we can determine a VerifiableCredential schema URL
+          expect(schemaUrl, 'Should be able to determine VerifiableCredential schema URL').to.be.a('string');
+
+          await expect(parsedCredential).to.match.schema(schemaUrl);
         });
       });
     });
