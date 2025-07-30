@@ -124,6 +124,13 @@ program
       return previous ? previous.concat([value]) : [value];
     },
   )
+  .option(
+    '--extension-schema-map <file>',
+    'load extension schema mappings from a JSON file (can be used multiple times). See src/untp-test/schema-mapper/default-mappings.json for format example',
+    (value: string, previous: string[]) => {
+      return previous ? previous.concat([value]) : [value];
+    },
+  )
   .arguments('[files...]')
   .action(async (files: string[], options: any) => {
     const allFiles = [...files]; // Start with provided file paths
@@ -200,6 +207,7 @@ program
       const results = await runner.run(
         {
           tags: options.tag,
+          extensionSchemaMaps: options.extensionSchemaMap,
           mochaSetupCallback: (mochaOptions) => {
             // Create Mocha instance with Node.js import
             const Mocha = require('mocha');

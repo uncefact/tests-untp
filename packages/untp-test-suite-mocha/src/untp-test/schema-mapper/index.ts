@@ -11,6 +11,7 @@ export {
   loadDefaultMappings,
   loadExternalMappings,
   validateMappings,
+  schemaMapper,
   type SchemaMappingConfig,
   type SchemaMappingsFile,
 } from './loader';

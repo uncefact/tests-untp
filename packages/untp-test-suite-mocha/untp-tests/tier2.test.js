@@ -15,17 +15,11 @@ registerUNTPTestSuite((credentialState) => {
 
     allCredentials.forEach(([fileName, content]) => {
       describe(`${fileName}`, () => {
-        let parsedCredential;
+        // Parse credential early to determine UNTP credential type for test naming
+        const parsedCredential = JSON.parse(content);
+        const untpType = untpTestSuite.getUNTPCredentialType(parsedCredential);
 
-        before(() => {
-          // Parse the credential once for this test suite
-          parsedCredential = JSON.parse(content);
-        });
-
-        it('should validate against the related UNTP schema tag:schema tag:untp-validation', async () => {
-          // Use the existing utility function to determine UNTP credential type
-          const untpType = untpTestSuite.getUNTPCredentialType(parsedCredential);
-
+        it(`should validate against ${untpType} UNTP schema tag:schema tag:untp-validation`, async () => {
           // Assert that we can determine a UNTP credential type
           expect(untpType, 'Should be able to determine UNTP credential type').to.be.a('string');
 
@@ -37,6 +31,24 @@ registerUNTPTestSuite((credentialState) => {
 
           // Validate the credential against its specific UNTP schema
           await expect(parsedCredential).to.match.schema(schemaUrl);
+        });
+
+        // Create individual tests for each extension type
+        const extensionTypes = untpTestSuite.getExtensionTypes(parsedCredential);
+        extensionTypes.forEach((extensionType) => {
+          it(`should validate against ${extensionType} extension schema tag:schema tag:extension-validation`, async () => {
+            // Get the appropriate schema URL for this extension type
+            const extensionSchemaUrl = await untpTestSuite.getSchemaUrlForCredential(parsedCredential, extensionType);
+
+            // Assert that we can determine a schema URL for this extension
+            expect(
+              extensionSchemaUrl,
+              `Should be able to determine schema URL for extension type ${extensionType}`,
+            ).to.be.a('string');
+
+            // Validate the credential against the extension schema
+            await expect(parsedCredential).to.match.schema(extensionSchemaUrl);
+          });
         });
       });
     });

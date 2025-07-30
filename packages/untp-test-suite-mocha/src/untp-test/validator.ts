@@ -4,6 +4,7 @@
 
 import { UNTPTestOptions } from './types';
 import { StreamReporter, StreamEvent } from './stream-reporter';
+import { schemaMapper } from './schema-mapper';
 
 export interface UNTPTestResults {
   success: boolean;
@@ -34,8 +35,17 @@ export class UNTPTestRunner {
    * Credential data should be set via credential-state module before calling run().
    */
   async run(options: UNTPTestOptions, onStream?: (event: StreamEvent) => void): Promise<UNTPTestResults> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
+        // Initialize the schema mapper with default mappings and extension configs if provided
+        try {
+          await schemaMapper.loadMappings(options.extensionSchemaMaps);
+        } catch (error) {
+          reject(
+            new Error(`Failed to load schema mappings: ${error instanceof Error ? error.message : String(error)}`),
+          );
+          return;
+        }
         // Create Mocha options with custom streaming reporter and grep support
         const mochaOptions: any = {
           reporter: StreamReporter as any,

@@ -239,3 +239,30 @@ export function getUNTPCredentialType(credential: any): UNTPCredentialType | und
 
   return undefined;
 }
+
+/**
+ * Gets extension types from a credential (types that precede the UNTP credential type)
+ * @param credential - The credential object
+ * @returns Array of extension type strings, or empty array if none found
+ */
+export function getExtensionTypes(credential: any): string[] {
+  if (!credential.type || !Array.isArray(credential.type)) {
+    return [];
+  }
+
+  // Get all possible UNTP credential types from the enum
+  const untpCredentialTypes = Object.values(UNTPCredentialType);
+
+  // Find the index of the first UNTP credential type
+  const untpTypeIndex = credential.type.findIndex((type: string) =>
+    untpCredentialTypes.includes(type as UNTPCredentialType),
+  );
+
+  // If no UNTP type found, return empty array
+  if (untpTypeIndex === -1) {
+    return [];
+  }
+
+  // Return all types before the UNTP credential type
+  return credential.type.slice(0, untpTypeIndex);
+}

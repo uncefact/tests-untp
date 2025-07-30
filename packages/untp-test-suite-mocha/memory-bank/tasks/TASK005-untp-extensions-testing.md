@@ -47,7 +47,7 @@ From the project brief, the library should support extension testing by allowing
 
 ## Progress Tracking
 
-**Overall Status:** In Progress - 40%
+**Overall Status:** In Progress - 50%
 
 ### Task Metadata
 - **Priority Level:** Medium - Important for ecosystem extensibility
@@ -62,7 +62,7 @@ From the project brief, the library should support extension testing by allowing
 | 5.2 | Extend credential type detection for custom types | Not Started | 2025-07-30 | Make getUNTPCredentialType() configurable |
 | 5.3 | Extend schema URL resolution for custom schemas | Complete | 2025-07-30 | Implemented `getSchemaUrlForCredential()` with configurable mappings |
 | 5.4 | Add configuration loading mechanism | Complete | 2025-07-30 | Created `SchemaMappingsManager` with browser/Node.js support |
-| 5.5 | Add CLI support for extension configuration | Not Started | 2025-07-30 | --config option for specifying extension config |
+| 5.5 | Add CLI support for extension configuration | Complete | 2025-07-30 | Added --extension-schema-map CLI option |
 | 5.6 | Create example extension and documentation | In Progress | 2025-07-30 | Created simplified DigitalLivestockPassport example |
 | 5.7 | Add browser support for extension configuration | Not Started | 2025-07-30 | Runtime configuration in browser environment |
 | 5.8 | Test with real extension scenarios | In Progress | 2025-07-30 | Testing with DigitalLivestockPassport extension |
@@ -83,6 +83,12 @@ From the project brief, the library should support extension testing by allowing
 - **Browser embedding**: Default mappings embedded in browser bundle for offline operation
 
 ### 2025-07-30
+- **Completed subtask 5.5 - CLI extension support**: Added `--extension-schema-map` option to CLI for loading external schema mappings
+- **Updated UNTPTestRunner**: Modified to load extension schema mappings before test execution
+- **Enhanced schema resolution**: Updated global `getSchemaUrlForCredential` to use configured schema manager when available
+- **Fixed AJV validation**: Resolved JSON Schema validation issues in schema mappings loader
+- **Tested successfully**: Verified digital livestock passport extension works with new CLI option
+- **CLI Usage**: `untp-test --extension-schema-map digital-livestock-mapping.json credentials.json`
 - **Completed configuration loader implementation**: Built `schema-mappings-loader.ts` with universal browser/Node.js compatibility
 - **Integrated with existing architecture**: Follows same patterns as `utils.ts` for environment detection
 - **Added caching and validation**: Configuration files are cached and validated before use

@@ -8,7 +8,7 @@
 import { UNTPTestRunner } from './validator';
 import { StreamReporter, StreamEvent } from './stream-reporter';
 import { setCredentialData, hasCredentials, getAllCredentials } from './credential-state';
-import { setupUNTPChaiAssertions, getUNTPCredentialType } from './test-utils';
+import { setupUNTPChaiAssertions, getUNTPCredentialType, getExtensionTypes } from './test-utils';
 import { createAjvInstance } from './utils';
 import { SchemaMappingsManager, getSchemaUrlForCredential } from './schema-mapper';
 import './utils';
@@ -48,6 +48,7 @@ setupUNTPChaiAssertions(chai, jsonld, ajvInstance);
   getAllCredentials,
   setupUNTPChaiAssertions,
   getUNTPCredentialType,
+  getExtensionTypes,
   SchemaMappingsManager,
   getSchemaUrlForCredential,
 };
@@ -66,6 +67,7 @@ export {
   getAllCredentials,
   setupUNTPChaiAssertions,
   getUNTPCredentialType,
+  getExtensionTypes,
   SchemaMappingsManager,
   getSchemaUrlForCredential,
 };

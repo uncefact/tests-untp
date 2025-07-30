@@ -6,7 +6,7 @@
  */
 
 import { getSchemaUrlForCredential } from './schema-mapper';
-import { getUNTPCredentialType } from './test-utils';
+import { getUNTPCredentialType, getExtensionTypes } from './test-utils';
 
 /**
  * Creates and configures an AJV instance for universal use with JSON Schema 2020-12 support
@@ -226,6 +226,7 @@ if (typeof window !== 'undefined') {
     showSuiteHierarchy,
     getSchemaUrlForCredential,
     getUNTPCredentialType,
+    getExtensionTypes,
   };
 } else {
   // Node.js environment
@@ -237,6 +238,7 @@ if (typeof window !== 'undefined') {
     showSuiteHierarchy,
     getSchemaUrlForCredential,
     getUNTPCredentialType,
+    getExtensionTypes,
   };
 }
 
@@ -250,4 +252,5 @@ export {
   createAjvInstance,
   getSchemaUrlForCredential,
   getUNTPCredentialType,
+  getExtensionTypes,
 };

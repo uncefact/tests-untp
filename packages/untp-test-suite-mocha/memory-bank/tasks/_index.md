@@ -5,7 +5,7 @@
 
 ## Pending
 - [TASK004] Implement Actual Tier 1 and Tier 2 Tests - 62.5% complete, subtasks 4.6-4.8 remaining
-- [TASK005] UNTP Extensions Testing Support - Support configurable custom schemas for credential extensions
+- [TASK005] UNTP Extensions Testing Support - 50% complete, CLI extension schema mapping support added
 
 ## Completed
 - [TASK001] Create initial package with untp-test CLI wrapper - Completed - Full CLI functionality with file and directory support

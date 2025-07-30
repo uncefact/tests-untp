@@ -5,6 +5,8 @@
  * It provides a unified interface that works in both browser and Node.js environments.
  */
 
+import { createAjvInstance } from '../utils';
+
 interface SchemaMappingConfig {
   credentialType: string;
   versionRegex?: string;
@@ -126,9 +128,8 @@ async function validateMappings(mappingsData: SchemaMappingsFile): Promise<void>
     schemaDefinition = require('./schema-mappings.schema.json');
   }
 
-  // Create AJV instance
-  const Ajv = typeof window !== 'undefined' ? (window as any).ajv2020 : require('ajv');
-  const ajv = new Ajv({ allErrors: true });
+  // Use shared AJV instance creation logic
+  const ajv = createAjvInstance();
 
   try {
     const validate = ajv.compile(schemaDefinition);
@@ -216,7 +217,7 @@ class SchemaMappingsManager {
     }
   }
 
-  getSchemaUrl(credential: any, targetType: string): string | null {
+  getSchemaUrlForCredential(credential: any, targetType: string): string | null {
     if (!this.isLoaded) {
       throw new Error('Schema mappings not loaded. Call loadMappings() first.');
     }
@@ -239,25 +240,17 @@ class SchemaMappingsManager {
   }
 }
 
-// Create a default instance for global use
-const defaultManager = new SchemaMappingsManager();
+// Create a schema mapper instance for global use
+const schemaMapper = new SchemaMappingsManager();
 
 /**
- * Global function to get schema URL - replaces getUNTPSchemaUrlForCredential
- * @param credential - The credential object
- * @param targetType - Specific credential type to look for
- * @param externalConfigs - Optional external configuration files/objects to load
+ * Get schema URL for a credential using the pre-initialized schema mapper
  */
-async function getSchemaUrlForCredential(
-  credential: any,
-  targetType: string,
-  externalConfigs?: (string | SchemaMappingsFile)[],
-): Promise<string | null> {
-  if (!defaultManager.isConfigLoaded()) {
-    await defaultManager.loadMappings(externalConfigs);
+async function getSchemaUrlForCredential(credential: any, targetType: string): Promise<string | null> {
+  if (!schemaMapper.isConfigLoaded()) {
+    throw new Error('Schema mapper not initialized. This should be done by the test runner.');
   }
-
-  return defaultManager.getSchemaUrl(credential, targetType);
+  return schemaMapper.getSchemaUrlForCredential(credential, targetType);
 }
 
 // Make functions available in global namespace
@@ -287,6 +280,7 @@ export {
   loadDefaultMappings,
   loadExternalMappings,
   validateMappings,
+  schemaMapper,
   type SchemaMappingConfig,
   type SchemaMappingsFile,
 };
