@@ -8,7 +8,7 @@ A reusable testing library for United Nations Transparency Protocol (UNTP) crede
 ✅ **Real-time Streaming Results** - Live test output with custom reporter
 ✅ **Tag-based Filtering** - Precise test selection with tags
 ✅ **TypeScript Support** - Full type safety and IntelliSense
-✅ **Extensible Architecture** - Support for including custom test suites for extensions (CLI-only currently)
+✅ **Extension Schema Mapping** - Support for custom credential types with configurable schema validation
 
 ## Testing Tiers
 
@@ -64,6 +64,37 @@ untp-test --directory ./credentials --tag tier1
 
 **Supported file types**: `.json` and `.jsonld` files are automatically detected and included.
 
+### Extension Schema Mapping
+
+Test credentials with custom extension types by providing schema mapping files:
+
+```bash
+# Test extension credential with custom schema mapping
+untp-test --extension-schema-map ./extensions/livestock-mapping.json credential.json
+
+# Multiple extension mappings
+untp-test --extension-schema-map ./ext1.json --extension-schema-map ./ext2.json credential.json
+
+# Combine with directory scanning
+untp-test --extension-schema-map ./mappings.json --directory ./credentials
+```
+
+Extension mapping files define how to resolve schema URLs for custom credential types:
+
+```json
+{
+  "version": "0.1.0",
+  "mappings": [
+    {
+      "credentialType": "DigitalLivestockPassport",
+      "schemaUrlPattern": "https://jargon.sh/user/aatp/DigitalLivestockPassport/v/working/artefacts/jsonSchemas/DigitalLivestockPassport.json?class=DigitalLivestockPassport"
+    }
+  ]
+}
+```
+
+See `src/untp-test/schema-mapper/default-mappings.json` for format example.
+
 ### Tag Filtering
 
 Run only specific test types using tags:
@@ -96,11 +127,13 @@ Tier 1 - W3C Verifiable Credential Validation (tags: tier1, w3c)
   product-passport.json
     ✔ should be a valid JSON-LD document (tags: jsonld) (598ms)
     ✔ should match the VerifiableCredential 1.1 schema (tags: jsonschema) (1ms)
-  identity-anchor.json
-    ✔ should be a valid JSON-LD document (tags: jsonld) (401ms)
-    ✔ should match the VerifiableCredential 1.1 schema (tags: jsonschema) (2ms)
+Tier 2 - UNTP Schema Validation (tags: tier2, untp)
+  ✔ should have access to credential state (tags: basic, integration)
+  digital-livestock-passport.json
+    ✔ should validate against DigitalProductPassport UNTP schema (tags: schema, untp-validation) (177ms)
+    ✔ should validate against DigitalLivestockPassport extension schema (tags: schema, extension-validation) (499ms)
 
-  5 passing (1003ms)
+  6 passing (1275ms)
 ```
 
 ## Browser Usage
@@ -181,10 +214,11 @@ const content = fs.readFileSync('credential.json', 'utf8');
 credentialData.set('credential.json', content);
 setCredentialData(credentialData);
 
-// Run tests
+// Run tests with extension schema mappings
 const runner = new UNTPTestRunner();
 const results = await runner.run({
   tags: ['tier1', 'validation'],
+  extensionSchemaMaps: ['./extensions/custom-mappings.json'], // Optional extension mappings
   mochaSetupCallback: (mochaOptions) => {
     const Mocha = require('mocha');
     const mocha = new Mocha(mochaOptions);
@@ -234,21 +268,37 @@ Other tags are completely optional, but could be used as per the examples below:
 
 ## Extension Testing
 
-Add your own test suites by providing additional test directories:
+The test suite automatically validates credentials with extension types. When a credential contains custom types (like `DigitalLivestockPassport`) before the standard UNTP type, the suite will:
 
-```bash
-# Test credentials from directory with extensions (extensions coming soon)
-untp-test --directory ./credentials --additional-tests ./my-custom-tests
+1. **Detect Extension Types**: Automatically identify extension types in the credential's type array
+2. **Validate Against Extension Schemas**: Create individual tests for each extension type found
+3. **Use Schema Mappings**: Resolve extension schema URLs using provided mapping files
+
+### Example Extension Credential
+
+```json
+{
+  "type": ["DigitalLivestockPassport", "DigitalProductPassport", "VerifiableCredential"],
+  "@context": ["https://www.w3.org/ns/credentials/v2", "..."],
+  "credentialSubject": { "...": "..." }
+}
 ```
 
-For programmatic usage, add your test files in the `mochaSetupCallback`:
+This credential will generate tests for:
+- W3C VerifiableCredential validation (Tier 1)
+- DigitalProductPassport UNTP schema validation (Tier 2)
+- DigitalLivestockPassport extension schema validation (Tier 2)
+
+### Custom Test Suites
+
+For additional custom test logic, add your test files in the `mochaSetupCallback`:
 
 ```typescript
 mochaSetupCallback: (mochaOptions) => {
   const mocha = new Mocha(mochaOptions);
 
   // Add built-in tests
-  mocha.addFile('./untp-tests/tier1/dummy.test.js');
+  mocha.addFile('./untp-tests/tier1/basic.test.js');
 
   // Add your custom tests
   mocha.addFile('./my-tests/custom-validation.test.js');
@@ -279,6 +329,8 @@ Main test execution class that works in both Node.js and browser environments.
 interface UNTPTestOptions {
   /** Tags to include (run only tests with these tags) */
   tags?: string[];
+  /** Extension schema mapping files to load */
+  extensionSchemaMaps?: string[];
   /** Callback to create and configure Mocha instance */
   mochaSetupCallback: (mochaOptions: any) => any;
 }
