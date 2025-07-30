@@ -130,8 +130,29 @@ program
 
     if (options.directory) {
       console.log(`Adding credential files from directory: ${options.directory}`);
-      // TODO: Scan directory and add files to allFiles array
-      allFiles.push(`${options.directory}/*`); // Placeholder - will implement scanning later
+      try {
+        const dirPath = path.resolve(options.directory);
+        const dirStats = await fs.promises.stat(dirPath);
+
+        if (!dirStats.isDirectory()) {
+          console.error(`Error: ${options.directory} is not a directory`);
+          process.exit(1);
+        }
+
+        const dirFiles = await fs.promises.readdir(dirPath);
+        const jsonFiles = dirFiles
+          .filter((file) => {
+            const lowerFile = file.toLowerCase();
+            return lowerFile.endsWith('.json') || lowerFile.endsWith('.jsonld');
+          })
+          .map((file) => path.join(dirPath, file));
+
+        allFiles.push(...jsonFiles);
+        console.log(`Found ${jsonFiles.length} credential files in directory`);
+      } catch (error) {
+        console.error(`Error reading directory ${options.directory}:`, error);
+        process.exit(1);
+      }
     }
 
     if (allFiles.length === 0) {
@@ -139,7 +160,7 @@ program
       process.exit(1);
     }
 
-    console.log(`Testing credential files: ${allFiles.join(', ')}`);
+    console.log(`Testing ${allFiles.length} credential files`);
 
     try {
       // Read credential files directly and populate credential state

@@ -37,9 +37,32 @@ untp-test credential.json
 # Test multiple files
 untp-test credential1.json credential2.json credential3.json
 
-# Add files from directory (coming soon)
-untp-test --directory ./credentials credential.json
+# Test all credential files from directory
+untp-test --directory ./credentials
+
+# Combine individual files with directory scanning
+untp-test credential.json --directory ./credentials
 ```
+
+### Directory Scanning
+
+The CLI can automatically find and test credential files from directories:
+
+```bash
+# Test all credential files in a directory
+untp-test --directory ./example-credentials
+
+# Short form
+untp-test -d ./credentials
+
+# Combine with individual files
+untp-test specific-file.json --directory ./more-credentials
+
+# With tag filtering
+untp-test --directory ./credentials --tag tier1
+```
+
+**Supported file types**: `.json` and `.jsonld` files are automatically detected and included.
 
 ### Tag Filtering
 
@@ -49,11 +72,11 @@ Run only specific test types using tags:
 # Run only Tier 1 tests
 untp-test --tag tier1 credential.json
 
-# Run only basic validation tests
-untp-test --tag basic credential.json
+# Run only basic validation tests on directory
+untp-test --tag basic --directory ./credentials
 
 # Combine multiple tags
-untp-test --tag tier1 --tag smoke credentials/*.json
+untp-test --tag tier1 --tag smoke --directory ./credentials
 
 # Run validation and JSON-LD tests
 untp-test --tag validation --tag jsonld credential.json
@@ -62,17 +85,22 @@ untp-test --tag validation --tag jsonld credential.json
 ### Example Output
 
 ```
-Testing credential files: product-passport.json, identity-anchor.json
+Adding credential files from directory: example-credentials
+Found 5 credential files in directory
+Testing 5 credential files
 
 Running UNTP validation tests...
 
-  Tier 1 - W3C Verifiable Credential Validation tag:tier1 tag:w3c
-    ✔ dummy test should pass tag:basic tag:smoke (2ms)
-    ✔ should have access to credential files tag:basic tag:integration (5ms)
-    ✔ should validate JSON structure for all credential files tag:json tag:validation (1ms)
-    ✔ should validate JSON-LD context in credential files tag:jsonld tag:validation (3ms)
+Tier 1 - W3C Verifiable Credential Validation (tags: tier1, w3c)
+  ✔ should have access to credential state (tags: basic, integration) (1ms)
+  product-passport.json
+    ✔ should be a valid JSON-LD document (tags: jsonld) (598ms)
+    ✔ should match the VerifiableCredential 1.1 schema (tags: jsonschema) (1ms)
+  identity-anchor.json
+    ✔ should be a valid JSON-LD document (tags: jsonld) (401ms)
+    ✔ should match the VerifiableCredential 1.1 schema (tags: jsonschema) (2ms)
 
-  4 passing (15ms)
+  5 passing (1003ms)
 ```
 
 ## Browser Usage
@@ -86,7 +114,7 @@ npm run browser-test
 
 2. Open `http://localhost:8080` in your browser
 
-3. Upload credential files (.json) using drag & drop or file selection
+3. Upload credential files (.json or .jsonld) using drag & drop or file selection
 
 4. Optionally add tags for filtering (e.g., `tier1`, `validation`, `smoke`)
 
@@ -209,8 +237,8 @@ Other tags are completely optional, but could be used as per the examples below:
 Add your own test suites by providing additional test directories:
 
 ```bash
-# CLI with extensions (coming soon)
-untp-test --additional-tests ./my-custom-tests credential.json
+# Test credentials from directory with extensions (extensions coming soon)
+untp-test --directory ./credentials --additional-tests ./my-custom-tests
 ```
 
 For programmatic usage, add your test files in the `mochaSetupCallback`:
