@@ -85,10 +85,36 @@ export async function validateJSONLD(
     await jsonld.expand(credential, expandOptions);
   } catch (error) {
     result.valid = false;
+
+    // Extract more detailed error information
+    let detailedMessage = 'Invalid JSON-LD format';
+    let errorCode = 'INVALID_JSONLD';
+
+    if (error instanceof Error) {
+      // Check for common JSON-LD error types
+      if (error.message.includes('loading document failed')) {
+        errorCode = 'JSONLD_DOCUMENT_LOAD_ERROR';
+        detailedMessage = `Failed to load JSON-LD context: ${error.message}`;
+      } else if (error.message.includes('invalid @context')) {
+        errorCode = 'JSONLD_INVALID_CONTEXT';
+        detailedMessage = `Invalid @context in JSON-LD document: ${error.message}`;
+      } else if (error.message.includes('syntax error')) {
+        errorCode = 'JSONLD_SYNTAX_ERROR';
+        detailedMessage = `JSON-LD syntax error: ${error.message}`;
+      } else if (error.message.includes('fetch')) {
+        errorCode = 'JSONLD_CONTEXT_FETCH_ERROR';
+        detailedMessage = `Could not fetch JSON-LD context from URL: ${error.message}`;
+      } else {
+        detailedMessage = `JSON-LD processing error: ${error.message}`;
+      }
+    } else {
+      detailedMessage = `JSON-LD validation failed: ${String(error)}`;
+    }
+
     result.errors.push({
-      code: 'INVALID_JSONLD',
-      message: 'Invalid JSON-LD format',
-      error: error, // Always include the actual error object
+      code: errorCode,
+      message: detailedMessage,
+      error: error, // Always include the actual error object for debugging
     });
   }
 
