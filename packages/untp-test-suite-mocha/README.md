@@ -12,6 +12,25 @@ Importantly, the same test runner is used in both environments for running the t
 
 ![Browser Usage](doc/images/browser-tag-schema.png)
 
+## Example tier 2 test
+
+Since the test runner is using mocha and chai, we benefit from simple test language.
+Below is an example showing the main tier 2 test which gets the schema for a UNTP
+credential type and expects the credential to match that schema:
+
+```typescript
+        it(`should validate against ${untpType} UNTP schema tag:schema`, async () => {
+          // Get the appropriate UNTP schema URL for this credential type
+          const schemaUrl = await untpTestSuite.getSchemaUrlForCredential(parsedCredential, untpType);
+
+          // Assert that we can determine a UNTP schema URL for this credential
+          expect(schemaUrl, 'Should be able to determine UNTP schema URL for credential').to.be.a('string');
+
+          // Validate the credential against its specific UNTP schema
+          await expect(parsedCredential).to.match.schema(schemaUrl);
+        });
+```
+
 ## Features
 
 - **Both CLI and Browser Compatibility** - Same tests run in CLI and browser
