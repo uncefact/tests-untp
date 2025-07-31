@@ -102,7 +102,7 @@ export async function validateJSONLD(
     let errorCode = 'INVALID_JSONLD';
 
     if (error instanceof Error) {
-      // Check for common JSON-LD error types
+      // Check for common JSON-LD error types and extract key information
       if (error.message.includes('loading document failed')) {
         errorCode = 'JSONLD_DOCUMENT_LOAD_ERROR';
         detailedMessage = `Failed to load JSON-LD context: ${error.message}`;
@@ -115,6 +115,12 @@ export async function validateJSONLD(
       } else if (error.message.includes('fetch')) {
         errorCode = 'JSONLD_CONTEXT_FETCH_ERROR';
         detailedMessage = `Could not fetch JSON-LD context from URL: ${error.message}`;
+      } else if (error.message.includes('Dereferencing a URL did not result in a valid JSON-LD object')) {
+        // Extract URL from the long error message
+        const urlMatch = error.message.match(/URL: "([^"]+)"/);
+        const failedUrl = urlMatch ? urlMatch[1] : 'unknown URL';
+        errorCode = 'JSONLD_CONTEXT_DEREFERENCE_ERROR';
+        detailedMessage = `Failed to load JSON-LD context from ${failedUrl} (URL not accessible or invalid JSON-LD)`;
       } else {
         detailedMessage = `JSON-LD processing error: ${error.message}`;
       }
@@ -149,10 +155,8 @@ export function setupUNTPChaiAssertions(chai: any, jsonld: any, ajv: any): void 
     return validateJSONLD(obj, jsonld).then((result) => {
       assertion.assert(
         result.valid,
-        `expected #{this} to be a valid JSON-LD document but got errors: ${result.errors
-          .map((e) => e.message)
-          .join(', ')}`,
-        `expected #{this} not to be a valid JSON-LD document`,
+        `JSON-LD document validation failed: ${result.errors.map((e) => e.message).join(', ')}`,
+        `expected credential not to be a valid JSON-LD document`,
         true,
         result.valid,
       );
