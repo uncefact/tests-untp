@@ -1,10 +1,10 @@
 # [TASK005] - UNTP Extensions Testing Support
 
-**Status:** Pending
+**Status:** Completed
 **Priority:** Medium
 **Tags:** extensions, custom-schemas, configuration, testing, untp
 **Added:** 2025-07-29
-**Updated:** 2025-07-30
+**Updated:** 2025-07-31
 
 ## Original Request
 Add a new task to test UNTP extensions, including supporting configurable custom schemas for a credential extension.
@@ -47,7 +47,7 @@ From the project brief, the library should support extension testing by allowing
 
 ## Progress Tracking
 
-**Overall Status:** In Progress - 87.5%
+**Overall Status:** Completed - 100%
 
 ### Task Metadata
 - **Priority Level:** Medium - Important for ecosystem extensibility
@@ -64,7 +64,7 @@ From the project brief, the library should support extension testing by allowing
 | 5.4 | Add configuration loading mechanism | Complete | 2025-07-30 | Created `SchemaMappingsManager` with browser/Node.js support |
 | 5.5 | Add CLI support for extension configuration | Complete | 2025-07-30 | Added --extension-schema-map CLI option |
 | 5.6 | Create example extension and documentation | Complete | 2025-07-30 | Created DigitalLivestockPassport example with full test integration |
-| 5.7 | Add browser support for extension configuration | Not Started | 2025-07-30 | Runtime configuration in browser environment |
+| 5.7 | Add browser support for extension configuration | Complete | 2025-07-31 | Runtime configuration in browser environment |
 | 5.8 | Test with real extension scenarios | Complete | 2025-07-30 | Successfully tested DigitalLivestockPassport with extension validation |
 
 ## Progress Log
@@ -81,6 +81,16 @@ From the project brief, the library should support extension testing by allowing
 - **Extension support**: Can load multiple external configuration files/objects for extensions
 - **API integration**: New `getSchemaUrlForCredential()` function replaces hardcoded logic
 - **Browser embedding**: Default mappings embedded in browser bundle for offline operation
+
+### 2025-07-31
+- **Completed subtask 5.7**: Successfully implemented browser support for extension configuration
+- **Added browser UI**: Created collapsible file upload section for extension schema mapping files
+- **Fixed critical AJV issue**: Discovered and resolved that CLI was using regular AJV instead of ajv/dist/2020, causing prefixItems validation to fail silently
+- **Browser validation working**: Extension schema validation now works correctly in browser with proper error reporting
+- **Consistent behavior achieved**: Both CLI and browser now properly validate extension schemas and show same error messages
+- **Enhanced error messages**: Added expected vs actual values for const validation failures, cleaned up JSON-LD error messages
+- **Complete feature working**: Users can upload extension mapping JSON files in browser and validate custom credential types
+- **Task completed**: All subtasks for TASK005 are now complete, extension testing support is fully implemented
 
 ### 2025-07-30
 - **Completed subtask 5.5 - CLI extension support**: Added `--extension-schema-map` option to CLI for loading external schema mappings
