@@ -36,9 +36,20 @@ export async function validateJsonAgainstSchema(
 
       if (validate.errors) {
         for (const ajvError of validate.errors) {
+          let message = `${ajvError.instancePath} ${ajvError.message}`;
+
+          // For const validation errors, show expected vs actual values
+          // We will probably want to detect different keywords here and include
+          // more user-friendly messages generally as we discover them. We can
+          // also update the data format of the errors if we want to pass more
+          // structured info.
+          if (ajvError.keyword === 'const' && ajvError.params?.allowedValue && ajvError.data) {
+            message += `\n        Expected: ${ajvError.params.allowedValue}\n        Actual: ${ajvError.data}`;
+          }
+
           result.errors.push({
             code: 'SCHEMA_VALIDATION_ERROR',
-            message: `${ajvError.instancePath} ${ajvError.message}`,
+            message,
             path: ajvError.instancePath,
           });
         }

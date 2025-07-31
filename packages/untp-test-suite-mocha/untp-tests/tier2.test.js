@@ -40,11 +40,12 @@ registerUNTPTestSuite((credentialState) => {
             // Get the appropriate schema URL for this extension type
             const extensionSchemaUrl = await untpTestSuite.getSchemaUrlForCredential(parsedCredential, extensionType);
 
-            // Assert that we can determine a schema URL for this extension
-            expect(
-              extensionSchemaUrl,
-              `Should be able to determine schema URL for extension type ${extensionType}`,
-            ).to.be.a('string');
+            // Check if we can determine a schema URL for this extension
+            if (!extensionSchemaUrl) {
+              throw new Error(
+                `Unable to determine schema URL for extension type ${extensionType}: no mapping found for ${extensionType}`,
+              );
+            }
 
             // Validate the credential against the extension schema
             await expect(parsedCredential).to.match.schema(extensionSchemaUrl);

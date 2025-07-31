@@ -13,7 +13,7 @@ import { getUNTPCredentialType, getExtensionTypes } from './test-utils';
  * Assumes fetch is globally available (native in browser, set up in Node.js CLI)
  */
 function createAjvInstance(): any {
-  const Ajv = typeof window !== 'undefined' ? (window as any).ajv2020 : require('ajv');
+  const Ajv = typeof window !== 'undefined' ? (window as any).ajv2020 : require('ajv/dist/2020');
   const addFormats = typeof window !== 'undefined' ? (window as any).AjvFormats : require('ajv-formats');
 
   // Schema cache to prevent repeated fetching
@@ -55,53 +55,8 @@ function createAjvInstance(): any {
     addFormats(instance);
   }
 
-  // Add meta-schemas for different JSON Schema drafts
-  try {
-    // Only add meta-schemas in Node.js environment where we can require them
-    if (typeof window === 'undefined') {
-      // Try to add 2020-12 meta-schemas if available
-      try {
-        const draft2020Schema = require('ajv/dist/refs/json-schema-2020-12/schema.json');
-        const metaCore = require('ajv/dist/refs/json-schema-2020-12/meta/core.json');
-        const metaApplicator = require('ajv/dist/refs/json-schema-2020-12/meta/applicator.json');
-        const metaValidation = require('ajv/dist/refs/json-schema-2020-12/meta/validation.json');
-        const metaMetaData = require('ajv/dist/refs/json-schema-2020-12/meta/meta-data.json');
-        const metaFormat = require('ajv/dist/refs/json-schema-2020-12/meta/format-annotation.json');
-        const metaContent = require('ajv/dist/refs/json-schema-2020-12/meta/content.json');
-        const metaUnevaluated = require('ajv/dist/refs/json-schema-2020-12/meta/unevaluated.json');
-
-        if (!instance.getSchema('https://json-schema.org/draft/2020-12/schema')) {
-          instance.addMetaSchema(draft2020Schema);
-          instance.addMetaSchema(metaCore);
-          instance.addMetaSchema(metaApplicator);
-          instance.addMetaSchema(metaValidation);
-          instance.addMetaSchema(metaMetaData);
-          instance.addMetaSchema(metaFormat);
-          instance.addMetaSchema(metaContent);
-          instance.addMetaSchema(metaUnevaluated);
-        }
-      } catch (metaError) {
-        console.warn('Could not load JSON Schema 2020-12 meta-schemas:', metaError);
-      }
-
-      // Try to add other draft meta-schemas
-      try {
-        const draft2019Schema = require('ajv/dist/refs/json-schema-2019-09/schema.json');
-        const draft7Schema = require('ajv/dist/refs/json-schema-draft-07.json');
-
-        if (!instance.getSchema('https://json-schema.org/draft/2019-09/schema')) {
-          instance.addMetaSchema(draft2019Schema);
-        }
-        if (!instance.getSchema('http://json-schema.org/draft-07/schema')) {
-          instance.addMetaSchema(draft7Schema);
-        }
-      } catch (draftError) {
-        console.warn('Could not load additional JSON Schema drafts:', draftError);
-      }
-    }
-  } catch (error) {
-    console.warn('Error setting up meta-schemas:', error);
-  }
+  // Note: Using ajv/dist/2020 provides built-in 2020-12 support including prefixItems
+  // No need to manually add meta-schemas as they are included by default
 
   return instance;
 }

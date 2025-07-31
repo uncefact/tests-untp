@@ -224,6 +224,21 @@
       </div>
 
       <div class="controls">
+        <details style="margin-bottom: 20px">
+          <summary style="cursor: pointer; font-weight: bold; font-size: 16px">
+            📋 Extension Schema Mappings (Optional)
+          </summary>
+          <div style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9">
+            <p>Upload JSON schema mapping files for custom credential extensions:</p>
+            <input type="file" id="extensionMappingFiles" accept=".json,application/json" multiple />
+            <div style="margin-top: 8px; font-size: 12px; color: #666">
+              Expected format:
+              <code>{"version": "0.1.0", "mappings": [{"credentialType": "...", "schemaUrlPattern": "..."}]}</code>
+            </div>
+            <div id="extensionFileList" style="margin-top: 10px"></div>
+          </div>
+        </details>
+
         <h3>🏷️ Test Filtering (Optional)</h3>
         <div class="tag-input">
           <input type="text" id="tagInput" placeholder="Enter tag name (e.g., tier1, smoke, validation)" />
@@ -267,6 +282,7 @@
       // Global state
       let selectedFiles = [];
       let selectedTags = [];
+      let extensionMappingFiles = [];
       let isRunning = false;
 
       // File upload handling
@@ -274,6 +290,8 @@
       const fileList = document.getElementById('fileList');
       const uploadSection = document.getElementById('uploadSection');
       const runTestsBtn = document.getElementById('runTestsBtn');
+      const extensionFileInput = document.getElementById('extensionMappingFiles');
+      const extensionFileList = document.getElementById('extensionFileList');
 
       // Drag and drop handlers
       uploadSection.addEventListener('dragover', (e) => {
@@ -295,6 +313,9 @@
       fileInput.addEventListener('change', (e) => {
         handleFiles(e.target.files);
       });
+
+      // Extension mapping file input change handler
+      extensionFileInput.addEventListener('change', handleExtensionFiles);
 
       // Handle selected files
       function handleFiles(files) {
@@ -416,7 +437,57 @@
       function clearResults() {
         document.getElementById('results').innerHTML = '';
         document.getElementById('results').style.display = 'none';
-        hideStatus();
+      }
+
+      function handleExtensionFiles(event) {
+        const files = Array.from(event.target.files);
+        extensionMappingFiles = files;
+        updateExtensionFileList();
+      }
+
+      function updateExtensionFileList() {
+        const container = extensionFileList;
+        container.innerHTML = '';
+
+        if (extensionMappingFiles.length === 0) {
+          return;
+        }
+
+        extensionMappingFiles.forEach((file, index) => {
+          const fileItem = document.createElement('div');
+          fileItem.className = 'file-item';
+          fileItem.innerHTML = `
+            <span>📄 ${file.name}</span>
+            <button class="file-remove" onclick="removeExtensionFile(${index})">❌</button>
+          `;
+          container.appendChild(fileItem);
+        });
+      }
+
+      function removeExtensionFile(index) {
+        extensionMappingFiles.splice(index, 1);
+        updateExtensionFileList();
+      }
+
+      async function getExtensionMappings() {
+        if (extensionMappingFiles.length === 0) {
+          return []; // No extension mappings provided
+        }
+
+        const mappings = [];
+
+        for (const file of extensionMappingFiles) {
+          try {
+            const content = await file.text();
+            const parsed = JSON.parse(content);
+            mappings.push(parsed);
+          } catch (error) {
+            showStatus(`Invalid JSON in extension mapping file "${file.name}": ${error.message}`, 'error');
+            return []; // Return empty on any error
+          }
+        }
+
+        return mappings;
       }
 
       // Main test execution function
@@ -483,9 +554,15 @@
 
           // Run tests using UNTPTestRunner
           const runner = new window.untpTestSuite.UNTPTestRunner();
+          const extensionMappings = await getExtensionMappings();
+
+          // Debug what we're passing
+          console.log('Extension mappings being passed:', extensionMappings);
+
           const results = await runner.run(
             {
               tags: selectedTags.length > 0 ? selectedTags : undefined,
+              extensionSchemaMaps: extensionMappings,
               mochaSetupCallback: (mochaOptions) => {
                 // Create fresh Mocha instance like CLI does
                 if (typeof window.Mocha === 'undefined') {
