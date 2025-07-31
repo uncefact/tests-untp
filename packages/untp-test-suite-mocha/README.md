@@ -2,6 +2,8 @@
 
 A reusable testing library for United Nations Transparency Protocol (UNTP) credentials that works in both Node.js CLI and browser environments, using [Mocha](https://mochajs.org/).
 
+Importantly, the same test runner is used in both environments for running the tests.
+
 ## Example CLI Usage
 
 ![CLI Usage](doc/images/console-tag-schema.png)
@@ -65,13 +67,15 @@ Test credentials with custom extension types by providing schema mapping files:
 
 ```bash
 # Test extension credential with custom schema mapping
-untp-test --extension-schema-map ./extensions/livestock-mapping.json credential.json
+untp-test --extension-schema-map example-credentials/extensions/digital-livestock-mapping.json  \\
+example-credentials/extensions/DigitalLivestockPassport/digital-livestock-passport-simple-working-context.json
 
 # Multiple extension mappings
 untp-test --extension-schema-map ./ext1.json --extension-schema-map ./ext2.json credential.json
 
 # Combine with directory scanning
-untp-test --extension-schema-map ./mappings.json --directory ./credentials
+untp-test --extension-schema-map example-credentials/extensions/digital-livestock-mapping.json  \\
+--directory ./credentials
 ```
 
 Extension mapping files define how to resolve schema URLs for custom credential types:
@@ -88,7 +92,7 @@ Extension mapping files define how to resolve schema URLs for custom credential 
 }
 ```
 
-See `src/untp-test/schema-mapper/default-mappings.json` for format example.
+See [default-mappings.json](src/untp-test/schema-mapper/default-mappings.json) for an example showing the schema mapping used for UNTP credentials, or [digital-livestock-mapping.json](example-credentials/extensions/digital-livestock-mapping.json) for an example showing the mapping used for an example extension.
 
 ### Tag Filtering
 
@@ -111,27 +115,27 @@ untp-test --tag validation --tag jsonld credential.json
 ### Example Output
 
 ```
-Adding credential files from directory: example-credentials
-Found 5 credential files in directory
-Testing 5 credential files
+Testing 1 credential files
 
 Running UNTP validation tests...
 
-Tier 1 - W3C Verifiable Credential Validation (tags: tier1, w3c)
-  ✔ should have access to credential state (tags: basic, integration) (1ms)
-  product-passport.json
-    ✔ should be a valid JSON-LD document (tags: jsonld) (598ms)
-    ✔ should match the VerifiableCredential 1.1 schema (tags: jsonschema) (1ms)
-Tier 2 - UNTP Schema Validation (tags: tier2, untp)
-  ✔ should have access to credential state (tags: basic, integration)
-  digital-livestock-passport.json
-    ✔ should validate against DigitalProductPassport UNTP schema (tags: schema, untp-validation) (177ms)
-    ✔ should validate against DigitalLivestockPassport extension schema (tags: schema, extension-validation) (499ms)
+Tier 1 - W3C Verifiable Credential Validation  (tags: tier1, w3c)
+    ✔ should have access to credential state  (tags: basic, integration)
+  product-passport-simple.json
+      ✔ should be a valid JSON-LD document  (tags: jsonld) (596ms)
+      ✔ should match the VerifiableCredential 1.1 schema  (tags: schema) (126ms)
+Tier 2 - UNTP Schema Validation  (tags: tier2, untp)
+    ✔ should have access to credential state  (tags: basic, integration)
+  product-passport-simple.json
+      ✔ should validate against DigitalProductPassport UNTP schema  (tags: schema) (105ms)
 
-  6 passing (1275ms)
+  5 passing (835ms)
 ```
 
-## Browser Usage
+## Example Browser Usage
+
+A small example browser test page has been generated that shows how you can run
+the same tests with the same test runner, in a browser environment.
 
 ### Quick Start
 
@@ -150,23 +154,23 @@ npm run browser-test
 
 6. Click "🚀 Run Tests" to see real-time results
 
-### Features
-
-- **Drag & Drop Upload** - Easy credential file selection
-- **Extension Schema Upload** - Upload custom schema mapping files for extension types
-- **Tag Filtering** - Same tag system as CLI
-- **Real-time Results** - Live streaming test output
-- **Color-coded Output** - Green ✔ for pass, red ✖ for fail
-- **Multiple Test Runs** - Run tests repeatedly without page reload
+Note that re-running tests uses the browser's cache automatically and so schemas are not re-fetched (and there's a [task](memory-bank/tasks/TASK006-persistent-http-cache.md) to
+get the same behaviour on the CLI).
 
 ### Integration in Web Applications
 
 Include the browser bundle in your web application:
 
 ```html
-<!-- Load Mocha and Chai -->
+<!-- Load Mocha and dependencies -->
 <script src="https://unpkg.com/mocha@10.2.0/mocha.js"></script>
 <script src="https://unpkg.com/chai@4.3.10/chai.js"></script>
+
+<!-- Load AJV for JSON schema validation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ajv/8.17.1/ajv2020.bundle.min.js"></script>
+
+<!-- Load JSON-LD for JSON-LD validation -->
+<script src="https://unpkg.com/jsonld@8/dist/jsonld.min.js"></script>
 
 <!-- Initialize Mocha -->
 <script>mocha.setup('bdd');</script>
@@ -198,6 +202,8 @@ const results = await runner.run({
 console.log('Tests completed:', results.success ? 'PASSED' : 'FAILED');
 </script>
 ```
+
+See the [example browser-test](browser-test) for more info.
 
 ## Programmatic Usage
 
@@ -242,28 +248,11 @@ const results = await runner.run({
 console.log(`Tests: ${results.stats.passes} passed, ${results.stats.failures} failed`);
 ```
 
+See the [CLI untp-test command](src/bin/untp-test.ts) for more info.
+
 ## Available Tags
 
 Tests can include any `tag:tagname` in their title to enable filtering by that tag when running tests in both the CLI and web environments.
-
-### By Tier
-Every test should have a tier tag:
-- `tag:tier1` - W3C Verifiable Credential validation
-- `tag:tier2` - UNTP-specific validation
-- `tag:tier3` - Graph inference and trust chains
-
-Other tags are completely optional, but could be used as per the examples below:
-
-### By Test Type
-- `tag:basic` - Basic functionality tests
-- `tag:smoke` - Quick validation tests
-- `tag:validation` - Data validation tests
-- `tag:integration` - Integration tests
-
-### By Technology
-- `tag:json` - JSON structure validation
-- `tag:jsonld` - JSON-LD context validation
-- `tag:w3c` - W3C standard compliance
 
 ## Extension Testing
 
@@ -288,6 +277,7 @@ This credential will generate tests for:
 - DigitalProductPassport UNTP schema validation (Tier 2)
 - DigitalLivestockPassport extension schema validation (Tier 2)
 
+
 ### Custom Test Suites
 
 For additional custom test logic, add your test files in the `mochaSetupCallback`:
@@ -306,9 +296,8 @@ mochaSetupCallback: (mochaOptions) => {
 }
 ```
 
-## Writing Custom Tests
+This will be exposed in the CLI at a later point.
 
-Create test files using the standard Mocha BDD syntax with UNTP helpers. See the [standard UNTP tests](./untp-tests) for examples.
 
 ## API Reference
 
@@ -322,33 +311,6 @@ Main test execution class that works in both Node.js and browser environments.
 - **onStream**: `(event: StreamEvent) => void` - Optional streaming callback to receive real-time events for test execution
 - **returns**: `Promise<UNTPTestResults>` - Test execution results
 
-### UNTPTestOptions
-
-```typescript
-interface UNTPTestOptions {
-  /** Tags to include (run only tests with these tags) */
-  tags?: string[];
-  /** Extension schema mapping files to load */
-  extensionSchemaMaps?: string[];
-  /** Callback to create and configure Mocha instance */
-  mochaSetupCallback: (mochaOptions: any) => any;
-}
-```
-
-### Credential State Functions
-
-```typescript
-// Set credential data for tests
-setCredentialData(data: Map<string, string>): void
-
-// Check if credentials are loaded
-hasCredentials(): boolean
-
-// Get all credentials as [filename, content] pairs
-getAllCredentials(): Array<[string, string]>
-```
-
-## Development
 
 ### Building
 
@@ -369,4 +331,7 @@ MIT License - see LICENSE file for details.
 
 ## Related Projects
 
-- [UNTP Playground](../untp-playground) - Web interface for UNTP credential testing
+The following projects both within this repository are potential users of this new untp-test-suite:
+
+- [UNTP Playground](../untp-playground) - Web interface for UNTP credential testing that I envisage will use this new untp-test-suite.
+- [tests-untp E2E](../../e2e) - end to end test that is currently the only library using the existing untp-test-suite.
