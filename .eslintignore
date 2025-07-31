@@ -1,4 +1,7 @@
+browser-test
 build
+dist
+generated
 lib
 coverage
 __tests__
@@ -9,4 +12,5 @@ integration
 node_modules
 .next
 packages/untp-playground/infra
+packages/untp-test-suite-mocha/untp-tests
 

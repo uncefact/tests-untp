@@ -150,10 +150,8 @@ export function setupUNTPChaiAssertions(chai: any, jsonld: any, ajv: any): void 
     const obj = this._obj;
 
     // Return a promise-based assertion
-    const assertion = this;
-
     return validateJSONLD(obj, jsonld).then((result) => {
-      assertion.assert(
+      this.assert(
         result.valid,
         `JSON-LD document validation failed: ${result.errors.map((e) => e.message).join(', ')}`,
         `expected credential not to be a valid JSON-LD document`,
@@ -173,17 +171,17 @@ export function setupUNTPChaiAssertions(chai: any, jsonld: any, ajv: any): void 
     'schema',
     function (this: any, schemaUrl: string) {
       const obj = this._obj;
-      const assertion = this;
 
+      // Return a promise-based assertion
       return validateJsonAgainstSchema(obj, schemaUrl, ajv)
         .then((result) => {
           if (result.valid) {
-            assertion.assert(true, '', '', true, true);
+            this.assert(true, '', '', true, true);
           } else {
             // Format errors for better readability
             const formattedErrors = result.errors.map((e) => `      - ${e.message}`).join('\n');
 
-            assertion.assert(
+            this.assert(
               false,
               `Schema validation failed:\n${formattedErrors}`,
               `expected credential not to match schema`,

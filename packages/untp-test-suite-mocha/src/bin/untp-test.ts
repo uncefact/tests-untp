@@ -30,7 +30,7 @@ function handleStreamEvent(event: StreamEvent): void {
       displayedSuites.clear();
       break;
 
-    case 'pass':
+    case 'pass': {
       // Show hierarchical suite structure
       showSuiteHierarchy(event.data.suiteHierarchy);
 
@@ -43,8 +43,9 @@ function handleStreamEvent(event: StreamEvent): void {
         `${' '.repeat(indent)}${chalk.green('✔')} ${chalk.gray(cleanTestTitle)}${formattedTestTags}${testDuration}`,
       );
       break;
+    }
 
-    case 'fail':
+    case 'fail': {
       // Show hierarchical suite structure
       showSuiteHierarchy(event.data.suiteHierarchy);
 
@@ -59,8 +60,9 @@ function handleStreamEvent(event: StreamEvent): void {
         console.log(`${' '.repeat(failIndent + 2)}${chalk.red(event.data.err.message)}`);
       }
       break;
+    }
 
-    case 'pending':
+    case 'pending': {
       // Show hierarchical suite structure
       showSuiteHierarchy(event.data.suiteHierarchy);
 
@@ -72,8 +74,9 @@ function handleStreamEvent(event: StreamEvent): void {
       const formattedPendingTestTags = pendingTestTags ? ` ${chalk.dim(pendingTestTags)}` : '';
       console.log(`${' '.repeat(pendingIndent)}${chalk.cyan('-')} ${cleanPendingTitle}${formattedPendingTestTags}`);
       break;
+    }
 
-    case 'end':
+    case 'end': {
       console.log(''); // Empty line before summary
 
       // Print summary
@@ -83,17 +86,16 @@ function handleStreamEvent(event: StreamEvent): void {
       if (stats.passes > 0) {
         console.log(`  ${chalk.green(`${stats.passes} passing`)} ${chalk.gray(`(${totalDuration})`)}`);
       }
-
       if (stats.failures > 0) {
         console.log(`  ${chalk.red(`${stats.failures} failing`)}`);
       }
-
       if (stats.pending > 0) {
         console.log(`  ${chalk.cyan(`${stats.pending} pending`)}`);
       }
 
       console.log(''); // Empty line after summary
       break;
+    }
   }
 }
 
