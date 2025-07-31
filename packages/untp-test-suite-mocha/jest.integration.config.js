@@ -2,7 +2,7 @@ export default {
   rootDir: './',
   collectCoverage: false,
   testMatch: [],
-  testPathIgnorePatterns: ['<rootDir>/**'],
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/'],
   preset: 'ts-jest',
   testEnvironment: 'node',
 };
