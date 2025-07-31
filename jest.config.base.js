@@ -3,5 +3,6 @@ module.exports = {
   collectCoverageFrom: ['<rootDir>/src/**/*.{ts,tsx}', '<rootDir>/src/**/*.{js,jsx}', '!**/*.d.ts'],
   coverageDirectory: '<rootDir>/coverage',
   coverageReporters: ['json', 'json-summary', 'text', 'lcov'],
+  testPathIgnorePatterns: ['/packages/untp-test-suite-mocha'],
   verbose: true,
 };
