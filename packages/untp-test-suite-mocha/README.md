@@ -2,20 +2,30 @@
 
 A reusable testing library for United Nations Transparency Protocol (UNTP) credentials that works in both Node.js CLI and browser environments, using [Mocha](https://mochajs.org/).
 
+## Example CLI Usage
+
+![CLI Usage](doc/images/console-tag-schema.png)
+
+## Example Browser Usage
+
+![Browser Usage](doc/images/browser-tag-schema.png)
+
 ## Features
 
-✅ **Both CLI and Browser Compatibility** - Same tests run in CLI and browser
-✅ **Real-time Streaming Results** - Live test output with custom reporter
-✅ **Tag-based Filtering** - Precise test selection with tags
-✅ **TypeScript Support** - Full type safety and IntelliSense
-✅ **Extension Schema Mapping** - Support for custom credential types with configurable schema validation
+- **Both CLI and Browser Compatibility** - Same tests run in CLI and browser
+- **Real-time Streaming Results** - Live test output with custom reporter
+- **Tag-based Filtering** - Specific sets of tests can be selected using tags
+- **Extension Schema Mapping** - Support for custom credential types with configurable mapping of extension type to schemas (both in CLI and browser)
+- **General test extensibility** - TBD
 
 ## Testing Tiers
 
-The package enables running the three tiers of UNTP validation:
+The package enables running the two tiers of UNTP validation that are currently available:
 
 - **Tier 1**: W3C Verifiable Credential validation (JSON, JSON-LD, schema conformance)
 - **Tier 2**: UNTP-specific credential type validation and required fields
+
+Tier 3 testing will be added soon:
 - **Tier 3**: Graph inference, trust-chain verification, and claim conformance
 
 ## Installation
@@ -28,7 +38,7 @@ npm install untp-test-suite-mocha
 
 ### Basic Usage
 
-Test credential files directly:
+Test credential files directly or by passing a directory:
 
 ```bash
 # Test single credential file
@@ -42,27 +52,12 @@ untp-test --directory ./credentials
 
 # Combine individual files with directory scanning
 untp-test credential.json --directory ./credentials
-```
-
-### Directory Scanning
-
-The CLI can automatically find and test credential files from directories:
-
-```bash
-# Test all credential files in a directory
-untp-test --directory ./example-credentials
-
-# Short form
-untp-test -d ./credentials
-
-# Combine with individual files
-untp-test specific-file.json --directory ./more-credentials
 
 # With tag filtering
 untp-test --directory ./credentials --tag tier1
 ```
 
-**Supported file types**: `.json` and `.jsonld` files are automatically detected and included.
+**Supported file types**: `.json` and `.jsonld` files are automatically detected and included when scanning a directory.
 
 ### Extension Schema Mapping
 
@@ -149,13 +144,16 @@ npm run browser-test
 
 3. Upload credential files (.json or .jsonld) using drag & drop or file selection
 
-4. Optionally add tags for filtering (e.g., `tier1`, `validation`, `smoke`)
+4. Optionally upload extension schema mapping JSON files for custom credential types
 
-5. Click "🚀 Run Tests" to see real-time results
+5. Optionally add tags for filtering (e.g., `tier1`, `validation`, `smoke`)
+
+6. Click "🚀 Run Tests" to see real-time results
 
 ### Features
 
 - **Drag & Drop Upload** - Easy credential file selection
+- **Extension Schema Upload** - Upload custom schema mapping files for extension types
 - **Tag Filtering** - Same tag system as CLI
 - **Real-time Results** - Live streaming test output
 - **Color-coded Output** - Green ✔ for pass, red ✖ for fail
@@ -182,10 +180,11 @@ const credentialData = new Map();
 credentialData.set('credential.json', '{"@context": [...], "type": [...]}');
 setCredentialData(credentialData);
 
-// Run tests
+// Run tests with extension schema mappings
 const runner = new UNTPTestRunner();
 const results = await runner.run({
   tags: ['tier1'], // Optional tag filtering
+  extensionSchemaMaps: [extensionMappingObject], // Optional extension mappings
   mochaSetupCallback: (mochaOptions) => {
     const mocha = new Mocha(mochaOptions);
     mocha.cleanReferencesAfterRun(false);

@@ -26,7 +26,7 @@ registerUNTPTestSuite((credentialState) => {
           await expect(parsedCredential).to.be.a.validJSONLDDocument;
         });
 
-        it('should match the VerifiableCredential 1.1 schema tag:jsonschema', async () => {
+        it('should match the VerifiableCredential 1.1 schema tag:schema', async () => {
           // Get the W3C VerifiableCredential schema URL
           const schemaUrl = await untpTestSuite.getSchemaUrlForCredential(parsedCredential, 'VerifiableCredential');
 

@@ -19,7 +19,7 @@ registerUNTPTestSuite((credentialState) => {
         const parsedCredential = JSON.parse(content);
         const untpType = untpTestSuite.getUNTPCredentialType(parsedCredential);
 
-        it(`should validate against ${untpType} UNTP schema tag:schema tag:untp-validation`, async () => {
+        it(`should validate against ${untpType} UNTP schema tag:schema`, async () => {
           // Assert that we can determine a UNTP credential type
           expect(untpType, 'Should be able to determine UNTP credential type').to.be.a('string');
 
@@ -36,7 +36,7 @@ registerUNTPTestSuite((credentialState) => {
         // Create individual tests for each extension type
         const extensionTypes = untpTestSuite.getExtensionTypes(parsedCredential);
         extensionTypes.forEach((extensionType) => {
-          it(`should validate against ${extensionType} extension schema tag:schema tag:extension-validation`, async () => {
+          it(`should validate against ${extensionType} extension schema tag:schema tag:extension`, async () => {
             // Get the appropriate schema URL for this extension type
             const extensionSchemaUrl = await untpTestSuite.getSchemaUrlForCredential(parsedCredential, extensionType);
 
