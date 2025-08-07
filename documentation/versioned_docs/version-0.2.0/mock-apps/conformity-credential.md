@@ -113,7 +113,7 @@ Steps:
                   "conformityEvidence": {
                     "type": "w3c_vc",
                     "assuranceLevel": "3rdParty",
-                    "reference": "http://localhost:3001/verify?q%3D%7Bpayload%3A%7Buri%3Ahttp%3A%2F%2Flocalhost%3A3001%2Fconformity-credentials%2Fsteel-mill-1-emissions.json%7D%7D"
+                    "reference": "http://localhost:3003verify?q%3D%7Bpayload%3A%7Buri%3Ahttp%3A%2F%2Flocalhost%3A3001%2Fconformity-credentials%2Fsteel-mill-1-emissions.json%7D%7D"
                   }
                 }
               ]

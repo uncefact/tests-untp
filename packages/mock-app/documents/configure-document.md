@@ -158,7 +158,7 @@ Based on the example, you can define the features of the apps in the configurati
                     ],
                     "type": ["DigitalProductPassport"],
                     "dlrLinkTitle": "Livestock Passport",
-                    "dlrVerificationPage": "http://localhost:3001/verify"
+                    "dlrVerificationPage": "http://localhost:3003/verify"
                   },
 
                   "dlr": {
