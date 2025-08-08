@@ -73,7 +73,7 @@ P-->>C: Return VC and resolver URL
         ],
         "type": ["DigitalProductPassport"],
         "dlrLinkTitle": "Steel Passport",
-        "dlrVerificationPage": "http://localhost:3333/verify",
+        "dlrVerificationPage": "http://localhost:3003/verify",
         "validUntil": "2025-11-28T04:47:15.136Z"
       },
       "dlr": {
