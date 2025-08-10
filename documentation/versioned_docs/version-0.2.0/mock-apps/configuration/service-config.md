@@ -56,7 +56,7 @@ graph TD
             "type": ["VerifiableCredential", " DigitalProductPassport"],
             "dlrLinkTitle": "Steel Passport",
             "dlrIdentificationKeyType": "gtin",
-            "dlrVerificationPage": "http://localhost:3000/verify"
+            "dlrVerificationPage": "http://localhost:3003/verify"
           },
           "dlr": {
             "dlrAPIUrl": "http://localhost:8080",

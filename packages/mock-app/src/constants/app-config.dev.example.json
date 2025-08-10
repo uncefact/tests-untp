@@ -725,7 +725,7 @@
                     ],
                     "type": ["VerifiableCredential", " DigitalProductPassport"],
                     "dlrLinkTitle": "Steel Passport",
-                    "dlrVerificationPage": "http://localhost:3000/verify"
+                    "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
                     "dlrAPIUrl": "http://localhost:8080",
@@ -1204,7 +1204,7 @@
                     ],
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Transaction Event",
-                    "dlrVerificationPage": "http://localhost:3000/verify"
+                    "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
                     "dlrAPIUrl": "http://localhost:8080",
@@ -1938,7 +1938,7 @@
                     ],
                     "type": ["VerifiableCredential", " DigitalProductPassport"],
                     "dlrLinkTitle": "Steel Passport",
-                    "dlrVerificationPage": "http://localhost:3000/verify"
+                    "dlrVerificationPage": "http://localhost:3003/verify"
                   },
 
                   "dlr": {
@@ -2418,7 +2418,7 @@
                     ],
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Transaction Event",
-                    "dlrVerificationPage": "http://localhost:3000/verify"
+                    "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
                     "dlrAPIUrl": "http://localhost:8080",
@@ -2512,7 +2512,7 @@
                     "type": ["TransformationEventCredential"],
                     "dlrIdentificationKeyType": "gtin",
                     "dlrLinkTitle": "EPCIS transformation event VC",
-                    "dlrVerificationPage": "http://localhost:3000/verify",
+                    "dlrVerificationPage": "http://localhost:3003/verify",
                     "dlrQualifierPath": ""
                   },
                   "dpp": {
@@ -2526,7 +2526,7 @@
                     "type": ["DigitalProductPassport"],
                     "dlrIdentificationKeyType": "gtin",
                     "dlrLinkTitle": "Digital Product Passport",
-                    "dlrVerificationPage": "http://localhost:3000/verify",
+                    "dlrVerificationPage": "http://localhost:3003/verify",
                     "dlrQualifierPath": ""
                   },
                   "vckit": {

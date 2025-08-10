@@ -31,13 +31,13 @@ The general structure of the verify link is as follows:
 
 ### Decoded (Human-readable) Example:
 ```
-http://localhost:3001/verify?q={payload:{uri:'http://localhost:3001/conformity-credentials/steel-mill-1-emissions.json', key:'secret', hash:'595d8d20c586c6f55f8a758f294674fa85069db5c518a0f4cbbd3fd61f46522f'}}
+http://localhost:3003/verify?q={payload:{uri:'http://localhost:3001/conformity-credentials/steel-mill-1-emissions.json', key:'secret', hash:'595d8d20c586c6f55f8a758f294674fa85069db5c518a0f4cbbd3fd61f46522f'}}
 ```
 
 ### Encoded (URL-safe) Example:
 ```
-http://localhost:3001/verify?q%3D%7Bpayload%3A%7Buri%3Ahttp%3A%2F%2Flocalhost%3A3001%2Fconformity-credentials%2Fsteel-mill-1-emissions.json%7D%7D
-http://localhost:3001/verify?q%3D%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Flocalhost%3A3001%2Fconformity-credentials%2Fsteel-mill-1-emissions.json%22%2C%22key%22%3A%22secret%22%2C%22hash%22%3A%22595d8d20c586c6f55f8a758f294674fa85069db5c518a0f4cbbd3fd61f46522f%22%7D%7D
+http://localhost:3003/verify?q%3D%7Bpayload%3A%7Buri%3Ahttp%3A%2F%2Flocalhost%3A3001%2Fconformity-credentials%2Fsteel-mill-1-emissions.json%7D%7D
+http://localhost:3003/verify?q%3D%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Flocalhost%3A3001%2Fconformity-credentials%2Fsteel-mill-1-emissions.json%22%2C%22key%22%3A%22secret%22%2C%22hash%22%3A%22595d8d20c586c6f55f8a758f294674fa85069db5c518a0f4cbbd3fd61f46522f%22%7D%7D
 ```
 
 ### Production Example:

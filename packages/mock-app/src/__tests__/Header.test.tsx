@@ -24,7 +24,7 @@ jest.mock('../hooks/GlobalContext', () => ({
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useLocation: () => ({
-    pathname: 'localhost:3000/',
+    pathname: 'localhost:3003/',
   }),
 }));
 
