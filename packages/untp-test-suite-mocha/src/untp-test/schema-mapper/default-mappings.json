@@ -1,0 +1,34 @@
+{
+  "version": "0.1.0",
+  "mappings": [
+    {
+      "credentialType": "DigitalProductPassport",
+      "versionRegex": "https://test\\.uncefact\\.org/vocabulary/untp/dpp/([^/]+)/",
+      "schemaUrlPattern": "https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-{version}.json"
+    },
+    {
+      "credentialType": "DigitalConformityCredential",
+      "versionRegex": "https://test\\.uncefact\\.org/vocabulary/untp/dcc/([^/]+)/",
+      "schemaUrlPattern": "https://test.uncefact.org/vocabulary/untp/dcc/untp-dcc-schema-{version}.json"
+    },
+    {
+      "credentialType": "DigitalFacilityRecord",
+      "versionRegex": "https://test\\.uncefact\\.org/vocabulary/untp/dfr/([^/]+)/",
+      "schemaUrlPattern": "https://test.uncefact.org/vocabulary/untp/dfr/untp-dfr-schema-{version}.json"
+    },
+    {
+      "credentialType": "DigitalIdentityAnchor",
+      "versionRegex": "https://test\\.uncefact\\.org/vocabulary/untp/dia/([^/]+)/",
+      "schemaUrlPattern": "https://test.uncefact.org/vocabulary/untp/dia/untp-dia-schema-{version}.json"
+    },
+    {
+      "credentialType": "DigitalTraceabilityEvent",
+      "versionRegex": "https://test\\.uncefact\\.org/vocabulary/untp/dte/([^/]+)/",
+      "schemaUrlPattern": "https://test.uncefact.org/vocabulary/untp/dte/untp-dte-schema-{version}.json"
+    },
+    {
+      "credentialType": "VerifiableCredential",
+      "schemaUrlPattern": "https://raw.githubusercontent.com/w3c/vc-data-model/refs/heads/main/schema/verifiable-credential/verifiable-credential-schema.json"
+    }
+  ]
+}

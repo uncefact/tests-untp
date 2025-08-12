@@ -1,0 +1,7 @@
+/**
+ * UNTP Test Suite Mocha - Main Library Entry Point
+ *
+ * A reusable Mocha-based testing library for UNTP (United Nations Transparency Protocol) credentials
+ */
+
+export * from './untp-test';

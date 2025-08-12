@@ -1,0 +1,181 @@
+{
+  "type": ["DigitalLivestockPassport", "DigitalProductPassport", "VerifiableCredential"],
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/",
+    "https://jargon.sh/user/aatp/DigitalLivestockPassport/v/working/artefacts/jsonldContexts/DigitalLivestockPassport.jsonld?class=DigitalLivestockPassport"
+  ],
+  "id": "https://livestock-registry.com.au/credentials/beef-passport-001",
+  "issuer": {
+    "type": ["CredentialIssuer"],
+    "id": "did:web:livestock-registry.com.au",
+    "name": "Australian Livestock Registry",
+    "issuerAlsoKnownAs": [
+      {
+        "id": "https://abr.business.gov.au/ABN/View?abn=12345678901",
+        "name": "Australian Livestock Registry Pty Ltd",
+        "registeredId": "12345678901"
+      }
+    ]
+  },
+  "validFrom": "2024-03-15T12:00:00Z",
+  "validUntil": "2034-03-15T12:00:00Z",
+  "credentialSubject": {
+    "type": ["LivestockPassport", "ProductPassport"],
+    "id": "https://livestock-registry.com.au/passport/beef-001",
+    "granularityLevel": "item",
+    "conformityClaim": [
+      {
+        "type": ["Claim", "Declaration"],
+        "id": "https://livestock-registry.com.au/claims/organic-certification-001",
+        "description": "Certification that this animal was raised according to organic farming standards with no synthetic pesticides, hormones, or antibiotics.",
+        "referenceStandard": {
+          "type": ["Standard"],
+          "id": "https://www.agriculture.gov.au/agriculture-land/farm-food-drought/food/organic-biodynamic",
+          "name": "Australian Organic Standards",
+          "issuingParty": {
+            "id": "https://www.agriculture.gov.au",
+            "name": "Australian Government Department of Agriculture",
+            "registeredId": "AGRIC-DEPT-001"
+          },
+          "issueDate": "2023-01-01"
+        },
+        "assessmentCriteria": [
+          {
+            "type": ["Criterion"],
+            "id": "https://www.agriculture.gov.au/organic-standards#pasture-management",
+            "name": "Organic pasture management requirements",
+            "description": "Animals must graze on certified organic pastures free from synthetic fertilizers and pesticides for minimum periods.",
+            "conformityTopic": "environment.biodiversity",
+            "status": "active"
+          }
+        ],
+        "assessmentDate": "2024-02-15",
+        "declaredValue": [
+          {
+            "metricName": "Organic pasture access percentage",
+            "metricValue": {
+              "value": 100,
+              "unit": "P1"
+            },
+            "score": "A",
+            "accuracy": 0.95
+          }
+        ],
+        "conformance": true,
+        "conformityTopic": "environment.biodiversity"
+      }
+    ],
+    "emissionsScorecard": {
+      "carbonFootprint": 12.5,
+      "declaredUnit": "KGM",
+      "operationalScope": "CradleToGate",
+      "primarySourcedRatio": 0.8,
+      "reportingStandard": {
+        "type": ["Standard"],
+        "id": "https://www.mla.com.au/research-and-development/environment-and-sustainability/carbon-neutral-2030/",
+        "name": "Meat & Livestock Australia Carbon Accounting Framework",
+        "issuingParty": {
+          "id": "https://www.mla.com.au",
+          "name": "Meat & Livestock Australia",
+          "registeredId": "MLA-CARBON-001"
+        },
+        "issueDate": "2023-06-01"
+      }
+    },
+    "traceabilityInformation": [
+      {
+        "valueChainProcess": "Birth and Early Life",
+        "verifiedRatio": 1.0,
+        "traceabilityEvent": [
+          {
+            "linkURL": "https://livestock-registry.com.au/events/birth-001",
+            "linkName": "Birth registration event",
+            "linkType": "application/json",
+            "hashDigest": "a1b2c3d4e5f6789",
+            "hashMethod": "SHA-256",
+            "encryptionMethod": "none"
+          }
+        ]
+      },
+      {
+        "valueChainProcess": "Grazing and Feeding",
+        "verifiedRatio": 0.9,
+        "traceabilityEvent": [
+          {
+            "linkURL": "https://livestock-registry.com.au/events/feeding-logs",
+            "linkName": "Feeding and grazing records",
+            "linkType": "application/json",
+            "hashDigest": "f6e5d4c3b2a1987",
+            "hashMethod": "SHA-256",
+            "encryptionMethod": "none"
+          }
+        ]
+      }
+    ],
+    "product": {
+      "type": ["BovineAnimal", "Product"],
+      "id": "https://nlis.com.au/QDBH0132XBS01234",
+      "name": "Angus Steer - Grass Fed",
+      "registeredId": "QDBH0132XBS01234",
+      "idScheme": {
+        "type": ["IdentifierScheme"],
+        "id": "https://nlis.com.au",
+        "name": "National Livestock Identification System"
+      },
+      "description": "Premium grass-fed Angus steer raised on certified organic pastures in the Hunter Valley region of NSW.",
+      "productCategory": [
+        {
+          "type": ["Classification"],
+          "id": "https://unstats.un.org/unsd/classifications/Econ/cpc/21111",
+          "code": "21111",
+          "name": "Live bovine animals",
+          "schemeID": "https://unstats.un.org/unsd/classifications/Econ/cpc/",
+          "schemeName": "UN Central Product Classification (CPC)"
+        }
+      ],
+      "furtherInformation": [
+        {
+          "linkURL": "https://riley-farms.com.au/animal-welfare",
+          "linkName": "Animal welfare practices",
+          "linkType": "text/html"
+        }
+      ],
+      "producedByParty": {
+        "id": "https://abr.business.gov.au/ABN/View?abn=98765432109",
+        "name": "Riley Farms Pty Ltd",
+        "registeredId": "98765432109"
+      },
+      "producedAtFacility": {
+        "id": "https://farms.nsw.gov.au/PIC/1234567",
+        "name": "Riley Farms - Hunter Valley",
+        "registeredId": "PIC1234567"
+      },
+      "productionDate": "2023-09-15",
+      "countryOfProduction": "AU",
+      "characteristics": {
+        "sex": "M",
+        "sexCharacteristic": "S",
+        "breed": ["AA"],
+        "liveWeight": 580,
+        "fatScore": "3",
+        "muscleScore": "A",
+        "frameSize": "7",
+        "maturity": "moderate"
+      }
+    },
+    "healthTreatment": [
+      {
+        "icarDiseaseCategory": "1",
+        "treatmentDate": "2024-01-15",
+        "productId": "https://portal.apvma.gov.au/pubcris/82541",
+        "productName": "Bovine Respiratory Vaccine",
+        "doseRate": {
+          "value": 2,
+          "unit": "MLT"
+        },
+        "witholdingPeriod": 0
+      }
+    ]
+  }
+}
