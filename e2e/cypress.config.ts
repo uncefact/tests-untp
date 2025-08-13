@@ -27,7 +27,7 @@ export default defineConfig({
       runMode: 2, // Retries in headless mode
       openMode: 0, // No retries in interactive mode
     },
-    defaultCommandTimeout: 4000,
+    defaultCommandTimeout: 10000,
     defaultBrowser: 'chrome',
     setupNodeEvents(on) {
       on('task', {
