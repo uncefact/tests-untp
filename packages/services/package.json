@@ -24,8 +24,8 @@
     "axios": "^1.6.7",
     "babel-jest": "^29.7.0",
     "digitallink_toolkit_server": "file:../../digitallink_toolkit_server",
-    "jsonpointer": "^5.0.1",
     "jose": "^5.9.3",
+    "jsonpointer": "^5.0.1",
     "lodash": "^4.17.21",
     "moment": "^2.30.1",
     "uuid": "^9.0.1"

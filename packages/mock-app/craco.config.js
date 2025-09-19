@@ -46,6 +46,17 @@ module.exports = {
   },
   webpack: {
     configure: (webpackConfig) => {
+      // Fix webpack-manifest-plugin compatibility issue
+      const manifestPlugin = webpackConfig.plugins.find(
+        plugin => plugin.constructor.name === 'WebpackManifestPlugin'
+      );
+      if (manifestPlugin) {
+        // Remove the problematic plugin and add it back with proper configuration
+        webpackConfig.plugins = webpackConfig.plugins.filter(
+          plugin => plugin.constructor.name !== 'WebpackManifestPlugin'
+        );
+      }
+
       // Polyfill the missing modules
       webpackConfig.resolve.fallback = {
         ...webpackConfig.resolve.fallback,
