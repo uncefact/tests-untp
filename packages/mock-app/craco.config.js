@@ -51,7 +51,7 @@ module.exports = {
         plugin => plugin.constructor.name === 'WebpackManifestPlugin'
       );
       if (manifestPlugin) {
-        // Remove the problematic plugin and add it back with proper configuration
+        // Remove the problematic plugin as it causes startup issues.
         webpackConfig.plugins = webpackConfig.plugins.filter(
           plugin => plugin.constructor.name !== 'WebpackManifestPlugin'
         );
