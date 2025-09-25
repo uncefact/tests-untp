@@ -30,16 +30,16 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@types/chai": "^5.2.2",
+    "@types/chai": "^4.3.16",
     "@types/mocha": "^10.0.3",
     "@types/node-fetch": "^2.6.12",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "chai": "^5.2.1",
-    "chalk": "4.1.2",
+    "chai": "^4.4.1",
+    "chalk": "^4.1.2",
     "commander": "^14.0.0",
     "mocha": "^11.7.1",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
