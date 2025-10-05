@@ -6,7 +6,9 @@
  */
 
 import { getSchemaUrlForCredential } from './schema-mapper';
-import { getUNTPCredentialType, getExtensionTypes } from './test-utils';
+import { getUNTPCredentialType, getExtensionTypes} from './test-utils';
+import { listAllProducts, getUnattestedIssuersForProduct } from './rdf-utils';
+import { n3store, storeQuads, runInferences } from './n3-utils';
 
 /**
  * Creates and configures an AJV instance for universal use with JSON Schema 2020-12 support
@@ -154,6 +156,7 @@ function setupUNTPTests() {
   // Handle ajv dependency for schema validation
   const ajv = typeof window !== 'undefined' ? (window as any).ajv : createAjvInstance();
 
+
   // Set up custom Chai assertions
   if (typeof window !== 'undefined') {
     // Browser environment - chai assertions are set up directly in browser bundle
@@ -170,6 +173,9 @@ function setupUNTPTests() {
   };
 }
 
+const trustedDIDs: string[] = [];
+
+
 // Make functions available under untpTestSuite namespace to avoid polluting globals
 if (typeof window !== 'undefined') {
   // Browser environment
@@ -182,6 +188,12 @@ if (typeof window !== 'undefined') {
     getSchemaUrlForCredential,
     getUNTPCredentialType,
     getExtensionTypes,
+    n3store,
+    storeQuads,
+    trustedDIDs,
+    listAllProducts,
+    runInferences,
+    getUnattestedIssuersForProduct
   };
 } else {
   // Node.js environment
@@ -194,6 +206,12 @@ if (typeof window !== 'undefined') {
     getSchemaUrlForCredential,
     getUNTPCredentialType,
     getExtensionTypes,
+    n3store,
+    storeQuads,
+    trustedDIDs,
+    listAllProducts,
+    runInferences,
+    getUnattestedIssuersForProduct
   };
 }
 
@@ -208,4 +226,10 @@ export {
   getSchemaUrlForCredential,
   getUNTPCredentialType,
   getExtensionTypes,
+  n3store,
+  storeQuads,
+  trustedDIDs,
+  listAllProducts,
+  runInferences,
+  getUnattestedIssuersForProduct
 };

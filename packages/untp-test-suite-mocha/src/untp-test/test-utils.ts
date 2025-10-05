@@ -139,6 +139,70 @@ export async function validateJSONLD(
 }
 
 /**
+ * Validates if a parsed JSON object can be converted to RDF
+ * @param credential - Object to validate for RDF conversion
+ * @param jsonld - The jsonld library instance
+ * @returns Promise<ValidationResult> with RDF conversion results
+ */
+export async function validateRDFConversion(
+  credential: any,
+  jsonld: any,
+): Promise<{ valid: boolean; errors: Array<{ code: string; message: string; error?: any }> }> {
+  const result = {
+    valid: true,
+    errors: [] as Array<{ code: string; message: string; error?: any }>,
+  };
+
+  try {
+    // Try to convert JSON-LD to RDF (N-Quads format)
+    const nquads = await jsonld.toRDF(credential, {
+      format: 'application/n-quads',
+    });
+
+    // If we get here without throwing, the conversion was successful
+    // Optionally validate that we got some actual RDF data
+    if (!nquads || nquads.toString().trim().length === 0) {
+      result.valid = false;
+      result.errors.push({
+        code: 'EMPTY_RDF_OUTPUT',
+        message: 'RDF conversion produced empty output',
+      });
+    }
+  } catch (error) {
+    result.valid = false;
+
+    // Extract more detailed error information
+    let detailedMessage = 'Failed to convert to RDF';
+    let errorCode = 'RDF_CONVERSION_ERROR';
+
+    if (error instanceof Error) {
+      if (error.message.includes('loading document failed')) {
+        errorCode = 'RDF_CONTEXT_LOAD_ERROR';
+        detailedMessage = `Failed to load context for RDF conversion: ${error.message}`;
+      } else if (error.message.includes('invalid @context')) {
+        errorCode = 'RDF_INVALID_CONTEXT';
+        detailedMessage = `Invalid @context for RDF conversion: ${error.message}`;
+      } else if (error.message.includes('fetch')) {
+        errorCode = 'RDF_CONTEXT_FETCH_ERROR';
+        detailedMessage = `Could not fetch context for RDF conversion: ${error.message}`;
+      } else {
+        detailedMessage = `RDF conversion error: ${error.message}`;
+      }
+    } else {
+      detailedMessage = `RDF conversion failed: ${String(error)}`;
+    }
+
+    result.errors.push({
+      code: errorCode,
+      message: detailedMessage,
+      error: error,
+    });
+  }
+
+  return result;
+}
+
+/**
  * Sets up custom Chai assertions for UNTP testing
  * Should be called once to extend Chai with UNTP-specific matchers
  */
@@ -150,11 +214,25 @@ export function setupUNTPChaiAssertions(chai: any, jsonld: any, ajv: any): void 
     const obj = this._obj;
 
     // Return a promise-based assertion
-    return validateJSONLD(obj, jsonld).then((result) => {
+    return validateJSONLD(this._obj, jsonld).then((result) => {
       this.assert(
         result.valid,
         `JSON-LD document validation failed: ${result.errors.map((e) => e.message).join(', ')}`,
         `expected credential not to be a valid JSON-LD document`,
+        true,
+        result.valid,
+      );
+    });
+  });
+
+  // Add validRDFDocument assertion
+  Assertion.addProperty('validRDFDocument', function (this: any) {
+    // Return a promise-based assertion that tries to convert JSON-LD to RDF
+    return validateRDFConversion(this._obj, jsonld).then((result) => {
+      this.assert(
+        result.valid,
+        `RDF document conversion failed: ${result.errors.map((e) => e.message).join(', ')}`,
+        `expected credential not to be a valid RDF document`,
         true,
         result.valid,
       );
