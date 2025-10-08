@@ -8,7 +8,7 @@
 import { getSchemaUrlForCredential } from './schema-mapper';
 import { getUNTPCredentialType, getExtensionTypes} from './test-utils';
 import { listAllProducts, getUnattestedIssuersForProduct } from './rdf-utils';
-import { n3store, storeQuads, runInferences } from './n3-utils';
+import { storeQuads, runInferences, createN3Store } from './n3-utils';
 
 /**
  * Creates and configures an AJV instance for universal use with JSON Schema 2020-12 support
@@ -188,12 +188,13 @@ if (typeof window !== 'undefined') {
     getSchemaUrlForCredential,
     getUNTPCredentialType,
     getExtensionTypes,
-    n3store,
+    // n3store, // Removed global n3store
     storeQuads,
     trustedDIDs,
     listAllProducts,
     runInferences,
-    getUnattestedIssuersForProduct
+    getUnattestedIssuersForProduct,
+    createN3Store
   };
 } else {
   // Node.js environment
@@ -206,12 +207,13 @@ if (typeof window !== 'undefined') {
     getSchemaUrlForCredential,
     getUNTPCredentialType,
     getExtensionTypes,
-    n3store,
+    // n3store, // Removed global n3store
     storeQuads,
     trustedDIDs,
     listAllProducts,
     runInferences,
-    getUnattestedIssuersForProduct
+    getUnattestedIssuersForProduct,
+    createN3Store
   };
 }
 
@@ -226,10 +228,11 @@ export {
   getSchemaUrlForCredential,
   getUNTPCredentialType,
   getExtensionTypes,
-  n3store,
+  // n3store, // Removed global n3store
   storeQuads,
   trustedDIDs,
   listAllProducts,
   runInferences,
-  getUnattestedIssuersForProduct
+  getUnattestedIssuersForProduct,
+  createN3Store
 };

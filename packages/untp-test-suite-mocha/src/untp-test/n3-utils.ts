@@ -1,23 +1,21 @@
-
 import jsonld from 'jsonld';
 import n3 from 'n3';
 
-export const n3store = new n3.Store();
-
 /**
- * Creates an RDF graph from pre-parsed JSON-LD data
+ * Creates an RDF graph from pre-parsed JSON-LD data and stores quads in the provided N3 Store.
  * @param jsonData - parsed JSON-LD data
  * @param filePath - file path
+ * @param n3store - The N3 Store to add quads to.
  * @param useNamedGraphs - Whether to store quads in named graphs (defaults to false)
  * @returns Promise with the RDF store and any validation results
  */
 export async function storeQuads(
   jsonData: any,
   filePath: string,
+  n3store: n3.Store,
   useNamedGraphs = false,
 ) {
   const graphName = n3.DataFactory.namedNode(`file://${filePath}` || jsonData.id || 'urn:unnamed');
-  // console.log(graphName);
 
   // Convert JSON-LD to N-Quads string jsonld.js
   const quadString = await jsonld.toRDF(jsonData, {
@@ -25,7 +23,11 @@ export async function storeQuads(
   });
 
   const n3parser = new n3.Parser({ format: 'N-Quads' });
-  const quads: n3.Quad[] = n3parser.parse(quadString.toString());
+  let quads: n3.Quad[] = n3parser.parse(quadString.toString());
+
+  if (useNamedGraphs) {
+    quads = quads.map((q) => n3.DataFactory.quad(q.subject, q.predicate, q.object, graphName));
+  }
 
   n3store.addQuads(quads);
 }
@@ -35,7 +37,7 @@ export async function storeQuads(
  * Converts parsed JSON-LD data to N-Quads
  * @param jsonData - The parsed JSON-LD data
  * @param fileName - Optional file name to be used as base URI for the data
- * @param useNamedGraphs - Whether to n3store quads in named graphs (defaults to false)
+ * @param useNamedGraphs - Whether to store quads in named graphs (defaults to false)
  * @returns Promise with the parsed quads
  */
 export async function getQuads(
@@ -43,8 +45,6 @@ export async function getQuads(
   fileName?: string,
   useNamedGraphs = false,
 ): Promise<n3.Quad[]> {
-  // Get the base URI from the credential ID if available
-  // const uri = baseUri || jsonData.id || 'urn:unnamed';
   const graphName = n3.DataFactory.namedNode(fileName || jsonData.id || 'urn:unnamed');
 
   // Convert JSON-LD to N-Quads string jsonld.js
@@ -70,7 +70,7 @@ export async function getQuads(
  * @param n3store - The N3 Store to run inferences on (will be updated in place)
  * @returns Promise with boolean indicating success or failure
  */
-export async function runInferences(): Promise<boolean> {
+export async function runInferences(n3store: n3.Store): Promise<boolean> {
   try {
     let inferenceFiles: Record<string, string> = {};
 
@@ -90,11 +90,7 @@ export async function runInferences(): Promise<boolean> {
         const fs = require('fs');
         const path = require('path');
 
-        // const __filename = fileURLToPath(import.meta.url);
-
         const inferencesDir = path.join(__dirname, '../../src/inferences');
-        // const __dirname = path.dirname(__filename);
-        // const inferencesDir = path.join(__dirname, 'inferences');
         const files = fs.readdirSync(inferencesDir)
           .filter((file: string) => file.endsWith('.n3'))
           .sort();
@@ -150,7 +146,6 @@ export async function runInferences(): Promise<boolean> {
 async function execRules(
   n3rules: string,
   credentials: n3.Quad[],
-  // eyereasoner: any
 ): Promise<n3.Quad[]> {
   // Serialize credential quads to string
   const writer = new n3.Writer({ format: 'N3' });
@@ -199,7 +194,7 @@ async function execRules(
     if (typeof result === 'string') {
       // Filter out lines containing log:outputString
       // This regex matches lines that contain log:outputString as a predicate
-      const outputStringRegex = /^.*\s+log:outputString\s+.*\.$/gm;
+      const outputStringRegex = /^.*\\\\s+log:outputString\\\\s+.*\\\\.$/gm;
       const filteredResult = result.replace(outputStringRegex, '');
 
       try {
@@ -241,4 +236,13 @@ async function execRules(
     console.error(`Error details for query ${n3rules}:`, error);
     throw new Error(`Error executing EYE reasoner: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+
+/**
+ * Initializes and returns a new N3 Store instance.
+ * @returns A new n3.Store instance.
+ */
+export function createN3Store(): n3.Store {
+  return new n3.Store();
 }
