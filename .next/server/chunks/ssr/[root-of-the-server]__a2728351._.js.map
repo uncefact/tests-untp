@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 3, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"","debugId":null}},
+    {"offset": {"line": 11, "column": 0}, "map": {"version":3,"sources":["file:///Users/nikokresic/github/pyx-rbtp/src/app/page.tsx"],"sourcesContent":["export default function Page() {\n  return <h1>Hello, Next.js!</h1>;\n}\n"],"names":[],"mappings":";;;;;;AAAe,SAAS;IACtB,qBAAO,6WAAC;kBAAG;;;;;;AACb","debugId":null}}]
+}

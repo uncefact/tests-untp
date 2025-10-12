@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://untp.org/schemas/schema-mappings.json",
+  "title": "UNTP Schema Mappings Configuration",
+  "description": "Configuration file that maps UNTP credential types to their schema URLs and validation patterns",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Version of this configuration format"
+    },
+    "mappings": {
+      "type": "array",
+      "description": "Array of credential type to schema URL mappings",
+      "items": {
+        "type": "object",
+        "properties": {
+          "credentialType": {
+            "type": "string",
+            "description": "The credential type as it appears in the credential's type array"
+          },
+          "versionRegex": {
+            "type": "string",
+            "description": "Regex pattern to extract version from credential (typically from @context URLs)"
+          },
+          "schemaUrlPattern": {
+            "type": "string",
+            "description": "Template for schema URL with {version} placeholder"
+          }
+        },
+        "required": ["credentialType", "schemaUrlPattern"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["version", "mappings"],
+  "additionalProperties": false
+}

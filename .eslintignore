@@ -1,0 +1,16 @@
+browser-test
+build
+dist
+generated
+lib
+coverage
+__tests__
+scripts
+jest.config.*
+jest.*.config.*
+integration
+node_modules
+.next
+packages/untp-playground/infra
+packages/untp-test-suite-mocha/untp-tests
+

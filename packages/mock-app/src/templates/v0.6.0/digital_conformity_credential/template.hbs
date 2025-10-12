@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Digital Conformity Credential</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap"
+      rel="stylesheet" />
+    <style>
+      :root {
+        /* Brand Colors */
+        --color-primary: rgba(31, 90, 149, 1); /* Key text like assessment-topic; Default: rgba(31, 90, 149, 1) */
+        --color-secondary: rgba(247, 250, 253, 1); /* Light background for assessment frames; Default: rgba(247, 250, 253, 1) */
+
+        /* Neutrals */
+        --color-white: rgba(255, 255, 255, 1); /* Main content background and text; Default: rgba(255, 255, 255, 1) */
+        --color-black: rgba(0, 0, 0, 1); /* Main text; Default: rgba(0, 0, 0, 1) */
+        --color-gray-700: rgba(35, 46, 61, 1); /* Primary dark text and header background; Default: rgba(35, 46, 61, 1) */
+        --color-gray-600: rgba(85, 96, 110, 1); /* Secondary text (labels); Default: rgba(85, 96, 110, 1) */
+        --color-gray-400: rgba(212, 214, 216, 1); /* Light gray text (subtle) and borders; Default: rgba(212, 214, 216, 1) */
+        --color-gray-300: rgba(237, 239, 240, 1); /* Issuing details background; Default: rgba(237, 239, 240, 1) */
+
+        /* Semantic (Functional) Colors */
+        --color-link-underline: rgba(79, 149, 221, 1); /* Link underlines; Default: rgba(79, 149, 221, 1) */
+        --color-icon: #94c4f5; /* SVG fill and stroke for icons; Default: #94C4F5 */
+
+        /* Font Variables */
+        --font-family: 'Lato', sans-serif; /* All text; Default: Lato font */
+
+        /* Font Weight Variables */
+        --font-weight-light: 300; /* Subtle text; Default: 300 */
+        --font-weight-regular: 400; /* Standard text; Default: 400 */
+        --font-weight-medium: 500; /* Titles, emphasized text; Default: 500 */
+        --font-weight-semi-bold: 600; /* Evidence names; Default: 600 */
+        --font-weight-bold: 700; /* Headings; Default: 700 */
+        --font-weight-black: 900; /* Main titles; Default: 900 */
+      }
+
+      /* Globals CSS */
+      * {
+        margin: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-family);
+      }
+
+      a {
+        text-decoration: none;
+      }
+
+      .conformity-attestation {
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+        word-break: break-word;
+      }
+
+      .conformity-attestation .attestation-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 32px;
+        background-color: var(--color-white);
+      }
+
+      .conformity-attestation .content-section {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+      }
+
+      .conformity-attestation .credential-header-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .conformity-attestation .credential-header {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 24px;
+        padding: 20px 16px;
+        background-color: var(--color-gray-700);
+        width: 100%;
+      }
+
+      .conformity-attestation .credential-details {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        width: 100%;
+      }
+
+      .conformity-attestation .credential-details header {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .conformity-attestation .credential-title-group {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-end;
+        gap: 8px;
+        align-self: stretch;
+      }
+
+      .conformity-attestation .credential-label {
+        font-weight: var(--font-weight-medium);
+        color: var(--color-white);
+        font-size: 16px;
+        letter-spacing: 0;
+        line-height: 22px;
+      }
+
+      .conformity-attestation .credential-title {
+        font-weight: var(--font-weight-black);
+        color: var(--color-white);
+        font-size: 30px;
+        line-height: 32.5px;
+        align-self: stretch;
+        letter-spacing: 0;
+        margin: 0;
+      }
+
+      .conformity-attestation .credential-info {
+        display: flex;
+        flex-direction: column;
+        font-weight: var(--font-weight-regular);
+        color: var(--color-white);
+        font-size: 16px;
+        letter-spacing: 0;
+        line-height: 22px;
+      }
+
+      .conformity-attestation .credential-info span {
+        font-size: 14px;
+        font-weight: var(--font-weight-regular);
+        line-height: 19.25px;
+      }
+
+      .conformity-attestation .credential-info a {
+        font-size: 16px;
+        font-weight: var(--font-weight-bold);
+        line-height: 22px;
+      }
+
+      .conformity-attestation .credential-info p {
+        color: var(--color-gray-400);
+        font-size: 14px;
+        font-weight: var(--font-weight-regular);
+        line-height: 19.25px;
+      }
+
+      .conformity-attestation .credential-info div {
+        font-size: 16px;
+        font-weight: var(--font-weight-bold);
+        line-height: 22px;
+        color: var(--color-white);
+        text-transform: capitalize;
+      }
+
+      .conformity-attestation .credential-link {
+        color: var(--color-white);
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-decoration-color: var(--color-white);
+        text-underline-offset: 3px;
+      }
+
+      .conformity-attestation .credential-description {
+        align-self: stretch;
+        font-weight: var(--font-weight-regular);
+        color: var(--color-white);
+        font-size: 16px;
+        letter-spacing: 0;
+        line-height: 18.9px;
+      }
+
+      .conformity-attestation .evidence-links {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        align-self: stretch;
+        padding: 8px 0px;
+      }
+
+      .conformity-attestation .evidence-link-group {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .conformity-attestation .evidence-name-container {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+
+      .conformity-attestation .evidence-name {
+        align-self: stretch;
+        margin-top: -1px;
+        font-weight: var(--font-weight-semi-bold);
+        color: var(--color-white);
+        font-size: 16px;
+        letter-spacing: 0;
+        line-height: 17.4px;
+      }
+
+      .conformity-attestation .assessment-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 32px;
+        align-self: stretch;
+        padding: 0 16px;
+      }
+
+      .conformity-attestation .assessment-title {
+        font-weight: var(--font-weight-bold);
+        color: var(--color-black);
+        font-size: 20px;
+        letter-spacing: 0;
+        line-height: 21.8px;
+      }
+
+      .conformity-attestation .assessment-description {
+        align-self: stretch;
+        font-weight: var(--font-weight-regular);
+        color: var(--color-black);
+        font-size: 16px;
+        letter-spacing: 0;
+        line-height: 18.9px;
+      }
+
+      .conformity-attestation .assessment-card {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 16px;
+        align-self: stretch;
+        background-color: var(--color-secondary);
+        border-radius: 4px;
+      }
+
+      .conformity-attestation .assessment-topic {
+        align-self: stretch;
+        font-weight: var(--font-weight-regular);
+        color: var(--color-primary);
+        font-size: 18px;
+        letter-spacing: 0;
+        line-height: 21.2px;
+        margin: 0;
+      }
+
+      .conformity-attestation .assessment-details {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        width: 100%;
+      }
+
+      .conformity-attestation .assessment-subheader {
+        display: flex;
+        height: 20px;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .conformity-attestation .subheader-title {
+        font-weight: var(--font-weight-medium);
+        color: var(--color-gray-700);
+        font-size: 16px;
+      }
+
+      .conformity-attestation .assessment-values {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        width: 100%;
+      }
+
+      .conformity-attestation .values-container {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        align-self: stretch;
+      }
+
+      .conformity-attestation .data-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 16px;
+        padding: 10px 0px 12px;
+        border-bottom-width: 1px;
+        border-bottom-style: solid;
+        border-color: var(--color-gray-400);
+        width: 100%;
+      }
+
+      .conformity-attestation .data-label {
+        font-weight: var(--font-weight-regular);
+        color: var(--color-gray-600);
+        font-size: 16px;
+        line-height: 22px;
+      }
+
+      .conformity-attestation .data-value {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        flex-grow: 1;
+        flex: 1;
+      }
+
+      .conformity-attestation .data-text {
+        flex: 1;
+        font-weight: var(--font-weight-medium);
+        color: var(--color-gray-700);
+        font-size: 16px;
+        line-height: 22px;
+      }
+
+      .conformity-attestation .industry-value {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        width: 100%;
+      }
+
+      .conformity-attestation .industry-average-text {
+        margin-top: -1px;
+        font-weight: var(--font-weight-regular);
+        color: var(--color-gray-700);
+        font-size: 16px;
+        letter-spacing: 0;
+        line-height: 17.4px;
+        margin: 0;
+      }
+
+      .conformity-attestation .criteria-name {
+        font-weight: var(--font-weight-light);
+        color: var(--color-black);
+        font-size: 16px;
+        line-height: 18.88px;
+      }
+
+      .conformity-attestation .industry-value-text {
+        font-weight: var(--font-weight-regular);
+        font-size: 16px;
+        line-height: 17.4px;
+        color: var(--color-gray-700);
+      }
+
+      .conformity-attestation .industry-value-text span {
+        font-weight: var(--font-weight-bold);
+      }
+
+      .conformity-attestation .criteria-link {
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+        display: flex;
+      }
+
+      .conformity-attestation .link-text {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        width: fit-content;
+        height: fit-content;
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-decoration-color: var(--color-link-underline);
+        text-underline-offset: 3px;
+      }
+
+      .conformity-attestation .link-label {
+        color: var(--color-black);
+        font-weight: var(--font-weight-regular);
+        font-size: 14px;
+        line-height: 15.3px;
+        width: fit-content;
+        margin-top: -2px;
+        letter-spacing: 0;
+      }
+
+      .conformity-attestation .facility-section {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        align-self: stretch;
+      }
+
+      .conformity-attestation .product-section {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        align-self: stretch;
+      }
+
+      .conformity-attestation .facility-header {
+        display: flex;
+        align-self: stretch;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .conformity-attestation .product-header {
+        display: flex;
+        align-self: stretch;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .conformity-attestation .facility-name {
+        font-weight: var(--font-weight-regular);
+        font-size: 16px;
+        line-height: 17.4px;
+        color: var(--color-gray-700);
+      }
+
+      .conformity-attestation .product-name {
+        font-weight: var(--font-weight-regular);
+        font-size: 16px;
+        line-height: 17.4px;
+        color: var(--color-gray-700);
+      }
+
+      .conformity-attestation .link-container {
+        display: flex;
+        flex-direction: column;
+        align-items: self-end;
+        gap: 6px;
+      }
+
+      .conformity-attestation .view-link {
+        font-weight: var(--font-weight-medium);
+        font-size: 16px;
+        line-height: 17.4px;
+        width: fit-content;
+        margin-top: -2px;
+        color: var(--color-gray-700);
+        letter-spacing: 0;
+      }
+
+      .conformity-attestation .issuing-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .conformity-attestation .issuing-title {
+        width: fit-content;
+        font-weight: var(--font-weight-bold);
+        color: var(--color-black);
+        font-size: 20px;
+        line-height: 21.8px;
+      }
+
+      .conformity-attestation .issuing-link {
+        display: flex;
+        flex: 1;
+        align-self: stretch;
+        flex-grow: 1;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+
+      .conformity-attestation .issuing-value {
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        flex: 1;
+        flex-grow: 1;
+        display: flex;
+        align-self: stretch;
+      }
+
+      .conformity-attestation .issuing-details-section {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        padding: 24px 16px 36px;
+        background-color: var(--color-gray-300);
+      }
+
+      .conformity-attestation .issuing-details-content {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+      }
+
+      .conformity-attestation .evidence-arrow {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .conformity-attestation .criteria-list {
+        margin: 0;
+        padding-left: 25px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .conformity-attestation .data-row-alt {
+        display: grid;
+        grid-template-columns: 1fr 3fr;
+        gap: 16px;
+        padding: 10px 0px 12px;
+        border-bottom-width: 1px;
+        border-bottom-style: solid;
+        border-color: var(--color-gray-400);
+        width: 100%;
+      }
+
+      .conformity-attestation .data-row-details {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 16px;
+        padding: 10px 0px 12px;
+        border-bottom-width: 1px;
+        border-bottom-style: solid;
+        border-color: var(--color-gray-400);
+        width: 100%;
+      }
+
+      /* Issuer endorsement section */
+      .issuer-endorsement-section {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        width: 100%;
+      }
+
+      .endorsement-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .endorsement-title {
+        width: fit-content;
+        font-weight: var(--font-weight-bold);
+        color: var(--color-black);
+        font-size: 20px;
+        line-height: 21.8px;
+      }
+
+      .endorsement-content {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        align-self: stretch;
+      }
+
+      .endorsement-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        align-self: stretch;
+      }
+
+      .accreditation-list {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .accreditation-item {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        position: relative;
+      }
+
+      .accreditation-image-container {
+        width: 110px;
+        height: 50px;
+        gap: 0px;
+        opacity: 0px;
+      }
+
+      .accreditation-image {
+        height: 50px;
+        width: auto;
+        max-width: 100%;
+        object-fit: contain;
+      }
+
+      .accreditation-details {
+        color: var(--color-gray-700);
+        font-weight: var(--font-weight-medium);
+        font-size: 16px;
+        line-height: 17.4px;
+      }
+
+      .accreditation-details a {
+        color: var(--color-gray-700);
+        text-decoration: underline;
+        text-decoration-thickness: 1px;
+        text-decoration-color: var(--color-gray-700);
+        text-underline-offset: 3px;
+      }
+
+      .accreditation-authority-link {
+        text-decoration: underline;
+        text-decoration-color: var(--color-link-underline);
+        color: var(--color-gray-700);
+      }
+
+      /* SVG Icon Styling */
+      .evidence-link-group svg {
+        fill: var(--color-icon);
+      }
+
+      .evidence-arrow svg {
+        stroke: var(--color-icon);
+      }
+
+      /* Media Queries for Desktops */
+      @media (min-width: 1200px) {
+        .conformity-attestation {
+          max-width: 1200px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="conformity-attestation">
+      <div class="attestation-content">
+        <div class="content-section">
+          <header class="credential-header-container">
+            <div class="credential-header">
+              <div class="credential-details">
+                <div class="credential-title-group">
+                  <div class="credential-label">CONFORMITY CREDENTIAL</div>
+                  <h1 class="credential-title">{{credentialSubject.name}}</h1>
+                </div>
+                <div class="credential-info">
+                  <span>Issued to:</span>
+                  <a href="{{credentialSubject.issuedToParty.id}}" class="credential-link" target="_blank">{{credentialSubject.issuedToParty.name}}</a>
+                </div>
+                {{#if credentialSubject.description}}
+                <p class="credential-description">{{credentialSubject.description}}</p>
+                {{/if}}
+                <div class="credential-info">
+                  <p>Level of independent assurance:</p>
+                  <div>{{credentialSubject.assessorLevel}}</div>
+                </div>
+                <div class="credential-info">
+                  <p>Type of authority endorsement:</p>
+                  <div>{{credentialSubject.assessmentLevel}}</div>
+                </div>
+                <div class="credential-info">
+                  <p>Type of the attestation credential:</p>
+                  <div>{{credentialSubject.attestationType}}</div>
+                </div>
+              </div>
+              <div class="credential-details">
+                {{#if credentialSubject.auditableEvidence.linkURL}}
+                <a href="{{credentialSubject.auditableEvidence.linkURL}}" class="evidence-links" target="_blank">
+                  <div class="evidence-link-group">
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path
+                        d="M2 18C1.45 18 0.979333 17.8043 0.588 17.413C0.196667 17.0217 0.000666667 16.5507 0 16V2C0 1.45 0.196 0.979333 0.588 0.588C0.98 0.196667 1.45067 0.000666667 2 0H16C16.55 0 17.021 0.196 17.413 0.588C17.805 0.98 18.0007 1.45067 18 2V16C18 16.55 17.8043 17.021 17.413 17.413C17.0217 17.805 16.5507 18.0007 16 18H2ZM2 2V16H16V2H14V9L11.5 7.5L9 9V2H2Z"
+                        fill="var(--color-icon)" />
+                    </svg>
+                    <div class="evidence-name-container">
+                      <div class="evidence-name">Auditable Evidence</div>
+                    </div>
+                  </div>
+                  <div class="evidence-arrow">
+                    <svg width="9" height="16" viewBox="0 0 9 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L8 8L1 15" stroke="var(--color-icon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </div>
+                </a>
+                {{/if}} {{#if credentialSubject.scope.id}}
+                <a href="{{credentialSubject.scope.id}}" class="evidence-links" target="_blank">
+                  <div class="evidence-link-group">
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path
+                        d="M2 18C1.45 18 0.979333 17.8043 0.588 17.413C0.196667 17.0217 0.000666667 16.5507 0 16V2C0 1.45 0.196 0.979333 0.588 0.588C0.98 0.196667 1.45067 0.000666667 2 0H16C16.55 0 17.021 0.196 17.413 0.588C17.805 0.98 18.0007 1.45067 18 2V16C18 16.55 17.8043 17.021 17.413 17.413C17.0217 17.805 16.5507 18.0007 16 18H2ZM2 2V16H16V2H14V9L11.5 7.5L9 9V2H2Z"
+                        fill="var(--color-icon)" />
+                    </svg>
+                    <div class="evidence-name-container">
+                      <div class="evidence-name">Conformity Assessment Scheme</div>
+                    </div>
+                  </div>
+                  <div class="evidence-arrow">
+                    <svg width="9" height="16" viewBox="0 0 9 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L8 8L1 15" stroke="var(--color-icon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </div>
+                </a>
+                {{/if}} {{#if credentialSubject.conformityCertificate.linkURL}}
+                <a href="{{credentialSubject.conformityCertificate.linkURL}}" class="evidence-links" target="_blank">
+                  <div class="evidence-link-group">
+                    <svg width="20" height="18" viewBox="0 0 20 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path
+                        d="M16 4H4V0H16V4ZM16 9.5C16.2833 9.5 16.521 9.404 16.713 9.212C16.905 9.02 17.0007 8.78267 17 8.5C16.9993 8.21733 16.9033 7.98 16.712 7.788C16.5207 7.596 16.2833 7.5 16 7.5C15.7167 7.5 15.4793 7.596 15.288 7.788C15.0967 7.98 15.0007 8.21733 15 8.5C14.9993 8.78267 15.0953 9.02033 15.288 9.213C15.4807 9.40567 15.718 9.50133 16 9.5ZM14 16V12H6V16H14ZM16 18H4V14H0V8C0 7.15 0.291667 6.43767 0.875 5.863C1.45833 5.28833 2.16667 5.00067 3 5H17C17.85 5 18.5627 5.28767 19.138 5.863C19.7133 6.43833 20.0007 7.15067 20 8V14H16V18Z"
+                        fill="var(--color-icon)" />
+                    </svg>
+                    <div class="evidence-name-container">
+                      <div class="evidence-name">Printable Certificate</div>
+                    </div>
+                  </div>
+                  <div class="evidence-arrow">
+                    <svg width="9" height="16" viewBox="0 0 9 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L8 8L1 15" stroke="var(--color-icon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </div>
+                </a>
+                {{/if}}
+              </div>
+            </div>
+          </header>
+        </div>
+        <div class="assessment-section">
+          {{#if credentialSubject.assessment}}
+          <section class="credential-details">
+            <header>
+              <h2 class="assessment-title">Assessments</h2>
+              <p class="assessment-description">The list of specific assessments made within this conformity attestation.</p>
+            </header>
+            {{#each credentialSubject.assessment}}
+            <article class="assessment-card">
+              <h3 class="assessment-topic">{{conformityTopic}}</h3>
+              {{#if declaredValue}}
+              <section class="assessment-details">
+                <header class="assessment-subheader">
+                  <h4 class="subheader-title">Declared values</h4>
+                </header>
+                <div class="assessment-values">
+                  <div class="values-container">
+                    {{#each declaredValue}}
+                    <div class="data-row-alt">
+                      <div class="data-label">Name</div>
+                      <div class="data-value">
+                        <div class="data-text">{{metricName}}</div>
+                      </div>
+                    </div>
+                    <div class="data-row-alt">
+                      <div class="data-label">Value</div>
+                      <div class="data-value">
+                        <div class="data-text">{{metricValue.value}}{{metricValue.unit}}</div>
+                      </div>
+                    </div>
+                    {{#if accuracy}}
+                    <div class="data-row-alt">
+                      <div class="data-label">Accuracy</div>
+                      <div class="data-value">
+                        <div class="data-text">{{accuracy}}</div>
+                      </div>
+                    </div>
+                    {{/if}} {{/each}}
+                  </div>
+                </div>
+              </section>
+              {{/if}} {{#if assessmentCriteria}}
+              <section class="assessment-details">
+                <header class="assessment-subheader">
+                  <h4 class="subheader-title">Assessment Criteria</h4>
+                </header>
+                {{#each assessmentCriteria}}
+                <div class="criteria-name">{{name}}</div>
+                <div class="criteria-link">
+                  <div class="link-text">
+                    <a href="{{id}}" class="link-label" target="_blank">Assessment criteria</a>
+                  </div>
+                </div>
+                <ul class="criteria-list">
+                  {{#if thresholdValue}}
+                  <li>
+                    <div class="industry-value">
+                      <p class="industry-average-text">
+                        <span class="industry-value-text">
+                          Industry average {{thresholdValue.metricName}} is
+                          <span>{{thresholdValue.metricValue.value}}{{thresholdValue.metricValue.unit}}</span>
+                          .
+                        </span>
+                      </p>
+                    </div>
+                  </li>
+                  {{/if}}
+                </ul>
+                {{/each}}
+              </section>
+              {{/if}} {{#if assessedFacility}}
+              <section class="facility-section">
+                <header class="facility-header">
+                  <h4 class="data-text">Assessed facilities</h4>
+                </header>
+                <div class="values-container">
+                  {{#each assessedFacility}} {{#if facility}}
+                  <div class="data-row">
+                    <p class="facility-name">{{facility.name}}</p>
+                    <div class="link-container">
+                      <a href="{{facility.id}}" class="link-text" target="_blank">
+                        <div class="view-link">View</div>
+                      </a>
+                    </div>
+                  </div>
+                  {{/if}} {{/each}}
+                </div>
+              </section>
+              {{/if}} {{#if assessedProduct}}
+              <section class="product-section">
+                <header class="product-header">
+                  <h4 class="data-text">Assessed products</h4>
+                </header>
+                <div class="values-container">
+                  {{#each assessedProduct}} {{#if product}}
+                  <div class="data-row">
+                    <p class="product-name">{{product.name}}</p>
+                    <div class="link-container">
+                      <a href="{{product.id}}" class="link-text" target="_blank">
+                        <div class="view-link">View</div>
+                      </a>
+                    </div>
+                  </div>
+                  {{/if}} {{/each}}
+                </div>
+              </section>
+              {{/if}}
+              <section class="assessment-details">
+                <header class="assessment-subheader">
+                  <h4 class="subheader-title">Other details</h4>
+                </header>
+                <div class="assessment-values">
+                  <div class="values-container">
+                    {{#if assessmentDate}}
+                    <div class="data-row-details">
+                      <div class="data-label">Assessed</div>
+                      <div class="data-value">
+                        <div class="data-text">{{assessmentDate}}</div>
+                      </div>
+                    </div>
+                    {{/if}}
+                    {{#if assessedOrganisation}}
+                    <div class="data-row-details">
+                      <div class="data-label">Organisation assessed</div>
+                      <a href="{{assessedOrganisation.id}}" class="link-text" target="_blank">
+                        <div class="data-text">{{assessedOrganisation.name}}</div>
+                      </a>
+                    </div>
+                    {{/if}}
+                    {{#if auditor}}
+                    <div class="data-row-details">
+                      <div class="data-label">Auditor</div>
+                      <a href="{{auditor.id}}" class="link-text" target="_blank">
+                        <div class="data-text">{{auditor.name}}</div>
+                      </a>
+                    </div>
+                    {{/if}}
+                    {{#if referenceStandard}}
+                    <div class="data-row-details">
+                      <div class="data-label">Standard</div>
+                      <a href="{{referenceStandard.id}}" class="link-text" target="_blank">
+                        <div class="data-text">{{referenceStandard.name}}</div>
+                      </a>
+                    </div>
+                    {{/if}} {{#if referenceRegulation}}
+                    <div class="data-row-details">
+                      <div class="data-label">Regulation</div>
+                      <a href="{{referenceRegulation.id}}" class="link-text" target="_blank">
+                        <div class="data-text">{{referenceRegulation.name}}</div>
+                      </a>
+                    </div>
+                    {{/if}}
+                  </div>
+                </div>
+              </section>
+            </article>
+            {{/each}}
+          </section>
+          {{/if}}
+          <!-- Issuer endorsement section -->
+          {{#if credentialSubject.authorisation}}
+          <section class="issuer-endorsement-section">
+            <header class="endorsement-header">
+              <h2 class="endorsement-title">Issuer endorsement</h2>
+            </header>
+            <div class="endorsement-content">
+              <div class="endorsement-wrapper">
+                <div class="accreditation-list">
+                  {{#each credentialSubject.authorisation}}
+                  <div class="accreditation-item">
+                    {{#if trustmark.file}}
+                    <div class="accreditation-image-container">
+                      <img src="data:{{trustmark.fileType}};base64,{{trustmark.file}}" alt="{{trustmark.fileName}}" class="accreditation-image" />
+                    </div>
+                    {{/if}}
+                    <div class="accreditation-details">
+                      {{name}} is accredited by
+                      <a href="{{issuingAuthority.id}}" class="accreditation-authority-link" target="_blank">{{issuingAuthority.name}}</a>
+                      .
+                    </div>
+                  </div>
+                  {{/each}}
+                </div>
+              </div>
+            </div>
+          </section>
+          {{/if}}
+        </div>
+      </div>
+      <section class="issuing-details-section">
+        <header class="issuing-header">
+          <h2 class="issuing-title">Issuing details</h2>
+        </header>
+        <div class="issuing-details-content">
+          <div class="data-row-alt">
+            <div class="data-label">Issued by</div>
+            <div class="issuing-link">
+              <a href="{{issuer.id}}" class="link-text" target="_blank">
+                <div class="view-link">{{issuer.name}}</div>
+              </a>
+            </div>
+          </div>
+          {{#if validFrom}}
+          <div class="data-row-alt">
+            <div class="data-label">Valid from</div>
+            <div class="issuing-value">
+              <div class="data-text">{{validFrom}}</div>
+            </div>
+          </div>
+          {{/if}} {{#if validUntil}}
+          <div class="data-row-alt">
+            <div class="data-label">Valid until</div>
+            <div class="issuing-value">
+              <div class="data-text">{{validUntil}}</div>
+            </div>
+          </div>
+          {{/if}}
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

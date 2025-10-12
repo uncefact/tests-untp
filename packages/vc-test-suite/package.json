@@ -1,0 +1,37 @@
+{
+  "name": "@test-untp/vc-test-suite",
+  "version": "0.2.0",
+  "description": "> TODO: description",
+  "author": "Nam Hoang <hoangxuannam160493@gmail.com>",
+  "homepage": "https://github.com/uncefact/tests-untp#readme",
+  "type": "module",
+  "license": "ISC",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uncefact/tests-untp.git"
+  },
+  "scripts": {
+    "test": "mocha tests/ -n=loader=ts-node/esm -n=es-module-specifier-resolution=node tests/**/*.test.ts --reporter @digitalbazaar/mocha-w3c-interop-reporter --reporter-options reportDir=\"$PWD/reports\",respec=\"$PWD/respecConfig.json\",suiteLog='./suite.log',templateData=\"$PWD/reports/index.json\",title=\"VC test suite\" --timeout 15000 --preserve-symlinks",
+    "test:package": "jest"
+  },
+  "bugs": {
+    "url": "https://github.com/uncefact/tests-untp/issues"
+  },
+  "dependencies": {
+    "@digitalbazaar/mocha-w3c-interop-reporter": "1.6.0",
+    "@mock-app/services": "0.2.0",
+    "axios": "^1.7.2",
+    "chai": "^4.3.6",
+    "jsonwebtoken": "^9.0.2",
+    "mocha": "^10.5.2"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.16",
+    "@types/mocha": "^10.0.7",
+    "ts-node": "^10.4.0",
+    "typescript": "^5.5.3"
+  }
+}

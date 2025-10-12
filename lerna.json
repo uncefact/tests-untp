@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "packages": ["packages/*"],
+  "npmClient": "yarn",
+  "command": {
+    "publish": {
+      "allowBranch": ["main", "next"],
+      "conventionalCommits": true,
+      "gitRemote": "origin",
+      "message": "chore(release): %s [skip ci]"
+    }
+  }
+}
