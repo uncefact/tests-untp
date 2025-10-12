@@ -17,7 +17,7 @@ export const Default: Story = {
     fps: 10,
     disableFlip: false,
     qrCodeSuccessCallback: (decodedText: string) => console.log(`Scanned QR Code: ${decodedText}`),
-    qrCodeErrorCallback: (error: unknown) => console.log('Failed to scanning code'),
+    qrCodeErrorCallback: () => console.log('Failed to scanning code'),
   },
   decorators: [(Story) => <Story />],
 };

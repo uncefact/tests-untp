@@ -6,6 +6,16 @@ jest.mock('@vckit/core-types', () => ({
   VerifiableCredential: {}, // Mocking VerifiableCredential to be an empty object
 }));
 
+// Mocking MUI components
+jest.mock('@mui/material', () => ({
+  Card: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...props}>{children}</div>
+  ),
+  CardContent: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...props}>{children}</div>
+  ),
+}));
+
 describe('Json block content', () => {
   afterEach(() => {
     jest.clearAllMocks(); // Clearing all mock calls after each test

@@ -1,14 +1,16 @@
-import React, { useState, useRef } from 'react';
+'use client';
+
+import React, { useState, useRef, useCallback } from 'react';
 import { Box, CircularProgress, Stack } from '@mui/material';
 import { VerifiableCredential } from '@vckit/core-types';
 import { Html5QrcodeResult } from 'html5-qrcode';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { toastMessage, Status, ToastMessage } from '@mock-app/components';
 import { getDlrPassport, IdentityProvider, getProviderByType } from '@mock-app/services';
-import { Scanner } from '../components/Scanner';
-import { IScannerRef } from '../types/scanner.types';
-import { CustomDialog } from '../components/CustomDialog';
-import appConfig from '../constants/app-config.json';
+import { Scanner } from '@/components/Scanner';
+import { IScannerRef } from '@/types/scanner.types';
+import { CustomDialog } from '@/components/CustomDialog';
+import appConfig from '@/constants/app-config.json';
 
 const Scanning = () => {
   const scannerRef = useRef<IScannerRef | null>(null);
@@ -16,36 +18,42 @@ const Scanning = () => {
   const [identityProvider, setIdentityProvider] = useState<IdentityProvider | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [openDialogErrorCode, setOpenDialogErrorCode] = useState<boolean>(false);
-  const navigate = useNavigate();
+  const router = useRouter();
 
-  const goVerifyPage = async (identityProvider: IdentityProvider) => {
-    try {
-      setIsLoading(true);
+  const redirectToVerifyPage = useCallback(
+    (verifyDlrPassportUri: string) => {
+      const urlComponents = new URL(verifyDlrPassportUri);
+      router.push(`${urlComponents.pathname}${urlComponents.search}`);
+    },
+    [router],
+  );
 
-      const dlrUrl = await identityProvider.getDlrUrl(scannedCode, appConfig.identifyProvider.namespace);
-      if (!dlrUrl) {
-        return toastMessage({ status: Status.error, message: 'There no DLR url' });
+  const goVerifyPage = useCallback(
+    async (identityProvider: IdentityProvider) => {
+      try {
+        setIsLoading(true);
+
+        const dlrUrl = await identityProvider.getDlrUrl(scannedCode, appConfig.identifyProvider.namespace);
+        if (!dlrUrl) {
+          return toastMessage({ status: Status.error, message: 'There no DLR url' });
+        }
+
+        const dlrPassport = await getDlrPassport<VerifiableCredential>(dlrUrl);
+        if (!dlrPassport) {
+          return toastMessage({ status: Status.error, message: 'There no DLR passport' });
+        }
+
+        scannerRef.current?.closeQrCodeScanner();
+        redirectToVerifyPage(dlrPassport.href);
+      } catch (error) {
+        console.log(error);
+        // toastMessage({ status: Status.error, message: 'Failed to verify code' });
+      } finally {
+        setIsLoading(false);
       }
-
-      const dlrPassport = await getDlrPassport<VerifiableCredential>(dlrUrl);
-      if (!dlrPassport) {
-        return toastMessage({ status: Status.error, message: 'There no DLR passport' });
-      }
-
-      scannerRef.current?.closeQrCodeScanner();
-      redirectToVerifyPage(dlrPassport.href);
-    } catch (error) {
-      console.log(error);
-      // toastMessage({ status: Status.error, message: 'Failed to verify code' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const redirectToVerifyPage = (verifyDlrPassportUri: string) => {
-    const urlComponents = new URL(verifyDlrPassportUri);
-    navigate(`${urlComponents.pathname}${urlComponents.search}`);
-  };
+    },
+    [redirectToVerifyPage, scannedCode],
+  );
 
   React.useEffect(() => {
     if (!scannedCode || !identityProvider || isLoading) {
@@ -53,9 +61,9 @@ const Scanning = () => {
     }
 
     goVerifyPage(identityProvider);
-  }, [scannedCode, identityProvider]);
+  }, [scannedCode, identityProvider, isLoading, goVerifyPage]);
 
-  const onScanError = (error: unknown) => {
+  const onScanError = () => {
     setIdentityProvider(null);
   };
 

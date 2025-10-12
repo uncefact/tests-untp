@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
 import { Renderer, WebRenderingTemplate2022 } from '@uncefact/vckit-renderer';
 import { IRenderDocument, UnsignedCredential, VerifiableCredential } from '@uncefact/vckit-core-types';
 import { Box, CircularProgress } from '@mui/material';
@@ -25,7 +27,7 @@ const CredentialRender = ({ credential }: { credential: VerifiableCredential | U
         defaultProvider: 'WebRenderingTemplate2022',
       });
 
-      let { documents }: { documents: IRenderDocument[] } = await renderer.renderCredential({
+      const { documents }: { documents: IRenderDocument[] } = await renderer.renderCredential({
         credential,
       });
 
@@ -45,7 +47,7 @@ const CredentialRender = ({ credential }: { credential: VerifiableCredential | U
 
   return (
     <>
-      {isLoading && <CircularProgress sx={{ margin: 'auto' }} data-testid="loading-indicator" />}
+      {isLoading && <CircularProgress sx={{ margin: 'auto' }} data-testid='loading-indicator' />}
       <Box
         data-testid='rendered-template-container'
         sx={{
@@ -56,22 +58,20 @@ const CredentialRender = ({ credential }: { credential: VerifiableCredential | U
       >
         {documents.length !== 0
           ? documents.map((doc, i) => (
-              <>
-                <div
-                  style={{
-                    contain: 'content', // isolate the content
-                    margin: '0 auto',
-                    height: '100%',
-                    minHeight: '100vh',
-                    overflowY: 'scroll',
-                    width: '100%',
-                    textAlign: 'left',
-                  }}
-                  key={i}
-                  dangerouslySetInnerHTML={{ __html: doc }}
-                  data-testid={"rendered-template"}
-                ></div>
-              </>
+              <div
+                style={{
+                  contain: 'content', // isolate the content
+                  margin: '0 auto',
+                  height: '100%',
+                  minHeight: '100vh',
+                  overflowY: 'scroll',
+                  width: '100%',
+                  textAlign: 'left',
+                }}
+                key={i}
+                dangerouslySetInnerHTML={{ __html: doc }}
+                data-testid={'rendered-template'}
+              ></div>
             ))
           : ''}
       </Box>

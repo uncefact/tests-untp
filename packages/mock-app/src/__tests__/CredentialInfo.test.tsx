@@ -1,10 +1,54 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { CredentialInfo } from '../components/CredentialInfo';
 
+// Mocking MUI components
+jest.mock('@mui/material', () => ({
+  Box: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...props}>{children}</div>
+  ),
+  Button: ({
+    children,
+    onClick,
+    variant,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    onClick?: () => void;
+    variant?: string;
+    [key: string]: unknown;
+  }) => (
+    <button onClick={onClick} className={`MuiButton-${variant || 'contained'}`} {...props}>
+      {children}
+    </button>
+  ),
+  Typography: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <span {...props}>{children}</span>
+  ),
+  List: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <ul {...props}>{children}</ul>
+  ),
+  ListItem: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <li {...props}>{children}</li>
+  ),
+  ListItemText: ({
+    primary,
+    secondary,
+    ...props
+  }: {
+    primary?: React.ReactNode;
+    secondary?: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <div {...props}>
+      {primary && <div>{primary}</div>}
+      {secondary && <div>{secondary}</div>}
+    </div>
+  ),
+}));
+
 // Mocking modules from @vckit/core-types
 jest.mock('@vckit/core-types', () => ({
-  IssuerType: '' || [], // Mocking IssuerType to be an empty string or an empty array
+  IssuerType: '', // Mocking IssuerType to be an empty string
   VerifiableCredential: {}, // Mocking VerifiableCredential to be an empty object
 }));
 

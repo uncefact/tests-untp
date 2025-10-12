@@ -1,4 +1,6 @@
-import React, { useEffect } from 'react';
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
 import { Box, Tab, Tabs, useMediaQuery, useTheme } from '@mui/material';
 
 import CredentialRender from '../CredentialRender/CredentialRender';
@@ -18,28 +20,37 @@ const CredentialTabs = ({ credential, decodedEnvelopedVC }: CredentialComponentP
     },
   ];
 
-  const [currentTabIndex, setCurrentTabIndex] = React.useState(0);
+  const [currentTabIndex, setCurrentTabIndex] = useState(0);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-  useEffect(() => {
-    configDefaultTabs();
-  }, [credential]);
-
-  const configDefaultTabs = () => {
+  const configDefaultTabs = useCallback(() => {
     if (decodedEnvelopedVC?.renderMethod?.[0]?.template) {
       return setCurrentTabIndex(0);
     }
 
     setCurrentTabIndex(1);
-  };
+  }, [decodedEnvelopedVC?.renderMethod]);
+
+  useEffect(() => {
+    configDefaultTabs();
+  }, [configDefaultTabs, credential]);
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     event.preventDefault();
     setCurrentTabIndex(newValue);
   };
 
-  const TabPanel = ({ children, value, index, ...other }: any) => (
+  const TabPanel = ({
+    children,
+    value,
+    index,
+    ...other
+  }: {
+    children: React.ReactNode;
+    value: number;
+    index: number;
+  } & React.HTMLAttributes<HTMLDivElement>) => (
     <div role='tabpanel' hidden={value !== index} id={`tabpanel-${index}`} aria-labelledby={`tab-${index}`} {...other}>
       {value === index && <Box>{children}</Box>}
     </div>

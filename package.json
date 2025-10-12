@@ -9,7 +9,7 @@
   "scripts": {
     "copy-config": "cp app-config.json packages/mock-app/src/constants/app-config.json && cp app-config.json packages/components/src/constants/app-config.json",
     "copy-config-test": "cp e2e/cypress/fixtures/app-config.json packages/mock-app/src/constants/app-config.json && cp e2e/cypress/fixtures/app-config.json packages/components/src/constants/app-config.json",
-    "start": "yarn copy-config && cd packages/mock-app && yarn start",
+    "start": "yarn copy-config && cd packages/mock-app && yarn dev",
     "start:e2e-test": "yarn copy-config-test && cd packages/mock-app && yarn start",
     "start:untp-playground": "cd packages/untp-playground && PORT=4001 yarn dev",
     "start:e2e-dependencies": "SEEDING=true docker compose -f docker-compose.e2e.yml up -d --build",

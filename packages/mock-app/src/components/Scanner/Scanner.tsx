@@ -1,4 +1,13 @@
-import React, { forwardRef, useImperativeHandle, useState, useCallback, useEffect, useMemo, memo, ForwardedRef } from 'react';
+import React, {
+  forwardRef,
+  useImperativeHandle,
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  memo,
+  ForwardedRef,
+} from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import CameraswitchRoundedIcon from '@mui/icons-material/CameraswitchRounded';
 import { Box } from '@mui/material';
@@ -15,13 +24,16 @@ const Scanner = forwardRef((props: IHtml5QrcodePluginProps, ref: ForwardedRef<IS
   /**
    * Define config with props passed and default property.
    */
-  const config = useMemo(() => ({
-    fps: props.fps || 10,
-    qrbox: props.qrbox || { width: 250, height: 150 },
-    disableFlip: props.disableFlip || false,
-    useBarCodeDetectorIfSupported: props.useBarCodeDetectorIfSupported || true,
-    focusMode: props.focusMode || 'continuous'
-  }), [props.fps, props.qrbox, props.disableFlip]);
+  const config = useMemo(
+    () => ({
+      fps: props.fps || 10,
+      qrbox: props.qrbox || { width: 250, height: 150 },
+      disableFlip: props.disableFlip || false,
+      useBarCodeDetectorIfSupported: props.useBarCodeDetectorIfSupported || true,
+      focusMode: props.focusMode || 'continuous',
+    }),
+    [props.fps, props.qrbox, props.disableFlip, props.useBarCodeDetectorIfSupported, props.focusMode],
+  );
 
   /**
    * create method with hook to use in parent with ref.
@@ -71,7 +83,7 @@ const Scanner = forwardRef((props: IHtml5QrcodePluginProps, ref: ForwardedRef<IS
     return () => {
       handleStop();
     };
-  }, []);
+  }, [deviceType, startHtml5QrcodeScanner]);
 
   // Handle switch camera.
   const handleSwitchCamera = async () => {
@@ -111,5 +123,8 @@ const Scanner = forwardRef((props: IHtml5QrcodePluginProps, ref: ForwardedRef<IS
     </Box>
   );
 });
+
+// Add display name for debugging and ESLint
+Scanner.displayName = 'Scanner';
 
 export default memo(Scanner);

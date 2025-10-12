@@ -13,7 +13,7 @@ export interface IHtml5QrcodePluginProps {
   focusMode?: string;
   qrCodeSuccessCallback: (decodedText: string, result: Html5QrcodeResult) => void;
   qrCodeErrorCallback?: (error: unknown) => void;
-};
+}
 
 export enum FacingCameraEnum {
   Font = 'user',
@@ -23,5 +23,5 @@ export enum FacingCameraEnum {
 export enum DeviceTypeEnum {
   Mobile = 'mobile',
   Laptop = 'laptop',
-  Unknown = 'unknown'
+  Unknown = 'unknown',
 }

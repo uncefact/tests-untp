@@ -1,6 +1,6 @@
 import React from 'react';
-import { GenericFeature } from '../components/GenericFeature';
-import { IServiceDefinition } from '../components/GenericFeature/GenericFeature';
+import { GenericFeature } from './GenericFeature';
+import { IServiceDefinition } from './GenericFeature/GenericFeature';
 import { ToastMessage, IDynamicComponentRendererProps } from '@mock-app/components';
 
 export interface IGenericFeatureProps {

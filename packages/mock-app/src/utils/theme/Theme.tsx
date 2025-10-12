@@ -1,16 +1,20 @@
 import { createTheme } from '@mui/material';
+import { IStyles } from '@/types/common.types';
 
-const ThemeSettings = (styles: any = {}) => {
+const ThemeSettings = (styles: Partial<IStyles> = {}) => {
   const baseMode = {
     palette: {
       primary: {
         main: styles?.primaryColor ?? '#ffffff',
-        typography: styles?.tertiaryColor ?? '#ffffff',
         contrastText: styles?.tertiaryColor ?? '#ffffff', // text color, intended to contrast with main
       },
     },
 
-    typography: styles?.tertiaryColor,
+    typography: {
+      allVariants: {
+        color: styles?.tertiaryColor ?? '#ffffff',
+      },
+    },
   };
 
   const theme = createTheme(baseMode);

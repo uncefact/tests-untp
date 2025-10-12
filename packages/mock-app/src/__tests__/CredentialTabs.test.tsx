@@ -13,10 +13,116 @@ jest.mock('../utils', () => ({
   convertBase64ToString: jest.fn().mockImplementation(() => '<div>Credential render</div>'), // Mocking the conversion function
 }));
 
+// Mocking MUI components
+jest.mock('@mui/material', () => ({
+  Box: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...props}>{children}</div>
+  ),
+  Tab: ({ label, ...props }: { label?: string; [key: string]: unknown }) => (
+    <button role='tab' {...props}>
+      {label}
+    </button>
+  ),
+  Tabs: ({
+    children,
+    value,
+    onChange,
+    variant,
+    scrollButtons,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    value?: number;
+    onChange?: (event: React.SyntheticEvent, newValue: number) => void;
+    variant?: string;
+    scrollButtons?: boolean | string;
+    [key: string]: unknown;
+  }) => (
+    <div role='tablist' {...props}>
+      {React.Children.map(children, (child, index) => {
+        if (React.isValidElement(child)) {
+          return React.cloneElement(
+            child as React.ReactElement<{ 'aria-selected'?: boolean; onClick?: (event: React.SyntheticEvent) => void }>,
+            {
+              'aria-selected': value === index,
+              onClick: (event: React.SyntheticEvent) => onChange?.(event, index),
+            },
+          );
+        }
+        return child;
+      })}
+    </div>
+  ),
+  Button: ({
+    children,
+    onClick,
+    variant,
+    startIcon,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    onClick?: () => void;
+    variant?: string;
+    startIcon?: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <button onClick={onClick} className={`MuiButton-${variant || 'contained'}`} {...props}>
+      {startIcon}
+      {children}
+    </button>
+  ),
+  IconButton: ({
+    children,
+    onClick,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    onClick?: () => void;
+    [key: string]: unknown;
+  }) => (
+    <button onClick={onClick} {...props}>
+      {children}
+    </button>
+  ),
+  useTheme: () => ({
+    breakpoints: {
+      down: () => false,
+    },
+  }),
+  useMediaQuery: () => false,
+}));
+
+// Mocking MUI icons
+jest.mock('@mui/icons-material/CloudDownloadOutlined', () => {
+  const MockCloudDownloadIcon = () => <span>📥</span>;
+  MockCloudDownloadIcon.displayName = 'MockCloudDownloadIcon';
+  return MockCloudDownloadIcon;
+});
+
 // Mocking the CredentialRender component
-jest.mock('../components/CredentialRender/CredentialRender', () => () => <>CredentialRender</>);
+jest.mock('../components/CredentialRender/CredentialRender', () => {
+  const MockCredentialRender = () => <>CredentialRender</>;
+  MockCredentialRender.displayName = 'MockCredentialRender';
+  return MockCredentialRender;
+});
 // Mocking the JsonBlock component
-jest.mock('../components/JsonBlock/JsonBlock', () => () => <>JsonBlock</>);
+jest.mock('../components/JsonBlock/JsonBlock', () => {
+  const MockJsonBlock = () => <>JsonBlock</>;
+  MockJsonBlock.displayName = 'MockJsonBlock';
+  return MockJsonBlock;
+});
+// Mocking the DownloadCredentialButton component
+jest.mock('../components/DownloadCredentialButton/DownloadCredentialButton', () => ({
+  DownloadCredentialButton: ({ credential }: { credential: unknown }) => {
+    const handleClick = () => {
+      const file = new Blob([JSON.stringify({ verifiableCredential: credential }, null, 2)], {
+        type: 'text/plain',
+      });
+      URL.createObjectURL(file);
+    };
+    return <button onClick={handleClick}>Download</button>;
+  },
+}));
 
 describe('Credential tabs content', () => {
   afterEach(() => {

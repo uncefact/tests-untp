@@ -1,5 +1,4 @@
-import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, act } from '@testing-library/react';
 import { GenericFeature } from '../components/GenericFeature/GenericFeature';
 import { ComponentType, DynamicComponentRenderer, IDynamicComponentRendererProps } from '@mock-app/components';
 
@@ -69,7 +68,7 @@ describe('GenericFeature', () => {
   ];
 
   test('should render UI with componentsData and call onChange in input form', async () => {
-    (DynamicComponentRenderer as any).mockImplementation(
+    (DynamicComponentRenderer as jest.MockedFunction<typeof DynamicComponentRenderer>).mockImplementation(
       ({ name, type, props }: { name: string; type: string; props: Record<string, any> }) => (
         <div>
           {type === ComponentType.EntryData && (
@@ -89,7 +88,7 @@ describe('GenericFeature', () => {
     expect(screen.getByText('Submit')).not.toBeNull();
   });
 
-  test('should render UI with componentsData and call onClick to trigger services', () => {
+  test('should render UI with componentsData and call onClick to trigger services', async () => {
     const mock = jest.fn().mockImplementation((value) => expect(value).toBe('logService'));
     const services = [
       {
@@ -98,7 +97,7 @@ describe('GenericFeature', () => {
       },
     ];
 
-    (DynamicComponentRenderer as any).mockImplementation(
+    (DynamicComponentRenderer as jest.MockedFunction<typeof DynamicComponentRenderer>).mockImplementation(
       ({ name, props }: { name: string; props: Record<string, any> }) => (
         <div>
           <p>{name}</p>
@@ -109,7 +108,10 @@ describe('GenericFeature', () => {
     );
 
     render(<GenericFeature components={componentsData} services={services} />);
-    fireEvent.click(screen.getByText('Click me!'));
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Click me!'));
+    });
 
     expect(screen.getByText('Button')).not.toBeNull();
   });

@@ -1,5 +1,8 @@
+'use client';
+
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   AppBar,
   Toolbar,
@@ -25,8 +28,10 @@ import DialpadIcon from '@mui/icons-material/Dialpad';
 import appConfig from '../../constants/app-config.json';
 import { convertPathToString, convertStringToPath } from '../../utils';
 import { useGlobalContext } from '../../hooks/GlobalContext';
+import { IApp } from '@/types/common.types';
 
 type ConfigAppType = typeof appConfig;
+type ConfigAppItem = ConfigAppType['apps'][number];
 
 const initialHeaderBrandInfo = {
   name: appConfig.name,
@@ -37,15 +42,15 @@ const initialHeaderBrandInfo = {
 
 const ICON_SIZE = '30px';
 
-const iconConfig: { [key: string]: JSX.Element } = {
+const iconConfig: { [key: string]: React.ReactNode } = {
   Scanning: <SearchIcon sx={{ fontSize: ICON_SIZE }} />,
   'General features': <DialpadIcon sx={{ fontSize: ICON_SIZE }} />,
 };
 
 function Header() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { theme } = useGlobalContext() as any;
+  const pathname = usePathname();
+  const router = useRouter();
+  const { theme } = useGlobalContext();
 
   const [open, setOpen] = useState(false);
   const [headerBrandInfo, setHeaderBrandInfo] = useState({
@@ -59,7 +64,7 @@ function Header() {
     setOpen(newOpen);
   };
 
-  const renderAvatar = (value: any) => {
+  const renderAvatar = (value: { assets?: { logo?: string }; name: string }) => {
     if (value?.assets?.logo) {
       return <Avatar sx={{ marginRight: '10px' }} alt='Company logo' src={value.assets.logo} />;
     }
@@ -67,17 +72,17 @@ function Header() {
     return iconConfig[value.name];
   };
 
-  const SideBarComponent = ({ app, route }: { app: any; route: string }) => (
+  const SideBarComponent = ({ app, route }: { app: Partial<IApp>; route: string }) => (
     <List>
       <ListItem key={app.name} disablePadding>
         <ListItemButton
           component={Link}
-          to={route}
+          href={route}
           onClick={() => {
             toggleDrawer(false);
           }}
         >
-          <ListItemIcon>{renderAvatar(app)}</ListItemIcon>
+          <ListItemIcon>{renderAvatar(app as IApp)}</ListItemIcon>
           <ListItemText primary={app.name} />
         </ListItemButton>
       </ListItem>
@@ -85,17 +90,26 @@ function Header() {
   );
 
   const renderSidebarElements = (configApp: ConfigAppType, scanningRoute: string) => {
-    const menuItems = configApp.apps.map((app: any) => {
-      const route = `/${convertStringToPath(app.name)}`;
-      return <SideBarComponent app={app} route={route} />;
+    const menuItems = configApp.apps.map((app: ConfigAppItem) => {
+      const route = `/${convertStringToPath(app.name ?? '')}`;
+      const sidebarApp: Partial<IApp> = {
+        name: app.name,
+        assets: {
+          logo: app.assets.logo,
+          brandTitle: app.assets.brandTitle,
+          passportVC: '',
+          transactionEventVC: '',
+        },
+      };
+      return <SideBarComponent key={app.name} app={sidebarApp} route={route} />;
     });
 
     // Add Scanning menu item
-    menuItems.push(<SideBarComponent app={{ name: 'Scanning' }} route={scanningRoute} />);
+    menuItems.push(<SideBarComponent key='Scanning' app={{ name: 'Scanning' }} route={scanningRoute} />);
 
-    const menuItemGeneratorFeatures = appConfig.generalFeatures.map((app: any) => {
-      const path = `/${convertStringToPath(app.name)}`;
-      return <SideBarComponent app={app} route={path} />;
+    const menuItemGeneratorFeatures = appConfig.generalFeatures.map((app: Partial<IApp>) => {
+      const path = `/${convertStringToPath(app.name ?? '')}`;
+      return <SideBarComponent key={app.name} app={app} route={path} />;
     });
 
     menuItems.push(...menuItemGeneratorFeatures);
@@ -130,37 +144,38 @@ function Header() {
 
   const handleClickHeaderText = (title: string) => {
     if (title === appConfig.name) {
-      navigate('/');
+      router.push('/');
       return;
     }
 
     const path = `/${convertStringToPath(title)}`;
-    navigate(path);
+    router.push(path);
   };
 
   useEffect(() => {
-    const path = location.pathname;
-    const nameLink = convertPathToString(path ?? '');
+    const nameLink = convertPathToString(pathname ?? '');
     const subAppStyles =
       appConfig.apps.find((app) => app.name.toLocaleLowerCase() === nameLink.toLocaleLowerCase()) ??
       appConfig.generalFeatures.find((app) => app.name.toLocaleLowerCase() === nameLink.toLocaleLowerCase());
 
     setHeaderBrandInfo({
-      name: convertPathToString(path ?? ''),
+      name: convertPathToString(pathname ?? ''),
       assets: {
         logo: subAppStyles && 'assets' in subAppStyles ? subAppStyles?.assets?.logo : '',
       },
     });
 
-    if (subAppStyles?.styles) {
-      theme.setSelectedTheme(subAppStyles?.styles);
-    } else {
-      theme.setSelectedTheme(appConfig.styles);
-      setHeaderBrandInfo(initialHeaderBrandInfo);
+    if (theme?.setSelectedTheme) {
+      if (subAppStyles?.styles) {
+        theme?.setSelectedTheme(subAppStyles?.styles);
+      } else {
+        theme?.setSelectedTheme(appConfig.styles);
+        setHeaderBrandInfo(initialHeaderBrandInfo);
+      }
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
+  }, [pathname]);
 
   return theme?.selectedTheme?.primaryColor &&
     theme?.selectedTheme?.secondaryColor &&
@@ -188,7 +203,7 @@ function Header() {
                 <Stack
                   data-testid='app-name'
                   component={Link}
-                  to='/'
+                  href='/'
                   sx={{
                     textDecoration: 'none',
                     textAlign: 'center',
@@ -222,7 +237,7 @@ function Header() {
 
           <Stack
             component={Link}
-            to='/'
+            href='/'
             sx={{
               textDecoration: 'none',
               alignItems: 'end',
