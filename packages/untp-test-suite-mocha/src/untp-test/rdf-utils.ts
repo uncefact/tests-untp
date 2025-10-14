@@ -263,13 +263,13 @@ export async function getUnattestedIssuersForProduct(
     // Create a query engine
     const mySparqlEngine = new querySparql.QueryEngine();
 
-    // Query for all credentials that attest to claims in the DPP
-    const result = await mySparqlEngine.queryBindings(`
+    // Query for all Conformity Credentials that attest to claims in the DPP
+    const dccList = await mySparqlEngine.queryBindings(`
       PREFIX result: <http://example.org/result#>
 
-      SELECT ?credential
+      SELECT ?dcc
       WHERE {
-        <${dppId}> result:claimsAttestedBy ?credential .
+        <${dppId}> result:claimsAttestedBy ?dcc .
       }
     `, {
       sources: [n3store]
@@ -279,10 +279,10 @@ export async function getUnattestedIssuersForProduct(
     const credentialIds: string[] = [dppId];
 
     // Add all credentials that attest to claims in the DPP
-    for await (const binding of result) {
-      const credentialId = binding.get('credential')?.value;
-      if (credentialId && !credentialIds.includes(credentialId)) {
-        credentialIds.push(credentialId);
+    for await (const binding of dccList) {
+      const dccId = binding.get('dcc')?.value;
+      if (dccId && !credentialIds.includes(dccId)) {
+        credentialIds.push(dccId);
       }
     }
 
