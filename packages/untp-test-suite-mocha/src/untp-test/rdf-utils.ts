@@ -63,7 +63,7 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
         ?claim untp:conformance ?conformance .
 
         # Get criteria if they exist
-        ?claim untp:Criterion ?criterion .
+        ?claim untp:assessmentCriteria ?criterion .
         ?criterion schemaorg:name ?criterionName .
       }
     `, {
@@ -123,6 +123,7 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
           verifiedBy: criterionVerified ? 'verified' : undefined
         };
         claim.criteria.push(criterion);
+        //console.log(`Product ${productName}: Found criterion ${criterionName} for claim ${claim.topic}`)
       }
     }
 
@@ -183,7 +184,7 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
         ?claim untp:conformance ?conformance .
 
         # Ensure this is a simple claim (no criteria)
-        FILTER NOT EXISTS { ?claim untp:Criterion ?criterion }
+        FILTER NOT EXISTS { ?claim untp:assessmentCriteria ?criterion }
       }
     `, {
       sources: [n3store]
@@ -225,6 +226,7 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
         // Update verification status if this binding indicates the claim is verified
         claimsMap.get(claimKey)!.verified = true;
       }
+      console.warn(`Product ${productName}: Found claim ${topic} without any criteria!`)
     }
 
     return Array.from(productsMap.values());
