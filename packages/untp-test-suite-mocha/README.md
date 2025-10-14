@@ -45,8 +45,6 @@ The package enables running the two tiers of UNTP validation that are currently 
 
 - **Tier 1**: W3C Verifiable Credential validation (JSON, JSON-LD, schema conformance)
 - **Tier 2**: UNTP-specific credential type validation and required fields
-
-Tier 3 testing will be added soon:
 - **Tier 3**: Graph inference, trust-chain verification, and claim conformance
 
 ## Installation
@@ -69,13 +67,16 @@ untp-test credential.json
 untp-test credential1.json credential2.json credential3.json
 
 # Test all credential files from directory
-untp-test --directory ./credentials
+untp-test --directory ./example-credentials/UNTP/
 
 # Combine individual files with directory scanning
-untp-test credential.json --directory ./credentials
+untp-test credential.json --directory ./example-credentials/UNTP/
 
 # With tag filtering
-untp-test --directory ./credentials --tag tier1
+untp-test --directory ./example-credentials/UNTP/ --tag tier1
+
+# Trust root issuer
+untp-test --directory ./example-credentials/UNTP/ --trust-did=did:web:abr.business.gov.au
 ```
 
 **Supported file types**: `.json` and `.jsonld` files are automatically detected and included when scanning a directory.
@@ -129,6 +130,16 @@ untp-test --tag tier1 --tag smoke --directory ./credentials
 
 # Run validation and JSON-LD tests
 untp-test --tag validation --tag jsonld credential.json
+```
+
+### Trust issuer for tier 3 tests
+
+Use `--trust-did` option to add a trusted issuer's _Decentralized Identifier_. Current example files in `example-credentials/` directory has all credentials in a single trust graph, with a sigle root of trust - `did:web:abr.business.gov.au`. Adding trusted root issuer in this way will trust all the underlying issuers in the _DIA_ chain, accepting issued _DPP_ and _DCC_ within this trust graph.
+
+This option can be used multiple times.
+
+```bash
+untp-test --directory ./example-credentials/UNTP/ --trust-did=did:web:abr.business.gov.au
 ```
 
 ### Example Output
