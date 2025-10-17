@@ -20,7 +20,7 @@
    ?dppSubject untp:conformityClaim ?claim .
    ?claim untp:conformityTopic ?topic .
    ?claim untp:conformance ?conformance .
-   ?claim untp:Criterion ?criterion .
+   ?claim untp:assessmentCriteria ?criterion .
    ?criterion schemaorg:name ?criterionName .
 
 
@@ -34,7 +34,7 @@
    ?assessedProduct untp:Product ?assessedProductId .
    ?assessment untp:conformityTopic ?assessedTopic .
    ?assessment untp:conformance ?dccConformance .
-   ?assessment untp:Criterion ?dccCriterion .
+   ?assessment untp:assessmentCriteria ?dccCriterion .
 
    # Only match when the assessed product Id is for the same product as the
    # claim AND
