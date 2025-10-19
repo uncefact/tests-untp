@@ -12,9 +12,10 @@
     "example-credentials/**/*"
   ],
   "scripts": {
-    "build": "node scripts/generate-test-list.js && tsc",
+    "build": "node scripts/generate-test-list.js && node scripts/generate-inference-bundle.js && tsc",
+    "run": "npx untp-test --directory example-credentials/UNTP",
     "dev": "tsc --watch",
-    "build:browser": "npm run build && esbuild src/untp-test/browser-bundle.ts --bundle --outfile=browser-test/browser-bundle.js --format=iife --platform=browser --external:chai --external:mocha --external:ajv --external:ajv-formats",
+    "build:browser": "npm run build && esbuild src/untp-test/browser-bundle.ts --bundle --outfile=browser-test/browser-bundle.js --format=iife --platform=browser --external:chai --external:mocha --external:ajv --external:ajv-formats --external:eyereasoner",
     "browser-test": "npm run build:browser && http-server browser-test -p 8080 -o",
     "prepublishOnly": "npm run build"
   },
@@ -31,15 +32,20 @@
   "license": "MIT",
   "dependencies": {
     "@types/chai": "^4.3.16",
+    "@comunica/query-sparql": "^4.4.1",
     "@types/mocha": "^10.0.3",
+    "@types/n3": "^1.26.0",
     "@types/node-fetch": "^2.6.12",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "chai": "^4.4.1",
     "chalk": "^4.1.2",
     "commander": "^14.0.0",
+    "eyereasoner": "^18.21.0",
+    "jsonld": "^8.3.3",
     "mocha": "^11.7.1",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.7.0",
+    "n3": "^1.26.0"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",

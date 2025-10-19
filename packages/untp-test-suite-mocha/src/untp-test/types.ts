@@ -8,6 +8,7 @@ export interface UNTPTestOptions {
   tags?: string[];
   /** Extension schema mapping files to load */
   extensionSchemaMaps?: string[];
+
   /** Callback to create and configure Mocha instance */
   mochaSetupCallback: (mochaOptions: any) => any;
 }

@@ -45,8 +45,6 @@ The package enables running the two tiers of UNTP validation that are currently 
 
 - **Tier 1**: W3C Verifiable Credential validation (JSON, JSON-LD, schema conformance)
 - **Tier 2**: UNTP-specific credential type validation and required fields
-
-Tier 3 testing will be added soon:
 - **Tier 3**: Graph inference, trust-chain verification, and claim conformance
 
 ## Installation
@@ -69,13 +67,16 @@ untp-test credential.json
 untp-test credential1.json credential2.json credential3.json
 
 # Test all credential files from directory
-untp-test --directory ./credentials
+untp-test --directory ./example-credentials/UNTP/
 
 # Combine individual files with directory scanning
-untp-test credential.json --directory ./credentials
+untp-test credential.json --directory ./example-credentials/UNTP/
 
 # With tag filtering
-untp-test --directory ./credentials --tag tier1
+untp-test --directory ./example-credentials/UNTP/ --tag tier1
+
+# Trust root issuer
+untp-test --directory ./example-credentials/UNTP/ --trust-did=did:web:abr.business.gov.au
 ```
 
 **Supported file types**: `.json` and `.jsonld` files are automatically detected and included when scanning a directory.
@@ -131,6 +132,16 @@ untp-test --tag tier1 --tag smoke --directory ./credentials
 untp-test --tag validation --tag jsonld credential.json
 ```
 
+### Trust issuer for tier 3 tests
+
+Use `--trust-did` option to add a trusted issuer's _Decentralized Identifier_. Current example files in `example-credentials/` directory has all credentials in a single trust graph, with a sigle root of trust - `did:web:abr.business.gov.au`. Adding trusted root issuer in this way will trust all the underlying issuers in the _DIA_ chain, accepting issued _DPP_ and _DCC_ within this trust graph.
+
+This option can be used multiple times.
+
+```bash
+untp-test --directory ./example-credentials/UNTP/ --trust-did=did:web:abr.business.gov.au
+```
+
 ### Example Output
 
 ```
@@ -147,8 +158,26 @@ Tier 2 - UNTP Schema Validation  (tags: tier2, untp)
     ✔ should have access to credential state  (tags: basic, integration)
   product-passport-simple.json
       ✔ should validate against DigitalProductPassport UNTP schema  (tags: schema) (105ms)
+Tier 3 - UNTP RDF Validation  (tags: tier3, untp)
+    ✔ should have access to credential state  (tags: basic, integration) (1ms)
+    ✔ conformity-credential-simple.json should be a valid RDF document.  (tags: rdf) (1169ms)
+    ✔ identity-anchor-for-dcc-issuer.json should be a valid RDF document.  (tags: rdf) (831ms)
+    ✔ identity-anchor-for-dia-issuer.json should be a valid RDF document.  (tags: rdf) (857ms)
+    ✔ identity-anchor-for-dpp-issuer.json should be a valid RDF document.  (tags: rdf) (810ms)
+    ✔ product-passport-simple.json should be a valid RDF document.  (tags: rdf) (889ms)
+Running 3 inference rules...
+Executing inference rule: 10-infer-product-claim-criteria-verified.n3
+Executing inference rule: 20-infer-product-claim-verified.n3
+Executing inference rule: 30-infer-identity-verified.n3
+Inference succeded: true. Total RDF quads in graph: 132
+  Verifications
+      ✖ should verify all product claims and issuer trust chains
+        Product "EV battery 300Ah", Claim "conformityTopicCode#environment.emissions", Criterion "GBA Battery rule book v2.0 battery assembly guidelines": should be verified in Digital Conformity Credential: expected undefined not to be undefined
 
   5 passing (835ms)
+  1 failing
+
+error Command failed with exit code 1.
 ```
 
 ## Example Browser Usage
@@ -171,7 +200,9 @@ npm run browser-test
 
 5. Optionally add tags for filtering (e.g., `tier1`, `validation`, `smoke`)
 
-6. Click "🚀 Run Tests" to see real-time results
+6. Optionally add trusted issuer DID (e.g., `did:web:abr.business.gov.au`)
+
+7. Click "🚀 Run Tests" to see real-time results
 
 Note that re-running tests uses the browser's cache automatically and so schemas are not re-fetched (and there's a [task](memory-bank/tasks/TASK006-persistent-http-cache.md) to
 get the same behaviour on the CLI).
@@ -191,6 +222,9 @@ Include the browser bundle in your web application:
 <!-- Load JSON-LD for JSON-LD validation -->
 <script src="https://unpkg.com/jsonld@8/dist/jsonld.min.js"></script>
 
+<!-- Load eyereasoner for tier 3 graph validation -->
+<script src="https://eyereasoner.github.io/eye-js/18/latest/index.js"></script>
+
 <!-- Initialize Mocha -->
 <script>mocha.setup('bdd');</script>
 
@@ -202,6 +236,11 @@ Include the browser bundle in your web application:
 const credentialData = new Map();
 credentialData.set('credential.json', '{"@context": [...], "type": [...]}');
 setCredentialData(credentialData);
+
+// Add trusted issuer DID
+const trustedDIDs = ['did:web:abr.business.gov.au'];
+untpTestSuite.trustedDIDs.length = 0;
+untpTestSuite.trustedDIDs.push(...trustedDIDs);
 
 // Run tests with extension schema mappings
 const runner = new UNTPTestRunner();
@@ -229,7 +268,7 @@ See the [example browser-test](browser-test) for more info.
 ### Node.js
 
 ```typescript
-import { UNTPTestRunner, setCredentialData } from 'untp-test-suite-mocha';
+import { UNTPTestRunner, setCredentialData, trustedDIDs } from 'untp-test-suite-mocha';
 import * as fs from 'fs';
 
 // Set up credential data
@@ -237,6 +276,11 @@ const credentialData = new Map();
 const content = fs.readFileSync('credential.json', 'utf8');
 credentialData.set('credential.json', content);
 setCredentialData(credentialData);
+
+// Add trusted issuer DID
+const trustedDIDs = ['did:web:abr.business.gov.au'];
+trustedDIDs.length = 0;
+trustedDIDs.push(...trustedDIDs);
 
 // Run tests with extension schema mappings
 const runner = new UNTPTestRunner();

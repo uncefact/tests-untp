@@ -127,6 +127,13 @@ program
     },
   )
   .option(
+    '--trust-did <did>',
+    'explicitly trust this DID (can be used multiple times)',
+    (value: string, previous: string[]) => {
+      return previous ? previous.concat([value]) : [value];
+    },
+  )
+  .option(
     '--extension-schema-map <file>',
     'load extension schema mappings from a JSON file (can be used multiple times). See src/untp-test/schema-mapper/default-mappings.json for format example',
     (value: string, previous: string[]) => {
@@ -242,6 +249,10 @@ program
 
             // Set up BDD interface globals (describe, it, before, etc.)
             mocha.suite.emit('pre-require', global, null, mocha);
+
+            if (options.trustDid) {
+              (global as any).untpTestSuite.trustedDIDs.push(...options.trustDid);
+            }
 
             // Execute registered test suites after test files are loaded and BDD is available
             (global as any).untpTestSuite.executeRegisteredTestSuites();

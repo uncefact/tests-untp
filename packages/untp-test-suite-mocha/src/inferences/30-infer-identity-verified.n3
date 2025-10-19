@@ -1,0 +1,30 @@
+@prefix dia: <https://test.uncefact.org/vocabulary/untp/dia/0/> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix result: <http://example.org/result#> .
+@prefix untp: <https://test.uncefact.org/vocabulary/untp/core/0/> .
+@prefix vc: <https://www.w3.org/2018/credentials#> .
+
+# This query infers whether the issuer of a verified credential has
+# its identity verified by a DIA.
+{
+    # Find all verified credentials.
+   ?credential a vc:VerifiableCredential .
+   ?credential vc:issuer ?credentialIssuer .
+
+   # Find DigitalIdentityAnchors where the DIA credentialSubject matches
+   # the issuer of the verified credential.
+   ?dia a dia:DigitalIdentityAnchor .
+   ?dia vc:credentialSubject ?credentialSubject .
+   ?credentialSubject log:equalTo ?credentialIssuer .
+}
+=> 
+{
+   ?credential result:issuerIdentityAttestedBy ?dia .
+} .
+
+# It seems there's different trust graphs - an identity trust graph for a DPP
+# will need to check not only the identity of the issuer of the DPP, but also
+# that of any DCC which attests to claims made by the DPP.
+# A claim trust graph (better name) needs to check that the issuer of the DCC is trusted to check the criteria types to which they've attested.

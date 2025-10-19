@@ -246,6 +246,13 @@
         </div>
         <div class="tag-list" id="tagList"></div>
 
+        <h3> Trusted DIDs (Optional)</h3>
+        <div class="tag-input">
+          <input type="text" id="trustedDIDInput" placeholder="Enter DID" />
+          <button onclick="addTrustedDID()">Add DID</button>
+        </div>
+        <div class="tag-list" id="trustedDIDList"></div>
+
         <div style="margin-top: 20px">
           <button id="runTestsBtn" onclick="runTests()" disabled>🚀 Run Tests</button>
           <button onclick="clearResults()">🗑️ Clear Results</button>
@@ -269,6 +276,8 @@
     <!-- Load JSON-LD for JSON-LD validation -->
     <script src="https://unpkg.com/jsonld@8/dist/jsonld.min.js"></script>
 
+    <script src="https://eyereasoner.github.io/eye-js/18/latest/index.js"></script>
+
     <!-- Initialize Mocha for browser -->
     <script>
       // Set up Mocha for browser environment
@@ -282,6 +291,7 @@
       // Global state
       let selectedFiles = [];
       let selectedTags = [];
+      let trustedDIDs = [];
       let extensionMappingFiles = [];
       let isRunning = false;
 
@@ -347,6 +357,32 @@
         selectedFiles.splice(index, 1);
         updateFileList();
         updateRunButton();
+      }
+
+
+      // Trusted DIDs
+      function addTrustedDID() {
+        const did = document.getElementById('trustedDIDInput').value.trim();
+        if (did && !trustedDIDs.includes(did)) {
+          trustedDIDs.push(did);
+          updateTrustedDIDsList();
+          document.getElementById('trustedDIDInput').value = '';
+        }
+      }
+
+      function removeTrustedDID(did) {
+        trustedDIDs = trustedDIDs.filter((t) => t !== did);
+        updateTrustedDIDsList();
+      }
+
+      function updateTrustedDIDsList() {
+        document.getElementById('trustedDIDList').innerHTML = '';
+        trustedDIDs.forEach((did) => {
+          const didSpan = document.createElement('span');
+          didSpan.className = 'tag';
+          didSpan.innerHTML = `${did} <span class="remove" onclick="removeTrustedDID('${did}')">✕</span>`;
+          document.getElementById('trustedDIDList').appendChild(didSpan);
+        });
       }
 
       // Tag management
@@ -546,6 +582,9 @@
             );
           }
           window.untpTestSuite.setCredentialData(credentialData);
+
+          window.untpTestSuite.trustedDIDs.length = 0;
+          window.untpTestSuite.trustedDIDs.push(...trustedDIDs);
 
           // Check if UNTPTestRunner is available
           if (typeof window.untpTestSuite.UNTPTestRunner === 'undefined') {
