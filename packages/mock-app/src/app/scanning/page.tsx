@@ -63,7 +63,8 @@ const Scanning = () => {
     goVerifyPage(identityProvider);
   }, [scannedCode, identityProvider, isLoading, goVerifyPage]);
 
-  const onScanError = () => {
+  const onScanError = (error: unknown) => {
+    console.log(error);
     setIdentityProvider(null);
   };
 
