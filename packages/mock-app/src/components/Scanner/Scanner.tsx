@@ -40,8 +40,10 @@ const Scanner = forwardRef((props: IHtml5QrcodePluginProps, ref: ForwardedRef<IS
    */
   useImperativeHandle(ref, () => ({
     async closeQrCodeScanner() {
-      await html5QrcodeScanner!.stop();
-      html5QrcodeScanner!.clear();
+      if (html5QrcodeScanner) {
+        await html5QrcodeScanner.stop();
+        html5QrcodeScanner.clear();
+      }
     },
   }));
 
@@ -88,8 +90,8 @@ const Scanner = forwardRef((props: IHtml5QrcodePluginProps, ref: ForwardedRef<IS
   // Handle switch camera.
   const handleSwitchCamera = async () => {
     if (html5QrcodeScanner) {
-      await html5QrcodeScanner!.stop();
-      html5QrcodeScanner!.clear();
+      await html5QrcodeScanner.stop();
+      html5QrcodeScanner.clear();
 
       let facingModeType = configEnvCamera;
       if (facingModeType === FacingCameraEnum.Back) {
