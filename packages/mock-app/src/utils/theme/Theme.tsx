@@ -9,12 +9,6 @@ const ThemeSettings = (styles: Partial<IStyles> = {}) => {
         contrastText: styles?.tertiaryColor ?? '#ffffff', // text color, intended to contrast with main
       },
     },
-
-    typography: {
-      allVariants: {
-        color: styles?.tertiaryColor ?? '#ffffff',
-      },
-    },
   };
 
   const theme = createTheme(baseMode);
