@@ -88,6 +88,7 @@ describe('Scanning', () => {
   });
 
   it('should renders scanning page with scanner component', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (Scanner as any).mockReturnValue(() => <>Scanner</>);
 
     render(<Scanning />);
@@ -103,6 +104,7 @@ describe('Scanning', () => {
         </button>
       );
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (Scanner as any).mockImplementation(MockScanner);
 
     await act(async () => {
@@ -142,6 +144,7 @@ describe('Scanning', () => {
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (Scanner as any).mockImplementation(MockScanner);
 
     await act(async () => {

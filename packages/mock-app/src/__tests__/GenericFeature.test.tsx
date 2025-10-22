@@ -69,7 +69,7 @@ describe('GenericFeature', () => {
 
   test('should render UI with componentsData and call onChange in input form', async () => {
     (DynamicComponentRenderer as jest.MockedFunction<typeof DynamicComponentRenderer>).mockImplementation(
-      ({ name, type, props }: { name: string; type: string; props: Record<string, any> }) => (
+      ({ name, type, props }: { name: string; type: string; props: { onChange?: (value: unknown) => void } }) => (
         <div>
           {type === ComponentType.EntryData && (
             <>
@@ -98,11 +98,11 @@ describe('GenericFeature', () => {
     ];
 
     (DynamicComponentRenderer as jest.MockedFunction<typeof DynamicComponentRenderer>).mockImplementation(
-      ({ name, props }: { name: string; props: Record<string, any> }) => (
+      ({ name, props }: { name: string; props: { onClick?: (handler: (args: unknown) => void) => void } }) => (
         <div>
           <p>{name}</p>
 
-          {name === 'Button' && <button onClick={() => props.onClick(mock)}>Click me!</button>}
+          {name === 'Button' && <button onClick={() => props.onClick?.(mock)}>Click me!</button>}
         </div>
       ),
     );
