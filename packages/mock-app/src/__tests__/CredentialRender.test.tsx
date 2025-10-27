@@ -1,13 +1,22 @@
-import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { CredentialRender } from '../components/CredentialRender';
+
+// Mocking MUI components
+jest.mock('@mui/material', () => ({
+  Box: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...props}>{children}</div>
+  ),
+  CircularProgress: ({ ...props }: { [key: string]: unknown }) => <div {...props}>Loading...</div>,
+}));
 
 // Mocking modules from @uncefact/vckit-renderer
 jest.mock('@uncefact/vckit-renderer', () => ({
-  Renderer: class MockHtml5Qrcode {
-    // Mocking the renderCredential method to return a single document
+  Renderer: class MockRenderer {
+    // Mocking the renderCredential method to return a single document with delay
     async renderCredential() {
-      return { documents: ['<div>Credential render</div>'] };
+      // Add a small delay to simulate async operation
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return { documents: [{ renderedTemplate: 'base64encodedtemplate' }] };
     }
   },
   WebRenderingTemplate2022: jest.fn(), // Mocking WebRenderingTemplate2022
@@ -20,7 +29,7 @@ jest.mock('@uncefact/vckit-core-types', () => ({
 
 // Mocking the convertBase64ToString utility function from ../utils
 jest.mock('../utils', () => ({
-  convertBase64ToString: jest.fn((doc) => '<div>Credential render</div>'), // Mocking the conversion function
+  convertBase64ToString: jest.fn(() => '<div>Credential render</div>'), // Mocking the conversion function
 }));
 
 describe('Credential render', () => {
@@ -59,7 +68,7 @@ describe('Credential render', () => {
     // Render the CredentialRender component with the mock credential
     render(<CredentialRender credential={credential} />);
 
-    // Expecting the loading indicator to be present in the rendered component
+    // Expecting the loading indicator to be present in the rendered component initially
     const loadingIndicator = screen.getByTestId('loading-indicator');
     expect(loadingIndicator).toBeInTheDocument();
   });
@@ -67,7 +76,9 @@ describe('Credential render', () => {
   // Test case: should renders credential content after loading
   it('should renders credential content after loading', async () => {
     // Render the CredentialRender component with the mock credential
-    render(<CredentialRender credential={credential} />);
+    await act(async () => {
+      render(<CredentialRender credential={credential} />);
+    });
 
     // Wait for the component to finish loading
     await waitFor(() => {

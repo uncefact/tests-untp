@@ -1,4 +1,6 @@
-import React, { useMemo } from 'react';
+'use client';
+
+import { useMemo } from 'react';
 import moment from 'moment';
 import { List, ListItem, ListItemText } from '@mui/material';
 import { IssuerType, UnsignedCredential, VerifiableCredential } from '@vckit/core-types';

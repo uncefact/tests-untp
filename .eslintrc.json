@@ -3,7 +3,8 @@
   // TODO: Enable linting for documentation folder
   "ignorePatterns": [
     "documentation",
-    "e2e"
+    "e2e",
+    "packages/mock-app/**"
   ],
   "plugins": [
     "@typescript-eslint",
@@ -47,6 +48,14 @@
       ],
       "rules": {
         "@typescript-eslint/no-var-requires": "off"
+      }
+    },
+    {
+      "files": [
+        "**/next-env.d.ts"
+      ],
+      "rules": {
+        "@typescript-eslint/triple-slash-reference": "off"
       }
     }
   ]

@@ -1,6 +1,8 @@
+'use client';
+
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Box, Button } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
 
 export interface IBackButton {
   children?: React.ReactNode;
@@ -9,11 +11,13 @@ export interface IBackButton {
 }
 
 const BackButton = ({ children, onNavigate, variant = 'contained' }: IBackButton) => {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const handleGoBack = () => {
-    onNavigate && onNavigate();
-    navigate('/', { replace: true });
+    if (onNavigate) {
+      onNavigate();
+    }
+    router.replace('/');
   };
 
   return (

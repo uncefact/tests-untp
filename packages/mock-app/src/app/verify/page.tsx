@@ -1,15 +1,17 @@
+'use client';
+
 import { Status } from '@mock-app/components';
 import { computeHash, decryptCredential, publicAPI, verifyVC } from '@mock-app/services';
 import { IVerifyResult, VerifiableCredential } from '@vckit/core-types';
 import * as jose from 'jose';
 import _ from 'lodash';
-import React, { useCallback, useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import { BackButton } from '../components/BackButton';
-import Credential from '../components/Credential/Credential';
-import { LoadingWithText } from '../components/LoadingWithText';
-import { MessageText } from '../components/MessageText';
-import appConfig from '../constants/app-config.json';
+import { useCallback, useEffect, useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { BackButton } from '@/components/BackButton';
+import Credential from '@/components/Credential/Credential';
+import { LoadingWithText } from '@/components/LoadingWithText';
+import { MessageText } from '@/components/MessageText';
+import appConfig from '@/constants/app-config.json';
 
 enum PassportStatus {
   'LOADING_FETCHING_PASSPORT' = 'LOADING_FETCHING_PASSPORT',
@@ -25,21 +27,10 @@ type VerifyError = { message: string; [k: string]: string };
  * Verify component is used to verify the passport
  */
 const Verify = () => {
-  const { search } = useLocation();
+  const search = useSearchParams();
   const [currentScreen, setCurrentScreen] = useState(PassportStatus.LOADING_FETCHING_PASSPORT);
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   const [credential, setCredential] = useState<VerifiableCredential | null>(null);
-
-  useEffect(() => {
-    fetchEncryptedVC();
-  }, [search]);
-
-  useEffect(() => {
-    if (credential) {
-      setCurrentScreen(PassportStatus.LOADING_PASSPORT_VERIFIED);
-      verifyCredential(credential);
-    }
-  }, [credential]);
 
   /**
    * fetchEncryptedVC function is used to fetch the encrypted VC and decrypt it
@@ -86,6 +77,7 @@ const Verify = () => {
 
           credentialObject = JSON.parse(credentialJsonString);
         } catch (error) {
+          console.log(error);
           return displayErrorUI(['Failed to decrypt credential.']);
         }
       } else {
@@ -94,36 +86,16 @@ const Verify = () => {
 
       return verifyHash(credentialObject);
     } catch (error) {
+      console.log(error);
       displayErrorUI();
     }
   }, [search]);
-
-  const displayErrorUI = (
-    errorMessages = ['Something went wrong. Please try again.'],
-    screen: PassportStatus = PassportStatus.ERROR,
-  ) => {
-    setErrorMessages(errorMessages);
-    setCurrentScreen(screen);
-  };
-  // TODO: Move this function to the vckit service
-  const verifyCredential = async (verifiableCredential: VerifiableCredential) => {
-    try {
-      const verifyServiceUrl = appConfig.defaultVerificationServiceLink.href;
-      const verifyServiceHeaders = appConfig.defaultVerificationServiceLink.headers;
-
-      const verifiedCredentialResult = await verifyVC(verifiableCredential, verifyServiceUrl, verifyServiceHeaders);
-
-      showVerifiedCredentialResult(verifiedCredentialResult);
-    } catch (error) {
-      displayErrorUI();
-    }
-  };
 
   /**
    * Show verified credential result
    * @param verifyResult
    */
-  const showVerifiedCredentialResult = (verifyResult: IVerifyResult) => {
+  const showVerifiedCredentialResult = useCallback((verifyResult: IVerifyResult) => {
     if (verifyResult?.verified) {
       return setCurrentScreen(PassportStatus.VERIFY_SUCCESS);
     }
@@ -138,6 +110,43 @@ const Verify = () => {
     }
 
     displayErrorUI();
+  }, []);
+
+  // TODO: Move this function to the vckit service
+  const verifyCredential = useCallback(
+    async (verifiableCredential: VerifiableCredential) => {
+      try {
+        const verifyServiceUrl = appConfig.defaultVerificationServiceLink.href;
+        const verifyServiceHeaders = appConfig.defaultVerificationServiceLink.headers;
+
+        const verifiedCredentialResult = await verifyVC(verifiableCredential, verifyServiceUrl, verifyServiceHeaders);
+
+        showVerifiedCredentialResult(verifiedCredentialResult);
+      } catch (error) {
+        console.log(error);
+        displayErrorUI();
+      }
+    },
+    [showVerifiedCredentialResult],
+  );
+
+  useEffect(() => {
+    fetchEncryptedVC();
+  }, [fetchEncryptedVC, search]);
+
+  useEffect(() => {
+    if (credential) {
+      setCurrentScreen(PassportStatus.LOADING_PASSPORT_VERIFIED);
+      verifyCredential(credential);
+    }
+  }, [credential, verifyCredential]);
+
+  const displayErrorUI = (
+    errorMessages = ['Something went wrong. Please try again.'],
+    screen: PassportStatus = PassportStatus.ERROR,
+  ) => {
+    setErrorMessages(errorMessages);
+    setCurrentScreen(screen);
   };
 
   /*
@@ -149,7 +158,7 @@ const Verify = () => {
         return <LoadingWithText text='Fetching the credential' />;
       case PassportStatus.LOADING_PASSPORT_VERIFIED:
         return <LoadingWithText text='Verifying the credential' />;
-      case PassportStatus.VERIFY_SUCCESS:
+      case PassportStatus.VERIFY_SUCCESS: {
         if (!credential) {
           return null;
         }
@@ -161,6 +170,7 @@ const Verify = () => {
             const encodedCredential = credential?.id?.split(',')[1];
             customCredential = jose.decodeJwt(encodedCredential as string) as VerifiableCredential;
           } catch (error) {
+            console.log(error);
             displayErrorUI();
           }
         }
@@ -170,6 +180,7 @@ const Verify = () => {
             <Credential credential={credential} decodedEnvelopedVC={customCredential} />
           </BackButton>
         );
+      }
       default:
         return (
           <BackButton>
@@ -184,4 +195,15 @@ const Verify = () => {
   return renderByScreenStatus();
 };
 
-export default Verify;
+/**
+ * Verify component wrapped with Suspense boundary
+ */
+const VerifyPage = () => {
+  return (
+    <Suspense fallback={<LoadingWithText text='Loading...' />}>
+      <Verify />
+    </Suspense>
+  );
+};
+
+export default VerifyPage;

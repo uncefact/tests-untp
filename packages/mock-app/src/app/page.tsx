@@ -1,6 +1,8 @@
+'use client';
+
 import * as React from 'react';
+import Link from 'next/link';
 import { Box, Button } from '@mui/material';
-import { Link } from 'react-router-dom';
 import { convertStringToPath } from '../utils';
 import appConfig from '../constants/app-config.json';
 
@@ -17,9 +19,9 @@ const Home = () => {
             },
           }}
           key={path}
-          variant='contained'
+          variant="contained"
           component={Link}
-          to={path}
+          href={path}
         >
           {configApp.name}
         </Button>
@@ -35,12 +37,12 @@ const Home = () => {
           },
         }}
         key={'/scanning'}
-        variant='contained'
+        variant="contained"
         component={Link}
-        to={'/scanning'}
+        href={'/scanning'}
       >
         Scanning
-      </Button>,
+      </Button>
     );
 
     return apps;
@@ -58,9 +60,9 @@ const Home = () => {
             },
           }}
           key={path}
-          variant='contained'
+          variant="contained"
           component={Link}
-          to={path}
+          href={path}
         >
           {feature.name}
         </Button>

@@ -15,7 +15,9 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     open: true,
-    onClose: () => {},
+    onClose: () => {
+      // Intentionally empty for Storybook
+    },
     title: 'Demo custom dialog',
     content: 'Dialog content',
   },

@@ -1,6 +1,69 @@
-import React from 'react';
 import { render, fireEvent, screen } from '@testing-library/react';
 import { CustomDialog } from '../components/CustomDialog';
+
+// Mocking MUI components
+jest.mock('@mui/material/Dialog', () => ({
+  __esModule: true,
+  default: ({
+    children,
+    open,
+    onClose,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    open?: boolean;
+    onClose?: () => void;
+    [key: string]: unknown;
+  }) =>
+    open ? (
+      <div data-testid='dialog' onClick={onClose} {...props}>
+        {children}
+      </div>
+    ) : null,
+}));
+
+jest.mock('@mui/material/DialogTitle', () => ({
+  __esModule: true,
+  default: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div data-testid='dialog-title' {...props}>
+      {children}
+    </div>
+  ),
+}));
+
+jest.mock('@mui/material/DialogContent', () => ({
+  __esModule: true,
+  default: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div data-testid='dialog-content' {...props}>
+      {children}
+    </div>
+  ),
+}));
+
+jest.mock('@mui/material/DialogActions', () => ({
+  __esModule: true,
+  default: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div data-testid='dialog-actions' {...props}>
+      {children}
+    </div>
+  ),
+}));
+
+jest.mock('@mui/material', () => ({
+  Button: ({
+    children,
+    onClick,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    onClick?: () => void;
+    [key: string]: unknown;
+  }) => (
+    <button onClick={onClick} {...props}>
+      {children}
+    </button>
+  ),
+}));
 
 describe('CustomDialog Component', () => {
   it('should renders with title, content, and buttons', () => {
@@ -38,5 +101,4 @@ describe('CustomDialog Component', () => {
     // Expecting the onClose function to have been called
     expect(onCloseMock).toHaveBeenCalled();
   });
-
 });

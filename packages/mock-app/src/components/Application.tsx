@@ -1,6 +1,8 @@
+'use client';
+
 import React from 'react';
 import { Box, Button } from '@mui/material';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { convertStringToPath } from '../utils';
 import { IApp, IFeature } from '../types/common.types';
 
@@ -23,9 +25,9 @@ const Application = ({ app }: IApplication) => {
             },
           }}
           key={childPath}
-          variant='contained'
+          variant="contained"
           component={Link}
-          to={childPath}
+          href={childPath}
         >
           {feature.name}
         </Button>

@@ -1,12 +1,58 @@
 import * as jose from 'jose';
-import { Router as RouterDom, useLocation } from 'react-router-dom';
-import { createMemoryHistory } from 'history';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { UnsignedCredential, VerifiableCredential } from '@uncefact/vckit-core-types';
 import { computeHash, decryptCredential, publicAPI, verifyVC } from '@mock-app/services';
-import Verify from '../pages/Verify';
+import Verify from '../app/verify/page';
 
 console.error = jest.fn();
+
+// Mock Next.js navigation
+const mockUseSearchParams = jest.fn();
+jest.mock('next/navigation', () => ({
+  useSearchParams: () => mockUseSearchParams(),
+}));
+
+// Mock BackButton component
+jest.mock('@/components/BackButton', () => ({
+  BackButton: ({ children }: { children: React.ReactNode }) => <div data-testid='back-button'>{children}</div>,
+}));
+
+// Mock Credential component
+jest.mock('@/components/Credential/Credential', () => ({
+  __esModule: true,
+  default: ({
+    credential,
+    decodedEnvelopedVC,
+  }: {
+    credential: VerifiableCredential;
+    decodedEnvelopedVC?: UnsignedCredential;
+  }) => {
+    const name = decodedEnvelopedVC?.credentialSubject?.name ?? credential?.credentialSubject?.name;
+    const renderTemplate = decodedEnvelopedVC?.renderMethod?.template ?? credential?.renderMethod?.template ?? '';
+    // Simulate the rendering of the credential with the name
+    const rendered = renderTemplate.replace('{{name}}', name);
+    return <div dangerouslySetInnerHTML={{ __html: rendered }} />;
+  },
+}));
+
+// Mock LoadingWithText component
+jest.mock('@/components/LoadingWithText', () => ({
+  LoadingWithText: ({ text }: { text: string }) => <div>{text}</div>,
+}));
+
+// Mock MessageText component
+jest.mock('@/components/MessageText', () => ({
+  MessageText: ({ text }: { text: string }) => <div>{text}</div>,
+}));
+
+// Mock app config
+jest.mock('@/constants/app-config.json', () => ({
+  defaultVerificationServiceLink: {
+    href: 'http://localhost:3332/agent/routeVerificationCredential',
+    headers: {},
+  },
+}));
+
 jest.mock('@mock-app/components', () => ({
   Status: 'success',
   toastMessage: jest.fn(),
@@ -30,30 +76,12 @@ jest.mock('@uncefact/vckit-renderer', () => ({
   Renderer: jest.fn(),
   WebRenderingTemplate2022: jest.fn(),
 }));
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
 
-  useLocation: jest.fn(() => ({
-    search:
-      'q=%7B"payload"%3A%7B"uri"%3A"http%3A%2F%2Flocalhost%3A3333%2Fv1%2Fverifiable-credentials%2Fd1fc233a-0e32-4c36-8131-2be5fef7a243.json"%7D%7D',
-  })),
-}));
-jest.mock(
-  '../components/CredentialTabs/CredentialTabs',
-  () =>
-    ({
-      credential,
-      decodedEnvelopedVC,
-    }: {
-      credential: VerifiableCredential;
-      decodedEnvelopedVC?: UnsignedCredential;
-    }) => {
-      const name = decodedEnvelopedVC?.credentialSubject?.name ?? credential?.credentialSubject?.name;
-      const renderTemplate = decodedEnvelopedVC?.renderMethod?.template ?? credential?.renderMethod?.template ?? '';
-      // Simulate the rendering of the credential with the name
-      const rendered = renderTemplate.replace('{{name}}', name);
-      return <div dangerouslySetInnerHTML={{ __html: rendered }} />;
-    },
+// Set default mock for useSearchParams
+mockUseSearchParams.mockReturnValue(
+  new URLSearchParams(
+    'q=%7B"payload"%3A%7B"uri"%3A"http%3A%2F%2Flocalhost%3A3333%2Fv1%2Fverifiable-credentials%2Fd1fc233a-0e32-4c36-8131-2be5fef7a243.json"%7D%7D',
+  ),
 );
 
 describe('Verify', () => {
@@ -77,18 +105,17 @@ describe('Verify', () => {
       },
     ],
   };
-  const history = createMemoryHistory({ initialEntries: ['/verify'] });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
   it('should render loading screen', async () => {
-    render(
-      <RouterDom location={history.location} navigator={history}>
-        <Verify />
-      </RouterDom>,
-    );
+    render(<Verify />);
 
     expect(screen.getByText('Fetching the credential')).toBeInTheDocument();
   });
@@ -97,11 +124,7 @@ describe('Verify', () => {
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce({});
 
     await act(async () => {
-      render(
-        <RouterDom location={history.location} navigator={history}>
-          <Verify />
-        </RouterDom>,
-      );
+      render(<Verify />);
     });
 
     await waitFor(() => {
@@ -120,11 +143,7 @@ describe('Verify', () => {
     }));
 
     await act(async () => {
-      render(
-        <RouterDom location={history.location} navigator={history}>
-          <Verify />
-        </RouterDom>,
-      );
+      render(<Verify />);
     });
 
     await waitFor(() => {
@@ -144,11 +163,7 @@ describe('Verify', () => {
     }));
 
     await act(async () => {
-      render(
-        <RouterDom location={history.location} navigator={history}>
-          <Verify />
-        </RouterDom>,
-      );
+      render(<Verify />);
     });
 
     await waitFor(() => {
@@ -164,11 +179,7 @@ describe('Verify', () => {
     }));
 
     await act(async () => {
-      render(
-        <RouterDom location={history.location} navigator={history}>
-          <Verify />
-        </RouterDom>,
-      );
+      render(<Verify />);
     });
 
     await waitFor(() => {
@@ -187,11 +198,7 @@ describe('Verify', () => {
     }));
 
     await act(async () => {
-      render(
-        <RouterDom location={history.location} navigator={history}>
-          <Verify />
-        </RouterDom>,
-      );
+      render(<Verify />);
     });
 
     await waitFor(() => {
@@ -209,24 +216,18 @@ describe('Verify', () => {
     };
     // URL-encode the payload for use as a query parameter
     const encodedPayload = `q=${encodeURIComponent(JSON.stringify(mockPayloadValidHash))}`;
-    (useLocation as any).mockImplementation(() => ({
-      search: encodedPayload,
-    }));
+    mockUseSearchParams.mockReturnValue(new URLSearchParams(encodedPayload));
 
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockEncryptedCredential);
 
-    (computeHash as any).mockImplementation(() => mockPayloadValidHash.payload.hash);
+    (computeHash as jest.Mock).mockImplementation(() => mockPayloadValidHash.payload.hash);
 
     (verifyVC as jest.Mock).mockImplementation(() => ({
       verified: true,
     }));
 
     await act(async () => {
-      render(
-        <RouterDom location={history.location} navigator={history}>
-          <Verify />
-        </RouterDom>,
-      );
+      render(<Verify />);
     });
 
     await waitFor(() => {
@@ -243,9 +244,7 @@ describe('Verify', () => {
     };
     // URL-encode the payload for use as a query parameter
     const encodedPayload = `q=${encodeURIComponent(JSON.stringify(mockPayloadValidHash))}`;
-    (useLocation as any).mockImplementation(() => ({
-      search: encodedPayload,
-    }));
+    mockUseSearchParams.mockReturnValue(new URLSearchParams(encodedPayload));
 
     const mockCredentialEnvelopingProof = {
       '@context': ['https://www.w3.org/ns/credentials/v2', 'https://vocabulary.uncefact.org/untp/dpp/0.5.0/'],
@@ -254,22 +253,18 @@ describe('Verify', () => {
     };
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockCredentialEnvelopingProof);
 
-    (computeHash as any).mockImplementation(() => mockPayloadValidHash.payload.hash);
+    (computeHash as jest.Mock).mockImplementation(() => mockPayloadValidHash.payload.hash);
 
     (verifyVC as jest.Mock).mockImplementation(() => ({
       verified: true,
     }));
 
-    (jose as any).decodeJwt.mockImplementation(() => ({
+    (jose.decodeJwt as jest.Mock).mockImplementation(() => ({
       ...mockEncryptedCredential,
     }));
 
     await act(async () => {
-      render(
-        <RouterDom location={history.location} navigator={history}>
-          <Verify />
-        </RouterDom>,
-      );
+      render(<Verify />);
     });
 
     await waitFor(() => {
@@ -287,9 +282,7 @@ describe('Verify', () => {
     };
     // URL-encode the payload for use as a query parameter
     const encodedPayload = `q=${encodeURIComponent(JSON.stringify(mockPayloadValidHash))}`;
-    (useLocation as any).mockImplementation(() => ({
-      search: encodedPayload,
-    }));
+    mockUseSearchParams.mockReturnValue(new URLSearchParams(encodedPayload));
 
     const mockNewEncryptedCredential = {
       cipherText:
@@ -300,20 +293,16 @@ describe('Verify', () => {
     };
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockNewEncryptedCredential);
 
-    (computeHash as any).mockImplementation(() => mockPayloadValidHash.payload.hash);
+    (computeHash as jest.Mock).mockImplementation(() => mockPayloadValidHash.payload.hash);
 
-    (decryptCredential as any).mockImplementation(() => JSON.stringify(mockEncryptedCredential));
+    (decryptCredential as jest.Mock).mockImplementation(() => JSON.stringify(mockEncryptedCredential));
 
     (verifyVC as jest.Mock).mockImplementation(() => ({
       verified: true,
     }));
 
     await act(async () => {
-      render(
-        <RouterDom location={history.location} navigator={history}>
-          <Verify />
-        </RouterDom>,
-      );
+      render(<Verify />);
     });
 
     await waitFor(() => {
@@ -329,9 +318,7 @@ describe('Verify', () => {
     };
     // URL-encode the payload for use as a query parameter
     const encodedPayload = `q=${encodeURIComponent(JSON.stringify(mockPayloadWithoutHash))}`;
-    (useLocation as any).mockImplementation(() => ({
-      search: encodedPayload,
-    }));
+    mockUseSearchParams.mockReturnValue(new URLSearchParams(encodedPayload));
 
     const mockCredentialEnvelopingProof = {
       '@context': ['https://www.w3.org/ns/credentials/v2', 'https://vocabulary.uncefact.org/untp/dpp/0.5.0/'],
@@ -344,16 +331,12 @@ describe('Verify', () => {
       verified: true,
     }));
 
-    (jose as any).decodeJwt.mockImplementation(() => ({
+    (jose.decodeJwt as jest.Mock).mockImplementation(() => ({
       ...mockEncryptedCredential,
     }));
 
     await act(async () => {
-      render(
-        <RouterDom location={history.location} navigator={history}>
-          <Verify />
-        </RouterDom>,
-      );
+      render(<Verify />);
     });
 
     await waitFor(() => {
@@ -371,9 +354,7 @@ describe('Verify', () => {
 
     // URL-encode the payload for use as a query parameter
     const encodedPayload = `q=${encodeURIComponent(JSON.stringify(mockPayloadWithoutHash))}`;
-    (useLocation as any).mockImplementation(() => ({
-      search: encodedPayload,
-    }));
+    mockUseSearchParams.mockReturnValue(new URLSearchParams(encodedPayload));
 
     const mockNewEncryptedCredential = {
       cipherText:
@@ -384,17 +365,13 @@ describe('Verify', () => {
     };
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockNewEncryptedCredential);
 
-    (decryptCredential as any).mockImplementation(() => JSON.stringify(mockEncryptedCredential));
+    (decryptCredential as jest.Mock).mockImplementation(() => JSON.stringify(mockEncryptedCredential));
     (verifyVC as jest.Mock).mockImplementation(() => ({
       verified: true,
     }));
 
     await act(async () => {
-      render(
-        <RouterDom location={history.location} navigator={history}>
-          <Verify />
-        </RouterDom>,
-      );
+      render(<Verify />);
     });
 
     await waitFor(() => {
@@ -411,24 +388,18 @@ describe('Verify', () => {
     };
     // URL-encode the payload for use as a query parameter
     const encodedPayload = `q=${encodeURIComponent(JSON.stringify(mockPayloadInvalidHash))}`;
-    (useLocation as any).mockImplementation(() => ({
-      search: encodedPayload,
-    }));
+    mockUseSearchParams.mockReturnValue(new URLSearchParams(encodedPayload));
 
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockEncryptedCredential);
 
-    (computeHash as any).mockImplementation(() => 'valid-hash');
+    (computeHash as jest.Mock).mockImplementation(() => 'valid-hash');
 
     (verifyVC as jest.Mock).mockImplementation(() => ({
       verified: true,
     }));
 
     await act(async () => {
-      render(
-        <RouterDom location={history.location} navigator={history}>
-          <Verify />
-        </RouterDom>,
-      );
+      render(<Verify />);
     });
 
     await waitFor(() => {
@@ -452,14 +423,12 @@ describe('Verify', () => {
     };
     // URL-encode the payload for use as a query parameter
     const encodedPayload = `q=${encodeURIComponent(JSON.stringify(mockPayloadInvalidKey))}`;
-    (useLocation as any).mockImplementation(() => ({
-      search: encodedPayload,
-    }));
+    mockUseSearchParams.mockReturnValue(new URLSearchParams(encodedPayload));
 
     jest.spyOn(publicAPI, 'get').mockResolvedValueOnce(mockEncryptedCredential);
 
-    (computeHash as any).mockImplementation(() => mockPayloadInvalidKey.payload.hash);
-    (decryptCredential as any).mockImplementation(() => {
+    (computeHash as jest.Mock).mockImplementation(() => mockPayloadInvalidKey.payload.hash);
+    (decryptCredential as jest.Mock).mockImplementation(() => {
       throw new Error('Failed to decrypt credential');
     });
 
@@ -468,11 +437,7 @@ describe('Verify', () => {
     }));
 
     await act(async () => {
-      render(
-        <RouterDom location={history.location} navigator={history}>
-          <Verify />
-        </RouterDom>,
-      );
+      render(<Verify />);
     });
 
     await waitFor(() => {
