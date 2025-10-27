@@ -33,7 +33,7 @@ jobs:
           yarn cache clean && yarn install --immutable
 
       - name: Check linting
-        run: yarn lint
+        run: yarn build && yarn lint
 
       - name: Build
         run: yarn build

@@ -5,7 +5,7 @@ import { computeHash, decryptCredential, publicAPI, verifyVC } from '@mock-app/s
 import { IVerifyResult, VerifiableCredential } from '@vckit/core-types';
 import * as jose from 'jose';
 import _ from 'lodash';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { BackButton } from '@/components/BackButton';
 import Credential from '@/components/Credential/Credential';
@@ -195,4 +195,15 @@ const Verify = () => {
   return renderByScreenStatus();
 };
 
-export default Verify;
+/**
+ * Verify component wrapped with Suspense boundary
+ */
+const VerifyPage = () => {
+  return (
+    <Suspense fallback={<LoadingWithText text='Loading...' />}>
+      <Verify />
+    </Suspense>
+  );
+};
+
+export default VerifyPage;
