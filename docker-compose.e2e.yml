@@ -155,18 +155,46 @@ services:
       - '3003:80'
     depends_on:
       - untp-playground
+      - e2e-keycloak
+      - e2e-ri-db
 
   e2e-ri-db:
     image: postgres:17-alpine
     ports:
       - 5433:5432
     environment:
-      - POSTGRES_USER=${RI_POSTGRES_USER:-ri-postgres}
-      - POSTGRES_PASSWORD=${RI_POSTGRES_PASSWORD:-ri-postgres}
-      - POSTGRES_DB=${RI_POSTGRES_DB:-ri}
+      - POSTGRES_USER=ri-postgres
+      - POSTGRES_PASSWORD=ri-postgres
+      - POSTGRES_DB=ri
     volumes:
       - e2e-ri-db-data:/var/lib/postgresql/data
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ri-postgres -d ri"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  e2e-keycloak:
+    image: quay.io/keycloak/keycloak:26.4.2
+    command:
+      - start-dev
+      - --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "127.0.0.1:8081:8080" # See https://github.com/quarkusio/quarkus/discussions/48905#discussioncomment-14213858
+      - "9991:9000"
+    volumes:
+      - ./e2e/cypress/fixtures/keycloak-realm-e2e.json:/opt/keycloak/data/import/ri-e2e.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
 
 volumes:
   vckit-data:
