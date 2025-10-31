@@ -138,8 +138,9 @@ If you need to completely re-initialise Keycloak with a new realm configuration:
 
 To re-initialise:
 1. Stop the services: `docker compose down`
-2. Remove the generated realm file: `rm keycloak-realms/*.json`
-3. Start the services: `docker compose up`
+2. Remove the keycloak volume `docker volume rm tests-untp_keycloak-data`
+3. Remove the generated realm file: `rm keycloak-realms/*.json`
+4. Start the services: `docker compose up`
 
 **Important Considerations:**
 - **Data Loss**: All users, sessions, and Keycloak configuration will be lost

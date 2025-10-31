@@ -50,6 +50,7 @@ services:
       - "9990:9000" # Port for health checks
     volumes:
       - ./keycloak-realms:/opt/keycloak/data/import:ro
+      - keycloak-data:/opt/keycloak/data
     depends_on:
       ri-init:
         condition: service_completed_successfully
@@ -227,3 +228,4 @@ volumes:
   ri-db-data:
   vckit-data:
   storage_service_data:
+  keycloak-data:
