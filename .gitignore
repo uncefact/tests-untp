@@ -83,3 +83,6 @@ packages/vc-test-suite/reports
 e2e/cypress/screenshots
 e2e/cypress/downloads
 e2e/cypress/screenshots
+
+# keycloak generated realm files
+keycloak-realms/

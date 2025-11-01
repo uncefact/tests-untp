@@ -1,0 +1,8 @@
+{
+  "name": "ri-provisioning-scripts",
+  "version": "1.0.0",
+  "dependencies": {
+    "tsx": "^4.19.2",
+    "zod": "^4.1.12"
+  }
+}

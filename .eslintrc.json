@@ -18,7 +18,8 @@
   ],
   "parserOptions": {
     "project": [
-      "./packages/*/tsconfig.json"
+      "./packages/*/tsconfig.json",
+      "./initialisation/tsconfig.json"
     ]
   },
   "rules": {

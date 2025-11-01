@@ -1,0 +1,25 @@
+{
+  "organisations": [
+    {
+      "name": "Test Organisation",
+      "primaryColor": "#3B82F6",
+      "logo": null,
+      "users": [
+        {
+          "email": "admin@example.com",
+          "firstName": "Admin",
+          "lastName": "User",
+          "role": "owner",
+          "password": "changeme"
+        },
+        {
+          "email": "user@example.com",
+          "firstName": "Test",
+          "lastName": "User",
+          "role": "user",
+          "password": "changeme"
+        }
+      ]
+    }
+  ]
+}

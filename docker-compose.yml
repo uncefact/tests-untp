@@ -4,12 +4,62 @@ services:
     ports:
       - 5433:5432
     environment:
-      - POSTGRES_USER=${RI_POSTGRES_USER:-ri-postgres}
-      - POSTGRES_PASSWORD=${RI_POSTGRES_PASSWORD:-ri-postgres}
-      - POSTGRES_DB=${RI_POSTGRES_DB:-ri}
+      - POSTGRES_USER=${RI_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${RI_POSTGRES_PASSWORD}
+      - POSTGRES_DB=${RI_POSTGRES_DB}
     volumes:
       - ri-db-data:/var/lib/postgresql/data
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${RI_POSTGRES_USER} -d ${RI_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ri-init:
+    build:
+      context: ./initialisation
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      POSTGRES_USER: ${RI_POSTGRES_USER}
+      POSTGRES_DB: ${RI_POSTGRES_DB}
+      POSTGRES_PORT: ${RI_POSTGRES_PORT}
+      RI_APP_URL: ${RI_APP_URL}
+      IDP_CLIENT_ID: ${IDP_CLIENT_ID}
+      IDP_CLIENT_SECRET: ${IDP_CLIENT_SECRET}
+    volumes:
+      - ./keycloak-realms:/keycloak-realms
+      - ./initialisation/config.json:/app/config.json:ro
+    depends_on:
+      ri-db:
+        condition: service_healthy
+    restart: "no"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.2
+    command:
+      - start-dev
+      - --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "127.0.0.1:${KEYCLOAK_PORT}:8080" # See https://github.com/quarkusio/quarkus/discussions/48905#discussioncomment-14213858
+      - "9990:9000" # Port for health checks
+    volumes:
+      - ./keycloak-realms:/opt/keycloak/data/import:ro
+      - keycloak-data:/opt/keycloak/data
+    depends_on:
+      ri-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
 
   documentation:
     build:
@@ -178,3 +228,4 @@ volumes:
   ri-db-data:
   vckit-data:
   storage_service_data:
+  keycloak-data:
