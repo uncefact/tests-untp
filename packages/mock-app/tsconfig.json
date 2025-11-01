@@ -17,8 +17,7 @@
     "noUnusedParameters": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@prisma/client": ["./src/lib/prisma/generated/client"]
-
+      "@prisma/client": ["./src/lib/prisma/generated"]
     },
     "plugins": [
       {

@@ -15,6 +15,25 @@ const {
   RI_POSTGRES_PORT,
 } = process.env;
 
+// Validate required environment variables
+const requiredEnvVars = {
+  RI_POSTGRES_USER,
+  RI_POSTGRES_PASSWORD,
+  RI_POSTGRES_DB,
+  RI_POSTGRES_HOST,
+  RI_POSTGRES_PORT,
+};
+
+const missingVars = Object.entries(requiredEnvVars)
+  .filter(([_, value]) => !value)
+  .map(([key]) => key);
+
+if (missingVars.length > 0) {
+  throw new Error(
+    `Missing required environment variables: ${missingVars.join(", ")}`
+  );
+}
+
 // Construct the database URL from individual environment variables
 const url = `postgresql://${RI_POSTGRES_USER}:${RI_POSTGRES_PASSWORD}@${RI_POSTGRES_HOST}:${RI_POSTGRES_PORT}/${RI_POSTGRES_DB}?schema=public`;
 
