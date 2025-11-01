@@ -164,7 +164,7 @@ services:
       untp-playground:
         condition: service_started
       e2e-keycloak:
-        condition: service_started
+        condition: service_healthy
       e2e-ri-db:
         condition: service_healthy
 
