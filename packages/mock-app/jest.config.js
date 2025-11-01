@@ -10,6 +10,8 @@ const jestConfig = {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^react($|/.+)': '<rootDir>/../../node_modules/react$1',
+    '^react-dom($|/.+)': '<rootDir>/../../node_modules/react-dom$1',
   },
   transform: {
     '^.+\\.m?tsx?$': [
@@ -25,7 +27,7 @@ const jestConfig = {
           skipLibCheck: true,
           strict: true,
           esModuleInterop: true,
-          moduleResolution: 'node',
+          moduleResolution: 'bundler',
           resolveJsonModule: true,
           isolatedModules: true,
         },
