@@ -22,15 +22,19 @@ services:
     environment:
       ENVIRONMENT: ${ENVIRONMENT}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM}
-      POSTGRES_USER: ${RI_POSTGRES_USER}
-      POSTGRES_DB: ${RI_POSTGRES_DB}
-      POSTGRES_PORT: ${RI_POSTGRES_PORT}
+      RI_POSTGRES_USER: ${RI_POSTGRES_USER}
+      RI_POSTGRES_PASSWORD: ${RI_POSTGRES_PASSWORD}
+      RI_POSTGRES_DB: ${RI_POSTGRES_DB}
+      # TODO: Harmonise with .env - hardcoded for now to use docker internal networking
+      RI_POSTGRES_HOST: ri-db
+      RI_POSTGRES_PORT: 5432
       RI_APP_URL: ${RI_APP_URL}
       IDP_CLIENT_ID: ${IDP_CLIENT_ID}
       IDP_CLIENT_SECRET: ${IDP_CLIENT_SECRET}
     volumes:
       - ./keycloak-realms:/keycloak-realms
       - ./initialisation/config.json:/app/config.json:ro
+      - ./packages/mock-app/prisma:/app/prisma:ro
     depends_on:
       ri-db:
         condition: service_healthy

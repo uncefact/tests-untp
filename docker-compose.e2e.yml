@@ -149,15 +149,22 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: development
       args:
         CONFIG_FILE: ./e2e/cypress/fixtures/app-config.json
     ports:
-      - '3003:80'
+      - '3003:3003'
+    environment:
+      - RI_POSTGRES_USER=ri-postgres
+      - RI_POSTGRES_PASSWORD=ri-postgres
+      - RI_POSTGRES_DB=ri
+      - RI_POSTGRES_HOST=e2e-ri-db
+      - RI_POSTGRES_PORT=5432
     depends_on:
-      unp-playground:
+      untp-playground:
         condition: service_started
       e2e-keycloak:
-        condition: service_healthy
+        condition: service_started
       e2e-ri-db:
         condition: service_healthy
 
