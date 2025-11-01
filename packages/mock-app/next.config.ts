@@ -39,10 +39,10 @@ if (missingVars.length > 0) {
 }
 
 // Construct the database URL from individual environment variables
-const databseUrl = `postgresql://${RI_POSTGRES_USER}:${RI_POSTGRES_PASSWORD}@${RI_POSTGRES_HOST}:${RI_POSTGRES_PORT}/${RI_POSTGRES_DB}?schema=public`;
+const databaseUrl = `postgresql://${RI_POSTGRES_USER}:${RI_POSTGRES_PASSWORD}@${RI_POSTGRES_HOST}:${RI_POSTGRES_PORT}/${RI_POSTGRES_DB}?schema=public`;
 
 // Set RI_DATABASE_URL for runtime access
-process.env.RI_DATABASE_URL = databseUrl;
+process.env.RI_DATABASE_URL = databaseUrl;
 
 const nextConfig: NextConfig = {
   reactStrictMode: false,

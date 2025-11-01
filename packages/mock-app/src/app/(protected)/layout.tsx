@@ -1,6 +1,6 @@
 'use client';
 
-import { SessionProvider, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { Container, ThemeProvider, Typography, CircularProgress } from '@mui/material';
 import React, { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -71,8 +71,6 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 
 export default function ProtectedLayout({ children }: ProtectedLayoutProps) {
   return (
-    <SessionProvider>
       <ProtectedContent>{children}</ProtectedContent>
-    </SessionProvider>
   );
 }
