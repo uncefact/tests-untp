@@ -10,14 +10,14 @@
           "firstName": "Admin",
           "lastName": "User",
           "role": "owner",
-          "password": "Admin123!"
+          "password": "changeme"
         },
         {
           "email": "user@example.com",
           "firstName": "Test",
           "lastName": "User",
           "role": "user",
-          "password": "User123!"
+          "password": "changeme"
         }
       ]
     }

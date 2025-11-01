@@ -154,9 +154,12 @@ services:
     ports:
       - '3003:80'
     depends_on:
-      - untp-playground
-      - e2e-keycloak
-      - e2e-ri-db
+      unp-playground:
+        condition: service_started
+      e2e-keycloak:
+        condition: service_healthy
+      e2e-ri-db:
+        condition: service_healthy
 
   e2e-ri-db:
     image: postgres:17-alpine

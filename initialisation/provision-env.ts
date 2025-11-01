@@ -86,7 +86,7 @@ function generateKeycloakRealm(config: ProvisionConfig): KeycloakRealmRepresenta
         enabled: true,
         protocol: "openid-connect" as const,
         publicClient: false,
-        secret: process.env.IDP_CLIENT_SECRET,
+        secret: process.env.IDP_CLIENT_SECRET!,
         redirectUris: [
           `${process.env.RI_APP_URL!}/api/auth/callback/keycloak`
         ],

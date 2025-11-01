@@ -1,7 +1,7 @@
 FROM node:22-alpine
 
 # Install PostgreSQL client for database operations
-RUN apk add --no-cache postgresql-client curl
+RUN apk add --no-cache postgresql-client
 
 WORKDIR /app
 
