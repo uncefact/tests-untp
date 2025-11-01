@@ -13,4 +13,4 @@ node_modules
 .next
 packages/untp-playground/infra
 packages/untp-test-suite-mocha/untp-tests
-
+packages/mock-app/src/lib/prisma/generated
