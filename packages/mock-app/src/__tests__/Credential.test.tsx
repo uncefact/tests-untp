@@ -76,7 +76,15 @@ jest.mock('@uncefact/vckit-renderer', () => ({
 }));
 
 describe('Credential content', () => {
+  let consoleLogSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    // Suppress expected console.log errors from verify page
+    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
   afterEach(() => {
+    consoleLogSpy.mockRestore();
     jest.clearAllMocks(); // Clearing all mock calls after each test
   });
 

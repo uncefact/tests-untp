@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { act } from 'react';
 import { render, waitFor } from '@testing-library/react';
 
 import { ToastMessage, toastMessage, Status } from '../../../components/ToastMessage/ToastMessage';
@@ -12,7 +12,9 @@ describe('Toast Message', () => {
     render(<ToastMessage />);
 
     // Call the toastMessage function
-    toastMessage({ status, message });
+    act(() => {
+      toastMessage({ status, message });
+    });
 
     // Check that the toast message is correctly.
     await waitFor(() => {

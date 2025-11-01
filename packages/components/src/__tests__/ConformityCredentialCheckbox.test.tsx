@@ -8,9 +8,7 @@ jest.mock('../components/ConformityCredentialCheckBox/utils', () => ({
 }));
 
 describe('ConformityCredentialCheckbox', () => {
-  const onChange = (arg: { data: object }) => {
-    console.log('onChangeJsonSchemaForm', arg);
-  };
+  const onChange = jest.fn();
 
   it('should render ConformityCredentialCheckbox with text', () => {
     render(<ConformityCredentialCheckbox onChange={onChange} />);
@@ -84,7 +82,6 @@ describe('ConformityCredentialCheckbox', () => {
     render(<ConformityCredentialCheckbox onChange={onChangeUpdate} />);
     const checkbox = screen.getByRole('checkbox', { name: 'testCheckbox' });
 
-    screen.debug();
     fireEvent.click(checkbox);
     expect(checkbox).toBeChecked();
     fireEvent.click(checkbox);

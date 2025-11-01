@@ -1,6 +1,6 @@
 import React from 'react';
 import { publicAPI } from '@mock-app/services';
-import { render, screen, getByText, act, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, getByText, fireEvent, waitFor } from '@testing-library/react';
 import { processVerifiableCredentialData } from '../utils/importDataHelpers.js';
 import { QRCodeScannerDialogButton } from '../components/QRCodeScannerDialogButton/QRCodeScannerDialogButton';
 import { ScannerDialog } from '../components/QRCodeScannerDialogButton/ScannerDialog';
@@ -56,22 +56,18 @@ describe('QRCodeScannerDialogButton, when type is JSON', () => {
       },
     };
     publicAPI.get = jest.fn().mockResolvedValue(result);
-    act(() => {
-      render(<QRCodeScannerDialogButton type={ImportDataType.JSON} onChange={onChange} />);
-    });
+    render(<QRCodeScannerDialogButton type={ImportDataType.JSON} onChange={onChange} />);
 
-    act(() => {
-      const button = getByText(document.body, 'ScanQR');
-      fireEvent.click(button);
-    });
+    const scanButton = getByText(document.body, 'ScanQR');
+    fireEvent.click(scanButton);
 
-    act(() => {
-      const button = getByText(document.body, 'Click');
-      fireEvent.click(button);
-    });
+    const clickButton = getByText(document.body, 'Click');
+    fireEvent.click(clickButton);
 
-    expect(publicAPI.get).toHaveBeenCalledWith(url);
-    expect(await onChange).toHaveBeenCalledWith({ 'https://example.com': result });
+    await waitFor(() => {
+      expect(publicAPI.get).toHaveBeenCalledWith(url);
+      expect(onChange).toHaveBeenCalledWith({ 'https://example.com': result });
+    });
   });
 
   it('should show toast message with error message when getQRCodeDataFromUrl is called with invalid URL', async () => {
@@ -87,22 +83,18 @@ describe('QRCodeScannerDialogButton, when type is JSON', () => {
     (ScannerDialog as any).mockImplementation(MockScannerDialog);
 
     const onChange = jest.fn();
-    act(() => {
-      render(<QRCodeScannerDialogButton type={ImportDataType.JSON} onChange={onChange} />);
-    });
+    render(<QRCodeScannerDialogButton type={ImportDataType.JSON} onChange={onChange} />);
 
-    act(() => {
-      const button = getByText(document.body, 'ScanQR');
-      fireEvent.click(button);
-    });
+    const scanButton = getByText(document.body, 'ScanQR');
+    fireEvent.click(scanButton);
 
-    act(() => {
-      const button = getByText(document.body, 'Click');
-      fireEvent.click(button);
-    });
+    const clickButton = getByText(document.body, 'Click');
+    fireEvent.click(clickButton);
 
-    expect(onChange).not.toHaveBeenCalled();
-    expect(screen.getByText(/Invalid URL/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(onChange).not.toHaveBeenCalled();
+      expect(screen.getByText(/Invalid URL/i)).toBeInTheDocument();
+    });
   });
 
   it('should close scanner dialog when close button is clicked', () => {
@@ -117,19 +109,13 @@ describe('QRCodeScannerDialogButton, when type is JSON', () => {
     (ScannerDialog as any).mockImplementation(MockScannerDialog);
 
     const onChange = jest.fn();
-    act(() => {
-      render(<QRCodeScannerDialogButton type={ImportDataType.JSON} onChange={onChange} />);
-    });
+    render(<QRCodeScannerDialogButton type={ImportDataType.JSON} onChange={onChange} />);
 
-    act(() => {
-      const button = getByText(document.body, 'ScanQR');
-      fireEvent.click(button);
-    });
+    const scanButton = getByText(document.body, 'ScanQR');
+    fireEvent.click(scanButton);
 
-    act(() => {
-      const button = getByText(document.body, 'Close');
-      fireEvent.click(button);
-    });
+    const closeButton = getByText(document.body, 'Close');
+    fireEvent.click(closeButton);
 
     expect(screen.queryByText('ScannerDialog')).not.toBeInTheDocument();
   });
@@ -174,15 +160,11 @@ describe('QRCodeScannerDialogButton, when type is VerifiableCredential', () => {
       />,
     );
 
-    act(() => {
-      const button = getByText(document.body, 'ScanQR');
-      fireEvent.click(button);
-    });
+    const scanButton = getByText(document.body, 'ScanQR');
+    fireEvent.click(scanButton);
 
-    act(() => {
-      const button = getByText(document.body, 'Click');
-      fireEvent.click(button);
-    });
+    const clickButton = getByText(document.body, 'Click');
+    fireEvent.click(clickButton);
 
     await waitFor(() => {
       expect(processVerifiableCredentialData).toHaveBeenCalledWith(
@@ -224,38 +206,33 @@ describe('QRCodeScannerDialogButton, when type is VerifiableCredential', () => {
     }));
 
     publicAPI.get = jest.fn().mockResolvedValue(result);
-    act(() => {
-      render(
-        <QRCodeScannerDialogButton
-          type={ImportDataType.VerifiableCredential}
-          onChange={(data) => {
-            expect(data).toEqual({
-              'https://example.com': {
-                vc: result,
-                decodedEnvelopedVC: {
-                  type: ['VerifiableCredential'],
-                  credentialSubject: {
-                    id: 'did:example:123',
-                    name: 'Alice',
-                  },
-                },
-              },
-            });
-          }}
-        />,
-      );
-    });
+    render(
+      <QRCodeScannerDialogButton
+        type={ImportDataType.VerifiableCredential}
+        onChange={onChange}
+      />,
+    );
 
-    act(() => {
-      const button = getByText(document.body, 'ScanQR');
-      fireEvent.click(button);
-    });
+    const scanButton = getByText(document.body, 'ScanQR');
+    fireEvent.click(scanButton);
 
-    act(() => {
-      const button = getByText(document.body, 'Click');
-      fireEvent.click(button);
-    });
+    const clickButton = getByText(document.body, 'Click');
+    fireEvent.click(clickButton);
 
-    expect(publicAPI.get).toHaveBeenCalledWith(url);
+    await waitFor(() => {
+      expect(publicAPI.get).toHaveBeenCalledWith(url);
+      expect(onChange).toHaveBeenCalledWith({
+        'https://example.com': {
+          vc: result,
+          decodedEnvelopedVC: {
+            type: ['VerifiableCredential'],
+            credentialSubject: {
+              id: 'did:example:123',
+              name: 'Alice',
+            },
+          },
+        },
+      });
+    });
   });
 });

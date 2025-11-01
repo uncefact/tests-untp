@@ -79,7 +79,11 @@ jest.mock('@uncefact/vckit-renderer', () => ({
 }));
 
 describe('Scanning', () => {
+  let consoleLogSpy: jest.SpyInstance;
+
   beforeEach(() => {
+    // Suppress expected console.log errors from error handling
+    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.resetAllMocks();
     jest.clearAllMocks();
     mockReplace.mockClear();
@@ -87,9 +91,13 @@ describe('Scanning', () => {
     mockUsedNavigate.mockClear();
   });
 
+  afterEach(() => {
+    consoleLogSpy.mockRestore();
+  });
+
   it('should renders scanning page with scanner component', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (Scanner as any).mockReturnValue(() => <>Scanner</>);
+    (Scanner as any).mockReturnValue(<>Scanner</>);
 
     render(<Scanning />);
 

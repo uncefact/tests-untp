@@ -172,8 +172,21 @@ jest.mock('next/link', () => {
 });
 
 describe('Header', () => {
+  let consoleErrorSpy: jest.SpyInstance;
+
   beforeEach(() => {
+    // Suppress MUI component prop warnings
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation((message) => {
+      if (typeof message === 'string' && message.includes('Invalid value for prop')) {
+        return;
+      }
+      console.warn(message);
+    });
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
   });
 
   it('should render the header', () => {

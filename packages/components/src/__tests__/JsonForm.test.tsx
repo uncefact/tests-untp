@@ -34,9 +34,7 @@ describe('render json schema component', () => {
     jest.clearAllMocks();
   });
 
-  const onChangeJsonSchemaForm = ({ data, errors }: { data: any; errors?: any[] }) => {
-    console.log('onChangeJsonSchemaForm', errors, data);
-  };
+  const onChangeJsonSchemaForm = jest.fn();
 
   it('should render component with schema props', async () => {
     render(<JsonForm schema={schema} onChange={onChangeJsonSchemaForm} className='json-form' />);
@@ -133,6 +131,9 @@ describe('render json schema component', () => {
   });
 
   it('should show error message when fetch schema failed', async () => {
+    // Suppress expected console.error for this test
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
     const schemaUrl = 'https://example.io/schema.json';
     fetchMock.mockReject(new Error('Failed to fetch schema'));
 
@@ -145,5 +146,8 @@ describe('render json schema component', () => {
 
     const errorElement = screen.getByText('Error setup schema');
     expect(errorElement).toBeInTheDocument();
+
+    // Restore console.error
+    consoleErrorSpy.mockRestore();
   });
 });
