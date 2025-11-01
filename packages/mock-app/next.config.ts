@@ -46,6 +46,7 @@ process.env.RI_DATABASE_URL = databaseUrl;
 
 const nextConfig: NextConfig = {
   reactStrictMode: false,
+  transpilePackages: ['@mock-app/components'],
   env:{
     NEXT_PUBLIC_AUTH_KEYCLOAK_ISSUER: AUTH_KEYCLOAK_ISSUER,
     NEXT_PUBLIC_NEXTAUTH_URL: RI_APP_URL

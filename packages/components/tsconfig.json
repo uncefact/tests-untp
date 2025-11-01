@@ -21,7 +21,11 @@
     "declaration": true,
     "jsx": "react-jsx",
     "sourceMap": true,
-    "rootDir": "src"
+    "rootDir": "src",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "types": [
     "node",
