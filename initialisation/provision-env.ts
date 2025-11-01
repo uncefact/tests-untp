@@ -82,16 +82,16 @@ function generateKeycloakRealm(config: ProvisionConfig): KeycloakRealmRepresenta
     users: allUsers,
     clients: [
       {
-        clientId: process.env.IDP_CLIENT_ID!,
+        clientId: process.env.AUTH_KEYCLOAK_CLIENT_ID!,
         enabled: true,
         protocol: "openid-connect" as const,
         publicClient: false,
-        secret: process.env.IDP_CLIENT_SECRET!,
+        secret: process.env.AUTH_KEYCLOAK_CLIENT_SECRET!,
         redirectUris: [
           `${process.env.RI_APP_URL!}/api/auth/callback/keycloak`
         ],
         attributes: {
-          "post.logout.redirect.uris": `${process.env.RI_APP_URL!}/signin`
+          "post.logout.redirect.uris": `${process.env.RI_APP_URL!}`
         },
         webOrigins: [
           process.env.RI_APP_URL!
@@ -106,7 +106,7 @@ function generateKeycloakRealm(config: ProvisionConfig): KeycloakRealmRepresenta
     ]
   }
 
-  console.log(`  ✓ Client: ${process.env.IDP_CLIENT_ID}`)
+  console.log(`  ✓ Client: ${process.env.AUTH_KEYCLOAK_CLIENT_ID}`)
 
   return realmConfig
 }
@@ -126,7 +126,7 @@ async function main() {
   }
 
   // Validate required environment variables
-  const requiredEnvVars = ['IDP_CLIENT_ID', 'IDP_CLIENT_SECRET', 'RI_APP_URL']
+  const requiredEnvVars = ['AUTH_KEYCLOAK_CLIENT_ID', 'AUTH_KEYCLOAK_CLIENT_SECRET', 'RI_APP_URL']
   const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName])
 
   if (missingEnvVars.length > 0) {

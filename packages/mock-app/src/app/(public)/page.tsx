@@ -3,8 +3,8 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Box, Button } from '@mui/material';
-import { convertStringToPath } from '../utils';
-import appConfig from '../constants/app-config.json';
+import { convertStringToPath } from '../../utils';
+import appConfig from '../../constants/app-config.json';
 
 const Home = () => {
   const renderApps = () => {

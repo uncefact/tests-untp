@@ -2,7 +2,7 @@ import * as jose from 'jose';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { UnsignedCredential, VerifiableCredential } from '@uncefact/vckit-core-types';
 import { computeHash, decryptCredential, publicAPI, verifyVC } from '@mock-app/services';
-import Verify from '../app/verify/page';
+import Verify from '../app/(public)/verify/page';
 
 console.error = jest.fn();
 
