@@ -8,3 +8,49 @@ datasource db {
   url      = env("RI_DATABASE_URL")
 
 }
+
+/** Auth.js + Prisma adapter tables for OAuth + JWT sessions */
+model User {
+  id             String        @id @default(cuid())
+  name           String?
+  email          String?       @unique
+  emailVerified  DateTime?
+  image          String?
+  organizationId String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  accounts     Account[]
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  access_token      String?
+  refresh_token     String?
+  expires_at        Int?
+  id_token          String?
+  token_type        String?
+  scope             String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Organization {
+  id             String   @id @default(cuid())
+  name           String
+  primaryColor   String?
+  secondaryColor String?
+  logo           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  users      User[]
+}

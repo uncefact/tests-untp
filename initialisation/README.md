@@ -124,8 +124,8 @@ Required environment variables:
 - `ENVIRONMENT`: Environment name (e.g., "local", "prod")
 - `POSTGRES_USER`, `POSTGRES_DB`, `POSTGRES_PORT`: Database connection info
 - `RI_APP_URL`: Application URL for OAuth callbacks
-- `IDP_CLIENT_ID`: Identity Provider (OAuth) client ID
-- `IDP_CLIENT_SECRET`: Identity Provider (OAuth) client secret
+- `AUTH_KEYCLOAK_CLIENT_ID`: Identity Provider (OAuth) client ID
+- `AUTH_KEYCLOAK_CLIENT_SECRET`: Identity Provider (OAuth) client secret
 
 Optional environment variables:
 - `KEYCLOAK_REALM`: Override the default realm name (defaults to `ri-{ENVIRONMENT}`)

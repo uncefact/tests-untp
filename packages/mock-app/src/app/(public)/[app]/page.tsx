@@ -1,9 +1,9 @@
 'use client';
 
 import { notFound } from 'next/navigation';
-import appConfig from '../../constants/app-config.json';
-import Application from '../../components/Application';
-import { convertStringToPath } from '../../utils';
+import appConfig from '../../../constants/app-config.json';
+import Application from '../../../components/Application';
+import { convertStringToPath } from '../../../utils';
 import { use } from 'react';
 import { IApp } from '@/types/common.types';
 

@@ -72,7 +72,7 @@ yarn prisma migrate dev
 You can view or modify data using Prisma Studio:
 
 ```bash
-yarn prisma studio
+yarn prisma studio --config=prisma/prisma.config.ts
 ```
 
 Accessible at `http://localhost:5555`.
@@ -88,6 +88,21 @@ packages/mock-app/
     ├── generated/             # Auto-generated Prisma client
     └── prisma.ts              # Prisma client instance
 ```
+
+---
+
+### Authentication Layer
+
+The Reference Implementation uses **NextAuth.js** with **Keycloak** as the identity provider.
+
+**Current protected routes:**
+* `/dashboard` - Protected page route (will migrate to homepage once new RI functionality is built, replacing the old implementation)
+* `/api/v1/*` - All versioned API endpoints
+
+**Architecture:**
+* Protected page routes use client-side session checks in their layout
+* Protected API routes use middleware for edge-safe authentication
+* Logout flow clears both application and IDP sessions
 
 ---
 
@@ -118,7 +133,7 @@ Start the database and dependent services using Docker Compose:
 SEEDING=true docker compose up -d
 ```
 
-This starts Postgres, VCKit, Storage Service, Link Resolver, and other required services in the background. The ri-init service within the Docker Compose config will apply the migrations to the Reference Implementation's database. 
+This starts Postgres, VCKit, Storage Service, Link Resolver, and other required services in the background. The ri-init service within the Docker Compose config will apply the migrations to the Reference Implementation's database.
 
 See [configure-document.md](./documents/configure-document.md) for additional configuration details.
 
@@ -136,3 +151,11 @@ yarn start
 
 The RI runs on `http://localhost:3003` with hot reloading enabled.
 The Prisma client is automatically generated during build or dev startup.
+
+#### Login Credentials
+
+Default credentials for development:
+* **Email:** `admin@example.com`
+* **Password:** `changeme`
+
+Credentials are defined in the Keycloak realm import file `keycloak-realms`.
