@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, fireEvent, screen } from '@testing-library/react';
+import { render, fireEvent, screen, waitFor } from '@testing-library/react';
 import { Html5Qrcode } from 'html5-qrcode';
 
 import { Scanner } from '../components/Scanner';
@@ -62,13 +62,12 @@ describe('Scanner', () => {
     const { mockStop } = mockHtml5QrcodeFn();
     render(<Scanner qrCodeSuccessCallback={() => {}} />);
     const cameraSwitch = screen.getByTestId('CameraswitchRoundedIcon');
-    await act(() => {
-      fireEvent.click(cameraSwitch);
+    fireEvent.click(cameraSwitch);
+    fireEvent.click(cameraSwitch);
+
+    await waitFor(() => {
+      expect(mockStop).toHaveBeenCalledTimes(2);
     });
-    await act(() => {
-      fireEvent.click(cameraSwitch);
-    });
-    expect(mockStop).toHaveBeenCalledTimes(2);
   });
 
   test('should stop camera when component unmount', () => {
@@ -83,13 +82,11 @@ describe('Scanner', () => {
     const mockFn = jest
       .fn()
       .mockImplementation((cb) => cb('Mocked QR Code Data'));
-    act(() => {
-      render(
-        <Scanner
-          qrCodeSuccessCallback={mockFn((cb: string) => (result = cb))}
-        />
-      );
-    });
+    render(
+      <Scanner
+        qrCodeSuccessCallback={mockFn((cb: string) => (result = cb))}
+      />
+    );
 
     expect(result).toBe('Mocked QR Code Data');
   });
@@ -112,14 +109,12 @@ describe('Scanner', () => {
       cb('Permission Denied');
     });
 
-    await act(async () => {
-      render(
-        <Scanner
-          qrCodeErrorCallback={mockFn((cb: string) => (errorResult = cb))}
-          qrCodeSuccessCallback={() => {}}
-        />
-      );
-    });
+    render(
+      <Scanner
+        qrCodeErrorCallback={mockFn((cb: string) => (errorResult = cb))}
+        qrCodeSuccessCallback={() => {}}
+      />
+    );
 
     expect(errorResult).toBe('Permission Denied');
   });

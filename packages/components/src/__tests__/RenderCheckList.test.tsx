@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { RenderCheckList } from '../components/RenderCheckList/RenderCheckList';
 import { IDynamicComponentRendererProps } from '../components/DynamicComponentRenderer/DynamicComponentRenderer';
 import { processVerifiableCredentialData } from '../utils/importDataHelpers.js';
@@ -93,9 +93,8 @@ describe('render RenderCheckList component', () => {
 
     // Find the import button and simulate a change event with a JSON file
     const importButton = screen.getByTestId('file-input');
-    act(() => {
-      fireEvent.change(importButton, { target: { files: [jsonFile] } });
-    });
+    fireEvent.change(importButton, { target: { files: [jsonFile] } });
+    
 
     // Wait for the checkbox to appear and assert that it's checked after being clicked
     await waitFor(() => {
@@ -124,9 +123,8 @@ describe('render RenderCheckList component', () => {
 
     // Find the import button and simulate a change event with a JSON file
     const importButton = screen.getByTestId('file-input');
-    act(() => {
-      fireEvent.change(importButton, { target: { files: [jsonFile] } });
-    });
+    fireEvent.change(importButton, { target: { files: [jsonFile] } });
+    
 
     // Wait for the checkbox to appear, click it, and assert that the onChange prop was called with the correct data
     await waitFor(() => {
@@ -148,9 +146,8 @@ describe('render RenderCheckList component', () => {
 
     // Find the import button and simulate a change event with multiple JSON files
     const importButton = screen.getByTestId('file-input');
-    act(() => {
-      fireEvent.change(importButton, { target: { files: importJsonFiles } });
-    });
+    fireEvent.change(importButton, { target: { files: importJsonFiles } });
+    
 
     // Wait for the checkboxes to appear, click them, and assert that they are checked
     await waitFor(() => {
@@ -185,9 +182,7 @@ describe('render RenderCheckList component', () => {
 
     // Find the import button and simulate a change event with a JSON file
     const importButton = screen.getByTestId('file-input');
-    act(() => {
-      fireEvent.change(importButton, { target: { files: importJsonFiles } });
-    });
+    fireEvent.change(importButton, { target: { files: importJsonFiles } });
 
     // Wait for the checkbox to appear, assert that it's not checked and the onChange prop was not called,
     // then click the checkbox and assert that it's checked and the onChange prop was called with the correct data
@@ -219,9 +214,7 @@ describe('render RenderCheckList component', () => {
 
     // Find the import button and simulate a change event with a JSON file
     const importButton = screen.getByTestId('file-input');
-    act(() => {
-      fireEvent.change(importButton, { target: { files: importJsonFiles } });
-    });
+    fireEvent.change(importButton, { target: { files: importJsonFiles } });
 
     // Wait for the checkbox to appear, click it to check it, assert that it's checked and the onChange prop was called with the correct data,
     // then click it again to uncheck it and assert that it's not checked and the onChange prop was called with an empty array
@@ -256,9 +249,7 @@ describe('render RenderCheckList component', () => {
 
     // Find the import button and simulate a change event with multiple JSON files
     const importButton = screen.getByTestId('file-input');
-    act(() => {
-      fireEvent.change(importButton, { target: { files: importJsonFiles } });
-    });
+    fireEvent.change(importButton, { target: { files: importJsonFiles } });
 
     // Wait for the checkboxes to appear, click them, and assert that they are checked and the onChange prop was called with the correct data
     await waitFor(() => {
@@ -306,9 +297,7 @@ describe('render RenderCheckList component', () => {
 
     // Find the import button and simulate a change event with multiple JSON files
     const importButton = screen.getByTestId('file-input');
-    act(() => {
-      fireEvent.change(importButton, { target: { files: importJsonFiles } });
-    });
+    fireEvent.change(importButton, { target: { files: importJsonFiles } });
 
     // Wait for the checkboxes to appear, assert that they are unchecked and the state is empty,
     // click on them to check them, assert that they are checked and the state is updated correctly,
@@ -384,9 +373,7 @@ describe('RenderCheckList vcOptions handling', () => {
     const jsonFile = new File([JSON.stringify({ requiredField1: 'test' })], 'vc.json', { type: 'application/json' });
 
     const importButton = screen.getByTestId('file-input');
-    act(() => {
-      fireEvent.change(importButton, { target: { files: [jsonFile] } });
-    });
+    fireEvent.change(importButton, { target: { files: [jsonFile] } });
 
     await waitFor(() => {
       expect(processVerifiableCredentialData).toHaveBeenCalledWith(
@@ -443,10 +430,8 @@ describe('RenderCheckList vcOptions handling', () => {
     (publicAPI.get as jest.Mock).mockResolvedValueOnce(mockCredential);
 
     // Trigger QR scan result
-    act(() => {
-      const scannerButton = screen.getByTestId('my-scanner');
-      fireEvent.click(scannerButton);
-    });
+    const scannerButton = screen.getByTestId('my-scanner');
+    fireEvent.click(scannerButton);
 
     await waitFor(() => {
       expect(processVerifiableCredentialData).toHaveBeenCalledWith(

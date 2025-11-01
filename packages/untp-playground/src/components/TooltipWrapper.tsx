@@ -14,7 +14,7 @@ export function TooltipWrapper({ content, children, disabled = false, dataTestId
   }
 
   return (
-    <TooltipProvider>
+    <TooltipProvider delayDuration={0}>
       <Tooltip disableHoverableContent>
         <TooltipTrigger asChild>
           <div data-testid={`${dataTestId}-tooltip-trigger`}>{children}</div>

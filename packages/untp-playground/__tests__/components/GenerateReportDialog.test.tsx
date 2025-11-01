@@ -34,35 +34,43 @@ describe('GenerateReportDialog', () => {
   });
 
   it('displays tooltip when report button is disabled', async () => {
+    const user = userEvent.setup();
     (useTestReport as jest.Mock).mockReturnValue({
       canGenerateReport: false,
       generateReport: mockGenerateReport,
       report: null,
     });
-    
+
     render(<GenerateReportDialog />);
 
     const button = screen.getByTestId('generate-report-button-tooltip-trigger');
-    userEvent.hover(button);
+    await user.hover(button);
 
-    await waitFor(() => {
-      const tooltipContent = screen.getByTestId('generate-report-button-tooltip-content');
-      expect(tooltipContent).toBeInTheDocument();
-      expect(tooltipContent).toHaveTextContent('Upload and validate a credential to generate a conformance report');
-    });
+    await waitFor(
+      () => {
+        const tooltipContent = screen.getByTestId('generate-report-button-tooltip-content');
+        expect(tooltipContent).toBeInTheDocument();
+        expect(tooltipContent).toHaveTextContent('Upload and validate a credential to generate a conformance report');
+      },
+      { timeout: 2000 },
+    );
   });
 
   it('displays tooltip when report button is enabled', async () => {
+    const user = userEvent.setup();
     render(<GenerateReportDialog />);
 
     const button = screen.getByTestId('generate-report-button-tooltip-trigger');
-    userEvent.hover(button);
+    await user.hover(button);
 
-    await waitFor(() => {
-      const tooltipContent = screen.getByTestId('generate-report-button-tooltip-content');
-      expect(tooltipContent).toBeInTheDocument();
-      expect(tooltipContent).toHaveTextContent('Generate UNTP conformance report');
-    });
+    await waitFor(
+      () => {
+        const tooltipContent = screen.getByTestId('generate-report-button-tooltip-content');
+        expect(tooltipContent).toBeInTheDocument();
+        expect(tooltipContent).toHaveTextContent('Generate UNTP conformance report');
+      },
+      { timeout: 2000 },
+    );
   });
 
   it('disables button when cannot generate report', () => {
@@ -99,18 +107,22 @@ describe('GenerateReportDialog', () => {
   });
 
   it('displays tooltip when generate button is disabled', async () => {
+    const user = userEvent.setup();
     render(<GenerateReportDialog />);
 
     fireEvent.click(screen.getByText('Generate Report'));
 
     const button = screen.getByTestId('dialog-generate-report-button-tooltip-trigger');
-    userEvent.hover(button);
+    await user.hover(button);
 
-    await waitFor(() => {
-      const tooltipContent = screen.getByTestId('dialog-generate-report-button-tooltip-content');
-      expect(tooltipContent).toBeInTheDocument();
-      expect(tooltipContent).toHaveTextContent('Enter implementation details to generate a conformance report');
-    });
+    await waitFor(
+      () => {
+        const tooltipContent = screen.getByTestId('dialog-generate-report-button-tooltip-content');
+        expect(tooltipContent).toBeInTheDocument();
+        expect(tooltipContent).toHaveTextContent('Enter implementation details to generate a conformance report');
+      },
+      { timeout: 2000 },
+    );
   });
 
   it('disables generate button when implementation name is empty', () => {

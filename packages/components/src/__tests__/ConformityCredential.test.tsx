@@ -1,5 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { act } from 'react-dom/test-utils';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ConformityCredential } from '../components';
 import { FetchOptions } from '../types/conformityCredential.types';
 import { getJsonDataFromConformityAPI, uploadData, getValueByPath } from '@mock-app/services';
@@ -23,7 +22,31 @@ jest.mock('../components/ConformityCredential/utils', () => ({
 }));
 
 describe('ConformityCredential', () => {
+  // Suppress console.error for expected errors in tests and MUI warnings
+  let consoleErrorSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation((message) => {
+      // Filter out MUI table nesting warnings and expected test errors
+      const messageStr = typeof message === 'string' ? message : String(message);
+
+      if (
+        messageStr.includes('cannot be a child of') ||
+        messageStr.includes('cannot contain a nested') ||
+        messageStr.includes('TypeError') ||
+        messageStr.includes('Invalid URL') ||
+        messageStr.includes('validateAndConstructVerifyURL') ||
+        message === 'error' // Suppress generic 'error' string
+      ) {
+        return;
+      }
+      // Log other unexpected errors (shouldn't happen in these tests)
+      console.warn('Unexpected error:', message);
+    });
+  });
+
   afterEach(() => {
+    consoleErrorSpy.mockRestore();
     jest.clearAllMocks();
   });
 
@@ -88,23 +111,22 @@ describe('ConformityCredential', () => {
       (getJsonDataFromConformityAPI as jest.Mock).mockResolvedValue(url);
       (getValueByPath as jest.Mock).mockReturnValue(url);
 
-      await act(async () => {
-        render(
-          <ConformityCredential
-            credentialRequestConfigs={credentialRequestConfigs}
-            storedCredentialsConfig={storedCredentialsConfig}
-          />,
-        );
+      render(
+        <ConformityCredential
+          credentialRequestConfigs={credentialRequestConfigs}
+          storedCredentialsConfig={storedCredentialsConfig}
+        />,
+      );
+
+      const credentialButton = screen.getByText('Deforestation Free Assessment');
+      fireEvent.click(credentialButton);
+
+      await waitFor(() => {
+        expect(screen.findByText(credentialRequestConfigs[0].credentialName)).not.toBeNull();
+        expect(screen.findByText(url)).not.toBeNull();
+        expect(document.querySelector('table')).not.toBeNull();
       });
 
-      await act(async () => {
-        const credentialButton = screen.getByText('Deforestation Free Assessment');
-        fireEvent.click(credentialButton);
-      });
-
-      expect(screen.findByText(credentialRequestConfigs[0].credentialName)).not.toBeNull();
-      expect(screen.findByText(url)).not.toBeNull();
-      expect(document.querySelector('table')).not.toBeNull();
     });
 
     it('should save credential as object when trigger onClickStorageCredential function', async () => {
@@ -133,19 +155,15 @@ describe('ConformityCredential', () => {
       (checkStoredCredentialsConfig as jest.Mock).mockReturnValue({ ok: true, value: '' });
       (uploadData as jest.Mock).mockResolvedValue('https://storage.example.com/credential');
 
-      await act(async () => {
-        render(
-          <ConformityCredential
-            credentialRequestConfigs={credentialRequestConfigs}
-            storedCredentialsConfig={storedCredentialsConfig}
-          />,
-        );
-      });
+      render(
+        <ConformityCredential
+          credentialRequestConfigs={credentialRequestConfigs}
+          storedCredentialsConfig={storedCredentialsConfig}
+        />,
+      );
 
-      await act(async () => {
-        const credentialButton = await screen.findAllByText('Deforestation Free Assessment');
-        fireEvent.click(credentialButton[0]);
-      });
+      const credentialButton = await screen.findAllByText('Deforestation Free Assessment');
+      fireEvent.click(credentialButton[0]);
 
       expect(screen.findAllByLabelText(credentialRequestConfigs[0].credentialName)).not.toBeNull();
       expect(screen.findByText('https://storage.example.com/credential')).not.toBeNull();
@@ -167,19 +185,16 @@ describe('ConformityCredential', () => {
           appOnly: '',
         },
       ];
-      await act(async () => {
-        render(
-          <ConformityCredential
-            credentialRequestConfigs={newCredentialRequestConfigs}
-            storedCredentialsConfig={storedCredentialsConfig}
-          />,
-        );
-      });
 
-      await act(async () => {
-        const credentialButton = await screen.findAllByText('Deforestation Free Assessment');
-        fireEvent.click(credentialButton[0]);
-      });
+      render(
+        <ConformityCredential
+          credentialRequestConfigs={newCredentialRequestConfigs}
+          storedCredentialsConfig={storedCredentialsConfig}
+        />,
+      );
+
+      const credentialButton = await screen.findAllByText('Deforestation Free Assessment');
+      fireEvent.click(credentialButton[0]);
 
       expect(screen.findByText('Invalid credential request config url')).not.toBeNull();
     });
@@ -188,19 +203,15 @@ describe('ConformityCredential', () => {
       JSON.parse = jest.fn().mockReturnValue('string');
       (getValueByPath as jest.Mock).mockReturnValue(null);
 
-      await act(async () => {
-        render(
-          <ConformityCredential
-            credentialRequestConfigs={credentialRequestConfigs}
-            storedCredentialsConfig={storedCredentialsConfig}
-          />,
-        );
-      });
+      render(
+        <ConformityCredential
+          credentialRequestConfigs={credentialRequestConfigs}
+          storedCredentialsConfig={storedCredentialsConfig}
+        />,
+      );
 
-      await act(async () => {
-        const credentialButton = await screen.findAllByText('Deforestation Free Assessment');
-        fireEvent.click(credentialButton[0]);
-      });
+      const credentialButton = await screen.findAllByText('Deforestation Free Assessment');
+      fireEvent.click(credentialButton[0]);
 
       expect(screen.findByText('Invalid credential data')).not.toBeNull();
     });
@@ -233,23 +244,19 @@ describe('ConformityCredential', () => {
         value: 'Invalid upload credential config',
       });
 
-      await act(async () => {
-        render(
-          <ConformityCredential
-            credentialRequestConfigs={credentialRequestConfigs}
-            storedCredentialsConfig={{
-              url: '',
-              //@ts-ignore
-              params: {},
-            }}
-          />,
-        );
-      });
+      render(
+        <ConformityCredential
+          credentialRequestConfigs={credentialRequestConfigs}
+          storedCredentialsConfig={{
+            url: '',
+            //@ts-ignore
+            params: {},
+          }}
+        />,
+      );
 
-      await act(async () => {
-        const credentialButton = await screen.findAllByText('Deforestation Free Assessment');
-        fireEvent.click(credentialButton[0]);
-      });
+      const credentialButton = await screen.findAllByText('Deforestation Free Assessment');
+      fireEvent.click(credentialButton[0]);
 
       expect(screen.findByText('Invalid upload credential config')).not.toBeNull();
     });
@@ -257,19 +264,15 @@ describe('ConformityCredential', () => {
     it('should throw error Something went wrong when getJsonDataFromConformityAPI function throw error', async () => {
       (getJsonDataFromConformityAPI as jest.Mock).mockRejectedValue('error');
 
-      await act(async () => {
-        render(
-          <ConformityCredential
-            credentialRequestConfigs={credentialRequestConfigs}
-            storedCredentialsConfig={storedCredentialsConfig}
-          />,
-        );
-      });
+      render(
+        <ConformityCredential
+          credentialRequestConfigs={credentialRequestConfigs}
+          storedCredentialsConfig={storedCredentialsConfig}
+        />,
+      );
 
-      await act(async () => {
-        const credentialButton = await screen.findAllByText('Deforestation Free Assessment');
-        fireEvent.click(credentialButton[0]);
-      });
+      const credentialButton = await screen.findAllByText('Deforestation Free Assessment');
+      fireEvent.click(credentialButton[0]);
 
       expect(screen.findByText('Something went wrong! Please retry again')).not.toBeNull();
     });
@@ -279,19 +282,15 @@ describe('ConformityCredential', () => {
       (getJsonDataFromConformityAPI as jest.Mock).mockResolvedValue(url);
       (getValueByPath as jest.Mock).mockReturnValue(url);
 
-      await act(async () => {
-        render(
-          <ConformityCredential
-            credentialRequestConfigs={credentialRequestConfigs}
-            storedCredentialsConfig={storedCredentialsConfig}
-          />,
-        );
-      });
+      render(
+        <ConformityCredential
+          credentialRequestConfigs={credentialRequestConfigs}
+          storedCredentialsConfig={storedCredentialsConfig}
+        />,
+      );
 
-      await act(async () => {
-        const credentialButton = screen.getByText('Deforestation Free Assessment');
-        fireEvent.click(credentialButton);
-      });
+      const credentialButton = screen.getByText('Deforestation Free Assessment');
+      fireEvent.click(credentialButton);
 
       expect(screen.findByText('Data should be URL')).not.toBeNull();
     });

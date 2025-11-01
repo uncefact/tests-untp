@@ -5,6 +5,7 @@ import { computeHash, decryptCredential, publicAPI, verifyVC } from '@mock-app/s
 import Verify from '../app/(public)/verify/page';
 
 console.error = jest.fn();
+console.log = jest.fn();
 
 // Mock Next.js navigation
 const mockUseSearchParams = jest.fn();
