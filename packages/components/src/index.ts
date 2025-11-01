@@ -8,5 +8,7 @@ export * from './components/ImportButton/ImportButton.js';
 export * from './components/RenderCheckList/RenderCheckList.js';
 export * from './components/DynamicComponentRenderer/DynamicComponentRenderer.js';
 export * from './components/CheckBoxList/CheckBoxList.js';
+export * from './components/ui';
+export * from './lib/utils.js';
 export * from './constants/index.js';
 export * from './types/index.js'
