@@ -1,0 +1,1 @@
+export { NavMenuItem, type NavMenuItemConfig } from "./NavMenuItem";
