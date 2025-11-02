@@ -88,8 +88,8 @@ const mockNavItems: NavMenuItemConfig[] = [
   {
     id: "resources",
     label: "Resources",
-    icon: <Settings />,
-    isExpandable: true,
+    icon: <BookOpen />,
+    isExternal: true,
   },
 ];
 
@@ -198,6 +198,52 @@ export const WithAutoCollapse: Story = {
       description: {
         story:
           "With auto-collapse enabled (default behavior). Try expanding Credentials, then click on 'Identifiers' or any sub-item. Notice how other expanded sections automatically collapse, keeping the navigation clean and focused.",
+      },
+    },
+  },
+};
+
+export const WithExternalLinks: Story = {
+  args: {
+    items: [
+      {
+        id: "credentials",
+        label: "Credentials",
+        icon: <Award />,
+        isExpandable: true,
+        subItems: [
+          {
+            id: "conformity-credential",
+            label: "Conformity credential",
+            icon: <FileCheck />,
+          },
+        ],
+      },
+      {
+        id: "identifiers",
+        label: "Identifiers",
+        icon: <Shield />,
+      },
+      {
+        id: "resources",
+        label: "Resources",
+        icon: <BookOpen />,
+        isExternal: true,
+      },
+      {
+        id: "documentation",
+        label: "Documentation",
+        icon: <BookOpen />,
+        isExternal: true,
+      },
+    ],
+    selectedNavId: "resources",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Navigation items can be marked as external links using the isExternal property. These items display an external link indicator (arrow) on the right side.",
       },
     },
   },

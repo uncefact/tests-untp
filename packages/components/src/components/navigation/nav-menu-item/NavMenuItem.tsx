@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ArrowUpRight } from "lucide-react";
 import React from "react";
 
 export interface NavMenuItemConfig {
@@ -8,6 +8,7 @@ export interface NavMenuItemConfig {
   icon?: string | React.ReactNode;
   isExpandable?: boolean;
   subItems?: NavMenuItemConfig[];
+  isExternal?: boolean;
 }
 
 interface NavMenuItemProps {
@@ -20,6 +21,7 @@ interface NavMenuItemProps {
   isExpandable?: boolean;
   isExpanded?: boolean;
   isSubItem?: boolean;
+  isExternal?: boolean;
 }
 
 /**
@@ -38,6 +40,7 @@ interface NavMenuItemProps {
  * - nav-menu-item-{label}: Main button element (label is lowercased and spaces replaced with hyphens)
  * - nav-menu-item-{label}-icon: Icon element (when icon prop is provided)
  * - nav-menu-item-{label}-chevron: Chevron icon (when isExpandable is true)
+ * - nav-menu-item-{label}-external: External link indicator (when isExternal is true)
  *
  */
 export function NavMenuItem({
@@ -50,6 +53,7 @@ export function NavMenuItem({
   isExpandable = false,
   isExpanded = false,
   isSubItem = false,
+  isExternal = false,
 }: NavMenuItemProps) {
   const testId = label.toLowerCase().replace(/\s+/g, "-");
 
@@ -122,6 +126,15 @@ export function NavMenuItem({
             data-testid={`nav-menu-item-${testId}-chevron`}
           />
         </button>
+      )}
+      {isExternal && !isExpandable && (
+        <ArrowUpRight
+          className={cn(
+            "w-5 h-5 shrink-0 pointer-events-none",
+            isActive ? "!text-nav-item-foreground-active" : "text-nav-item-foreground-inactive"
+          )}
+          data-testid={`nav-menu-item-${testId}-external`}
+        />
       )}
     </div>
   );

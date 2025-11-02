@@ -117,6 +117,7 @@ export function NavMenu({
               isExpandable={item.isExpandable}
               isExpanded={isExpanded}
               isActive={isActive}
+              isExternal={item.isExternal}
               onClick={() => handleItemClick(item)}
               onChevronClick={() => toggleExpanded(item.id)}
             />
@@ -130,6 +131,7 @@ export function NavMenu({
                     icon={subItem.icon}
                     isSubItem
                     isActive={selectedNavId === subItem.id}
+                    isExternal={subItem.isExternal}
                     onClick={() => handleSubItemClick(subItem)}
                   />
                 ))}

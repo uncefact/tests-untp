@@ -54,6 +54,10 @@ const meta = {
       control: "boolean",
       description: "Whether this is a sub-item (applies additional left padding)",
     },
+    isExternal: {
+      control: "boolean",
+      description: "Whether this links to an external resource (shows external link indicator)",
+    },
   },
 } satisfies Meta<typeof NavMenuItem>;
 
@@ -111,5 +115,22 @@ export const SubItem: Story = {
     label: "Sub Item",
     icon: <FileCheck />,
     isSubItem: true,
+  },
+};
+
+export const ExternalLink: Story = {
+  args: {
+    label: "Resources",
+    icon: <Settings />,
+    isExternal: true,
+  },
+};
+
+export const ExternalLinkActive: Story = {
+  args: {
+    label: "Resources",
+    icon: <Settings />,
+    isExternal: true,
+    isActive: true,
   },
 };
