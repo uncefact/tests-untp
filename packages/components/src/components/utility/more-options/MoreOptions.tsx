@@ -20,7 +20,7 @@ export interface MoreOptionGroup {
   options: MoreOption[];
 }
 
-export interface MoreOptionsProps {
+interface MoreOptionsProps {
   groups: MoreOptionGroup[];
   className?: string;
   testId?: string;
