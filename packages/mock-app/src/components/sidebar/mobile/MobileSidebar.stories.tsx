@@ -77,7 +77,7 @@ const meta = {
   },
   argTypes: {
     logo: {
-      control: "text",
+      control: false,
       description: "Logo to display in the mobile navbar (can be a string URL or React node)",
     },
     onLogoClick: {
