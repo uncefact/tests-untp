@@ -18,6 +18,7 @@ const jestConfig = {
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^jose$': '<rootDir>/src/__mocks__/jose.ts',
+    '^next-auth/react$': '<rootDir>/src/__mocks__/next-auth/react.ts',
     '^react($|/.+)': '<rootDir>/../../node_modules/react$1',
     '^react-dom($|/.+)': '<rootDir>/../../node_modules/react-dom$1',
   },
