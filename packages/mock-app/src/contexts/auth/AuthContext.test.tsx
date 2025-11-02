@@ -53,7 +53,7 @@ describe('AuthContext', () => {
       expect(screen.queryByTestId('user')).not.toBeInTheDocument();
     });
 
-    it('provides loading state when session is null', () => {
+    it('provides unauthenticated state when session is null', () => {
       mockUseSession.mockReturnValue({
         data: null,
         status: 'unauthenticated',
@@ -66,7 +66,7 @@ describe('AuthContext', () => {
         </AuthProvider>
       );
 
-      expect(screen.getByTestId('loading')).toHaveTextContent('loading');
+      expect(screen.getByTestId('loading')).toHaveTextContent('not-loading');
       expect(screen.getByTestId('authenticated')).toHaveTextContent('not-authenticated');
     });
 
