@@ -133,4 +133,39 @@ describe("NavMenuItem", () => {
 
     expect(screen.getByTestId("nav-menu-item-my-settings")).toBeInTheDocument();
   });
+
+  it("renders external link indicator when isExternal is true", () => {
+    render(<NavMenuItem label="Resources" icon="/icons/settings.svg" isExternal />);
+
+    const externalIcon = screen.getByTestId("nav-menu-item-resources-external");
+    expect(externalIcon).toBeInTheDocument();
+  });
+
+  it("does not render external link indicator when isExternal is false", () => {
+    render(<NavMenuItem label="Resources" icon="/icons/settings.svg" />);
+
+    expect(screen.queryByTestId("nav-menu-item-resources-external")).not.toBeInTheDocument();
+  });
+
+  it("applies correct styles to external link indicator when active", () => {
+    render(<NavMenuItem label="Resources" icon="/icons/settings.svg" isExternal isActive />);
+
+    const externalIcon = screen.getByTestId("nav-menu-item-resources-external");
+    expect(externalIcon).toHaveClass("!text-nav-item-foreground-active");
+  });
+
+  it("applies correct styles to external link indicator when inactive", () => {
+    render(<NavMenuItem label="Resources" icon="/icons/settings.svg" isExternal />);
+
+    const externalIcon = screen.getByTestId("nav-menu-item-resources-external");
+    expect(externalIcon).toHaveClass("text-nav-item-foreground-inactive");
+  });
+
+  it("does not render external link indicator when item is expandable", () => {
+    render(<NavMenuItem label="Resources" icon="/icons/settings.svg" isExternal isExpandable />);
+
+    // Should show chevron but not external icon
+    expect(screen.getByTestId("nav-menu-item-resources-chevron")).toBeInTheDocument();
+    expect(screen.queryByTestId("nav-menu-item-resources-external")).not.toBeInTheDocument();
+  });
 });
