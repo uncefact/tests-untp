@@ -43,6 +43,8 @@
   --nav-item-foreground-inactive: #333333;
   --nav-menu: #ffffff;
   --nav-menu-foreground: #333333;
+  --user-profile: transparent;
+  --user-profile-foreground: #333333;
 }
 
 .dark {
@@ -84,6 +86,8 @@
   --nav-item-foreground-inactive: #333333;
   --nav-menu: #1a1a1a;
   --nav-menu-foreground: #e5e5e5;
+  --user-profile: transparent;
+  --user-profile-foreground: #e5e5e5;
 }
 
 @theme inline {
@@ -129,6 +133,8 @@
   --color-nav-item-foreground-inactive: var(--nav-item-foreground-inactive);
   --color-nav-menu: var(--nav-menu);
   --color-nav-menu-foreground: var(--nav-menu-foreground);
+  --color-user-profile: var(--user-profile);
+  --color-user-profile-foreground: var(--user-profile-foreground);
 }
 
 @layer base {
