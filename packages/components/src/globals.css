@@ -48,6 +48,8 @@
   --more-options: transparent;
   --more-options-hover: rgba(0, 0, 0, 0.1);
   --more-options-foreground: #333333;
+  --loader: #666666;
+  --loader-foreground: #666666;
 }
 
 .dark {
@@ -94,6 +96,8 @@
   --more-options: transparent;
   --more-options-hover: rgba(255, 255, 255, 0.1);
   --more-options-foreground: #e5e5e5;
+  --loader: #999999;
+  --loader-foreground: #999999;
 }
 
 @theme inline {
@@ -144,6 +148,8 @@
   --color-more-options: var(--more-options);
   --color-more-options-hover: var(--more-options-hover);
   --color-more-options-foreground: var(--more-options-foreground);
+  --color-loader: var(--loader);
+  --color-loader-foreground: var(--loader-foreground);
 }
 
 @layer base {
