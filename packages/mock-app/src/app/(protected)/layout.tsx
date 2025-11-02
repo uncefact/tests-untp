@@ -51,17 +51,20 @@ const navItems: NavMenuItemConfig[] = [
 ];
 
 function ProtectedContent({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, isAuthenticated, logout } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
   const router = useRouter();
 
   const [selectedNavId, setSelectedNavId] = useState<string>('credentials');
 
   // Redirect to login page if user is not authenticated
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
       router.push('/api/auth/signin');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router]);
+
+  // Show loading state while authenticating OR while redirecting (not authenticated)
+  const isLoading = authLoading || !isAuthenticated;
 
   // Menu groups for the more options dropdown in the sidebar footer
   const menuGroups: MoreOptionGroup[] = [

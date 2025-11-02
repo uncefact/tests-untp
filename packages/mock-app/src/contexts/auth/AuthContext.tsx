@@ -21,16 +21,16 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const { data: session, status } = useSession();
 
-  const isLoading = status === 'loading' || !session;
+  const isLoading = status === 'loading';
   const isAuthenticated = status === 'authenticated' && !!session;
 
-  const user: User | null = isLoading
-    ? null
-    : {
+  const user: User | null = isAuthenticated
+    ? {
         name: session?.user?.name || '',
         email: session?.user?.email || '',
         roles: [], // TODO: Fetch org roles from organization endpoint.
-      };
+      }
+    : null;
 
   const logout = async () => {
     try {
