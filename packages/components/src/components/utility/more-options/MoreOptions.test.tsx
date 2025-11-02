@@ -445,7 +445,7 @@ describe("MoreOptions", () => {
     );
 
     const trigger = screen.getByTestId("more-options-trigger");
-    expect(trigger).toHaveClass("hover:bg-accent");
+    expect(trigger).toHaveClass("hover:bg-more-options-hover");
   });
 
   it("trigger has cursor pointer", () => {

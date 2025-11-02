@@ -45,6 +45,9 @@
   --nav-menu-foreground: #333333;
   --user-profile: transparent;
   --user-profile-foreground: #333333;
+  --more-options: transparent;
+  --more-options-hover: rgba(0, 0, 0, 0.1);
+  --more-options-foreground: #333333;
 }
 
 .dark {
@@ -88,6 +91,9 @@
   --nav-menu-foreground: #e5e5e5;
   --user-profile: transparent;
   --user-profile-foreground: #e5e5e5;
+  --more-options: transparent;
+  --more-options-hover: rgba(255, 255, 255, 0.1);
+  --more-options-foreground: #e5e5e5;
 }
 
 @theme inline {
@@ -135,6 +141,9 @@
   --color-nav-menu-foreground: var(--nav-menu-foreground);
   --color-user-profile: var(--user-profile);
   --color-user-profile-foreground: var(--user-profile-foreground);
+  --color-more-options: var(--more-options);
+  --color-more-options-hover: var(--more-options-hover);
+  --color-more-options-foreground: var(--more-options-foreground);
 }
 
 @layer base {
