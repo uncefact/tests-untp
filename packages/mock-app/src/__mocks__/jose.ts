@@ -1,0 +1,9 @@
+// Mock for jose library
+export const decodeJwt = jest.fn();
+export const SignJWT = jest.fn();
+export const jwtVerify = jest.fn();
+export const compactDecrypt = jest.fn();
+export const CompactEncrypt = jest.fn();
+export const generateKeyPair = jest.fn();
+export const exportJWK = jest.fn();
+export const importJWK = jest.fn();

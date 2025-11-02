@@ -167,7 +167,7 @@ export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, ser
             break;
           case ComponentType.Result:
             if (result) {
-              props.data = result;
+              props.data = result as object;
             }
             break;
           default:
