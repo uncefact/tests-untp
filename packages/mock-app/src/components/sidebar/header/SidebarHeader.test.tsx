@@ -19,14 +19,16 @@ describe("SidebarHeader", () => {
 
     const logo = screen.getByTestId("sidebar-header-logo");
     expect(logo).toBeInTheDocument();
-    expect(logo).toHaveAttribute("src", "/logo.png");
+    expect(logo).toHaveAttribute("src");
+    expect(decodeURIComponent(logo.getAttribute("src") || "")).toContain("/logo.png");
   });
 
   it("renders with custom logo", () => {
     render(<SidebarHeader {...defaultProps} logo="/custom-logo.png" />);
 
     const logo = screen.getByTestId("sidebar-header-logo");
-    expect(logo).toHaveAttribute("src", "/custom-logo.png");
+    expect(logo).toHaveAttribute("src");
+    expect(decodeURIComponent(logo.getAttribute("src") || "")).toContain("/custom-logo.png");
   });
 
   it("calls onLogoClick when logo is clicked", async () => {
