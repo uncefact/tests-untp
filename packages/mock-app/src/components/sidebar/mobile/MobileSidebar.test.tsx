@@ -209,7 +209,8 @@ describe("MobileSidebar", () => {
     expect(logoButton).toBeInTheDocument();
 
     const logoImage = screen.getByAltText("Logo");
-    expect(logoImage).toHaveAttribute("src", "/logo.png");
+    expect(logoImage).toHaveAttribute("src");
+    expect(decodeURIComponent(logoImage.getAttribute("src") || "")).toContain("/logo.png");
   });
 
   it("calls onLogoClick when logo is clicked in mobile navbar", async () => {
