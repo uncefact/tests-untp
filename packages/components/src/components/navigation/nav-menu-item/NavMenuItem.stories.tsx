@@ -30,6 +30,10 @@ const meta = {
       action: "clicked",
       description: "Callback when nav item is clicked",
     },
+    onChevronClick: {
+      action: "chevron clicked",
+      description: "Callback when chevron icon is clicked (only applies if isExpandable is true)",
+    },
     className: {
       control: "text",
       description: "Additional CSS classes to apply",

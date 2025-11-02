@@ -14,6 +14,7 @@ interface NavMenuItemProps {
   label: string;
   icon?: string | React.ReactNode;
   onClick?: () => void;
+  onChevronClick?: () => void;
   className?: string;
   isActive?: boolean;
   isExpandable?: boolean;
@@ -43,6 +44,7 @@ export function NavMenuItem({
   label,
   icon,
   onClick,
+  onChevronClick,
   className,
   isActive = false,
   isExpandable = false,
@@ -51,11 +53,15 @@ export function NavMenuItem({
 }: NavMenuItemProps) {
   const testId = label.toLowerCase().replace(/\s+/g, "-");
 
+  const handleChevronClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChevronClick?.();
+  };
+
   return (
-    <button
-      onClick={onClick}
+    <div
       className={cn(
-        "w-full p-2 rounded inline-flex justify-between items-center transition-colors cursor-pointer",
+        "w-full p-2 rounded inline-flex justify-between items-center transition-colors",
         isActive
           ? "bg-nav-item-active"
           : "hover:bg-nav-item-hover",
@@ -64,14 +70,17 @@ export function NavMenuItem({
       )}
       data-testid={`nav-menu-item-${testId}`}
     >
-      <div className="flex justify-start items-center gap-2">
+      <button
+        onClick={onClick}
+        className="flex justify-start items-center gap-2 flex-1 text-left cursor-pointer bg-transparent border-none p-0"
+      >
         {icon && (
           typeof icon === 'string' ? (
             <img
               src={icon}
               alt=""
               className={cn(
-                "w-6 h-6 shrink-0",
+                "w-6 h-6 shrink-0 pointer-events-none",
                 isActive ? "brightness-0 invert" : ""
               )}
               style={!isActive ? { filter: "brightness(0) saturate(100%) invert(17%) sepia(0%) saturate(0%) hue-rotate(202deg) brightness(95%) contrast(91%)" } : undefined}
@@ -81,7 +90,7 @@ export function NavMenuItem({
           ) : (
             <div
               className={cn(
-                "w-6 h-6 shrink-0 flex items-center justify-center",
+                "w-6 h-6 shrink-0 flex items-center justify-center pointer-events-none",
                 isActive ? "text-nav-item-foreground-active" : "text-nav-item-foreground-inactive"
               )}
               aria-hidden="true"
@@ -97,17 +106,23 @@ export function NavMenuItem({
         )}>
           {label}
         </span>
-      </div>
+      </button>
       {isExpandable && (
-        <ChevronDown
-          className={cn(
-            "w-5 h-5 shrink-0 transition-transform",
-            isActive ? "!text-nav-item-foreground-active" : "text-nav-item-foreground-inactive",
-            isExpanded && "rotate-180"
-          )}
-          data-testid={`nav-menu-item-${testId}-chevron`}
-        />
+        <button
+          onClick={handleChevronClick}
+          className="p-1 -m-1 cursor-pointer bg-transparent border-none"
+          aria-label={isExpanded ? "Collapse" : "Expand"}
+        >
+          <ChevronDown
+            className={cn(
+              "w-5 h-5 shrink-0 transition-transform pointer-events-none",
+              isActive ? "!text-nav-item-foreground-active" : "text-nav-item-foreground-inactive",
+              isExpanded && "rotate-180"
+            )}
+            data-testid={`nav-menu-item-${testId}-chevron`}
+          />
+        </button>
       )}
-    </button>
+    </div>
   );
 }

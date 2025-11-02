@@ -39,7 +39,7 @@ describe("NavMenuItem", () => {
     expect(screen.getByText("Configuration")).toBeInTheDocument();
   });
 
-  it("calls onClick when clicked", async () => {
+  it("calls onClick when label is clicked", async () => {
     const user = userEvent.setup();
     const handleClick = jest.fn();
 
@@ -51,10 +51,33 @@ describe("NavMenuItem", () => {
       />,
     );
 
-    const navItem = screen.getByTestId("nav-menu-item-configuration");
-    await user.click(navItem);
+    // Click on the label text
+    const label = screen.getByText("Configuration");
+    await user.click(label);
 
     expect(handleClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onChevronClick when chevron is clicked", async () => {
+    const user = userEvent.setup();
+    const handleClick = jest.fn();
+    const handleChevronClick = jest.fn();
+
+    render(
+      <NavMenuItem
+        label="Resources"
+        icon="/icons/settings.svg"
+        isExpandable
+        onClick={handleClick}
+        onChevronClick={handleChevronClick}
+      />,
+    );
+
+    const chevron = screen.getByTestId("nav-menu-item-resources-chevron");
+    await user.click(chevron);
+
+    expect(handleChevronClick).toHaveBeenCalledTimes(1);
+    expect(handleClick).not.toHaveBeenCalled();
   });
 
   it("applies active styles", () => {
@@ -69,13 +92,6 @@ describe("NavMenuItem", () => {
 
     const navItem = screen.getByTestId("nav-menu-item-configuration");
     expect(navItem).toHaveClass("hover:bg-nav-item-hover");
-  });
-
-  it("has cursor-pointer class", () => {
-    render(<NavMenuItem label="Configuration" icon="/icons/settings.svg" />);
-
-    const navItem = screen.getByTestId("nav-menu-item-configuration");
-    expect(navItem).toHaveClass("cursor-pointer");
   });
 
   it("renders with custom className", () => {
