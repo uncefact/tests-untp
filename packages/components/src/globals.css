@@ -37,6 +37,12 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --nav-item-active: #0369a1;
+  --nav-item-hover: rgba(0, 0, 0, 0.1);
+  --nav-item-foreground-active: #ffffff;
+  --nav-item-foreground-inactive: #333333;
+  --nav-menu: #ffffff;
+  --nav-menu-foreground: #333333;
 }
 
 .dark {
@@ -72,6 +78,12 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+  --nav-item-active: #0369a1;
+  --nav-item-hover: rgba(255, 255, 255, 0.1);
+  --nav-item-foreground-active: #ffffff;
+  --nav-item-foreground-inactive: #333333;
+  --nav-menu: #1a1a1a;
+  --nav-menu-foreground: #e5e5e5;
 }
 
 @theme inline {
@@ -111,6 +123,12 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-nav-item-active: var(--nav-item-active);
+  --color-nav-item-hover: var(--nav-item-hover);
+  --color-nav-item-foreground-active: var(--nav-item-foreground-active);
+  --color-nav-item-foreground-inactive: var(--nav-item-foreground-inactive);
+  --color-nav-menu: var(--nav-menu);
+  --color-nav-menu-foreground: var(--nav-menu-foreground);
 }
 
 @layer base {
