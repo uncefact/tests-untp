@@ -63,6 +63,28 @@ const config: StorybookConfig = {
       exclude: /node_modules/,
     });
 
+    // Add PostCSS processing for Tailwind
+    const cssRule = config.module?.rules?.find((rule: any) => {
+      return rule.test?.toString().includes('css');
+    }) as any;
+
+    if (cssRule) {
+      cssRule.use = [
+        'style-loader',
+        'css-loader',
+        {
+          loader: 'postcss-loader',
+          options: {
+            postcssOptions: {
+              plugins: [
+                '@tailwindcss/postcss',
+              ],
+            },
+          },
+        },
+      ];
+    }
+
     return config;
   },
 };
