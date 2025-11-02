@@ -13,11 +13,10 @@ interface NavMenuProps {
 /**
  * NavMenu component for rendering a navigation menu with expandable items.
  *
- * Theme tokens used:
- * - bg-nav-menu: Background color for the nav menu container
- * - text-nav-menu-foreground: Text color for the nav menu
+ * This component has no background color by default and will inherit from its parent.
+ * Individual menu items use their own theme tokens (nav-item-active, nav-item-hover, etc.).
  *
- * You can override these with custom colors via the className prop,
+ * You can add a background via the className prop if needed,
  * e.g., className="bg-sidebar-primary text-sidebar-primary-foreground"
  *
  * Test IDs:
@@ -63,14 +62,23 @@ export function NavMenu({
   };
 
   const handleItemClick = (item: NavMenuItemConfig) => {
+    // Always notify parent of selection
+    onNavClick?.(item.id);
+
     if (item.isExpandable) {
-      toggleExpanded(item.id);
+      // Expand this parent
+      if (autoCollapseInactive) {
+        // If auto-collapse is enabled, only keep this item expanded
+        setExpandedItems(new Set([item.id]));
+      } else {
+        // Otherwise, add to the set of expanded items
+        setExpandedItems((prev) => new Set([...prev, item.id]));
+      }
     } else {
       // When clicking a non-expandable item, auto-collapse if enabled
       if (autoCollapseInactive) {
         setExpandedItems(new Set());
       }
-      onNavClick?.(item.id);
     }
   };
 
@@ -92,7 +100,7 @@ export function NavMenu({
   return (
     <div
       className={cn(
-        "self-stretch flex flex-col justify-start items-start gap-2 bg-nav-menu text-nav-menu-foreground",
+        "self-stretch flex flex-col justify-start items-start gap-2",
         className
       )}
       data-testid="nav-menu"
@@ -110,6 +118,7 @@ export function NavMenu({
               isExpanded={isExpanded}
               isActive={isActive}
               onClick={() => handleItemClick(item)}
+              onChevronClick={() => toggleExpanded(item.id)}
             />
 
             {item.isExpandable && isExpanded && item.subItems && (
