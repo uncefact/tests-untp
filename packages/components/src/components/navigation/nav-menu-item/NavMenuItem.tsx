@@ -85,9 +85,8 @@ export function NavMenuItem({
               alt=""
               className={cn(
                 "w-6 h-6 shrink-0 pointer-events-none",
-                isActive ? "brightness-0 invert" : ""
+                isActive ? "text-nav-item-foreground-active" : "text-nav-item-foreground-inactive"
               )}
-              style={!isActive ? { filter: "brightness(0) saturate(100%) invert(17%) sepia(0%) saturate(0%) hue-rotate(202deg) brightness(95%) contrast(91%)" } : undefined}
               aria-hidden="true"
               data-testid={`nav-menu-item-${testId}-icon`}
             />
