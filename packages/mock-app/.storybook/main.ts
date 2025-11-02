@@ -24,6 +24,9 @@ const config: StorybookConfig = {
       new webpack.ProvidePlugin({
         Buffer: ['buffer', 'Buffer'],
       }),
+      new webpack.DefinePlugin({
+        'process.env': JSON.stringify(process.env),
+      }),
     );
 
     // Add path alias resolution
