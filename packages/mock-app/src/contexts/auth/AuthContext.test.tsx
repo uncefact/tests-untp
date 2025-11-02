@@ -127,8 +127,8 @@ describe('AuthContext', () => {
   describe('logout', () => {
     beforeEach(() => {
       // Mock window.location.href
-      delete (window as any).location;
-      window.location = { href: '' } as any;
+      delete (window as unknown as { location: unknown }).location;
+      (window as unknown as { location: { href: string } }).location = { href: '' };
     });
 
     it('calls signOut and redirects to IDP logout URL', async () => {
@@ -144,7 +144,7 @@ describe('AuthContext', () => {
       });
 
       mockGetIdpLogoutUrl.mockReturnValue('https://idp.example.com/logout');
-      mockSignOut.mockResolvedValue(undefined as any);
+      mockSignOut.mockResolvedValue({} as never);
 
       function LogoutTestComponent() {
         const { logout } = useAuth();
@@ -184,7 +184,7 @@ describe('AuthContext', () => {
       });
 
       mockGetIdpLogoutUrl.mockReturnValue(null);
-      mockSignOut.mockResolvedValue(undefined as any);
+      mockSignOut.mockResolvedValue({} as never);
 
       function LogoutTestComponent() {
         const { logout } = useAuth();

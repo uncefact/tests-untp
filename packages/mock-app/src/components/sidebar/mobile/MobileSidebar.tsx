@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Sidebar } from "../Sidebar";
+import Image from "next/image";
 import type { User, NavMenuItemConfig, MoreOptionGroup } from "@mock-app/components";
 
 interface MobileSidebarProps {
@@ -42,9 +43,11 @@ export function MobileSidebar(props: MobileSidebarProps) {
             data-testid="mobile-navbar-logo"
           >
             {typeof props.logo === "string" ? (
-              <img
+              <Image
                 src={props.logo}
                 alt="Logo"
+                width={48}
+                height={48}
                 className="w-12 h-12"
               />
             ) : (

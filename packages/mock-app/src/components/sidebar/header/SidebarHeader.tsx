@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
+import Image from "next/image";
 
 interface SidebarHeaderProps {
   className?: string;
@@ -13,9 +14,11 @@ export function SidebarHeader({
   onLogoClick,
 }: SidebarHeaderProps) {
   const logoElement = typeof logo === "string" ? (
-    <img
+    <Image
       src={logo}
       alt="Logo"
+      width={48}
+      height={48}
       className={cn("w-12 h-12", className)}
       data-testid="sidebar-header-logo"
     />

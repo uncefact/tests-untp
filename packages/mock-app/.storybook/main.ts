@@ -64,9 +64,10 @@ const config: StorybookConfig = {
     });
 
     // Add PostCSS processing for Tailwind
-    const cssRule = config.module?.rules?.find((rule: any) => {
-      return rule.test?.toString().includes('css');
-    }) as any;
+    const cssRule = config.module?.rules?.find((rule: unknown) => {
+      const r = rule as { test?: RegExp };
+      return r.test?.toString().includes('css');
+    }) as { use?: unknown[] };
 
     if (cssRule) {
       cssRule.use = [
