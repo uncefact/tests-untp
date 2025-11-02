@@ -23,7 +23,7 @@ interface UserProfileProps {
 export function UserProfile({ user, className }: UserProfileProps) {
   return (
     <div
-      className={cn("flex items-center gap-2 bg-user-profile", className)}
+      className={cn("flex items-center gap-2 bg-user-profile min-w-0", className)}
       data-testid="user-profile"
     >
       <div className="flex flex-col min-w-0 flex-1">
