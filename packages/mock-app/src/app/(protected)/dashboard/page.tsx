@@ -1,6 +1,5 @@
 "use client";
 
-import SignOutButton from "@/components/Auth/SignOutButton";
 import { Box, Typography, Paper, Stack } from "@mui/material";
 import { useSession } from "next-auth/react";
 
@@ -10,12 +9,9 @@ export default function DashboardPage() {
   return (
     <Box sx={{ padding: 4 }}>
       <Stack spacing={3}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography variant="h3" component="h1">
-            Dashboard
-          </Typography>
-          <SignOutButton variant="outlined" color="error" />
-        </Box>
+        <Typography variant="h3" component="h1">
+          Dashboard
+        </Typography>
 
         <Typography variant="body1" color="text.secondary">
           This is a protected dashboard. Only authenticated users can access this page.
