@@ -161,7 +161,7 @@ function Header() {
     setHeaderBrandInfo({
       name: convertPathToString(pathname ?? ''),
       assets: {
-        logo: subAppStyles && 'assets' in subAppStyles ? (subAppStyles as any)?.assets?.logo : '',
+        logo: subAppStyles && 'assets' in subAppStyles ? (subAppStyles as { assets?: { logo?: string } })?.assets?.logo ?? '' : '',
       },
     });
 
