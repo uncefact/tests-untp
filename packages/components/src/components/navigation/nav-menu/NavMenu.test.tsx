@@ -60,26 +60,38 @@ describe("NavMenu", () => {
     const user = userEvent.setup();
     render(<NavMenu items={mockNavItems} />);
 
-    const credentialsItem = screen.getByTestId("nav-menu-item-credentials");
-    await user.click(credentialsItem);
+    await user.click(screen.getByText("Credentials"));
 
     expect(screen.getByText("Conformity credential")).toBeInTheDocument();
     expect(screen.getByText("Facility record")).toBeInTheDocument();
   });
 
-  it("collapses item when expandable item is clicked again", async () => {
+  it("collapses item when chevron is clicked", async () => {
     const user = userEvent.setup();
     render(<NavMenu items={mockNavItems} />);
 
-    const credentialsItem = screen.getByTestId("nav-menu-item-credentials");
+    // Click by text
+    const chevron = screen.getByTestId("nav-menu-item-credentials-chevron");
 
-    // Expand
-    await user.click(credentialsItem);
+    // Expand by clicking item
+    await user.click(screen.getByText("Credentials"));
     expect(screen.getByText("Conformity credential")).toBeInTheDocument();
 
-    // Collapse
-    await user.click(credentialsItem);
+    // Collapse by clicking chevron
+    await user.click(chevron);
     expect(screen.queryByText("Conformity credential")).not.toBeInTheDocument();
+  });
+
+  it("calls onNavClick when expandable item is clicked", async () => {
+    const user = userEvent.setup();
+    const handleNavClick = jest.fn();
+
+    render(<NavMenu items={mockNavItems} onNavClick={handleNavClick} />);
+
+    // Click by text
+    await user.click(screen.getByText("Credentials"));
+
+    expect(handleNavClick).toHaveBeenCalledWith("credentials");
   });
 
   it("calls onNavClick when non-expandable item is clicked", async () => {
@@ -88,8 +100,8 @@ describe("NavMenu", () => {
 
     render(<NavMenu items={mockNavItems} onNavClick={handleNavClick} />);
 
-    const identifiersItem = screen.getByTestId("nav-menu-item-identifiers");
-    await user.click(identifiersItem);
+    // Click by text
+    await user.click(screen.getByText("Identifiers"));
 
     expect(handleNavClick).toHaveBeenCalledWith("identifiers");
   });
@@ -101,12 +113,12 @@ describe("NavMenu", () => {
     render(<NavMenu items={mockNavItems} onNavClick={handleNavClick} />);
 
     // Expand credentials
-    const credentialsItem = screen.getByTestId("nav-menu-item-credentials");
-    await user.click(credentialsItem);
+    // Click by text
+    await user.click(screen.getByText("Credentials"));
 
     // Click sub-item
-    const conformityItem = screen.getByTestId("nav-menu-item-conformity-credential");
-    await user.click(conformityItem);
+    // Click by text
+    await user.click(screen.getByText("Conformity credential"));
 
     expect(handleNavClick).toHaveBeenCalledWith("conformity-credential");
   });
@@ -157,15 +169,15 @@ describe("NavMenu", () => {
       );
 
       // Manually expand credentials
-      const credentialsItem = screen.getByTestId("nav-menu-item-credentials");
-      await user.click(credentialsItem);
+      // Click by text
+      await user.click(screen.getByText("Credentials"));
 
       // Sub-items should be visible
       expect(screen.getByText("Conformity credential")).toBeInTheDocument();
 
       // Click on another non-expandable item
-      const masterDataItem = screen.getByTestId("nav-menu-item-master-data");
-      await user.click(masterDataItem);
+      // Click by text
+      await user.click(screen.getByText("Master data"));
 
       // Credentials should still be expanded (autoCollapseInactive is false)
       expect(screen.getByText("Conformity credential")).toBeInTheDocument();
@@ -178,36 +190,67 @@ describe("NavMenu", () => {
       );
 
       // Manually expand credentials
-      const credentialsItem = screen.getByTestId("nav-menu-item-credentials");
-      await user.click(credentialsItem);
+      // Click by text
+      await user.click(screen.getByText("Credentials"));
 
       // Sub-items should be visible
       expect(screen.getByText("Conformity credential")).toBeInTheDocument();
 
       // Click on a non-expandable item
-      const masterDataItem = screen.getByTestId("nav-menu-item-master-data");
-      await user.click(masterDataItem);
+      // Click by text
+      await user.click(screen.getByText("Master data"));
 
       // Credentials should be collapsed (autoCollapseInactive is true)
       expect(screen.queryByText("Conformity credential")).not.toBeInTheDocument();
     });
 
-    it("allows multiple items to be expanded manually with autoCollapseInactive", async () => {
+    it("collapses previous parent when clicking another parent with autoCollapseInactive", async () => {
       const user = userEvent.setup();
+
+      const expandableItems: NavMenuItemConfig[] = [
+        {
+          id: "credentials",
+          label: "Credentials",
+          icon: "/icons/license.svg",
+          isExpandable: true,
+          subItems: [
+            {
+              id: "conformity-credential",
+              label: "Conformity credential",
+              icon: "/icons/approval.svg",
+            },
+          ],
+        },
+        {
+          id: "resources",
+          label: "Resources",
+          icon: "/icons/book.svg",
+          isExpandable: true,
+          subItems: [
+            {
+              id: "products",
+              label: "Products",
+              icon: "/icons/product.svg",
+            },
+          ],
+        },
+      ];
+
       render(
-        <NavMenu items={mockNavItems} autoCollapseInactive={true} />
+        <NavMenu items={expandableItems} autoCollapseInactive={true} />
       );
 
-      // Manually expand credentials
-      const credentialsItem = screen.getByTestId("nav-menu-item-credentials");
-      await user.click(credentialsItem);
+      // Expand credentials
+      // Click by text
+      await user.click(screen.getByText("Credentials"));
       expect(screen.getByText("Conformity credential")).toBeInTheDocument();
 
-      // User can still manually expand another expandable item
-      // (clicking expandable items doesn't trigger auto-collapse)
-      await user.click(credentialsItem); // Collapse
-      await user.click(credentialsItem); // Expand again
-      expect(screen.getByText("Conformity credential")).toBeInTheDocument();
+      // Click on another expandable parent - should collapse credentials and expand resources
+      // Click by text
+      await user.click(screen.getByText("Resources"));
+
+      expect(screen.queryByText("Conformity credential")).not.toBeInTheDocument();
+      expect(screen.getByText("Products")).toBeInTheDocument();
     });
 
     it("keeps parent expanded when clicking a sub-item with autoCollapseInactive", async () => {
@@ -217,12 +260,12 @@ describe("NavMenu", () => {
       );
 
       // Expand credentials
-      const credentialsItem = screen.getByTestId("nav-menu-item-credentials");
-      await user.click(credentialsItem);
+      // Click by text
+      await user.click(screen.getByText("Credentials"));
 
       // Click on a sub-item
-      const conformityItem = screen.getByTestId("nav-menu-item-conformity-credential");
-      await user.click(conformityItem);
+      // Click by text
+      await user.click(screen.getByText("Conformity credential"));
 
       // Parent should still be expanded
       expect(screen.getByText("Conformity credential")).toBeInTheDocument();
