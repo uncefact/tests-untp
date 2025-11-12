@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { act } from 'react';
 import { render, waitFor, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
@@ -14,7 +14,9 @@ describe('Toast Message', () => {
     render(<ToastMessage />);
 
     // Call the toastMessage function
-    toastMessage({ status, message, linkURL });
+    act(() => {
+      toastMessage({ status, message, linkURL });
+    });
 
     // Check that the toast message is correctly.
     await waitFor(() => {
@@ -58,9 +60,10 @@ describe('Toast Message', () => {
 
   test('toast disappears after autoClose duration', async () => {
     const message = 'Temporary toast';
+    const linkURL = 'https://example.com/vc/456';
   
     render(<ToastMessage />);
-    toastMessage({ status: Status.warning, message, linkURL: '' });
+    toastMessage({ status: Status.warning, message, linkURL });
   
     // Confirm it appears
     await waitFor(() => {
