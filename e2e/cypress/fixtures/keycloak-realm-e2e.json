@@ -1,0 +1,66 @@
+{
+  "realm": "ri-e2e",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "users": [
+    {
+      "username": "e2e-admin@test.local",
+      "email": "e2e-admin@test.local",
+      "firstName": "E2E",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "E2eTest123!",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "e2e-user@test.local",
+      "email": "e2e-user@test.local",
+      "firstName": "E2E",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "E2eTest123!",
+          "temporary": false
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "ri-app-e2e",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "e2e-test-secret",
+      "redirectUris": [
+        "http://localhost:3003/api/auth/callback/keycloak"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:3003/signin"
+      },
+      "webOrigins": [
+        "http://localhost:3003"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "consentRequired": false,
+      "defaultClientScopes": ["profile", "email", "roles"]
+    }
+  ]
+}

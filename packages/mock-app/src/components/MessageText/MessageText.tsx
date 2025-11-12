@@ -1,4 +1,3 @@
-import React from 'react';
 import { Box } from '@mui/material';
 import { Typography } from '@mui/material';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
@@ -13,7 +12,7 @@ import { Status } from '@mock-app/components';
 export interface IMessageText {
   status?: Status;
   text: string;
-};
+}
 
 export default function MessageText({ status, text }: IMessageText) {
   return (

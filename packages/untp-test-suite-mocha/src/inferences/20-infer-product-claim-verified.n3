@@ -1,0 +1,24 @@
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix result: <http://example.org/result#> .
+@prefix untp: <https://test.uncefact.org/vocabulary/untp/core/0/> .
+
+# This query infers DPP claims for which all criteria are verified.  It depends
+# on inferences created in 10-infer-verified-product-claim-criteria.n3 and so
+# must be run after that.
+{
+   ?claim a untp:Claim .
+   (
+       {
+           ?claim untp:Criterion ?criterion 
+       }
+       {
+           ?claim result:verifiedCriterion ?criterion 
+       }
+   ) log:forAllIn _:t .
+}
+=> 
+{
+   ?claim result:allCriteriaVerified true .
+} .

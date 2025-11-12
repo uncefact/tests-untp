@@ -90,9 +90,11 @@ import {
   IDynamicComponentRendererProps,
 } from '@mock-app/components';
 
+type ServiceFunction = (...args: unknown[]) => unknown | Promise<unknown>;
+
 export interface IServiceDefinition {
   name: string;
-  parameters: any[];
+  parameters: Record<string, object | string>[];
 }
 
 export interface IGenericFeatureProps {
@@ -100,10 +102,10 @@ export interface IGenericFeatureProps {
   services: IServiceDefinition[];
 }
 
-const getService = (name: string) => {
+const getService = (name: string): ServiceFunction => {
   const serviceName = name as keyof typeof services;
   if (typeof services[serviceName] !== 'undefined') {
-    return services[serviceName];
+    return services[serviceName] as ServiceFunction;
   }
   // const eventName = name as keyof typeof events;
   // if (typeof events[eventName] !== 'undefined') {
@@ -118,24 +120,24 @@ const getService = (name: string) => {
  * @returns
  */
 export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, services }: IGenericFeatureProps) => {
-  const [state, setState] = React.useState<any[]>([]);
-  const [result, setResult] = React.useState<any>();
-  const props: Record<string, any> = {};
+  const [state, setState] = React.useState<unknown[]>([]);
+  const [result, setResult] = React.useState<unknown>();
+  const props: Record<string, object> = {};
 
   const executeServices = async (
     services: IServiceDefinition[],
-    parameters: any[]
-  ): Promise<[any, any[]]> => {
-    const allResults = await services.reduce(async (previousResult: any[] | Promise<any[]>, currentService) => {
+    parameters: unknown[]
+  ): Promise<[unknown, unknown[]]> => {
+    const allResults = await services.reduce(async (previousResult: unknown[] | Promise<unknown[]>, currentService) => {
         const prevResults = await previousResult;
-        const service: any = getService(currentService.name);
+        const service: ServiceFunction = getService(currentService.name);
 
         const lastResult = prevResults[prevResults.length - 1];
         const inputParams = prevResults.length > 0
           ? [lastResult, ...currentService.parameters]
           : [...parameters, ...currentService.parameters];
 
-        const result = await service(...inputParams);
+        const result: unknown = await service(...inputParams);
 
         return [...prevResults, result];
       },
@@ -161,24 +163,26 @@ export const GenericFeature: React.FC<IGenericFeatureProps> = ({ components, ser
             };
             break;
           case ComponentType.Submit:
-            props.onClick = async (handler: (args: any) => void) => {
+            props.onClick = async (handler: (args: unknown) => void) => {
               try {
                 const [finalResult, allResults] = await executeServices(services, state);
 
                 handler(finalResult);
                 setResult(finalResult);
 
-                const resultWithLinkResolver = result?.linkResolver ?? allResults.find((item: any) => item?.linkResolver !== undefined);
+                const resultWithLinkResolver = (result as any)?.linkResolver ?? allResults.find((item: any) => item?.linkResolver !== undefined);
                 toastMessage({ status: Status.success, message: 'Action Successful.', linkURL: resultWithLinkResolver?.linkResolver });
-              } catch (error: any) {
-                console.log(error.message);
+              } catch (error) {
+                if (error && typeof error === 'object' && 'message' in error) {
+                  console.log(error.message);
+                }
                 toastMessage({ status: Status.error, message: 'Something went wrong' });
               }
             };
             break;
           case ComponentType.Result:
             if (result) {
-              props.data = result;
+              props.data = result as object;
             }
             break;
           default:

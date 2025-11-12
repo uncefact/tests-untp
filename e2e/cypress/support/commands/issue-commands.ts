@@ -2,7 +2,7 @@ Cypress.Commands.add('verifyAppConfig', () => {
   const AppConfig = Cypress.env('AppConfig');
   expect(AppConfig?.name).to.not.be.null;
   expect(AppConfig?.name).to.not.be.undefined;
-  expect(AppConfig?.name).to.eq('CHERRIES SUPPLY CHAIN TRACEABILITY');
+  expect(AppConfig?.name).to.eq('UNTP Reference Implementation');
 });
 
 Cypress.Commands.add(
@@ -42,7 +42,7 @@ Cypress.Commands.add(
       ISSUE_BITSTRING_STATUS_LIST: '/agent/issueBitstringStatusList',
       VCKit_URL: appService?.vckit?.vckitAPIUrl + '/credentials/issue',
       STORAGE_URL: appService?.storage?.url,
-      IDR_URL: appService?.dlr?.dlrAPIUrl + appService?.dlr?.linkRegisterPath,
+      IDR_URL: `${appService?.dlr?.dlrAPIUrl}/${appService?.dlr?.linkRegisterPath}`,
     };
 
     cy.interceptAPI('POST', API_ENDPOINT.ISSUE_BITSTRING_STATUS_LIST, 'issueBitStringStatusList');

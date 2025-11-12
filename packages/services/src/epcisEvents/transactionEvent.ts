@@ -58,17 +58,20 @@ export const processTransactionEvent: IService = async (
     LinkType.traceability,
     traceabilityEvent.dlrVerificationPage,
     dlr.dlrAPIUrl,
+    dlr.linkRegisterPath,
     dlr.dlrAPIKey,
     dlr.namespace,
     qualifierPath,
     LinkType.traceability,
   );
 
-  deleteValuesFromLocalStorageByKeyPath(
-    localStorageParams.storageKey,
-    transactionEvent.data,
-    localStorageParams.keyPath,
-  );
+  if (localStorageParams?.storageKey && localStorageParams?.keyPath) {
+    deleteValuesFromLocalStorageByKeyPath(
+      localStorageParams.storageKey,
+      transactionEvent.data,
+      localStorageParams.keyPath,
+    );
+  }
 
   return { vc, decodedEnvelopedVC, linkResolver };
 };

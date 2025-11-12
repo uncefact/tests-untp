@@ -62,6 +62,7 @@ export const processDPP: IService = async (data: any, context: IDppContext): Pro
       LinkType.sustainabilityInfo,
       dppContext.dlrVerificationPage,
       linkResolverContext.dlrAPIUrl,
+      linkResolverContext.linkRegisterPath,
       linkResolverContext.dlrAPIKey,
       linkResolverContext.namespace,
       qualifierPath,

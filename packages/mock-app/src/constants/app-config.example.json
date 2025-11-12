@@ -706,7 +706,7 @@
                     ],
                     "type": ["VerifiableCredential", "DigitalProductPassport"],
                     "dlrLinkTitle": "Truffle Product Passport",
-                    "dlrVerificationPage": "http://localhost:3001/verify"
+                    "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
                     "dlrAPIUrl": "http://localhost:8080",
@@ -1186,7 +1186,7 @@
                     ],
                     "type": ["TransactionEventCredential"],
                     "dlrLinkTitle": "Transaction Event",
-                    "dlrVerificationPage": "http://localhost:3001/verify"
+                    "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
                     "dlrAPIUrl": "http://localhost:8080",

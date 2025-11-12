@@ -102,7 +102,7 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
   const {
     dlrAPIUrl,
     namespace,
-    linkRegisterPath = '/api/resolver',
+    linkRegisterPath = '',
     linkResolver,
     linkResponses,
     qualifierPath,
@@ -111,8 +111,13 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
 
   const params: LinkResolver = constructLinkResolver(namespace, linkResolver, linkResponses, qualifierPath);
   try {
+    const url =
+      linkRegisterPath && linkRegisterPath.length > 0
+        ? `${dlrAPIUrl}/${linkRegisterPath}`
+        : dlrAPIUrl;
+
     privateAPI.setBearerTokenAuthorizationHeaders(arg.dlrAPIKey || '');
-    await privateAPI.post<string>(`${dlrAPIUrl}${linkRegisterPath}`, params);
+    await privateAPI.post<string>(url, params);
     const linkTypeQuery = responseLinkType === 'all' ? 'all' : `${namespace}:${responseLinkType}`;
 
     const path = qualifierPath.includes('?')
@@ -181,6 +186,7 @@ export const registerLinkResolver = async (
   linkType: LinkType,
   verificationPage: string,
   dlrAPIUrl: string,
+  linkRegisterPath: string | undefined,
   dlrAPIKey: string,
   namespace: string,
   qualifierPath?: string,
@@ -218,6 +224,7 @@ export const registerLinkResolver = async (
 
   return await createLinkResolver({
     dlrAPIUrl,
+    linkRegisterPath,
     namespace,
     linkResolver,
     linkResponses,
@@ -226,42 +233,59 @@ export const registerLinkResolver = async (
     responseLinkType,
   });
 };
+
 /**
  * Function to fetch the DLR passport data from the provided DLR URL.
  * @param dlrUrl The DLR URL from which to fetch the passport data.
  * @returns The DLR passport data if found, otherwise returns null.
  */
 export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
+  // Extract the root domain from the DLR URL
   const rootDlrDomain = extractDomain(dlrUrl);
 
-  // Fetch DLR data from the provided DLR URL
+  // Fetch the linkset
   const dlrData = await privateAPI.get(dlrUrl);
-  if (!dlrData) {
+  if (!dlrData?.linkset) {
     return null;
   }
 
-  // Find certificate passports in the DLR data
-  const certificatePassports = dlrData?.linkset?.find(
-    (linkSetItem: any) => linkSetItem[`${rootDlrDomain}/${GS1ServiceEnum.sustainabilityInfo}`],
+  // Define the suffix we care about (Product Passport Link Type)
+  const serviceSuffix = `/${GS1ServiceEnum.sustainabilityInfo}`;  
+
+  // Find the first linkset entry whose key matches the domain + suffix
+  const certificatePassports = dlrData.linkset.find((item: any) =>
+    Object.keys(item).some(key =>
+      key.includes(rootDlrDomain) &&
+      key.endsWith(serviceSuffix)
+    )
   );
   if (!certificatePassports) {
     return null;
   }
 
-  // Extract passport infos from certificate passports
-  const dlrPassports = certificatePassports[`${rootDlrDomain}/${GS1ServiceEnum.sustainabilityInfo}`];
-  if (!dlrPassports) {
+  // Extract the key
+  const passportKey = Object
+    .keys(certificatePassports)
+    .find(key =>
+      key.includes(rootDlrDomain) &&
+      key.endsWith(serviceSuffix)
+    );
+  if (!passportKey) {
     return null;
   }
 
-  // Find DLR passport with MIME type text/html
-  const dlrPassport = dlrPassports.find((passportItem: any) => passportItem?.type === MimeTypeEnum.textHtml);
-  if (!dlrPassport) {
+  // Grab the array of passports
+  const dlrPassports = certificatePassports[passportKey];
+  if (!Array.isArray(dlrPassports)) {
     return null;
   }
 
-  // Return the found DLR passport
-  return dlrPassport;
+  // Return the first text/html passport we find (Human-friendly format)
+  const dlrPassport = (dlrPassports).find(
+    p => p.type === MimeTypeEnum.textHtml
+  );
+
+  return (dlrPassport as T) ?? null;
 };
 
 /**

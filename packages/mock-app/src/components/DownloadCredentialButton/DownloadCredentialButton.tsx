@@ -1,4 +1,3 @@
-import React from 'react';
 import CloudDownloadOutlinedIcon from '@mui/icons-material/CloudDownloadOutlined';
 import { Button, IconButton, useMediaQuery, useTheme } from '@mui/material';
 import { UnsignedCredential, VerifiableCredential } from '@vckit/core-types';

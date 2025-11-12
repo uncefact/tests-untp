@@ -1,26 +1,30 @@
 # ---- Base Node ----
-FROM node:21 AS base
+FROM node:22 AS base
+
 WORKDIR /app
+
 COPY package*.json yarn.lock ./
 
 # ---- Dependencies ----
 FROM base AS dependencies
-COPY . .
-RUN yarn install && yarn cache clean
 
-# ---- Build ----
-FROM dependencies AS build
+# TODO: Only copy packages needed in the image
+COPY . .
+
+RUN yarn install --frozen-lockfile
+
 RUN yarn build
+
+# ---- Development ----
+FROM dependencies AS development
 
 ARG CONFIG_FILE
+
 COPY ${CONFIG_FILE} packages/mock-app/src/constants/app-config.json
 COPY ${CONFIG_FILE} packages/components/src/constants/app-config.json
-WORKDIR /app/packages/mock-app
-RUN yarn build
 
-# ---- Nginx ----
-FROM nginx:stable-alpine AS release
-COPY ./nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/packages/mock-app/build /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+WORKDIR /app/packages/mock-app
+
+EXPOSE 3003
+
+CMD ["sh", "-c", "npx prisma migrate deploy --config=prisma/prisma.config.ts && yarn dev"]

@@ -28,11 +28,15 @@ class RenderPage {
 
   verifyTemplateRenderingWhenContentExists() {
     cy.contains('button', 'Rendered').click();
+
     cy.get('div[role="tabpanel"]#tabpanel-0')
-      .should('be.visible')
-      .within(() => {
-        cy.get('div').should('exist');
-      });
+    .should('be.visible');
+    
+    cy.get('[data-testid="loading-indicator"]')
+    .should('not.exist');
+
+    cy.get('[data-testid="rendered-template"]')
+    .should('be.visible');
   }
 
   verifyNoContentRenderingWhenTemplateIsEmpty() {

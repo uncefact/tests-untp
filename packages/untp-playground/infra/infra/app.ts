@@ -118,11 +118,11 @@ const authToken = aws.ecr.getAuthorizationTokenOutput({
 const appImage = new docker_build.Image(`app-image-${stack}`, {
   // Tag our image with our ECR repository's address.
   tags: [pulumi.interpolate`${appRepository.repositoryUrl}:latest`],
-  /* dockerfile: {
+  dockerfile: {
     location: '../../../packages/untp-playground/Dockerfile',
-  }, */
+  },
   context: {
-      location: '../',
+      location: '../../../',
   },
   // Use the pushed image as a cache source.
   cacheFrom: [{

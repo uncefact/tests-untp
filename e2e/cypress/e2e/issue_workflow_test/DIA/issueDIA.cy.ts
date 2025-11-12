@@ -1,3 +1,4 @@
+import { DIA_LINK_TYPE } from 'constant';
 import IssuePage from 'cypress/page/issuePage';
 
 class DIAIssueFlow extends IssuePage {
@@ -11,7 +12,7 @@ class DIAIssueFlow extends IssuePage {
   }
 
   testUNTPTestSuite() {
-    this.runUntpTest('digitalIdentityAnchor', 'v0.2.1', {}, 'WARN');
+    this.runUntpTest('digitalIdentityAnchor', 'v0.6.0');
   }
 }
 
@@ -26,15 +27,15 @@ describe('Issue DIA end-to-end testing flow', () => {
     diaTest.testAppConfig();
   });
 
-  it('should generate DCC', () => {
+  it('should generate DIA', () => {
     diaTest.testGenerateDCCWorkflow();
   });
 
-  it('Verify linkType for DCC', () => {
-    diaTest.verifyLinkType('http://localhost:3000/gs1/01/09359502000010');
+  it('Verify linkType for DIA', () => {
+    diaTest.verifyLinkType(DIA_LINK_TYPE);
   });
 
-  it('Runs testing UNTP test suite for DCC', () => {
+  it('Runs testing UNTP test suite for DIA', () => {
     diaTest.testUNTPTestSuite();
   });
 });

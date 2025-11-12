@@ -1,0 +1,9 @@
+{
+  "version": "0.1.0",
+  "mappings": [
+    {
+      "credentialType": "DigitalLivestockPassport",
+      "schemaUrlPattern": "https://jargon.sh/user/aatp/DigitalLivestockPassport/v/working/artefacts/jsonSchemas/DigitalLivestockPassport.json?class=DigitalLivestockPassport"
+    }
+  ]
+}

@@ -282,13 +282,13 @@ describe('constructVerifyURL', () => {
   beforeEach(() => {
     // Mock window location for consistent tests
     delete (window as any).location;
-    (window as any).location = new URL('http://localhost:3000');
+    (window as any).location = new URL('http://localhost:3003');
   });
 
   it('should construct the correct verify URL with only URI', () => {
     const uri = 'http://example.com/credential';
     const expectedURL =
-      'http://localhost:3000/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%7D%7D';
+      'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%7D%7D';
     const result = constructVerifyURL({ uri });
 
     expect(result).toBe(expectedURL);
@@ -299,7 +299,7 @@ describe('constructVerifyURL', () => {
     const hash = 'someHash';
     const result = constructVerifyURL({ uri, hash });
     
-    const expectedURL = 'http://localhost:3000/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22hash%22%3A%22someHash%22%7D%7D';
+    const expectedURL = 'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22hash%22%3A%22someHash%22%7D%7D';
     expect(result).toBe(expectedURL);
   });
 
@@ -308,7 +308,7 @@ describe('constructVerifyURL', () => {
     const key = 'someKey';
     const result = constructVerifyURL({ uri, key });
     
-    const expectedURL = 'http://localhost:3000/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22key%22%3A%22someKey%22%7D%7D';
+    const expectedURL = 'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22key%22%3A%22someKey%22%7D%7D';
     expect(result).toBe(expectedURL);
   });
 
@@ -317,7 +317,7 @@ describe('constructVerifyURL', () => {
     const key = 'someKey';
     const hash = 'someHash';
     const expectedURL =
-      'http://localhost:3000/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22key%22%3A%22someKey%22%2C%22hash%22%3A%22someHash%22%7D%7D';
+      'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22key%22%3A%22someKey%22%2C%22hash%22%3A%22someHash%22%7D%7D';
     const result = constructVerifyURL({ uri, key, hash });
 
     expect(result).toBe(expectedURL);
@@ -338,7 +338,7 @@ describe('validateAndConstructVerifyURL', () => {
   it('should return the verify URL when value is a string', () => {
     const value = 'http://example.com/credential';
     const expectedURL =
-      'http://localhost:3000/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%7D%7D';
+      'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%7D%7D';
     const result = validateAndConstructVerifyURL(value);
 
     expect(result).toBe(expectedURL);
@@ -351,7 +351,7 @@ describe('validateAndConstructVerifyURL', () => {
       hash: 'someHash',
     };
     const expectedURL =
-      'http://localhost:3000/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22key%22%3A%22someKey%22%2C%22hash%22%3A%22someHash%22%7D%7D';
+      'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22key%22%3A%22someKey%22%2C%22hash%22%3A%22someHash%22%7D%7D';
     const result = validateAndConstructVerifyURL(value);
 
     expect(result).toBe(expectedURL);

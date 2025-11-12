@@ -1,16 +1,58 @@
-/* eslint-disable testing-library/no-node-access */
-/* eslint-disable testing-library/no-unnecessary-act */
 import React from 'react';
-import { fireEvent, render } from '@testing-library/react';
+import { act, fireEvent, render } from '@testing-library/react';
 import { publicAPI } from '@mock-app/services';
-import { act } from 'react-dom/test-utils';
 import { Scanner } from '../components/Scanner';
-import Scanning from '../pages/Scanning';
+import Scanning from '../app/(public)/scanning/page';
 
 const mockUsedNavigate = jest.fn();
 jest.mock('react-router', () => ({
   ...jest.requireActual('react-router'),
   useNavigate: () => mockUsedNavigate,
+}));
+
+// Mock Next.js router
+const mockReplace = jest.fn();
+const mockPush = jest.fn();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    replace: mockReplace,
+    push: mockPush,
+  }),
+}));
+
+// Mocking MUI components
+jest.mock('@mui/material', () => ({
+  Box: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...props}>{children}</div>
+  ),
+  Button: ({
+    children,
+    onClick,
+    variant,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    onClick?: () => void;
+    variant?: string;
+    [key: string]: unknown;
+  }) => (
+    <button onClick={onClick} className={`MuiButton-${variant || 'contained'}`} {...props}>
+      {children}
+    </button>
+  ),
+  Typography: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...props}>{children}</div>
+  ),
+  Container: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...props}>{children}</div>
+  ),
+  Paper: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...props}>{children}</div>
+  ),
+  CircularProgress: (props: { [key: string]: unknown }) => <div {...props}>Loading...</div>,
+  Stack: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...props}>{children}</div>
+  ),
 }));
 
 jest.mock('../components/Scanner', () => ({
@@ -37,12 +79,25 @@ jest.mock('@uncefact/vckit-renderer', () => ({
 }));
 
 describe('Scanning', () => {
+  let consoleLogSpy: jest.SpyInstance;
+
   beforeEach(() => {
+    // Suppress expected console.log errors from error handling
+    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.resetAllMocks();
+    jest.clearAllMocks();
+    mockReplace.mockClear();
+    mockPush.mockClear();
+    mockUsedNavigate.mockClear();
+  });
+
+  afterEach(() => {
+    consoleLogSpy.mockRestore();
   });
 
   it('should renders scanning page with scanner component', () => {
-    (Scanner as any).mockReturnValue(() => <>Scanner</>);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (Scanner as any).mockReturnValue(<>Scanner</>);
 
     render(<Scanning />);
 
@@ -57,6 +112,7 @@ describe('Scanning', () => {
         </button>
       );
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (Scanner as any).mockImplementation(MockScanner);
 
     await act(async () => {
@@ -96,6 +152,7 @@ describe('Scanning', () => {
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (Scanner as any).mockImplementation(MockScanner);
 
     await act(async () => {

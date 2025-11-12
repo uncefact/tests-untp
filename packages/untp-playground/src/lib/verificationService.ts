@@ -1,12 +1,11 @@
-const API_URL = 'https://vckit.untp.showthething.com/agent/routeVerificationCredential';
-const API_TOKEN = 'test123';
+import { verificationServiceUrl, verificationServiceToken } from '../../config';
 
 export async function verifyCredential(credential: any) {
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetch(verificationServiceUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${API_TOKEN}`,
+        Authorization: `Bearer ${verificationServiceToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
