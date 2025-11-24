@@ -248,7 +248,7 @@ describe('processDPP', () => {
   describe('error case', () => {
     afterEach(() => {
       jest.clearAllMocks();
-      jest.resetAllMocks;
+      jest.resetAllMocks();
     });
 
     it('should throw error when data is empty', async () => {

@@ -40,7 +40,7 @@ setupUNTPChaiAssertions(chai, jsonld, ajvInstance);
 
 // Make classes and functions available under untpTestSuite namespace
 (window as any).untpTestSuite = {
-  ...(window as any).untpTestSuite, // Preserve existing namespace from utils
+  ...((window as any).untpTestSuite || {}), // Preserve existing namespace from utils
   UNTPTestRunner,
   StreamReporter,
   setCredentialData,

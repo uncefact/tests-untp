@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -7,30 +8,68 @@ import { CredentialUploader } from '@/components/CredentialUploader';
 import { DownloadCredential } from '@/components/DownloadCredential';
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
-import { TestResults } from '@/components/TestResults';
-import { TestReportProvider } from '@/contexts/TestReportContext';
+
 import { decodeEnvelopedCredential, detectCredentialType, isEnvelopedProof } from '@/lib/credentialService';
-import { detectExtension } from '@/lib/schemaValidation';
 import { isPermittedCredentialType, validateNormalizedCredential } from '@/lib/utils';
 import type { PermittedCredentialType, StoredCredential, TestStep } from '@/types';
+import type { StreamEvent } from 'untp-test-suite-mocha/dist/untp-test/stream-reporter';
 import { useError } from '@/contexts/ErrorContext';
 import { Button } from '@/components/ui/button';
+import { XCircle } from 'lucide-react';
 import { permittedCredentialTypes } from '../../constants';
 
+import * as defaultSchemaMappings from 'untp-test-suite-mocha/dist/untp-test/schema-mapper/default-mappings.json';
+
 export default function Home() {
-  const [credentials, setCredentials] = useState<{
-    [key in PermittedCredentialType]?: StoredCredential;
-  }>({});
+  const [credentials, setCredentials] = useState<StoredCredential[]>([]);
   const [testResults, setTestResults] = useState<{
     [key in PermittedCredentialType]?: TestStep[];
   }>({});
   const [fileCount, setFileCount] = useState(0);
   const { dispatchError, errors, setIsDetailsOpen } = useError();
 
+  const [isMochaLoaded, setIsMochaLoaded] = useState(false);
+  const [testLog, setTestLog] = useState('');
+
   const shouldDisplayUploadDetailBtn = errors && errors.length > 0;
 
-  const handleCredentialUpload = async (rawCredential: any) => {
+  const handleDeleteCredential = (index: number) => {
+    setCredentials(prev => prev.filter((_, i) => i !== index));
+  };
+
+  useEffect(() => {
+    const setupMocha = async () => {
+      try {
+        (window as any).mocha.setup('bdd');
+        await import('untp-test-suite-mocha/dist/untp-test/browser-bundle');
+
+        // Poll until the test suites are registered
+        const poll = (resolve: (value: unknown) => void, reject: (reason?: any) => void) => {
+          if ((window as any).untpTestSuite && (window as any).untpTestSuite.registeredTestSuites && (window as any).untpTestSuite.registeredTestSuites.length === 3) {
+            resolve(true);
+          } else {
+            setTimeout(() => poll(resolve, reject), 100);
+          }
+        };
+        await new Promise(poll);
+
+
+      } catch (error) {
+        console.error('Failed to load scripts:', error);
+        toast.error('Failed to load necessary scripts for validation.');
+      }
+    };
+
+    setupMocha();
+  }, []);
+
+
+
+  const handleCredentialUpload = async ({ credential: rawCredential, fileName }: { credential: any; fileName:string }) => {
     try {
+      if (!rawCredential) {
+        throw new Error('Invalid credential format: credential is null or undefined.');
+      }
       const normalizedCredential = rawCredential.verifiableCredential || rawCredential;
       const error = validateNormalizedCredential(normalizedCredential);
 
@@ -40,11 +79,8 @@ export default function Home() {
       }
 
       const isEnveloped = isEnvelopedProof(normalizedCredential);
-      const decodedCredential = isEnveloped ? decodeEnvelopedCredential(normalizedCredential) : normalizedCredential;
-
-      const extension = detectExtension(decodedCredential);
-      let credentialType = extension ? extension.core.type : detectCredentialType(decodedCredential);
-
+                  const decodedCredential = isEnveloped ? decodeEnvelopedCredential(normalizedCredential) : normalizedCredential;
+                  let credentialType = detectCredentialType(decodedCredential);
       if (!credentialType || !isPermittedCredentialType(credentialType as PermittedCredentialType)) {
         dispatchError([
           {
@@ -53,7 +89,6 @@ export default function Home() {
             params: {
               missingProperty: `type array with a supported types:  ${permittedCredentialTypes.join(', ')}`,
               receivedValue: normalizedCredential,
-              allowedValue: { type: ['VerifiableCredential', 'DigitalProductPassport'] },
               solution: "Add a valid UNTP credential type (e.g., 'DigitalProductPassport', 'ConformityCredential').",
             },
             message: `The credential type is missing or invalid.`,
@@ -62,16 +97,125 @@ export default function Home() {
         return;
       }
 
-      setCredentials((prev) => ({
+      setCredentials((prev) => ([
         ...prev,
-        [credentialType]: {
+        {
           original: normalizedCredential,
           decoded: decodedCredential,
+          fileName,
         },
-      }));
+      ]));
+    } catch (error) {
+      console.error('Error in handleCredentialUpload:', error);
+      toast.error('Failed to process credential');
+    }
+  };
+
+  const runValidation = async () => {
+    try {
+//       (window as any).untpDefaultSchemaMappings = defaultSchemaMappings;
+//       const { UNTPTestRunner, setCredentialData, trustedDIDs, executeRegisteredTestSuites } = await import('untp-test-suite-mocha');
+
+      const credentialData = new Map();
+      credentials.forEach(cred => {
+        credentialData.set(cred.fileName, JSON.stringify(cred.decoded));
+      });
+      (window as any).untpTestSuite.setCredentialData(credentialData);
+
+      const runner = new (window as any).untpTestSuite.UNTPTestRunner();
+      const displayedSuites = new Set();
+
+      const results = await runner.run({
+        mochaSetupCallback: (mochaOptions: any) => {
+          const newMocha = new (window as any).Mocha(mochaOptions);
+          // Set up BDD interface globals (describe, it, etc.) for this instance
+          newMocha.suite.emit('pre-require', window, null, newMocha);
+          // Register the test suites with the new mocha instance
+          (window as any).untpTestSuite.executeRegisteredTestSuites();
+          return newMocha;
+        }
+      }, (event: StreamEvent) => {
+        function showSuiteHierarchy(suiteHierarchy: any) {
+          (window as any).untpTestSuite.showSuiteHierarchy(
+            suiteHierarchy,
+            displayedSuites,
+            (suiteTitle: string, cleanTitle: string, tags: any, indentLevel: number) => {
+              setTestLog(prevLog => prevLog + `${'  '.repeat(indentLevel)}${cleanTitle} ${tags}\n`);
+            },
+          );
+        }
+        function appendResult(text: string, indentLevel = 0) {
+          setTestLog(prevLog => prevLog + `${'  '.repeat(indentLevel)}${text}\n`);
+        }
+
+
+        switch (event.type) {
+          case 'start': {
+            setTestLog('🚀 Running UNTP validation tests...\n');
+            //displayedSuites.clear();
+            break;
+          }
+          case 'pass': {
+            showSuiteHierarchy(event.data.suiteHierarchy);
+            const testDuration = event.data.duration ? ` (${event.data.duration}ms)` : '';
+            const passIndent = event.data.suiteHierarchy.length;
+            const { cleanTitle: cleanTestTitle, tags: testTags } = (window as any).untpTestSuite.formatTags(
+              event.data.title,
+            );
+            appendResult(`✔ ${cleanTestTitle}${testTags}${testDuration}`, passIndent);
+            break;
+          }
+          case 'fail': {
+            showSuiteHierarchy(event.data.suiteHierarchy);
+            const failIndent = event.data.suiteHierarchy.length;
+            const { cleanTitle: cleanFailTitle, tags: failTestTags } = (window as any).untpTestSuite.formatTags(
+              event.data.title,
+            );
+            appendResult(`✖ ${cleanFailTitle}${failTestTags}`, failIndent);
+            if (event.data.err && event.data.err.message) {
+              appendResult(event.data.err.message, failIndent + 1);
+            }
+            break;
+          }
+          case 'pending': {
+            showSuiteHierarchy(event.data.suiteHierarchy);
+            const pendingIndent = event.data.suiteHierarchy.length;
+            const { cleanTitle: cleanPendingTitle, tags: pendingTestTags } = (window as any).untpTestSuite.formatTags(
+              event.data.title,
+            );
+            appendResult(`- ${cleanPendingTitle}${pendingTestTags}`, pendingIndent);
+            break;
+          }
+          case 'end': {
+            const stats = event.data;
+            let summaryText = '';
+            if (stats.passes > 0) {
+              summaryText += `${stats.passes} passing`;
+            }
+            if (stats.failures > 0) {
+              if (summaryText) summaryText += ', ';
+              summaryText += `${stats.failures} failing`;
+            }
+            if (stats.pending > 0) {
+              if (summaryText) summaryText += ', ';
+              summaryText += `${stats.pending} pending`;
+            }
+            if (summaryText) {
+              summaryText += ` (${stats.duration || 0}ms)`;
+              appendResult(summaryText);
+            }
+            break;
+          }
+          default: {
+            // Fallback for any other event types
+            appendResult(`Unknown event type '${event.type}': ${JSON.stringify(event.data)}`);
+          }
+        }
+      });
+      console.log('Test Results:', results);
     } catch (error) {
       console.error(error);
-      toast.error('Failed to process credential');
+      toast.error('Failed to run validation');
     }
   };
 
@@ -79,33 +223,44 @@ export default function Home() {
     <div className='min-h-screen flex flex-col'>
       <Header />
       <main className='container mx-auto p-8 max-w-7xl flex-1'>
-        <div className='flex flex-col md:flex-row gap-8'>
-          <div className='md:w-2/3'>
-            <TestReportProvider testResults={testResults} credentials={credentials}>
-              <TestResults credentials={credentials} testResults={testResults} setTestResults={setTestResults} />
-            </TestReportProvider>
-          </div>
-          <div className='md:w-1/3 flex flex-col space-y-8'>
-            <div>
-              <h2 className='text-xl font-semibold mb-6'>Add New Credential</h2>
-              <div className='h-[300px]'>
-                <CredentialUploader onCredentialUpload={handleCredentialUpload} setFileCount={setFileCount} />
-              </div>
-            </div>
-            {shouldDisplayUploadDetailBtn && (
-              <div>
-                <h2 className='text-sm font-semibold hover:cursor-pointer'>
-                  <Button onClick={() => setIsDetailsOpen(true)}>View Upload Detail</Button>
-                </h2>
-              </div>
-            )}
+          <div className='flex flex-col flex-grow'>
 
             <div>
+              <h2 className='text-xl font-semibold mb-6'>Add New Credential</h2>
+              <div className='mb-6'>
+                <CredentialUploader
+                  onCredentialUpload={handleCredentialUpload}
+                  setFileCount={setFileCount}
+                  credentials={credentials}
+                  onDeleteCredential={handleDeleteCredential}
+                />
+              </div>
+            </div>
+
+            <div className='mb-6'>
               <h2 className='text-xl font-semibold mb-6'>Download Test Credential</h2>
               <DownloadCredential />
             </div>
+
           </div>
-        </div>
+          <div className='flex flex-col space-y-8'>
+
+            <Button onClick={runValidation} className=''>
+              Run Validation
+            </Button>
+
+            <h2 className='text-xl font-semibold mt-6'>Test Results</h2>
+            <textarea
+              id="test-log"
+              className="w-full flex-grow p-2 border rounded mt-4 overflow-hidden"
+              readOnly
+              value={testLog}
+              // TODO: field-sizing is not yet supported in firefox:
+              // https://bugzilla.mozilla.org/show_bug.cgi?id=1977177
+              style={{ fieldSizing: "content" } as React.CSSProperties}
+            />
+
+          </div>
       </main>
       <Footer />
     </div>

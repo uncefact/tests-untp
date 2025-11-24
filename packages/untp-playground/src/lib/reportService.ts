@@ -1,5 +1,4 @@
 import { detectVersion } from '@/lib/credentialService';
-import { detectExtension } from '@/lib/schemaValidation';
 import { StoredCredential, TestReport, TestReportResult, TestReportStep, TestStep } from '@/types';
 import { reportName, testSuiteRunner, testSuiteVersion } from '../../config';
 import { CredentialType, TestCaseStatus, TestCaseStepId } from '../../constants';
@@ -23,9 +22,7 @@ export const generateReport = async ({
 
   const results: TestReportResult[] = validCredentials.map(([type, credential]) => {
     const steps = testResults[type] || [];
-    const extension = detectExtension(credential.decoded);
-    // Get version from extension core if it exists, otherwise detect from credential
-    const version = extension ? extension.core.version : detectVersion(credential.decoded);
+    const version = detectVersion(credential.decoded);
 
     // Filter core steps (non-extension steps)
     const coreSteps = steps.filter((step) => step.id !== TestCaseStepId.EXTENSION_SCHEMA_VALIDATION);
@@ -45,14 +42,7 @@ export const generateReport = async ({
       },
     };
 
-    // Add extension data if it exists
-    if (extension && extensionStep) {
-      result.extension = {
-        type: extension.extension.type,
-        version: extension.extension.version,
-        steps: [extensionStep as TestReportStep],
-      };
-    }
+
 
     return result;
   });

@@ -20,6 +20,7 @@ const config = {
     '^react-dom$': '<rootDir>/../../node_modules/react-dom',
     '^.+\\.hbs$': '<rootDir>/__tests__/mocks/handlebars.ts',
   },
+  setupFiles: ['<rootDir>/jest.polyfills.js'],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testEnvironment: 'jsdom',
   testMatch: ['**/__tests__/**/*.(spec|test).[jt]s?(x)'],

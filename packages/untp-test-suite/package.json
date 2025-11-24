@@ -25,7 +25,7 @@
     "test:integration": "node --experimental-vm-modules ../../node_modules/.bin/jest --config=jest.integration.config.js",
     "build": "tsc --build --clean && tsc && cp -r src/templates/templateMessages/ build/templates/",
     "watch": "tsc -b --watch",
-    "lint": "eslint ."
+    "lint": "eslint . --ext .ts,.tsx"
   },
   "dependencies": {
     "ajv": "^8.12.0",

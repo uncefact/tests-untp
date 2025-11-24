@@ -5,12 +5,14 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "cypress:open": "cypress open"
+    "cypress:open": "cypress open",
+    "e2e-playground": "start-server-and-test \"yarn --cwd .. start:untp-playground\" http://localhost:4000 \"CYPRESS_SKIP_MINIO=true cypress run --config baseUrl=http://localhost:4000 --spec 'cypress/e2e/untp-playground/**/*.cy.{js,jsx,ts,tsx}'\""
   },
   "devDependencies": {
-    "minio": "^8.0.4",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.13.1",
+    "minio": "^8.0.4",
+    "start-server-and-test": "^2.1.2",
     "ts-node": "10.9.2"
   },
   "dependencies": {

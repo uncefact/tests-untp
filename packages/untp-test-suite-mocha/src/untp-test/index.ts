@@ -15,5 +15,6 @@ export {
   formatTags,
   showSuiteHierarchy,
   createAjvInstance,
+  trustedDIDs,
 } from './utils';
 export { extractUNTPVersion, validateJSONLD, validateJsonAgainstSchema, setupUNTPChaiAssertions } from './test-utils';

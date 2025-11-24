@@ -126,6 +126,8 @@ function registerUNTPTestSuite(testSuiteFunction: (credentialState: any) => void
  * no cleanup is needed - each instance starts clean.
  */
 function executeRegisteredTestSuites(): void {
+  console.log(`Executing ${registeredTestSuites.length} registered test suites.`);
+
   // Get credential state for passing to test suites
   const credentialState =
     typeof window !== 'undefined'
@@ -194,7 +196,8 @@ if (typeof window !== 'undefined') {
     listAllProducts,
     runInferences,
     getUnattestedIssuersForProduct,
-    createN3Store
+    createN3Store,
+    registeredTestSuites,
   };
 } else {
   // Node.js environment

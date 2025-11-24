@@ -30,20 +30,19 @@ describe('CredentialUploader component', () => {
   });
 
   it('renders the CredentialUploader component', () => {
-    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} />);
+    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} credentials={[]} onDeleteCredential={jest.fn()} />);
     const dropzoneElement = screen.getByText(/drag and drop credentials here/i);
     expect(dropzoneElement).toBeInTheDocument();
   });
 
   it('calls onCredentialUpload with valid JSON file', async () => {
-    const returnValue = {
-      key: 'value',
-    };
-
-    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} />);
+    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} credentials={[]} onDeleteCredential={jest.fn()} />);
     const inputElement = screen.getByRole('presentation').querySelector('input[type="file"]');
 
-    const validJsonFile = new File([JSON.stringify(returnValue)], 'valid.json', {
+    const fileContent = {
+      key: 'value',
+    };
+    const validJsonFile = new File([JSON.stringify(fileContent)], 'valid.json', {
       type: 'application/json',
     });
 
@@ -53,13 +52,13 @@ describe('CredentialUploader component', () => {
     });
 
     await waitFor(async () => {
-      expect(mockOnCredentialUpload).toHaveBeenCalledWith(returnValue);
+      expect(mockOnCredentialUpload).toHaveBeenCalledWith({ credential: fileContent, fileName: 'valid.json' });
     });
   });
 
   it('displays an error for invalid JSON content', async () => {
     // JSON.parse = jest.fn().mockRejectedValue(new Error('Invalid JSON'));
-    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} />);
+    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} credentials={[]} onDeleteCredential={jest.fn()} />);
     const inputElement = screen.getByRole('presentation').querySelector('input[type="file"]');
 
     const invalidJsonFile = new File(['invalid json'], 'invalid.json', {
@@ -75,7 +74,7 @@ describe('CredentialUploader component', () => {
   });
 
   it('displays an error for invalid file types', async () => {
-    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} />);
+    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} credentials={[]} onDeleteCredential={jest.fn()} />);
     // Find the input element of type file
     const inputElement = screen.getByRole('presentation').querySelector('input[type="file"]');
     const invalidFile = new File(['content'], 'invalid.pdf', { type: 'application/pdf' });
@@ -88,7 +87,7 @@ describe('CredentialUploader component', () => {
   });
 
   it('displays an error for invalid JWT content', async () => {
-    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} />);
+    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} credentials={[]} onDeleteCredential={jest.fn()} />);
     const inputElement = screen.getByRole('presentation').querySelector('input[type="file"]');
 
     const invalidJwtFile = new File(['invalid jwt'], 'invalid.jwt', {
@@ -109,10 +108,10 @@ describe('CredentialUploader component', () => {
 
   it('shows generic error when credential processing fails', async () => {
     // Mock onCredentialUpload to throw an error
-    const mockOnCredentialUpload = jest.fn().mockImplementation(() => {
+    const mockOnCredentialUpload = jest.fn().mockImplementation(({ credential, fileName }) => {
       throw new Error('Some unexpected error');
     });
-    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} />);
+    render(<CredentialUploader onCredentialUpload={mockOnCredentialUpload} setFileCount={() => {}} credentials={[]} onDeleteCredential={jest.fn()} />);
 
     const inputElement = screen.getByRole('presentation').querySelector('input[type="file"]');
 

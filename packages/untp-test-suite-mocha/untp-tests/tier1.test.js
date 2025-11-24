@@ -24,7 +24,7 @@ registerUNTPTestSuite((credentialState) => {
 
         it('should be a valid JSON-LD document tag:jsonld', async () => {
           await expect(parsedCredential).to.be.a.validJSONLDDocument;
-        });
+        }).timeout(30000); // increased timeout: json-ld validation might take long time.
 
         it('should match the VerifiableCredential 1.1 schema tag:schema', async () => {
           // Get the W3C VerifiableCredential schema URL
