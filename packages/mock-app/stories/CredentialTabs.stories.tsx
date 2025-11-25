@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 import { CredentialTabs } from '../src/components/CredentialTabs';
 import { storyCredentialMock } from './StoryVCMock';

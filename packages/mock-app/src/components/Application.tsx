@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { Box, Button } from '@mui/material';
 import Link from 'next/link';
 import { convertStringToPath } from '../utils';

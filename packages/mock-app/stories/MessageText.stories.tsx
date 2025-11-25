@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 import { MessageText } from '../src/components/MessageText';
 import { Status } from '@mock-app/components';
