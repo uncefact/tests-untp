@@ -113,9 +113,6 @@ export default function Home() {
 
   const runValidation = async () => {
     try {
-//       (window as any).untpDefaultSchemaMappings = defaultSchemaMappings;
-//       const { UNTPTestRunner, setCredentialData, trustedDIDs, executeRegisteredTestSuites } = await import('untp-test-suite-mocha');
-
       const credentialData = new Map();
       credentials.forEach(cred => {
         credentialData.set(cred.fileName, JSON.stringify(cred.decoded));
