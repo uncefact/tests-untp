@@ -22,8 +22,8 @@ interface EncryptedData {
  * @returns {string} - Decrypted data
  */
 export function decryptData({ cipherText, iv, tag }: EncryptedData, key: string): Record<string, any> | string {
-  const decipher = crypto.createDecipheriv('aes-256-gcm', Buffer.from(key, 'hex'), Buffer.from(iv, 'base64'));
-  decipher.setAuthTag(Buffer.from(tag, 'base64'));
+  const decipher = crypto.createDecipheriv('aes-256-gcm', Buffer.from(key, 'hex') as any, Buffer.from(iv, 'base64') as any);
+  decipher.setAuthTag(Buffer.from(tag, 'base64') as any);
   let decrypted = decipher.update(cipherText, 'base64', 'utf8');
   decrypted += decipher.final('utf8');
 
