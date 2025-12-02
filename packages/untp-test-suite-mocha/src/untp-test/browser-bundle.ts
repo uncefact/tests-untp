@@ -58,10 +58,10 @@ setupUNTPChaiAssertions(chai, jsonld, ajvInstance);
 import '../generated/test-file-list';
 
 // Export types for TypeScript users
+export type { StreamEvent };
 export {
   UNTPTestRunner,
   StreamReporter,
-  StreamEvent,
   setCredentialData,
   hasCredentials,
   getAllCredentials,
