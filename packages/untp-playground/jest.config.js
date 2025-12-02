@@ -15,6 +15,7 @@ const config = {
   coverageReporters: ['text', 'lcov', 'json', 'json-summary'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^untp-test-suite-mocha$': '<rootDir>/../untp-test-suite-mocha/src/index.ts',
     '^lucide-react$': '<rootDir>/../../node_modules/lucide-react/dist/cjs/lucide-react.js',
     '^react$': '<rootDir>/../../node_modules/react',
     '^react-dom$': '<rootDir>/../../node_modules/react-dom',
