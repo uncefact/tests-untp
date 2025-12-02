@@ -12,14 +12,35 @@ ENV NEXT_PUBLIC_BASE_PATH=/
 ENV NEXT_PUBLIC_ASSET_PREFIX=/
 
 # Install dependencies based on the preferred package manager
-COPY packages/untp-playground/package.json yarn.lock ./
+# Set up proper workspace structure
+COPY package.json yarn.lock ./
+COPY packages/untp-playground/package.json ./packages/untp-playground/
+COPY packages/untp-test-suite-mocha/package.json ./packages/untp-test-suite-mocha/
+COPY packages/untp-test-suite-mocha/src ./packages/untp-test-suite-mocha/src/
+COPY packages/untp-test-suite-mocha/scripts ./packages/untp-test-suite-mocha/scripts/
+COPY packages/untp-test-suite-mocha/untp-tests ./packages/untp-test-suite-mocha/untp-tests/
+COPY packages/untp-test-suite-mocha/tsconfig.json ./packages/untp-test-suite-mocha/
+
+# Install from root to resolve workspace dependencies
 RUN yarn install --immutable
+
+# Build the workspace dependency
+WORKDIR /app/packages/untp-test-suite-mocha
+RUN yarn run build
+WORKDIR /app
+
 
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
+# Copy hoisted node_modules from workspace root
 COPY --from=deps /app/node_modules ./node_modules
+# Copy package-specific node_modules if they exist
+COPY --from=deps /app/packages/untp-playground/node_modules ./packages/untp-playground/node_modules
+# Copy the built workspace dependency
+COPY --from=deps /app/packages/untp-test-suite-mocha/dist ./node_modules/untp-test-suite-mocha/dist
+COPY --from=deps /app/packages/untp-test-suite-mocha/package.json ./node_modules/untp-test-suite-mocha/
 COPY packages/untp-playground/. .
 
 # Add build args without defaults
