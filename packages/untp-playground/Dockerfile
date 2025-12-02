@@ -38,9 +38,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 # Copy package-specific node_modules if they exist
 COPY --from=deps /app/packages/untp-playground/node_modules ./packages/untp-playground/node_modules
-# Copy the built workspace dependency
-COPY --from=deps /app/packages/untp-test-suite-mocha/dist ./node_modules/untp-test-suite-mocha/dist
-COPY --from=deps /app/packages/untp-test-suite-mocha/package.json ./node_modules/untp-test-suite-mocha/
+# Copy the complete built workspace dependency (preserves relative imports)
+COPY --from=deps /app/packages/untp-test-suite-mocha ./node_modules/untp-test-suite-mocha
 COPY packages/untp-playground/. .
 
 # Add build args without defaults
