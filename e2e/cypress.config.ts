@@ -28,7 +28,7 @@ export default defineConfig({
       openMode: 0, // No retries in interactive mode
     },
     defaultCommandTimeout: 10000,
-    defaultBrowser: 'chromium',
+    defaultBrowser: 'chrome',
     setupNodeEvents(on) {
       on('task', {
         writeToFile({ fileName, data }: { fileName: string; data: any }) {
