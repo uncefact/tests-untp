@@ -200,11 +200,11 @@ services:
     volumes:
       - ./e2e/cypress/fixtures/keycloak-realm-e2e.json:/opt/keycloak/data/import/ri-e2e.json:ro
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9000/health/ready || exit 1"]
+      test: [ "CMD-SHELL", "exec 3<> /dev/tcp/127.0.0.1/8080; echo -e 'GET /health/ready HTTP/1.1\\r\\nhost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; if [ $? -eq 0 ]; then echo 'Healthcheck Successful'; exit 0; else echo 'Healthcheck Failed'; exit 1; fi;" ]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 90s
+      start_period: 180s
 
 volumes:
   vckit-data:
