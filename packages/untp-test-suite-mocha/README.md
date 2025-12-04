@@ -66,7 +66,6 @@ Follow the [Prerequisites section](../../README.md#prerequisites) in the root RE
 
 2. **Build the package**:
    ```bash
-   # From the packages/untp-test-suite-mocha directory
    cd packages/untp-test-suite-mocha
    yarn build
    ```
@@ -81,6 +80,8 @@ Test credential files directly or by passing a directory:
 
 > **Note**: In the examples below, `credential.json`, `credential1.json`, etc. are placeholder filenames that don't exist - replace them with paths to your actual credential files. Examples using `./example-credentials/` reference actual example files included in this package.
 
+> **Note**: The credentials in `example-credentials` are designed to demonstrate both passing and failing test scenarios. Tier 1 and Tier 2 tests will pass for all credentials. However, Tier 3 tests will report an expected failure: the Digital Product Passport claims 4 conformity criteria, but the Digital Conformity Credential only attests to 3 of them. This intentionally demonstrates the test suite's ability to detect when product claims are not fully verified by a conformity credential.
+
 ```bash
 # Test single credential file (replace credential.json with your credential file)
 npx untp-test credential.json
@@ -88,7 +89,7 @@ npx untp-test credential.json
 # Test multiple files (replace with your credential files)
 npx untp-test credential1.json credential2.json credential3.json
 
-# Test all credential files from directory (example-credentials/ exists)
+# Test all credential files from directory (tier 3 tests will fail due to the absence of the --trust-did)
 npx untp-test --directory ./example-credentials/UNTP/
 
 # Combine individual files with directory scanning (replace credential.json with your credential file)
@@ -97,7 +98,7 @@ npx untp-test credential.json --directory ./example-credentials/UNTP/
 # With tag filtering
 npx untp-test --directory ./example-credentials/UNTP/ --tag tier1
 
-# Trust root issuer
+# Trust root issuer (tier 3 test will still fail - demonstrates detecting unattested claims)
 npx untp-test --directory ./example-credentials/UNTP/ --trust-did=did:web:abr.business.gov.au
 ```
 
@@ -108,14 +109,14 @@ npx untp-test --directory ./example-credentials/UNTP/ --trust-did=did:web:abr.bu
 Test credentials with custom extension types by providing schema mapping files:
 
 ```bash
-# Test extension credential with custom schema mapping
+# Test extension credential with custom schema mapping (expected to fail)
 npx untp-test --extension-schema-map example-credentials/extensions/digital-livestock-mapping.json \
 example-credentials/extensions/DigitalLivestockPassport/digital-livestock-passport-simple-working-context.json
 
 # Multiple extension mappings (replace credential.json with your credential file)
 npx untp-test --extension-schema-map ./ext1.json --extension-schema-map ./ext2.json credential.json
 
-# Combine with directory scanning
+# Combine with directory scanning (expected to fail)
 npx untp-test --extension-schema-map example-credentials/extensions/digital-livestock-mapping.json \
 --directory ./example-credentials/extensions/DigitalLivestockPassport
 ```
@@ -209,7 +210,7 @@ the same tests with the same test runner, in a browser environment.
 
 ### Quick Start
 
-1. Build the browser bundle (from the `packages/untp-test-suite-mocha` directory):
+1. Build the browser bundle:
 
 ```bash
 cd packages/untp-test-suite-mocha
