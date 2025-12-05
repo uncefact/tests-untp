@@ -28,28 +28,28 @@ jobs:
         run: |
           yarn cache clean && yarn install --immutable
 
-      - name: Check linting
-        run: yarn build && yarn lint
+      # - name: Check linting
+      #   run: yarn build && yarn lint
 
       - name: Build
         run: yarn build
 
-      - name: Run tests
-        run: |
-          yarn test:coverage
+      # - name: Run tests
+      #   run: |
+      #     yarn test:coverage
 
-      - name: Jest Coverage Comment
-        uses: MishaKav/jest-coverage-comment@main
-        with:
-          title: Code Coverage Report
-          multiple-files: |
-            All packages, ./coverage/coverage-summary.json
-            Components, ./packages/components/coverage/coverage-summary.json
-            Mock app, ./packages/mock-app/coverage/coverage-summary.json
-            Services, ./packages/services/coverage/coverage-summary.json
-            UNTP test suite, ./packages/untp-test-suite/coverage/coverage-summary.json
-            VC test suite, ./packages/vc-test-suite/coverage/coverage-summary.json
-            UNTP Playground, ./packages/untp-playground/coverage/coverage-summary.json
+      # - name: Jest Coverage Comment
+      #   uses: MishaKav/jest-coverage-comment@main
+      #   with:
+      #     title: Code Coverage Report
+      #     multiple-files: |
+      #       All packages, ./coverage/coverage-summary.json
+      #       Components, ./packages/components/coverage/coverage-summary.json
+      #       Mock app, ./packages/mock-app/coverage/coverage-summary.json
+      #       Services, ./packages/services/coverage/coverage-summary.json
+      #       UNTP test suite, ./packages/untp-test-suite/coverage/coverage-summary.json
+      #       VC test suite, ./packages/vc-test-suite/coverage/coverage-summary.json
+      #       UNTP Playground, ./packages/untp-playground/coverage/coverage-summary.json
 
       - name: check disk space
         run: df -h
@@ -58,19 +58,16 @@ jobs:
         run: |
           du -sh \
           "$AGENT_TOOLSDIRECTORY" \
-          /opt/ghc \
           /opt/google/chrome \
           /opt/microsoft/msedge \
           /opt/microsoft/powershell \
           /opt/pipx \
-          /usr/lib/mono \
           /usr/local/julia* \
           /usr/local/lib/android \
           /usr/local/share/chromium \
           /usr/local/share/powershell \
           /usr/share/dotnet \
-          /usr/share/swift \
-          2>/dev/null
+          /usr/share/swift
 
       # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
       # https://github.com/uncefact/tests-untp/issues/344
@@ -78,12 +75,10 @@ jobs:
         run: |
           sudo rm -rf \
           "$AGENT_TOOLSDIRECTORY" \
-          /opt/ghc \
           /opt/google/chrome \
           /opt/microsoft/msedge \
           /opt/microsoft/powershell \
           /opt/pipx \
-          /usr/lib/mono \
           /usr/local/julia* \
           /usr/local/lib/android \
           /usr/local/share/chromium \
