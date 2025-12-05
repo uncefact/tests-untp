@@ -180,7 +180,7 @@ services:
       - e2e-ri-db-data:/var/lib/postgresql/data
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ri-postgres -d ri"]
+      test: ['CMD-SHELL', 'pg_isready -U ri-postgres -d ri']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -193,18 +193,24 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-      KC_HEALTH_ENABLED: "true"
+      KC_HEALTH_ENABLED: 'true'
     ports:
-      - "127.0.0.1:8081:8080" # See https://github.com/quarkusio/quarkus/discussions/48905#discussioncomment-14213858
-      - "9991:9000"
+      - '127.0.0.1:8081:8080' # See https://github.com/quarkusio/quarkus/discussions/48905#discussioncomment-14213858
+      - '9991:9000'
     volumes:
       - ./e2e/cypress/fixtures/keycloak-realm-e2e.json:/opt/keycloak/data/import/ri-e2e.json:ro
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9000/health/ready || exit 1"]
+      test:
+        - CMD-SHELL
+        - |
+          set -e
+          exec 3<>/dev/tcp/127.0.0.1/9000
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          grep -q '^HTTP/1\.1 200' <&3
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 90s
+      start_period: 180s
 
 volumes:
   vckit-data:
