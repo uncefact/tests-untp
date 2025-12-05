@@ -50,12 +50,49 @@ jobs:
             UNTP test suite, ./packages/untp-test-suite/coverage/coverage-summary.json
             VC test suite, ./packages/vc-test-suite/coverage/coverage-summary.json
             UNTP Playground, ./packages/untp-playground/coverage/coverage-summary.json
-      
-      #https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
+
+      - name: check disk space
+        run: df -h
+
+      - name: check disk space of directories
+        run: |
+          du -sh \
+          "$AGENT_TOOLSDIRECTORY" \
+          /opt/ghc \
+          /opt/google/chrome \
+          /opt/microsoft/msedge \
+          /opt/microsoft/powershell \
+          /opt/pipx \
+          /usr/lib/mono \
+          /usr/local/julia* \
+          /usr/local/lib/android \
+          /usr/local/share/chromium \
+          /usr/local/share/powershell \
+          /usr/share/dotnet \
+          /usr/share/swift \
+          2>/dev/null
+
+      # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
+      # https://github.com/uncefact/tests-untp/issues/344
       - name: Free up space on ubuntu runner for E2E tests
         run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf \
+          "$AGENT_TOOLSDIRECTORY" \
+          /opt/ghc \
+          /opt/google/chrome \
+          /opt/microsoft/msedge \
+          /opt/microsoft/powershell \
+          /opt/pipx \
+          /usr/lib/mono \
+          /usr/local/julia* \
+          /usr/local/lib/android \
+          /usr/local/share/chromium \
+          /usr/local/share/powershell \
+          /usr/share/dotnet \
+          /usr/share/swift
+
+      - name: check disk space after cleanup
+        run: df -h
 
       - name: Start E2E docker compose
         run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d
@@ -63,7 +100,7 @@ jobs:
       - name: Run E2E tests
         run: yarn test:run-cypress
         env:
-          NODE_OPTIONS: "--no-experimental-require-module --no-experimental-detect-module" # See issue https://github.com/cypress-io/github-action/issues/1408
+          NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module' # See issue https://github.com/cypress-io/github-action/issues/1408
 
       - name: Stop docker compose
         run: docker compose -f docker-compose.e2e.yml down
