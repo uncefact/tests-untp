@@ -57,13 +57,11 @@ jobs:
         run: |
           sudo rm -rf \
           "$AGENT_TOOLSDIRECTORY" \
-          /opt/google/chrome \
           /opt/microsoft/msedge \
           /opt/microsoft/powershell \
           /opt/pipx \
           /usr/local/julia* \
           /usr/local/lib/android \
-          /usr/local/share/chromium \
           /usr/local/share/powershell \
           /usr/share/dotnet \
           /usr/share/swift
