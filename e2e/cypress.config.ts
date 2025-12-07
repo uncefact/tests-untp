@@ -18,7 +18,7 @@ export default defineConfig({
     },
   },
   e2e: {
-    baseUrl: 'http://localhost:4001', // Replace with your application's base URL
+    baseUrl: 'http://localhost:3003', // Replace with your application's base URL
     supportFile: 'cypress/support/e2e.ts',
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}', // Specifies the test file pattern
     video: false, // Disable video recording (optional)
