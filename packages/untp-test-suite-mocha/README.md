@@ -19,16 +19,16 @@ Below is an example showing the main tier 2 test which gets the schema for a UNT
 credential type and expects the credential to match that schema:
 
 ```typescript
-        it(`should validate against ${untpType} UNTP schema tag:schema`, async () => {
-          // Get the appropriate UNTP schema URL for this credential type
-          const schemaUrl = await untpTestSuite.getSchemaUrlForCredential(parsedCredential, untpType);
+it(`should validate against ${untpType} UNTP schema tag:schema`, async () => {
+  // Get the appropriate UNTP schema URL for this credential type
+  const schemaUrl = await untpTestSuite.getSchemaUrlForCredential(parsedCredential, untpType);
 
-          // Assert that we can determine a UNTP schema URL for this credential
-          expect(schemaUrl, 'Should be able to determine UNTP schema URL for credential').to.be.a('string');
+  // Assert that we can determine a UNTP schema URL for this credential
+  expect(schemaUrl, 'Should be able to determine UNTP schema URL for credential').to.be.a('string');
 
-          // Validate the credential against its specific UNTP schema
-          await expect(parsedCredential).to.match.schema(schemaUrl);
-        });
+  // Validate the credential against its specific UNTP schema
+  await expect(parsedCredential).to.match.schema(schemaUrl);
+});
 ```
 
 ## Features
@@ -49,9 +49,28 @@ The package enables running the two tiers of UNTP validation that are currently 
 
 ## Installation
 
-```bash
-npm install untp-test-suite-mocha
-```
+This package is part of the `tests-untp` monorepo and is not currently published to npm. To use it, you need to install dependencies from the repository root and build the package locally.
+
+### Prerequisites
+
+Follow the [Prerequisites section](../../README.md#prerequisites) in the root README to set up Node.js and Yarn.
+
+### Setup Steps
+
+1. **Install dependencies from the repository root** (this ensures packages are hoisted correctly):
+
+   ```bash
+   # From the repository root directory
+   yarn install
+   ```
+
+2. **Build the package**:
+   ```bash
+   cd packages/untp-test-suite-mocha
+   yarn build
+   ```
+
+After building, you can use the CLI commands with `npx` to pick up the local build.
 
 ## CLI Usage
 
@@ -59,24 +78,28 @@ npm install untp-test-suite-mocha
 
 Test credential files directly or by passing a directory:
 
+> **Note**: In the examples below, `credential.json`, `credential1.json`, etc. are placeholder filenames that don't exist - replace them with paths to your actual credential files. Examples using `./example-credentials/` reference actual example files included in this package.
+
+> **Note**: The credentials in `example-credentials` are designed to demonstrate both passing and failing test scenarios. Tier 1 and Tier 2 tests will pass for all credentials. However, Tier 3 tests will report an expected failure: the Digital Product Passport claims 4 conformity criteria, but the Digital Conformity Credential only attests to 3 of them. This intentionally demonstrates the test suite's ability to detect when product claims are not fully verified by a conformity credential.
+
 ```bash
-# Test single credential file
-untp-test credential.json
+# Test single credential file (replace credential.json with your credential file)
+npx untp-test credential.json
 
-# Test multiple files
-untp-test credential1.json credential2.json credential3.json
+# Test multiple files (replace with your credential files)
+npx untp-test credential1.json credential2.json credential3.json
 
-# Test all credential files from directory
-untp-test --directory ./example-credentials/UNTP/
+# Test all credential files from directory (tier 3 tests will fail due to the absence of the --trust-did)
+npx untp-test --directory ./example-credentials/UNTP/
 
-# Combine individual files with directory scanning
-untp-test credential.json --directory ./example-credentials/UNTP/
+# Combine individual files with directory scanning (replace credential.json with your credential file)
+npx untp-test credential.json --directory ./example-credentials/UNTP/
 
 # With tag filtering
-untp-test --directory ./example-credentials/UNTP/ --tag tier1
+npx untp-test --directory ./example-credentials/UNTP/ --tag tier1
 
-# Trust root issuer
-untp-test --directory ./example-credentials/UNTP/ --trust-did=did:web:abr.business.gov.au
+# Trust root issuer (tier 3 test will still fail - demonstrates detecting unattested claims)
+npx untp-test --directory ./example-credentials/UNTP/ --trust-did=did:web:abr.business.gov.au
 ```
 
 **Supported file types**: `.json` and `.jsonld` files are automatically detected and included when scanning a directory.
@@ -86,16 +109,16 @@ untp-test --directory ./example-credentials/UNTP/ --trust-did=did:web:abr.busine
 Test credentials with custom extension types by providing schema mapping files:
 
 ```bash
-# Test extension credential with custom schema mapping
-untp-test --extension-schema-map example-credentials/extensions/digital-livestock-mapping.json  \\
+# Test extension credential with custom schema mapping (expected to fail)
+npx untp-test --extension-schema-map example-credentials/extensions/digital-livestock-mapping.json \
 example-credentials/extensions/DigitalLivestockPassport/digital-livestock-passport-simple-working-context.json
 
-# Multiple extension mappings
-untp-test --extension-schema-map ./ext1.json --extension-schema-map ./ext2.json credential.json
+# Multiple extension mappings (replace credential.json with your credential file)
+npx untp-test --extension-schema-map ./ext1.json --extension-schema-map ./ext2.json credential.json
 
-# Combine with directory scanning
-untp-test --extension-schema-map example-credentials/extensions/digital-livestock-mapping.json  \\
---directory ./credentials
+# Combine with directory scanning (expected to fail)
+npx untp-test --extension-schema-map example-credentials/extensions/digital-livestock-mapping.json \
+--directory ./example-credentials/extensions/DigitalLivestockPassport
 ```
 
 Extension mapping files define how to resolve schema URLs for custom credential types:
@@ -119,17 +142,17 @@ See [default-mappings.json](src/untp-test/schema-mapper/default-mappings.json) f
 Run only specific test types using tags:
 
 ```bash
-# Run only Tier 1 tests
-untp-test --tag tier1 credential.json
+# Run only Tier 1 tests (replace credential.json with your credential file)
+npx untp-test --tag tier1 credential.json
 
 # Run only basic validation tests on directory
-untp-test --tag basic --directory ./credentials
+npx untp-test --tag basic --directory ./credentials
 
 # Combine multiple tags
-untp-test --tag tier1 --tag smoke --directory ./credentials
+npx untp-test --tag tier1 --tag smoke --directory ./credentials
 
-# Run validation and JSON-LD tests
-untp-test --tag validation --tag jsonld credential.json
+# Run validation and JSON-LD tests (replace credential.json with your credential file)
+npx untp-test --tag validation --tag jsonld credential.json
 ```
 
 ### Trust issuer for tier 3 tests
@@ -139,7 +162,7 @@ Use `--trust-did` option to add a trusted issuer's _Decentralized Identifier_. C
 This option can be used multiple times.
 
 ```bash
-untp-test --directory ./example-credentials/UNTP/ --trust-did=did:web:abr.business.gov.au
+npx untp-test --directory ./example-credentials/UNTP/ --trust-did=did:web:abr.business.gov.au
 ```
 
 ### Example Output
@@ -188,8 +211,11 @@ the same tests with the same test runner, in a browser environment.
 ### Quick Start
 
 1. Build the browser bundle:
+
 ```bash
-npm run browser-test
+cd packages/untp-test-suite-mocha
+yarn build:browser
+yarn browser-test
 ```
 
 2. Open `http://localhost:8080` in your browser
@@ -226,38 +252,40 @@ Include the browser bundle in your web application:
 <script src="https://eyereasoner.github.io/eye-js/18/latest/index.js"></script>
 
 <!-- Initialize Mocha -->
-<script>mocha.setup('bdd');</script>
+<script>
+  mocha.setup('bdd');
+</script>
 
 <!-- Load UNTP Test Suite -->
 <script src="browser-bundle.js"></script>
 
 <script>
-// Set up credential data
-const credentialData = new Map();
-credentialData.set('credential.json', '{"@context": [...], "type": [...]}');
-setCredentialData(credentialData);
+  // Set up credential data
+  const credentialData = new Map();
+  credentialData.set('credential.json', '{"@context": [...], "type": [...]}');
+  setCredentialData(credentialData);
 
-// Add trusted issuer DID
-const trustedDIDs = ['did:web:abr.business.gov.au'];
-untpTestSuite.trustedDIDs.length = 0;
-untpTestSuite.trustedDIDs.push(...trustedDIDs);
+  // Add trusted issuer DID
+  const trustedDIDs = ['did:web:abr.business.gov.au'];
+  untpTestSuite.trustedDIDs.length = 0;
+  untpTestSuite.trustedDIDs.push(...trustedDIDs);
 
-// Run tests with extension schema mappings
-const runner = new UNTPTestRunner();
-const results = await runner.run({
-  tags: ['tier1'], // Optional tag filtering
-  extensionSchemaMaps: [extensionMappingObject], // Optional extension mappings
-  mochaSetupCallback: (mochaOptions) => {
-    const mocha = new Mocha(mochaOptions);
-    mocha.cleanReferencesAfterRun(false);
-    return mocha;
-  }
-}, (event) => {
-  // Handle streaming test results
-  console.log(`${event.type}:`, event.data);
-});
+  // Run tests with extension schema mappings
+  const runner = new UNTPTestRunner();
+  const results = await runner.run({
+    tags: ['tier1'], // Optional tag filtering
+    extensionSchemaMaps: [extensionMappingObject], // Optional extension mappings
+    mochaSetupCallback: (mochaOptions) => {
+      const mocha = new Mocha(mochaOptions);
+      mocha.cleanReferencesAfterRun(false);
+      return mocha;
+    }
+  }, (event) => {
+    // Handle streaming test results
+    console.log(`${event.type}:`, event.data);
+  });
 
-console.log('Tests completed:', results.success ? 'PASSED' : 'FAILED');
+  console.log('Tests completed:', results.success ? 'PASSED' : 'FAILED');
 </script>
 ```
 
@@ -271,7 +299,7 @@ See the [example browser-test](browser-test) for more info.
 import { UNTPTestRunner, setCredentialData, trustedDIDs } from 'untp-test-suite-mocha';
 import * as fs from 'fs';
 
-// Set up credential data
+// Set up credential data (replace 'credential.json' with your credential file path)
 const credentialData = new Map();
 const content = fs.readFileSync('credential.json', 'utf8');
 credentialData.set('credential.json', content);
@@ -284,29 +312,32 @@ trustedDIDs.push(...trustedDIDs);
 
 // Run tests with extension schema mappings
 const runner = new UNTPTestRunner();
-const results = await runner.run({
-  tags: ['tier1', 'validation'],
-  extensionSchemaMaps: ['./extensions/custom-mappings.json'], // Optional extension mappings
-  mochaSetupCallback: (mochaOptions) => {
-    const Mocha = require('mocha');
-    const mocha = new Mocha(mochaOptions);
+const results = await runner.run(
+  {
+    tags: ['tier1', 'validation'],
+    extensionSchemaMaps: ['./extensions/custom-mappings.json'], // Optional extension mappings
+    mochaSetupCallback: (mochaOptions) => {
+      const Mocha = require('mocha');
+      const mocha = new Mocha(mochaOptions);
 
-    // Load test helpers
-    require('./test-helpers');
+      // Load test helpers
+      require('./test-helpers');
 
-    // Add test files
-    mocha.addFile('./untp-tests/tier1/dummy.test.js');
+      // Add test files
+      mocha.addFile('./untp-tests/tier1/dummy.test.js');
 
-    return mocha;
-  }
-}, (event) => {
-  // Stream results in real-time
-  if (event.type === 'pass') {
-    console.log(`✔ ${event.data.title}`);
-  } else if (event.type === 'fail') {
-    console.log(`✖ ${event.data.title}`);
-  }
-});
+      return mocha;
+    },
+  },
+  (event) => {
+    // Stream results in real-time
+    if (event.type === 'pass') {
+      console.log(`✔ ${event.data.title}`);
+    } else if (event.type === 'fail') {
+      console.log(`✖ ${event.data.title}`);
+    }
+  },
+);
 
 console.log(`Tests: ${results.stats.passes} passed, ${results.stats.failures} failed`);
 ```
@@ -336,10 +367,10 @@ The test suite automatically validates credentials with extension types. When a 
 ```
 
 This credential will generate tests for:
+
 - W3C VerifiableCredential validation (Tier 1)
 - DigitalProductPassport UNTP schema validation (Tier 2)
 - DigitalLivestockPassport extension schema validation (Tier 2)
-
 
 ### Custom Test Suites
 
@@ -356,11 +387,10 @@ mochaSetupCallback: (mochaOptions) => {
   mocha.addFile('./my-tests/custom-validation.test.js');
 
   return mocha;
-}
+};
 ```
 
 This will be exposed in the CLI at a later point.
-
 
 ## API Reference
 
@@ -373,20 +403,6 @@ Main test execution class that works in both Node.js and browser environments.
 - **options**: `UNTPTestOptions` - Test configuration
 - **onStream**: `(event: StreamEvent) => void` - Optional streaming callback to receive real-time events for test execution
 - **returns**: `Promise<UNTPTestResults>` - Test execution results
-
-
-### Building
-
-```bash
-# Build TypeScript
-npm run build
-
-# Build browser bundle
-npm run build:browser
-
-# Start development server
-npm run browser-test
-```
 
 ## License
 

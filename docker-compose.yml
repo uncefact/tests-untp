@@ -11,7 +11,7 @@ services:
       - ri-db-data:/var/lib/postgresql/data
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${RI_POSTGRES_USER} -d ${RI_POSTGRES_DB}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${RI_POSTGRES_USER} -d ${RI_POSTGRES_DB}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -38,7 +38,7 @@ services:
     depends_on:
       ri-db:
         condition: service_healthy
-    restart: "no"
+    restart: 'no'
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.4.2
@@ -48,22 +48,16 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-      KC_HEALTH_ENABLED: "true"
+      KC_HEALTH_ENABLED: 'true'
     ports:
-      - "127.0.0.1:${KEYCLOAK_PORT}:8080" # See https://github.com/quarkusio/quarkus/discussions/48905#discussioncomment-14213858
-      - "9990:9000" # Port for health checks
+      - '127.0.0.1:${KEYCLOAK_PORT}:8080' # See https://github.com/quarkusio/quarkus/discussions/48905#discussioncomment-14213858
+      - '9990:9000' # Port for health checks
     volumes:
       - ./keycloak-realms:/opt/keycloak/data/import:ro
       - keycloak-data:/opt/keycloak/data
     depends_on:
       ri-init:
         condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9000/health/ready || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 90s
 
   documentation:
     build:
