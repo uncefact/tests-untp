@@ -21,15 +21,23 @@ export const metadata: Metadata = {
   description: 'A playground for UNTP',
 };
 
-export default function RootLayout({
+import { headers } from 'next/headers';
+import { FirefoxTextareaResize } from '@/components/FirefoxTextareaResize';
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const headersList = await headers();
+  const userAgent = headersList.get('user-agent') || '';
+  const isFirefox = userAgent.toLowerCase().includes('firefox');
+
   return (
     <html lang='en'>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ClientLayout>{children}</ClientLayout>
+        {isFirefox && <FirefoxTextareaResize />}
 
         {/* Dependencies for untp-test-suite-mocha */}
         <Script src='https://unpkg.com/chai@4.3.10/chai.js' strategy='beforeInteractive' />

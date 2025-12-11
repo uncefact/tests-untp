@@ -78,6 +78,7 @@ export default function Home() {
 
 
 
+
   const handleCredentialUpload = async ({ credential: rawCredential, fileName }: { credential: any; fileName: string }) => {
     try {
       if (!rawCredential) {
@@ -297,7 +298,7 @@ export default function Home() {
             value={testLog}
             // TODO: field-sizing is not yet supported in firefox:
             // https://bugzilla.mozilla.org/show_bug.cgi?id=1977177
-            style={{ fieldSizing: "content" } as React.CSSProperties}
+            style={{ fieldSizing: "content", "--field-sizing": "content" } as React.CSSProperties}
           />
 
         </div>
