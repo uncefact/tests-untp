@@ -25,8 +25,7 @@ describe('UNTP Playground Validation', () => {
     // Click "Run Validation"
     cy.contains('Run Validation').click();
 
-    // Give some time for validation to run
-    cy.wait(5000);
+
 
     // Assert that all tier1, tier2, and tier3 validation results appear in the log
     cy.get('#test-log', { timeout: 20000 }).should('be.visible');

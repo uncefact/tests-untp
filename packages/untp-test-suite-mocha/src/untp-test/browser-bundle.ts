@@ -14,6 +14,9 @@ import { SchemaMappingsManager, getSchemaUrlForCredential } from './schema-mappe
 import './utils';
 import './schema-mapper';
 
+// Setup Mocha for BDD-style tests before any test suites are registered
+(window as any).mocha.setup('bdd');
+
 // Embed default schema mappings and schema definition for browser environment
 import * as defaultMappings from './schema-mapper/default-mappings.json';
 import * as schemaDefinition from './schema-mapper/schema-mappings.schema.json';

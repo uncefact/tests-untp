@@ -28,7 +28,6 @@ export default function Home() {
   const [fileCount, setFileCount] = useState(0);
   const { dispatchError, errors, setIsDetailsOpen } = useError();
 
-  const [isMochaLoaded, setIsMochaLoaded] = useState(false);
   const [testLog, setTestLog] = useState('');
 
   const shouldDisplayUploadDetailBtn = errors && errors.length > 0;
@@ -51,22 +50,10 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // The browser-bundle relies on browser globals (window.mocha, window.chai, etc.) and must be loaded only on the client side; therefore we import it dynamically here.
     const setupMocha = async () => {
       try {
-        (window as any).mocha.setup('bdd');
         await import('untp-test-suite-mocha/dist/untp-test/browser-bundle');
-
-        // Poll until the test suites are registered
-        const poll = (resolve: (value: unknown) => void, reject: (reason?: any) => void) => {
-          if ((window as any).untpTestSuite && (window as any).untpTestSuite.registeredTestSuites && (window as any).untpTestSuite.registeredTestSuites.length === 3) {
-            resolve(true);
-          } else {
-            setTimeout(() => poll(resolve, reject), 100);
-          }
-        };
-        await new Promise(poll);
-
-
       } catch (error) {
         console.error('Failed to load scripts:', error);
         toast.error('Failed to load necessary scripts for validation.');
