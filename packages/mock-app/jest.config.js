@@ -1,6 +1,9 @@
-import base from '../../jest.config.base.js';
+/* eslint-disable @typescript-eslint/no-require-imports */
+const base = require('../../jest.config.base.js');
+
 const jestConfig = {
   ...base,
+  rootDir: '.',
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
@@ -14,9 +17,12 @@ const jestConfig = {
   ],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   moduleNameMapper: {
-    '^(\\.{1,2}/.*)\\.js$': '$1',
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+
+    // General alias for mock-app's root
     '^@/(.*)$': '<rootDir>/src/$1',
+
+    // Mocks and external packages
     '^jose$': '<rootDir>/src/__mocks__/jose.ts',
     '^next-auth/react$': '<rootDir>/src/__mocks__/next-auth/react.ts',
     '^react($|/.+)': '<rootDir>/../../node_modules/react$1',
@@ -29,7 +35,7 @@ const jestConfig = {
         useESM: true,
         tsconfig: {
           jsx: 'react-jsx',
-          module: 'esnext',
+          module: 'commonjs',
           target: 'ES2017',
           lib: ['dom', 'dom.iterable', 'esnext'],
           allowJs: true,
@@ -45,4 +51,4 @@ const jestConfig = {
   },
 };
 
-export default jestConfig;
+module.exports = jestConfig;

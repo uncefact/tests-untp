@@ -14,6 +14,9 @@ import { SchemaMappingsManager, getSchemaUrlForCredential } from './schema-mappe
 import './utils';
 import './schema-mapper';
 
+// Setup Mocha for BDD-style tests before any test suites are registered
+(window as any).mocha.setup('bdd');
+
 // Embed default schema mappings and schema definition for browser environment
 import * as defaultMappings from './schema-mapper/default-mappings.json';
 import * as schemaDefinition from './schema-mapper/schema-mappings.schema.json';
@@ -40,7 +43,7 @@ setupUNTPChaiAssertions(chai, jsonld, ajvInstance);
 
 // Make classes and functions available under untpTestSuite namespace
 (window as any).untpTestSuite = {
-  ...(window as any).untpTestSuite, // Preserve existing namespace from utils
+  ...((window as any).untpTestSuite || {}), // Preserve existing namespace from utils
   UNTPTestRunner,
   StreamReporter,
   setCredentialData,
@@ -58,10 +61,10 @@ setupUNTPChaiAssertions(chai, jsonld, ajvInstance);
 import '../generated/test-file-list';
 
 // Export types for TypeScript users
+export type { StreamEvent };
 export {
   UNTPTestRunner,
   StreamReporter,
-  StreamEvent,
   setCredentialData,
   hasCredentials,
   getAllCredentials,

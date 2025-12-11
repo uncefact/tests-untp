@@ -1,32 +1,34 @@
-{
-  "root": true,
-  // TODO: Enable linting for documentation folder
-  "ignorePatterns": [
+const path = require('path');
+
+module.exports = {
+  root: true,
+  ignorePatterns: [
     "documentation",
     "e2e",
-    "packages/mock-app/**"
+    "packages/mock-app/**",
+    "packages/untp-playground/.eslintrc.js"
   ],
-  "plugins": [
+  plugins: [
     "@typescript-eslint",
     "prettier"
   ],
-  "parser": "@typescript-eslint/parser",
-  "extends": [
+  parser: "@typescript-eslint/parser",
+  extends: [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
     "plugin:@typescript-eslint/recommended-requiring-type-checking"
   ],
-  "parserOptions": {
-    "project": [
-      "./packages/*/tsconfig.json",
-      "./initialisation/tsconfig.json"
-    ]
+  parserOptions: {
+    project: [
+      path.resolve(__dirname, "./packages/*/tsconfig.json"),
+      path.resolve(__dirname, "./initialisation/tsconfig.json")
+    ],
+    tsconfigRootDir: __dirname,
   },
-  "rules": {
+  rules: {
     "no-console": "warn",
     "prefer-rest-params": "warn",
     "@typescript-eslint/ban-ts-comment": "warn",
-    // Off for now, but we should enable this in the future
     "@typescript-eslint/no-unsafe-call": "off",
     "@typescript-eslint/no-unsafe-member-access": "off",
     "@typescript-eslint/no-unsafe-assignment": "off",
@@ -40,9 +42,16 @@
     "@typescript-eslint/no-misused-promises": "off",
     "@typescript-eslint/require-await": "off",
     "@typescript-eslint/no-unused-vars": "off",
-    "prefer-const": "off"
+    "prefer-const": "off",
+    "@typescript-eslint/no-redundant-type-constituents": "off"
   },
   "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "rules": {
+        "@typescript-eslint/unbound-method": "off"
+      }
+    },
     {
       "files": [
         "*.js"
@@ -60,4 +69,4 @@
       }
     }
   ]
-}
+};

@@ -1,15 +1,17 @@
-import { ReactNode } from 'react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+'use client';
+
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import React from 'react';
 
 interface TooltipWrapperProps {
-  content?: string;
-  children: ReactNode;
+  content: React.ReactNode;
+  children: React.ReactNode;
   disabled?: boolean;
   dataTestId?: string;
 }
 
 export function TooltipWrapper({ content, children, disabled = false, dataTestId = 'default' }: TooltipWrapperProps) {
-  if (!content || disabled) {
+  if (disabled) {
     return <>{children}</>;
   }
 
@@ -19,7 +21,9 @@ export function TooltipWrapper({ content, children, disabled = false, dataTestId
         <TooltipTrigger asChild>
           <div data-testid={`${dataTestId}-tooltip-trigger`}>{children}</div>
         </TooltipTrigger>
-        <TooltipContent data-testid={`${dataTestId}-tooltip-content`}>{content}</TooltipContent>
+        <TooltipContent data-testid={`${dataTestId}-tooltip-content`}>
+          <p>{content}</p>
+        </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );

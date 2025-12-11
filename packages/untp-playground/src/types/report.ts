@@ -1,5 +1,4 @@
 import { TestCaseStatus } from '../../constants';
-import { EXTENSION_VERSIONS } from '../lib/schemaValidation';
 import { Credential } from './credential';
 import { TestStep } from './test';
 import { PermittedCredentialType } from './untp';
@@ -35,11 +34,7 @@ export interface TestReportResult {
     version: string;
     steps: TestReportStep[];
   };
-  extension?: {
-    type: keyof typeof EXTENSION_VERSIONS;
-    version: string;
-    steps: TestReportStep[];
-  };
+
 }
 
 export enum DownloadReportFormat {

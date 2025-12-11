@@ -1,8 +1,11 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useError } from '@/contexts/ErrorContext';
+import type { StoredCredential } from '@/types';
 import { jwtDecode } from 'jwt-decode';
+import { XCircle } from 'lucide-react';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
@@ -10,9 +13,13 @@ import { toast } from 'sonner';
 export function CredentialUploader({
   onCredentialUpload,
   setFileCount,
+  credentials,
+  onDeleteCredential,
 }: {
-  onCredentialUpload: (credential: any) => void;
+  onCredentialUpload: (data: { credential: any; fileName: string }) => void;
   setFileCount: (count: number) => void;
+  credentials: StoredCredential[];
+  onDeleteCredential: (index: number) => void;
 }) {
   // eslint-disable-next-line @typescript-eslint/unbound-method
   const { resetErrors } = useError();
@@ -59,7 +66,7 @@ export function CredentialUploader({
               }
             }
 
-            onCredentialUpload(json);
+            onCredentialUpload({ credential: json, fileName: file.name });
           } catch (error) {
             console.log('Error processing credential:', error);
             toast.error('Failed to process credential - Please ensure the file contains valid data');
@@ -80,21 +87,40 @@ export function CredentialUploader({
   });
 
   return (
-    <Card
-      {...getRootProps()}
-      className='h-full p-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors flex items-center justify-center'
-      data-testid='credential-upload'
-    >
-      <input {...getInputProps()} data-testid='credential-upload-input' />
-      {isDragActive ? (
-        <p className='text-center' data-testid='credential-upload-drop-text'>
-          Drop the credentials here...
-        </p>
-      ) : (
-        <p className='text-center' data-testid='credential-upload-drag-text'>
-          Drag and drop credentials here, or click to select files
-        </p>
-      )}
-    </Card>
+    <>
+      <Card
+        {...getRootProps()}
+        className='h-full p-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors flex items-center justify-center'
+        data-testid='credential-upload'
+      >
+        <input {...getInputProps()} data-testid='credential-upload-input' />
+        {isDragActive ? (
+          <p className='text-center' data-testid='credential-upload-drop-text'>
+            Drop the credentials here...
+          </p>
+        ) : (
+          <p className='text-center' data-testid='credential-upload-drag-text'>
+            Drag and drop credentials here, or click to select files
+          </p>
+        )}
+      </Card>
+      <div className='mt-6'>
+        <h2 className='text-xl font-semibold mb-6'>Uploaded Files</h2>
+        {credentials.length === 0 ? (
+          <p>None</p>
+        ) : (
+          <ul>
+            {credentials.map((cred, index) => (
+              <li key={index} className="flex items-center justify-between">
+                <span>{cred.fileName}</span>
+                <Button variant="ghost" size="icon" onClick={() => onDeleteCredential(index)}>
+                  <XCircle className="h-4 w-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
   );
 }

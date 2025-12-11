@@ -17,7 +17,7 @@
     "copy-config-test": "cp e2e/cypress/fixtures/app-config.json packages/mock-app/src/constants/app-config.json && cp e2e/cypress/fixtures/app-config.json packages/components/src/constants/app-config.json",
     "start": "yarn copy-config && cd packages/mock-app && yarn dev",
     "start:e2e-test": "yarn copy-config-test && cd packages/mock-app && yarn start",
-    "start:untp-playground": "cd packages/untp-playground && PORT=4001 yarn dev",
+    "start:untp-playground": "cd packages/untp-playground && PORT=4000 yarn dev",
     "start:e2e-dependencies": "SEEDING=true docker compose -f docker-compose.e2e.yml up -d --build",
     "stop:e2e-dependencies": "docker compose -f docker-compose.e2e.yml down",
     "build": "yarn copy-config && yarn build:services && yarn build:components && yarn build:untp-test-suite",
@@ -42,7 +42,7 @@
     "upgrade:packages": "yarn -r --stream upgrade --latest",
     "version": "lerna version",
     "prepare": "husky install",
-    "lint": "cross-env NODE_OPTIONS=--max-old-space-size=8192 yarn eslint packages && cd packages/mock-app && yarn lint",
+    "lint": "lerna exec -- yarn lint",
     "release:doc": "node scripts/release-doc.js",
     "generate-version-mapping": "node documentation/version-mapping/script.js"
   },
@@ -66,6 +66,9 @@
     "pretty-quick": "3.1.3",
     "ts-jest": "29.1.1",
     "ts-node": "10.9.2",
+    "@typescript-eslint/parser": "^8.47.0",
+    "@typescript-eslint/eslint-plugin": "^8.47.0",
+    "@typescript-eslint/typescript-estree": "^8.47.0",
     "typescript": "^5.9.3"
   },
   "publishConfig": {

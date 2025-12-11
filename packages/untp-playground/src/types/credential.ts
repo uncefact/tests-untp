@@ -8,4 +8,5 @@ export interface Credential {
 export interface StoredCredential {
   original: any;
   decoded: Credential;
+  fileName: string;
 }

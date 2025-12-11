@@ -66,13 +66,15 @@ jobs:
           /usr/share/dotnet \
           /usr/share/swift
 
+
       - name: Start E2E docker compose
-        run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d
+        run: SEEDING=true docker compose -f docker-compose.e2e.yml up --detach
 
       - name: Run E2E tests
         run: yarn test:run-cypress
         env:
           NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module' # See issue https://github.com/cypress-io/github-action/issues/1408
+          CYPRESS_DEFAULT_BROWSER: "chrome"
 
       - name: Stop docker compose
         run: docker compose -f docker-compose.e2e.yml down

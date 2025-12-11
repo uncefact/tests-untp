@@ -100,6 +100,7 @@ export class UNTPTestRunner {
           reject(error);
         });
       } catch (error) {
+        console.log(error);
         reject(error);
       }
     });

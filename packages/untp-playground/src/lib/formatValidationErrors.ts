@@ -18,13 +18,14 @@ export function formatValidationError(error: ValidationError): string {
         return `Missing required field: ${error.params.missingProperty}`;
       }
       return `Missing required field: ${path} → ${error.params.missingProperty}`;
-    case "const":
+    case "const": {
       const allowedValues = Array.isArray(error.params.allowedValue)
         ? error.params.allowedValue.join(" or ")
         : error.params.allowedValue;
       return `Invalid value for ${
         path || "field"
       }: must be one of [${allowedValues}]`;
+    }
     case "enum":
       return `Invalid value for ${
         path || "field"

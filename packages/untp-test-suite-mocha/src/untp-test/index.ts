@@ -5,8 +5,10 @@
  */
 
 export * from './types';
-export { UNTPTestRunner, UNTPTestResults } from './validator';
-export { StreamReporter, StreamEvent } from './stream-reporter';
+export { UNTPTestRunner } from './validator';
+export type { UNTPTestResults } from './validator';
+export { StreamReporter } from './stream-reporter';
+export type { StreamEvent } from './stream-reporter';
 export { setCredentialData, hasCredentials, getAllCredentials } from './credential-state';
 export {
   setupUNTPTests,
@@ -15,5 +17,6 @@ export {
   formatTags,
   showSuiteHierarchy,
   createAjvInstance,
+  trustedDIDs,
 } from './utils';
 export { extractUNTPVersion, validateJSONLD, validateJsonAgainstSchema, setupUNTPChaiAssertions } from './test-utils';
