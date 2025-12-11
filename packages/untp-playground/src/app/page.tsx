@@ -298,6 +298,8 @@ export default function Home() {
             value={testLog}
             // TODO: field-sizing is not yet supported in firefox:
             // https://bugzilla.mozilla.org/show_bug.cgi?id=1977177
+            // Until it is implemented in firefox, we include components/FirefoxTextareaResize.tsx
+            // in layout.tsx as a polyfill.
             style={{ fieldSizing: "content", "--field-sizing": "content" } as React.CSSProperties}
           />
 

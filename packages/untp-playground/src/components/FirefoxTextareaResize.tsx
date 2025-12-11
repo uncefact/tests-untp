@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 'use client';
 
+// This is a polyfill for field-sizing CSS attribute in firefox.
+// Needed until firefox implements it natively:
+// https://bugzilla.mozilla.org/show_bug.cgi?id=1977177
+
 import { useEffect } from 'react';
 
 export function FirefoxTextareaResize() {
