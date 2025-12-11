@@ -359,7 +359,7 @@ export async function getUnattestedIssuersForProduct(
       }
     }
 
-    unattestedIssuers = unattestedIssuers.filter(issuer => !trustedDIDs.includes(issuer));
+    unattestedIssuers = unattestedIssuers.filter(issuer => !trustedDIDs.includes(issuer.trim()));
 
     return unattestedIssuers;
   } catch (error) {

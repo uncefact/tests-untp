@@ -37,6 +37,19 @@ export default function Home() {
     setCredentials(prev => prev.filter((_, i) => i !== index));
   };
 
+  const [trustedIssuerDIDs, setTrustedIssuerDIDs] = useState<string[]>([]);
+
+  const handleDeleteTrustedIssuerDID = (index: number) => {
+    setTrustedIssuerDIDs(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddTrustedIssuerDID = () => {
+    const did = prompt('Enter Trusted Issuer DID');
+    if (did) {
+      setTrustedIssuerDIDs(prev => [...prev, did]);
+    }
+  };
+
   useEffect(() => {
     const setupMocha = async () => {
       try {
@@ -65,7 +78,7 @@ export default function Home() {
 
 
 
-  const handleCredentialUpload = async ({ credential: rawCredential, fileName }: { credential: any; fileName:string }) => {
+  const handleCredentialUpload = async ({ credential: rawCredential, fileName }: { credential: any; fileName: string }) => {
     try {
       if (!rawCredential) {
         throw new Error('Invalid credential format: credential is null or undefined.');
@@ -79,8 +92,8 @@ export default function Home() {
       }
 
       const isEnveloped = isEnvelopedProof(normalizedCredential);
-                  const decodedCredential = isEnveloped ? decodeEnvelopedCredential(normalizedCredential) : normalizedCredential;
-                  let credentialType = detectCredentialType(decodedCredential);
+      const decodedCredential = isEnveloped ? decodeEnvelopedCredential(normalizedCredential) : normalizedCredential;
+      let credentialType = detectCredentialType(decodedCredential);
       if (!credentialType || !isPermittedCredentialType(credentialType as PermittedCredentialType)) {
         dispatchError([
           {
@@ -118,6 +131,9 @@ export default function Home() {
         credentialData.set(cred.fileName, JSON.stringify(cred.decoded));
       });
       (window as any).untpTestSuite.setCredentialData(credentialData);
+
+      (window as any).untpTestSuite.trustedDIDs.length = 0;
+      (window as any).untpTestSuite.trustedDIDs.push(...trustedIssuerDIDs);
 
       const runner = new (window as any).untpTestSuite.UNTPTestRunner();
       const displayedSuites = new Set();
@@ -184,8 +200,9 @@ export default function Home() {
             break;
           }
           case 'end': {
+            console.log('UNTP Test End Event:', event.data);
             const stats = event.data;
-            let summaryText = '';
+            let summaryText = 'All finished.';
             if (stats.passes > 0) {
               summaryText += `${stats.passes} passing`;
             }
@@ -220,46 +237,72 @@ export default function Home() {
     <div className='min-h-screen flex flex-col'>
       <Header />
       <main className='container mx-auto p-8 max-w-7xl flex-1'>
-          <div className='flex flex-col flex-grow'>
+        <div className='flex flex-col flex-grow'>
 
-            <div>
-              <h2 className='text-xl font-semibold mb-6'>Add New Credential</h2>
-              <div className='mb-6'>
-                <CredentialUploader
-                  onCredentialUpload={handleCredentialUpload}
-                  setFileCount={setFileCount}
-                  credentials={credentials}
-                  onDeleteCredential={handleDeleteCredential}
-                />
-              </div>
-            </div>
-
+          <div>
+            <h2 className='text-xl font-semibold mb-6'>Add New Credential</h2>
             <div className='mb-6'>
-              <h2 className='text-xl font-semibold mb-6'>Download Test Credential</h2>
-              <DownloadCredential />
+              <CredentialUploader
+                onCredentialUpload={handleCredentialUpload}
+                setFileCount={setFileCount}
+                credentials={credentials}
+                onDeleteCredential={handleDeleteCredential}
+              />
             </div>
-
           </div>
-          <div className='flex flex-col space-y-8'>
 
-            <Button onClick={runValidation} className=''>
-              Run Validation
-            </Button>
-
-            <h2 className='text-xl font-semibold mt-6'>Test Results</h2>
-            <textarea
-              id="test-log"
-              className="w-full flex-grow p-2 border rounded mt-4 overflow-hidden"
-              readOnly
-              value={testLog}
-              // TODO: field-sizing is not yet supported in firefox:
-              // https://bugzilla.mozilla.org/show_bug.cgi?id=1977177
-              style={{ fieldSizing: "content" } as React.CSSProperties}
-            />
-
+          <div className='mb-6'>
+            <h2 className='text-xl font-semibold mb-6'>Download Test Credential</h2>
+            <DownloadCredential />
           </div>
-      </main>
+
+        </div>
+
+        <fieldset className="border p-4 rounded-md mb-6">
+          <legend className="text-lg font-semibold px-2">Trusted Issuer DIDs</legend>
+          <Button onClick={handleAddTrustedIssuerDID} variant="outline" size="sm" className="mb-4">
+            Add Trusted Issuer DID
+          </Button>
+          <ul className="space-y-2">
+            {trustedIssuerDIDs.map((did, index) => (
+              <li key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                <span className="font-mono text-sm">{did}</span>
+                <Button
+                  onClick={() => handleDeleteTrustedIssuerDID(index)}
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                >
+                  Remove
+                </Button>
+              </li>
+            ))}
+          </ul>
+          {trustedIssuerDIDs.length === 0 && (
+            <p className="text-gray-500 text-sm italic">No trusted issuer DIDs added.</p>
+          )}
+        </fieldset>
+
+        <div className='flex flex-col space-y-8'>
+
+          <Button onClick={runValidation} className=''>
+            Run Validation
+          </Button>
+
+          <h2 className='text-xl font-semibold mt-6'>Test Results</h2>
+          <textarea
+            id="test-log"
+            className="w-full flex-grow p-2 border rounded mt-4 overflow-hidden"
+            readOnly
+            value={testLog}
+            // TODO: field-sizing is not yet supported in firefox:
+            // https://bugzilla.mozilla.org/show_bug.cgi?id=1977177
+            style={{ fieldSizing: "content" } as React.CSSProperties}
+          />
+
+        </div>
+      </main >
       <Footer />
-    </div>
+    </div >
   );
 }

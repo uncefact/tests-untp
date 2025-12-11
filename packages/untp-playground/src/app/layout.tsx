@@ -36,6 +36,7 @@ export default function RootLayout({
         <Script src='https://unpkg.com/mocha@10.2.0/mocha.js' strategy='beforeInteractive' />
         <Script src='https://cdnjs.cloudflare.com/ajax/libs/ajv/8.17.1/ajv2020.bundle.min.js' strategy='beforeInteractive' />
         <Script src='https://unpkg.com/jsonld@8/dist/jsonld.min.js' strategy='beforeInteractive' />
+        <Script src='https://eyereasoner.github.io/eye-js/18/latest/index.js' strategy='beforeInteractive' />
       </body>
     </html>
   );
