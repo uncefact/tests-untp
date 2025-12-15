@@ -17,15 +17,12 @@ export async function POST(req: Request) {
   // issue credential with VCkit
   const signedCredential = await issueCredential(config, body);
 
-  console.log("received signed credential: ", signedCredential)
-
   // register credential to storage service
-  console.log("TODO: register credential to storage service")
+  const storeResponse = await storeCredential(config, signedCredential);
 
   // Publish link with IDR if requested
   if (body.publish) {
     // if publish=true, register with IDR service
-    // TODO
     console.log("TODO: register with IDR service")
   }
 
@@ -33,14 +30,15 @@ export async function POST(req: Request) {
 }
 
 async function issueCredential(config: any, body: IssueRequest) {
-  const svc = config.services[0];
-  const params = svc.parameters[0];
+  const services = config.services[0];
+  const params = services.parameters[0];
+  const vckit = params.vckit;
 
   const payload = {
     credential: {
       "@context": params.dpp.context,
       type: ["VerifiableCredential", ...params.dpp.type],
-      issuer: params.vckit.issuer,
+      issuer: vckit.issuer,
       credentialSubject: body.formData,
       renderMethod: params.dpp.renderTemplate,
       validUntil: params.dpp.validUntil,
@@ -48,11 +46,38 @@ async function issueCredential(config: any, body: IssueRequest) {
     }
   };
 
-  const res = await fetch(`${params.vckit.vckitAPIUrl}/credentials/issue`, {
+  const res = await fetch(`${vckit.vckitAPIUrl}/credentials/issue`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(params.vckit.headers ?? {}),
+      ...(vckit.headers ?? {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VCkit issue failed: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+async function storeCredential(config: any, signedCredential) {
+  const services = config.services[0];
+  const params = services.parameters[0];
+  const storage = params.storage;
+
+  const payload = {
+    bucket: storage.params.bucket,
+    data: signedCredential
+  };
+
+  const res = await fetch(storage.url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(storage.headers ?? {}),
     },
     body: JSON.stringify(payload),
   });
