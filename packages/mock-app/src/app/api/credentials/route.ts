@@ -178,7 +178,6 @@ async function publishCredential(
     throw new Error("Missing credentialSubject.registeredId");
   }
 
-
   const baseResponses = [
     {
       linkType: "gs1:verificationService",
@@ -208,47 +207,47 @@ async function publishCredential(
   const contexts = ["au", "us"];
 
   const responses = contexts.flatMap((context) =>
-                                     baseResponses.map((response) => ({
-                                       ...response,
-                                       context,
-                                       ianaLanguage: 'en',
-                                       context: 'us',
-                                       defaultLinkType: false,
-                                       defaultIanaLanguage: false,
-                                       defaultContext: false,
-                                       defaultMimeType: false,
-                                       fwqs: false,
-                                       active: true,
-                                     }))
-                                    );
+    baseResponses.map((response) => ({
+       ...response,
+       context,
+       ianaLanguage: 'en',
+       context: 'us',
+       defaultLinkType: false,
+       defaultIanaLanguage: false,
+       defaultContext: false,
+       defaultMimeType: false,
+       fwqs: false,
+       active: true,
+     }))
+  );
 
-                                    const payload = {
-                                      namespace,
-                                      link: storage.uri,
-                                      title: linkTitle,
-                                      verificationPage,
-                                      identificationKey,
-                                      identificationKeyType: "01",
-                                      itemDescription: linkTitle,
-                                      active: true,
-                                      responses,
-                                    };
+  const payload = {
+    namespace,
+    link: storage.uri,
+    title: linkTitle,
+    verificationPage,
+    identificationKey,
+    identificationKeyType: "01",
+    itemDescription: linkTitle,
+    active: true,
+    responses,
+  };
 
-                                    const res = await fetch(`${dlr.dlrAPIUrl}/${dlr.linkRegisterPath}`, {
-                                      method: "POST",
-                                      headers: {
-                                        "Content-Type": "application/json",
-                                        ...(dlr.dlrAPIKey ? { Authorization: `Bearer ${dlr.dlrAPIKey}` } : {}),
-                                      },
-                                      body: JSON.stringify(payload),
-                                    });
+  const res = await fetch(`${dlr.dlrAPIUrl}/${dlr.linkRegisterPath}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(dlr.dlrAPIKey ? { Authorization: `Bearer ${dlr.dlrAPIKey}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
 
-                                    if (!res.ok) {
-                                      const text = await res.text();
-                                      throw new Error(`Publish failed: ${res.status} ${text}`);
-                                    }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Publish failed: ${res.status} ${text}`);
+  }
 
-                                    return { enabled: true, raw: await res.json() };
+  return { enabled: true, raw: await res.json() };
 }
 
 function constructVerifyURL(opts: { baseUrl: string; uri: string; key?: string; hash?: string }) {
