@@ -1,1 +1,1 @@
-export * from "./verifiableCredentialService";
+export * from './verifiableCredentialService.js';
