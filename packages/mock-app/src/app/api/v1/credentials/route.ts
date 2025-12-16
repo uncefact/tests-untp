@@ -114,16 +114,17 @@ export async function POST(req: Request) {
 
   try {
     const config = await getConfig();
+    const params = getConfigParameters(config);
 
     // Issue VC via VCkit
-    const signedCredential = await issueCredential(config, body);
+    const signedCredential = await issueCredential(params, body);
 
     // Store VC
-    const storageResponse = await storeCredential(config, signedCredential);
+    const storageResponse = await storeCredential(params, signedCredential);
 
     // Optionally publish VC
     const publishResponse = shouldPublish
-      ? await publishCredential(config, signedCredential, storageResponse)
+      ? await publishCredential(params, signedCredential, storageResponse)
       : { enabled: false };
 
     return NextResponse.json({ ok: true, storageResponse, publishResponse, signedCredential });
@@ -138,8 +139,7 @@ export async function POST(req: Request) {
 /**
  * Issues a verifiable credential using VCkit
  */
-async function issueCredential(config: AppConfig, body: IssueRequest): Promise<SignedCredential> {
-  const params = getConfigParameters(config);
+async function issueCredential(params: IssueConfigParams, body: IssueRequest): Promise<SignedCredential> {
   const vckit = params.vckit;
 
   const payload = {
@@ -175,10 +175,9 @@ async function issueCredential(config: AppConfig, body: IssueRequest): Promise<S
  * Stores the signed credential
  */
 async function storeCredential(
-  config: AppConfig,
+  params: IssueConfigParams,
   signedCredential: SignedCredential
 ): Promise<StorageResponse> {
-  const params = getConfigParameters(config);
   const storage = params.storage;
 
   const payload = {
@@ -207,7 +206,7 @@ async function storeCredential(
  * Publishes credential
  */
 async function publishCredential(
-  config: AppConfig,
+  params: IssueConfigParams,
   signedCredential: SignedCredential,
   storage: StorageResponse
 ): Promise<{ enabled: true; raw: any }> {
