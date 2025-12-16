@@ -2,12 +2,17 @@ import { NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import path from "path";
 
+type JSONPrimitive = string | number | boolean | null;
+type JSONValue = JSONPrimitive | JSONObject | JSONArray;
+type JSONObject = { [key: string]: JSONValue };
+type JSONArray = JSONValue[];
+
 /**
  * Incoming POST request payload
  */
 type IssueRequest = {
-  formData: Record<string, any>;
-  publish: boolean;
+  formData: JSONObject;
+  publish?: boolean;
 };
 
 /**
@@ -15,7 +20,7 @@ type IssueRequest = {
  */
 type VCkitConfig = {
   vckitAPIUrl: string;
-  issuer: any;
+  issuer: string | JSONObject;
   headers?: Record<string, string>;
 };
 
@@ -25,7 +30,7 @@ type VCkitConfig = {
 type DppConfig = {
   context: string[];
   type: string[];
-  renderTemplate: any;
+  renderTemplate: JSONObject;
   validUntil?: string;
   validFrom?: string;
   dlrLinkTitle: string;
@@ -70,13 +75,12 @@ type AppConfig = {
 /**
  * Issued and signed verifiable credential
  */
-type SignedCredential = {
+type SignedCredential = JSONObject & {
   verifiableCredential?: {
     credentialSubject?: {
       registeredId?: string;
-    };
-  };
-  [key: string]: any;
+    } & JSONObject;
+  } & JSONObject;
 };
 
 /**
@@ -86,7 +90,6 @@ type StorageResponse = {
   uri: string;
   key?: string;
   hash?: string;
-  [key: string]: any;
 };
 
 /**
@@ -128,9 +131,10 @@ export async function POST(req: Request) {
       : { enabled: false };
 
     return NextResponse.json({ ok: true, storageResponse, publishResponse, signedCredential });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "An unexpected error has occurred.";
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "An unexpected error has occurred." },
+      { ok: false, error: message },
       { status: 500 }
     );
   }
@@ -209,7 +213,7 @@ async function publishCredential(
   params: IssueConfigParams,
   signedCredential: SignedCredential,
   storage: StorageResponse
-): Promise<{ enabled: true; raw: any }> {
+): Promise<{ enabled: true; raw: JSONValue }> {
   const dlr = params.dlr;
 
   if (!storage?.uri) throw new Error("Storage response missing uri");
@@ -304,7 +308,7 @@ function constructVerifyURL(opts: {
   const { baseUrl, uri, key, hash } = opts;
   if (!uri) throw new Error("URI is required");
 
-  const payload: Record<string, any> = { uri };
+  const payload: Record<string, string> = { uri };
   if (key) payload.key = key;
   if (hash) payload.hash = hash;
 
@@ -321,8 +325,9 @@ async function getConfig(): Promise<AppConfig> {
   try {
     const raw = await readFile(configPath, "utf-8");
     return JSON.parse(raw) as AppConfig;
-  } catch (err: any) {
-    throw new Error(`Failed to load config file: ${err.message}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    throw new Error(`Failed to load config file: ${message}`);
   }
 }
 
