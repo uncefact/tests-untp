@@ -68,8 +68,8 @@ export type W3CVerifiableCredential = {
   validFrom?: string;
   validUntil?: string;
 
-  credentialStatus: CredentialStatus[] | CredentialStatus;
-  credentialSchema: CredentialSchema[] | CredentialSchema;
+  credentialStatus?: CredentialStatus[] | CredentialStatus;
+  credentialSchema?: CredentialSchema[] | CredentialSchema;
 
   proof?: Proof;
 } & Extensible;
