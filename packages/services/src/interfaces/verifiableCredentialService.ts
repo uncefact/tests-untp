@@ -4,6 +4,10 @@ import {
   JSONValue
 } from "@/types";
 
+import {
+  StorageConfig,
+} from "./storageService";
+
 /**
  * Payload used to issue a credential
  */
@@ -77,6 +81,11 @@ export type SignedVerifiableCredential = {
   verifiableCredential: W3CVerifiableCredential;
 }
 
+export type IssueCredentialConfig = {
+  storage: StorageConfig; 
+  // TODO: Add type options when we support generic credential types
+} & Extensible;
+
 /**
  * Service responsible for issuing verifiable credentials
  */
@@ -84,5 +93,5 @@ export interface IVerifiableCredentialService {
   /**
    * Issue and sign a verifiable credential
    */
-  issue(input: IssueCredentialPayload): Promise<SignedVerifiableCredential>;
+  issue(config: IssueCredentialConfig, payload: IssueCredentialPayload): Promise<SignedVerifiableCredential>;
 }
