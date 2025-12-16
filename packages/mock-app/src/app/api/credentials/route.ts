@@ -2,17 +2,26 @@ import { NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import path from "path";
 
+/**
+ * Incoming POST request payload
+ */
 type IssueRequest = {
   formData: Record<string, any>;
   publish: boolean;
 };
 
+/**
+ * VCkit service configuration
+ */
 type VCkitConfig = {
   vckitAPIUrl: string;
   issuer: any;
   headers?: Record<string, string>;
 };
 
+/**
+ * Digital Product Passport configuration
+ */
 type DppConfig = {
   context: string[];
   type: string[];
@@ -23,6 +32,9 @@ type DppConfig = {
   dlrVerificationPage: string;
 };
 
+/**
+ * Storage service configuration
+ */
 type StorageConfig = {
   url: string;
   params: { bucket: string };
@@ -32,6 +44,9 @@ type StorageConfig = {
   };
 };
 
+/**
+ * Digital Link Resolver configuration
+ */
 type DlrConfig = {
   dlrAPIUrl: string;
   linkRegisterPath: string;
@@ -52,6 +67,9 @@ type AppConfig = {
   }>;
 };
 
+/**
+ * Issued and signed verifiable credential
+ */
 type SignedCredential = {
   verifiableCredential?: {
     credentialSubject?: {
@@ -61,6 +79,9 @@ type SignedCredential = {
   [key: string]: any;
 };
 
+/**
+ * Storage service response
+ */
 type StorageResponse = {
   uri: string;
   key?: string;
@@ -68,15 +89,23 @@ type StorageResponse = {
   [key: string]: any;
 };
 
+/**
+ * POST handler:
+ * - issues credential
+ * - stores credential
+ * - optionally publishes it
+ */
 export async function POST(req: Request) {
   let body: IssueRequest;
 
+  // Parse request body
   try {
     body = (await req.json()) as IssueRequest;
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
+  // Validate form data
   if (!body.formData || typeof body.formData !== "object") {
     return NextResponse.json({ ok: false, error: "formData must be a JSON object" }, { status: 400 });
   }
@@ -86,20 +115,29 @@ export async function POST(req: Request) {
   try {
     const config = await getConfig();
 
+    // Issue VC via VCkit
     const signedCredential = await issueCredential(config, body);
 
+    // Store VC
     const storageResponse = await storeCredential(config, signedCredential);
 
+    // Optionally publish VC
     const publishResponse = shouldPublish
       ? await publishCredential(config, signedCredential, storageResponse)
       : { enabled: false };
 
-      return NextResponse.json({ ok: true, storageResponse, publishResponse, signedCredential });
+    return NextResponse.json({ ok: true, storageResponse, publishResponse, signedCredential });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? "An unexpected error has occurred." }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: e?.message ?? "An unexpected error has occurred." },
+      { status: 500 }
+    );
   }
 }
 
+/**
+ * Issues a verifiable credential using VCkit
+ */
 async function issueCredential(config: AppConfig, body: IssueRequest): Promise<SignedCredential> {
   const params = getConfigParameters(config);
   const vckit = params.vckit;
@@ -133,7 +171,13 @@ async function issueCredential(config: AppConfig, body: IssueRequest): Promise<S
   return (await res.json()) as SignedCredential;
 }
 
-async function storeCredential(config: AppConfig, signedCredential: SignedCredential): Promise<StorageResponse> {
+/**
+ * Stores the signed credential
+ */
+async function storeCredential(
+  config: AppConfig,
+  signedCredential: SignedCredential
+): Promise<StorageResponse> {
   const params = getConfigParameters(config);
   const storage = params.storage;
 
@@ -159,6 +203,9 @@ async function storeCredential(config: AppConfig, signedCredential: SignedCreden
   return (await res.json()) as StorageResponse;
 }
 
+/**
+ * Publishes credential
+ */
 async function publishCredential(
   config: AppConfig,
   signedCredential: SignedCredential,
@@ -167,13 +214,11 @@ async function publishCredential(
   const params = getConfigParameters(config);
   const dlr = params.dlr;
 
-  const namespace = dlr.namespace;
-  const linkTitle = params.dpp.dlrLinkTitle;
-  const verificationPage = params.dpp.dlrVerificationPage;
-
   if (!storage?.uri) throw new Error("Storage response missing uri");
 
-  const identificationKey = signedCredential.verifiableCredential?.credentialSubject?.registeredId;
+  const identificationKey =
+    signedCredential.verifiableCredential?.credentialSubject?.registeredId;
+
   if (!identificationKey) {
     throw new Error("Missing credentialSubject.registeredId");
   }
@@ -182,7 +227,7 @@ async function publishCredential(
     {
       linkType: "gs1:verificationService",
       title: "VCKit verify service",
-      targetUrl: verificationPage,
+      targetUrl: params.dpp.dlrVerificationPage,
       mimeType: "text/plain",
     },
     {
@@ -195,7 +240,7 @@ async function publishCredential(
       linkType: "gs1:sustainabilityInfo",
       title: "Product Passport",
       targetUrl: constructVerifyURL({
-        baseUrl: verificationPage,
+        baseUrl: params.dpp.dlrVerificationPage,
         uri: storage.uri,
         key: storage.key,
         hash: storage.hash,
@@ -208,27 +253,26 @@ async function publishCredential(
 
   const responses = contexts.flatMap((context) =>
     baseResponses.map((response) => ({
-       ...response,
-       context,
-       ianaLanguage: 'en',
-       context: 'us',
-       defaultLinkType: false,
-       defaultIanaLanguage: false,
-       defaultContext: false,
-       defaultMimeType: false,
-       fwqs: false,
-       active: true,
-     }))
+      ...response,
+      context,
+      ianaLanguage: "en",
+      defaultLinkType: false,
+      defaultIanaLanguage: false,
+      defaultContext: false,
+      defaultMimeType: false,
+      fwqs: false,
+      active: true,
+    }))
   );
 
   const payload = {
-    namespace,
+    namespace: dlr.namespace,
     link: storage.uri,
-    title: linkTitle,
-    verificationPage,
+    title: params.dpp.dlrLinkTitle,
+    verificationPage: params.dpp.dlrVerificationPage,
     identificationKey,
     identificationKeyType: "01",
-    itemDescription: linkTitle,
+    itemDescription: params.dpp.dlrLinkTitle,
     active: true,
     responses,
   };
@@ -250,7 +294,15 @@ async function publishCredential(
   return { enabled: true, raw: await res.json() };
 }
 
-function constructVerifyURL(opts: { baseUrl: string; uri: string; key?: string; hash?: string }) {
+/**
+ * Builds verification URL with embedded query payload
+ */
+function constructVerifyURL(opts: {
+  baseUrl: string;
+  uri: string;
+  key?: string;
+  hash?: string;
+}) {
   const { baseUrl, uri, key, hash } = opts;
   if (!uri) throw new Error("URI is required");
 
@@ -262,6 +314,9 @@ function constructVerifyURL(opts: { baseUrl: string; uri: string; key?: string; 
   return `${baseUrl}/verify?${queryString}`;
 }
 
+/**
+ * Loads hardcoded issue configuration
+ */
 async function getConfig(): Promise<AppConfig> {
   const configPath = path.join(process.cwd(), "src/constants/app-config.issue.json");
 
@@ -273,6 +328,9 @@ async function getConfig(): Promise<AppConfig> {
   }
 }
 
+/**
+ * Extracts service parameters
+ */
 function getConfigParameters(config: AppConfig): IssueConfigParams {
   const params = config?.services?.[0]?.parameters?.[0];
   if (!params) throw new Error("Invalid config: missing services[0].parameters[0]");
