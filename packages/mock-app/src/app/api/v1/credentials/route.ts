@@ -210,7 +210,6 @@ async function publishCredential(
   signedCredential: SignedCredential,
   storage: StorageResponse
 ): Promise<{ enabled: true; raw: any }> {
-  const params = getConfigParameters(config);
   const dlr = params.dlr;
 
   if (!storage?.uri) throw new Error("Storage response missing uri");
