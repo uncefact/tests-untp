@@ -6,11 +6,17 @@ import {
   SignedVerifiableCredential
 } from "./verifiableCredentialService";
 
+/**
+ * Result of storing a verifiable credential in external storage
+ */
 export type StorageResponse = {
   uri: string;
   hash: string;
-} & Extensible
+} & Extensible;
 
+/**
+ * Configuration for storing a credential in an external storage service
+ */
 export type StorageConfig = {
   url: string;
   params: { 
@@ -22,6 +28,15 @@ export type StorageConfig = {
   } & Extensible;
 } & Extensible;
 
+/**
+ * Service responsible for persisting verifiable credentials
+ */
 export interface IStorageService {
-  store(config: StorageConfig, crendential: SignedVerifiableCredential): Promise<StorageResponse>
+  /**
+   * Stores a signed verifiable credential using the provided storage configuration
+   */
+  store(
+    config: StorageConfig, 
+    crendential: SignedVerifiableCredential
+  ): Promise<StorageResponse>
 }
