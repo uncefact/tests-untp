@@ -1,5 +1,6 @@
 import type { 
   Extensible,
+  JSONObject,
   JSONValue,
   NonEmptyArray,
   OneOrMany
@@ -81,3 +82,45 @@ export type W3CVerifiableCredential = {
 export type SignedVerifiableCredential = {
   verifiableCredential: W3CVerifiableCredential;
 };
+
+/**
+ * Configuration for issuing a verifiable credential
+ */
+export type IssueConfig = {
+  context: NonEmptyArray<JsonLdContext> & {
+    0: "https://www.w3.org/ns/credentials/v2";
+  };
+  type: VCType;
+  url: string;
+  issuer: Issuer;
+  renderTemplate: RenderTemplate[];
+  validFrom?: string;
+  validUntil?: string;
+  headers?: Record<string, string>;
+}
+
+export type RenderTemplate = {
+  type: string;
+  template: string;
+}
+
+/**
+ * Input payload used to issue a verifiable credential
+ */
+export type CredentialPayload = {
+  formData: JSONObject;
+  publish?: boolean;
+};
+
+/**
+ * Service responsible for issuing verifiable credentials
+ */
+export interface IVerifiableCredentialService {
+/**
+   * Issues a verifiable credential
+   */
+  issue(
+    config: IssueConfig, 
+    payload: CredentialPayload
+  ): Promise<SignedVerifiableCredential>
+}
