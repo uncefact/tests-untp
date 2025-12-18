@@ -1,151 +1,130 @@
 import _ from 'lodash';
 import type {
-  IVerifiableCredentialService,
-  IssueConfig,
   CredentialPayload,
+  IVerifiableCredentialService,
   SignedVerifiableCredential,
+  VerifyResult,
   W3CVerifiableCredential
 } from './interfaces/verifiableCredentialService';
+
+import { privateAPI } from './utils/httpService.js';
+
+export const contextDefault = ['https://www.w3.org/ns/credentials/v2'];
+
+export const typeDefault = ['VerifiableCredential'];
+
+export const issuerDefault = "did:web:uncefact.github.io:project-vckit:test-and-development"
 
 /**
  * Service implementation for issuing verifiable credentials
  * Implements the IVerifiableCredentialService interface
  */
-export class VerifiableCredentialService implements IVerifiableCredentialService {                                          
+export class VerifiableCredentialService implements IVerifiableCredentialService {
   /**                                                                   
    * Issues a verifiable credential by signing the provided payload     
    * @param config - Configuration for issuing the credential           
    * @param payload - The credential payload containing form data       
    * @returns A promise that resolves to a signed verifiable credential 
    */ 
-  async sign(config: IssueConfig, payload: CredentialPayload): Promise<SignedVerifiableCredential> {
-    // validate config
-    this.validateConfig(config);
-    
-    // validate payload
-    this.validatePayload(payload);
+  async sign(
+    baseURL: string,
+    credentialPayload: CredentialPayload,
+    headers?: Record<string, string>
+  ): Promise<SignedVerifiableCredential> {
+    if (!baseURL) {
+      throw new Error("Error issuing VC. API URL is required.");
+    }
+
+    // A verifiable credential MUST contain a credentialSubject property
+    if (!credentialPayload.credentialSubject || 
+        (typeof credentialPayload.credentialSubject === 'object' && 
+         Object.keys(credentialPayload.credentialSubject).length === 0)) {
+      throw new Error("Error issuing VC. credentialSubject is required in credential payload.");
+    }
 
     // construct verifiable credential
-    const vc = this.constructVerifiableCredential(config, payload);
+    const vc = this.constructVerifiableCredential(credentialPayload);
+
+    const result = await this.validateVerifiableCredential(baseURL, vc, headers);
 
     // issue credential
-    const signedCredential = this.issueVerifiableCredential(config, vc);
+    const signedCredential = await this.issueVerifiableCredential(baseURL, vc, headers);
 
     return signedCredential;
   }
 
-  /**
-   * Validates the configuration for issuing a credential
-   * @param config - Configuration object to validate
-   * @note This method may mutate the config object by normalizing renderTemplate to renderMethod for backward compatibility
-   */
-  private validateConfig(config: IssueConfig): void {
-    if (!config.context || config.context.length === 0) {
-      throw new Error("config.context is required and must be a non-empty array");
-    }
-    if (!config.context.every((ctx) => typeof ctx === 'string')) {
-      throw new Error("config.context must be an array of strings");
-    }
-
-    if (!config[0] !== contextDefault) {
-      throw new Error(`First element config.context should be "${contextDefault}"`);
+  private async validateVerifiableCredential(
+    baseURL: string,
+    vc: W3CVerifiableCredential,
+    headers?: Record<string, string>
+  ): Promise<VerifyResult> {
+    const verifyCredentialPayload = {
+      credential: vc,
+      fetchRemoteContexts: true,
+      policies: {
+        credentialStatus: true,
+      },
     }
 
-    // context property MUST be an ordered set
-    config.context = config.context.sort()
-
-    // Validate type
-    if (!config.type) {
-      throw new Error("config.type is required");
-    }
-    if (Array.isArray(config.type) && !config.type.every((t) => typeof t === 'string')) {
-      throw new Error("config.type array must contain only strings");
+    if (!baseURL) {
+      throw new Error("Error verifying VC. API URL is required.");
     }
 
-    // Validate URL
-    if (!config.url) {
-      throw new Error("config.url is required");
+    if (headers) {
+      this.validateHeaders(headers);
     }
 
-    // Validate issuer
-    if (!config.issuer) {
-      throw new Error("config.issuer is required");
-    }
-
-    // Validate dates (optional)
-    if (config.validUntil) {
-      const validFrom = config.validFrom || new Date().toISOString();
-
-      const validFromDate = new Date(validFrom);
-      const validUntilDate = new Date(config.validUntil);
-
-      // Check validity period
-      if (!this.validityPeriod(validFrom, config.validUntil)) {
-        throw new Error("Invalid validity period: config.validUntil must be after or equal to config.validFrom");
-      }
-    }
-
-    // Validate headers (optional)
-    if (config.headers) this.validateHeaders(config.headers);
+    return await privateAPI.post<VerifyResult>(baseURL, verifyCredentialPayload, { headers: headers || {} });
   }
 
-  /**
-   * Validate the validity period of the credential
-   * @param validFrom - The date-time stamp when the credential was issued
-   * @param validUntil - The date-time stamp when the credential expires
-   * @returns boolean
-   *
-   * @example
-   * const validFrom = '2022-01-01T00:00:00Z';
-   * const validUntil = '2022-01-01T00:00:00Z';
-   * const isValid = validityPeriod(validFrom, validUntil);
-   * console.log(isValid); // Output: true
-   */
-  private validityPeriod = (validFrom: string, validUntil: string): boolean => {
-    const validFromDate = new Date(validFrom);
-    const validUntilDate = new Date(validUntil);
-  
-    return validFromDate <= validUntilDate;
-  };
-
-
-  /**
-   * Validate headers
-   * @param headers - Headers object to validate
-   */
-  private validateHeaders = (headers: Record<string, string>) => {
+  private validateHeaders(headers: Record<string, string>) {
     if (!_.isPlainObject(headers) || !_.every(headers, (value) => _.isString(value))) {
-      throw new Error("config.headers must be a plain object with string values");
-    }
-  };
-
-  /**
-   * Validates the credential payload
-   * @param payload - Payload object to validate
-   */
-  private validatePayload(payload: CredentialPayload): void {
-    if (!payload.formData) {
-      throw new Error("payload.formData is required");
+      throw new Error("Headers must be a plain object with string values");
     }
   }
 
-  /**
-   * Constructs a W3C verifiable credential from config and payload
-   * @param config - Configuration for the credential
-   * @param payload - Payload containing the credential data
-   * @returns A W3C verifiable credential object
-   */
-  private constructVerifiableCredential(config: IssueConfig, payload: CredentialPayload): W3CVerifiableCredential {
-    throw new Error("Not implemented");
+  private constructVerifiableCredential(
+    credentialPayload: CredentialPayload
+  ): W3CVerifiableCredential {
+    // add or merge context from credentialPayload
+    const context = [...contextDefault, ...(credentialPayload.context || [])]
+    const type = [...(credentialPayload.type || []), ...typeDefault];
+
+    const issuer = credentialPayload.issuer || issuerDefault;
+
+    const vc = {
+      "@context": context,
+      type: type,
+      issuer: issuer,
+      ...credentialPayload
+    } as W3CVerifiableCredential
+
+    return vc;
   }
 
   /**
-   * Issues and signs a verifiable credential
+   * Issues and signs a verifiable credential by calling VCkit API
    * @param config - Configuration for issuing the credential
    * @param vc - The verifiable credential to sign
    * @returns A signed verifiable credential
    */
-  private issueVerifiableCredential(config: IssueConfig, vc: W3CVerifiableCredential): SignedVerifiableCredential {
-    throw new Error("Not implemented");
+  private async issueVerifiableCredential(
+    baseURL: string,
+    vc: W3CVerifiableCredential,
+    headers?: Record<string, string>
+  ): Promise<SignedVerifiableCredential> {
+    try {
+      const verifiableCredential = await privateAPI.post<SignedVerifiableCredential>(
+        `${baseURL}/credentials/issue`,
+        vc,
+        { headers: headers || {} },
+      );
+      return verifiableCredential;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to issue verifiable credential: ${error.message}`);
+      }
+      throw new Error('Failed to issue verifiable credential: Unknown error');
+    }
   }
 }
