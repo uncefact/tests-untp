@@ -81,7 +81,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
 
       // Check validity period
       if (!this.validityPeriod(validFrom, config.validUntil)) {
-        throw new Error('Invalid validity period: config.validUntil must be after or equal to config.validFrom');
+        throw new Error("Invalid validity period: config.validUntil must be after or equal to config.validFrom");
       }
     }
 
@@ -115,7 +115,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
    */
   private validateHeaders = (headers: Record<string, string>) => {
     if (!_.isPlainObject(headers) || !_.every(headers, (value) => _.isString(value))) {
-      throw new Error('config.headers must be a plain object with string values');
+      throw new Error("config.headers must be a plain object with string values");
     }
   };
 
@@ -124,7 +124,9 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
    * @param payload - Payload object to validate
    */
   private validatePayload(payload: CredentialPayload): void {
-    throw new Error('Not implemented');
+    if (!payload.formData) {
+      throw new Error("payload.formData is required");
+    }
   }
 
   /**
@@ -134,7 +136,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
    * @returns A W3C verifiable credential object
    */
   private constructVerifiableCredential(config: IssueConfig, payload: CredentialPayload): W3CVerifiableCredential {
-    throw new Error('Not implemented');
+    throw new Error("Not implemented");
   }
 
   /**
@@ -144,6 +146,6 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
    * @returns A signed verifiable credential
    */
   private issueVerifiableCredential(config: IssueConfig, vc: W3CVerifiableCredential): SignedVerifiableCredential {
-    throw new Error('Not implemented');
+    throw new Error("Not implemented");
   }
 }
