@@ -36,7 +36,7 @@ export interface IStorageService {
    * Stores a signed verifiable credential using the provided storage configuration
    */
   store(
-    config: StorageConfig, 
-    crendential: SignedVerifiableCredential
+    config: StorageConfig,
+    credential: SignedVerifiableCredential
   ): Promise<StorageResponse>
 }

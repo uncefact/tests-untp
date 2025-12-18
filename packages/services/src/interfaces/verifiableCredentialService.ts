@@ -6,6 +6,9 @@ import type {
   OneOrMany
 } from "@/types";
 
+export const contextDefault = 'https://www.w3.org/ns/credentials/v2';
+export const typeDefault = 'VerifiableCredential';
+
 /** JSON-LD Context value allowed by the schema */
 export type JsonLdContext = string | ({ [key: string]: JSONValue } & Extensible);
 
@@ -54,12 +57,14 @@ export type Proof = {
  */
 export type W3CVerifiableCredential = {
   "@context": NonEmptyArray<JsonLdContext> & {
-    0: "https://www.w3.org/ns/credentials/v2";
+    0: contextDefault;
   };
 
-  type: "VerifiableCredential" | ["VerifiableCredential", ...string[]];
+  type: typeDefault | [typeDefault, ...string[]];
 
   id?: string;
+  name?: string;
+  description?: string;
 
   issuer: Issuer;
 
@@ -88,18 +93,18 @@ export type SignedVerifiableCredential = {
  */
 export type IssueConfig = {
   context: NonEmptyArray<JsonLdContext> & {
-    0: "https://www.w3.org/ns/credentials/v2";
+    0: contextDefault;
   };
   type: VCType;
   url: string;
   issuer: Issuer;
-  renderTemplate: RenderTemplate[];
+  renderMethod?: RenderMethod[];
   validFrom?: string;
   validUntil?: string;
   headers?: Record<string, string>;
 }
 
-export type RenderTemplate = {
+export type RenderMethod = {
   type: string;
   template: string;
 }
@@ -119,7 +124,7 @@ export interface IVerifiableCredentialService {
 /**
    * Issues a verifiable credential
    */
-  issue(
+  sign(
     config: IssueConfig, 
     payload: CredentialPayload
   ): Promise<SignedVerifiableCredential>
