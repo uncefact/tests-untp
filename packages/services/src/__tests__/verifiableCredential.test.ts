@@ -43,7 +43,7 @@ describe('verifiableCredential', () => {
         credentialSubject: mockCredentialSubject
       } as CredentialPayload;
 
-      const mockValidateResponse = { verified: true, results: [] };
+      const mockValidateResponse = { verified: true };
       const mockIssueResponse = mockVerifiableCredential;
 
       (privateAPI.post as jest.Mock)
@@ -183,6 +183,46 @@ describe('verifiableCredential', () => {
       expect(result).toEqual(mockVerifiableCredential);
     });
 
+    it('should issue VC with added context', async () => {
+      const service = new VerifiableCredentialService();
+      const vc = {
+        context: ['https://test.uncefact.org/vocabulary/untp/dia/0.6.0/'],
+        credentialSubject: mockCredentialSubject
+      } as CredentialPayload;
+
+      const mockValidateResponse = { verified: true };
+      const mockIssueResponse = mockVerifiableCredential;
+
+      (privateAPI.post as jest.Mock)
+      .mockResolvedValueOnce(mockValidateResponse)
+      .mockResolvedValueOnce({
+        ...mockIssueResponse,
+        "@context": ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/']
+      });
+
+      const result = await service.sign(mockAPIUrl, vc);
+    });
+
+    it('should issue VC with added type', async () => {
+      const service = new VerifiableCredentialService();
+      const vc = {
+        type: ['Custom Type'],
+        credentialSubject: mockCredentialSubject
+      } as CredentialPayload;
+
+      const mockValidateResponse = { verified: true };
+      const mockIssueResponse = mockVerifiableCredential;
+
+      (privateAPI.post as jest.Mock)
+      .mockResolvedValueOnce(mockValidateResponse)
+      .mockResolvedValueOnce({
+        ...mockIssueResponse,
+        type: ['Custom Type', 'VerifiableCredential']
+      });
+
+      const result = await service.sign(mockAPIUrl, vc);
+    });
+
     it('should throw error when baseURL is not provided', async () => {
       const service = new VerifiableCredentialService();
       const vc = {
@@ -211,6 +251,56 @@ describe('verifiableCredential', () => {
 
       await expect(service.sign(mockAPIUrl, vc)).rejects.toThrow('Error issuing VC. credentialSubject is required in credential payload.');
       expect(privateAPI.post).not.toHaveBeenCalled();
+    });
+
+    it('should throw error when headers have invalid format', async () => {
+      const service = new VerifiableCredentialService();
+      const vc = {
+        issuer: mockIssuer,
+        credentialSubject: mockCredentialSubject
+      } as CredentialPayload;
+
+      const invalidHeaders = { Authorization: 123 } as any;
+
+      await expect(service.sign(mockAPIUrl, vc, invalidHeaders)).rejects.toThrow('Headers must be a plain object with string values');
+      expect(privateAPI.post).not.toHaveBeenCalled();
+    });
+
+    it('should throw error when validation returns verified: false with error message', async () => {
+      const service = new VerifiableCredentialService();
+      const vc = {
+        issuer: mockIssuer,
+        credentialSubject: mockCredentialSubject
+      } as CredentialPayload;
+
+      const mockValidateResponse = {
+        verified: false,
+        error: { message: 'Invalid credential format' }
+      };
+
+      (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockValidateResponse);
+
+      await expect(service.sign(mockAPIUrl, vc)).rejects.toThrow('Error issuing VC. Validation failed: Invalid credential format');
+
+      // Should only call validate, not issue
+      expect(privateAPI.post).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw error when validation returns verified: false without error message', async () => {
+      const service = new VerifiableCredentialService();
+      const vc = {
+        issuer: mockIssuer,
+        credentialSubject: mockCredentialSubject
+      } as CredentialPayload;
+
+      const mockValidateResponse = { verified: false };
+
+      (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockValidateResponse);
+
+      await expect(service.sign(mockAPIUrl, vc)).rejects.toThrow('Error issuing VC. Validation failed: Credential validation failed');
+
+      // Should only call validate, not issue
+      expect(privateAPI.post).toHaveBeenCalledTimes(1);
     });
   });
 })

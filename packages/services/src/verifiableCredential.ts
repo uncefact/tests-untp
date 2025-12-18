@@ -10,10 +10,8 @@ import type {
 import { privateAPI } from './utils/httpService.js';
 
 export const contextDefault = ['https://www.w3.org/ns/credentials/v2'];
-
 export const typeDefault = ['VerifiableCredential'];
-
-export const issuerDefault = "did:web:uncefact.github.io:project-vckit:test-and-development"
+export const issuerDefault = 'did:web:uncefact.github.io:project-vckit:test-and-development';
 
 /**
  * Service implementation for issuing verifiable credentials
@@ -47,6 +45,12 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
 
     const result = await this.validateVerifiableCredential(baseURL, vc, headers);
 
+    // Check validation result before issuing
+    if (!result.verified) {
+      const errorMessage = result.error?.message || 'Credential validation failed';
+      throw new Error(`Error issuing VC. Validation failed: ${errorMessage}`);
+    }
+
     // issue credential
     const signedCredential = await this.issueVerifiableCredential(baseURL, vc, headers);
 
@@ -74,7 +78,14 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
       this.validateHeaders(headers);
     }
 
-    return await privateAPI.post<VerifyResult>(baseURL, verifyCredentialPayload, { headers: headers || {} });
+    try {
+      return await privateAPI.post<VerifyResult>(baseURL, verifyCredentialPayload, { headers: headers || {} });
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to validate verifiable credential: ${error.message}`);
+      }
+      throw new Error('Failed to validate verifiable credential: Unknown error');
+    }
   }
 
   private validateHeaders(headers: Record<string, string>) {
@@ -93,10 +104,10 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     const issuer = credentialPayload.issuer || issuerDefault;
 
     const vc = {
+      ...credentialPayload,
       "@context": context,
       type: type,
-      issuer: issuer,
-      ...credentialPayload
+      issuer: issuer
     } as W3CVerifiableCredential
 
     return vc;
@@ -113,6 +124,10 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     vc: W3CVerifiableCredential,
     headers?: Record<string, string>
   ): Promise<SignedVerifiableCredential> {
+    if (headers) {
+      this.validateHeaders(headers);
+    }
+
     try {
       const verifiableCredential = await privateAPI.post<SignedVerifiableCredential>(
         `${baseURL}/credentials/issue`,
