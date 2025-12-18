@@ -9,9 +9,6 @@ import type {
 export const contextDefault = 'https://www.w3.org/ns/credentials/v2';
 export const typeDefault = 'VerifiableCredential';
 
-/** JSON-LD Context value allowed by the schema */
-export type JsonLdContext = string | ({ [key: string]: JSONValue } & Extensible);
-
 /** "type" fields can be a string or a non-empty array of strings */
 export type VCType = string | NonEmptyArray<string>;
 
@@ -57,7 +54,7 @@ export type Proof = {
  * W3C VC v2
  */
 export type W3CVerifiableCredential = {
-  "@context": NonEmptyArray<JsonLdContext>;
+  "@context": string[];
   type: VCType;
   id?: string;
   name?: string;
@@ -83,7 +80,7 @@ export type SignedVerifiableCredential = {
  * Configuration for issuing a verifiable credential
  */
 export type IssueConfig = {
-  context: NonEmptyArray<JsonLdContext>;
+  context: string[];
   type: VCType;
   url: string;
   issuer: Issuer;
