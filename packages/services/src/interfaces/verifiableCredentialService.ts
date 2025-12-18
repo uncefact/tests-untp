@@ -30,7 +30,9 @@ export type CredentialStatus = { type: VCType; id?: string } & Extensible;
 export type CredentialSchema = { id: string; type: VCType } & Extensible;
 
 export type RefreshService = { id: string; type: VCType } & Extensible;
+
 export type TermsOfUse = { type: VCType; id?: string } & Extensible;
+
 export type Evidence = { type: VCType; id?: string } & Extensible;
 
 export type VerificationMethodObject = {
@@ -45,7 +47,6 @@ export type Proof = {
   type: VCType;
   proofPurpose: string;
   verificationMethod: VerificationMethod;
-
   created?: string;
   domain?: string;
   challenge?: string;
@@ -56,30 +57,20 @@ export type Proof = {
  * W3C VC v2
  */
 export type W3CVerifiableCredential = {
-  "@context": NonEmptyArray<JsonLdContext> & {
-    0: contextDefault;
-  };
-
-  type: typeDefault | [typeDefault, ...string[]];
-
+  "@context": NonEmptyArray<JsonLdContext>;
+  type: VCType;
   id?: string;
   name?: string;
   description?: string;
-
   issuer: Issuer;
-
   credentialSubject: OneOrMany<CredentialSubject>;
-
   validFrom?: string;
   validUntil?: string;
-
   credentialStatus?: OneOrMany<CredentialStatus>;
   credentialSchema?: OneOrMany<CredentialSchema>;
-
   refreshService?: OneOrMany<RefreshService>;
   termsOfUse?: OneOrMany<TermsOfUse>;
   evidence?: OneOrMany<Evidence>;
-
   proof?: OneOrMany<Proof>;
 } & Extensible;
 
@@ -92,9 +83,7 @@ export type SignedVerifiableCredential = {
  * Configuration for issuing a verifiable credential
  */
 export type IssueConfig = {
-  context: NonEmptyArray<JsonLdContext> & {
-    0: contextDefault;
-  };
+  context: NonEmptyArray<JsonLdContext>;
   type: VCType;
   url: string;
   issuer: Issuer;
@@ -121,7 +110,7 @@ export type CredentialPayload = {
  * Service responsible for issuing verifiable credentials
  */
 export interface IVerifiableCredentialService {
-/**
+  /**
    * Issues a verifiable credential
    */
   sign(
