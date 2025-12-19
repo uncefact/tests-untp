@@ -6,7 +6,7 @@ export interface JSONObject {
   [key: string]: JSONValue;
 }
 
-export interface JSONArray extends Array<JSONValue> { }
+export type JSONArray = Array<JSONValue>;
 
 export type Extensible = { [key: string]: JSONValue | undefined };
 export type NonEmptyArray<T> = [T, ...T[]];
