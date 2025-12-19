@@ -15,20 +15,6 @@ export type StorageResponse = {
 } & Extensible;
 
 /**
- * Configuration for storing a credential in an external storage service
- */
-export type StorageConfig = {
-  url: string;
-  params: { 
-    bucket?: string;
-  } & Extensible;
-  options: {
-    method: 'POST' | 'PUT';
-    headers: Record<string, string>;
-  } & Extensible;
-} & Extensible;
-
-/**
  * Service responsible for persisting verifiable credentials
  */
 export interface IStorageService {
@@ -36,7 +22,10 @@ export interface IStorageService {
    * Stores a signed verifiable credential using the provided storage configuration
    */
   store(
-    config: StorageConfig,
-    credential: SignedVerifiableCredential
+    url: string,
+    method: string,
+    bucket: string,
+    credential: SignedVerifiableCredential,
+    headers?: Record<string, string>
   ): Promise<StorageResponse>
 }
