@@ -1,13 +1,10 @@
-import type { 
+import type {
   Extensible,
   JSONObject,
   JSONValue,
   NonEmptyArray,
   OneOrMany
 } from "@/types";
-
-export const contextDefault = 'https://www.w3.org/ns/credentials/v2';
-export const typeDefault = 'VerifiableCredential';
 
 /** "type" fields can be a string or a non-empty array of strings */
 export type VCType = string | NonEmptyArray<string>;
@@ -76,20 +73,6 @@ export type SignedVerifiableCredential = {
   verifiableCredential: W3CVerifiableCredential;
 };
 
-/**
- * Configuration for issuing a verifiable credential
- */
-export type IssueConfig = {
-  context: string[];
-  type: VCType;
-  url: string;
-  issuer: Issuer;
-  renderMethod?: RenderMethod[];
-  validFrom?: string;
-  validUntil?: string;
-  headers?: Record<string, string>;
-}
-
 export type RenderMethod = {
   type: string;
   template: string;
@@ -99,9 +82,21 @@ export type RenderMethod = {
  * Input payload used to issue a verifiable credential
  */
 export type CredentialPayload = {
-  formData: JSONObject;
-  publish?: boolean;
-};
+  context?: string[];
+  type?: VCType;
+  issuer?: Issuer;
+  credentialSubject: OneOrMany<CredentialSubject>;
+} & Extensible;
+
+export type Error = {
+  message?: string;
+  errorCode?: string;
+}
+
+export type VerifyResult = {
+  verified: boolean;
+  error?: Error;
+} & Extensible
 
 /**
  * Service responsible for issuing verifiable credentials
@@ -111,7 +106,8 @@ export interface IVerifiableCredentialService {
    * Issues a verifiable credential
    */
   sign(
-    config: IssueConfig, 
-    payload: CredentialPayload
+    baseURL: string,
+    credentialPayload: CredentialPayload,
+    headers?: Record<string, string>
   ): Promise<SignedVerifiableCredential>
 }
