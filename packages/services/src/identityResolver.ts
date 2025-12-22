@@ -1,90 +1,142 @@
 import type {
-  SignedVerifiableCredential,
-  StorageResponse,
   PublishResponse,
-  LinkResponse
-} from './interfaces';
+  LinkResponse,
+  BaseLinkResponse,
+  PublishCredentialParams,
+} from './interfaces/identityResolverService';
 
 import {
   IIdentityResolverService,
   LinkType,
   MimeType,
-} from "./interfaces";
+} from './interfaces/identityResolverService';
+
+import type { LinkResolver } from './linkResolver.service';
 
 import { privateAPI } from './utils/httpService.js';
 
+export const locales = ['us', 'au'];
+
+/**
+ * Implementation of the Identity Resolver Service.
+ * Registers credential links with an identity resolver to make them discoverable via identifiers.
+ */
 export class IdentityResolverService implements IIdentityResolverService {
-  async publish(
-    namespace: string,
-    dlrVerificationPage: string,
-    dlrLinkTitle: string,
-    dlrAPIKey: string,
-    dlrAPIUrl: string,
-    linkRegisterPath: string,
-    identificationKeyType: string,
-    identificationKey: string,
-    verificationLinkType: LinkType,
-    credential: SignedVerifiableCredential, 
-    storage: StorageResponse
-  ): Promise<PublishResponse> {
-    if (!namespace) {
-      throw new Error("Failed to publish credential: namespace is required.")
-    }
 
-    if (!dlrVerificationPage) {
-      throw new Error("Failed to publish credential: dlrVerificationPage is required.")
-    }
+  /**
+   * Publishes a credential to the identity resolver, making it discoverable via the identifier.
+   * This registers the association between the identifier and the credential link.
+   *
+   * @param params - The parameters for publishing the credential
+   * @returns A promise that resolves to the publish response
+   * @throws Error if validation fails or the registration fails
+   */
+  async publish(params: PublishCredentialParams): Promise<PublishResponse> {
+    // Validate required parameters
+    this.validateParams(params);
 
-    if (!dlrLinkTitle) {
-      throw new Error("Failed to publish credential: dlrLinkTitle is required.")
-    }
-
-    if (!dlrAPIKey) {
-      throw new Error("Failed to publish credential: dlrAPIKey is required.")
-    }
-
-    if (!dlrAPIUrl) {
-      throw new Error("Failed to publish credential: dlrAPIUrl is required.")
-    }
-
-    if (!linkRegisterPath) {
-      throw new Error("Failed to publish credential: linkRegisterPath is required.")
-    }
-
-    if (!identificationKey) {
-      throw new Error("Failed to publish credential: identificationKey is required.")
-    }
-
-    if (!identificationKeyType) {
-      throw new Error("Failed to publish credential: identificationKeyType is required.")
-    }
-
-    // construct responses array
-    const responses: LinkResponse[] = this.constructLinkResponses(
+    // Set defaults for optional parameters
+    const {
       namespace,
-      dlrLinkTitle,
-      LinkType.sustainabilityInfo,
-      verificationLinkType,
-      dlrAPIUrl,
-      linkRegisterPath,
-      dlrVerificationPage
-    );
+      identificationKeyType,
+      identificationKey,
+      credentialUrl,
+      verificationPage,
+      linkTitle,
+      linkType,
+      qualifierPath = '/',
+      verificationLinkType = LinkType.verificationLinkType,
+      apiUrl,
+      apiKey,
+      linkRegisterPath = '',
+    } = params;
 
-    // construct link resolver
-    
-    // post 
+    try {
+      // Construct responses array for different locales
+      const responses: LinkResponse[] = this.constructLinkResponses(
+        namespace,
+        linkTitle,
+        linkType,
+        verificationLinkType,
+        credentialUrl,
+        verificationPage,
+      );
+
+      // Construct link resolver payload
+      const payload: LinkResolver = {
+        namespace,
+        identificationKey,
+        identificationKeyType,
+        itemDescription: linkTitle,
+        qualifierPath,
+        active: true,
+        responses,
+      };
+
+      // Construct full URL for the identity resolver endpoint
+      const url: string = linkRegisterPath
+        ? `${apiUrl}/${linkRegisterPath}`
+        : apiUrl;
+
+      // Set authorization and make the API call
+      privateAPI.setBearerTokenAuthorizationHeaders(apiKey);
+      const response = await privateAPI.post<PublishResponse>(url, payload);
+
+      return { enabled: true, raw: response } as PublishResponse;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to register credential with identity resolver for identifier ${identificationKey}: ${errorMessage}`);
+      }
+      throw new Error(`Failed to register credential with identity resolver for identifier ${identificationKey}: Unknown error`);
+    }
   }
 
+  /**
+   * Validates the required parameters for publishing a credential.
+   *
+   * @param params - The parameters to validate
+   * @throws Error if any required parameter is missing
+   */
+  private validateParams(params: PublishCredentialParams): void {
+    const requiredFields: (keyof PublishCredentialParams)[] = [
+      'namespace',
+      'identificationKeyType',
+      'identificationKey',
+      'credentialUrl',
+      'verificationPage',
+      'linkTitle',
+      'apiUrl',
+      'apiKey',
+    ];
+
+    for (const field of requiredFields) {
+      if (!params[field]) {
+        throw new Error(`Failed to publish credential: ${field} is required.`);
+      }
+    }
+  }
+
+  /**
+   * Constructs link responses for different locales and link types.
+   * Creates responses for verification service and credential access.
+   *
+   * @param namespace - The namespace for the identifier
+   * @param linkTitle - The title for the link
+   * @param linkType - The type of link for the credential
+   * @param verificationLinkType - The type of link for verification
+   * @param credentialUrl - The URL where the credential can be accessed
+   * @param verificationPageUrl - The URL of the verification page
+   * @returns Array of link responses for different locales
+   */
   private constructLinkResponses(
     namespace: string,
     linkTitle: string,
     linkType: LinkType,
     verificationLinkType: LinkType,
     credentialUrl: string,
-    linkRegisterUrl: string,
     verificationPageUrl: string,
   ): LinkResponse[] {
-    const baseResponses: LinkResponse[] = [
+    const baseResponses: BaseLinkResponse[] = [
       {
         linkType: `${namespace}:${verificationLinkType}`,
         linkTitle: 'VCKit verify service',
@@ -100,45 +152,36 @@ export class IdentityResolverService implements IIdentityResolverService {
       {
         linkType: `${namespace}:${linkType}`,
         linkTitle: linkTitle,
-        targetUrl: linkRegisterUrl,
+        targetUrl: credentialUrl,
         mimeType: MimeType.textHtml,
         defaultLinkType: true,
         defaultIanaLanguage: true,
         defaultMimeType: true,
       },
-    ]
+    ];
 
     const responses: LinkResponse[] = [];
 
-    baseResponses.forEach((linkResponse: LinkResponse) => {
-      const linkResponseForUS: LinkResponse = {
-        ianaLanguage: 'en',
-        context: 'us',
-        title: linkResponse.linkTitle,
-        defaultLinkType: false,
-        defaultIanaLanguage: false,
-        defaultContext: false,
-        defaultMimeType: false,
-        fwqs: false,
-        active: true,
-        ...linkResponse,
-      };
+    // Create link responses for each configured locale
+    baseResponses.forEach((linkResponse: BaseLinkResponse) => {
+      for (const locale of locales) {
+        const localizedResponse: LinkResponse = {
+          ...linkResponse,
+          title: linkResponse.linkTitle,
+          ianaLanguage: 'en',
+          context: locale,
+          defaultLinkType: linkResponse.defaultLinkType ?? false,
+          defaultIanaLanguage: linkResponse.defaultIanaLanguage ?? false,
+          defaultContext: false,
+          defaultMimeType: linkResponse.defaultMimeType ?? false,
+          fwqs: false,
+          active: true,
+        };
 
-      const linkResponseForAU: LinkResponse = {
-        ianaLanguage: 'en',
-        context: 'au',
-        defaultLinkType: false,
-        defaultIanaLanguage: false,
-        defaultContext: false,
-        defaultMimeType: false,
-        fwqs: false,
-        active: true,
-        ...linkResponse,
-      };
-
-      responses.push(linkResponseForUS, linkResponseForAU);
-    })
+        responses.push(localizedResponse);
+      }
+    });
 
     return responses;
-  };
+  }
 }
