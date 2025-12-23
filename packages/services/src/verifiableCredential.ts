@@ -43,49 +43,10 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     // construct verifiable credential
     const vc = this.constructVerifiableCredential(credentialPayload);
 
-    const result = await this.validateVerifiableCredential(baseURL, vc, headers);
-
-    // Check validation result before issuing
-    if (!result.verified) {
-      const errorMessage = result.error?.message || 'Credential validation failed';
-      throw new Error(`Error issuing VC. Validation failed: ${errorMessage}`);
-    }
-
     // issue credential
     const signedCredential = await this.issueVerifiableCredential(baseURL, vc, headers);
 
     return signedCredential;
-  }
-
-  private async validateVerifiableCredential(
-    baseURL: string,
-    vc: W3CVerifiableCredential,
-    headers?: Record<string, string>
-  ): Promise<VerifyResult> {
-    const verifyCredentialPayload = {
-      credential: vc,
-      fetchRemoteContexts: true,
-      policies: {
-        credentialStatus: true,
-      },
-    }
-
-    if (!baseURL) {
-      throw new Error("Error verifying VC. API URL is required.");
-    }
-
-    if (headers) {
-      this.validateHeaders(headers);
-    }
-
-    try {
-      return await privateAPI.post<VerifyResult>(baseURL, verifyCredentialPayload, { headers: headers || {} });
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to validate verifiable credential: ${error.message}`);
-      }
-      throw new Error('Failed to validate verifiable credential: Unknown error');
-    }
   }
 
   private validateHeaders(headers: Record<string, string>) {
