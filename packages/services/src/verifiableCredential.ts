@@ -99,10 +99,14 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
       this.validateHeaders(headers);
     }
 
+    const payload = {
+      credential: vc
+    };
+
     try {
       const verifiableCredential = await privateAPI.post<SignedVerifiableCredential>(
         `${this.baseURL}/credentials/issue`,
-        vc,
+        payload,
         { headers: headers || {} },
       );
       return verifiableCredential;

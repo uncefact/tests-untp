@@ -53,10 +53,12 @@ describe('verifiableCredential', () => {
       expect(privateAPI.post).toHaveBeenCalledWith(
         `${mockAPIUrl}/credentials/issue`,
         expect.objectContaining({
-          '@context': expect.arrayContaining(['https://www.w3.org/ns/credentials/v2']),
-          type: expect.arrayContaining(['VerifiableCredential']),
-          issuer: mockIssuer,
-          credentialSubject: mockCredentialSubject,
+          credential: {
+            '@context': expect.arrayContaining(['https://www.w3.org/ns/credentials/v2']),
+            type: expect.arrayContaining(['VerifiableCredential']),
+            issuer: mockIssuer,
+            credentialSubject: mockCredentialSubject,
+          }
         }),
         { headers: {} },
       );
