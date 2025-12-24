@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import path from "path";
+import { VerifiableCredential } from "@vckit/core-types";
 
-import { 
-  decodeEnvelopedVC, 
-  issueCredentialStatus, 
-  PROOF_FORMAT, 
-  DEFAULT_MACHINE_VERIFICATION_URL 
+import {
+  decodeEnvelopedVC,
+  issueCredentialStatus,
+  PROOF_FORMAT,
+  DEFAULT_MACHINE_VERIFICATION_URL
 } from "@mock-app/services";
 
 type JSONPrimitive = string | number | boolean | null;
@@ -83,13 +84,13 @@ type AppConfig = {
  * VCkit API response for credential issuance
  */
 type VCkitIssueResponse = {
-  verifiableCredential: JSONObject;
+  verifiableCredential: VerifiableCredential;
 };
 
 /**
  * Enveloped verifiable credential
  */
-type EnvelopedVC = JSONObject;
+type EnvelopedVC = VerifiableCredential;
 
 /**
  * Decoded (unsigned) credential with credentialSubject
