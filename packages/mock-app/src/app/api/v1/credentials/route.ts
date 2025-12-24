@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import path from "path";
 
-import { issueCredentialStatus, PROOF_FORMAT, DEFAULT_MACHINE_VERIFICATION_URL } from "@mock-app/services";
+import { 
+  decodeEnvelopedVC, 
+  issueCredentialStatus, 
+  PROOF_FORMAT, 
+  DEFAULT_MACHINE_VERIFICATION_URL 
+} from "@mock-app/services";
 
 type JSONPrimitive = string | number | boolean | null;
 type JSONValue = JSONPrimitive | JSONObject | JSONArray;
@@ -22,7 +27,7 @@ type IssueRequest = {
  */
 type VCkitConfig = {
   vckitAPIUrl: string;
-  issuer: string | JSONObject;
+  issuer: string | { id: string; [key: string]: JSONValue };
   headers?: Record<string, string>;
 };
 
@@ -75,14 +80,24 @@ type AppConfig = {
 };
 
 /**
- * Issued and signed verifiable credential
+ * VCkit API response for credential issuance
  */
-type SignedCredential = JSONObject & {
-  verifiableCredential: {
-    credentialSubject?: {
-      registeredId?: string;
-    } & JSONObject;
-  } & JSONObject;
+type VCkitIssueResponse = {
+  verifiableCredential: JSONObject;
+};
+
+/**
+ * Enveloped verifiable credential
+ */
+type EnvelopedVC = JSONObject;
+
+/**
+ * Decoded (unsigned) credential with credentialSubject
+ */
+type DecodedCredential = JSONObject & {
+  credentialSubject?: JSONObject & {
+    registeredId?: string;
+  };
 };
 
 /**
@@ -121,18 +136,24 @@ export async function POST(req: Request) {
     const config = await getConfig();
     const params = getConfigParameters(config);
 
-    // Issue VC via VCkit
-    const signedCredential = await issueCredential(params, body));
+    // Issue VC
+    const envelopedVC = (await issueCredential(params, body)).verifiableCredential;
 
-    // Store VC
-    const storageResponse = await storeCredential(params, signedCredential);
+    // Decode the enveloped VC
+    const decodedCredential = decodeEnvelopedVC(envelopedVC);
+    if (!decodedCredential) {
+      throw new Error("Failed to decode enveloped verifiable credential");
+    }
+
+    // Store VC (enveloped format)
+    const storageResponse = await storeCredential(params, envelopedVC);
 
     // Optionally publish VC
     const publishResponse = shouldPublish
-      ? await publishCredential(params, signedCredential, storageResponse)
+      ? await publishCredential(params, decodedCredential, storageResponse)
       : { enabled: false };
 
-    return NextResponse.json({ ok: true, storageResponse, publishResponse, signedCredential });
+    return NextResponse.json({ ok: true, storageResponse, publishResponse, credential: decodedCredential });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "An unexpected error has occurred.";
     return NextResponse.json(
@@ -145,16 +166,13 @@ export async function POST(req: Request) {
 /**
  * Issues a verifiable credential using VCkit
  */
-async function issueCredential(params: IssueConfigParams, body: IssueRequest): Promise<SignedCredential> {
+async function issueCredential(params: IssueConfigParams, body: IssueRequest): Promise<VCkitIssueResponse> {
   const vckit = params.vckit;
 
   const credentialStatus = await issueCredentialStatus({
     host: new URL(vckit.vckitAPIUrl).origin,
-    headers: {
-      "Content-Type": "application/json",
-      ...vckit.headers,
-    },
-    bitstringStatusIssuer: {id: vckit.issuer.id, name: vckit.issuer.name},
+    headers: vckit.headers,
+    bitstringStatusIssuer: vckit.issuer,
   });
 
   const payload = {
@@ -162,11 +180,11 @@ async function issueCredential(params: IssueConfigParams, body: IssueRequest): P
       "@context": ["https://www.w3.org/ns/credentials/v2", ...params.dpp.context],
       type: ["VerifiableCredential", ...params.dpp.type],
       issuer: vckit.issuer,
-      credentialStatus,
       credentialSubject: body.formData,
       renderMethod: params.dpp.renderTemplate,
       validUntil: params.dpp.validUntil,
       validFrom: params.dpp.validFrom,
+      credentialStatus,
     },
     options: {
       proofFormat: PROOF_FORMAT,
@@ -187,21 +205,21 @@ async function issueCredential(params: IssueConfigParams, body: IssueRequest): P
     throw new Error(`Failed to issue credential with VCkit: ${res.status} ${text}`);
   }
 
-  return (await res.json()) as SignedCredential;
+  return (await res.json()) as VCkitIssueResponse;
 }
 
 /**
- * Stores the signed credential
+ * Stores the enveloped credential
  */
 async function storeCredential(
   params: IssueConfigParams,
-  signedCredential: SignedCredential
+  envelopedVC: EnvelopedVC
 ): Promise<StorageResponse> {
   const storage = params.storage;
 
   const payload = {
     bucket: storage.params.bucket,
-    data: signedCredential,
+    data: envelopedVC,
   };
 
   const res = await fetch(storage.url, {
@@ -226,15 +244,14 @@ async function storeCredential(
  */
 async function publishCredential(
   params: IssueConfigParams,
-  signedCredential: SignedCredential,
+  decodedCredential: DecodedCredential,
   storage: StorageResponse
 ): Promise<{ enabled: true; raw: JSONValue }> {
   const dlr = params.dlr;
 
   if (!storage?.uri) throw new Error("Storage response missing uri");
 
-  const identificationKey =
-    signedCredential.verifiableCredential.credentialSubject?.registeredId;
+  const identificationKey = decodedCredential.credentialSubject?.registeredId;
 
   if (!identificationKey) {
     throw new Error("Missing credentialSubject.registeredId");
