@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import path from "path";
 
+import { issueCredentialStatus, PROOF_FORMAT, DEFAULT_MACHINE_VERIFICATION_URL } from "@mock-app/services";
+
 type JSONPrimitive = string | number | boolean | null;
 type JSONValue = JSONPrimitive | JSONObject | JSONArray;
 type JSONObject = { [key: string]: JSONValue };
@@ -76,7 +78,7 @@ type AppConfig = {
  * Issued and signed verifiable credential
  */
 type SignedCredential = JSONObject & {
-  verifiableCredential?: {
+  verifiableCredential: {
     credentialSubject?: {
       registeredId?: string;
     } & JSONObject;
@@ -120,7 +122,7 @@ export async function POST(req: Request) {
     const params = getConfigParameters(config);
 
     // Issue VC via VCkit
-    const signedCredential = await issueCredential(params, body);
+    const signedCredential = await issueCredential(params, body));
 
     // Store VC
     const storageResponse = await storeCredential(params, signedCredential);
@@ -146,15 +148,28 @@ export async function POST(req: Request) {
 async function issueCredential(params: IssueConfigParams, body: IssueRequest): Promise<SignedCredential> {
   const vckit = params.vckit;
 
+  const credentialStatus = await issueCredentialStatus({
+    host: new URL(vckit.vckitAPIUrl).origin,
+    headers: {
+      "Content-Type": "application/json",
+      ...vckit.headers,
+    },
+    bitstringStatusIssuer: {id: vckit.issuer.id, name: vckit.issuer.name},
+  });
+
   const payload = {
     credential: {
       "@context": ["https://www.w3.org/ns/credentials/v2", ...params.dpp.context],
       type: ["VerifiableCredential", ...params.dpp.type],
       issuer: vckit.issuer,
+      credentialStatus,
       credentialSubject: body.formData,
       renderMethod: params.dpp.renderTemplate,
       validUntil: params.dpp.validUntil,
       validFrom: params.dpp.validFrom,
+    },
+    options: {
+      proofFormat: PROOF_FORMAT,
     },
   };
 
@@ -219,7 +234,7 @@ async function publishCredential(
   if (!storage?.uri) throw new Error("Storage response missing uri");
 
   const identificationKey =
-    signedCredential.verifiableCredential?.credentialSubject?.registeredId;
+    signedCredential.verifiableCredential.credentialSubject?.registeredId;
 
   if (!identificationKey) {
     throw new Error("Missing credentialSubject.registeredId");
@@ -229,7 +244,7 @@ async function publishCredential(
     {
       linkType: "gs1:verificationService",
       title: "VCKit verify service",
-      targetUrl: params.dpp.dlrVerificationPage,
+      targetUrl: DEFAULT_MACHINE_VERIFICATION_URL,
       mimeType: "text/plain",
     },
     {
@@ -241,12 +256,7 @@ async function publishCredential(
     {
       linkType: "gs1:sustainabilityInfo",
       title: "Product Passport",
-      targetUrl: constructVerifyURL({
-        baseUrl: params.dpp.dlrVerificationPage,
-        uri: storage.uri,
-        key: storage.key,
-        hash: storage.hash,
-      }),
+      targetUrl: DEFAULT_MACHINE_VERIFICATION_URL,
       mimeType: "text/html",
     },
   ];
@@ -275,6 +285,7 @@ async function publishCredential(
     identificationKey,
     identificationKeyType: "01",
     itemDescription: params.dpp.dlrLinkTitle,
+    qualifierPath: "/",
     active: true,
     responses,
   };
@@ -294,26 +305,6 @@ async function publishCredential(
   }
 
   return { enabled: true, raw: await res.json() };
-}
-
-/**
- * Builds verification URL with embedded query payload
- */
-function constructVerifyURL(opts: {
-  baseUrl: string;
-  uri: string;
-  key?: string;
-  hash?: string;
-}) {
-  const { baseUrl, uri, key, hash } = opts;
-  if (!uri) throw new Error("URI is required");
-
-  const payload: Record<string, string> = { uri };
-  if (key) payload.key = key;
-  if (hash) payload.hash = hash;
-
-  const queryString = `q=${encodeURIComponent(JSON.stringify({ payload }))}`;
-  return `${baseUrl}/verify?${queryString}`;
 }
 
 /**

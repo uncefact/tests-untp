@@ -16,6 +16,7 @@ export const contextDefault = ['https://www.w3.org/ns/credentials/v2'];
 export const typeDefault = ['VerifiableCredential'];
 
 export const PROOF_FORMAT = 'EnvelopingProofJose';
+export const DEFAULT_MACHINE_VERIFICATION_URL = 'http://localhost:3332/agent/routeVerificationCredential'
 
 export interface IArgIssueVC {
   credentialSubject: CredentialSubject;
