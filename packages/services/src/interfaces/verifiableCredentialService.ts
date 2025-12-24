@@ -73,6 +73,20 @@ export type SignedVerifiableCredential = {
   verifiableCredential: W3CVerifiableCredential;
 };
 
+/**
+ * Enveloped Verifiable Credential
+ * A credential that has been secured and wrapped in an envelope format (e.g., JWT, JOSE)
+ */
+export type EnvelopedVerifiableCredential = W3CVerifiableCredential & {
+  type: 'EnvelopedVerifiableCredential';
+};
+
+/**
+ * Decoded Verifiable Credential
+ * The unsigned/decoded content of an enveloped credential
+ */
+export type DecodedVerifiableCredential = Omit<W3CVerifiableCredential, 'proof'> & Extensible;
+
 export type RenderMethod = {
   type: string;
   template: string;
