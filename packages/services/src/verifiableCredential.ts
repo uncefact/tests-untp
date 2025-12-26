@@ -1,7 +1,10 @@
 import _ from 'lodash';
 import type {
   CredentialPayload,
+  CredentialStatus,
   IVerifiableCredentialService,
+  Issuer,
+  IssueCredentialStatusParams,
   SignedVerifiableCredential,
   VerifyResult,
   W3CVerifiableCredential
@@ -9,9 +12,11 @@ import type {
 
 import { privateAPI } from './utils/httpService.js';
 
+
 export const contextDefault = ['https://www.w3.org/ns/credentials/v2'];
 export const typeDefault = ['VerifiableCredential'];
 export const issuerDefault = 'did:web:uncefact.github.io:project-vckit:test-and-development';
+export const PROOF_FORMAT = 'EnvelopingProofJose';
 
 /**
  * Service implementation for issuing verifiable credentials
@@ -49,6 +54,16 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
         (typeof credentialPayload.credentialSubject === 'object' &&
          Object.keys(credentialPayload.credentialSubject).length === 0)) {
       throw new Error("Error issuing VC. credentialSubject is required in credential payload.");
+    }
+
+    // Issue credential status if not provided
+    if (!credentialPayload.credentialStatus) {
+      const credentialStatus = await this.issueCredentialStatus({
+        host: new URL(this.baseURL).origin,
+        headers,
+        bitstringStatusIssuer: credentialPayload.issuer || issuerDefault,
+      });
+      credentialPayload.credentialStatus = credentialStatus as CredentialStatus;
     }
 
     // construct verifiable credential
@@ -115,6 +130,59 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
         throw new Error(`Failed to issue verifiable credential: ${error.message}`);
       }
       throw new Error('Failed to issue verifiable credential: Unknown error');
+    }
+  }
+
+  /**
+   * Issues a credential status for bitstring status list
+   * @param params - Parameters for issuing credential status
+   * @returns A promise that resolves to a credential status object
+   * @throws Error if required parameters are missing or invalid
+   */
+  private async issueCredentialStatus(
+    params: IssueCredentialStatusParams
+  ): Promise<CredentialStatus> {
+    if (!params.host) {
+      throw new Error('Error issuing credential status: Host is required');
+    }
+
+    if (!params.bitstringStatusIssuer) {
+      throw new Error('Error issuing credential status: Bitstring Status Issuer is required');
+    }
+
+    // issuer can be either a string or an object
+    let issuerId: string;
+    if (typeof params.bitstringStatusIssuer === 'string') {
+      issuerId = params.bitstringStatusIssuer;
+    } else if (typeof params.bitstringStatusIssuer === 'object' && params.bitstringStatusIssuer.id) {
+      issuerId = params.bitstringStatusIssuer.id;
+    } else {
+      throw new Error('Error issuing credential status: Bitstring Status Issuer ID is required');
+    }
+
+    const { host, headers, statusPurpose = 'revocation', ...rest } = params;
+    const payload = {
+      statusPurpose,
+      ...rest,
+      bitstringStatusIssuer: issuerId,
+    };
+
+    if (headers) {
+      this.validateHeaders(headers);
+    }
+
+    try {
+      const response = await privateAPI.post<CredentialStatus>(
+        `${host}/agent/issueBitstringStatusList`,
+        payload,
+        { headers: headers || {} }
+      );
+      return response;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to issue credential status: ${error.message}`);
+      }
+      throw new Error('Failed to issue credential status: Unknown error');
     }
   }
 }
