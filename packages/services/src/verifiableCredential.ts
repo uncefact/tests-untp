@@ -57,17 +57,17 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     }
 
     // Issue credential status if not provided
-    if (!credentialPayload.credentialStatus) {
-      const credentialStatus = await this.issueCredentialStatus({
-        host: new URL(this.baseURL).origin,
-        headers,
-        bitstringStatusIssuer: credentialPayload.issuer || issuerDefault,
-      });
-      credentialPayload.credentialStatus = credentialStatus as CredentialStatus;
-    }
+    const credentialStatus = credentialPayload.credentialStatus ?? await this.issueCredentialStatus({
+      host: new URL(this.baseURL).origin,
+      headers,
+      bitstringStatusIssuer: credentialPayload.issuer || issuerDefault,
+    });
 
     // construct verifiable credential
-    const vc = this.constructVerifiableCredential(credentialPayload);
+    const vc = this.constructVerifiableCredential({
+      ...credentialPayload,
+      credentialStatus
+    });
 
     // issue credential
     const signedCredential = await this.issueVerifiableCredential(vc, headers);
@@ -85,8 +85,12 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     credentialPayload: CredentialPayload
   ): W3CVerifiableCredential {
     // add or merge context from credentialPayload
-    const context = [...contextDefault, ...(credentialPayload.context || [])]
-    const type = [...(credentialPayload.type || []), ...typeDefault];
+    const context = [...new Set([...contextDefault, ...(credentialPayload.context || [])])]
+    const additionalTypes = credentialPayload.type
+      ? (Array.isArray(credentialPayload.type) ? credentialPayload.type : [credentialPayload.type])
+      : [];
+
+    const type = [...typeDefault, ...additionalTypes];
 
     const issuer = credentialPayload.issuer || issuerDefault;
 

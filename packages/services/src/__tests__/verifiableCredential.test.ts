@@ -38,10 +38,12 @@ describe('verifiableCredential', () => {
 
   describe('sign', () => {
     const mockEnvelopedVerifiableCredential = {
-      '@context': ['https://www.w3.org/ns/credentials/v2'],
-      type: 'EnvelopedVerifiableCredential',
-      id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsImlzcyI6ImRpZDp3ZWIvcmcvMjAxOC9jcmVkZWyMDIyIn1dfQ.8pUt1rZktWKGBGyJ6GH3io6f7fliAg8IWsEqTWCYvKm0fQkIlPnqqTobxgR3qmtMd_jJXc8IHwbVVOBUEvpcCg',
-      issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development'
+      verifiableCredential: {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: 'EnvelopedVerifiableCredential',
+        id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsImlzcyI6ImRpZDp3ZWIvcmcvMjAxOC9jcmVkZWyMDIyIn1dfQ.8pUt1rZktWKGBGyJ6GH3io6f7fliAg8IWsEqTWCYvKm0fQkIlPnqqTobxgR3qmtMd_jJXc8IHwbVVOBUEvpcCg',
+        issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development'
+      }
     };
 
     it('should call issue API endpoint with credential status', async () => {
@@ -61,7 +63,7 @@ describe('verifiableCredential', () => {
       // Verify call to credential status endpoint
       expect(privateAPI.post).toHaveBeenNthCalledWith(
         1,
-        `https://api.vc.example.com/agent/issueBitstringStatusList`,
+        `${mockAPIUrl}/agent/issueBitstringStatusList`,
         expect.objectContaining({
           statusPurpose: 'revocation',
           bitstringStatusIssuer: mockIssuer,
@@ -106,7 +108,7 @@ describe('verifiableCredential', () => {
       // Verify headers in credential status call
       expect(privateAPI.post).toHaveBeenNthCalledWith(
         1,
-        `https://api.vc.example.com/agent/issueBitstringStatusList`,
+        `${mockAPIUrl}/agent/issueBitstringStatusList`,
         expect.any(Object),
         { headers: customHeaders },
       );
@@ -168,6 +170,33 @@ describe('verifiableCredential', () => {
 
       const result = await service.sign(vc);
 
+      // Verify call to credential status endpoint with default issuer
+      expect(privateAPI.post).toHaveBeenNthCalledWith(
+        1,
+        `${mockAPIUrl}/agent/issueBitstringStatusList`,
+        expect.objectContaining({
+          statusPurpose: 'revocation',
+          bitstringStatusIssuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+        }),
+        { headers: {} },
+      );
+
+      // Verify call to issue endpoint with default context, type, and issuer
+      expect(privateAPI.post).toHaveBeenNthCalledWith(
+        2,
+        `${mockAPIUrl}/credentials/issue`,
+        expect.objectContaining({
+          credential: {
+            '@context': ['https://www.w3.org/ns/credentials/v2'],
+            type: ['VerifiableCredential'],
+            issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+            credentialSubject: mockCredentialSubject,
+            credentialStatus: mockCredentialStatus,
+          }
+        }),
+        { headers: {} },
+      );
+
       expect(result).toEqual(mockEnvelopedVerifiableCredential);
     });
 
@@ -179,8 +208,10 @@ describe('verifiableCredential', () => {
       } as CredentialPayload;
 
       const mockIssueResponse = {
-        ...mockEnvelopedVerifiableCredential,
-        "@context": ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/']
+        verifiableCredential: {
+          ...mockEnvelopedVerifiableCredential.verifiableCredential,
+          "@context": ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/']
+        }
       };
 
       (privateAPI.post as jest.Mock)
@@ -188,6 +219,33 @@ describe('verifiableCredential', () => {
         .mockResolvedValueOnce(mockIssueResponse);
 
       const result = await service.sign(vc);
+
+      // Verify call to credential status endpoint with default issuer
+      expect(privateAPI.post).toHaveBeenNthCalledWith(
+        1,
+        `${mockAPIUrl}/agent/issueBitstringStatusList`,
+        expect.objectContaining({
+          statusPurpose: 'revocation',
+          bitstringStatusIssuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+        }),
+        { headers: {} },
+      );
+
+      // Verify call to issue endpoint with merged context (default + custom)
+      expect(privateAPI.post).toHaveBeenNthCalledWith(
+        2,
+        `${mockAPIUrl}/credentials/issue`,
+        expect.objectContaining({
+          credential: expect.objectContaining({
+            '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/'],
+            type: ['VerifiableCredential'],
+            issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+            credentialSubject: mockCredentialSubject,
+            credentialStatus: mockCredentialStatus,
+          })
+        }),
+        { headers: {} },
+      );
 
       expect(result).toEqual(mockIssueResponse);
     });
@@ -195,13 +253,15 @@ describe('verifiableCredential', () => {
     it('should issue VC with added type', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl);
       const vc = {
-        type: ['Custom Type'],
+        type: 'CustomType',
         credentialSubject: mockCredentialSubject
       } as CredentialPayload;
 
       const mockIssueResponse = {
-        ...mockEnvelopedVerifiableCredential,
-        type: ['Custom Type', 'VerifiableCredential']
+        verifiableCredential: {
+          ...mockEnvelopedVerifiableCredential.verifiableCredential,
+          type: ['VerifiableCredential', 'CustomType']
+        }
       };
 
       (privateAPI.post as jest.Mock)
@@ -209,6 +269,33 @@ describe('verifiableCredential', () => {
         .mockResolvedValueOnce(mockIssueResponse);
 
       const result = await service.sign(vc);
+
+      // Verify call to credential status endpoint with default issuer
+      expect(privateAPI.post).toHaveBeenNthCalledWith(
+        1,
+        `${mockAPIUrl}/agent/issueBitstringStatusList`,
+        expect.objectContaining({
+          statusPurpose: 'revocation',
+          bitstringStatusIssuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+        }),
+        { headers: {} },
+      );
+
+      // Verify call to issue endpoint with merged type (custom + default)
+      expect(privateAPI.post).toHaveBeenNthCalledWith(
+        2,
+        `${mockAPIUrl}/credentials/issue`,
+        expect.objectContaining({
+          credential: expect.objectContaining({
+            '@context': ['https://www.w3.org/ns/credentials/v2'],
+            type: ['VerifiableCredential', 'CustomType'],
+            issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+            credentialSubject: mockCredentialSubject,
+            credentialStatus: mockCredentialStatus,
+          })
+        }),
+        { headers: {} },
+      );
 
       expect(result).toEqual(mockIssueResponse);
     });
