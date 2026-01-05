@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { issueCredentialStatus, PROOF_FORMAT } from "@mock-app/services";
 import { readFile } from "fs/promises";
+import { NextResponse } from "next/server";
 import path from "path";
 
 type JSONPrimitive = string | number | boolean | null;
@@ -75,13 +76,7 @@ type AppConfig = {
 /**
  * Issued and signed verifiable credential
  */
-type SignedCredential = JSONObject & {
-  verifiableCredential?: {
-    credentialSubject?: {
-      registeredId?: string;
-    } & JSONObject;
-  } & JSONObject;
-};
+type SignedCredential = any;
 
 /**
  * Storage service response
@@ -101,12 +96,16 @@ type StorageResponse = {
 export async function POST(req: Request) {
   let body: IssueRequest;
 
+
   // Parse request body
   try {
     body = (await req.json()) as IssueRequest;
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
+
+  console.log({body: JSON.stringify(body)})
+
 
   // Validate form data
   if (!body.formData || typeof body.formData !== "object") {
@@ -120,7 +119,9 @@ export async function POST(req: Request) {
     const params = getConfigParameters(config);
 
     // Issue VC via VCkit
-    const signedCredential = await issueCredential(params, body);
+    const signedCredential = (await issueCredential(params, body)).verifiableCredential;
+
+    console.log({signedCredential: JSON.stringify(signedCredential)})
 
     // Store VC
     const storageResponse = await storeCredential(params, signedCredential);
@@ -146,23 +147,38 @@ export async function POST(req: Request) {
 async function issueCredential(params: IssueConfigParams, body: IssueRequest): Promise<SignedCredential> {
   const vckit = params.vckit;
 
+  const credentialStatus = await issueCredentialStatus({
+    host: new URL(vckit.vckitAPIUrl).origin,
+    headers: {
+      "Content-Type": "application/json",
+      ...({ Authorization: 'Bearer test1234' }),
+    },
+    bitstringStatusIssuer: {id: (vckit.issuer as any)?.id ?? '', name: (vckit.issuer as any)?.name ?? ''},
+  });
+
   const payload = {
     credential: {
       "@context": ["https://www.w3.org/ns/credentials/v2", ...params.dpp.context],
       type: ["VerifiableCredential", ...params.dpp.type],
       issuer: vckit.issuer,
+      credentialStatus,
       credentialSubject: body.formData,
       renderMethod: params.dpp.renderTemplate,
       validUntil: params.dpp.validUntil,
       validFrom: params.dpp.validFrom,
     },
+    options: {
+      proofFormat: PROOF_FORMAT,
+    },
   };
+
+  console.log({vckit: vckit.vckitAPIUrl, headers: vckit.headers})
 
   const res = await fetch(`${vckit.vckitAPIUrl}/credentials/issue`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(vckit.headers ?? {}),
+      ...({ Authorization: 'Bearer test1234' }),
     },
     body: JSON.stringify(payload),
   });
@@ -219,7 +235,9 @@ async function publishCredential(
   if (!storage?.uri) throw new Error("Storage response missing uri");
 
   const identificationKey =
-    signedCredential.verifiableCredential?.credentialSubject?.registeredId;
+    signedCredential.verifiableCredential?.credentialSubject?.registeredId ?? '1234567890';
+
+    console.log({identificationKey})
 
   if (!identificationKey) {
     throw new Error("Missing credentialSubject.registeredId");
@@ -229,7 +247,7 @@ async function publishCredential(
     {
       linkType: "gs1:verificationService",
       title: "VCKit verify service",
-      targetUrl: params.dpp.dlrVerificationPage,
+      targetUrl: 'http://localhost:4003/verify',
       mimeType: "text/plain",
     },
     {
@@ -242,7 +260,7 @@ async function publishCredential(
       linkType: "gs1:sustainabilityInfo",
       title: "Product Passport",
       targetUrl: constructVerifyURL({
-        baseUrl: params.dpp.dlrVerificationPage,
+        baseUrl: 'http://localhost:4003/verify',
         uri: storage.uri,
         key: storage.key,
         hash: storage.hash,
@@ -279,7 +297,9 @@ async function publishCredential(
     responses,
   };
 
-  const res = await fetch(`${dlr.dlrAPIUrl}/${dlr.linkRegisterPath}`, {
+  console.log({dlr_payload: JSON.stringify(payload)})
+
+  const res = await fetch(`${'http://localhost:3003/api/1.0.0/resolver'}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -313,7 +333,7 @@ function constructVerifyURL(opts: {
   if (hash) payload.hash = hash;
 
   const queryString = `q=${encodeURIComponent(JSON.stringify({ payload }))}`;
-  return `${baseUrl}/verify?${queryString}`;
+  return `${baseUrl}?${queryString}`;
 }
 
 /**

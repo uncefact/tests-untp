@@ -1863,7 +1863,7 @@
     "href": "http://localhost:3332/agent/routeVerificationCredential",
     "hreflang": ["en"],
     "headers": {
-      "Authorization": "Bearer test123",
+      "Authorization": "Bearer test1234",
       "Content-Type": "application/json"
     }
   }
