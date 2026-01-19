@@ -16,6 +16,14 @@ export type StorageRecord = {
 };
 
 /**
+ * Configuration for storing a credential in an external storage service
+ */
+export type StorageConfig<TParams extends object = {}> = {
+  params?: TParams;
+  headers?: Record<string, string>;
+};
+
+/**
  * Service responsible for persisting verifiable credentials
  */
 export interface IStorageService {
@@ -23,10 +31,7 @@ export interface IStorageService {
    * Stores a signed verifiable credential using the provided storage configuration
    */
   store(
-    url: string,
-    method: string,
-    bucket: string,
     credential: SignedVerifiableCredential,
-    headers?: Record<string, string>
+    config?: StorageConfig,
   ): Promise<StorageRecord>
 }
