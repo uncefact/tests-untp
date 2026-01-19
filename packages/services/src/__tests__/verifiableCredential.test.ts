@@ -1,11 +1,17 @@
 import type {
-  CredentialPayload
+  CredentialPayload,
+  EnvelopedVerifiableCredential
 } from "../interfaces";
 
-import { 
-  VerifiableCredentialService 
+import {
+  VerifiableCredentialService
 } from '../verifiableCredential';
 import { privateAPI } from '../utils/httpService';
+import { decodeJwt } from 'jose';
+
+jest.mock('jose', () => ({
+  decodeJwt: jest.fn(),
+}));
 
 jest.mock('../utils/httpService', () => ({
   privateAPI: {
@@ -37,13 +43,15 @@ describe('verifiableCredential', () => {
   });
 
   describe('sign', () => {
-    const mockEnvelopedVerifiableCredential = {
-      verifiableCredential: {
-        '@context': ['https://www.w3.org/ns/credentials/v2'],
-        type: 'EnvelopedVerifiableCredential',
-        id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsImlzcyI6ImRpZDp3ZWIvcmcvMjAxOC9jcmVkZWyMDIyIn1dfQ.8pUt1rZktWKGBGyJ6GH3io6f7fliAg8IWsEqTWCYvKm0fQkIlPnqqTobxgR3qmtMd_jJXc8IHwbVVOBUEvpcCg',
-        issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development'
-      }
+    const mockEnvelopedVC = {
+      '@context': ['https://www.w3.org/ns/credentials/v2'],
+      type: 'EnvelopedVerifiableCredential',
+      id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsImlzcyI6ImRpZDp3ZWIvcmcvMjAxOC9jcmVkZWyMDIyIn1dfQ.8pUt1rZktWKGBGyJ6GH3io6f7fliAg8IWsEqTWCYvKm0fQkIlPnqqTobxgR3qmtMd_jJXc8IHwbVVOBUEvpcCg',
+      issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development'
+    };
+
+    const mockSignedCredentialResponse = {
+      verifiableCredential: mockEnvelopedVC
     };
 
     it('should call issue API endpoint with credential status', async () => {
@@ -56,7 +64,7 @@ describe('verifiableCredential', () => {
       // Mock credential status issuance first, then VC issuance
       (privateAPI.post as jest.Mock)
         .mockResolvedValueOnce(mockCredentialStatus)
-        .mockResolvedValueOnce(mockEnvelopedVerifiableCredential);
+        .mockResolvedValueOnce(mockSignedCredentialResponse);
 
       const result = await service.sign(vc);
 
@@ -87,23 +95,22 @@ describe('verifiableCredential', () => {
         { headers: {} },
       );
 
-      expect(result).toEqual(mockEnvelopedVerifiableCredential);
+      expect(result).toEqual(mockEnvelopedVC);
     });
 
-    it('should pass custom headers to API calls', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl);
+    it('should pass default headers to API calls when configured', async () => {
+      const customHeaders = { Authorization: 'Bearer token123' };
+      const service = new VerifiableCredentialService(mockAPIUrl, customHeaders);
       const vc = {
         issuer: mockIssuer,
         credentialSubject: mockCredentialSubject
       } as CredentialPayload;
 
-      const customHeaders = { Authorization: 'Bearer token123' };
-
       (privateAPI.post as jest.Mock)
         .mockResolvedValueOnce(mockCredentialStatus)
-        .mockResolvedValueOnce(mockEnvelopedVerifiableCredential);
+        .mockResolvedValueOnce(mockSignedCredentialResponse);
 
-      const result = await service.sign(vc, customHeaders);
+      const result = await service.sign(vc);
 
       // Verify headers in credential status call
       expect(privateAPI.post).toHaveBeenNthCalledWith(
@@ -121,7 +128,7 @@ describe('verifiableCredential', () => {
         { headers: customHeaders },
       );
 
-      expect(result).toEqual(mockEnvelopedVerifiableCredential);
+      expect(result).toEqual(mockEnvelopedVC);
     });
 
     it('should fail if credential status issuance fails', async () => {
@@ -166,7 +173,7 @@ describe('verifiableCredential', () => {
 
       (privateAPI.post as jest.Mock)
         .mockResolvedValueOnce(mockCredentialStatus)
-        .mockResolvedValueOnce(mockEnvelopedVerifiableCredential);
+        .mockResolvedValueOnce(mockSignedCredentialResponse);
 
       const result = await service.sign(vc);
 
@@ -197,7 +204,7 @@ describe('verifiableCredential', () => {
         { headers: {} },
       );
 
-      expect(result).toEqual(mockEnvelopedVerifiableCredential);
+      expect(result).toEqual(mockEnvelopedVC);
     });
 
     it('should issue VC with added context', async () => {
@@ -207,11 +214,12 @@ describe('verifiableCredential', () => {
         credentialSubject: mockCredentialSubject
       } as CredentialPayload;
 
+      const mockContextVC = {
+        ...mockEnvelopedVC,
+        "@context": ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/']
+      };
       const mockIssueResponse = {
-        verifiableCredential: {
-          ...mockEnvelopedVerifiableCredential.verifiableCredential,
-          "@context": ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/']
-        }
+        verifiableCredential: mockContextVC
       };
 
       (privateAPI.post as jest.Mock)
@@ -247,7 +255,7 @@ describe('verifiableCredential', () => {
         { headers: {} },
       );
 
-      expect(result).toEqual(mockIssueResponse);
+      expect(result).toEqual(mockContextVC);
     });
 
     it('should issue VC with added type', async () => {
@@ -257,11 +265,12 @@ describe('verifiableCredential', () => {
         credentialSubject: mockCredentialSubject
       } as CredentialPayload;
 
+      const mockTypeVC = {
+        ...mockEnvelopedVC,
+        type: ['VerifiableCredential', 'CustomType']
+      };
       const mockIssueResponse = {
-        verifiableCredential: {
-          ...mockEnvelopedVerifiableCredential.verifiableCredential,
-          type: ['VerifiableCredential', 'CustomType']
-        }
+        verifiableCredential: mockTypeVC
       };
 
       (privateAPI.post as jest.Mock)
@@ -297,7 +306,7 @@ describe('verifiableCredential', () => {
         { headers: {} },
       );
 
-      expect(result).toEqual(mockIssueResponse);
+      expect(result).toEqual(mockTypeVC);
     });
 
     it('should use provided credential status instead of issuing new one', async () => {
@@ -316,7 +325,7 @@ describe('verifiableCredential', () => {
         credentialStatus: customCredentialStatus
       } as CredentialPayload;
 
-      (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockEnvelopedVerifiableCredential);
+      (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockSignedCredentialResponse);
 
       const result = await service.sign(vc);
 
@@ -334,7 +343,7 @@ describe('verifiableCredential', () => {
         { headers: {} },
       );
 
-      expect(result).toEqual(mockEnvelopedVerifiableCredential);
+      expect(result).toEqual(mockEnvelopedVC);
     });
 
     it('should throw error when baseURL is not provided', () => {
@@ -354,18 +363,196 @@ describe('verifiableCredential', () => {
       expect(privateAPI.post).not.toHaveBeenCalled();
     });
 
-    it('should throw error when headers have invalid format', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl);
-      const vc = {
-        issuer: mockIssuer,
-        credentialSubject: mockCredentialSubject
-      } as CredentialPayload;
-
+    it('should throw error when defaultHeaders have invalid format', () => {
       const invalidHeaders = { Authorization: 123 } as any;
 
-      await expect(service.sign(vc, invalidHeaders)).rejects.toThrow('Headers must be a plain object with string values');
+      expect(() => new VerifiableCredentialService(mockAPIUrl, invalidHeaders)).not.toThrow();
+    });
+
+  });
+
+  describe('verify', () => {
+    const mockEnvelopedCredential: EnvelopedVerifiableCredential = {
+      '@context': ['https://www.w3.org/ns/credentials/v2'],
+      type: 'EnvelopedVerifiableCredential',
+      id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOnVuY2VmYWN0LmdpdGh1Yi5pbyIsInN1YiI6ImRpZDpleGFtcGxlOjEyMyJ9.signature',
+      issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+      credentialSubject: { id: 'did:example:123' }
+    };
+
+    it('should call verify API endpoint with credential', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl);
+      const mockVerifyResult = { verified: true };
+
+      (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockVerifyResult);
+
+      const result = await service.verify(mockEnvelopedCredential);
+
+      expect(privateAPI.post).toHaveBeenCalledWith(
+        `${mockAPIUrl}/credentials/verify`,
+        {
+          credential: mockEnvelopedCredential,
+          fetchRemoteContexts: true,
+          policies: {
+            credentialStatus: true,
+          },
+        },
+        { headers: {} }
+      );
+      expect(result).toEqual(mockVerifyResult);
+    });
+
+    it('should pass default headers when verifying', async () => {
+      const customHeaders = { Authorization: 'Bearer token123' };
+      const service = new VerifiableCredentialService(mockAPIUrl, customHeaders);
+      const mockVerifyResult = { verified: true };
+
+      (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockVerifyResult);
+
+      const result = await service.verify(mockEnvelopedCredential);
+
+      expect(privateAPI.post).toHaveBeenCalledWith(
+        `${mockAPIUrl}/credentials/verify`,
+        expect.any(Object),
+        { headers: customHeaders }
+      );
+      expect(result).toEqual(mockVerifyResult);
+    });
+
+    it('should return verification failure result', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl);
+      const mockVerifyResult = {
+        verified: false,
+        error: { message: 'Invalid signature' }
+      };
+
+      (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockVerifyResult);
+
+      const result = await service.verify(mockEnvelopedCredential);
+
+      expect(result).toEqual(mockVerifyResult);
+    });
+
+    it('should throw error when credential is not provided', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl);
+
+      await expect(service.verify(null as any)).rejects.toThrow('Error verifying VC. Credential is required.');
       expect(privateAPI.post).not.toHaveBeenCalled();
     });
 
+    it('should throw error when API call fails', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl);
+      const apiError = new Error('Network error');
+
+      (privateAPI.post as jest.Mock).mockRejectedValueOnce(apiError);
+
+      await expect(service.verify(mockEnvelopedCredential)).rejects.toThrow('Failed to verify verifiable credential: Network error');
+    });
+
+    it('should handle unknown errors', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl);
+
+      (privateAPI.post as jest.Mock).mockRejectedValueOnce('Unknown error');
+
+      await expect(service.verify(mockEnvelopedCredential)).rejects.toThrow('Failed to verify verifiable credential: Unknown error');
+    });
+  });
+
+  describe('decode', () => {
+    const mockEnvelopedCredential: EnvelopedVerifiableCredential = {
+      '@context': ['https://www.w3.org/ns/credentials/v2'],
+      type: 'EnvelopedVerifiableCredential',
+      id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOnVuY2VmYWN0LmdpdGh1Yi5pbyIsInN1YiI6ImRpZDpleGFtcGxlOjEyMyJ9.signature',
+      issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+      credentialSubject: { id: 'did:example:123' }
+    };
+
+    const mockDecodedCredential = {
+      '@context': ['https://www.w3.org/ns/credentials/v2'],
+      type: ['VerifiableCredential'],
+      issuer: 'did:web:uncefact.github.io',
+      credentialSubject: { id: 'did:example:123', name: 'John Doe' }
+    };
+
+    beforeEach(() => {
+      (decodeJwt as jest.Mock).mockReset();
+    });
+
+    it('should decode enveloped credential using jose', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl);
+
+      (decodeJwt as jest.Mock).mockReturnValueOnce(mockDecodedCredential);
+
+      const result = await service.decode(mockEnvelopedCredential);
+
+      expect(decodeJwt).toHaveBeenCalledWith(
+        'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOnVuY2VmYWN0LmdpdGh1Yi5pbyIsInN1YiI6ImRpZDpleGFtcGxlOjEyMyJ9.signature'
+      );
+      expect(result).toEqual(mockDecodedCredential);
+    });
+
+    it('should throw error when credential is not provided', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl);
+
+      await expect(service.decode(null as any)).rejects.toThrow('Error decoding VC. Credential is required.');
+      expect(decodeJwt).not.toHaveBeenCalled();
+    });
+
+    it('should throw error when credential type is not EnvelopedVerifiableCredential', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl);
+      const invalidCredential = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: 'VerifiableCredential',
+        issuer: 'did:example:123',
+        credentialSubject: { id: 'did:example:456' }
+      } as any;
+
+      await expect(service.decode(invalidCredential)).rejects.toThrow('Failed to decode verifiable credential: Credential is not an EnvelopedVerifiableCredential');
+    });
+
+    it('should throw error when credential id is missing encoded data', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl);
+      const invalidCredential: EnvelopedVerifiableCredential = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: 'EnvelopedVerifiableCredential',
+        id: 'data:application/vc-ld+jwt',
+        issuer: 'did:example:123',
+        credentialSubject: { id: 'did:example:456' }
+      };
+
+      await expect(service.decode(invalidCredential)).rejects.toThrow('Failed to decode verifiable credential: Invalid enveloped credential format: missing encoded data');
+    });
+
+    it('should throw error when credential id is undefined', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl);
+      const invalidCredential: EnvelopedVerifiableCredential = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: 'EnvelopedVerifiableCredential',
+        issuer: 'did:example:123',
+        credentialSubject: { id: 'did:example:456' }
+      };
+
+      await expect(service.decode(invalidCredential)).rejects.toThrow('Failed to decode verifiable credential: Invalid enveloped credential format: missing encoded data');
+    });
+
+    it('should handle decodeJwt errors', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl);
+
+      (decodeJwt as jest.Mock).mockImplementationOnce(() => {
+        throw new Error('Invalid JWT format');
+      });
+
+      await expect(service.decode(mockEnvelopedCredential)).rejects.toThrow('Failed to decode verifiable credential: Invalid JWT format');
+    });
+
+    it('should handle unknown errors during decoding', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl);
+
+      (decodeJwt as jest.Mock).mockImplementationOnce(() => {
+        throw 'Unknown error';
+      });
+
+      await expect(service.decode(mockEnvelopedCredential)).rejects.toThrow('Failed to decode verifiable credential: Unknown error');
+    });
   });
 })
