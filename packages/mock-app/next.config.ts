@@ -14,7 +14,8 @@ const {
   RI_POSTGRES_HOST,
   RI_POSTGRES_PORT,
   AUTH_KEYCLOAK_ISSUER,
-  RI_APP_URL
+  RI_APP_URL,
+  PUBLIC_VERIFICATION_SERVICE_URL
 } = process.env;
 
 // Validate required environment variables
@@ -25,7 +26,8 @@ const requiredEnvVars = {
   RI_POSTGRES_HOST,
   RI_POSTGRES_PORT,
   AUTH_KEYCLOAK_ISSUER,
-  RI_APP_URL
+  RI_APP_URL,
+  PUBLIC_VERIFICATION_SERVICE_URL
 };
 
 const missingVars = Object.entries(requiredEnvVars)
@@ -49,7 +51,8 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@mock-app/components'],
   env:{
     NEXT_PUBLIC_AUTH_KEYCLOAK_ISSUER: AUTH_KEYCLOAK_ISSUER,
-    NEXT_PUBLIC_NEXTAUTH_URL: RI_APP_URL
+    NEXT_PUBLIC_NEXTAUTH_URL: RI_APP_URL,
+    NEXT_PUBLIC_VERIFICATION_SERVICE_URL: PUBLIC_VERIFICATION_SERVICE_URL
   }
 };
 

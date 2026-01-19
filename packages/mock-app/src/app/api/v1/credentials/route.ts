@@ -7,7 +7,6 @@ import {
   decodeEnvelopedVC,
   issueCredentialStatus,
   PROOF_FORMAT,
-  DEFAULT_MACHINE_VERIFICATION_URL
 } from "@mock-app/services";
 
 type JSONPrimitive = string | number | boolean | null;
@@ -258,11 +257,18 @@ async function publishCredential(
     throw new Error("Missing credentialSubject.registeredId");
   }
 
+  const verificationURL = process.env.NEXT_PUBLIC_VERIFICATION_SERVICE_URL!;
+
   const baseResponses = [
     {
       linkType: "gs1:verificationService",
       title: "VCKit verify service",
-      targetUrl: DEFAULT_MACHINE_VERIFICATION_URL,
+      targetUrl: constructVerifyURL({
+        baseUrl: verificationURL,
+        uri: storage.uri,
+        key: storage.key,
+        hash: storage.hash,
+      }),
       mimeType: "text/plain",
     },
     {
@@ -274,7 +280,12 @@ async function publishCredential(
     {
       linkType: "gs1:sustainabilityInfo",
       title: "Product Passport",
-      targetUrl: DEFAULT_MACHINE_VERIFICATION_URL,
+      targetUrl: constructVerifyURL({
+        baseUrl: verificationURL,
+        uri: storage.uri,
+        key: storage.key,
+        hash: storage.hash,
+      }),
       mimeType: "text/html",
     },
   ];
