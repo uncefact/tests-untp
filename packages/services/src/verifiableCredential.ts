@@ -1,7 +1,10 @@
 import _ from 'lodash';
+import { decodeJwt } from 'jose';
 import type {
   CredentialPayload,
   CredentialStatus,
+  DecodedVerifiableCredential,
+  EnvelopedVerifiableCredential,
   IVerifiableCredentialService,
   Issuer,
   IssueCredentialStatusParams,
@@ -23,20 +26,19 @@ export const PROOF_FORMAT = 'EnvelopingProofJose';
  * Implements the IVerifiableCredentialService interface
  */
 export class VerifiableCredentialService implements IVerifiableCredentialService {
-  /**
-   * Base URL for the credential service API
-   */
-  public readonly baseURL: string;
+  readonly baseURL: string;
+  readonly defaultHeaders: Record<string, string>;
 
   /**
    * Constructs a new VerifiableCredentialService instance
    * @param baseURL - The base URL for the credential service API
    */
-  constructor(baseURL: string) {
+  constructor(baseURL: string, defaultHeaders?: Record<string, string>) {
     if (!baseURL) {
       throw new Error("Error creating VerifiableCredentialService. API URL is required.");
     }
     this.baseURL = baseURL;
+    this.defaultHeaders = defaultHeaders || {};
   }
 
   /**
@@ -47,8 +49,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
    */
   async sign(
     credentialPayload: CredentialPayload,
-    headers?: Record<string, string>
-  ): Promise<SignedVerifiableCredential> {
+  ): Promise<EnvelopedVerifiableCredential> {
     // A verifiable credential MUST contain a credentialSubject property
     if (!credentialPayload.credentialSubject ||
         (typeof credentialPayload.credentialSubject === 'object' &&
@@ -59,7 +60,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     // Issue credential status if not provided
     const credentialStatus = credentialPayload.credentialStatus ?? await this.issueCredentialStatus({
       host: new URL(this.baseURL).origin,
-      headers,
+      headers: this.defaultHeaders,
       bitstringStatusIssuer: credentialPayload.issuer || issuerDefault,
     });
 
@@ -70,14 +71,68 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     });
 
     // issue credential
-    const signedCredential = await this.issueVerifiableCredential(vc, headers);
+    const signedCredential = await this.issueVerifiableCredential(vc);
 
-    return signedCredential;
+    return signedCredential.verifiableCredential as EnvelopedVerifiableCredential;
   }
 
-  private validateHeaders(headers: Record<string, string>) {
-    if (!_.isPlainObject(headers) || !_.every(headers, (value) => _.isString(value))) {
-      throw new Error("Headers must be a plain object with string values");
+  /**
+   * Verifies an enveloped verifiable credential
+   * @param credential - The enveloped verifiable credential to verify
+   * @returns A promise that resolves to a verification result
+   */
+  public async verify(credential: EnvelopedVerifiableCredential): Promise<VerifyResult> {
+    if (!credential) {
+      throw new Error('Error verifying VC. Credential is required.');
+    }
+
+    const verifyCredentialParams = {
+      credential: credential,
+      fetchRemoteContexts: true,
+      policies: {
+        credentialStatus: true,
+      },
+    };
+
+    try {
+      const result = await privateAPI.post<VerifyResult>(
+        `${this.baseURL}/credentials/verify`,
+        verifyCredentialParams,
+        { headers: this.defaultHeaders || {} }
+      );
+      return result;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to verify verifiable credential: ${error.message}`);
+      }
+      throw new Error('Failed to verify verifiable credential: Unknown error');
+    }
+  }
+
+  /**
+   * Decodes an enveloped verifiable credential to extract the unsigned credential content
+   * @param credential - The enveloped verifiable credential to decode
+   * @returns A promise that resolves to the decoded credential without the proof
+   */
+  public async decode(credential: EnvelopedVerifiableCredential): Promise<DecodedVerifiableCredential> {
+    if (!credential) {
+      throw new Error('Error decoding VC. Credential is required.');
+    }
+
+    try {
+      if (credential.type === 'EnvelopedVerifiableCredential') {
+        const encodedCredential = credential.id?.split(',')[1];
+        if (!encodedCredential) {
+          throw new Error('Invalid enveloped credential format: missing encoded data');
+        }
+        return decodeJwt(encodedCredential) as DecodedVerifiableCredential;
+      }
+      throw new Error('Credential is not an EnvelopedVerifiableCredential');
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to decode verifiable credential: ${error.message}`);
+      }
+      throw new Error('Failed to decode verifiable credential: Unknown error');
     }
   }
 
@@ -107,17 +162,11 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
   /**
    * Issues and signs a verifiable credential by calling VCkit API
    * @param vc - The verifiable credential to sign
-   * @param headers - Optional HTTP headers to include in the request
    * @returns A signed verifiable credential
    */
   private async issueVerifiableCredential(
-    vc: W3CVerifiableCredential,
-    headers?: Record<string, string>
+    vc: W3CVerifiableCredential
   ): Promise<SignedVerifiableCredential> {
-    if (headers) {
-      this.validateHeaders(headers);
-    }
-
     const payload = {
       credential: vc
     };
@@ -126,7 +175,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
       const verifiableCredential = await privateAPI.post<SignedVerifiableCredential>(
         `${this.baseURL}/credentials/issue`,
         payload,
-        { headers: headers || {} },
+        { headers: this.defaultHeaders },
       );
       return verifiableCredential;
     } catch (error) {
@@ -170,10 +219,6 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
       ...rest,
       bitstringStatusIssuer: issuerId,
     };
-
-    if (headers) {
-      this.validateHeaders(headers);
-    }
 
     try {
       const response = await privateAPI.post<CredentialStatus>(
