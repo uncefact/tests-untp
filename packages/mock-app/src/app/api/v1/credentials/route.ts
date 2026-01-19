@@ -250,6 +250,7 @@ async function publishCredential(
   const dlr = params.dlr;
 
   if (!storage?.uri) throw new Error("Storage response missing uri");
+  if (!storage?.hash) throw new Error("Storage response missing hash");
 
   const identificationKey = decodedCredential.credentialSubject?.registeredId;
 
