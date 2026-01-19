@@ -37,7 +37,7 @@ describe('verifiableCredential', () => {
     };
 
     it('should call issue API endpoint', async () => {
-      const service = new VerifiableCredentialService();
+      const service = new VerifiableCredentialService(mockAPIUrl);
       const vc = {
         issuer: mockIssuer,
         credentialSubject: mockCredentialSubject
@@ -47,7 +47,7 @@ describe('verifiableCredential', () => {
 
       (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockIssueResponse);
 
-      const result = await service.sign(mockAPIUrl, vc);
+      const result = await service.sign(vc);
 
       // Verify call to issue endpoint
       expect(privateAPI.post).toHaveBeenCalledWith(
@@ -65,7 +65,7 @@ describe('verifiableCredential', () => {
     });
 
     it('should pass custom headers to API call', async () => {
-      const service = new VerifiableCredentialService();
+      const service = new VerifiableCredentialService(mockAPIUrl);
       const vc = {
         issuer: mockIssuer,
         credentialSubject: mockCredentialSubject
@@ -76,7 +76,7 @@ describe('verifiableCredential', () => {
 
       (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockIssueResponse);
 
-      const result = await service.sign(mockAPIUrl, vc, customHeaders);
+      const result = await service.sign(vc, customHeaders);
 
       // Verify headers in issue call
       expect(privateAPI.post).toHaveBeenCalledWith(
@@ -89,7 +89,7 @@ describe('verifiableCredential', () => {
     });
 
     it('should fail if issuance fails', async () => {
-      const service = new VerifiableCredentialService();
+      const service = new VerifiableCredentialService(mockAPIUrl);
       const vc = {
         issuer: mockIssuer,
         credentialSubject: mockCredentialSubject
@@ -99,13 +99,13 @@ describe('verifiableCredential', () => {
 
       (privateAPI.post as jest.Mock).mockRejectedValueOnce(issuanceError);
 
-      await expect(service.sign(mockAPIUrl, vc)).rejects.toThrow('Failed to issue verifiable credential: Issuance failed');
+      await expect(service.sign(vc)).rejects.toThrow('Failed to issue verifiable credential: Issuance failed');
 
       expect(privateAPI.post).toHaveBeenCalled();
     });
 
     it('should issue VC with default context, issuer and type', async () => {
-      const service = new VerifiableCredentialService();
+      const service = new VerifiableCredentialService(mockAPIUrl);
       const vc = {
         credentialSubject: mockCredentialSubject
       } as CredentialPayload;
@@ -114,13 +114,13 @@ describe('verifiableCredential', () => {
 
       (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockIssueResponse);
 
-      const result = await service.sign(mockAPIUrl, vc);
+      const result = await service.sign(vc);
 
       expect(result).toEqual(mockVerifiableCredential);
     });
 
     it('should issue VC with added context', async () => {
-      const service = new VerifiableCredentialService();
+      const service = new VerifiableCredentialService(mockAPIUrl);
       const vc = {
         context: ['https://test.uncefact.org/vocabulary/untp/dia/0.6.0/'],
         credentialSubject: mockCredentialSubject
@@ -133,13 +133,13 @@ describe('verifiableCredential', () => {
 
       (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockIssueResponse);
 
-      const result = await service.sign(mockAPIUrl, vc);
+      const result = await service.sign(vc);
 
       expect(result).toEqual(mockIssueResponse);
     });
 
     it('should issue VC with added type', async () => {
-      const service = new VerifiableCredentialService();
+      const service = new VerifiableCredentialService(mockAPIUrl);
       const vc = {
         type: ['Custom Type'],
         credentialSubject: mockCredentialSubject
@@ -152,30 +152,17 @@ describe('verifiableCredential', () => {
 
       (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockIssueResponse);
 
-      const result = await service.sign(mockAPIUrl, vc);
+      const result = await service.sign(vc);
 
       expect(result).toEqual(mockIssueResponse);
     });
 
-    it('should throw error when baseURL is not provided', async () => {
-      const service = new VerifiableCredentialService();
-      const vc = {
-        context: ['https://www.w3.org/ns/credentials/v2'],
-        type: ['VerifiableCredential'],
-        issuer: 'did:web:localhost',
-        credentialSubject: {
-          id: 'did:web:localhost',
-          name: 'John Doe',
-          age: 30,
-        },
-      } as CredentialPayload;
-
-      await expect(service.sign('', vc)).rejects.toThrow('Error issuing VC. API URL is required.');
-      expect(privateAPI.post).not.toHaveBeenCalled();
+    it('should throw error when baseURL is not provided', () => {
+      expect(() => new VerifiableCredentialService('')).toThrow('Error creating VerifiableCredentialService. API URL is required.');
     });
 
     it('should throw error when vc.credentialSubject is not provided', async () => {
-      const service = new VerifiableCredentialService();
+      const service = new VerifiableCredentialService(mockAPIUrl);
       const vc = {
         context: ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
@@ -183,12 +170,12 @@ describe('verifiableCredential', () => {
         credentialSubject: {}
       } as CredentialPayload;
 
-      await expect(service.sign(mockAPIUrl, vc)).rejects.toThrow('Error issuing VC. credentialSubject is required in credential payload.');
+      await expect(service.sign(vc)).rejects.toThrow('Error issuing VC. credentialSubject is required in credential payload.');
       expect(privateAPI.post).not.toHaveBeenCalled();
     });
 
     it('should throw error when headers have invalid format', async () => {
-      const service = new VerifiableCredentialService();
+      const service = new VerifiableCredentialService(mockAPIUrl);
       const vc = {
         issuer: mockIssuer,
         credentialSubject: mockCredentialSubject
@@ -196,7 +183,7 @@ describe('verifiableCredential', () => {
 
       const invalidHeaders = { Authorization: 123 } as any;
 
-      await expect(service.sign(mockAPIUrl, vc, invalidHeaders)).rejects.toThrow('Headers must be a plain object with string values');
+      await expect(service.sign(vc, invalidHeaders)).rejects.toThrow('Headers must be a plain object with string values');
       expect(privateAPI.post).not.toHaveBeenCalled();
     });
 

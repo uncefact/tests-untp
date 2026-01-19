@@ -18,24 +18,35 @@ export const issuerDefault = 'did:web:uncefact.github.io:project-vckit:test-and-
  * Implements the IVerifiableCredentialService interface
  */
 export class VerifiableCredentialService implements IVerifiableCredentialService {
-  /**                                                                   
-   * Issues a verifiable credential by signing the provided payload     
-   * @param config - Configuration for issuing the credential           
-   * @param payload - The credential payload containing form data       
-   * @returns A promise that resolves to a signed verifiable credential 
-   */ 
+  /**
+   * Base URL for the credential service API
+   */
+  public readonly baseURL: string;
+
+  /**
+   * Constructs a new VerifiableCredentialService instance
+   * @param baseURL - The base URL for the credential service API
+   */
+  constructor(baseURL: string) {
+    if (!baseURL) {
+      throw new Error("Error creating VerifiableCredentialService. API URL is required.");
+    }
+    this.baseURL = baseURL;
+  }
+
+  /**
+   * Issues a verifiable credential by signing the provided payload
+   * @param payload - The credential payload containing form data
+   * @param headers - Optional HTTP headers to include in the request
+   * @returns A promise that resolves to a signed verifiable credential
+   */
   async sign(
-    baseURL: string,
     credentialPayload: CredentialPayload,
     headers?: Record<string, string>
   ): Promise<SignedVerifiableCredential> {
-    if (!baseURL) {
-      throw new Error("Error issuing VC. API URL is required.");
-    }
-
     // A verifiable credential MUST contain a credentialSubject property
-    if (!credentialPayload.credentialSubject || 
-        (typeof credentialPayload.credentialSubject === 'object' && 
+    if (!credentialPayload.credentialSubject ||
+        (typeof credentialPayload.credentialSubject === 'object' &&
          Object.keys(credentialPayload.credentialSubject).length === 0)) {
       throw new Error("Error issuing VC. credentialSubject is required in credential payload.");
     }
@@ -44,7 +55,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     const vc = this.constructVerifiableCredential(credentialPayload);
 
     // issue credential
-    const signedCredential = await this.issueVerifiableCredential(baseURL, vc, headers);
+    const signedCredential = await this.issueVerifiableCredential(vc, headers);
 
     return signedCredential;
   }
@@ -76,12 +87,11 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
 
   /**
    * Issues and signs a verifiable credential by calling VCkit API
-   * @param config - Configuration for issuing the credential
    * @param vc - The verifiable credential to sign
+   * @param headers - Optional HTTP headers to include in the request
    * @returns A signed verifiable credential
    */
   private async issueVerifiableCredential(
-    baseURL: string,
     vc: W3CVerifiableCredential,
     headers?: Record<string, string>
   ): Promise<SignedVerifiableCredential> {
@@ -91,7 +101,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
 
     try {
       const verifiableCredential = await privateAPI.post<SignedVerifiableCredential>(
-        `${baseURL}/credentials/issue`,
+        `${this.baseURL}/credentials/issue`,
         vc,
         { headers: headers || {} },
       );
