@@ -1,4 +1,5 @@
 import { EnvelopedVerifiableCredential } from './verifiableCredentialService';
+import { EnvelopedVerifiableCredential } from './verifiableCredentialService';
 
 /**
  * Result of storing a verifiable credential.
