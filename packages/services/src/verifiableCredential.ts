@@ -168,7 +168,10 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     vc: W3CVerifiableCredential
   ): Promise<SignedVerifiableCredential> {
     const payload = {
-      credential: vc
+      credential: vc,
+      options: {
+        proofFormat: PROOF_FORMAT,
+      }
     };
 
     try {
