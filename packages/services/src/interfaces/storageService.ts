@@ -18,7 +18,7 @@ export type StorageRecord = {
 /**
  * Configuration for storing a credential in an external storage service
  */
-export type StorageConfig<TParams extends object = {}> = {
+export type StorageConfig<TParams extends object = Record<string, never>> = {
   params?: TParams;
   headers?: Record<string, string>;
 };
