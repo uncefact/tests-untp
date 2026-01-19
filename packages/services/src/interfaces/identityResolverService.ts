@@ -8,7 +8,7 @@ import {
 } from "./verifiableCredentialService";
 
 import {
-  StorageResponse
+  StorageRecord
 } from "./storageService";
 
 /**
@@ -17,7 +17,7 @@ import {
 export type PublishResponse = {
   enabled: boolean;
   raw: JSONValue;
-} & Extensible;
+};
 
 /**
  * Service for publishing credentials to an identity resolver
@@ -33,6 +33,6 @@ export interface IIdentityResolverService {
     linkRegisterPath: string,
     dlrAPIUrl: string,
     credential: SignedVerifiableCredential, 
-    storage: StorageResponse
+    storage: StorageRecord
   ): Promise<PublishResponse>
 }

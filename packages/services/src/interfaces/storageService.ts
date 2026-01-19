@@ -9,10 +9,11 @@ import {
 /**
  * Result of storing a verifiable credential in external storage
  */
-export type StorageResponse = {
+export type StorageRecord = {
   uri: string;
   hash: string;
-} & Extensible;
+  decryptionKey?: string;
+};
 
 /**
  * Service responsible for persisting verifiable credentials
@@ -27,5 +28,5 @@ export interface IStorageService {
     bucket: string,
     credential: SignedVerifiableCredential,
     headers?: Record<string, string>
-  ): Promise<StorageResponse>
+  ): Promise<StorageRecord>
 }

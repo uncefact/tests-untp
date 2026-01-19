@@ -110,7 +110,7 @@ export type Error = {
 export type VerifyResult = {
   verified: boolean;
   error?: Error;
-} & Extensible
+};
 
 /**
  * Service responsible for issuing verifiable credentials
