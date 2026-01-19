@@ -257,18 +257,14 @@ async function publishCredential(
     throw new Error("Missing credentialSubject.registeredId");
   }
 
-  const verificationURL = process.env.NEXT_PUBLIC_VERIFICATION_SERVICE_URL!;
+  const DEFAULT_MACHINE_VERIFICATION_URL = process.env.NEXT_DEFAULT_MACHINE_VERIFICATION_URL!;
+  const DEFAULT_HUMAN_VERIFICATION_URL = process.env.NEXT_DEFAULT_HUMAN_VERIFICATION_URL!;
 
   const baseResponses = [
     {
       linkType: "gs1:verificationService",
       title: "VCKit verify service",
-      targetUrl: constructVerifyURL({
-        baseUrl: verificationURL,
-        uri: storage.uri,
-        key: storage.key,
-        hash: storage.hash,
-      }),
+      targetUrl: DEFAULT_MACHINE_VERIFICATION_URL,
       mimeType: "text/plain",
     },
     {
@@ -281,9 +277,8 @@ async function publishCredential(
       linkType: "gs1:sustainabilityInfo",
       title: "Product Passport",
       targetUrl: constructVerifyURL({
-        baseUrl: verificationURL,
+        baseUrl: DEFAULT_HUMAN_VERIFICATION_URL,
         uri: storage.uri,
-        key: storage.key,
         hash: storage.hash,
       }),
       mimeType: "text/html",
@@ -366,15 +361,14 @@ function getConfigParameters(config: AppConfig): IssueConfigParams {
 function constructVerifyURL(opts: {
   baseUrl: string;
   uri: string;
+  hash: string;
   key?: string;
-  hash?: string;
 }) {
-  const { baseUrl, uri, key, hash } = opts;
+  const { baseUrl, uri, hash, key } = opts;
   if (!uri) throw new Error("URI is required");
 
-  const payload: Record<string, string> = { uri };
+  const payload: Record<string, string> = { uri, hash };
   if (key) payload.key = key;
-  if (hash) payload.hash = hash;
 
   const queryString = `q=${encodeURIComponent(JSON.stringify({ payload }))}`;
   return `${baseUrl}/verify?${queryString}`;
