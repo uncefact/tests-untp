@@ -116,12 +116,7 @@ export type VerifyResult = {
  * Service responsible for issuing verifiable credentials
  */
 export interface IVerifiableCredentialService {
-  /**
-   * Issues a verifiable credential
-   */
-  sign(
-    baseURL: string,
-    credentialPayload: CredentialPayload,
-    headers?: Record<string, string>
-  ): Promise<SignedVerifiableCredential>
+  sign(payload: CredentialPayload): Promise<EnvelopedVerifiableCredential>
+  verify(credential: EnvelopedVerifiableCredential): Promise<VerifyResult>
+  decode(credential: EnvelopedVerifiableCredential): Promise<DecodedVerifiableCredential>
 }
