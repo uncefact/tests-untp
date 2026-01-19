@@ -22,7 +22,7 @@ export interface LinkRegistration {
   resolverUri: string;      // Canonical URI where this identifier can be resolved
   identifierScheme: string;
   identifier: string;
-};
+}
 
 export interface IIdentityResolverService {
   registerLinks(
