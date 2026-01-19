@@ -359,3 +359,23 @@ function getConfigParameters(config: AppConfig): IssueConfigParams {
   if (!params) throw new Error("Invalid config: missing services[0].parameters[0]");
   return params;
 }
+
+/**
+ * Builds verification URL with embedded query payload
+ */
+function constructVerifyURL(opts: {
+  baseUrl: string;
+  uri: string;
+  key?: string;
+  hash?: string;
+}) {
+  const { baseUrl, uri, key, hash } = opts;
+  if (!uri) throw new Error("URI is required");
+
+  const payload: Record<string, string> = { uri };
+  if (key) payload.key = key;
+  if (hash) payload.hash = hash;
+
+  const queryString = `q=${encodeURIComponent(JSON.stringify({ payload }))}`;
+  return `${baseUrl}/verify?${queryString}`;
+}
