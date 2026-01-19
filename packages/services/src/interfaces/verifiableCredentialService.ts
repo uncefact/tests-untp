@@ -117,7 +117,7 @@ export type VerifyResult = {
  */
 export interface IVerifiableCredentialService {
   readonly baseURL: string;
-  readonly headers: Record<string, string>;
+  readonly defaultHeaders: Record<string, string>;
 
   sign(payload: CredentialPayload): Promise<EnvelopedVerifiableCredential>
   verify(credential: EnvelopedVerifiableCredential): Promise<VerifyResult>
