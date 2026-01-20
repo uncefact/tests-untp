@@ -9,16 +9,42 @@ import type {
 /** "type" fields can be a string or a non-empty array of strings */
 export type VCType = string | NonEmptyArray<string>;
 
-/** Issuer can be a DID/URL string or an object with an id */
-export type Issuer = string | ({ id: string } & Extensible);
+/** Also known as identity for the issuer */
+export type IssuerAlsoKnownAs = {
+  id: string;
+  name: string;
+  registeredId?: string;
+};
+
+/**
+ * The issuer party (person or organisation) of a verifiable credential.
+ */
+export type Issuer = {
+  id: string;
+  name: string;
+  type?: NonEmptyArray<string>;
+  issuerAlsoKnownAs?: IssuerAlsoKnownAs[];
+};
 
 /**
  * Subject(s) the credential is about.
  */
 export type CredentialSubject = { id?: string } & Extensible;
 
-/** Status info */
-export type CredentialStatus = { type: VCType; id?: string } & Extensible;
+/** 
+ * Status info 
+ * https://www.w3.org/TR/vc-bitstring-status-list/#bitstringstatuslistentry
+ */
+export type CredentialStatus = { 
+  type: "BitstringStatusListEntry"; 
+  statusPurpose: "revocation";
+  statusListIndex: string;
+  statusListCredential: string;
+  id?: string;
+  statusMessage?: Array<{ status: string; message: string }>;
+  statusSize?: number;
+  statusReference?: OneOrMany<string>;
+};
 
 /** Credential schema objects */
 export type CredentialSchema = { id: string; type: VCType } & Extensible;
@@ -58,9 +84,9 @@ export type W3CVerifiableCredential = {
   description?: string;
   issuer: Issuer;
   credentialSubject: OneOrMany<CredentialSubject>;
+  credentialStatus: OneOrMany<CredentialStatus>;
   validFrom?: string;
   validUntil?: string;
-  credentialStatus?: OneOrMany<CredentialStatus>;
   credentialSchema?: OneOrMany<CredentialSchema>;
   refreshService?: OneOrMany<RefreshService>;
   termsOfUse?: OneOrMany<TermsOfUse>;
@@ -70,15 +96,18 @@ export type W3CVerifiableCredential = {
 
 /** Wrapper for a signed verifiable credential */
 export type SignedVerifiableCredential = {
-  verifiableCredential: W3CVerifiableCredential;
+  "@context": string[];
+  type: "VerifiablePresentation";
+  verifiableCredential: EnvelopedVerifiableCredential;
 };
 
 /**
  * Enveloped Verifiable Credential
- * A credential that has been secured and wrapped in an envelope format (e.g., JWT, JOSE)
  */
-export type EnvelopedVerifiableCredential = W3CVerifiableCredential & {
-  type: 'EnvelopedVerifiableCredential';
+export type EnvelopedVerifiableCredential = {
+  "@context": string[];
+  id: string;
+  type: "EnvelopedVerifiableCredential";
 };
 
 /**
@@ -90,7 +119,7 @@ export type DecodedVerifiableCredential = Omit<W3CVerifiableCredential, 'proof'>
 export type RenderMethod = {
   type: string;
   template: string;
-}
+} & Extensible;
 
 /**
  * Input payload used to issue a verifiable credential
@@ -116,9 +145,6 @@ export type VerifyResult = {
  * Service responsible for issuing verifiable credentials
  */
 export interface IVerifiableCredentialService {
-  readonly baseURL: string;
-  readonly defaultHeaders: Record<string, string>;
-
   sign(payload: CredentialPayload): Promise<EnvelopedVerifiableCredential>
   verify(credential: EnvelopedVerifiableCredential): Promise<VerifyResult>
   decode(credential: EnvelopedVerifiableCredential): Promise<DecodedVerifiableCredential>
