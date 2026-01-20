@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
-import { readFile } from "fs/promises";
-import path from "path";
 import { VerifiableCredential } from "@vckit/core-types";
+import { readFile } from "fs/promises";
+import { NextResponse } from "next/server";
+import path from "path";
 
 import {
   decodeEnvelopedVC,
@@ -366,7 +366,7 @@ function constructVerifyURL(opts: {
   key?: string;
 }) {
   const { baseUrl, uri, hash, key } = opts;
-  if (!uri) throw new Error("URI is required");
+  if (!uri || !hash) throw new Error("URI and hash are required");
 
   const payload: Record<string, string> = { uri, hash };
   if (key) payload.key = key;
