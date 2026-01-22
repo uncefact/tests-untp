@@ -81,7 +81,7 @@ curl -X POST "${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token" \
   "refresh_expires_in": 0,
   "token_type": "Bearer",
   "not-before-policy": 0,
-  "scope": "profile email"
+  "scope": "profile email roles"
 }
 ```
 
