@@ -71,32 +71,29 @@ export async function validateServiceAccountToken(
       payload,
     };
   } catch (error) {
-    if (error instanceof jose.errors.JWTExpired) {
-      return {
-        valid: false,
-        error: "Token has expired",
-      };
-    }
-
-    if (error instanceof jose.errors.JWTClaimValidationFailed) {
-      return {
-        valid: false,
-        error: `Token claim validation failed: ${error.message}`,
-      };
-    }
-
-    if (error instanceof jose.errors.JWSSignatureVerificationFailed) {
-      return {
-        valid: false,
-        error: "Token signature verification failed",
-      };
-    }
-
-    if (error instanceof jose.errors.JWKSNoMatchingKey) {
-      return {
-        valid: false,
-        error: "No matching key found in JWKS",
-      };
+    if (error instanceof jose.errors.JOSEError) {
+      switch (error.code) {
+        case "ERR_JWT_EXPIRED":
+          return {
+            valid: false,
+            error: "Token has expired",
+          };
+        case "ERR_JWT_CLAIM_VALIDATION_FAILED":
+          return {
+            valid: false,
+            error: `Token claim validation failed: ${error.message}`,
+          };
+        case "ERR_JWS_SIGNATURE_VERIFICATION_FAILED":
+          return {
+            valid: false,
+            error: "Token signature verification failed",
+          };
+        case "ERR_JWKS_NO_MATCHING_KEY":
+          return {
+            valid: false,
+            error: "No matching key found in JWKS",
+          };
+      }
     }
 
     return {
