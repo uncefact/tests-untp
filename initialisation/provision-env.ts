@@ -112,7 +112,7 @@ function generateKeycloakRealm(config: ProvisionConfig): KeycloakRealmRepresenta
         redirectUris: [],
         attributes: {},
         webOrigins: [],
-        standardFlowEnabled: true,
+        standardFlowEnabled: false,
         directAccessGrantsEnabled: false,
         serviceAccountsEnabled: true,
         authorizationServicesEnabled: false,
