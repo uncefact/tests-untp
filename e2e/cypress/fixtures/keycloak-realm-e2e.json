@@ -61,6 +61,23 @@
       "authorizationServicesEnabled": false,
       "consentRequired": false,
       "defaultClientScopes": ["profile", "email", "roles"]
+    },
+    {
+      "clientId": "ri-service-account-e2e",
+      "name": "E2E Service Account",
+      "description": "Service account client for E2E API testing",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "e2e-service-account-secret",
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "consentRequired": false,
+      "defaultClientScopes": ["profile", "email", "roles"]
     }
   ]
 }

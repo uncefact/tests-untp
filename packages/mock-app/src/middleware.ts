@@ -2,27 +2,59 @@
  * API Route Protection Middleware
  *
  * Protects /api/v1/* routes only.
+ *
+ * Supports two authentication methods:
+ * 1. Session-based auth (NextAuth.js session cookies)
+ * 2. Service account Bearer tokens (for machine-to-machine auth)
  */
 
 import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth/auth.config";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import {
+  validateServiceAccountToken,
+  extractBearerToken,
+} from "@/lib/auth/token-validator";
 
 const { auth } = NextAuth(authConfig);
 
-export default auth((req) => {
-  const { pathname } = req.nextUrl;
-  const isAuthenticated = !!req.auth;
+/**
+ * Validates a Bearer token from the Authorization header.
+ */
+async function validateBearerAuth(req: NextRequest): Promise<boolean> {
+  const authHeader = req.headers.get("authorization");
+  const token = extractBearerToken(authHeader);
 
-  // For API routes, return 401 if not authenticated
+  if (!token) {
+    return false;
+  }
+
+  const result = await validateServiceAccountToken(token);
+  return result.valid;
+}
+
+export default auth(async (req) => {
+  const { pathname } = req.nextUrl;
+  const isSessionAuthenticated = !!req.auth;
+
+  // For API routes, check authentication
   if (pathname.startsWith("/api/v1/")) {
-    if (!isAuthenticated) {
-      return NextResponse.json(
-        { error: "Unauthorized", message: "Authentication required" },
-        { status: 401 }
-      );
+    // check session-based auth first
+    if (isSessionAuthenticated) {
+      return NextResponse.next();
     }
-    return NextResponse.next();
+
+    // check Bearer token for service account auth
+    const isBearerAuthenticated = await validateBearerAuth(req);
+    if (isBearerAuthenticated) {
+      return NextResponse.next();
+    }
+
+    // user is unauthorized
+    return NextResponse.json(
+      { error: "Unauthorized", message: "Authentication required" },
+      { status: 401 }
+    );
   }
 
   return NextResponse.next();

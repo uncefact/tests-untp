@@ -102,11 +102,28 @@ function generateKeycloakRealm(config: ProvisionConfig): KeycloakRealmRepresenta
         authorizationServicesEnabled: false,
         consentRequired: false,
         defaultClientScopes: ["profile", "email", "roles"],
+      },
+      {
+        clientId: process.env.AUTH_KEYCLOAK_SERVICE_ACCOUNT_CLIENT_ID!,
+        enabled: true,
+        protocol: "openid-connect" as const,
+        publicClient: false,
+        secret: process.env.AUTH_KEYCLOAK_SERVICE_ACCOUNT_CLIENT_SECRET!,
+        redirectUris: [],
+        attributes: {},
+        webOrigins: [],
+        standardFlowEnabled: false,
+        directAccessGrantsEnabled: false,
+        serviceAccountsEnabled: true,
+        authorizationServicesEnabled: false,
+        consentRequired: false,
+        defaultClientScopes: ["profile", "email", "roles"],
       }
     ]
   }
 
   console.log(`  ✓ Client: ${process.env.AUTH_KEYCLOAK_CLIENT_ID}`)
+  console.log(`  ✓ Client: ${process.env.AUTH_KEYCLOAK_SERVICE_ACCOUNT_CLIENT_ID}`)
 
   return realmConfig
 }
@@ -126,7 +143,13 @@ async function main() {
   }
 
   // Validate required environment variables
-  const requiredEnvVars = ['AUTH_KEYCLOAK_CLIENT_ID', 'AUTH_KEYCLOAK_CLIENT_SECRET', 'RI_APP_URL']
+  const requiredEnvVars = [
+    'AUTH_KEYCLOAK_CLIENT_ID', 
+    'AUTH_KEYCLOAK_CLIENT_SECRET', 
+    'RI_APP_URL',
+    'AUTH_KEYCLOAK_SERVICE_ACCOUNT_CLIENT_ID',
+    'AUTH_KEYCLOAK_SERVICE_ACCOUNT_CLIENT_SECRET'
+  ]
   const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName])
 
   if (missingEnvVars.length > 0) {
