@@ -1,8 +1,6 @@
-import type {
-  SignedVerifiableCredential,
-  StorageResponse,
-  IStorageService
-} from './interfaces/storageService';
+import type { StorageRecord, IStorageService } from './interfaces/storageService';
+
+import type { EnvelopedVerifiableCredential } from './interfaces/verifiableCredentialService';
 
 import { publicAPI } from './utils/httpService.js';
 
@@ -12,53 +10,64 @@ import { publicAPI } from './utils/httpService.js';
 export type StorageMethod = 'PUT' | 'POST';
 
 /**
+ * Config for storage services.
+ * Each implementation validates and uses the fields it requires.
+ */
+export type StorageServiceConfig = Record<string, unknown>;
+
+/**
  * Service implementation for storing verifiable credentials
  * Implements the IStorageService interface
  */
 export class StorageService implements IStorageService {
+  private readonly config: StorageServiceConfig;
+
+  constructor(config: StorageServiceConfig) {
+    this.validateConfig(config);
+    this.config = config;
+  }
+
+  private validateConfig(config: StorageServiceConfig): void {
+    if (!config.url || typeof config.url !== 'string') {
+      throw new Error('Storage config error: url is required and must be a string');
+    }
+
+    if (!config.method || (config.method !== 'PUT' && config.method !== 'POST')) {
+      throw new Error("Storage config error: method is required and must be 'PUT' or 'POST'");
+    }
+
+    if (config.headers !== undefined && (typeof config.headers !== 'object' || config.headers === null)) {
+      throw new Error('Storage config error: headers must be an object');
+    }
+  }
+
   /**
-   * Stores a verifiable credential to the specified storage service
-   * @param url - The storage API endpoint URL
-   * @param method - HTTP method to use (PUT or POST)
-   * @param bucket - The storage bucket name
-   * @param credential - The signed verifiable credential to store
-   * @param headers - Optional additional HTTP headers
-   * @returns A promise that resolves to a storage response
-   */ 
-  async store(
-    url: string,
-    method: StorageMethod,
-    bucket: string,
-    credential: SignedVerifiableCredential,
-    headers?: Record<string, string>
-  ): Promise<StorageResponse> {
-    if (!url) {
-      throw new Error("Error storing VC. API URL is required.");
-    }
+   * Stores an enveloped verifiable credential to the configured storage service
+   * @param credential - The enveloped verifiable credential to store
+   * @returns A promise that resolves to a storage record
+   */
+  async store(credential: EnvelopedVerifiableCredential): Promise<StorageRecord> {
+    const { url, method, headers, ...params } = this.config;
 
-    if (!bucket) {
-      throw new Error("Error storing VC. Bucket name is required.");
-    }
-
-    const payload: { bucket: string; data: SignedVerifiableCredential } = {
-      bucket,
-      data: credential
+    const payload = {
+      ...params,
+      data: credential,
     };
 
     const requestHeaders: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(headers ?? {}),
+      'Content-Type': 'application/json',
+      ...((headers as Record<string, string>) ?? {}),
     };
 
     try {
-      let result: StorageResponse;
+      let result: StorageRecord;
       switch (method) {
         case 'PUT':
-          result = await publicAPI.put<StorageResponse>(url, payload, requestHeaders);
-        break;
+          result = await publicAPI.put<StorageRecord>(url, payload, requestHeaders);
+          break;
         case 'POST':
-          result = await publicAPI.post<StorageResponse>(url, payload, requestHeaders);
-        break;
+          result = await publicAPI.post<StorageRecord>(url, payload, requestHeaders);
+          break;
         default:
           throw new Error(`Failed to store verifiable credential: Unsupported method`);
       }
