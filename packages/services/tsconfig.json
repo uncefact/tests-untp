@@ -16,7 +16,10 @@
     "outDir": "build",
     "declaration": true,
     "sourceMap": true,
-    "rootDir": "src"
+    "rootDir": "src",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "references": [],
   "types": ["node", "jest"],
