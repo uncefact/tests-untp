@@ -43,7 +43,9 @@ describe('StorageService', () => {
           data: mockCredential,
         },
         {
-          'Content-Type': 'application/json',
+          headers: {
+            'Content-Type': 'application/json',
+          },
         },
       );
       expect(result).toEqual(mockStorageRecord);
@@ -69,8 +71,10 @@ describe('StorageService', () => {
           data: mockCredential,
         },
         {
-          'Content-Type': 'application/json',
-        },
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
       );
       expect(result).toEqual(mockStorageRecord);
     });
@@ -97,9 +101,11 @@ describe('StorageService', () => {
           data: mockCredential,
         },
         {
-          'Content-Type': 'application/json',
-          'X-API-Key': 'test-api-key',
-          'X-Custom-Header': 'custom-value',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': 'test-api-key',
+            'X-Custom-Header': 'custom-value',
+          },
         },
       );
       expect(result).toEqual(mockStorageRecord);
@@ -139,8 +145,10 @@ describe('StorageService', () => {
           data: mockCredential,
         },
         {
-          'Content-Type': 'application/json',
-        },
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
       );
       expect(result).toEqual(mockStorageRecord);
     });
@@ -223,8 +231,10 @@ describe('StorageService', () => {
         expect.any(String),
         expect.any(Object),
         {
-          'Content-Type': 'application/json',
-          'X-Request-ID': 'request-123',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Request-ID': 'request-123',
+          },
         },
       );
     });
@@ -243,7 +253,9 @@ describe('StorageService', () => {
         expect.any(String),
         expect.any(Object),
         {
-          'Content-Type': 'application/json',
+          headers: {
+            'Content-Type': 'application/json',
+          },
         },
       );
     });

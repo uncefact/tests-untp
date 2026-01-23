@@ -63,10 +63,10 @@ export class StorageService implements IStorageService {
       let result: StorageRecord;
       switch (method) {
         case 'PUT':
-          result = await publicAPI.put<StorageRecord>(url, payload, requestHeaders);
+          result = await publicAPI.put<StorageRecord>(url as string, payload, { headers: requestHeaders });
           break;
         case 'POST':
-          result = await publicAPI.post<StorageRecord>(url, payload, requestHeaders);
+          result = await publicAPI.post<StorageRecord>(url as string, payload, { headers: requestHeaders });
           break;
         default:
           throw new Error(`Failed to store verifiable credential: Unsupported method`);
@@ -74,7 +74,6 @@ export class StorageService implements IStorageService {
 
       return result;
     } catch (error) {
-      console.error(error);
       if (error instanceof Error) {
         throw new Error(`Failed to store verifiable credential: ${error.message}`);
       }
