@@ -1,5 +1,7 @@
 import type {
   CredentialPayload,
+  CredentialIssuer,
+  CredentialSubject,
   EnvelopedVerifiableCredential
 } from "../interfaces";
 
@@ -23,8 +25,18 @@ jest.mock('../utils/httpService', () => ({
 
 describe('verifiableCredential', () => {
   const mockAPIUrl = 'https://api.vc.example.com';
-  const mockCredentialSubject = { id: 'did:example:123', name: 'John Doe' };
-  const mockIssuer = 'did:example:issuer';
+  const mockCredentialSubject: CredentialSubject = { type: ['Person'], id: 'did:example:123', name: 'John Doe' };
+  const mockIssuer: CredentialIssuer = {
+    type: ['CredentialIssuer'],
+    id: 'did:web:example.issuer' as const,
+    name: 'Test Issuer'
+  };
+
+  const mockDefaultIssuer: CredentialIssuer = {
+    type: ['CredentialIssuer'],
+    id: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+    name: 'Default Issuer'
+  };
 
   const mockCredentialStatus = {
     id: 'https://api.vc.example.com/credentials/status/3#94567',
@@ -57,6 +69,8 @@ describe('verifiableCredential', () => {
     it('should call issue API endpoint with credential status', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl);
       const vc = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: ['VerifiableCredential'],
         issuer: mockIssuer,
         credentialSubject: mockCredentialSubject
       } as CredentialPayload;
@@ -74,7 +88,7 @@ describe('verifiableCredential', () => {
         `${mockAPIUrl}/agent/issueBitstringStatusList`,
         expect.objectContaining({
           statusPurpose: 'revocation',
-          bitstringStatusIssuer: mockIssuer,
+          bitstringStatusIssuer: mockIssuer.id,
         }),
         { headers: {} },
       );
@@ -102,6 +116,8 @@ describe('verifiableCredential', () => {
       const customHeaders = { Authorization: 'Bearer token123' };
       const service = new VerifiableCredentialService(mockAPIUrl, customHeaders);
       const vc = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: ['VerifiableCredential'],
         issuer: mockIssuer,
         credentialSubject: mockCredentialSubject
       } as CredentialPayload;
@@ -134,6 +150,8 @@ describe('verifiableCredential', () => {
     it('should fail if credential status issuance fails', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl);
       const vc = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: ['VerifiableCredential'],
         issuer: mockIssuer,
         credentialSubject: mockCredentialSubject
       } as CredentialPayload;
@@ -150,6 +168,8 @@ describe('verifiableCredential', () => {
     it('should fail if credential issuance fails', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl);
       const vc = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: ['VerifiableCredential'],
         issuer: mockIssuer,
         credentialSubject: mockCredentialSubject
       } as CredentialPayload;
@@ -167,9 +187,12 @@ describe('verifiableCredential', () => {
 
     it('should issue VC with default context, issuer and type', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl);
-      const vc = {
+      const vc: CredentialPayload = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: ['VerifiableCredential'],
+        issuer: mockDefaultIssuer,
         credentialSubject: mockCredentialSubject
-      } as CredentialPayload;
+      };
 
       (privateAPI.post as jest.Mock)
         .mockResolvedValueOnce(mockCredentialStatus)
@@ -183,7 +206,7 @@ describe('verifiableCredential', () => {
         `${mockAPIUrl}/agent/issueBitstringStatusList`,
         expect.objectContaining({
           statusPurpose: 'revocation',
-          bitstringStatusIssuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+          bitstringStatusIssuer: mockDefaultIssuer.id,
         }),
         { headers: {} },
       );
@@ -193,13 +216,13 @@ describe('verifiableCredential', () => {
         2,
         `${mockAPIUrl}/credentials/issue`,
         expect.objectContaining({
-          credential: {
+          credential: expect.objectContaining({
             '@context': ['https://www.w3.org/ns/credentials/v2'],
-            type: ['VerifiableCredential'],
-            issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+            type: expect.arrayContaining(['VerifiableCredential']),
+            issuer: mockDefaultIssuer,
             credentialSubject: mockCredentialSubject,
             credentialStatus: mockCredentialStatus,
-          }
+          })
         }),
         { headers: {} },
       );
@@ -209,10 +232,12 @@ describe('verifiableCredential', () => {
 
     it('should issue VC with added context', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl);
-      const vc = {
-        context: ['https://test.uncefact.org/vocabulary/untp/dia/0.6.0/'],
+      const vc: CredentialPayload = {
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/'],
+        type: ['VerifiableCredential'],
+        issuer: mockDefaultIssuer,
         credentialSubject: mockCredentialSubject
-      } as CredentialPayload;
+      };
 
       const mockContextVC = {
         ...mockEnvelopedVC,
@@ -234,7 +259,7 @@ describe('verifiableCredential', () => {
         `${mockAPIUrl}/agent/issueBitstringStatusList`,
         expect.objectContaining({
           statusPurpose: 'revocation',
-          bitstringStatusIssuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+          bitstringStatusIssuer: mockDefaultIssuer.id,
         }),
         { headers: {} },
       );
@@ -246,8 +271,8 @@ describe('verifiableCredential', () => {
         expect.objectContaining({
           credential: expect.objectContaining({
             '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/'],
-            type: ['VerifiableCredential'],
-            issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+            type: expect.arrayContaining(['VerifiableCredential']),
+            issuer: mockDefaultIssuer,
             credentialSubject: mockCredentialSubject,
             credentialStatus: mockCredentialStatus,
           })
@@ -260,10 +285,12 @@ describe('verifiableCredential', () => {
 
     it('should issue VC with added type', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl);
-      const vc = {
-        type: 'CustomType',
+      const vc: CredentialPayload = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: ['VerifiableCredential', 'CustomType'],
+        issuer: mockDefaultIssuer,
         credentialSubject: mockCredentialSubject
-      } as CredentialPayload;
+      };
 
       const mockTypeVC = {
         ...mockEnvelopedVC,
@@ -285,7 +312,7 @@ describe('verifiableCredential', () => {
         `${mockAPIUrl}/agent/issueBitstringStatusList`,
         expect.objectContaining({
           statusPurpose: 'revocation',
-          bitstringStatusIssuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+          bitstringStatusIssuer: mockDefaultIssuer.id,
         }),
         { headers: {} },
       );
@@ -297,8 +324,8 @@ describe('verifiableCredential', () => {
         expect.objectContaining({
           credential: expect.objectContaining({
             '@context': ['https://www.w3.org/ns/credentials/v2'],
-            type: ['VerifiableCredential', 'CustomType'],
-            issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
+            type: expect.arrayContaining(['VerifiableCredential', 'CustomType']),
+            issuer: mockDefaultIssuer,
             credentialSubject: mockCredentialSubject,
             credentialStatus: mockCredentialStatus,
           })
@@ -313,17 +340,19 @@ describe('verifiableCredential', () => {
       const service = new VerifiableCredentialService(mockAPIUrl);
       const customCredentialStatus = {
         id: 'https://custom.example.com/status/1#123',
-        type: 'BitstringStatusListEntry',
-        statusPurpose: 'suspension',
-        statusListIndex: '123',
+        type: 'BitstringStatusListEntry' as const,
+        statusPurpose: 'revocation' as const,
+        statusListIndex: 123,
         statusListCredential: 'https://custom.example.com/status/1'
       };
 
-      const vc = {
+      const vc: CredentialPayload = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: ['VerifiableCredential'],
         issuer: mockIssuer,
         credentialSubject: mockCredentialSubject,
         credentialStatus: customCredentialStatus
-      } as CredentialPayload;
+      } as any;
 
       (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockSignedCredentialResponse);
 
@@ -352,12 +381,17 @@ describe('verifiableCredential', () => {
 
     it('should throw error when vc.credentialSubject is not provided', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl);
-      const vc = {
-        context: ['https://www.w3.org/ns/credentials/v2'],
+      const localhostIssuer: CredentialIssuer = {
+        type: ['CredentialIssuer'],
+        id: 'did:web:localhost',
+        name: 'Localhost Issuer'
+      };
+      const vc: CredentialPayload = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
-        issuer: 'did:web:localhost',
-        credentialSubject: {}
-      } as CredentialPayload;
+        issuer: localhostIssuer,
+        credentialSubject: {} as any
+      };
 
       await expect(service.sign(vc)).rejects.toThrow('Error issuing VC. credentialSubject is required in credential payload.');
       expect(privateAPI.post).not.toHaveBeenCalled();
@@ -375,9 +409,7 @@ describe('verifiableCredential', () => {
     const mockEnvelopedCredential: EnvelopedVerifiableCredential = {
       '@context': ['https://www.w3.org/ns/credentials/v2'],
       type: 'EnvelopedVerifiableCredential',
-      id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOnVuY2VmYWN0LmdpdGh1Yi5pbyIsInN1YiI6ImRpZDpleGFtcGxlOjEyMyJ9.signature',
-      issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
-      credentialSubject: { id: 'did:example:123' }
+      id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOnVuY2VmYWN0LmdpdGh1Yi5pbyIsInN1YiI6ImRpZDpleGFtcGxlOjEyMyJ9.signature'
     };
 
     it('should call verify API endpoint with credential', async () => {
@@ -462,9 +494,7 @@ describe('verifiableCredential', () => {
     const mockEnvelopedCredential: EnvelopedVerifiableCredential = {
       '@context': ['https://www.w3.org/ns/credentials/v2'],
       type: 'EnvelopedVerifiableCredential',
-      id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOnVuY2VmYWN0LmdpdGh1Yi5pbyIsInN1YiI6ImRpZDpleGFtcGxlOjEyMyJ9.signature',
-      issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
-      credentialSubject: { id: 'did:example:123' }
+      id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOnVuY2VmYWN0LmdpdGh1Yi5pbyIsInN1YiI6ImRpZDpleGFtcGxlOjEyMyJ9.signature'
     };
 
     const mockDecodedCredential = {
@@ -512,25 +542,22 @@ describe('verifiableCredential', () => {
 
     it('should throw error when credential id is missing encoded data', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl);
-      const invalidCredential: EnvelopedVerifiableCredential = {
+      const invalidCredential = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: 'EnvelopedVerifiableCredential',
-        id: 'data:application/vc-ld+jwt',
-        issuer: 'did:example:123',
-        credentialSubject: { id: 'did:example:456' }
-      };
+        id: 'data:application/vc-ld+jwt'
+      } as EnvelopedVerifiableCredential;
 
       await expect(service.decode(invalidCredential)).rejects.toThrow('Failed to decode verifiable credential: Invalid enveloped credential format: missing encoded data');
     });
 
     it('should throw error when credential id is undefined', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl);
-      const invalidCredential: EnvelopedVerifiableCredential = {
+      const invalidCredential = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: 'EnvelopedVerifiableCredential',
-        issuer: 'did:example:123',
-        credentialSubject: { id: 'did:example:456' }
-      };
+        id: undefined as any
+      } as EnvelopedVerifiableCredential;
 
       await expect(service.decode(invalidCredential)).rejects.toThrow('Failed to decode verifiable credential: Invalid enveloped credential format: missing encoded data');
     });

@@ -3,18 +3,25 @@ import { decodeJwt } from 'jose';
 import type {
   CredentialPayload,
   CredentialStatus,
-  DecodedVerifiableCredential,
+  CredentialIssuer,
+  UNTPVerifiableCredential,
   EnvelopedVerifiableCredential,
   IVerifiableCredentialService,
-  Issuer,
-  IssueCredentialStatusParams,
-  SignedVerifiableCredential,
-  VerifyResult,
-  W3CVerifiableCredential
+  VerifyResult
 } from './interfaces/verifiableCredentialService';
 
 import { privateAPI } from './utils/httpService.js';
 
+type IssueCredentialStatusParams = {
+  host: string;
+  headers?: Record<string, string>;
+  bitstringStatusIssuer: CredentialIssuer | string;
+  statusPurpose?: 'revocation';
+};
+
+type CredentialPayloadWithStatus = CredentialPayload & {
+  credentialStatus?: CredentialStatus;
+};
 
 export const contextDefault = ['https://www.w3.org/ns/credentials/v2'];
 export const typeDefault = ['VerifiableCredential'];
@@ -57,11 +64,14 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
       throw new Error("Error issuing VC. credentialSubject is required in credential payload.");
     }
 
+    // Check if credential status is provided in the payload
+    const payloadWithStatus = credentialPayload as CredentialPayloadWithStatus;
+
     // Issue credential status if not provided
-    const credentialStatus = credentialPayload.credentialStatus ?? await this.issueCredentialStatus({
+    const credentialStatus = payloadWithStatus.credentialStatus ?? await this.issueCredentialStatus({
       host: new URL(this.baseURL).origin,
       headers: this.defaultHeaders,
-      bitstringStatusIssuer: credentialPayload.issuer || issuerDefault,
+      bitstringStatusIssuer: credentialPayload.issuer,
     });
 
     // construct verifiable credential
@@ -71,9 +81,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     });
 
     // issue credential
-    const signedCredential = await this.issueVerifiableCredential(vc);
-
-    return signedCredential.verifiableCredential as EnvelopedVerifiableCredential;
+    return this.issueVerifiableCredential(vc);
   }
 
   /**
@@ -114,7 +122,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
    * @param credential - The enveloped verifiable credential to decode
    * @returns A promise that resolves to the decoded credential without the proof
    */
-  public async decode(credential: EnvelopedVerifiableCredential): Promise<DecodedVerifiableCredential> {
+  public async decode(credential: EnvelopedVerifiableCredential): Promise<UNTPVerifiableCredential> {
     if (!credential) {
       throw new Error('Error decoding VC. Credential is required.');
     }
@@ -125,7 +133,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
         if (!encodedCredential) {
           throw new Error('Invalid enveloped credential format: missing encoded data');
         }
-        return decodeJwt(encodedCredential) as DecodedVerifiableCredential;
+        return decodeJwt(encodedCredential) as UNTPVerifiableCredential;
       }
       throw new Error('Credential is not an EnvelopedVerifiableCredential');
     } catch (error) {
@@ -137,24 +145,24 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
   }
 
   private constructVerifiableCredential(
-    credentialPayload: CredentialPayload
-  ): W3CVerifiableCredential {
+    credentialPayload: CredentialPayloadWithStatus
+  ): UNTPVerifiableCredential {
     // add or merge context from credentialPayload
-    const context = [...new Set([...contextDefault, ...(credentialPayload.context || [])])]
+    const context = [...new Set([...contextDefault, ...(credentialPayload['@context'] || [])])]
     const additionalTypes = credentialPayload.type
       ? (Array.isArray(credentialPayload.type) ? credentialPayload.type : [credentialPayload.type])
       : [];
 
     const type = [...typeDefault, ...additionalTypes];
 
-    const issuer = credentialPayload.issuer || issuerDefault;
+    const issuer = credentialPayload.issuer;
 
     const vc = {
       ...credentialPayload,
       "@context": context,
       type: type,
       issuer: issuer
-    } as W3CVerifiableCredential
+    } as UNTPVerifiableCredential
 
     return vc;
   }
@@ -162,11 +170,11 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
   /**
    * Issues and signs a verifiable credential by calling VCkit API
    * @param vc - The verifiable credential to sign
-   * @returns A signed verifiable credential
+   * @returns An enveloped verifiable credential
    */
   private async issueVerifiableCredential(
-    vc: W3CVerifiableCredential
-  ): Promise<SignedVerifiableCredential> {
+    vc: UNTPVerifiableCredential
+  ): Promise<EnvelopedVerifiableCredential> {
     const payload = {
       credential: vc,
       options: {
@@ -175,12 +183,12 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     };
 
     try {
-      const verifiableCredential = await privateAPI.post<SignedVerifiableCredential>(
+      const response = await privateAPI.post<{ verifiableCredential: EnvelopedVerifiableCredential }>(
         `${this.baseURL}/credentials/issue`,
         payload,
         { headers: this.defaultHeaders },
       );
-      return verifiableCredential;
+      return response.verifiableCredential;
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Failed to issue verifiable credential: ${error.message}`);
