@@ -1,186 +1,140 @@
-import type {
-  PublishResponse,
-  LinkResponse,
-  BaseLinkResponse,
-  PublishCredentialParams,
-} from './interfaces/identityResolverService';
-
-import {
-  IIdentityResolverService,
-  LinkType,
-  MimeType,
-} from './interfaces/identityResolverService';
-
-import type { LinkResolver } from './linkResolver.service';
+import type { Link, LinkRegistration } from './interfaces/identityResolverService';
+import type { IIdentityResolverService } from './interfaces/identityResolverService';
+import type { LinkResolver, LinkResponse } from './linkResolver.service';
 
 import { privateAPI } from './utils/httpService.js';
 
+/**
+ * Configuration for the Identity Resolver Service.
+ */
+export interface IdentityResolverConfig {
+  apiUrl: string;
+  apiKey: string;
+  namespace?: string;
+  linkRegisterPath?: string;
+}
+
+/** Supported locales for link responses */
 export const locales = ['us', 'au'];
 
 /**
  * Implementation of the Identity Resolver Service.
- * Registers credential links with an identity resolver to make them discoverable via identifiers.
+ * Registers links with an identity resolver to make them discoverable via identifiers.
  */
 export class IdentityResolverService implements IIdentityResolverService {
+  private config: IdentityResolverConfig;
 
   /**
-   * Publishes a credential to the identity resolver, making it discoverable via the identifier.
-   * This registers the association between the identifier and the credential link.
+   * Creates an instance of IdentityResolverService.
    *
-   * @param params - The parameters for publishing the credential
-   * @returns A promise that resolves to the publish response
+   * @param config - Configuration for the identity resolver
+   */
+  constructor(config: IdentityResolverConfig) {
+    if (!config.apiUrl || !config.apiKey) {
+      throw new Error('IdentityResolverService requires apiUrl and apiKey in configuration');
+    }
+    this.config = config;
+  }
+
+  /**
+   * Publishes links for an identifier to the identity resolver.
+   *
+   * @param identifierScheme - The scheme of the identifier (e.g., "abn", "nzbn", "lei")
+   * @param identifier - The identifier value within the scheme
+   * @param links - Links to publish for this identifier
+   * @returns Registration details including the canonical resolver URI
    * @throws Error if validation fails or the registration fails
    */
-  async publish(params: PublishCredentialParams): Promise<PublishResponse> {
+  async publishLinks(
+    identifierScheme: string,
+    identifier: string,
+    links: Link[],
+  ): Promise<LinkRegistration> {
     // Validate required parameters
-    this.validateParams(params);
+    if (!identifierScheme) {
+      throw new Error('Failed to publish links: identifierScheme is required');
+    }
+    if (!identifier) {
+      throw new Error('Failed to publish links: identifier is required');
+    }
+    if (!links || links.length === 0) {
+      throw new Error('Failed to publish links: at least one link is required');
+    }
 
-    // Set defaults for optional parameters
-    const {
-      namespace,
-      identificationKeyType,
-      identificationKey,
-      credentialUrl,
-      verificationPage,
-      linkTitle,
-      linkType,
-      qualifierPath = '/',
-      verificationLinkType = LinkType.verificationLinkType,
-      apiUrl,
-      apiKey,
-      linkRegisterPath = '',
-    } = params;
+    const { apiUrl, apiKey, namespace = identifierScheme, linkRegisterPath = '' } = this.config;
 
     try {
-      // Construct responses array for different locales
-      const responses: LinkResponse[] = this.constructLinkResponses(
-        namespace,
-        linkTitle,
-        linkType,
-        verificationLinkType,
-        credentialUrl,
-        verificationPage,
-      );
+      // Convert links to the format expected by the link resolver API
+      const responses: LinkResponse[] = this.convertLinksToResponses(links, namespace);
 
       // Construct link resolver payload
       const payload: LinkResolver = {
         namespace,
-        identificationKey,
-        identificationKeyType,
-        itemDescription: linkTitle,
-        qualifierPath,
+        identificationKey: identifier,
+        identificationKeyType: identifierScheme,
+        itemDescription: links[0].title,
+        qualifierPath: '/',
         active: true,
         responses,
       };
 
       // Construct full URL for the identity resolver endpoint
-      const url: string = linkRegisterPath
-        ? `${apiUrl}/${linkRegisterPath}`
-        : apiUrl;
+      const url: string = linkRegisterPath ? `${apiUrl}/${linkRegisterPath}` : apiUrl;
 
       // Set authorization and make the API call
       privateAPI.setBearerTokenAuthorizationHeaders(apiKey);
-      const response = await privateAPI.post<PublishResponse>(url, payload);
+      await privateAPI.post(url, payload);
 
-      return { enabled: true, raw: response } as PublishResponse;
+      // Return the registration details
+      return {
+        resolverUri: `${apiUrl}/${namespace}/${identifierScheme}/${identifier}`,
+        identifierScheme,
+        identifier,
+      };
     } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to register credential with identity resolver for identifier ${identificationKey}: ${errorMessage}`);
-      }
-      throw new Error(`Failed to register credential with identity resolver for identifier ${identificationKey}: Unknown error`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(
+        `Failed to register links with identity resolver for identifier ${identifier}: ${errorMessage}`,
+      );
     }
   }
 
   /**
-   * Validates the required parameters for publishing a credential.
+   * Converts Link[] to the LinkResponse[] format expected by the link resolver API.
+   * Creates localized responses for each configured locale.
    *
-   * @param params - The parameters to validate
-   * @throws Error if any required parameter is missing
+   * @param links - Array of links to convert
+   * @param namespace - The namespace for link types
+   * @returns Array of link responses formatted for the link resolver API
    */
-  private validateParams(params: PublishCredentialParams): void {
-    const requiredFields: (keyof PublishCredentialParams)[] = [
-      'namespace',
-      'identificationKeyType',
-      'identificationKey',
-      'credentialUrl',
-      'verificationPage',
-      'linkTitle',
-      'apiUrl',
-      'apiKey',
-    ];
-
-    for (const field of requiredFields) {
-      if (!params[field]) {
-        throw new Error(`Failed to publish credential: ${field} is required.`);
-      }
-    }
-  }
-
-  /**
-   * Constructs link responses for different locales and link types.
-   * Creates responses for verification service and credential access.
-   *
-   * @param namespace - The namespace for the identifier
-   * @param linkTitle - The title for the link
-   * @param linkType - The type of link for the credential
-   * @param verificationLinkType - The type of link for verification
-   * @param credentialUrl - The URL where the credential can be accessed
-   * @param verificationPageUrl - The URL of the verification page
-   * @returns Array of link responses for different locales
-   */
-  private constructLinkResponses(
-    namespace: string,
-    linkTitle: string,
-    linkType: LinkType,
-    verificationLinkType: LinkType,
-    credentialUrl: string,
-    verificationPageUrl: string,
-  ): LinkResponse[] {
-    const baseResponses: BaseLinkResponse[] = [
-      {
-        linkType: `${namespace}:${verificationLinkType}`,
-        linkTitle: 'VCKit verify service',
-        targetUrl: verificationPageUrl,
-        mimeType: MimeType.textPlain,
-      },
-      {
-        linkType: `${namespace}:${linkType}`,
-        linkTitle: linkTitle,
-        targetUrl: credentialUrl,
-        mimeType: MimeType.applicationJson,
-      },
-      {
-        linkType: `${namespace}:${linkType}`,
-        linkTitle: linkTitle,
-        targetUrl: credentialUrl,
-        mimeType: MimeType.textHtml,
-        defaultLinkType: true,
-        defaultIanaLanguage: true,
-        defaultMimeType: true,
-      },
-    ];
-
+  private convertLinksToResponses(links: Link[], namespace: string): LinkResponse[] {
     const responses: LinkResponse[] = [];
 
-    // Create link responses for each configured locale
-    baseResponses.forEach((linkResponse: BaseLinkResponse) => {
+    for (const link of links) {
+      // Construct the link type with namespace prefix if not already prefixed
+      const linkType = link.rel.includes(':') ? link.rel : `${namespace}:${link.rel}`;
+
+      // Create a response for each configured locale
       for (const locale of locales) {
-        const localizedResponse: LinkResponse = {
-          ...linkResponse,
-          title: linkResponse.linkTitle,
-          ianaLanguage: 'en',
+        const response: LinkResponse = {
+          linkType,
+          linkTitle: link.title,
+          targetUrl: link.href,
+          mimeType: link.type,
+          title: link.title,
+          ianaLanguage: link.hreflang?.[0] || 'en',
           context: locale,
-          defaultLinkType: linkResponse.defaultLinkType ?? false,
-          defaultIanaLanguage: linkResponse.defaultIanaLanguage ?? false,
-          defaultContext: false,
-          defaultMimeType: linkResponse.defaultMimeType ?? false,
-          fwqs: false,
           active: true,
+          defaultLinkType: link.default ?? false,
+          defaultIanaLanguage: link.default ?? false,
+          defaultContext: false,
+          defaultMimeType: link.default ?? false,
+          fwqs: false,
         };
 
-        responses.push(localizedResponse);
+        responses.push(response);
       }
-    });
+    }
 
     return responses;
   }

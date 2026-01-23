@@ -81,8 +81,8 @@ class BaseAPI {
     try {
       const response = await this.axiosInstance.post<T>(url, data, config);
       return this.handleResponse(response) as T;
-    } catch (error) {
-      throw new Error('Request failed with get method');
+    } catch (error: any) {
+      throw new Error('Request failed with post method');
     }
   }
 
