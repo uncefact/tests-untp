@@ -1,7 +1,5 @@
 import { EnvelopedVerifiableCredential } from './verifiableCredentialService';
 
-export type { SignedVerifiableCredential };
-
 /**
  * Result of storing a verifiable credential.
  */

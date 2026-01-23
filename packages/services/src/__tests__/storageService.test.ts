@@ -194,6 +194,7 @@ describe('StorageService', () => {
         ),
       ).rejects.toThrow('Failed to store verifiable credential: Unknown error');
     });
+  });
 
   describe('headers handling', () => {
     it('should merge custom headers with default Content-Type', async () => {
