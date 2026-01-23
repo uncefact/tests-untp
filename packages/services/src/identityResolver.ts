@@ -89,7 +89,7 @@ export class IdentityResolverService implements IIdentityResolverService {
 
       // Return the registration details
       return {
-        resolverUri: `${apiUrl}/${namespace}/${identifierScheme}/${identifier}`,
+        resolverUri: new URL(`${namespace}/${identifierScheme}/${identifier}`, apiUrl.endsWith('/') ? apiUrl : `${apiUrl}/`).toString(),
         identifierScheme,
         identifier,
       };
