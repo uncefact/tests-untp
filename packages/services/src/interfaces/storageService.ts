@@ -16,9 +16,6 @@ export type StorageRecord = {
  * Service responsible for persisting verifiable credentials.
  */
 export interface IStorageService {
-  readonly baseURL: string;
-  readonly defaultHeaders: Record<string, string>;
-
   /**
    * Stores an enveloped verifiable credential.
    */
