@@ -79,7 +79,9 @@ export class IdentityResolverService implements IIdentityResolverService {
       };
 
       // Construct full URL for the identity resolver endpoint
-      const url: string = linkRegisterPath ? `${apiUrl}/${linkRegisterPath}` : apiUrl;
+      const url: string = linkRegisterPath
+        ? new URL(linkRegisterPath, apiUrl.endsWith('/') ? apiUrl : `${apiUrl}/`).toString()
+        : apiUrl;
 
       // Set authorization and make the API call
       privateAPI.setBearerTokenAuthorizationHeaders(apiKey);
