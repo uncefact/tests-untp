@@ -230,16 +230,16 @@ export type EnvelopedVerifiableCredential = {
 
 /**
  * Input payload for issuing a credential.
- * The service will add defaults for context, type, validFrom, and credentialStatus.
+ * The service will add defaults for validFrom and credentialStatus.
  *
  * Extension support: Additional properties beyond those defined here will be
  * passed through to the issued credential.
  */
 export type CredentialPayload = {
-  /** Additional context URIs beyond the default */
-  context?: string[];
-  /** Additional credential types beyond "VerifiableCredential" */
-  type?: string[];
+  /** JSON-LD context, first element MUST be "https://www.w3.org/ns/credentials/v2" */
+  '@context': VCContext;
+  /** Credential types, first element MUST be "VerifiableCredential" */
+  type: VCType;
   /** Issuer information */
   issuer: CredentialIssuer;
   /** The subject(s) of the credential - single object for DPP/DFR/DCC, array for DTE */
