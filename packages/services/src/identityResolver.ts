@@ -110,34 +110,24 @@ export class IdentityResolverService implements IIdentityResolverService {
    * @returns Array of link responses formatted for the link resolver API
    */
   private convertLinksToResponses(links: Link[], namespace: string): LinkResponse[] {
-    const responses: LinkResponse[] = [];
-
-    for (const link of links) {
-      // Construct the link type with namespace prefix if not already prefixed
+    return links.flatMap((link) => {
       const linkType = link.rel.includes(':') ? link.rel : `${namespace}:${link.rel}`;
 
-      // Create a response for each configured locale
-      for (const locale of locales) {
-        const response: LinkResponse = {
-          linkType,
-          linkTitle: link.title,
-          targetUrl: link.href,
-          mimeType: link.type,
-          title: link.title,
-          ianaLanguage: link.hreflang?.[0] || 'en',
-          context: locale,
-          active: true,
-          defaultLinkType: link.default ?? false,
-          defaultIanaLanguage: link.default ?? false,
-          defaultContext: false,
-          defaultMimeType: link.default ?? false,
-          fwqs: false,
-        };
-
-        responses.push(response);
-      }
-    }
-
-    return responses;
+      return locales.map((locale) => ({
+        linkType,
+        linkTitle: link.title,
+        targetUrl: link.href,
+        mimeType: link.type,
+        title: link.title,
+        ianaLanguage: link.hreflang?.[0] || 'en',
+        context: locale,
+        active: true,
+        defaultLinkType: link.default ?? false,
+        defaultIanaLanguage: link.default ?? false,
+        defaultContext: false,
+        defaultMimeType: link.default ?? false,
+        fwqs: false,
+      }));
+    });
   }
 }
