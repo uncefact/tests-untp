@@ -150,10 +150,13 @@ export async function POST(req: Request) {
     const storageResponse = await storeCredential(params, envelopedVC);
 
     // Save credential record to database
+    if (!storageResponse.hash) {
+      throw new Error("Storage response is missing a hash for the credential.");
+    }
     const credentialType = params.dpp.type[0] ?? "VerifiableCredential";
     const credentialRecord = await createCredential({
       storageUri: storageResponse.uri,
-      hash: storageResponse.hash ?? "",
+      hash: storageResponse.hash,
       credentialType,
       isPublished: shouldPublish,
     });
