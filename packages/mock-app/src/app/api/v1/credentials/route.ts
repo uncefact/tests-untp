@@ -8,6 +8,7 @@ import {
   issueCredentialStatus,
   PROOF_FORMAT,
 } from "@mock-app/services";
+import { createCredential } from "@/lib/prisma/repositories";
 
 type JSONPrimitive = string | number | boolean | null;
 type JSONValue = JSONPrimitive | JSONObject | JSONArray;
@@ -148,12 +149,27 @@ export async function POST(req: Request) {
     // Store VC (enveloped format)
     const storageResponse = await storeCredential(params, envelopedVC);
 
+    // Save credential record to database
+    const credentialType = params.dpp.type[0] ?? "VerifiableCredential";
+    const credentialRecord = await createCredential({
+      storageUri: storageResponse.uri,
+      hash: storageResponse.hash ?? "",
+      credentialType,
+      isPublished: shouldPublish,
+    });
+
     // Optionally publish VC
     const publishResponse = shouldPublish
       ? await publishCredential(params, decodedCredential, storageResponse)
       : { enabled: false };
 
-    return NextResponse.json({ ok: true, storageResponse, publishResponse, credential: decodedCredential });
+    return NextResponse.json({
+      ok: true,
+      storageResponse,
+      publishResponse,
+      credential: decodedCredential,
+      credentialId: credentialRecord.id,
+    });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "An unexpected error has occurred.";
     return NextResponse.json(
