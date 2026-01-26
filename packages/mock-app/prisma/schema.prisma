@@ -6,19 +6,20 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("RI_DATABASE_URL")
-
 }
 
-/** Auth.js + Prisma adapter tables for OAuth + JWT sessions */
+/**
+ * Auth.js + Prisma adapter tables for OAuth + JWT sessions
+ */
 model User {
-  id             String        @id @default(cuid())
+  id             String    @id @default(cuid())
   name           String?
-  email          String?       @unique
+  email          String?   @unique
   emailVerified  DateTime?
   image          String?
   organizationId String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   accounts     Account[]
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
@@ -52,5 +53,18 @@ model Organization {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  users      User[]
+  users User[]
+}
+
+/**
+ * Stores issued verifiable credentials metadata
+ */
+model Credential {
+  id             String   @id @default(cuid())
+  storageUri     String
+  hash           String
+  credentialType String
+  isPublished    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
