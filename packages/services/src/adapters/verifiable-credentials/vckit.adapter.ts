@@ -1,13 +1,15 @@
 import _ from 'lodash';
 import { decodeJwt } from 'jose';
-import type {
-  CredentialPayload,
-  CredentialStatus,
-  CredentialIssuer,
-  UNTPVerifiableCredential,
-  EnvelopedVerifiableCredential,
-  IVerifiableCredentialService,
-  VerifyResult
+import {
+  VC_CONTEXT_V2,
+  VC_TYPE,
+  type CredentialPayload,
+  type CredentialStatus,
+  type CredentialIssuer,
+  type UNTPVerifiableCredential,
+  type EnvelopedVerifiableCredential,
+  type IVerifiableCredentialService,
+  type VerifyResult
 } from './interfaces/verifiableCredentialService';
 
 import { privateAPI } from './utils/httpService.js';
@@ -19,9 +21,6 @@ type IssueCredentialStatusParams = {
   statusPurpose?: 'revocation';
 };
 
-export const contextDefault = ['https://www.w3.org/ns/credentials/v2'];
-export const typeDefault = ['VerifiableCredential'];
-export const issuerDefault = 'did:web:uncefact.github.io:project-vckit:test-and-development';
 export const PROOF_FORMAT = 'EnvelopingProofJose';
 
 /**
@@ -141,8 +140,8 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     credentialPayload: CredentialPayloadWithStatus
   ): UNTPVerifiableCredential {
     // add or merge context from credentialPayload
-    const context = [...new Set([...contextDefault, ...(credentialPayload['@context'] || [])])]
-    const type = [...new Set(['VerifiableCredential', ...(credentialPayload.type || [])])];
+    const context = [...new Set([VC_CONTEXT_V2, ...(credentialPayload['@context'] || [])])]
+    const type = [...new Set([VC_TYPE, ...(credentialPayload.type || [])])];
 
     const issuer = credentialPayload.issuer;
 
