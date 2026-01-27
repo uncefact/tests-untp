@@ -35,12 +35,15 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
    * Constructs a new VerifiableCredentialService instance
    * @param baseURL - The base URL for the credential service API
    */
-  constructor(baseURL: string, defaultHeaders?: Record<string, string>) {
+  constructor(baseURL: string, defaultHeaders: Record<string, string>) {
     if (!baseURL) {
       throw new Error("Error creating VerifiableCredentialService. API URL is required.");
     }
+    if (!defaultHeaders?.Authorization) {
+      throw new Error("Error creating VerifiableCredentialService. Authorization header is required.");
+    }
     this.baseURL = baseURL;
-    this.defaultHeaders = defaultHeaders || {};
+    this.defaultHeaders = defaultHeaders;
   }
 
   /**
