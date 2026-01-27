@@ -117,7 +117,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
   /**
    * Decodes an enveloped verifiable credential to extract the unsigned credential content
    * @param credential - The enveloped verifiable credential to decode
-   * @returns A promise that resolves to the decoded credential without the proof
+   * @returns A promise that resolves to the decoded credential.
    */
   public async decode(credential: EnvelopedVerifiableCredential): Promise<UNTPVerifiableCredential> {
     if (!credential) {
