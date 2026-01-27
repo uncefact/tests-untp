@@ -63,6 +63,7 @@ model Credential {
   id             String   @id @default(cuid())
   storageUri     String
   hash           String
+  decryptionKey  String?
   credentialType String
   isPublished    Boolean  @default(false)
   createdAt      DateTime @default(now())
