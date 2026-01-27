@@ -1,4 +1,3 @@
-import _ from 'lodash';
 import { decodeJwt } from 'jose';
 import {
   VC_CONTEXT_V2,
@@ -10,9 +9,9 @@ import {
   type EnvelopedVerifiableCredential,
   type IVerifiableCredentialService,
   type VerifyResult
-} from './interfaces/verifiableCredentialService';
+} from '../../interfaces/verifiableCredentialService.js';
 
-import { privateAPI } from './utils/httpService.js';
+import { privateAPI } from '../../utils/httpService.js';
 
 type IssueCredentialStatusParams = {
   host: string;
@@ -140,7 +139,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
   }
 
   private constructVerifiableCredential(
-    credentialPayload: CredentialPayloadWithStatus
+    credentialPayload: CredentialPayload & { credentialStatus: CredentialStatus }
   ): UNTPVerifiableCredential {
     // add or merge context from credentialPayload
     const context = [...new Set([VC_CONTEXT_V2, ...(credentialPayload['@context'] || [])])]

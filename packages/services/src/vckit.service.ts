@@ -206,7 +206,11 @@ export const verifyVC = async (
     _validateVckitHeaders(headers);
   }
 
-  return await privateAPI.post<IVerifyResult>(vcKitAPIUrl, verifyCredentialParams, { headers: headers || {} });
+  const response = await privateAPI.post<IVerifyResult>(vcKitAPIUrl, verifyCredentialParams, { headers: headers || {} });
+
+  console.log(response);
+
+  return response;
 };
 
 /**
