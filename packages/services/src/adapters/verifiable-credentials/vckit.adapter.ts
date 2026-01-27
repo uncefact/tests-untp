@@ -64,11 +64,8 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
       throw new Error("Error issuing VC. credentialSubject is required in credential payload.");
     }
 
-    // Check if credential status is provided in the payload
-    const payloadWithStatus = credentialPayload as CredentialPayloadWithStatus;
-
     // Issue credential status if not provided
-    const credentialStatus = payloadWithStatus.credentialStatus ?? await this.issueCredentialStatus({
+    const credentialStatus = await this.issueCredentialStatus({
       host: new URL(this.baseURL).origin,
       headers: this.defaultHeaders,
       bitstringStatusIssuer: credentialPayload.issuer,
