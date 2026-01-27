@@ -13,14 +13,14 @@ import {
 
 import { privateAPI } from '../../utils/httpService.js';
 
+const PROOF_FORMAT = 'EnvelopingProofJose';
+
 type IssueCredentialStatusParams = {
   host: string;
   headers?: Record<string, string>;
   bitstringStatusIssuer: CredentialIssuer | string;
   statusPurpose?: 'revocation';
 };
-
-export const PROOF_FORMAT = 'EnvelopingProofJose';
 
 /**
  * Service implementation for issuing verifiable credentials

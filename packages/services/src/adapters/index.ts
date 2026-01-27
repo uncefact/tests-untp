@@ -1,1 +1,1 @@
-export * from './verifiable-credentials.js';
+export * from './verifiable-credentials';
