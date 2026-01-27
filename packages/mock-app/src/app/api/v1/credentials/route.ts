@@ -106,8 +106,8 @@ type DecodedCredential = JSONObject & {
  */
 type StorageResponse = {
   uri: string;
+  hash: string;
   key?: string;
-  hash?: string;
 };
 
 /**
@@ -155,7 +155,8 @@ export async function POST(req: Request) {
       : { enabled: false };
 
     // Save credential record to database
-    const credentialType = decodedCredential.type[0];
+    const credentialType = (decodedCredential.type as string[] | undefined)?.[0] ?? 'VerifiableCredential';
+
     const credentialRecord = await createCredential({
       storageUri: storageResponse.uri,
       hash: storageResponse.hash,
