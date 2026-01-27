@@ -19,10 +19,6 @@ type IssueCredentialStatusParams = {
   statusPurpose?: 'revocation';
 };
 
-type CredentialPayloadWithStatus = CredentialPayload & {
-  credentialStatus?: CredentialStatus;
-};
-
 export const contextDefault = ['https://www.w3.org/ns/credentials/v2'];
 export const typeDefault = ['VerifiableCredential'];
 export const issuerDefault = 'did:web:uncefact.github.io:project-vckit:test-and-development';
@@ -146,11 +142,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
   ): UNTPVerifiableCredential {
     // add or merge context from credentialPayload
     const context = [...new Set([...contextDefault, ...(credentialPayload['@context'] || [])])]
-    const additionalTypes = credentialPayload.type
-      ? (Array.isArray(credentialPayload.type) ? credentialPayload.type : [credentialPayload.type])
-      : [];
-
-    const type = [...typeDefault, ...additionalTypes];
+    const type = [...new Set(['VerifiableCredential', ...(credentialPayload.type || [])])];
 
     const issuer = credentialPayload.issuer;
 
