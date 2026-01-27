@@ -12,7 +12,7 @@ export * from './identityProviders/index.js';
 export * from './features/index.js';
 export * from './api.service.js';
 export * from './identifierSchemes/index.js';
-export { VerifiableCredentialService } from './verifiableCredential.js';
+export * from './adapters/index.js';
 export type {
   CredentialPayload,
   CredentialIssuer,
