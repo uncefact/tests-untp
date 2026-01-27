@@ -29,7 +29,7 @@
     "dev": "prisma generate && next dev --turbopack -p 3003",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "prisma generate && tsc && eslint .",
+    "lint": "tsc && eslint .",
     "storybook": "storybook dev -p 6006",
     "test": "jest",
     "test:watch": "jest --watch",
