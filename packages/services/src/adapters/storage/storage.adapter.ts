@@ -11,6 +11,12 @@ export class StorageService implements IStorageService {
   readonly headers?: Record<string, string>;
   readonly additionalPayload?: Record<string, unknown>;
 
+  /**
+   * Constructs a new StorageService instance
+   * @param baseURL - The base URL of the storage API
+   * @param headers - Optional HTTP headers to include with requests
+   * @param additionalPayload - Optional additional data to merge into the request payload
+   */
   constructor(baseURL: string, headers?: Record<string, string>, additionalPayload?: Record<string, unknown>) {
     if (!baseURL) {
       throw new Error("Error creating StorageService. API URL is required.");
