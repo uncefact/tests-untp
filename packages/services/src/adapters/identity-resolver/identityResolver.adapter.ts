@@ -66,8 +66,6 @@ export class IdentityResolverAdapter implements IIdentityResolverService {
       throw new Error('Failed to publish links: at least one link is required');
     }
 
-    const baseURL = this.baseURL;
-    const headers = this.headers;
     const namespace = this.namespace ?? identifierScheme;
     const linkRegisterPath = this.linkRegisterPath ?? '';
 
@@ -88,14 +86,14 @@ export class IdentityResolverAdapter implements IIdentityResolverService {
 
       // Construct full URL for the identity resolver endpoint
       const url: string = linkRegisterPath
-        ? new URL(linkRegisterPath, baseURL.endsWith('/') ? baseURL : `${baseURL}/`).toString()
-        : baseURL;
+        ? new URL(linkRegisterPath, this.baseURL.endsWith('/') ? this.baseURL : `${this.baseURL}/`).toString()
+        : this.baseURL;
 
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...headers,
+          ...this.headers,
         },
         body: JSON.stringify(payload),
       });
@@ -106,7 +104,10 @@ export class IdentityResolverAdapter implements IIdentityResolverService {
 
       // Return the registration details
       return {
-        resolverUri: new URL(`${namespace}/${identifierScheme}/${identifier}`, baseURL.endsWith('/') ? baseURL : `${baseURL}/`).toString(),
+        resolverUri: new URL(
+          `${namespace}/${identifierScheme}/${identifier}`, 
+          this.baseURL.endsWith('/') ? this.baseURL : `${this.baseURL}/`
+        ).toString(),
         identifierScheme,
         identifier,
       };
