@@ -1,16 +1,6 @@
 import type { Link, LinkRegistration } from '../../interfaces/identityResolverService';
-import type { IIdentityResolverService } from '../../interfaces/identityResolverService';
+import type { IIdentityResolverAdapter } from '../../interfaces/identityResolverService';
 import type { LinkResolver, LinkResponse } from '../../linkResolver.service';
-
-/**
- * Configuration for the Identity Resolver Service.
- */
-export interface IdentityResolverConfig {
-  apiUrl: string;
-  apiKey: string;
-  namespace?: string;
-  linkRegisterPath?: string;
-}
 
 /** Supported locales for link responses */
 export const locales = ['us', 'au'];
@@ -19,19 +9,37 @@ export const locales = ['us', 'au'];
  * Implementation of the Identity Resolver Service.
  * Registers links with an identity resolver to make them discoverable via identifiers.
  */
-export class IdentityResolverService implements IIdentityResolverService {
-  private config: IdentityResolverConfig;
+export class IdentityResolverAdapter implements IIdentityResolverAdapter {
+  readonly baseURL: string;
+  readonly headers: Record<string, string>;
+  readonly namespace?: string;
+  readonly linkRegisterPath?: string;
 
   /**
-   * Creates an instance of IdentityResolverService.
+   * Creates an instance of IdentityResolverAdapter.
    *
-   * @param config - Configuration for the identity resolver
+   * @param baseURL - Base URL for the identity resolver API
+   * @param headers - Headers including Authorization
+   * @param namespace - Optional namespace for identifiers
+   * @param linkRegisterPath - Optional path for link registration endpoint
    */
-  constructor(config: IdentityResolverConfig) {
-    if (!config.apiUrl || !config.apiKey) {
-      throw new Error('IdentityResolverService requires apiUrl and apiKey in configuration');
+  constructor(
+    baseURL: string,
+    headers: Record<string, string>,
+    namespace?: string,
+    linkRegisterPath?: string,
+  ) {
+    if (!baseURL) {
+      throw new Error("Error creating IdentityResolverAdapter. API URL is required.");
     }
-    this.config = config;
+    if (!headers?.Authorization) {
+      throw new Error("Error creating IdentityResolverAdapter. Authorization header is required.");
+    }
+
+    this.baseURL = baseURL;
+    this.headers = headers;
+    this.namespace = namespace;
+    this.linkRegisterPath = linkRegisterPath;
   }
 
   /**
@@ -41,7 +49,6 @@ export class IdentityResolverService implements IIdentityResolverService {
    * @param identifier - The identifier value within the scheme
    * @param links - Links to publish for this identifier
    * @returns Registration details including the canonical resolver URI
-   * @throws Error if validation fails or the registration fails
    */
   async publishLinks(
     identifierScheme: string,
@@ -59,7 +66,10 @@ export class IdentityResolverService implements IIdentityResolverService {
       throw new Error('Failed to publish links: at least one link is required');
     }
 
-    const { apiUrl, apiKey, namespace = identifierScheme, linkRegisterPath = '' } = this.config;
+    const baseURL = this.baseURL;
+    const headers = this.headers;
+    const namespace = this.namespace ?? identifierScheme;
+    const linkRegisterPath = this.linkRegisterPath ?? '';
 
     try {
       // Convert links to the format expected by the link resolver API
@@ -78,15 +88,14 @@ export class IdentityResolverService implements IIdentityResolverService {
 
       // Construct full URL for the identity resolver endpoint
       const url: string = linkRegisterPath
-        ? new URL(linkRegisterPath, apiUrl.endsWith('/') ? apiUrl : `${apiUrl}/`).toString()
-        : apiUrl;
+        ? new URL(linkRegisterPath, baseURL.endsWith('/') ? baseURL : `${baseURL}/`).toString()
+        : baseURL;
 
-      // Make the API call
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+          ...headers,
         },
         body: JSON.stringify(payload),
       });
@@ -97,15 +106,15 @@ export class IdentityResolverService implements IIdentityResolverService {
 
       // Return the registration details
       return {
-        resolverUri: new URL(`${namespace}/${identifierScheme}/${identifier}`, apiUrl.endsWith('/') ? apiUrl : `${apiUrl}/`).toString(),
+        resolverUri: new URL(`${namespace}/${identifierScheme}/${identifier}`, baseURL.endsWith('/') ? baseURL : `${baseURL}/`).toString(),
         identifierScheme,
         identifier,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(
-        `Failed to register links with identity resolver for identifier ${identifier}: ${errorMessage}`,
-      );
+      if (error instanceof Error) {
+        throw new Error(`Failed to register links with identity resolver for identifier: ${error.message}`);
+      }
+      throw new Error('Failed to register links with identity resolver for identifier: Unknown error');
     }
   }
 

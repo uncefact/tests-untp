@@ -1,11 +1,9 @@
-import { IdentityResolverService, IdentityResolverConfig, locales } from './identityResolver.adapter';
+import { IdentityResolverAdapter, locales } from './identityResolver.adapter';
 import type { Link } from '../../interfaces/identityResolverService';
 
-describe('IdentityResolverService', () => {
-  const mockConfig: IdentityResolverConfig = {
-    apiUrl: 'https://resolver.example.com',
-    apiKey: 'test-api-key',
-  };
+describe('IdentityResolverAdapter', () => {
+  const mockBaseURL = 'https://resolver.example.com';
+  const mockHeaders = { Authorization: 'Bearer test-api-key' };
 
   const mockLinks: Link[] = [
     {
@@ -42,36 +40,33 @@ describe('IdentityResolverService', () => {
 
   describe('constructor', () => {
     it('should create an instance with valid configuration', () => {
-      const service = new IdentityResolverService(mockConfig);
-      expect(service).toBeInstanceOf(IdentityResolverService);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
+      expect(adapter).toBeInstanceOf(IdentityResolverAdapter);
     });
 
-    it('should throw an error when apiUrl is missing', () => {
-      const invalidConfig = { apiKey: 'test-key' } as IdentityResolverConfig;
-      expect(() => new IdentityResolverService(invalidConfig)).toThrow(
-        'IdentityResolverService requires apiUrl and apiKey in configuration',
+    it('should throw an error when baseURL is missing', () => {
+      expect(() => new IdentityResolverAdapter('', mockHeaders)).toThrow(
+        'Error creating IdentityResolverAdapter. API URL is required.',
       );
     });
 
-    it('should throw an error when apiKey is missing', () => {
-      const invalidConfig = { apiUrl: 'https://resolver.example.com' } as IdentityResolverConfig;
-      expect(() => new IdentityResolverService(invalidConfig)).toThrow(
-        'IdentityResolverService requires apiUrl and apiKey in configuration',
+    it('should throw an error when Authorization header is missing', () => {
+      expect(() => new IdentityResolverAdapter(mockBaseURL, {} as Record<string, string>)).toThrow(
+        'Error creating IdentityResolverAdapter. Authorization header is required.',
       );
     });
 
-    it('should throw an error when both apiUrl and apiKey are missing', () => {
-      const invalidConfig = {} as IdentityResolverConfig;
-      expect(() => new IdentityResolverService(invalidConfig)).toThrow(
-        'IdentityResolverService requires apiUrl and apiKey in configuration',
-      );
+    it('should throw an error when headers is undefined', () => {
+      expect(
+        () => new IdentityResolverAdapter(mockBaseURL, undefined as unknown as Record<string, string>),
+      ).toThrow('Error creating IdentityResolverAdapter. Authorization header is required.');
     });
   });
 
   describe('publishLinks', () => {
     it('should successfully publish links and return registration details', async () => {
-      const service = new IdentityResolverService(mockConfig);
-      const result = await service.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
+      const result = await adapter.publishLinks('abn', '51824753556', mockLinks);
 
       expect(result).toEqual({
         resolverUri: 'https://resolver.example.com/abn/abn/51824753556',
@@ -80,9 +75,9 @@ describe('IdentityResolverService', () => {
       });
     });
 
-    it('should set bearer token authorization header', async () => {
-      const service = new IdentityResolverService(mockConfig);
-      await service.publishLinks('abn', '51824753556', mockLinks);
+    it('should set authorization header', async () => {
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks);
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),
@@ -95,8 +90,8 @@ describe('IdentityResolverService', () => {
     });
 
     it('should call the API with correct URL when no linkRegisterPath is provided', async () => {
-      const service = new IdentityResolverService(mockConfig);
-      await service.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks);
 
       expect(mockFetch).toHaveBeenCalledWith(
         'https://resolver.example.com',
@@ -105,12 +100,8 @@ describe('IdentityResolverService', () => {
     });
 
     it('should call the API with correct URL when linkRegisterPath is provided', async () => {
-      const configWithPath: IdentityResolverConfig = {
-        ...mockConfig,
-        linkRegisterPath: 'register',
-      };
-      const service = new IdentityResolverService(configWithPath);
-      await service.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders, undefined, 'register');
+      await adapter.publishLinks('abn', '51824753556', mockLinks);
 
       expect(mockFetch).toHaveBeenCalledWith(
         'https://resolver.example.com/register',
@@ -119,8 +110,8 @@ describe('IdentityResolverService', () => {
     });
 
     it('should use identifierScheme as namespace when namespace is not provided', async () => {
-      const service = new IdentityResolverService(mockConfig);
-      await service.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -128,12 +119,8 @@ describe('IdentityResolverService', () => {
     });
 
     it('should use provided namespace when configured', async () => {
-      const configWithNamespace: IdentityResolverConfig = {
-        ...mockConfig,
-        namespace: 'custom-namespace',
-      };
-      const service = new IdentityResolverService(configWithNamespace);
-      await service.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders, 'custom-namespace');
+      await adapter.publishLinks('abn', '51824753556', mockLinks);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -141,8 +128,8 @@ describe('IdentityResolverService', () => {
     });
 
     it('should construct correct payload structure', async () => {
-      const service = new IdentityResolverService(mockConfig);
-      await service.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -159,9 +146,9 @@ describe('IdentityResolverService', () => {
     });
 
     it('should create responses for each locale', async () => {
-      const service = new IdentityResolverService(mockConfig);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
       const singleLink: Link[] = [mockLinks[0]];
-      await service.publishLinks('abn', '51824753556', singleLink);
+      await adapter.publishLinks('abn', '51824753556', singleLink);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -175,9 +162,9 @@ describe('IdentityResolverService', () => {
     });
 
     it('should correctly convert link properties to response format', async () => {
-      const service = new IdentityResolverService(mockConfig);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
       const singleLink: Link[] = [mockLinks[0]];
-      await service.publishLinks('abn', '51824753556', singleLink);
+      await adapter.publishLinks('abn', '51824753556', singleLink);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -208,8 +195,8 @@ describe('IdentityResolverService', () => {
         },
       ];
 
-      const service = new IdentityResolverService(mockConfig);
-      await service.publishLinks('abn', '51824753556', linkWithoutPrefix);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', linkWithoutPrefix);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -217,8 +204,8 @@ describe('IdentityResolverService', () => {
     });
 
     it('should preserve rel when already prefixed with colon', async () => {
-      const service = new IdentityResolverService(mockConfig);
-      await service.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -236,8 +223,8 @@ describe('IdentityResolverService', () => {
         },
       ];
 
-      const service = new IdentityResolverService(mockConfig);
-      await service.publishLinks('abn', '51824753556', linkWithoutLang);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', linkWithoutLang);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -245,9 +232,9 @@ describe('IdentityResolverService', () => {
     });
 
     it('should use first hreflang when provided', async () => {
-      const service = new IdentityResolverService(mockConfig);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
       // mockLinks[1] has hreflang: ['de']
-      await service.publishLinks('abn', '51824753556', [mockLinks[1]]);
+      await adapter.publishLinks('abn', '51824753556', [mockLinks[1]]);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -255,9 +242,9 @@ describe('IdentityResolverService', () => {
     });
 
     it('should set default flags to false when link.default is not set', async () => {
-      const service = new IdentityResolverService(mockConfig);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
       // mockLinks[1] does not have default: true
-      await service.publishLinks('abn', '51824753556', [mockLinks[1]]);
+      await adapter.publishLinks('abn', '51824753556', [mockLinks[1]]);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -267,8 +254,8 @@ describe('IdentityResolverService', () => {
     });
 
     it('should send POST request with correct headers', async () => {
-      const service = new IdentityResolverService(mockConfig);
-      await service.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks);
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),
@@ -284,42 +271,42 @@ describe('IdentityResolverService', () => {
 
     describe('validation errors', () => {
       it('should throw an error when identifierScheme is empty', async () => {
-        const service = new IdentityResolverService(mockConfig);
+        const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
 
-        await expect(service.publishLinks('', '51824753556', mockLinks)).rejects.toThrow(
+        await expect(adapter.publishLinks('', '51824753556', mockLinks)).rejects.toThrow(
           'Failed to publish links: identifierScheme is required',
         );
       });
 
       it('should throw an error when identifier is empty', async () => {
-        const service = new IdentityResolverService(mockConfig);
+        const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
 
-        await expect(service.publishLinks('abn', '', mockLinks)).rejects.toThrow(
+        await expect(adapter.publishLinks('abn', '', mockLinks)).rejects.toThrow(
           'Failed to publish links: identifier is required',
         );
       });
 
       it('should throw an error when links array is empty', async () => {
-        const service = new IdentityResolverService(mockConfig);
+        const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
 
-        await expect(service.publishLinks('abn', '51824753556', [])).rejects.toThrow(
+        await expect(adapter.publishLinks('abn', '51824753556', [])).rejects.toThrow(
           'Failed to publish links: at least one link is required',
         );
       });
 
       it('should throw an error when links is null', async () => {
-        const service = new IdentityResolverService(mockConfig);
+        const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
 
         await expect(
-          service.publishLinks('abn', '51824753556', null as unknown as Link[]),
+          adapter.publishLinks('abn', '51824753556', null as unknown as Link[]),
         ).rejects.toThrow('Failed to publish links: at least one link is required');
       });
 
       it('should throw an error when links is undefined', async () => {
-        const service = new IdentityResolverService(mockConfig);
+        const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
 
         await expect(
-          service.publishLinks('abn', '51824753556', undefined as unknown as Link[]),
+          adapter.publishLinks('abn', '51824753556', undefined as unknown as Link[]),
         ).rejects.toThrow('Failed to publish links: at least one link is required');
       });
     });
@@ -328,9 +315,9 @@ describe('IdentityResolverService', () => {
       it('should throw an error with message when fetch fails', async () => {
         mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
-        const service = new IdentityResolverService(mockConfig);
+        const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
 
-        await expect(service.publishLinks('abn', '51824753556', mockLinks)).rejects.toThrow(
+        await expect(adapter.publishLinks('abn', '51824753556', mockLinks)).rejects.toThrow(
           'Failed to register links with identity resolver for identifier 51824753556: Network error',
         );
       });
@@ -342,9 +329,9 @@ describe('IdentityResolverService', () => {
           statusText: 'Internal Server Error',
         });
 
-        const service = new IdentityResolverService(mockConfig);
+        const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
 
-        await expect(service.publishLinks('abn', '51824753556', mockLinks)).rejects.toThrow(
+        await expect(adapter.publishLinks('abn', '51824753556', mockLinks)).rejects.toThrow(
           'Failed to register links with identity resolver for identifier 51824753556: HTTP 500: Internal Server Error',
         );
       });
@@ -352,9 +339,9 @@ describe('IdentityResolverService', () => {
       it('should handle non-Error exceptions', async () => {
         mockFetch.mockRejectedValueOnce('String error');
 
-        const service = new IdentityResolverService(mockConfig);
+        const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
 
-        await expect(service.publishLinks('abn', '51824753556', mockLinks)).rejects.toThrow(
+        await expect(adapter.publishLinks('abn', '51824753556', mockLinks)).rejects.toThrow(
           'Failed to register links with identity resolver for identifier 51824753556: Unknown error',
         );
       });
