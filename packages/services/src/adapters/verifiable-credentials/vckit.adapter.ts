@@ -92,15 +92,15 @@ export class VCKitAdapter implements IVerifiableCredentialService {
   readonly headers: Record<string, string>;
 
   /**
-   * Constructs a new VerifiableCredentialService instance
+   * Constructs a new VCKitAdapter instance
    * @param baseURL - The base URL for the VCkit credential service API
    */
   constructor(baseURL: string, headers: Record<string, string>) {
     if (!baseURL) {
-      throw new Error("Error creating VerifiableCredentialService. API URL is required.");
+      throw new Error("Error creating VCKitAdapter. API URL is required.");
     }
     if (!headers?.Authorization) {
-      throw new Error("Error creating VerifiableCredentialService. Authorization header is required.");
+      throw new Error("Error creating VCKitAdapter. Authorization header is required.");
     }
     this.baseURL = baseURL;
     this.headers = headers;
