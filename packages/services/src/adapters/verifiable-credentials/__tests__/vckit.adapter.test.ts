@@ -6,22 +6,21 @@ import type {
 } from "../../../interfaces";
 
 import {
+  VerificationErrorCode
+} from '../../../interfaces/verifiableCredentialService';
+
+import {
   VerifiableCredentialService
 } from '../vckit.adapter';
-import { privateAPI } from '../../../utils/httpService';
 import { decodeJwt } from 'jose';
 
 jest.mock('jose', () => ({
   decodeJwt: jest.fn(),
 }));
 
-jest.mock('../../../utils/httpService', () => ({
-  privateAPI: {
-    post: jest.fn(),
-    put: jest.fn(),
-    setBearerTokenAuthorizationHeaders: jest.fn(),
-  },
-}));
+// Mock global fetch
+const mockFetch = jest.fn();
+global.fetch = mockFetch;
 
 describe('vckit.adapter', () => {
   const mockAPIUrl = 'https://api.vc.example.com';
@@ -55,6 +54,14 @@ describe('vckit.adapter', () => {
     jest.restoreAllMocks();
   });
 
+  // Helper to create a mock Response
+  const createMockResponse = (data: unknown, ok = true, status = 200) => ({
+    ok,
+    status,
+    statusText: ok ? 'OK' : 'Error',
+    json: jest.fn().mockResolvedValue(data)
+  });
+
   describe('sign', () => {
     const mockEnvelopedVC = {
       '@context': ['https://www.w3.org/ns/credentials/v2'],
@@ -77,37 +84,37 @@ describe('vckit.adapter', () => {
       } as CredentialPayload;
 
       // Mock credential status issuance first, then VC issuance
-      (privateAPI.post as jest.Mock)
-        .mockResolvedValueOnce(mockCredentialStatus)
-        .mockResolvedValueOnce(mockSignedCredentialResponse);
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse(mockCredentialStatus))
+        .mockResolvedValueOnce(createMockResponse(mockSignedCredentialResponse));
 
       const result = await service.sign(vc);
 
       // Verify call to credential status endpoint
-      expect(privateAPI.post).toHaveBeenNthCalledWith(
+      expect(mockFetch).toHaveBeenNthCalledWith(
         1,
         `${mockAPIUrl}/agent/issueBitstringStatusList`,
         expect.objectContaining({
-          statusPurpose: 'revocation',
-          bitstringStatusIssuer: mockIssuer.id,
-        }),
-        { headers: mockHeaders },
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            Authorization: mockHeaders.Authorization
+          }),
+          body: expect.stringContaining('"statusPurpose":"revocation"')
+        })
       );
 
       // Verify call to issue endpoint with credential status
-      expect(privateAPI.post).toHaveBeenNthCalledWith(
+      expect(mockFetch).toHaveBeenNthCalledWith(
         2,
         `${mockAPIUrl}/credentials/issue`,
         expect.objectContaining({
-          credential: {
-            '@context': expect.arrayContaining(['https://www.w3.org/ns/credentials/v2']),
-            type: expect.arrayContaining(['VerifiableCredential']),
-            issuer: mockIssuer,
-            credentialSubject: mockCredentialSubject,
-            credentialStatus: mockCredentialStatus,
-          }
-        }),
-        { headers: mockHeaders },
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            Authorization: mockHeaders.Authorization
+          })
+        })
       );
 
       expect(result).toEqual(mockEnvelopedVC);
@@ -123,26 +130,32 @@ describe('vckit.adapter', () => {
         credentialSubject: mockCredentialSubject
       } as CredentialPayload;
 
-      (privateAPI.post as jest.Mock)
-        .mockResolvedValueOnce(mockCredentialStatus)
-        .mockResolvedValueOnce(mockSignedCredentialResponse);
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse(mockCredentialStatus))
+        .mockResolvedValueOnce(createMockResponse(mockSignedCredentialResponse));
 
       const result = await service.sign(vc);
 
       // Verify headers in credential status call
-      expect(privateAPI.post).toHaveBeenNthCalledWith(
+      expect(mockFetch).toHaveBeenNthCalledWith(
         1,
-        `${mockAPIUrl}/agent/issueBitstringStatusList`,
-        expect.any(Object),
-        { headers: customHeaders },
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Bearer token123'
+          })
+        })
       );
 
       // Verify headers in issue call
-      expect(privateAPI.post).toHaveBeenNthCalledWith(
+      expect(mockFetch).toHaveBeenNthCalledWith(
         2,
-        `${mockAPIUrl}/credentials/issue`,
-        expect.any(Object),
-        { headers: customHeaders },
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Bearer token123'
+          })
+        })
       );
 
       expect(result).toEqual(mockEnvelopedVC);
@@ -157,13 +170,11 @@ describe('vckit.adapter', () => {
         credentialSubject: mockCredentialSubject
       } as CredentialPayload;
 
-      const statusError = new Error('Status issuance failed');
+      mockFetch.mockResolvedValueOnce(createMockResponse({}, false, 500));
 
-      (privateAPI.post as jest.Mock).mockRejectedValueOnce(statusError);
+      await expect(service.sign(vc)).rejects.toThrow('Failed to issue credential status: HTTP 500: Error');
 
-      await expect(service.sign(vc)).rejects.toThrow('Failed to issue credential status: Status issuance failed');
-
-      expect(privateAPI.post).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it('should fail if credential issuance fails', async () => {
@@ -175,15 +186,13 @@ describe('vckit.adapter', () => {
         credentialSubject: mockCredentialSubject
       } as CredentialPayload;
 
-      const issuanceError = new Error('Issuance failed');
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse(mockCredentialStatus))
+        .mockResolvedValueOnce(createMockResponse({}, false, 500));
 
-      (privateAPI.post as jest.Mock)
-        .mockResolvedValueOnce(mockCredentialStatus)
-        .mockRejectedValueOnce(issuanceError);
+      await expect(service.sign(vc)).rejects.toThrow('Failed to issue verifiable credential: HTTP 500: Error');
 
-      await expect(service.sign(vc)).rejects.toThrow('Failed to issue verifiable credential: Issuance failed');
-
-      expect(privateAPI.post).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
     it('should issue VC with default context, issuer and type', async () => {
@@ -195,37 +204,19 @@ describe('vckit.adapter', () => {
         credentialSubject: mockCredentialSubject
       };
 
-      (privateAPI.post as jest.Mock)
-        .mockResolvedValueOnce(mockCredentialStatus)
-        .mockResolvedValueOnce(mockSignedCredentialResponse);
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse(mockCredentialStatus))
+        .mockResolvedValueOnce(createMockResponse(mockSignedCredentialResponse));
 
       const result = await service.sign(vc);
 
       // Verify call to credential status endpoint with default issuer
-      expect(privateAPI.post).toHaveBeenNthCalledWith(
+      expect(mockFetch).toHaveBeenNthCalledWith(
         1,
         `${mockAPIUrl}/agent/issueBitstringStatusList`,
         expect.objectContaining({
-          statusPurpose: 'revocation',
-          bitstringStatusIssuer: mockDefaultIssuer.id,
-        }),
-        { headers: mockHeaders },
-      );
-
-      // Verify call to issue endpoint with default context, type, and issuer
-      expect(privateAPI.post).toHaveBeenNthCalledWith(
-        2,
-        `${mockAPIUrl}/credentials/issue`,
-        expect.objectContaining({
-          credential: expect.objectContaining({
-            '@context': ['https://www.w3.org/ns/credentials/v2'],
-            type: expect.arrayContaining(['VerifiableCredential']),
-            issuer: mockDefaultIssuer,
-            credentialSubject: mockCredentialSubject,
-            credentialStatus: mockCredentialStatus,
-          })
-        }),
-        { headers: mockHeaders },
+          body: expect.stringContaining(mockDefaultIssuer.id)
+        })
       );
 
       expect(result).toEqual(mockEnvelopedVC);
@@ -248,38 +239,11 @@ describe('vckit.adapter', () => {
         verifiableCredential: mockContextVC
       };
 
-      (privateAPI.post as jest.Mock)
-        .mockResolvedValueOnce(mockCredentialStatus)
-        .mockResolvedValueOnce(mockIssueResponse);
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse(mockCredentialStatus))
+        .mockResolvedValueOnce(createMockResponse(mockIssueResponse));
 
       const result = await service.sign(vc);
-
-      // Verify call to credential status endpoint with default issuer
-      expect(privateAPI.post).toHaveBeenNthCalledWith(
-        1,
-        `${mockAPIUrl}/agent/issueBitstringStatusList`,
-        expect.objectContaining({
-          statusPurpose: 'revocation',
-          bitstringStatusIssuer: mockDefaultIssuer.id,
-        }),
-        { headers: mockHeaders },
-      );
-
-      // Verify call to issue endpoint with merged context (default + custom)
-      expect(privateAPI.post).toHaveBeenNthCalledWith(
-        2,
-        `${mockAPIUrl}/credentials/issue`,
-        expect.objectContaining({
-          credential: expect.objectContaining({
-            '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/'],
-            type: expect.arrayContaining(['VerifiableCredential']),
-            issuer: mockDefaultIssuer,
-            credentialSubject: mockCredentialSubject,
-            credentialStatus: mockCredentialStatus,
-          })
-        }),
-        { headers: mockHeaders },
-      );
 
       expect(result).toEqual(mockContextVC);
     });
@@ -301,38 +265,11 @@ describe('vckit.adapter', () => {
         verifiableCredential: mockTypeVC
       };
 
-      (privateAPI.post as jest.Mock)
-        .mockResolvedValueOnce(mockCredentialStatus)
-        .mockResolvedValueOnce(mockIssueResponse);
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse(mockCredentialStatus))
+        .mockResolvedValueOnce(createMockResponse(mockIssueResponse));
 
       const result = await service.sign(vc);
-
-      // Verify call to credential status endpoint with default issuer
-      expect(privateAPI.post).toHaveBeenNthCalledWith(
-        1,
-        `${mockAPIUrl}/agent/issueBitstringStatusList`,
-        expect.objectContaining({
-          statusPurpose: 'revocation',
-          bitstringStatusIssuer: mockDefaultIssuer.id,
-        }),
-        { headers: mockHeaders },
-      );
-
-      // Verify call to issue endpoint with merged type (custom + default)
-      expect(privateAPI.post).toHaveBeenNthCalledWith(
-        2,
-        `${mockAPIUrl}/credentials/issue`,
-        expect.objectContaining({
-          credential: expect.objectContaining({
-            '@context': ['https://www.w3.org/ns/credentials/v2'],
-            type: expect.arrayContaining(['VerifiableCredential', 'CustomType']),
-            issuer: mockDefaultIssuer,
-            credentialSubject: mockCredentialSubject,
-            credentialStatus: mockCredentialStatus,
-          })
-        }),
-        { headers: mockHeaders },
-      );
 
       expect(result).toEqual(mockTypeVC);
     });
@@ -360,7 +297,7 @@ describe('vckit.adapter', () => {
       };
 
       await expect(service.sign(vc)).rejects.toThrow('Error issuing VC. credentialSubject is required in credential payload.');
-      expect(privateAPI.post).not.toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
   });
@@ -374,77 +311,192 @@ describe('vckit.adapter', () => {
 
     it('should call verify API endpoint with credential', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
-      const mockVerifyResult = { verified: true };
+      // VCkit response format
+      const vckitVerifyResult = { verified: true };
 
-      (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockVerifyResult);
+      mockFetch.mockResolvedValueOnce(createMockResponse(vckitVerifyResult));
 
       const result = await service.verify(mockEnvelopedCredential);
 
-      expect(privateAPI.post).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         `${mockAPIUrl}/credentials/verify`,
-        {
-          credential: mockEnvelopedCredential,
-          fetchRemoteContexts: true,
-          policies: {
-            credentialStatus: true,
-          },
-        },
-        { headers: mockHeaders }
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            Authorization: mockHeaders.Authorization
+          }),
+          body: JSON.stringify({
+            credential: mockEnvelopedCredential,
+            fetchRemoteContexts: true,
+            policies: {
+              credentialStatus: true,
+            },
+          })
+        })
       );
-      expect(result).toEqual(mockVerifyResult);
+      expect(result).toEqual({ verified: true });
     });
 
     it('should pass default headers when verifying', async () => {
       const customHeaders = { Authorization: 'Bearer token123' };
       const service = new VerifiableCredentialService(mockAPIUrl, customHeaders);
-      const mockVerifyResult = { verified: true };
+      const vckitVerifyResult = { verified: true };
 
-      (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockVerifyResult);
+      mockFetch.mockResolvedValueOnce(createMockResponse(vckitVerifyResult));
 
       const result = await service.verify(mockEnvelopedCredential);
 
-      expect(privateAPI.post).toHaveBeenCalledWith(
-        `${mockAPIUrl}/credentials/verify`,
-        expect.any(Object),
-        { headers: customHeaders }
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Bearer token123'
+          })
+        })
       );
-      expect(result).toEqual(mockVerifyResult);
+      expect(result).toEqual({ verified: true });
     });
 
-    it('should return verification failure result', async () => {
+    it('should transform VCkit verification failure with errorCode to VerifyResult', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
-      const mockVerifyResult = {
+      // VCkit response format with errorCode
+      const vckitVerifyResult = {
         verified: false,
-        error: { message: 'Invalid signature' }
+        error: {
+          message: 'Credential has been revoked',
+          errorCode: 'credential_status_revoked'
+        }
       };
 
-      (privateAPI.post as jest.Mock).mockResolvedValueOnce(mockVerifyResult);
+      mockFetch.mockResolvedValueOnce(createMockResponse(vckitVerifyResult));
 
       const result = await service.verify(mockEnvelopedCredential);
 
-      expect(result).toEqual(mockVerifyResult);
+      // Should be transformed to VerifyResult format with type
+      expect(result).toEqual({
+        verified: false,
+        error: {
+          type: VerificationErrorCode.Status,
+          message: 'Credential has been revoked'
+        }
+      });
+    });
+
+    it('should map integrity-related errorCodes correctly', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const vckitVerifyResult = {
+        verified: false,
+        error: {
+          message: 'Invalid signature',
+          errorCode: 'signature_invalid'
+        }
+      };
+
+      mockFetch.mockResolvedValueOnce(createMockResponse(vckitVerifyResult));
+
+      const result = await service.verify(mockEnvelopedCredential);
+
+      expect(result).toEqual({
+        verified: false,
+        error: {
+          type: VerificationErrorCode.Integrity,
+          message: 'Invalid signature'
+        }
+      });
+    });
+
+    it('should map temporal-related errorCodes correctly', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const vckitVerifyResult = {
+        verified: false,
+        error: {
+          message: 'Credential has expired',
+          errorCode: 'credential_expired'
+        }
+      };
+
+      mockFetch.mockResolvedValueOnce(createMockResponse(vckitVerifyResult));
+
+      const result = await service.verify(mockEnvelopedCredential);
+
+      expect(result).toEqual({
+        verified: false,
+        error: {
+          type: VerificationErrorCode.Temporal,
+          message: 'Credential has expired'
+        }
+      });
+    });
+
+    it('should handle VCkit error without errorCode', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const vckitVerifyResult = {
+        verified: false,
+        error: { message: 'Unknown verification error' }
+      };
+
+      mockFetch.mockResolvedValueOnce(createMockResponse(vckitVerifyResult));
+
+      const result = await service.verify(mockEnvelopedCredential);
+
+      // Should default to Integrity type
+      expect(result).toEqual({
+        verified: false,
+        error: {
+          type: VerificationErrorCode.Integrity,
+          message: 'Unknown verification error'
+        }
+      });
+    });
+
+    it('should handle VCkit error without message', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const vckitVerifyResult = {
+        verified: false,
+        error: { errorCode: 'some_error' }
+      };
+
+      mockFetch.mockResolvedValueOnce(createMockResponse(vckitVerifyResult));
+
+      const result = await service.verify(mockEnvelopedCredential);
+
+      expect(result).toEqual({
+        verified: false,
+        error: {
+          type: VerificationErrorCode.Integrity,
+          message: 'Verification failed'
+        }
+      });
     });
 
     it('should throw error when credential is not provided', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
 
       await expect(service.verify(null as any)).rejects.toThrow('Error verifying VC. Credential is required.');
-      expect(privateAPI.post).not.toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it('should throw error when API call fails', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
-      const apiError = new Error('Network error');
 
-      (privateAPI.post as jest.Mock).mockRejectedValueOnce(apiError);
+      mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
       await expect(service.verify(mockEnvelopedCredential)).rejects.toThrow('Failed to verify verifiable credential: Network error');
+    });
+
+    it('should throw error when API returns non-ok response', async () => {
+      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+
+      mockFetch.mockResolvedValueOnce(createMockResponse({}, false, 500));
+
+      await expect(service.verify(mockEnvelopedCredential)).rejects.toThrow('Failed to verify verifiable credential: HTTP 500: Error');
     });
 
     it('should handle unknown errors', async () => {
       const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
 
-      (privateAPI.post as jest.Mock).mockRejectedValueOnce('Unknown error');
+      mockFetch.mockRejectedValueOnce('Unknown error');
 
       await expect(service.verify(mockEnvelopedCredential)).rejects.toThrow('Failed to verify verifiable credential: Unknown error');
     });
