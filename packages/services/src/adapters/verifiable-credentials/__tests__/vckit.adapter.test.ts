@@ -10,7 +10,7 @@ import {
 } from '../../../interfaces/verifiableCredentialService';
 
 import {
-  VerifiableCredentialService
+  VCKitAdapter
 } from '../vckit.adapter';
 import { decodeJwt } from 'jose';
 
@@ -75,7 +75,7 @@ describe('vckit.adapter', () => {
     };
 
     it('should call issue API endpoint with credential status', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const vc = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
@@ -122,7 +122,7 @@ describe('vckit.adapter', () => {
 
     it('should pass default headers to API calls when configured', async () => {
       const customHeaders = { Authorization: 'Bearer token123' };
-      const service = new VerifiableCredentialService(mockAPIUrl, customHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, customHeaders);
       const vc = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
@@ -162,7 +162,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should fail if credential status issuance fails', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const vc = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
@@ -178,7 +178,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should fail if credential issuance fails', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const vc = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
@@ -196,7 +196,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should issue VC with default context, issuer and type', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const vc: CredentialPayload = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
@@ -223,7 +223,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should issue VC with added context', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const vc: CredentialPayload = {
         '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/'],
         type: ['VerifiableCredential'],
@@ -249,7 +249,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should issue VC with added type', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const vc: CredentialPayload = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential', 'CustomType'],
@@ -275,15 +275,15 @@ describe('vckit.adapter', () => {
     });
 
     it('should throw error when baseURL is not provided', () => {
-      expect(() => new VerifiableCredentialService('', mockHeaders)).toThrow('Error creating VerifiableCredentialService. API URL is required.');
+      expect(() => new VCKitAdapter('', mockHeaders)).toThrow('Error creating VCKitAdapter. API URL is required.');
     });
 
     it('should throw error when Authorization header is not provided', () => {
-      expect(() => new VerifiableCredentialService(mockAPIUrl, {})).toThrow('Error creating VerifiableCredentialService. Authorization header is required.');
+      expect(() => new VCKitAdapter(mockAPIUrl, {})).toThrow('Error creating VCKitAdapter. Authorization header is required.');
     });
 
     it('should throw error when vc.credentialSubject is not provided', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const localhostIssuer: CredentialIssuer = {
         type: ['CredentialIssuer'],
         id: 'did:web:localhost',
@@ -310,7 +310,7 @@ describe('vckit.adapter', () => {
     };
 
     it('should call verify API endpoint with credential', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       // VCkit response format
       const vckitVerifyResult = { verified: true };
 
@@ -340,7 +340,7 @@ describe('vckit.adapter', () => {
 
     it('should pass default headers when verifying', async () => {
       const customHeaders = { Authorization: 'Bearer token123' };
-      const service = new VerifiableCredentialService(mockAPIUrl, customHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, customHeaders);
       const vckitVerifyResult = { verified: true };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(vckitVerifyResult));
@@ -359,7 +359,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should transform VCkit verification failure with errorCode to VerifyResult', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       // VCkit response format with errorCode
       const vckitVerifyResult = {
         verified: false,
@@ -384,7 +384,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should map integrity-related errorCodes correctly', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const vckitVerifyResult = {
         verified: false,
         error: {
@@ -407,7 +407,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should map temporal-related errorCodes correctly', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const vckitVerifyResult = {
         verified: false,
         error: {
@@ -430,7 +430,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should handle VCkit error without errorCode', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const vckitVerifyResult = {
         verified: false,
         error: { message: 'Unknown verification error' }
@@ -451,7 +451,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should handle VCkit error without message', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const vckitVerifyResult = {
         verified: false,
         error: { errorCode: 'some_error' }
@@ -471,14 +471,14 @@ describe('vckit.adapter', () => {
     });
 
     it('should throw error when credential is not provided', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
 
       await expect(service.verify(null as any)).rejects.toThrow('Error verifying VC. Credential is required.');
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it('should throw error when API call fails', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
 
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
@@ -486,7 +486,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should throw error when API returns non-ok response', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
 
       mockFetch.mockResolvedValueOnce(createMockResponse({}, false, 500));
 
@@ -494,7 +494,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should handle unknown errors', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
 
       mockFetch.mockRejectedValueOnce('Unknown error');
 
@@ -521,7 +521,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should decode enveloped credential using jose', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
 
       (decodeJwt as jest.Mock).mockReturnValueOnce(mockDecodedCredential);
 
@@ -534,14 +534,14 @@ describe('vckit.adapter', () => {
     });
 
     it('should throw error when credential is not provided', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
 
       await expect(service.decode(null as any)).rejects.toThrow('Error decoding VC. Credential is required.');
       expect(decodeJwt).not.toHaveBeenCalled();
     });
 
     it('should throw error when credential type is not EnvelopedVerifiableCredential', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const invalidCredential = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: 'VerifiableCredential',
@@ -553,7 +553,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should throw error when credential id is missing encoded data', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const invalidCredential = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: 'EnvelopedVerifiableCredential',
@@ -564,7 +564,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should throw error when credential id is undefined', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const invalidCredential = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: 'EnvelopedVerifiableCredential',
@@ -575,7 +575,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should handle decodeJwt errors', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
 
       (decodeJwt as jest.Mock).mockImplementationOnce(() => {
         throw new Error('Invalid JWT format');
@@ -585,7 +585,7 @@ describe('vckit.adapter', () => {
     });
 
     it('should handle unknown errors during decoding', async () => {
-      const service = new VerifiableCredentialService(mockAPIUrl, mockHeaders);
+      const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
 
       (decodeJwt as jest.Mock).mockImplementationOnce(() => {
         throw 'Unknown error';
