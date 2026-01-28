@@ -93,7 +93,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
 
   /**
    * Constructs a new VerifiableCredentialService instance
-   * @param baseURL - The base URL for the credential service API
+   * @param baseURL - The base URL for the VCkit credential service API
    */
   constructor(baseURL: string, defaultHeaders: Record<string, string>) {
     if (!baseURL) {
@@ -162,7 +162,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(this.defaultHeaders || {})
+          ...this.defaultHeaders
         },
         body: JSON.stringify(verifyCredentialParams)
       });
@@ -293,10 +293,9 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
       throw new Error('Error issuing credential status: Bitstring Status Issuer ID is required');
     }
 
-    const { host, headers, statusPurpose = 'revocation', ...rest } = params;
+    const { host, headers, statusPurpose = 'revocation' } = params;
     const payload = {
       statusPurpose,
-      ...rest,
       bitstringStatusIssuer: issuerId,
     };
 
@@ -305,7 +304,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(headers || {})
+          ...headers
         },
         body: JSON.stringify(payload)
       });
