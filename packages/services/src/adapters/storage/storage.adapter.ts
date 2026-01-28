@@ -3,33 +3,22 @@ import type { StorageRecord, IStorageService } from '../../interfaces/storageSer
 import type { EnvelopedVerifiableCredential } from '../../interfaces/verifiableCredentialService';
 
 /**
- * HTTP methods supported for storage operations
- */
-export type StorageMethod = 'POST';
-
-/**
  * Service implementation for storing verifiable credentials
  * Implements the IStorageService interface
  */
 export class StorageService implements IStorageService {
   readonly baseURL: string;
-  readonly method: StorageMethod;
   readonly headers?: Record<string, string>;
-  readonly params?: Record<string, unknown>;
+  readonly additionalPayload?: Record<string, unknown>;
 
-  constructor(baseURL: string, method: StorageMethod, headers?: Record<string, string>, params?: Record<string, unknown>) {
+  constructor(baseURL: string, headers?: Record<string, string>, additionalPayload?: Record<string, unknown>) {
     if (!baseURL) {
       throw new Error("Error creating StorageService. API URL is required.");
     }
 
-    if (!method) {
-      throw new Error("Error creating StorageService. method is required.");
-    }
-
     this.baseURL = baseURL;
-    this.method = method;
     this.headers = headers;
-    this.params = params;
+    this.additionalPayload = additionalPayload;
   }
 
   /**
@@ -45,7 +34,7 @@ export class StorageService implements IStorageService {
     const url = `${this.baseURL}${endpoint}`;
 
     const payload = {
-      ...this.params,
+      ...this.additionalPayload,
       data: credential,
     };
 
@@ -56,7 +45,7 @@ export class StorageService implements IStorageService {
 
     try {
       const response = await fetch(url, {
-        method: this.method,
+        method: 'POST',
         headers: requestHeaders,
         body: JSON.stringify(payload),
       });
@@ -67,10 +56,10 @@ export class StorageService implements IStorageService {
 
       return (await response.json()) as StorageRecord;
     } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to store verifiable credential: ${error.message}`);
-      }
-      throw new Error('Failed to store verifiable credential: Unknown error');
+      throw new Error(
+        `Failed to store verifiable credential: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        { cause: error }
+      );
     }
   }
 }
