@@ -11,8 +11,6 @@ import {
   type VerifyResult
 } from '../../interfaces/verifiableCredentialService.js';
 
-import { privateAPI } from '../../utils/httpService.js';
-
 const PROOF_FORMAT = 'EnvelopingProofJose';
 
 type IssueCredentialStatusParams = {
@@ -97,12 +95,20 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     };
 
     try {
-      const result = await privateAPI.post<VerifyResult>(
-        `${this.baseURL}/credentials/verify`,
-        verifyCredentialParams,
-        { headers: this.defaultHeaders || {} }
-      );
-      return result;
+      const response = await fetch(`${this.baseURL}/credentials/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.defaultHeaders || {})
+        },
+        body: JSON.stringify(verifyCredentialParams)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json() as VerifyResult;
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Failed to verify verifiable credential: ${error.message}`);
@@ -173,12 +179,21 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     };
 
     try {
-      const response = await privateAPI.post<{ verifiableCredential: EnvelopedVerifiableCredential }>(
-        `${this.baseURL}/credentials/issue`,
-        payload,
-        { headers: this.defaultHeaders },
-      );
-      return response.verifiableCredential;
+      const response = await fetch(`${this.baseURL}/credentials/issue`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.defaultHeaders
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json() as { verifiableCredential: EnvelopedVerifiableCredential };
+      return result.verifiableCredential;
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Failed to issue verifiable credential: ${error.message}`);
@@ -222,12 +237,20 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     };
 
     try {
-      const response = await privateAPI.post<CredentialStatus>(
-        `${host}/agent/issueBitstringStatusList`,
-        payload,
-        { headers: headers || {} }
-      );
-      return response;
+      const response = await fetch(`${host}/agent/issueBitstringStatusList`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(headers || {})
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json() as CredentialStatus;
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Failed to issue credential status: ${error.message}`);
