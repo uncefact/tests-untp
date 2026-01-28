@@ -87,23 +87,23 @@ type IssueCredentialStatusParams = {
  * Service implementation for issuing verifiable credentials
  * Implements the IVerifiableCredentialService interface
  */
-export class VerifiableCredentialService implements IVerifiableCredentialService {
+export class VCKitAdapter implements IVerifiableCredentialService {
   readonly baseURL: string;
-  readonly defaultHeaders: Record<string, string>;
+  readonly headers: Record<string, string>;
 
   /**
    * Constructs a new VerifiableCredentialService instance
    * @param baseURL - The base URL for the VCkit credential service API
    */
-  constructor(baseURL: string, defaultHeaders: Record<string, string>) {
+  constructor(baseURL: string, headers: Record<string, string>) {
     if (!baseURL) {
       throw new Error("Error creating VerifiableCredentialService. API URL is required.");
     }
-    if (!defaultHeaders?.Authorization) {
+    if (!headers?.Authorization) {
       throw new Error("Error creating VerifiableCredentialService. Authorization header is required.");
     }
     this.baseURL = baseURL;
-    this.defaultHeaders = defaultHeaders;
+    this.headers = headers;
   }
 
   /**
@@ -125,7 +125,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
     // Issue credential status if not provided
     const credentialStatus = await this.issueCredentialStatus({
       host: new URL(this.baseURL).origin,
-      headers: this.defaultHeaders,
+      headers: this.headers,
       bitstringStatusIssuer: credentialPayload.issuer,
     });
 
@@ -162,7 +162,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...this.defaultHeaders
+          ...this.headers
         },
         body: JSON.stringify(verifyCredentialParams)
       });
@@ -247,7 +247,7 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...this.defaultHeaders
+          ...this.headers
         },
         body: JSON.stringify(payload)
       });
