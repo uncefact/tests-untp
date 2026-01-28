@@ -12,5 +12,5 @@ export * from './identityProviders/index.js';
 export * from './features/index.js';
 export * from './api.service.js';
 export * from './identifierSchemes/index.js';
-export * from './identityResolver.js';
+export * from './adapters/identity-resolver/identityResolver.adapter.js';
 export * from './interfaces/identityResolverService.js';

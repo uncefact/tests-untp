@@ -1,13 +1,5 @@
-import { IdentityResolverService, IdentityResolverConfig, locales } from '../identityResolver';
-import { privateAPI } from '../utils/httpService';
-import type { Link } from '../interfaces/identityResolverService';
-
-jest.mock('../utils/httpService', () => ({
-  privateAPI: {
-    post: jest.fn(),
-    setBearerTokenAuthorizationHeaders: jest.fn(),
-  },
-}));
+import { IdentityResolverService, IdentityResolverConfig, locales } from './identityResolver.adapter';
+import type { Link } from '../../interfaces/identityResolverService';
 
 describe('IdentityResolverService', () => {
   const mockConfig: IdentityResolverConfig = {
@@ -33,8 +25,19 @@ describe('IdentityResolverService', () => {
     },
   ];
 
+  let mockFetch: jest.Mock;
+
   beforeEach(() => {
-    jest.clearAllMocks();
+    mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+    });
+    global.fetch = mockFetch;
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('constructor', () => {
@@ -67,8 +70,6 @@ describe('IdentityResolverService', () => {
 
   describe('publishLinks', () => {
     it('should successfully publish links and return registration details', async () => {
-      jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({});
-
       const service = new IdentityResolverService(mockConfig);
       const result = await service.publishLinks('abn', '51824753556', mockLinks);
 
@@ -80,29 +81,30 @@ describe('IdentityResolverService', () => {
     });
 
     it('should set bearer token authorization header', async () => {
-      jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({});
-
       const service = new IdentityResolverService(mockConfig);
       await service.publishLinks('abn', '51824753556', mockLinks);
 
-      expect(privateAPI.setBearerTokenAuthorizationHeaders).toHaveBeenCalledWith('test-api-key');
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Bearer test-api-key',
+          }),
+        }),
+      );
     });
 
     it('should call the API with correct URL when no linkRegisterPath is provided', async () => {
-      jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({});
-
       const service = new IdentityResolverService(mockConfig);
       await service.publishLinks('abn', '51824753556', mockLinks);
 
-      expect(privateAPI.post).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'https://resolver.example.com',
         expect.any(Object),
       );
     });
 
     it('should call the API with correct URL when linkRegisterPath is provided', async () => {
-      jest.spyOn(privateAPI, 'post').mockResolvedValueOnce({});
-
       const configWithPath: IdentityResolverConfig = {
         ...mockConfig,
         linkRegisterPath: 'register',
@@ -110,32 +112,22 @@ describe('IdentityResolverService', () => {
       const service = new IdentityResolverService(configWithPath);
       await service.publishLinks('abn', '51824753556', mockLinks);
 
-      expect(privateAPI.post).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'https://resolver.example.com/register',
         expect.any(Object),
       );
     });
 
     it('should use identifierScheme as namespace when namespace is not provided', async () => {
-      let capturedPayload: any;
-      jest.spyOn(privateAPI, 'post').mockImplementation((url, payload) => {
-        capturedPayload = payload;
-        return Promise.resolve({});
-      });
-
       const service = new IdentityResolverService(mockConfig);
       await service.publishLinks('abn', '51824753556', mockLinks);
 
-      expect(capturedPayload.namespace).toBe('abn');
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      expect(body.namespace).toBe('abn');
     });
 
     it('should use provided namespace when configured', async () => {
-      let capturedPayload: any;
-      jest.spyOn(privateAPI, 'post').mockImplementation((url, payload) => {
-        capturedPayload = payload;
-        return Promise.resolve({});
-      });
-
       const configWithNamespace: IdentityResolverConfig = {
         ...mockConfig,
         namespace: 'custom-namespace',
@@ -143,20 +135,18 @@ describe('IdentityResolverService', () => {
       const service = new IdentityResolverService(configWithNamespace);
       await service.publishLinks('abn', '51824753556', mockLinks);
 
-      expect(capturedPayload.namespace).toBe('custom-namespace');
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      expect(body.namespace).toBe('custom-namespace');
     });
 
     it('should construct correct payload structure', async () => {
-      let capturedPayload: any;
-      jest.spyOn(privateAPI, 'post').mockImplementation((url, payload) => {
-        capturedPayload = payload;
-        return Promise.resolve({});
-      });
-
       const service = new IdentityResolverService(mockConfig);
       await service.publishLinks('abn', '51824753556', mockLinks);
 
-      expect(capturedPayload).toMatchObject({
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      expect(body).toMatchObject({
         namespace: 'abn',
         identificationKey: '51824753556',
         identificationKeyType: 'abn',
@@ -164,41 +154,34 @@ describe('IdentityResolverService', () => {
         qualifierPath: '/',
         active: true,
       });
-      expect(capturedPayload.responses).toBeDefined();
-      expect(Array.isArray(capturedPayload.responses)).toBe(true);
+      expect(body.responses).toBeDefined();
+      expect(Array.isArray(body.responses)).toBe(true);
     });
 
     it('should create responses for each locale', async () => {
-      let capturedPayload: any;
-      jest.spyOn(privateAPI, 'post').mockImplementation((url, payload) => {
-        capturedPayload = payload;
-        return Promise.resolve({});
-      });
-
       const service = new IdentityResolverService(mockConfig);
       const singleLink: Link[] = [mockLinks[0]];
       await service.publishLinks('abn', '51824753556', singleLink);
 
-      // Should have one response per locale for each link
-      expect(capturedPayload.responses.length).toBe(locales.length);
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
 
-      const contexts = capturedPayload.responses.map((r: any) => r.context);
+      // Should have one response per locale for each link
+      expect(body.responses.length).toBe(locales.length);
+
+      const contexts = body.responses.map((r: { context: string }) => r.context);
       expect(contexts).toContain('us');
       expect(contexts).toContain('au');
     });
 
     it('should correctly convert link properties to response format', async () => {
-      let capturedPayload: any;
-      jest.spyOn(privateAPI, 'post').mockImplementation((url, payload) => {
-        capturedPayload = payload;
-        return Promise.resolve({});
-      });
-
       const service = new IdentityResolverService(mockConfig);
       const singleLink: Link[] = [mockLinks[0]];
       await service.publishLinks('abn', '51824753556', singleLink);
 
-      const firstResponse = capturedPayload.responses[0];
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      const firstResponse = body.responses[0];
       expect(firstResponse).toMatchObject({
         linkType: 'untp:dpp',
         linkTitle: 'Digital Product Passport',
@@ -216,12 +199,6 @@ describe('IdentityResolverService', () => {
     });
 
     it('should add namespace prefix to rel when not already prefixed', async () => {
-      let capturedPayload: any;
-      jest.spyOn(privateAPI, 'post').mockImplementation((url, payload) => {
-        capturedPayload = payload;
-        return Promise.resolve({});
-      });
-
       const linkWithoutPrefix: Link[] = [
         {
           href: 'https://example.com/resource',
@@ -234,30 +211,22 @@ describe('IdentityResolverService', () => {
       const service = new IdentityResolverService(mockConfig);
       await service.publishLinks('abn', '51824753556', linkWithoutPrefix);
 
-      expect(capturedPayload.responses[0].linkType).toBe('abn:dpp');
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      expect(body.responses[0].linkType).toBe('abn:dpp');
     });
 
     it('should preserve rel when already prefixed with colon', async () => {
-      let capturedPayload: any;
-      jest.spyOn(privateAPI, 'post').mockImplementation((url, payload) => {
-        capturedPayload = payload;
-        return Promise.resolve({});
-      });
-
       const service = new IdentityResolverService(mockConfig);
       await service.publishLinks('abn', '51824753556', mockLinks);
 
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
       // untp:dpp already has a colon, should be preserved
-      expect(capturedPayload.responses[0].linkType).toBe('untp:dpp');
+      expect(body.responses[0].linkType).toBe('untp:dpp');
     });
 
     it('should use default language "en" when hreflang is not provided', async () => {
-      let capturedPayload: any;
-      jest.spyOn(privateAPI, 'post').mockImplementation((url, payload) => {
-        capturedPayload = payload;
-        return Promise.resolve({});
-      });
-
       const linkWithoutLang: Link[] = [
         {
           href: 'https://example.com/resource',
@@ -270,37 +239,47 @@ describe('IdentityResolverService', () => {
       const service = new IdentityResolverService(mockConfig);
       await service.publishLinks('abn', '51824753556', linkWithoutLang);
 
-      expect(capturedPayload.responses[0].ianaLanguage).toBe('en');
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      expect(body.responses[0].ianaLanguage).toBe('en');
     });
 
     it('should use first hreflang when provided', async () => {
-      let capturedPayload: any;
-      jest.spyOn(privateAPI, 'post').mockImplementation((url, payload) => {
-        capturedPayload = payload;
-        return Promise.resolve({});
-      });
-
       const service = new IdentityResolverService(mockConfig);
       // mockLinks[1] has hreflang: ['de']
       await service.publishLinks('abn', '51824753556', [mockLinks[1]]);
 
-      expect(capturedPayload.responses[0].ianaLanguage).toBe('de');
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      expect(body.responses[0].ianaLanguage).toBe('de');
     });
 
     it('should set default flags to false when link.default is not set', async () => {
-      let capturedPayload: any;
-      jest.spyOn(privateAPI, 'post').mockImplementation((url, payload) => {
-        capturedPayload = payload;
-        return Promise.resolve({});
-      });
-
       const service = new IdentityResolverService(mockConfig);
       // mockLinks[1] does not have default: true
       await service.publishLinks('abn', '51824753556', [mockLinks[1]]);
 
-      expect(capturedPayload.responses[0].defaultLinkType).toBe(false);
-      expect(capturedPayload.responses[0].defaultIanaLanguage).toBe(false);
-      expect(capturedPayload.responses[0].defaultMimeType).toBe(false);
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      expect(body.responses[0].defaultLinkType).toBe(false);
+      expect(body.responses[0].defaultIanaLanguage).toBe(false);
+      expect(body.responses[0].defaultMimeType).toBe(false);
+    });
+
+    it('should send POST request with correct headers', async () => {
+      const service = new IdentityResolverService(mockConfig);
+      await service.publishLinks('abn', '51824753556', mockLinks);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer test-api-key',
+          },
+        }),
+      );
     });
 
     describe('validation errors', () => {
@@ -346,9 +325,8 @@ describe('IdentityResolverService', () => {
     });
 
     describe('API error handling', () => {
-      it('should throw an error with message when API call fails', async () => {
-        const apiError = new Error('Network error');
-        jest.spyOn(privateAPI, 'post').mockRejectedValueOnce(apiError);
+      it('should throw an error with message when fetch fails', async () => {
+        mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
         const service = new IdentityResolverService(mockConfig);
 
@@ -357,8 +335,22 @@ describe('IdentityResolverService', () => {
         );
       });
 
+      it('should throw an error when response is not ok', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+        });
+
+        const service = new IdentityResolverService(mockConfig);
+
+        await expect(service.publishLinks('abn', '51824753556', mockLinks)).rejects.toThrow(
+          'Failed to register links with identity resolver for identifier 51824753556: HTTP 500: Internal Server Error',
+        );
+      });
+
       it('should handle non-Error exceptions', async () => {
-        jest.spyOn(privateAPI, 'post').mockRejectedValueOnce('String error');
+        mockFetch.mockRejectedValueOnce('String error');
 
         const service = new IdentityResolverService(mockConfig);
 

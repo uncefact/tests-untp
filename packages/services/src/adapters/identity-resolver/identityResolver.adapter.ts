@@ -1,8 +1,6 @@
-import type { Link, LinkRegistration } from './interfaces/identityResolverService';
-import type { IIdentityResolverService } from './interfaces/identityResolverService';
-import type { LinkResolver, LinkResponse } from './linkResolver.service';
-
-import { privateAPI } from './utils/httpService.js';
+import type { Link, LinkRegistration } from '../../interfaces/identityResolverService';
+import type { IIdentityResolverService } from '../../interfaces/identityResolverService';
+import type { LinkResolver, LinkResponse } from '../../linkResolver.service';
 
 /**
  * Configuration for the Identity Resolver Service.
@@ -83,9 +81,19 @@ export class IdentityResolverService implements IIdentityResolverService {
         ? new URL(linkRegisterPath, apiUrl.endsWith('/') ? apiUrl : `${apiUrl}/`).toString()
         : apiUrl;
 
-      // Set authorization and make the API call
-      privateAPI.setBearerTokenAuthorizationHeaders(apiKey);
-      await privateAPI.post(url, payload);
+      // Make the API call
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
       // Return the registration details
       return {
