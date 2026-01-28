@@ -1,11 +1,11 @@
-import { StorageService } from './storage.adapter';
+import { StorageAdapter } from './storage.adapter';
 import type { StorageRecord } from '../../interfaces/storageService';
 import type { EnvelopedVerifiableCredential } from '../../interfaces/verifiableCredentialService';
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-describe('StorageService', () => {
+describe('StorageAdapter', () => {
   beforeEach(() => {
     mockFetch.mockReset();
   });
@@ -34,7 +34,7 @@ describe('StorageService', () => {
         json: () => Promise.resolve(mockStorageRecord),
       });
 
-      const storageService = new StorageService('https://api.storage.example.com');
+      const storageService = new StorageAdapter('https://api.storage.example.com');
 
       const result = await storageService.store(mockCredential);
 
@@ -57,7 +57,7 @@ describe('StorageService', () => {
         json: () => Promise.resolve(mockStorageRecord),
       });
 
-      const storageService = new StorageService('https://api.storage.example.com');
+      const storageService = new StorageAdapter('https://api.storage.example.com');
 
       const result = await storageService.store(mockCredential, false);
 
@@ -74,7 +74,7 @@ describe('StorageService', () => {
         json: () => Promise.resolve(mockStorageRecord),
       });
 
-      const storageService = new StorageService(
+      const storageService = new StorageAdapter(
         'https://api.storage.example.com',
         undefined,
         { bucket: 'my-bucket', path: 'credentials/vc.json' },
@@ -110,7 +110,7 @@ describe('StorageService', () => {
         'X-Custom-Header': 'custom-value',
       };
 
-      const storageService = new StorageService(
+      const storageService = new StorageAdapter(
         'https://api.storage.example.com',
         customHeaders,
       );
@@ -140,7 +140,7 @@ describe('StorageService', () => {
         json: () => Promise.resolve(mockEncryptedStorageRecord),
       });
 
-      const storageService = new StorageService('https://api.storage.example.com');
+      const storageService = new StorageAdapter('https://api.storage.example.com');
 
       const result = await storageService.store(mockCredential, true);
 
@@ -164,7 +164,7 @@ describe('StorageService', () => {
         json: () => Promise.resolve(mockEncryptedStorageRecord),
       });
 
-      const storageService = new StorageService(
+      const storageService = new StorageAdapter(
         'https://api.storage.example.com',
         { 'X-API-Key': 'test-key' },
         { bucket: 'secure-bucket' },
@@ -198,7 +198,7 @@ describe('StorageService', () => {
         statusText: 'Internal Server Error',
       });
 
-      const storageService = new StorageService('https://api.storage.example.com');
+      const storageService = new StorageAdapter('https://api.storage.example.com');
 
       await expect(storageService.store(mockCredential)).rejects.toThrow(
         'Failed to store verifiable credential: HTTP 500: Internal Server Error',
@@ -209,7 +209,7 @@ describe('StorageService', () => {
       const errorMessage = 'Network error occurred';
       mockFetch.mockRejectedValue(new Error(errorMessage));
 
-      const storageService = new StorageService('https://api.storage.example.com');
+      const storageService = new StorageAdapter('https://api.storage.example.com');
 
       await expect(storageService.store(mockCredential)).rejects.toThrow(
         `Failed to store verifiable credential: ${errorMessage}`,
@@ -219,7 +219,7 @@ describe('StorageService', () => {
     it('should handle non-Error exceptions', async () => {
       mockFetch.mockRejectedValue('String error');
 
-      const storageService = new StorageService('https://api.storage.example.com');
+      const storageService = new StorageAdapter('https://api.storage.example.com');
 
       await expect(storageService.store(mockCredential)).rejects.toThrow(
         'Failed to store verifiable credential: Unknown error',
@@ -229,8 +229,8 @@ describe('StorageService', () => {
 
   describe('constructor validation', () => {
     it('should throw error when baseURL is empty', () => {
-      expect(() => new StorageService('')).toThrow(
-        'Error creating StorageService. API URL is required.',
+      expect(() => new StorageAdapter('')).toThrow(
+        'Error creating StorageAdapter. API URL is required.',
       );
     });
   });
