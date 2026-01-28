@@ -35,7 +35,7 @@ export class StorageService implements IStorageService {
    *                  unencrypted storage. Defaults to false.
    * @returns A promise that resolves to a storage record
    */
-  async store(credential: EnvelopedVerifiableCredential, encrypt: boolean = false): Promise<StorageRecord> {
+  async store(credential: EnvelopedVerifiableCredential, encrypt = false): Promise<StorageRecord> {
     const endpoint = encrypt ? '/credentials' : '/documents';
     const url = `${this.baseURL}${endpoint}`;
 
