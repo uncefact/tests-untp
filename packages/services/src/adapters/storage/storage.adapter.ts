@@ -38,15 +38,13 @@ export class StorageService implements IStorageService {
       data: credential,
     };
 
-    const requestHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...this.headers,
-    };
-
     try {
       const response = await fetch(url, {
         method: 'POST',
-        headers: requestHeaders,
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.headers
+        },
         body: JSON.stringify(payload),
       });
 
@@ -56,10 +54,10 @@ export class StorageService implements IStorageService {
 
       return (await response.json()) as StorageRecord;
     } catch (error) {
-      throw new Error(
-        `Failed to store verifiable credential: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        { cause: error }
-      );
+      if (error instanceof Error) {
+        throw new Error(`Failed to store verifiable credential: ${error.message}`);
+      }
+      throw new Error('Failed to store verifiable credential: Unknown error');
     }
   }
 }
