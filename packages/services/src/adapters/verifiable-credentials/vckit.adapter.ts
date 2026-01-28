@@ -2,16 +2,79 @@ import { decodeJwt } from 'jose';
 import {
   VC_CONTEXT_V2,
   VC_TYPE,
-  type CredentialPayload,
-  type CredentialStatus,
-  type CredentialIssuer,
-  type UNTPVerifiableCredential,
-  type EnvelopedVerifiableCredential,
-  type IVerifiableCredentialService,
-  type VerifyResult
+  VerificationErrorCode,
 } from '../../interfaces/verifiableCredentialService.js';
 
+import type {
+  CredentialPayload,
+  CredentialStatus,
+  CredentialIssuer,
+  UNTPVerifiableCredential,
+  EnvelopedVerifiableCredential,
+  IVerifiableCredentialService,
+  VerifyResult
+} from '../../interfaces/verifiableCredentialService.js';
+
+/**
+ * VCkit's IVerifyResult structure from the verification endpoint
+ * @see https://github.com/uncefact/project-vckit/blob/main/packages/core-types/src/types/IVerifyResult.ts
+ */
+type VCkitVerifyResult = {
+  verified: boolean;
+  error?: {
+    message?: string;
+    errorCode?: string;
+  };
+  [x: string]: unknown;
+};
+
 const PROOF_FORMAT = 'EnvelopingProofJose';
+
+/**
+ * Maps VCkit errorCode strings to VerificationErrorCode enum values
+ */
+function mapErrorCode(errorCode?: string): VerificationErrorCode {
+  if (!errorCode) {
+    return VerificationErrorCode.Integrity;
+  }
+
+  const code = errorCode.toLowerCase();
+
+  // Check for status/revocation errors
+  if (code.includes('status') || code.includes('revoke')) {
+    return VerificationErrorCode.Status;
+  }
+
+  // Check for integrity errors (signature, proof, etc.) before temporal
+  // to avoid false matches like "signature_invalid" matching "valid"
+  if (code.includes('signature') || code.includes('proof') || code.includes('integrity')) {
+    return VerificationErrorCode.Integrity;
+  }
+
+  // Check for temporal errors (expiry, validity period)
+  if (code.includes('expir') || code.includes('not_yet_valid') || code.includes('validfrom') || code.includes('validuntil')) {
+    return VerificationErrorCode.Temporal;
+  }
+
+  return VerificationErrorCode.Integrity;
+}
+
+/**
+ * Transforms VCkit's verification response to the VerifyResult interface
+ */
+function transformVerifyResult(vckitResult: VCkitVerifyResult): VerifyResult {
+  if (vckitResult.verified) {
+    return { verified: true };
+  }
+
+  return {
+    verified: false,
+    error: vckitResult.error ? {
+      type: mapErrorCode(vckitResult.error.errorCode),
+      message: vckitResult.error.message || 'Verification failed'
+    } : undefined
+  };
+}
 
 type IssueCredentialStatusParams = {
   host: string;
@@ -108,7 +171,8 @@ export class VerifiableCredentialService implements IVerifiableCredentialService
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      return await response.json() as VerifyResult;
+      const vckitResult = await response.json() as VCkitVerifyResult;
+      return transformVerifyResult(vckitResult);
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Failed to verify verifiable credential: ${error.message}`);
