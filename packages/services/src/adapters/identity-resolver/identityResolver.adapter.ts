@@ -1,5 +1,5 @@
 import type { Link, LinkRegistration } from '../../interfaces/identityResolverService';
-import type { IIdentityResolverAdapter } from '../../interfaces/identityResolverService';
+import type { IIdentityResolverService } from '../../interfaces/identityResolverService';
 import type { LinkResolver, LinkResponse } from '../../linkResolver.service';
 
 /** Supported locales for link responses */
@@ -9,7 +9,7 @@ export const locales = ['us', 'au'];
  * Implementation of the Identity Resolver Service.
  * Registers links with an identity resolver to make them discoverable via identifiers.
  */
-export class IdentityResolverAdapter implements IIdentityResolverAdapter {
+export class IdentityResolverAdapter implements IIdentityResolverService {
   readonly baseURL: string;
   readonly headers: Record<string, string>;
   readonly namespace?: string;
@@ -112,9 +112,9 @@ export class IdentityResolverAdapter implements IIdentityResolverAdapter {
       };
     } catch (error) {
       if (error instanceof Error) {
-        throw new Error(`Failed to register links with identity resolver for identifier: ${error.message}`);
+        throw new Error(`Failed to register links with identity resolver: ${error.message}`);
       }
-      throw new Error('Failed to register links with identity resolver for identifier: Unknown error');
+      throw new Error('Failed to register links with identity resolver: Unknown error');
     }
   }
 

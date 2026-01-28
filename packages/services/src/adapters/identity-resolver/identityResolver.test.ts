@@ -318,7 +318,7 @@ describe('IdentityResolverAdapter', () => {
         const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
 
         await expect(adapter.publishLinks('abn', '51824753556', mockLinks)).rejects.toThrow(
-          'Failed to register links with identity resolver for identifier 51824753556: Network error',
+          'Failed to register links with identity resolver: Network error',
         );
       });
 
@@ -332,7 +332,7 @@ describe('IdentityResolverAdapter', () => {
         const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
 
         await expect(adapter.publishLinks('abn', '51824753556', mockLinks)).rejects.toThrow(
-          'Failed to register links with identity resolver for identifier 51824753556: HTTP 500: Internal Server Error',
+          'Failed to register links with identity resolver: HTTP 500: Internal Server Error',
         );
       });
 
@@ -342,7 +342,7 @@ describe('IdentityResolverAdapter', () => {
         const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
 
         await expect(adapter.publishLinks('abn', '51824753556', mockLinks)).rejects.toThrow(
-          'Failed to register links with identity resolver for identifier 51824753556: Unknown error',
+          'Failed to register links with identity resolver: Unknown error',
         );
       });
     });
