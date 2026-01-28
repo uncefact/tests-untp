@@ -5,7 +5,7 @@ import type { EnvelopedVerifiableCredential } from './interfaces/verifiableCrede
 /**
  * HTTP methods supported for storage operations
  */
-export type StorageMethod = 'PUT' | 'POST';
+export type StorageMethod = 'POST';
 
 /**
  * Service implementation for storing verifiable credentials
