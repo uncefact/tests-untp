@@ -122,7 +122,7 @@ export class VCKitAdapter implements IVerifiableCredentialService {
       throw new Error("Error issuing VC. credentialSubject is required in credential payload.");
     }
 
-    // Issue credential status if not provided
+    // Issue credential status
     const credentialStatus = await this.issueCredentialStatus({
       host: new URL(this.baseURL).origin,
       headers: this.headers,
