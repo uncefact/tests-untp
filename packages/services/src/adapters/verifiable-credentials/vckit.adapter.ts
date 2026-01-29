@@ -15,18 +15,9 @@ import type {
   VerifyResult
 } from '../../interfaces/verifiableCredentialService.js';
 
-/**
- * VCkit's IVerifyResult structure from the verification endpoint
- * @see https://github.com/uncefact/project-vckit/blob/main/packages/core-types/src/types/IVerifyResult.ts
- */
-type VCkitVerifyResult = {
-  verified: boolean;
-  error?: {
-    message?: string;
-    errorCode?: string;
-  };
-  [x: string]: unknown;
-};
+import type {
+  IVerifyResult
+} from '@vckit/core-types'
 
 const PROOF_FORMAT = 'EnvelopingProofJose';
 
@@ -62,7 +53,7 @@ function mapErrorCode(errorCode?: string): VerificationErrorCode {
 /**
  * Transforms VCkit's verification response to the VerifyResult interface
  */
-function transformVerifyResult(vckitResult: VCkitVerifyResult): VerifyResult {
+function transformVerifyResult(vckitResult: IVerifyResult): VerifyResult {
   if (vckitResult.verified) {
     return { verified: true };
   }
@@ -171,7 +162,7 @@ export class VCKitAdapter implements IVerifiableCredentialService {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const vckitResult = await response.json() as VCkitVerifyResult;
+      const vckitResult = await response.json() as IVerifyResult;
       return transformVerifyResult(vckitResult);
     } catch (error) {
       if (error instanceof Error) {
