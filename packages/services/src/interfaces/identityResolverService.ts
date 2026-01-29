@@ -114,7 +114,7 @@ export type LinkRegistration = {
   identifierScheme: string;
   /** The identifier value within the scheme */
   identifier: string;
-};
+}
 
 /**
  * Service responsible for publishing links to an identity resolver.
