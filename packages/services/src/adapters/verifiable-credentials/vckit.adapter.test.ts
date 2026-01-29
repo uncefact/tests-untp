@@ -3,15 +3,15 @@ import type {
   CredentialIssuer,
   CredentialSubject,
   EnvelopedVerifiableCredential
-} from "../../../interfaces";
+} from "../../interfaces";
 
 import {
   VerificationErrorCode
-} from '../../../interfaces/verifiableCredentialService';
+} from '../../interfaces/verifiableCredentialService';
 
 import {
   VCKitAdapter
-} from '../vckit.adapter';
+} from './vckit.adapter';
 import { decodeJwt } from 'jose';
 
 jest.mock('jose', () => ({
