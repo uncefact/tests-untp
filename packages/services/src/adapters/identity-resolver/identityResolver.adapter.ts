@@ -129,7 +129,7 @@ export class IdentityResolverAdapter implements IIdentityResolverService {
 
       // Construct link resolver payload
       const payload: LinkResolver = {
-        this.namespace,
+        namespace: this.namespace,
         identificationKey: identifier,
         identificationKeyType: identifierScheme,
         itemDescription: links[0].title,
