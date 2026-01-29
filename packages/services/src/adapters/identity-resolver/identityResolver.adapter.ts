@@ -1,9 +1,63 @@
 import type { Link, LinkRegistration } from '../../interfaces/identityResolverService';
 import type { IIdentityResolverService } from '../../interfaces/identityResolverService';
-import type { LinkResolver, LinkResponse } from '../../linkResolver.service';
+
+/**
+ * Payload for registering links with the Identity Resolver.
+ * Matches the IDR's CreateLinkRegistrationDto.
+ *
+ * @see https://github.com/pyx-industries/pyx-identity-resolver
+ */
+export interface LinkResolver {
+  /** Namespace for the identifier vocabulary (e.g., "untp", "gs1") */
+  namespace: string;
+  /** Type of identifier (e.g., "abn", "gtin", "lei") */
+  identificationKeyType: string;
+  /** The identifier value */
+  identificationKey: string;
+  /** Human-readable description of the item */
+  itemDescription: string;
+  /** Qualifier path for the identifier (default: "/") */
+  qualifierPath: string;
+  /** Whether this registration is active */
+  active: boolean;
+  /** Array of link responses to register */
+  responses: LinkResponse[];
+}
+
+/**
+ * Individual link response in the IDR format.
+ * Matches the IDR's Response DTO.
+ */
+export interface LinkResponse {
+  /** Link relation type with namespace prefix (e.g., "untp:dpp") */
+  linkType: string;
+  /** URL of the linked resource */
+  targetUrl: string;
+  /** MIME type of the resource (e.g., "application/json") */
+  mimeType: string;
+  /** Human-readable title for the link */
+  title: string;
+  /** ISO 639-1 language code (e.g., "en", "de") */
+  ianaLanguage: string;
+  /** Country/region code (e.g., "us", "au") */
+  context: string;
+  /** Whether this link response is active */
+  active: boolean;
+  /** Whether this is the default link type for the identifier */
+  defaultLinkType: boolean;
+  /** Whether this is the default language */
+  defaultIanaLanguage: boolean;
+  /** Whether this is the default context/region */
+  defaultContext: boolean;
+  /** Whether this is the default MIME type */
+  defaultMimeType: boolean;
+  /** Whether to forward query string to target URL */
+  fwqs: boolean;
+}
 
 /** Supported locales for link responses */
 export const locales = ['us', 'au'];
+const defaultLanguage = 'en';
 
 /**
  * Implementation of the Identity Resolver Service.
@@ -12,7 +66,7 @@ export const locales = ['us', 'au'];
 export class IdentityResolverAdapter implements IIdentityResolverService {
   readonly baseURL: string;
   readonly headers: Record<string, string>;
-  readonly namespace?: string;
+  readonly namespace: string;
   readonly linkRegisterPath?: string;
 
   /**
@@ -26,11 +80,14 @@ export class IdentityResolverAdapter implements IIdentityResolverService {
   constructor(
     baseURL: string,
     headers: Record<string, string>,
-    namespace?: string,
+    namespace: string,
     linkRegisterPath?: string,
   ) {
     if (!baseURL) {
       throw new Error("Error creating IdentityResolverAdapter. API URL is required.");
+    }
+    if (!namespace) {
+      throw new Error("Error creating IdentityResolverAdapter. namespace is required.");
     }
     if (!headers?.Authorization) {
       throw new Error("Error creating IdentityResolverAdapter. Authorization header is required.");
@@ -66,16 +123,13 @@ export class IdentityResolverAdapter implements IIdentityResolverService {
       throw new Error('Failed to publish links: at least one link is required');
     }
 
-    const namespace = this.namespace ?? identifierScheme;
-    const linkRegisterPath = this.linkRegisterPath ?? '';
-
     try {
       // Convert links to the format expected by the link resolver API
       const responses: LinkResponse[] = this.convertLinksToResponses(links, namespace);
 
       // Construct link resolver payload
       const payload: LinkResolver = {
-        namespace,
+        this.namespace,
         identificationKey: identifier,
         identificationKeyType: identifierScheme,
         itemDescription: links[0].title,
@@ -85,8 +139,8 @@ export class IdentityResolverAdapter implements IIdentityResolverService {
       };
 
       // Construct full URL for the identity resolver endpoint
-      const url: string = linkRegisterPath
-        ? new URL(linkRegisterPath, this.baseURL.endsWith('/') ? this.baseURL : `${this.baseURL}/`).toString()
+      const url: string = this.linkRegisterPath
+        ? new URL(this.linkRegisterPath, this.baseURL.endsWith('/') ? this.baseURL : `${this.baseURL}/`).toString()
         : this.baseURL;
 
       const response = await fetch(url, {
@@ -105,7 +159,7 @@ export class IdentityResolverAdapter implements IIdentityResolverService {
       // Return the registration details
       return {
         resolverUri: new URL(
-          `${namespace}/${identifierScheme}/${identifier}`, 
+          `${this.namespace}/${identifierScheme}/${identifier}`, 
           this.baseURL.endsWith('/') ? this.baseURL : `${this.baseURL}/`
         ).toString(),
         identifierScheme,
@@ -133,11 +187,10 @@ export class IdentityResolverAdapter implements IIdentityResolverService {
 
       return locales.map((locale) => ({
         linkType,
-        linkTitle: link.title,
         targetUrl: link.href,
         mimeType: link.type,
         title: link.title,
-        ianaLanguage: link.hreflang?.[0] || 'en',
+        ianaLanguage: link.hreflang?.[0] || defaultLanguage,
         context: locale,
         active: true,
         defaultLinkType: link.default ?? false,

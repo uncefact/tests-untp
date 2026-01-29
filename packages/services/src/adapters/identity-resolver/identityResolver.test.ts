@@ -9,7 +9,7 @@ describe('IdentityResolverAdapter', () => {
     {
       href: 'https://storage.example.com/dpp-123.json',
       rel: 'untp:dpp',
-      type: 'application/ld+json',
+      type: 'application/json',
       title: 'Digital Product Passport',
       hreflang: ['en'],
       default: true,
@@ -17,7 +17,7 @@ describe('IdentityResolverAdapter', () => {
     {
       href: 'https://storage.example.com/dcc-456.json',
       rel: 'untp:dcc',
-      type: 'application/ld+json',
+      type: 'application/json',
       title: 'Conformity Certificate',
       hreflang: ['de'],
     },
@@ -68,8 +68,9 @@ describe('IdentityResolverAdapter', () => {
       const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
       const result = await adapter.publishLinks('abn', '51824753556', mockLinks);
 
+      // Namespace is extracted from pre-prefixed link relations (untp:dpp -> 'untp')
       expect(result).toEqual({
-        resolverUri: 'https://resolver.example.com/abn/abn/51824753556',
+        resolverUri: 'https://resolver.example.com/untp/abn/51824753556',
         identifierScheme: 'abn',
         identifier: '51824753556',
       });
@@ -109,18 +110,57 @@ describe('IdentityResolverAdapter', () => {
       );
     });
 
-    it('should use identifierScheme as namespace when namespace is not provided', async () => {
+    it('should extract namespace from pre-prefixed link relations', async () => {
       const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
       await adapter.publishLinks('abn', '51824753556', mockLinks);
+
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      // mockLinks use 'untp:dpp' and 'untp:dcc', so namespace should be 'untp'
+      expect(body.namespace).toBe('untp');
+    });
+
+    it('should use identifierScheme as namespace when links have no prefix', async () => {
+      const linksWithoutPrefix: Link[] = [
+        {
+          href: 'https://example.com/resource',
+          rel: 'dpp',
+          type: 'application/json',
+          title: 'Test Link',
+        },
+      ];
+
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', linksWithoutPrefix);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
       expect(body.namespace).toBe('abn');
     });
 
-    it('should use provided namespace when configured', async () => {
+    it('should use namespace from link prefix even when custom namespace is configured', async () => {
+      // Pre-prefixed link relations take precedence to ensure IDR validation passes
       const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders, 'custom-namespace');
       await adapter.publishLinks('abn', '51824753556', mockLinks);
+
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      // mockLinks use 'untp:dpp', so namespace is extracted as 'untp'
+      expect(body.namespace).toBe('untp');
+    });
+
+    it('should use provided namespace when links have no prefix', async () => {
+      const linksWithoutPrefix: Link[] = [
+        {
+          href: 'https://example.com/resource',
+          rel: 'dpp',
+          type: 'application/json',
+          title: 'Test Link',
+        },
+      ];
+
+      const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders, 'custom-namespace');
+      await adapter.publishLinks('abn', '51824753556', linksWithoutPrefix);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -134,7 +174,7 @@ describe('IdentityResolverAdapter', () => {
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
       expect(body).toMatchObject({
-        namespace: 'abn',
+        namespace: 'untp', // Extracted from pre-prefixed link relations
         identificationKey: '51824753556',
         identificationKeyType: 'abn',
         itemDescription: 'Digital Product Passport',
@@ -171,9 +211,8 @@ describe('IdentityResolverAdapter', () => {
       const firstResponse = body.responses[0];
       expect(firstResponse).toMatchObject({
         linkType: 'untp:dpp',
-        linkTitle: 'Digital Product Passport',
         targetUrl: 'https://storage.example.com/dpp-123.json',
-        mimeType: 'application/ld+json',
+        mimeType: 'application/json',
         title: 'Digital Product Passport',
         ianaLanguage: 'en',
         active: true,
@@ -270,6 +309,29 @@ describe('IdentityResolverAdapter', () => {
     });
 
     describe('validation errors', () => {
+      it('should throw an error when links have inconsistent namespace prefixes', async () => {
+        const mixedPrefixLinks: Link[] = [
+          {
+            href: 'https://example.com/dpp',
+            rel: 'untp:dpp',
+            type: 'application/json',
+            title: 'DPP',
+          },
+          {
+            href: 'https://example.com/cert',
+            rel: 'gs1:certificationInfo',
+            type: 'application/json',
+            title: 'Certification',
+          },
+        ];
+
+        const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
+
+        await expect(adapter.publishLinks('abn', '51824753556', mixedPrefixLinks)).rejects.toThrow(
+          "Inconsistent namespace prefixes in links: found 'gs1' but expected 'untp'",
+        );
+      });
+
       it('should throw an error when identifierScheme is empty', async () => {
         const adapter = new IdentityResolverAdapter(mockBaseURL, mockHeaders);
 
