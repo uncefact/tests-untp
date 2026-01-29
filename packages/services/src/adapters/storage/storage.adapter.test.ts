@@ -34,7 +34,10 @@ describe('StorageAdapter', () => {
         json: () => Promise.resolve(mockStorageRecord),
       });
 
-      const storageService = new StorageAdapter('https://api.storage.example.com');
+      const storageService = new StorageAdapter(
+        'https://api.storage.example.com',
+        { 'X-API-Key': 'test-api-key' },
+      );
 
       const result = await storageService.store(mockCredential);
 
@@ -44,6 +47,7 @@ describe('StorageAdapter', () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-API-Key': 'test-api-key',
           },
           body: JSON.stringify({ data: mockCredential }),
         },
@@ -57,7 +61,10 @@ describe('StorageAdapter', () => {
         json: () => Promise.resolve(mockStorageRecord),
       });
 
-      const storageService = new StorageAdapter('https://api.storage.example.com');
+      const storageService = new StorageAdapter(
+        'https://api.storage.example.com',
+        { 'X-API-Key': 'test-api-key' },
+      );
 
       const result = await storageService.store(mockCredential, false);
 
@@ -76,7 +83,7 @@ describe('StorageAdapter', () => {
 
       const storageService = new StorageAdapter(
         'https://api.storage.example.com',
-        undefined,
+        { 'X-API-Key': 'test-api-key' },
         { bucket: 'my-bucket', path: 'credentials/vc.json' },
       );
 
@@ -88,6 +95,7 @@ describe('StorageAdapter', () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-API-Key': 'test-api-key',
           },
           body: JSON.stringify({
             bucket: 'my-bucket',
@@ -140,7 +148,10 @@ describe('StorageAdapter', () => {
         json: () => Promise.resolve(mockEncryptedStorageRecord),
       });
 
-      const storageService = new StorageAdapter('https://api.storage.example.com');
+      const storageService = new StorageAdapter(
+        'https://api.storage.example.com',
+        { 'X-API-Key': 'test-api-key' },
+      );
 
       const result = await storageService.store(mockCredential, true);
 
@@ -150,6 +161,7 @@ describe('StorageAdapter', () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-API-Key': 'test-api-key',
           },
           body: JSON.stringify({ data: mockCredential }),
         },
@@ -198,7 +210,10 @@ describe('StorageAdapter', () => {
         statusText: 'Internal Server Error',
       });
 
-      const storageService = new StorageAdapter('https://api.storage.example.com');
+      const storageService = new StorageAdapter(
+        'https://api.storage.example.com',
+        { 'X-API-Key': 'test-api-key' },
+      );
 
       await expect(storageService.store(mockCredential)).rejects.toThrow(
         'Failed to store verifiable credential: HTTP 500: Internal Server Error',
@@ -209,7 +224,10 @@ describe('StorageAdapter', () => {
       const errorMessage = 'Network error occurred';
       mockFetch.mockRejectedValue(new Error(errorMessage));
 
-      const storageService = new StorageAdapter('https://api.storage.example.com');
+      const storageService = new StorageAdapter(
+        'https://api.storage.example.com',
+        { 'X-API-Key': 'test-api-key' },
+      );
 
       await expect(storageService.store(mockCredential)).rejects.toThrow(
         `Failed to store verifiable credential: ${errorMessage}`,
@@ -219,7 +237,10 @@ describe('StorageAdapter', () => {
     it('should handle non-Error exceptions', async () => {
       mockFetch.mockRejectedValue('String error');
 
-      const storageService = new StorageAdapter('https://api.storage.example.com');
+      const storageService = new StorageAdapter(
+        'https://api.storage.example.com',
+        { 'X-API-Key': 'test-api-key' },
+      );
 
       await expect(storageService.store(mockCredential)).rejects.toThrow(
         'Failed to store verifiable credential: Unknown error',
@@ -229,8 +250,26 @@ describe('StorageAdapter', () => {
 
   describe('constructor validation', () => {
     it('should throw error when baseURL is empty', () => {
-      expect(() => new StorageAdapter('')).toThrow(
+      expect(() => new StorageAdapter('', { 'X-API-Key': 'test-api-key' })).toThrow(
         'Error creating StorageAdapter. API URL is required.',
+      );
+    });
+
+    it('should throw error when X-API-Key header is missing', () => {
+      expect(() => new StorageAdapter(
+        'https://api.storage.example.com',
+        { 'X-Custom-Header': 'value' },
+      )).toThrow(
+        'Error creating StorageAdapter. X-API-Key header is required.',
+      );
+    });
+
+    it('should throw error when headers object is empty', () => {
+      expect(() => new StorageAdapter(
+        'https://api.storage.example.com',
+        {},
+      )).toThrow(
+        'Error creating StorageAdapter. X-API-Key header is required.',
       );
     });
   });

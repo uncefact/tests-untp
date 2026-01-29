@@ -8,18 +8,22 @@ import type { EnvelopedVerifiableCredential } from '../../interfaces/verifiableC
  */
 export class StorageAdapter implements IStorageService {
   readonly baseURL: string;
-  readonly headers?: Record<string, string>;
+  readonly headers: Record<string, string>;
   readonly additionalPayload?: Record<string, unknown>;
 
   /**
    * Constructs a new StorageAdapter instance
    * @param baseURL - The base URL of the storage API
-   * @param headers - Optional HTTP headers to include with requests
+   * @param headers - HTTP headers to include with requests (must contain X-API-Key)
    * @param additionalPayload - Optional additional data to merge into the request payload
    */
-  constructor(baseURL: string, headers?: Record<string, string>, additionalPayload?: Record<string, unknown>) {
+  constructor(baseURL: string, headers: Record<string, string>, additionalPayload?: Record<string, unknown>) {
     if (!baseURL) {
       throw new Error("Error creating StorageAdapter. API URL is required.");
+    }
+
+    if (!headers?.['X-API-Key']) {
+      throw new Error("Error creating StorageAdapter. X-API-Key header is required.");
     }
 
     this.baseURL = baseURL;
