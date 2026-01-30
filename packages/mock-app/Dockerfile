@@ -33,6 +33,11 @@ COPY packages/components/. ./packages/components/
 COPY packages/services/. ./packages/services/
 COPY digitallink_toolkit_server ./digitallink_toolkit_server/
 
+# Copy app-config.json from root to expected locations (excluded by .dockerignore)
+ARG CONFIG_FILE=./app-config.json
+COPY ${CONFIG_FILE} ./packages/mock-app/src/constants/app-config.json
+COPY ${CONFIG_FILE} ./packages/components/src/constants/app-config.json
+
 # Add build args without defaults
 ARG NEXT_PUBLIC_BASE_PATH
 ARG NEXT_PUBLIC_ASSET_PREFIX
@@ -63,6 +68,13 @@ ENV AUTH_KEYCLOAK_ISSUER=${AUTH_KEYCLOAK_ISSUER}
 ENV RI_APP_URL=${RI_APP_URL}
 ENV DEFAULT_HUMAN_VERIFICATION_URL=${DEFAULT_HUMAN_VERIFICATION_URL}
 ENV DEFAULT_MACHINE_VERIFICATION_URL=${DEFAULT_MACHINE_VERIFICATION_URL}
+
+# Build workspace dependencies in order: services -> components -> mock-app
+WORKDIR /app/packages/services
+RUN yarn run build
+
+WORKDIR /app/packages/components
+RUN yarn run build
 
 WORKDIR /app/packages/mock-app
 RUN yarn run build
