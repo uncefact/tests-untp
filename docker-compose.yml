@@ -98,11 +98,10 @@ services:
     depends_on:
       - db
 
-  app:
+  ri:
     build:
-      context: ./packages/mock-app
-      dockerfile: Dockerfile
-      target: production
+      context: .
+      dockerfile: packages/mock-app/Dockerfile
       args:
         CONFIG_FILE: ./app-config.json
     ports:
