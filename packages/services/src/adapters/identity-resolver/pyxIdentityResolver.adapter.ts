@@ -1,5 +1,4 @@
-import type { Link, LinkRegistration } from '../../interfaces/identityResolverService';
-import type { IIdentityResolverService } from '../../interfaces/identityResolverService';
+import type { Link, LinkRegistration, IIdentityResolverService } from '../../interfaces/identityResolverService';
 
 /**
  * Payload for registering links with the Identity Resolver.
@@ -55,48 +54,94 @@ export interface LinkResponse {
   fwqs: boolean;
 }
 
-/** Supported locales for link responses */
-export const locales = ['us', 'au'];
-const defaultLanguage = 'en';
+const DEFAULT_LANGUAGE = 'en';
+const DEFAULT_MIME_TYPE = 'application/json';
+const DEFAULT_CONTEXT = 'au';
 
 /**
- * Implementation of the Identity Resolver Service.
- * Registers links with an identity resolver to make them discoverable via identifiers.
+ * Configuration for how the adapter maps `link.default` to IDR default flags.
+ * These are Pyx IDR implementation-specific options.
+ *
+ * Note: All flags default to false to avoid accidentally overriding system-wide
+ * defaults for the identifier. Setting a default flag to true will make this link
+ * the default for ALL links registered against that identifier, not just the links
+ * being registered in this call.
+ *
+ * @see https://pyx-industries.github.io/pyx-identity-resolver/docs/introduction/link_registration/
  */
-export class IdentityResolverAdapter implements IIdentityResolverService {
+export interface DefaultFlagsConfig {
+  /** Set defaultLinkType flag when link.default is true (default: false) */
+  defaultLinkType?: boolean;
+  /** Set defaultMimeType flag when link.default is true (default: false) */
+  defaultMimeType?: boolean;
+  /** Set defaultIanaLanguage flag when link.default is true (default: false) */
+  defaultIanaLanguage?: boolean;
+  /** Set defaultContext flag when link.default is true (default: false) */
+  defaultContext?: boolean;
+  /** Forward query string to target URL (default: false) */
+  fwqs?: boolean;
+}
+
+/**
+ * Pyx Identity Resolver adapter implementation.
+ * Registers links with a Pyx IDR instance to make them discoverable via identifiers.
+ *
+ * @see https://github.com/pyx-industries/pyx-identity-resolver
+ * @see https://pyx-industries.github.io/pyx-identity-resolver/
+ */
+export class PyxIdentityResolverAdapter implements IIdentityResolverService {
   readonly baseURL: string;
   readonly headers: Record<string, string>;
   readonly namespace: string;
   readonly linkRegisterPath?: string;
+  readonly context: string;
+  readonly itemDescription?: string;
+  private readonly config: Required<DefaultFlagsConfig>;
 
   /**
-   * Creates an instance of IdentityResolverAdapter.
+   * Creates an instance of PyxIdentityResolverAdapter.
    *
-   * @param baseURL - Base URL for the identity resolver API
+   * @param baseURL - Base URL for the Pyx identity resolver API
    * @param headers - Headers including Authorization
-   * @param namespace - Optional namespace for identifiers
-   * @param linkRegisterPath - Optional path for link registration endpoint
+   * @param namespace - Namespace for identifiers (e.g., "untp", "gs1")
+   * @param linkRegisterPath - Path for link registration endpoint (appended to baseURL)
+   * @param context - Default context/region when link doesn't specify one (default: 'au')
+   * @param itemDescription - Default item description (falls back to first link title if not provided)
+   * @param config - Configuration for default flags
    */
   constructor(
     baseURL: string,
     headers: Record<string, string>,
     namespace: string,
     linkRegisterPath?: string,
+    context?: string,
+    itemDescription?: string,
+    config?: DefaultFlagsConfig,
   ) {
     if (!baseURL) {
-      throw new Error("Error creating IdentityResolverAdapter. API URL is required.");
+      throw new Error("Error creating PyxIdentityResolverAdapter. API URL is required.");
     }
     if (!namespace) {
-      throw new Error("Error creating IdentityResolverAdapter. namespace is required.");
+      throw new Error("Error creating PyxIdentityResolverAdapter. namespace is required.");
     }
     if (!headers?.Authorization) {
-      throw new Error("Error creating IdentityResolverAdapter. Authorization header is required.");
+      throw new Error("Error creating PyxIdentityResolverAdapter. Authorization header is required.");
     }
 
     this.baseURL = baseURL;
     this.headers = headers;
     this.namespace = namespace;
     this.linkRegisterPath = linkRegisterPath;
+    this.context = context ?? DEFAULT_CONTEXT;
+    this.itemDescription = itemDescription;
+    // Default to false for all default flags to avoid accidentally overriding system-wide defaults.
+    this.config = {
+      defaultLinkType: config?.defaultLinkType ?? false,
+      defaultMimeType: config?.defaultMimeType ?? false,
+      defaultIanaLanguage: config?.defaultIanaLanguage ?? false,
+      defaultContext: config?.defaultContext ?? false,
+      fwqs: config?.fwqs ?? false,
+    };
   }
 
   /**
@@ -105,12 +150,14 @@ export class IdentityResolverAdapter implements IIdentityResolverService {
    * @param identifierScheme - The scheme of the identifier (e.g., "abn", "nzbn", "lei")
    * @param identifier - The identifier value within the scheme
    * @param links - Links to publish for this identifier
+   * @param qualifierPath - Qualifier path for sub-identifiers like lot/serial numbers (default: "/")
    * @returns Registration details including the canonical resolver URI
    */
   async publishLinks(
     identifierScheme: string,
     identifier: string,
     links: Link[],
+    qualifierPath?: string,
   ): Promise<LinkRegistration> {
     // Validate required parameters
     if (!identifierScheme) {
@@ -125,15 +172,15 @@ export class IdentityResolverAdapter implements IIdentityResolverService {
 
     try {
       // Convert links to the format expected by the link resolver API
-      const responses: LinkResponse[] = this.convertLinksToResponses(links, namespace);
+      const responses: LinkResponse[] = this.convertLinksToResponses(links, this.namespace);
 
       // Construct link resolver payload
       const payload: LinkResolver = {
         namespace: this.namespace,
         identificationKey: identifier,
         identificationKeyType: identifierScheme,
-        itemDescription: links[0].title,
-        qualifierPath: '/',
+        itemDescription: this.itemDescription ?? links[0].title,
+        qualifierPath: qualifierPath ?? '/',
         active: true,
         responses,
       };
@@ -159,8 +206,8 @@ export class IdentityResolverAdapter implements IIdentityResolverService {
       // Return the registration details
       return {
         resolverUri: new URL(
-          `${this.namespace}/${identifierScheme}/${identifier}`, 
-          this.baseURL.endsWith('/') ? this.baseURL : `${this.baseURL}/`
+          `${this.namespace}/${identifierScheme}/${identifier}`,
+          this.baseURL.endsWith('/') ? this.baseURL : `${this.baseURL}/`,
         ).toString(),
         identifierScheme,
         identifier,
@@ -175,30 +222,40 @@ export class IdentityResolverAdapter implements IIdentityResolverService {
 
   /**
    * Converts Link[] to the LinkResponse[] format expected by the link resolver API.
-   * Creates localized responses for each configured locale.
    *
    * @param links - Array of links to convert
    * @param namespace - The namespace for link types
    * @returns Array of link responses formatted for the link resolver API
    */
   private convertLinksToResponses(links: Link[], namespace: string): LinkResponse[] {
-    return links.flatMap((link) => {
+    return links.map((link) => {
+      // Use rel as linkType, prefixing with namespace if not already namespaced
       const linkType = link.rel.includes(':') ? link.rel : `${namespace}:${link.rel}`;
+      const ianaLanguage = link.hreflang?.[0] || DEFAULT_LANGUAGE;
+      const mimeType = link.type || DEFAULT_MIME_TYPE;
+      const context = link.context || this.context;
 
-      return locales.map((locale) => ({
+      // Map link.default to IDR default flags based on adapter configuration
+      const isDefault = link.default ?? false;
+      const isDefaultLinkType = isDefault && this.config.defaultLinkType;
+      const isDefaultMimeType = isDefault && this.config.defaultMimeType;
+      const isDefaultIanaLanguage = isDefault && this.config.defaultIanaLanguage;
+      const isDefaultContext = isDefault && this.config.defaultContext;
+
+      return {
         linkType,
         targetUrl: link.href,
-        mimeType: link.type,
+        mimeType,
         title: link.title,
-        ianaLanguage: link.hreflang?.[0] || defaultLanguage,
-        context: locale,
+        ianaLanguage,
+        context,
         active: true,
-        defaultLinkType: link.default ?? false,
-        defaultIanaLanguage: link.default ?? false,
-        defaultContext: false,
-        defaultMimeType: link.default ?? false,
-        fwqs: false,
-      }));
+        defaultLinkType: isDefaultLinkType,
+        defaultIanaLanguage: isDefaultIanaLanguage,
+        defaultContext: isDefaultContext,
+        defaultMimeType: isDefaultMimeType,
+        fwqs: this.config.fwqs,
+      };
     });
   }
 }

@@ -86,6 +86,7 @@ export type RFC9264Link = {
  * UNTP-specific link extensions for decentralised access control.
  *
  * @see https://untp.unece.org/docs/specification/DecentralisedAccessControl
+ * @see https://www.iso.org/standard/85540.html (ISO 18975)
  */
 export type UNTPLinkExtensions = {
   /** HTTP method required to access the resource (default: GET) */
@@ -94,6 +95,12 @@ export type UNTPLinkExtensions = {
   encryptionMethod?: string;
   /** Access roles required to access the resource */
   accessRole?: AccessRole[];
+  /**
+   * Regional/market context for the link (e.g., "au", "us", "gb").
+   * Used by resolvers to serve region-appropriate responses.
+   * @see ISO 18975 context parameter
+   */
+  context?: string;
   /** Whether this is the default link for its relation type */
   default?: boolean;
 };
@@ -132,7 +139,13 @@ export interface IIdentityResolverService {
    * @param identifierScheme - The scheme of the identifier (e.g., "abn", "nzbn", "lei")
    * @param identifier - The identifier value within the scheme
    * @param links - Links to publish for this identifier
+   * @param qualifierPath - Qualifier path for sub-identifiers like lot/serial numbers (default: "/")
    * @returns Registration details including the canonical resolver URI
    */
-  publishLinks(identifierScheme: string, identifier: string, links: Link[]): Promise<LinkRegistration>;
+  publishLinks(
+    identifierScheme: string,
+    identifier: string,
+    links: Link[],
+    qualifierPath?: string,
+  ): Promise<LinkRegistration>;
 }
