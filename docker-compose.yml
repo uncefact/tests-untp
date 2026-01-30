@@ -98,6 +98,30 @@ services:
     depends_on:
       - db
 
+  app:
+    build:
+      context: ./packages/mock-app
+      dockerfile: Dockerfile
+      target: production
+      args:
+        CONFIG_FILE: ./app-config.json
+    ports:
+      - '3003:3003'
+    environment:
+      RI_POSTGRES_USER: ${RI_POSTGRES_USER}
+      RI_POSTGRES_PASSWORD: ${RI_POSTGRES_PASSWORD}
+      RI_POSTGRES_DB: ${RI_POSTGRES_DB}
+      # TODO: Harmonise with .env - hardcoded for now to use docker internal networking
+      RI_POSTGRES_HOST: ri-db
+      RI_POSTGRES_PORT: 5432
+    depends_on:
+      untp-playground:
+        condition: service_started
+      keycloak:
+        condition: service_started
+      ri-db:
+        condition: service_healthy
+
   db:
     image: postgres:16-alpine
     ports:
