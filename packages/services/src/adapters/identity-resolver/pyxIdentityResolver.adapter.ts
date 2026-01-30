@@ -6,7 +6,7 @@ import type { Link, LinkRegistration, IIdentityResolverService } from '../../int
  *
  * @see https://github.com/pyx-industries/pyx-identity-resolver
  */
-export interface LinkResolver {
+interface LinkResolver {
   /** Namespace for the identifier vocabulary (e.g., "untp", "gs1") */
   namespace: string;
   /** Type of identifier (e.g., "abn", "gtin", "lei") */
@@ -27,7 +27,7 @@ export interface LinkResolver {
  * Individual link response in the IDR format.
  * Matches the IDR's Response DTO.
  */
-export interface LinkResponse {
+interface LinkResponse {
   /** Link relation type with namespace prefix (e.g., "untp:dpp") */
   linkType: string;
   /** URL of the linked resource */
