@@ -16,6 +16,7 @@ COPY package.json yarn.lock ./
 COPY packages/mock-app/package.json ./packages/mock-app/
 COPY packages/components/package.json ./packages/components/
 COPY packages/services/package.json ./packages/services/
+COPY digitallink_toolkit_server ./digitallink_toolkit_server/
 RUN yarn install --immutable
 
 
@@ -30,6 +31,7 @@ COPY package.json ./
 COPY packages/mock-app/. ./packages/mock-app/
 COPY packages/components/. ./packages/components/
 COPY packages/services/. ./packages/services/
+COPY digitallink_toolkit_server ./digitallink_toolkit_server/
 
 # Add build args without defaults
 ARG NEXT_PUBLIC_BASE_PATH
