@@ -7,6 +7,8 @@
 
 * **ci:** Remove empty commit step from changelog workflow ([f92d116](https://github.com/uncefact/tests-untp/commit/f92d1165ca1dfe64832ae2644d27ebb1aa4255df))
 * **security:** Patch React Server Components vulnerabilities ([5dbccd9](https://github.com/uncefact/tests-untp/commit/5dbccd9cd27c2de665659472d76fc1a70fba76a4))
+* **types:** Update crypto Buffer types for Node.js compatibility ([04a2858](https://github.com/uncefact/tests-untp/commit/04a28588))
+* **deps:** Update eslint-config-next to 15.0.7 for Next.js compatibility ([04a2858](https://github.com/uncefact/tests-untp/commit/04a28588))
 
 
 ### Miscellaneous
