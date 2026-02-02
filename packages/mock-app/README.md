@@ -110,7 +110,7 @@ The Reference Implementation uses **NextAuth.js** with **Keycloak** as the ident
 
 #### Prerequisites
 
-* Node.js ≥ 22.19.0
+* Node.js ≥ 20.12.2
 * Yarn ≥ 1.22.22
 * Docker and Docker Compose
 

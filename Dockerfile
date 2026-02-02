@@ -1,5 +1,5 @@
 # ---- Base Node ----
-FROM node:22 AS base
+FROM node:20.12.2 AS base
 
 WORKDIR /app
 
