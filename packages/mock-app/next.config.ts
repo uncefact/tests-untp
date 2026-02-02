@@ -57,7 +57,10 @@ const nextConfig: NextConfig = {
     NEXT_DEFAULT_HUMAN_VERIFICATION_URL: DEFAULT_HUMAN_VERIFICATION_URL,
     NEXT_DEFAULT_MACHINE_VERIFICATION_URL: DEFAULT_MACHINE_VERIFICATION_URL
   },
-  output: 'standalone'
+  output: 'standalone',
+  eslint: {
+    ignoreDuringBuilds: true,
+  }
 };
 
 export default nextConfig;

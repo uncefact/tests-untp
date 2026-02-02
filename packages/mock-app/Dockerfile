@@ -17,7 +17,7 @@ COPY packages/mock-app/package.json ./packages/mock-app/
 COPY packages/components/package.json ./packages/components/
 COPY packages/services/package.json ./packages/services/
 COPY digitallink_toolkit_server ./digitallink_toolkit_server/
-RUN yarn install --immutable
+RUN yarn install --frozen-lockfile
 
 
 # Rebuild the source code only when needed
@@ -71,7 +71,7 @@ ENV DEFAULT_MACHINE_VERIFICATION_URL=${DEFAULT_MACHINE_VERIFICATION_URL}
 
 # Recreate workspace symlinks after copying source files
 WORKDIR /app
-RUN yarn install --immutable
+RUN yarn install --frozen-lockfile
 
 # Build workspace dependencies in order: services -> components -> mock-app
 WORKDIR /app/packages/services
