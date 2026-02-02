@@ -13,8 +13,6 @@ COPY . .
 
 RUN yarn install --frozen-lockfile
 
-RUN yarn build
-
 # ---- Development ----
 FROM dependencies AS development
 
@@ -23,8 +21,19 @@ ARG CONFIG_FILE
 COPY ${CONFIG_FILE} packages/mock-app/src/constants/app-config.json
 COPY ${CONFIG_FILE} packages/components/src/constants/app-config.json
 
+# Build all packages once with correct config
+RUN yarn build
+
 WORKDIR /app/packages/mock-app
+
+# Copy static assets to standalone output
+RUN cp -r .next/static .next/standalone/packages/mock-app/.next/static
+RUN cp -r public .next/standalone/packages/mock-app/public 2>/dev/null || true
+
+# Copy prisma files to standalone for migrations
+RUN cp -r prisma .next/standalone/packages/mock-app/prisma
 
 EXPOSE 3003
 
-CMD ["sh", "-c", "npx prisma migrate deploy --config=prisma/prisma.config.ts && yarn dev"]
+# Run prisma migrate from original location, then start standalone server
+CMD ["sh", "-c", "cd /app/packages/mock-app && npx prisma migrate deploy --config=prisma/prisma.config.ts && cd .next/standalone/packages/mock-app && PORT=3003 node server.js"]

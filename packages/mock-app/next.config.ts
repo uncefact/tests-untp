@@ -49,6 +49,7 @@ const databaseUrl = `postgresql://${RI_POSTGRES_USER}:${RI_POSTGRES_PASSWORD}@${
 process.env.RI_DATABASE_URL = databaseUrl;
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   reactStrictMode: false,
   transpilePackages: ['@mock-app/components'],
   env:{
