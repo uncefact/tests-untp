@@ -104,6 +104,15 @@ services:
       dockerfile: packages/mock-app/Dockerfile
       args:
         CONFIG_FILE: ./app-config.json
+        RI_POSTGRES_USER: build_user
+        RI_POSTGRES_PASSWORD: build_password
+        RI_POSTGRES_DB: build_db
+        RI_POSTGRES_HOST: localhost
+        RI_POSTGRES_PORT: 5432
+        AUTH_KEYCLOAK_ISSUER: http://localhost:8080/realms/build
+        RI_APP_URL: http://localhost:3003
+        DEFAULT_HUMAN_VERIFICATION_URL: http://localhost:4000/verify
+        DEFAULT_MACHINE_VERIFICATION_URL: http://localhost:3332/agent/routeVerificationCredential
     ports:
       - '3003:3003'
     environment:
