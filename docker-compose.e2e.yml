@@ -160,6 +160,9 @@ services:
       - RI_POSTGRES_DB=ri
       - RI_POSTGRES_HOST=e2e-ri-db
       - RI_POSTGRES_PORT=5432
+      - RI_APP_URL=http://localhost:3003
+      - DEFAULT_HUMAN_VERIFICATION_URL=http://localhost:3003
+      - DEFAULT_MACHINE_VERIFICATION_URL=http://vckit-api:3332/agent/routeVerificationCredential
     depends_on:
       untp-playground:
         condition: service_started
