@@ -20,7 +20,7 @@ fi
 if [ "${SKIP_MIGRATIONS:-false}" = "false" ]; then
     echo "Running database migrations..."
     cd /app/prisma
-    npx prisma migrate deploy --config=prisma.config.ts
+    node /app/node_modules/prisma/build/index.js migrate deploy --config=prisma.config.ts
     echo "Database migrations completed"
 else
     echo "Skipping database migrations (SKIP_MIGRATIONS is set)"
