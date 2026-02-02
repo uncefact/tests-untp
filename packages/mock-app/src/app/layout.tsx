@@ -1,4 +1,4 @@
-import { SessionProvider } from "next-auth/react";
+import { Providers } from "@/components/Providers/Providers";
 import "./globals.css";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -6,9 +6,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang='en'>
       <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
-        <SessionProvider>
+        <Providers>
           {children}
-        </SessionProvider>
+        </Providers>
       </body>
     </html>
   );
