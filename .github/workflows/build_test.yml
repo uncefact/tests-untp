@@ -4,6 +4,9 @@ on:
   pull_request:
     branches:
       - next
+  push:
+    branches:
+      - hotfix/*
 
 jobs:
   test_and_build:
