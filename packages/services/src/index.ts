@@ -1,4 +1,5 @@
 export * from './types/index.js';
+export * from './interfaces/index.js';
 export * from './epcisEvents/index.js';
 export * from './processDPP.service.js';
 export * from './processDigitalIdentityAnchor.service.js';
