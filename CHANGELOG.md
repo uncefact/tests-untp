@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.1](https://github.com/uncefact/tests-untp/compare/0.2.0...v0.2.1) (2026-02-02)
+
+
+### Bug Fixes
+
+* **ci:** Remove empty commit step from changelog workflow ([f92d116](https://github.com/uncefact/tests-untp/commit/f92d1165ca1dfe64832ae2644d27ebb1aa4255df))
+* **security:** Patch React Server Components vulnerabilities ([5dbccd9](https://github.com/uncefact/tests-untp/commit/5dbccd9cd27c2de665659472d76fc1a70fba76a4))
+
+
+### Miscellaneous
+
+* Bump version to 0.2.1 for hotfix release ([2fb8da4](https://github.com/uncefact/tests-untp/commit/2fb8da445938ecafe84bd52ba4f1a4151c1208fc))
+* Release 0.2.1 ([1442ce7](https://github.com/uncefact/tests-untp/commit/1442ce7aa384e8c1ce306881a98ec88a363521e0))
+
 ## [0.2.0](https://github.com/uncefact/tests-untp/compare/v0.2.0...v0.2.0) (2025-06-16)
 
 
