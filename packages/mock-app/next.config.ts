@@ -36,14 +36,16 @@ const missingVars = Object.entries(requiredEnvVars)
   .filter(([_, value]) => !value)
   .map(([key]) => key);
 
-if (missingVars.length > 0) {
+// Skip validation during build phase (env vars are only available at runtime in Docker)
+const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
+if (missingVars.length > 0 && !isBuildPhase) {
   throw new Error(
     `Missing required environment variables: ${missingVars.join(", ")}`
   );
 }
 
-// Construct the database URL from individual environment variables
-const databaseUrl = `postgresql://${RI_POSTGRES_USER}:${RI_POSTGRES_PASSWORD}@${RI_POSTGRES_HOST}:${RI_POSTGRES_PORT}/${RI_POSTGRES_DB}?schema=public`;
+// Construct the database URL from individual environment variables (use empty strings during build)
+const databaseUrl = `postgresql://${RI_POSTGRES_USER || ''}:${RI_POSTGRES_PASSWORD || ''}@${RI_POSTGRES_HOST || ''}:${RI_POSTGRES_PORT || ''}/${RI_POSTGRES_DB || ''}?schema=public`;
 
 // Set RI_DATABASE_URL for runtime access
 process.env.RI_DATABASE_URL = databaseUrl;
@@ -53,10 +55,10 @@ const nextConfig: NextConfig = {
   reactStrictMode: false,
   transpilePackages: ['@mock-app/components'],
   env:{
-    NEXT_PUBLIC_AUTH_KEYCLOAK_ISSUER: AUTH_KEYCLOAK_ISSUER,
-    NEXT_PUBLIC_NEXTAUTH_URL: RI_APP_URL,
-    NEXT_DEFAULT_HUMAN_VERIFICATION_URL: DEFAULT_HUMAN_VERIFICATION_URL,
-    NEXT_DEFAULT_MACHINE_VERIFICATION_URL: DEFAULT_MACHINE_VERIFICATION_URL
+    NEXT_PUBLIC_AUTH_KEYCLOAK_ISSUER: AUTH_KEYCLOAK_ISSUER || '',
+    NEXT_PUBLIC_NEXTAUTH_URL: RI_APP_URL || '',
+    NEXT_DEFAULT_HUMAN_VERIFICATION_URL: DEFAULT_HUMAN_VERIFICATION_URL || '',
+    NEXT_DEFAULT_MACHINE_VERIFICATION_URL: DEFAULT_MACHINE_VERIFICATION_URL || ''
   }
 };
 
