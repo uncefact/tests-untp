@@ -3,32 +3,36 @@ import type { StorageRecord, IStorageService } from '../../interfaces/storageSer
 import type { EnvelopedVerifiableCredential } from '../../interfaces/verifiableCredentialService';
 
 /**
- * Adapter implementation for storing verifiable credentials
+ * Adapter for the UNCEFACT Identity Resolver storage service
  * Implements the IStorageService interface
  */
-export class StorageAdapter implements IStorageService {
+export class UNCEFACTStorageAdapter implements IStorageService {
   readonly baseURL: string;
   readonly headers: Record<string, string>;
-  readonly additionalPayload?: Record<string, unknown>;
+  readonly bucket: string;
 
   /**
-   * Constructs a new StorageAdapter instance
-   * @param baseURL - The base URL of the storage API
+   * Constructs a new UNCEFACTStorageAdapter instance
+   * @param baseURL - The base URL of the UNCEFACT Identity Resolver storage API
    * @param headers - HTTP headers to include with requests (must contain X-API-Key)
-   * @param additionalPayload - Optional additional data to merge into the request payload
+   * @param bucket - The storage bucket name for storing credentials
    */
-  constructor(baseURL: string, headers: Record<string, string>, additionalPayload?: Record<string, unknown>) {
+  constructor(baseURL: string, headers: Record<string, string>, bucket: string) {
     if (!baseURL) {
-      throw new Error("Error creating StorageAdapter. API URL is required.");
+      throw new Error("Error creating UNCEFACTStorageAdapter. API URL is required.");
     }
 
     if (!headers?.['X-API-Key']) {
-      throw new Error("Error creating StorageAdapter. X-API-Key header is required.");
+      throw new Error("Error creating UNCEFACTStorageAdapter. X-API-Key header is required.");
+    }
+
+    if (!bucket) {
+      throw new Error("Error creating UNCEFACTStorageAdapter. Bucket is required.");
     }
 
     this.baseURL = baseURL;
     this.headers = headers;
-    this.additionalPayload = additionalPayload;
+    this.bucket = bucket;
   }
 
   /**
@@ -44,7 +48,7 @@ export class StorageAdapter implements IStorageService {
     const url = `${this.baseURL}${endpoint}`;
 
     const payload = {
-      ...this.additionalPayload,
+      bucket: this.bucket,
       data: credential,
     };
 

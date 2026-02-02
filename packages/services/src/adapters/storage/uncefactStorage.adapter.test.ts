@@ -1,11 +1,11 @@
-import { StorageAdapter } from './storage.adapter';
+import { UNCEFACTStorageAdapter } from './uncefactStorage.adapter';
 import type { StorageRecord } from '../../interfaces/storageService';
 import type { EnvelopedVerifiableCredential } from '../../interfaces/verifiableCredentialService';
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-describe('StorageAdapter', () => {
+describe('UNCEFACTStorageAdapter', () => {
   beforeEach(() => {
     mockFetch.mockReset();
   });
@@ -34,9 +34,10 @@ describe('StorageAdapter', () => {
         json: () => Promise.resolve(mockStorageRecord),
       });
 
-      const storageService = new StorageAdapter(
+      const storageService = new UNCEFACTStorageAdapter(
         'https://api.storage.example.com',
         { 'X-API-Key': 'test-api-key' },
+        'test-bucket',
       );
 
       const result = await storageService.store(mockCredential);
@@ -49,7 +50,7 @@ describe('StorageAdapter', () => {
             'Content-Type': 'application/json',
             'X-API-Key': 'test-api-key',
           },
-          body: JSON.stringify({ data: mockCredential }),
+          body: JSON.stringify({ bucket: 'test-bucket', data: mockCredential }),
         },
       );
       expect(result).toEqual(mockStorageRecord);
@@ -61,9 +62,10 @@ describe('StorageAdapter', () => {
         json: () => Promise.resolve(mockStorageRecord),
       });
 
-      const storageService = new StorageAdapter(
+      const storageService = new UNCEFACTStorageAdapter(
         'https://api.storage.example.com',
         { 'X-API-Key': 'test-api-key' },
+        'test-bucket',
       );
 
       const result = await storageService.store(mockCredential, false);
@@ -71,38 +73,6 @@ describe('StorageAdapter', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'https://api.storage.example.com/documents',
         expect.any(Object),
-      );
-      expect(result).toEqual(mockStorageRecord);
-    });
-
-    it('should store credential with additional payload', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockStorageRecord),
-      });
-
-      const storageService = new StorageAdapter(
-        'https://api.storage.example.com',
-        { 'X-API-Key': 'test-api-key' },
-        { bucket: 'my-bucket', path: 'credentials/vc.json' },
-      );
-
-      const result = await storageService.store(mockCredential);
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.storage.example.com/documents',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': 'test-api-key',
-          },
-          body: JSON.stringify({
-            bucket: 'my-bucket',
-            path: 'credentials/vc.json',
-            data: mockCredential,
-          }),
-        },
       );
       expect(result).toEqual(mockStorageRecord);
     });
@@ -118,9 +88,10 @@ describe('StorageAdapter', () => {
         'X-Custom-Header': 'custom-value',
       };
 
-      const storageService = new StorageAdapter(
+      const storageService = new UNCEFACTStorageAdapter(
         'https://api.storage.example.com',
         customHeaders,
+        'test-bucket',
       );
 
       const result = await storageService.store(mockCredential);
@@ -134,7 +105,7 @@ describe('StorageAdapter', () => {
             'X-API-Key': 'test-api-key',
             'X-Custom-Header': 'custom-value',
           },
-          body: JSON.stringify({ data: mockCredential }),
+          body: JSON.stringify({ bucket: 'test-bucket', data: mockCredential }),
         },
       );
       expect(result).toEqual(mockStorageRecord);
@@ -148,9 +119,10 @@ describe('StorageAdapter', () => {
         json: () => Promise.resolve(mockEncryptedStorageRecord),
       });
 
-      const storageService = new StorageAdapter(
+      const storageService = new UNCEFACTStorageAdapter(
         'https://api.storage.example.com',
         { 'X-API-Key': 'test-api-key' },
+        'test-bucket',
       );
 
       const result = await storageService.store(mockCredential, true);
@@ -163,23 +135,23 @@ describe('StorageAdapter', () => {
             'Content-Type': 'application/json',
             'X-API-Key': 'test-api-key',
           },
-          body: JSON.stringify({ data: mockCredential }),
+          body: JSON.stringify({ bucket: 'test-bucket', data: mockCredential }),
         },
       );
       expect(result).toEqual(mockEncryptedStorageRecord);
       expect(result.decryptionKey).toBe('secret-key-123');
     });
 
-    it('should store encrypted credential with custom headers and additional payload', async () => {
+    it('should store encrypted credential with custom headers', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(mockEncryptedStorageRecord),
       });
 
-      const storageService = new StorageAdapter(
+      const storageService = new UNCEFACTStorageAdapter(
         'https://api.storage.example.com',
-        { 'X-API-Key': 'test-key' },
-        { bucket: 'secure-bucket' },
+        { 'X-API-Key': 'test-key', 'X-Custom': 'value' },
+        'secure-bucket',
       );
 
       const result = await storageService.store(mockCredential, true);
@@ -191,6 +163,7 @@ describe('StorageAdapter', () => {
           headers: {
             'Content-Type': 'application/json',
             'X-API-Key': 'test-key',
+            'X-Custom': 'value',
           },
           body: JSON.stringify({
             bucket: 'secure-bucket',
@@ -210,9 +183,10 @@ describe('StorageAdapter', () => {
         statusText: 'Internal Server Error',
       });
 
-      const storageService = new StorageAdapter(
+      const storageService = new UNCEFACTStorageAdapter(
         'https://api.storage.example.com',
         { 'X-API-Key': 'test-api-key' },
+        'test-bucket',
       );
 
       await expect(storageService.store(mockCredential)).rejects.toThrow(
@@ -224,9 +198,10 @@ describe('StorageAdapter', () => {
       const errorMessage = 'Network error occurred';
       mockFetch.mockRejectedValue(new Error(errorMessage));
 
-      const storageService = new StorageAdapter(
+      const storageService = new UNCEFACTStorageAdapter(
         'https://api.storage.example.com',
         { 'X-API-Key': 'test-api-key' },
+        'test-bucket',
       );
 
       await expect(storageService.store(mockCredential)).rejects.toThrow(
@@ -237,9 +212,10 @@ describe('StorageAdapter', () => {
     it('should handle non-Error exceptions', async () => {
       mockFetch.mockRejectedValue('String error');
 
-      const storageService = new StorageAdapter(
+      const storageService = new UNCEFACTStorageAdapter(
         'https://api.storage.example.com',
         { 'X-API-Key': 'test-api-key' },
+        'test-bucket',
       );
 
       await expect(storageService.store(mockCredential)).rejects.toThrow(
@@ -250,26 +226,38 @@ describe('StorageAdapter', () => {
 
   describe('constructor validation', () => {
     it('should throw error when baseURL is empty', () => {
-      expect(() => new StorageAdapter('', { 'X-API-Key': 'test-api-key' })).toThrow(
-        'Error creating StorageAdapter. API URL is required.',
+      expect(() => new UNCEFACTStorageAdapter('', { 'X-API-Key': 'test-api-key' }, 'test-bucket')).toThrow(
+        'Error creating UNCEFACTStorageAdapter. API URL is required.',
       );
     });
 
     it('should throw error when X-API-Key header is missing', () => {
-      expect(() => new StorageAdapter(
+      expect(() => new UNCEFACTStorageAdapter(
         'https://api.storage.example.com',
         { 'X-Custom-Header': 'value' },
+        'test-bucket',
       )).toThrow(
-        'Error creating StorageAdapter. X-API-Key header is required.',
+        'Error creating UNCEFACTStorageAdapter. X-API-Key header is required.',
       );
     });
 
     it('should throw error when headers object is empty', () => {
-      expect(() => new StorageAdapter(
+      expect(() => new UNCEFACTStorageAdapter(
         'https://api.storage.example.com',
         {},
+        'test-bucket',
       )).toThrow(
-        'Error creating StorageAdapter. X-API-Key header is required.',
+        'Error creating UNCEFACTStorageAdapter. X-API-Key header is required.',
+      );
+    });
+
+    it('should throw error when bucket is empty', () => {
+      expect(() => new UNCEFACTStorageAdapter(
+        'https://api.storage.example.com',
+        { 'X-API-Key': 'test-api-key' },
+        '',
+      )).toThrow(
+        'Error creating UNCEFACTStorageAdapter. Bucket is required.',
       );
     });
   });

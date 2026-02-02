@@ -1,1 +1,1 @@
-export * from "./storage.adapter.js";
+export * from "./uncefactStorage.adapter.js";
