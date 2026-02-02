@@ -13,6 +13,8 @@ COPY . .
 
 RUN yarn install --frozen-lockfile
 
+RUN yarn build
+
 # ---- Development ----
 FROM dependencies AS development
 
@@ -21,10 +23,10 @@ ARG CONFIG_FILE
 COPY ${CONFIG_FILE} packages/mock-app/src/constants/app-config.json
 COPY ${CONFIG_FILE} packages/components/src/constants/app-config.json
 
-# Build all packages once with correct config
-RUN yarn build
-
 WORKDIR /app/packages/mock-app
+
+# Rebuild mock-app for standalone output
+RUN yarn build
 
 # Copy static assets to standalone output
 RUN cp -r .next/static .next/standalone/packages/mock-app/.next/static
