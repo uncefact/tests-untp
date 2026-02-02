@@ -46,11 +46,15 @@ Cypress.Commands.add(
 // Command to open error details
 Cypress.Commands.add('openErrorDetails', () => {
   cy.contains('View Details').click();
+  // Wait for the sheet content to be visible after animation
+  cy.contains('Validation Details').should('be.visible');
 });
 
 // Command to open error details for a specific step
 Cypress.Commands.add('openErrorDetailsByStepName', (stepName: string) => {
   cy.contains(stepName).parent().parent().contains('View Details').click();
+  // Wait for the sheet content to be visible after animation
+  cy.contains('Validation Details').should('be.visible');
 });
 
 // Command to validate that the confetti is visible
