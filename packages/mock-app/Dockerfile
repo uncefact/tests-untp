@@ -101,6 +101,19 @@ COPY --from=builder /app/packages/mock-app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/.next/static ./.next/static
 
+# Copy prisma files for running migrations at runtime
+COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/dotenv ./node_modules/dotenv
+
+# Copy and set up entrypoint script
+COPY --chown=nextjs:nodejs packages/mock-app/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
+
+# Create config directory for mounted configuration
+RUN mkdir -p /app/config && chown nextjs:nodejs /app/config
+
 USER nextjs
 
 EXPOSE 3000
@@ -110,4 +123,4 @@ ENV PORT=3000
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
 ENV HOSTNAME="0.0.0.0"
-CMD ["node", "server.js"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
