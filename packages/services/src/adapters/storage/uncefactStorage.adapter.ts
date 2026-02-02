@@ -66,7 +66,13 @@ export class UNCEFACTStorageAdapter implements IStorageService {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      return (await response.json()) as StorageRecord;
+      const { uri, hash, key } = await response.json();
+      
+      return {
+        uri,
+        hash,
+        decryptionKey: key,
+      };
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Failed to store verifiable credential: ${error.message}`);
