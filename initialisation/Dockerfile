@@ -1,4 +1,4 @@
-FROM node:22-alpine
+FROM node:20.12.2-alpine
 
 # Install PostgreSQL client for database operations
 RUN apk add --no-cache postgresql-client

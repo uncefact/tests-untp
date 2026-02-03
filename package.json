@@ -76,10 +76,10 @@
     "eslint": "^8.57.1",
     "strip-ansi": "6.0.0",
     "string-width": "4.0.0",
-    "@types/react": "19.2.0",
-    "@types/react-dom": "19.2.0",
-    "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "@types/react": "19.2.4",
+    "@types/react-dom": "19.2.3",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
   },
   "engines": {
     "node": ">= 20.12.2"

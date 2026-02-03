@@ -1,16 +1,22 @@
 'use client';
 
 import React, { useState, useRef, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { Box, CircularProgress, Stack } from '@mui/material';
 import { VerifiableCredential } from '@vckit/core-types';
 import { Html5QrcodeResult } from 'html5-qrcode';
 import { useRouter } from 'next/navigation';
 import { toastMessage, Status, ToastMessage } from '@mock-app/components';
 import { getDlrPassport, IdentityProvider, getProviderByType } from '@mock-app/services';
-import { Scanner } from '@/components/Scanner';
 import { IScannerRef } from '@/types/scanner.types';
 import { CustomDialog } from '@/components/CustomDialog';
 import appConfig from '@/constants/app-config.json';
+
+// Dynamic import to avoid SSR issues with navigator
+const Scanner = dynamic(() => import('@/components/Scanner').then(mod => mod.Scanner), {
+  ssr: false,
+  loading: () => <CircularProgress sx={{ margin: 'auto' }} />,
+});
 
 const Scanning = () => {
   const scannerRef = useRef<IScannerRef | null>(null);
