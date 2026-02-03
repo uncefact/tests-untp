@@ -93,7 +93,6 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
   readonly baseURL: string;
   readonly headers: Record<string, string>;
   readonly namespace: string;
-  readonly linkRegisterPath?: string;
   readonly context: string;
   readonly itemDescription?: string;
   private readonly config: Required<DefaultFlagsConfig>;
@@ -104,7 +103,6 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
    * @param baseURL - Base URL for the Pyx identity resolver API
    * @param headers - Headers including Authorization
    * @param namespace - Namespace for identifiers (e.g., "untp", "gs1")
-   * @param linkRegisterPath - Path for link registration endpoint (appended to baseURL)
    * @param context - Default context/region when link doesn't specify one (default: 'au')
    * @param itemDescription - Default item description (falls back to first link title if not provided)
    * @param config - Configuration for default flags
@@ -113,7 +111,6 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
     baseURL: string,
     headers: Record<string, string>,
     namespace: string,
-    linkRegisterPath?: string,
     context?: string,
     itemDescription?: string,
     config?: DefaultFlagsConfig,
@@ -131,7 +128,6 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
     this.baseURL = baseURL;
     this.headers = headers;
     this.namespace = namespace;
-    this.linkRegisterPath = linkRegisterPath;
     this.context = context ?? DEFAULT_CONTEXT;
     this.itemDescription = itemDescription;
     // Default to false for all default flags to avoid accidentally overriding system-wide defaults.
@@ -185,12 +181,7 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
         responses,
       };
 
-      // Construct full URL for the identity resolver endpoint
-      const url: string = this.linkRegisterPath
-        ? new URL(this.linkRegisterPath, this.baseURL.endsWith('/') ? this.baseURL : `${this.baseURL}/`).toString()
-        : this.baseURL;
-
-      const response = await fetch(url, {
+      const response = await fetch(`${this.baseURL}/resolver`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -204,9 +195,10 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
       }
 
       // Return the registration details
+      const qualifiers = qualifierPath && qualifierPath !== '/' ? `/${qualifierPath}` : '';
       return {
         resolverUri: new URL(
-          `${this.namespace}/${identifierScheme}/${identifier}`,
+          `${this.namespace}/${identifierScheme}/${identifier}${qualifiers}`,
           this.baseURL.endsWith('/') ? this.baseURL : `${this.baseURL}/`,
         ).toString(),
         identifierScheme,

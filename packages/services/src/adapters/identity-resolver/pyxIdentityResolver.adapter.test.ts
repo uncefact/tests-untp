@@ -96,22 +96,12 @@ describe('PyxIdentityResolverAdapter', () => {
       );
     });
 
-    it('should call the API with correct URL when no linkRegisterPath is provided', async () => {
+    it('should call the API with correct URL', async () => {
       const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
       await adapter.publishLinks('abn', '51824753556', mockLinks);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://resolver.example.com',
-        expect.any(Object),
-      );
-    });
-
-    it('should call the API with correct URL when linkRegisterPath is provided', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace, 'register');
-      await adapter.publishLinks('abn', '51824753556', mockLinks);
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://resolver.example.com/register',
+        'https://resolver.example.com/resolver',
         expect.any(Object),
       );
     });
@@ -294,7 +284,6 @@ describe('PyxIdentityResolverAdapter', () => {
         mockBaseURL,
         mockHeaders,
         mockNamespace,
-        undefined, // linkRegisterPath
         undefined, // context
         undefined, // itemDescription
         {
@@ -335,7 +324,6 @@ describe('PyxIdentityResolverAdapter', () => {
         mockBaseURL,
         mockHeaders,
         mockNamespace,
-        undefined, // linkRegisterPath
         undefined, // context
         'Custom Item Description', // itemDescription
       );
@@ -378,7 +366,6 @@ describe('PyxIdentityResolverAdapter', () => {
         mockBaseURL,
         mockHeaders,
         mockNamespace,
-        undefined, // linkRegisterPath
         'nz', // context
       );
       await adapter.publishLinks('abn', '51824753556', [mockLinks[0]]);
@@ -393,7 +380,6 @@ describe('PyxIdentityResolverAdapter', () => {
         mockBaseURL,
         mockHeaders,
         mockNamespace,
-        undefined, // linkRegisterPath
         undefined, // context
         undefined, // itemDescription
         { fwqs: true },
