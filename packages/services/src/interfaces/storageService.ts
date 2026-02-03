@@ -18,6 +18,9 @@ export type StorageRecord = {
 export interface IStorageService {
   /**
    * Stores an enveloped verifiable credential.
+   * @param credential - The enveloped verifiable credential to store
+   * @param encrypt - If true, the credential will be encrypted by the storage service
+   *                  and a decryption key will be returned. Defaults to false.
    */
-  store(credential: EnvelopedVerifiableCredential): Promise<StorageRecord>;
+  store(credential: EnvelopedVerifiableCredential, encrypt?: boolean): Promise<StorageRecord>;
 }
