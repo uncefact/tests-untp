@@ -21,6 +21,12 @@ describe('UNCEFACTStorageAdapter', () => {
     hash: 'hash-response',
   };
 
+  const mockEncryptedApiResponse = {
+    uri: 'https://storage.example.com/credentials/test-credential.json',
+    hash: 'hash-response',
+    key: 'secret-key-123',
+  };
+
   const mockEncryptedStorageRecord: StorageRecord = {
     uri: 'https://storage.example.com/credentials/test-credential.json',
     hash: 'hash-response',
@@ -116,7 +122,7 @@ describe('UNCEFACTStorageAdapter', () => {
     it('should store credential to /credentials endpoint when encrypt is true', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(mockEncryptedStorageRecord),
+        json: () => Promise.resolve(mockEncryptedApiResponse),
       });
 
       const storageService = new UNCEFACTStorageAdapter(
@@ -145,7 +151,7 @@ describe('UNCEFACTStorageAdapter', () => {
     it('should store encrypted credential with custom headers', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(mockEncryptedStorageRecord),
+        json: () => Promise.resolve(mockEncryptedApiResponse),
       });
 
       const storageService = new UNCEFACTStorageAdapter(
