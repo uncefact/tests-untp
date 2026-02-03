@@ -13,3 +13,15 @@ export * from './identityProviders/index.js';
 export * from './features/index.js';
 export * from './api.service.js';
 export * from './identifierSchemes/index.js';
+export * from './adapters/index.js';
+export type {
+  CredentialPayload,
+  CredentialIssuer,
+  CredentialSubject,
+  CredentialStatus,
+  EnvelopedVerifiableCredential,
+  UNTPVerifiableCredential,
+  RenderMethod,
+  VerifyResult,
+  IVerifiableCredentialService,
+} from './interfaces/verifiableCredentialService.js';

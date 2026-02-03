@@ -1,5 +1,5 @@
 # ---- Base Node ----
-FROM node:22 AS base
+FROM node:20.12.2 AS base
 
 WORKDIR /app
 
@@ -25,6 +25,17 @@ COPY ${CONFIG_FILE} packages/components/src/constants/app-config.json
 
 WORKDIR /app/packages/mock-app
 
+# Rebuild mock-app for standalone output
+RUN yarn build
+
+# Copy static assets to standalone output
+RUN cp -r .next/static .next/standalone/packages/mock-app/.next/static
+RUN cp -r public .next/standalone/packages/mock-app/public 2>/dev/null || true
+
+# Copy prisma files to standalone for migrations
+RUN cp -r prisma .next/standalone/packages/mock-app/prisma
+
 EXPOSE 3003
 
-CMD ["sh", "-c", "npx prisma migrate deploy --config=prisma/prisma.config.ts && yarn dev"]
+# Run prisma migrate from original location, then start standalone server
+CMD ["sh", "-c", "cd /app/packages/mock-app && npx prisma migrate deploy --config=prisma/prisma.config.ts && cd .next/standalone/packages/mock-app && PORT=3003 node server.js"]

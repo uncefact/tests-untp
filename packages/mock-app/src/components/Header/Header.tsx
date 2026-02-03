@@ -107,9 +107,9 @@ function Header() {
     // Add Scanning menu item
     menuItems.push(<SideBarComponent key='Scanning' app={{ name: 'Scanning' }} route={scanningRoute} />);
 
-    const menuItemGeneratorFeatures = appConfig.generalFeatures.map((app: Partial<IApp>) => {
+    const menuItemGeneratorFeatures = appConfig.generalFeatures.map((app) => {
       const path = `/${convertStringToPath(app.name ?? '')}`;
-      return <SideBarComponent key={app.name} app={app} route={path} />;
+      return <SideBarComponent key={app.name} app={app as Partial<IApp>} route={path} />;
     });
 
     menuItems.push(...menuItemGeneratorFeatures);

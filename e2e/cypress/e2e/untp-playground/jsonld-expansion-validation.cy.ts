@@ -32,7 +32,7 @@ describe('JSON-LD Expansion and Validation', () => {
 
   const unresolvableContextCredential = {
     ...validCredential,
-    '@context': ['https://www.invalid.com'],
+    '@context': ['https://unresolvable-context.invalid'],
   };
 
   const invalidPropertiesCredential = {
@@ -74,7 +74,7 @@ describe('JSON-LD Expansion and Validation', () => {
 
     cy.checkValidationErrorMessages([
       'Incorrect value: @context',
-      'Invalid URL: "https://www.invalid.com". Failed to resolve context url.',
+      'Invalid URL: "https://unresolvable-context.invalid". Failed to resolve context url.',
       'Update the value(s) to the correct one(s) or remove the field(s).',
     ]);
   });

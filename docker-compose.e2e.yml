@@ -48,7 +48,7 @@ services:
       - STORAGE_TYPE=local
 
   identity-resolver-service:
-    image: ghcr.io/pyx-industries/pyx-identity-resolver:sha-1f21512-local@sha256:af3cb7f2cffdbac501832ee484215cecc8f8d6ac3f571c9f239d61d8cbc74050
+    image: ghcr.io/pyx-industries/pyx-identity-resolver:1.1.3
     ports:
       - '3000:3000'
     environment:
@@ -82,7 +82,7 @@ services:
       - ./minio_data/identity-resolver-service-object-store/data-test:/data
 
   mock-global-gs1-resolver:
-    image: ghcr.io/pyx-industries/pyx-identity-resolver:sha-1f21512-local@sha256:af3cb7f2cffdbac501832ee484215cecc8f8d6ac3f571c9f239d61d8cbc74050
+    image: ghcr.io/pyx-industries/pyx-identity-resolver:1.1.3
     ports:
       - '3001:3001'
     environment:
@@ -160,6 +160,9 @@ services:
       - RI_POSTGRES_DB=ri
       - RI_POSTGRES_HOST=e2e-ri-db
       - RI_POSTGRES_PORT=5432
+      - RI_APP_URL=http://localhost:3003
+      - DEFAULT_HUMAN_VERIFICATION_URL=http://localhost:3003
+      - DEFAULT_MACHINE_VERIFICATION_URL=http://vckit-api:3332/agent/routeVerificationCredential
     depends_on:
       untp-playground:
         condition: service_started
