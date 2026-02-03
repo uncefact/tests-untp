@@ -161,7 +161,7 @@ services:
 
   mock-global-gs1-resolver:
     # Replace with local or deployed image
-    image: ghcr.io/pyx-industries/pyx-identity-resolver:sha-1f21512-local@sha256:af3cb7f2cffdbac501832ee484215cecc8f8d6ac3f571c9f239d61d8cbc74050
+    image: ghcr.io/pyx-industries/pyx-identity-resolver:sha-5155f89@sha256:7931897601e227e9ac8b361ec421f321521ea306bbffa7ceb29242764d2d10b2
     ports:
       - '3001:3001'
     environment:
