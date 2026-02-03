@@ -152,7 +152,7 @@ export async function POST(req: Request) {
     const credentialRecord = await createCredential({
       storageUri: storageResponse.uri,
       hash: storageResponse.hash,
-      decryptionKey: storageResponse.decryptionKey ?? null
+      decryptionKey: storageResponse.decryptionKey ?? null,
       credentialType,
       isPublished: shouldPublish,
     });
