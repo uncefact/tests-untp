@@ -37,7 +37,8 @@ const Verify = () => {
    */
   const fetchEncryptedVC = useCallback(async () => {
     try {
-      const payloadQuery = search?.get('q') || '';
+      const queryParams = new URLSearchParams(search?.toString() ?? '');
+      const payloadQuery = queryParams.get('q') || '';
       if (!payloadQuery) {
         return displayErrorUI();
       }

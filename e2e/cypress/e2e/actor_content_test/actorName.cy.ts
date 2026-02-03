@@ -15,7 +15,7 @@ describe('Facility Links Test', () => {
     cy.visit('/');
 
     cy.get('a').then(($aTags) => {
-      expect($aTags.length - 1).to.equal(expectedTexts.length);
+      expect($aTags.length).to.equal(expectedTexts.length);
 
       $aTags.each((index, el) => {
         if (index === 0) return;
@@ -23,7 +23,7 @@ describe('Facility Links Test', () => {
         cy.wrap(el)
           .invoke('text')
           .then((text) => {
-            expect(text.trim()).to.equal(expectedTexts[index - 1]);
+            expect(text.trim()).to.equal(expectedTexts[index]);
           });
       });
     });
@@ -34,7 +34,7 @@ describe('Facility Links Test', () => {
       // Visit the homepage
       cy.visit('/');
 
-      cy.get('a').eq(1).should('be.visible').and('not.be.disabled').click()
+      cy.get('a').eq(0).should('be.visible').and('not.be.disabled').click()
 
       // Verify the URL to confirm navigation
       cy.url().should('include', '/example-company');
