@@ -7,7 +7,9 @@ import {
   decodeEnvelopedVC,
   issueCredentialStatus,
   PROOF_FORMAT,
+  StorageRecord,
 } from "@mock-app/services";
+import { createCredential } from "@/lib/prisma/repositories";
 
 type JSONPrimitive = string | number | boolean | null;
 type JSONValue = JSONPrimitive | JSONObject | JSONArray;
@@ -101,15 +103,6 @@ type DecodedCredential = JSONObject & {
 };
 
 /**
- * Storage service response
- */
-type StorageResponse = {
-  uri: string;
-  key?: string;
-  hash?: string;
-};
-
-/**
  * POST handler:
  * - issues credential
  * - stores credential
@@ -153,7 +146,24 @@ export async function POST(req: Request) {
       ? await publishCredential(params, decodedCredential, storageResponse)
       : { enabled: false };
 
-    return NextResponse.json({ ok: true, storageResponse, publishResponse, credential: decodedCredential });
+    // Save credential record to database
+    const credentialType = (decodedCredential.type as string[] | undefined)?.[0] ?? 'VerifiableCredential';
+
+    const credentialRecord = await createCredential({
+      storageUri: storageResponse.uri,
+      hash: storageResponse.hash,
+      decryptionKey: storageResponse.decryptionKey,
+      credentialType,
+      isPublished: shouldPublish,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      storageResponse,
+      publishResponse,
+      credential: decodedCredential,
+      credentialId: credentialRecord.id,
+    });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "An unexpected error has occurred.";
     return NextResponse.json(
@@ -214,7 +224,7 @@ async function issueCredential(params: IssueConfigParams, body: IssueRequest): P
 async function storeCredential(
   params: IssueConfigParams,
   envelopedVC: EnvelopedVC
-): Promise<StorageResponse> {
+): Promise<StorageRecord> {
   const storage = params.storage;
 
   const payload = {
@@ -236,7 +246,7 @@ async function storeCredential(
     throw new Error(`Failed to store credential: ${res.status} ${text}`);
   }
 
-  return (await res.json()) as StorageResponse;
+  return (await res.json()) as StorageRecord;
 }
 
 /**
@@ -245,7 +255,7 @@ async function storeCredential(
 async function publishCredential(
   params: IssueConfigParams,
   decodedCredential: DecodedCredential,
-  storage: StorageResponse
+  storage: StorageRecord
 ): Promise<{ enabled: true; raw: JSONValue }> {
   const dlr = params.dlr;
 
