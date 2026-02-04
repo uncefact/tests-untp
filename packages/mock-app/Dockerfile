@@ -101,11 +101,9 @@ COPY --from=builder /app/packages/mock-app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/.next/static ./.next/static
 
-# Copy prisma files for running migrations at runtime
+# Copy prisma files and all node_modules for running migrations at runtime
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/dotenv ./node_modules/dotenv
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # Copy and set up entrypoint script
 COPY --chown=nextjs:nodejs packages/mock-app/docker-entrypoint.sh ./docker-entrypoint.sh
