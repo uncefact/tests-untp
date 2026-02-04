@@ -17,8 +17,6 @@ const nextConfig = (phase: string): NextConfig => {
     RI_POSTGRES_PORT,
     AUTH_KEYCLOAK_ISSUER,
     RI_APP_URL,
-    DEFAULT_HUMAN_VERIFICATION_URL,
-    DEFAULT_MACHINE_VERIFICATION_URL
   } = process.env;
 
   // Validate required environment variables (skip during build phase for Docker)
@@ -31,8 +29,6 @@ const nextConfig = (phase: string): NextConfig => {
       RI_POSTGRES_PORT,
       AUTH_KEYCLOAK_ISSUER,
       RI_APP_URL,
-      DEFAULT_HUMAN_VERIFICATION_URL,
-      DEFAULT_MACHINE_VERIFICATION_URL
     };
 
     const missingVars = Object.entries(requiredEnvVars)
@@ -59,8 +55,6 @@ const nextConfig = (phase: string): NextConfig => {
     env: {
       NEXT_PUBLIC_AUTH_KEYCLOAK_ISSUER: AUTH_KEYCLOAK_ISSUER || '',
       NEXT_PUBLIC_NEXTAUTH_URL: RI_APP_URL || '',
-      NEXT_DEFAULT_HUMAN_VERIFICATION_URL: DEFAULT_HUMAN_VERIFICATION_URL || '',
-      NEXT_DEFAULT_MACHINE_VERIFICATION_URL: DEFAULT_MACHINE_VERIFICATION_URL || ''
     }
   };
 };

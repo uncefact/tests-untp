@@ -121,8 +121,8 @@ services:
       AUTH_KEYCLOAK_ISSUER: http://keycloak:8080/realms/${KEYCLOAK_REALM}
       RI_APP_URL: http://localhost:3003
       # Verification URLs
-      DEFAULT_HUMAN_VERIFICATION_URL: http://localhost:4000/verify
-      DEFAULT_MACHINE_VERIFICATION_URL: http://vckit-api:3332/agent/routeVerificationCredential
+      DEFAULT_HUMAN_VERIFICATION_URL: http://localhost:3003
+      DEFAULT_MACHINE_VERIFICATION_URL: http://localhost:3332/agent/routeVerificationCredential
       # Service URLs (using docker internal networking)
       VCKIT_API_URL: http://vckit-api:3332/v2
       VCKIT_AUTH_TOKEN: ${VCKIT_AUTH_TOKEN}

@@ -268,8 +268,8 @@ async function publishCredential(
     throw new Error("Missing credentialSubject.registeredId");
   }
 
-  const DEFAULT_MACHINE_VERIFICATION_URL = process.env.NEXT_DEFAULT_MACHINE_VERIFICATION_URL!;
-  const DEFAULT_HUMAN_VERIFICATION_URL = process.env.NEXT_DEFAULT_HUMAN_VERIFICATION_URL!;
+  const DEFAULT_MACHINE_VERIFICATION_URL = process.env.DEFAULT_MACHINE_VERIFICATION_URL!;
+  const DEFAULT_HUMAN_VERIFICATION_URL = process.env.DEFAULT_HUMAN_VERIFICATION_URL!;
 
   const baseResponses = [
     {
