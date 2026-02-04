@@ -268,15 +268,8 @@ async function publishCredential(
     throw new Error("Missing credentialSubject.registeredId");
   }
 
-  const DEFAULT_MACHINE_VERIFICATION_URL = process.env.DEFAULT_MACHINE_VERIFICATION_URL;
-  const DEFAULT_HUMAN_VERIFICATION_URL = process.env.DEFAULT_HUMAN_VERIFICATION_URL;
-
-  if (!DEFAULT_MACHINE_VERIFICATION_URL) {
-    throw new Error("Missing environment variable: DEFAULT_MACHINE_VERIFICATION_URL");
-  }
-  if (!DEFAULT_HUMAN_VERIFICATION_URL) {
-    throw new Error("Missing environment variable: DEFAULT_HUMAN_VERIFICATION_URL");
-  }
+  const DEFAULT_MACHINE_VERIFICATION_URL = process.env.NEXT_DEFAULT_MACHINE_VERIFICATION_URL!;
+  const DEFAULT_HUMAN_VERIFICATION_URL = process.env.NEXT_DEFAULT_HUMAN_VERIFICATION_URL!;
 
   const baseResponses = [
     {
@@ -331,8 +324,6 @@ async function publishCredential(
     active: true,
     responses,
   };
-
-  console.log(dlr);
 
   const res = await fetch(`${dlr.dlrAPIUrl}/${dlr.linkRegisterPath}`, {
     method: "POST",
