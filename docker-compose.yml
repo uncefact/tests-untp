@@ -115,6 +115,8 @@ services:
         DEFAULT_MACHINE_VERIFICATION_URL: http://localhost:3332/agent/routeVerificationCredential
     ports:
       - '3003:3003'
+    volumes:
+      - ./app-config.json:/config/app-config.json:ro
     environment:
       RI_POSTGRES_USER: ${RI_POSTGRES_USER}
       RI_POSTGRES_PASSWORD: ${RI_POSTGRES_PASSWORD}
