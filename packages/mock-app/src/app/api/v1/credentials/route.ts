@@ -355,7 +355,8 @@ async function getConfig(): Promise<AppConfig> {
   try {
     const raw = await readFile(runtimeConfigPath, "utf-8");
     return JSON.parse(raw) as AppConfig;
-  } catch {
+  } catch (err) {
+    console.log(`Runtime config not found or failed to load from ${runtimeConfigPath}. Falling back to built-in config. Error: ${err instanceof Error ? err.message : "Unknown error"}`);
     // Fall back to built-in config
   }
 
