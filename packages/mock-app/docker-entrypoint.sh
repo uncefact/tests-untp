@@ -12,6 +12,8 @@ if [ -f "$CONFIG_MOUNT_PATH" ]; then
     mkdir -p "$(dirname "$CONFIG_DEST_PATH")"
     cp "$CONFIG_MOUNT_PATH" "$CONFIG_DEST_PATH"
     echo "Configuration copied to $CONFIG_DEST_PATH"
+    # Export CONFIG_PATH for the API routes to use runtime config
+    export CONFIG_PATH="$CONFIG_DEST_PATH"
 else
     echo "No configuration file found at $CONFIG_MOUNT_PATH, using built-in configuration"
 fi

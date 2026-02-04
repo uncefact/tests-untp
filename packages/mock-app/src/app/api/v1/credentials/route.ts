@@ -333,13 +333,25 @@ async function publishCredential(
 }
 
 /**
- * Loads hardcoded issue configuration
+ * Loads configuration from mounted volume or falls back to built-in config
  */
 async function getConfig(): Promise<AppConfig> {
-  const configPath = path.join(process.cwd(), "src/constants/app-config.issue.json");
+  // Runtime config path (mounted volume)
+  const runtimeConfigPath = process.env.CONFIG_PATH || "/app/config/app-config.json";
+  // Built-in fallback config
+  const builtInConfigPath = path.join(process.cwd(), "src/constants/app-config.issue.json");
 
+  // Try runtime config first
   try {
-    const raw = await readFile(configPath, "utf-8");
+    const raw = await readFile(runtimeConfigPath, "utf-8");
+    return JSON.parse(raw) as AppConfig;
+  } catch {
+    // Fall back to built-in config
+  }
+
+  // Try built-in config
+  try {
+    const raw = await readFile(builtInConfigPath, "utf-8");
     return JSON.parse(raw) as AppConfig;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";

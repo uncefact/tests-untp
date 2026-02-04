@@ -105,6 +105,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/.next/static ./
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
+# Copy built-in config files for fallback (when no runtime config is mounted)
+COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/src/constants/app-config*.json ./src/constants/
+
 # Copy and set up entrypoint script
 COPY --chown=nextjs:nodejs packages/mock-app/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
