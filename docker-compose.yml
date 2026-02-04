@@ -124,6 +124,12 @@ services:
       # TODO: Harmonise with .env - hardcoded for now to use docker internal networking
       RI_POSTGRES_HOST: ri-db
       RI_POSTGRES_PORT: 5432
+      # Service URLs (using docker internal networking)
+      VCKIT_API_URL: http://vckit-api:3332/v2
+      VCKIT_AUTH_TOKEN: ${VCKIT_AUTH_TOKEN}
+      STORAGE_SERVICE_URL: http://storage-service:3334/api/1.0.0/documents
+      DLR_API_URL: http://identity-resolver-service:3000/api/1.0.0
+      DLR_API_KEY: ${DLR_API_KEY}
     depends_on:
       untp-playground:
         condition: service_started

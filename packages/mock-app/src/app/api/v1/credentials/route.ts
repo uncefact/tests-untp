@@ -360,12 +360,35 @@ async function getConfig(): Promise<AppConfig> {
 }
 
 /**
- * Extracts service parameters
+ * Extracts service parameters and applies environment variable overrides
  */
 function getConfigParameters(config: AppConfig): IssueConfigParams {
   const params = config?.services?.[0]?.parameters?.[0];
   if (!params) throw new Error("Invalid config: missing services[0].parameters[0]");
-  return params;
+
+  // Apply environment variable overrides for sensitive/configurable values
+  return {
+    ...params,
+    vckit: {
+      ...params.vckit,
+      vckitAPIUrl: process.env.VCKIT_API_URL || params.vckit.vckitAPIUrl,
+      headers: {
+        ...params.vckit.headers,
+        ...(process.env.VCKIT_AUTH_TOKEN && {
+          Authorization: `Bearer ${process.env.VCKIT_AUTH_TOKEN}`,
+        }),
+      },
+    },
+    storage: {
+      ...params.storage,
+      url: process.env.STORAGE_SERVICE_URL || params.storage.url,
+    },
+    dlr: {
+      ...params.dlr,
+      dlrAPIUrl: process.env.DLR_API_URL || params.dlr.dlrAPIUrl,
+      dlrAPIKey: process.env.DLR_API_KEY || params.dlr.dlrAPIKey,
+    },
+  };
 }
 
 /**
