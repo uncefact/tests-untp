@@ -1,10 +1,11 @@
-import { PyxIdentityResolverAdapter } from './pyxIdentityResolver.adapter';
+import { PyxIdentityResolverAdapter, PyxPublishLinksOptions } from './pyxIdentityResolver.adapter';
 import type { Link } from '../../interfaces/identityResolverService';
 
 describe('PyxIdentityResolverAdapter', () => {
   const mockBaseURL = 'https://resolver.example.com';
   const mockHeaders = { Authorization: 'Bearer test-api-key' };
   const mockNamespace = 'untp';
+  const mockOptions: PyxPublishLinksOptions = { namespace: mockNamespace };
 
   const mockLinks: Link[] = [
     {
@@ -41,39 +42,33 @@ describe('PyxIdentityResolverAdapter', () => {
 
   describe('constructor', () => {
     it('should create an instance with valid configuration', () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
       expect(adapter).toBeInstanceOf(PyxIdentityResolverAdapter);
     });
 
     it('should throw an error when baseURL is missing', () => {
-      expect(() => new PyxIdentityResolverAdapter('', mockHeaders, mockNamespace)).toThrow(
+      expect(() => new PyxIdentityResolverAdapter('', mockHeaders)).toThrow(
         'Error creating PyxIdentityResolverAdapter. API URL is required.',
       );
     });
 
-    it('should throw an error when namespace is missing', () => {
-      expect(() => new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, '')).toThrow(
-        'Error creating PyxIdentityResolverAdapter. namespace is required.',
-      );
-    });
-
     it('should throw an error when Authorization header is missing', () => {
-      expect(() => new PyxIdentityResolverAdapter(mockBaseURL, {} as Record<string, string>, mockNamespace)).toThrow(
+      expect(() => new PyxIdentityResolverAdapter(mockBaseURL, {} as Record<string, string>)).toThrow(
         'Error creating PyxIdentityResolverAdapter. Authorization header is required.',
       );
     });
 
     it('should throw an error when headers is undefined', () => {
       expect(
-        () => new PyxIdentityResolverAdapter(mockBaseURL, undefined as unknown as Record<string, string>, mockNamespace),
+        () => new PyxIdentityResolverAdapter(mockBaseURL, undefined as unknown as Record<string, string>),
       ).toThrow('Error creating PyxIdentityResolverAdapter. Authorization header is required.');
     });
   });
 
   describe('publishLinks', () => {
     it('should successfully publish links and return registration details', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
-      const result = await adapter.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      const result = await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       expect(result).toEqual({
         resolverUri: 'https://resolver.example.com/untp/abn/51824753556',
@@ -83,8 +78,8 @@ describe('PyxIdentityResolverAdapter', () => {
     });
 
     it('should set authorization header', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
-      await adapter.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),
@@ -97,8 +92,8 @@ describe('PyxIdentityResolverAdapter', () => {
     });
 
     it('should call the API with correct URL', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
-      await adapter.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       expect(mockFetch).toHaveBeenCalledWith(
         'https://resolver.example.com/resolver',
@@ -106,27 +101,35 @@ describe('PyxIdentityResolverAdapter', () => {
       );
     });
 
-    it('should use configured namespace in payload', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
-      await adapter.publishLinks('abn', '51824753556', mockLinks);
+    it('should use namespace from options in payload', async () => {
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
       expect(body.namespace).toBe('untp');
     });
 
-    it('should use custom namespace when provided', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, 'custom-namespace');
-      await adapter.publishLinks('abn', '51824753556', mockLinks);
+    it('should use custom namespace when provided in options', async () => {
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, { namespace: 'custom-namespace' });
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
       expect(body.namespace).toBe('custom-namespace');
     });
 
+    it('should throw error when namespace is not provided in options', async () => {
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+
+      await expect(adapter.publishLinks('abn', '51824753556', mockLinks)).rejects.toThrow(
+        'Failed to publish links: options.namespace is required',
+      );
+    });
+
     it('should construct correct payload structure', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
-      await adapter.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -143,9 +146,9 @@ describe('PyxIdentityResolverAdapter', () => {
     });
 
     it('should use default context when link has no context specified', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
       const singleLink: Link[] = [mockLinks[0]];
-      await adapter.publishLinks('abn', '51824753556', singleLink);
+      await adapter.publishLinks('abn', '51824753556', singleLink, undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -165,8 +168,8 @@ describe('PyxIdentityResolverAdapter', () => {
         },
       ];
 
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
-      await adapter.publishLinks('abn', '51824753556', linkWithContext);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', linkWithContext, undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -176,9 +179,9 @@ describe('PyxIdentityResolverAdapter', () => {
     });
 
     it('should correctly convert link properties to response format', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
       const singleLink: Link[] = [mockLinks[0]];
-      await adapter.publishLinks('abn', '51824753556', singleLink);
+      await adapter.publishLinks('abn', '51824753556', singleLink, undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -209,8 +212,8 @@ describe('PyxIdentityResolverAdapter', () => {
         },
       ];
 
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
-      await adapter.publishLinks('abn', '51824753556', linkWithoutPrefix);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', linkWithoutPrefix, undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -218,8 +221,8 @@ describe('PyxIdentityResolverAdapter', () => {
     });
 
     it('should preserve rel when already prefixed with colon', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
-      await adapter.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -237,8 +240,8 @@ describe('PyxIdentityResolverAdapter', () => {
         },
       ];
 
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
-      await adapter.publishLinks('abn', '51824753556', linkWithoutLang);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', linkWithoutLang, undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -246,9 +249,9 @@ describe('PyxIdentityResolverAdapter', () => {
     });
 
     it('should use first hreflang when provided', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
       // mockLinks[1] has hreflang: ['de']
-      await adapter.publishLinks('abn', '51824753556', [mockLinks[1]]);
+      await adapter.publishLinks('abn', '51824753556', [mockLinks[1]], undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -256,9 +259,9 @@ describe('PyxIdentityResolverAdapter', () => {
     });
 
     it('should set default flags to false when link.default is not set', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
       // mockLinks[1] does not have default: true
-      await adapter.publishLinks('abn', '51824753556', [mockLinks[1]]);
+      await adapter.publishLinks('abn', '51824753556', [mockLinks[1]], undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -283,9 +286,6 @@ describe('PyxIdentityResolverAdapter', () => {
       const adapter = new PyxIdentityResolverAdapter(
         mockBaseURL,
         mockHeaders,
-        mockNamespace,
-        undefined, // context
-        undefined, // itemDescription
         {
           defaultLinkType: true,
           defaultMimeType: false,
@@ -293,7 +293,7 @@ describe('PyxIdentityResolverAdapter', () => {
           defaultContext: false,
         },
       );
-      await adapter.publishLinks('abn', '51824753556', linkWithDefault);
+      await adapter.publishLinks('abn', '51824753556', linkWithDefault, undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -304,8 +304,8 @@ describe('PyxIdentityResolverAdapter', () => {
     });
 
     it('should send POST request with correct headers', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
-      await adapter.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),
@@ -319,24 +319,21 @@ describe('PyxIdentityResolverAdapter', () => {
       );
     });
 
-    it('should use custom itemDescription from constructor when provided', async () => {
-      const adapter = new PyxIdentityResolverAdapter(
-        mockBaseURL,
-        mockHeaders,
-        mockNamespace,
-        undefined, // context
-        'Custom Item Description', // itemDescription
-      );
-      await adapter.publishLinks('abn', '51824753556', mockLinks);
+    it('should use custom itemDescription from options when provided', async () => {
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, {
+        namespace: mockNamespace,
+        itemDescription: 'Custom Item Description',
+      });
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
       expect(body.itemDescription).toBe('Custom Item Description');
     });
 
-    it('should use first link title as itemDescription when not provided', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
-      await adapter.publishLinks('abn', '51824753556', mockLinks);
+    it('should use first link title as itemDescription when not provided in options', async () => {
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -344,8 +341,8 @@ describe('PyxIdentityResolverAdapter', () => {
     });
 
     it('should use custom qualifierPath when provided', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
-      await adapter.publishLinks('abn', '51824753556', mockLinks, '/10/lot123');
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks, '/10/lot123', mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -353,22 +350,20 @@ describe('PyxIdentityResolverAdapter', () => {
     });
 
     it('should use "/" as qualifierPath when not provided', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
-      await adapter.publishLinks('abn', '51824753556', mockLinks);
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
       expect(body.qualifierPath).toBe('/');
     });
 
-    it('should use custom context when link has no context', async () => {
-      const adapter = new PyxIdentityResolverAdapter(
-        mockBaseURL,
-        mockHeaders,
-        mockNamespace,
-        'nz', // context
-      );
-      await adapter.publishLinks('abn', '51824753556', [mockLinks[0]]);
+    it('should use custom context from options when link has no context', async () => {
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
+      await adapter.publishLinks('abn', '51824753556', [mockLinks[0]], undefined, {
+        namespace: mockNamespace,
+        context: 'nz',
+      });
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -379,12 +374,9 @@ describe('PyxIdentityResolverAdapter', () => {
       const adapter = new PyxIdentityResolverAdapter(
         mockBaseURL,
         mockHeaders,
-        mockNamespace,
-        undefined, // context
-        undefined, // itemDescription
         { fwqs: true },
       );
-      await adapter.publishLinks('abn', '51824753556', [mockLinks[0]]);
+      await adapter.publishLinks('abn', '51824753556', [mockLinks[0]], undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -393,42 +385,42 @@ describe('PyxIdentityResolverAdapter', () => {
 
     describe('validation errors', () => {
       it('should throw an error when identifierScheme is empty', async () => {
-        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
+        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
 
-        await expect(adapter.publishLinks('', '51824753556', mockLinks)).rejects.toThrow(
+        await expect(adapter.publishLinks('', '51824753556', mockLinks, undefined, mockOptions)).rejects.toThrow(
           'Failed to publish links: identifierScheme is required',
         );
       });
 
       it('should throw an error when identifier is empty', async () => {
-        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
+        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
 
-        await expect(adapter.publishLinks('abn', '', mockLinks)).rejects.toThrow(
+        await expect(adapter.publishLinks('abn', '', mockLinks, undefined, mockOptions)).rejects.toThrow(
           'Failed to publish links: identifier is required',
         );
       });
 
       it('should throw an error when links array is empty', async () => {
-        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
+        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
 
-        await expect(adapter.publishLinks('abn', '51824753556', [])).rejects.toThrow(
+        await expect(adapter.publishLinks('abn', '51824753556', [], undefined, mockOptions)).rejects.toThrow(
           'Failed to publish links: at least one link is required',
         );
       });
 
       it('should throw an error when links is null', async () => {
-        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
+        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
 
         await expect(
-          adapter.publishLinks('abn', '51824753556', null as unknown as Link[]),
+          adapter.publishLinks('abn', '51824753556', null as unknown as Link[], undefined, mockOptions),
         ).rejects.toThrow('Failed to publish links: at least one link is required');
       });
 
       it('should throw an error when links is undefined', async () => {
-        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
+        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
 
         await expect(
-          adapter.publishLinks('abn', '51824753556', undefined as unknown as Link[]),
+          adapter.publishLinks('abn', '51824753556', undefined as unknown as Link[], undefined, mockOptions),
         ).rejects.toThrow('Failed to publish links: at least one link is required');
       });
     });
@@ -437,9 +429,9 @@ describe('PyxIdentityResolverAdapter', () => {
       it('should throw an error with message when fetch fails', async () => {
         mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
-        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
+        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
 
-        await expect(adapter.publishLinks('abn', '51824753556', mockLinks)).rejects.toThrow(
+        await expect(adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions)).rejects.toThrow(
           'Failed to register links with identity resolver: Network error',
         );
       });
@@ -451,9 +443,9 @@ describe('PyxIdentityResolverAdapter', () => {
           statusText: 'Internal Server Error',
         });
 
-        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
+        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
 
-        await expect(adapter.publishLinks('abn', '51824753556', mockLinks)).rejects.toThrow(
+        await expect(adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions)).rejects.toThrow(
           'Failed to register links with identity resolver: HTTP 500: Internal Server Error',
         );
       });
@@ -461,9 +453,9 @@ describe('PyxIdentityResolverAdapter', () => {
       it('should handle non-Error exceptions', async () => {
         mockFetch.mockRejectedValueOnce('String error');
 
-        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, mockNamespace);
+        const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
 
-        await expect(adapter.publishLinks('abn', '51824753556', mockLinks)).rejects.toThrow(
+        await expect(adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions)).rejects.toThrow(
           'Failed to register links with identity resolver: Unknown error',
         );
       });

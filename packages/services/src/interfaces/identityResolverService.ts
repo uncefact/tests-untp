@@ -121,7 +121,15 @@ export type LinkRegistration = {
   identifierScheme: string;
   /** The identifier value within the scheme */
   identifier: string;
-}
+};
+
+/**
+ * Options for publishing links to an identity resolver.
+ */
+export type PublishLinksOptions = {
+  /** Human-readable description of the item being registered */
+  itemDescription?: string;
+};
 
 /**
  * Service responsible for publishing links to an identity resolver.
@@ -140,6 +148,7 @@ export interface IIdentityResolverService {
    * @param identifier - The identifier value within the scheme
    * @param links - Links to publish for this identifier
    * @param qualifierPath - Qualifier path for sub-identifiers like lot/serial numbers (default: "/")
+   * @param options - Additional options for the registration
    * @returns Registration details including the canonical resolver URI
    */
   publishLinks(
@@ -147,5 +156,6 @@ export interface IIdentityResolverService {
     identifier: string,
     links: Link[],
     qualifierPath?: string,
+    options?: PublishLinksOptions,
   ): Promise<LinkRegistration>;
 }

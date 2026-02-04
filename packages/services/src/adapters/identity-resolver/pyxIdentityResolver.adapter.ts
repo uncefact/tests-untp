@@ -1,4 +1,4 @@
-import type { Link, LinkRegistration, IIdentityResolverService } from '../../interfaces/identityResolverService';
+import type { Link, LinkRegistration, IIdentityResolverService, PublishLinksOptions } from '../../interfaces/identityResolverService';
 
 /**
  * Payload for registering links with the Identity Resolver.
@@ -83,6 +83,23 @@ export interface DefaultFlagsConfig {
 }
 
 /**
+ * Pyx-specific options for publishing links, extending the base options.
+ * These are request-specific values that must be provided for each publishLinks call.
+ */
+export interface PyxPublishLinksOptions extends PublishLinksOptions {
+  /**
+   * Namespace for the identifier vocabulary (e.g., "untp", "gs1").
+   * Required for each request.
+   */
+  namespace: string;
+  /**
+   * Default regional/market context for links that don't specify one (e.g., "au", "us").
+   * Individual links can override this via their `context` property.
+   */
+  context?: string;
+}
+
+/**
  * Pyx Identity Resolver adapter implementation.
  * Registers links with a Pyx IDR instance to make them discoverable via identifiers.
  *
@@ -92,9 +109,6 @@ export interface DefaultFlagsConfig {
 export class PyxIdentityResolverAdapter implements IIdentityResolverService {
   readonly baseURL: string;
   readonly headers: Record<string, string>;
-  readonly namespace: string;
-  readonly context: string;
-  readonly itemDescription?: string;
   private readonly config: Required<DefaultFlagsConfig>;
 
   /**
@@ -102,24 +116,15 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
    *
    * @param baseURL - Base URL for the Pyx identity resolver API
    * @param headers - Headers including Authorization
-   * @param namespace - Namespace for identifiers (e.g., "untp", "gs1")
-   * @param context - Default context/region when link doesn't specify one (default: 'au')
-   * @param itemDescription - Default item description (falls back to first link title if not provided)
    * @param config - Configuration for default flags
    */
   constructor(
     baseURL: string,
     headers: Record<string, string>,
-    namespace: string,
-    context?: string,
-    itemDescription?: string,
     config?: DefaultFlagsConfig,
   ) {
     if (!baseURL) {
       throw new Error("Error creating PyxIdentityResolverAdapter. API URL is required.");
-    }
-    if (!namespace) {
-      throw new Error("Error creating PyxIdentityResolverAdapter. namespace is required.");
     }
     if (!headers?.Authorization) {
       throw new Error("Error creating PyxIdentityResolverAdapter. Authorization header is required.");
@@ -127,9 +132,6 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
 
     this.baseURL = baseURL;
     this.headers = headers;
-    this.namespace = namespace;
-    this.context = context ?? DEFAULT_CONTEXT;
-    this.itemDescription = itemDescription;
     // Default to false for all default flags to avoid accidentally overriding system-wide defaults.
     this.config = {
       defaultLinkType: config?.defaultLinkType ?? false,
@@ -147,6 +149,7 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
    * @param identifier - The identifier value within the scheme
    * @param links - Links to publish for this identifier
    * @param qualifierPath - Qualifier path for sub-identifiers like lot/serial numbers (default: "/")
+   * @param options - Required options including namespace, and optional itemDescription and context
    * @returns Registration details including the canonical resolver URI
    */
   async publishLinks(
@@ -154,6 +157,7 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
     identifier: string,
     links: Link[],
     qualifierPath?: string,
+    options?: PyxPublishLinksOptions,
   ): Promise<LinkRegistration> {
     // Validate required parameters
     if (!identifierScheme) {
@@ -165,17 +169,25 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
     if (!links || links.length === 0) {
       throw new Error('Failed to publish links: at least one link is required');
     }
+    if (!options?.namespace) {
+      throw new Error('Failed to publish links: options.namespace is required');
+    }
+
+    // Extract options
+    const namespace = options.namespace;
+    const context = options.context ?? DEFAULT_CONTEXT;
+    const itemDescription = options.itemDescription ?? links[0].title;
 
     try {
       // Convert links to the format expected by the link resolver API
-      const responses: LinkResponse[] = this.convertLinksToResponses(links, this.namespace);
+      const responses: LinkResponse[] = this.convertLinksToResponses(links, namespace, context);
 
       // Construct link resolver payload
       const payload: LinkResolver = {
-        namespace: this.namespace,
+        namespace,
         identificationKey: identifier,
         identificationKeyType: identifierScheme,
-        itemDescription: this.itemDescription ?? links[0].title,
+        itemDescription,
         qualifierPath: qualifierPath ?? '/',
         active: true,
         responses,
@@ -198,7 +210,7 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
       const qualifiers = qualifierPath && qualifierPath !== '/' ? `/${qualifierPath}` : '';
       return {
         resolverUri: new URL(
-          `${this.namespace}/${identifierScheme}/${identifier}${qualifiers}`,
+          `${namespace}/${identifierScheme}/${identifier}${qualifiers}`,
           this.baseURL.endsWith('/') ? this.baseURL : `${this.baseURL}/`,
         ).toString(),
         identifierScheme,
@@ -217,15 +229,16 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
    *
    * @param links - Array of links to convert
    * @param namespace - The namespace for link types
+   * @param defaultContext - The default context to use when link doesn't specify one
    * @returns Array of link responses formatted for the link resolver API
    */
-  private convertLinksToResponses(links: Link[], namespace: string): LinkResponse[] {
+  private convertLinksToResponses(links: Link[], namespace: string, defaultContext: string): LinkResponse[] {
     return links.map((link) => {
       // Use rel as linkType, prefixing with namespace if not already namespaced
       const linkType = link.rel.includes(':') ? link.rel : `${namespace}:${link.rel}`;
       const ianaLanguage = link.hreflang?.[0] || DEFAULT_LANGUAGE;
       const mimeType = link.type || DEFAULT_MIME_TYPE;
-      const context = link.context || this.context;
+      const context = link.context || defaultContext;
 
       // Map link.default to IDR default flags based on adapter configuration
       const isDefault = link.default ?? false;
