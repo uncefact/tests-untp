@@ -103,7 +103,7 @@ describe('generateReport', () => {
       reportName: 'UNTP',
       testSuite: {
         runner: 'untp-playground',
-        version: '0.2.0',
+        version: '0.2.2',
       },
       implementation: {
         name: 'Test Implementation',
