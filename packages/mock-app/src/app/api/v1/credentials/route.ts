@@ -339,7 +339,7 @@ async function publishCredential(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      { Authorization: `Bearer ${idrAPIKey}` },
+      "Authorization": `Bearer ${idrAPIKey}`,
     },
     body: JSON.stringify(payload),
   });
