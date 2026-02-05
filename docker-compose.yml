@@ -104,8 +104,6 @@ services:
       dockerfile: packages/mock-app/Dockerfile
       args:
         CONFIG_FILE: ./app-config.json
-        AUTH_KEYCLOAK_ISSUER: http://localhost:8080/realms/untp-reference-implementation
-        RI_APP_URL: http://localhost:3003
     ports:
       - '3003:3003'
     volumes:
