@@ -70,9 +70,11 @@ COPY --from=builder /app/packages/mock-app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/.next/static ./.next/static
 
-# Copy prisma files and all node_modules for running migrations at runtime
+# Copy prisma files and only required node_modules for running migrations at runtime
+# (standalone output already bundles all other dependencies)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
 # Copy built-in config files for fallback (when no runtime config is mounted)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/src/constants/app-config*.json ./src/constants/
