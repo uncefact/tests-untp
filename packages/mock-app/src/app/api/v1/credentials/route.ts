@@ -396,8 +396,8 @@ function getConfigParameters(config: AppConfig): IssueConfigParams {
     },
     dlr: {
       ...params.dlr,
-      dlrAPIUrl: process.env.DLR_API_URL || params.dlr.dlrAPIUrl,
-      dlrAPIKey: process.env.DLR_API_KEY || params.dlr.dlrAPIKey,
+      dlrAPIUrl: process.env.IDR_API_URL || params.dlr.dlrAPIUrl,
+      dlrAPIKey: process.env.IDR_API_KEY || params.dlr.dlrAPIKey,
     },
   };
 }

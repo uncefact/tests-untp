@@ -127,8 +127,8 @@ services:
       VCKIT_API_URL: http://vckit-api:3332/v2
       VCKIT_AUTH_TOKEN: ${VCKIT_AUTH_TOKEN}
       STORAGE_SERVICE_URL: http://storage-service:3334/api/1.0.0/documents
-      DLR_API_URL: http://identity-resolver-service:3000/api/1.0.0
-      DLR_API_KEY: ${DLR_API_KEY}
+      IDR_API_URL: http://identity-resolver-service:3000/api/1.0.0
+      IDR_API_KEY: ${IDR_API_KEY}
     depends_on:
       keycloak:
         condition: service_started
