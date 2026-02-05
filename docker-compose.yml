@@ -130,8 +130,6 @@ services:
       DLR_API_URL: http://identity-resolver-service:3000/api/1.0.0
       DLR_API_KEY: ${DLR_API_KEY}
     depends_on:
-      untp-playground:
-        condition: service_started
       keycloak:
         condition: service_started
       ri-db:
