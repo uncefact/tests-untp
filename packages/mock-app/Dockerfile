@@ -38,19 +38,6 @@ ARG CONFIG_FILE=./app-config.json
 COPY ${CONFIG_FILE} ./packages/mock-app/src/constants/app-config.json
 COPY ${CONFIG_FILE} ./packages/components/src/constants/app-config.json
 
-# Build args for client-side variables (inlined into JS at build time)
-ARG NEXT_PUBLIC_BASE_PATH
-ARG NEXT_PUBLIC_ASSET_PREFIX
-ARG NEXT_PUBLIC_IMAGE_PATH
-ARG AUTH_KEYCLOAK_ISSUER
-ARG RI_APP_URL
-
-ENV NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
-ENV NEXT_PUBLIC_ASSET_PREFIX=${NEXT_PUBLIC_ASSET_PREFIX}
-ENV NEXT_PUBLIC_IMAGE_PATH=${NEXT_PUBLIC_IMAGE_PATH}
-ENV AUTH_KEYCLOAK_ISSUER=${AUTH_KEYCLOAK_ISSUER}
-ENV RI_APP_URL=${RI_APP_URL}
-
 # Recreate workspace symlinks after copying source files
 WORKDIR /app
 RUN yarn install --frozen-lockfile
