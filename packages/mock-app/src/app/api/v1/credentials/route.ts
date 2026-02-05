@@ -178,10 +178,17 @@ export async function POST(req: Request) {
  */
 async function issueCredential(params: IssueConfigParams, body: IssueRequest): Promise<VCkitIssueResponse> {
   const vckit = params.vckit;
+  const vckitAPIUrl = process.env.VCKIT_API_URL || vckit.vckitAPIUrl;
+  const vckitAuthToken = process.env.VCKIT_AUTH_TOKEN;
+
+  const headers: Record<string, string> = {
+    ...vckit.headers,
+    ...(vckitAuthToken && { Authorization: `Bearer ${vckitAuthToken}` }),
+  };
 
   const credentialStatus = await issueCredentialStatus({
-    host: new URL(vckit.vckitAPIUrl).origin,
-    headers: vckit.headers,
+    host: new URL(vckitAPIUrl).origin,
+    headers,
     bitstringStatusIssuer: vckit.issuer,
   });
 
@@ -201,11 +208,11 @@ async function issueCredential(params: IssueConfigParams, body: IssueRequest): P
     },
   };
 
-  const res = await fetch(`${vckit.vckitAPIUrl}/credentials/issue`, {
+  const res = await fetch(`${vckitAPIUrl}/credentials/issue`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(vckit.headers ?? {}),
+      ...headers,
     },
     body: JSON.stringify(payload),
   });
@@ -226,13 +233,14 @@ async function storeCredential(
   envelopedVC: EnvelopedVC
 ): Promise<StorageRecord> {
   const storage = params.storage;
+  const storageUrl = process.env.STORAGE_SERVICE_URL || storage.url;
 
   const payload = {
     bucket: storage.params.bucket,
     data: envelopedVC,
   };
 
-  const res = await fetch(storage.url, {
+  const res = await fetch(storageUrl, {
     method: storage.options.method,
     headers: {
       "Content-Type": "application/json",
@@ -258,6 +266,8 @@ async function publishCredential(
   storage: StorageRecord
 ): Promise<{ enabled: true; raw: JSONValue }> {
   const dlr = params.dlr;
+  const dlrAPIUrl = process.env.IDR_API_URL || dlr.dlrAPIUrl;
+  const dlrAPIKey = process.env.IDR_API_KEY || dlr.dlrAPIKey;
 
   if (!storage?.uri) throw new Error("Storage response missing uri");
   if (!storage?.hash) throw new Error("Storage response missing hash");
@@ -325,11 +335,11 @@ async function publishCredential(
     responses,
   };
 
-  const res = await fetch(`${dlr.dlrAPIUrl}/${dlr.linkRegisterPath}`, {
+  const res = await fetch(`${dlrAPIUrl}/${dlr.linkRegisterPath}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(dlr.dlrAPIKey ? { Authorization: `Bearer ${dlr.dlrAPIKey}` } : {}),
+      ...(dlrAPIKey ? { Authorization: `Bearer ${dlrAPIKey}` } : {}),
     },
     body: JSON.stringify(payload),
   });
@@ -371,35 +381,12 @@ async function getConfig(): Promise<AppConfig> {
 }
 
 /**
- * Extracts service parameters and applies environment variable overrides
+ * Extracts service parameters from config
  */
 function getConfigParameters(config: AppConfig): IssueConfigParams {
   const params = config?.services?.[0]?.parameters?.[0];
   if (!params) throw new Error("Invalid config: missing services[0].parameters[0]");
-
-  // Apply environment variable overrides for sensitive/configurable values
-  return {
-    ...params,
-    vckit: {
-      ...params.vckit,
-      vckitAPIUrl: process.env.VCKIT_API_URL || params.vckit.vckitAPIUrl,
-      headers: {
-        ...params.vckit.headers,
-        ...(process.env.VCKIT_AUTH_TOKEN && {
-          Authorization: `Bearer ${process.env.VCKIT_AUTH_TOKEN}`,
-        }),
-      },
-    },
-    storage: {
-      ...params.storage,
-      url: process.env.STORAGE_SERVICE_URL || params.storage.url,
-    },
-    dlr: {
-      ...params.dlr,
-      dlrAPIUrl: process.env.IDR_API_URL || params.dlr.dlrAPIUrl,
-      dlrAPIKey: process.env.IDR_API_KEY || params.dlr.dlrAPIKey,
-    },
-  };
+  return params;
 }
 
 /**
