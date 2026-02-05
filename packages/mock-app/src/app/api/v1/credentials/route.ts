@@ -266,8 +266,8 @@ async function publishCredential(
   storage: StorageRecord
 ): Promise<{ enabled: true; raw: JSONValue }> {
   const dlr = params.dlr;
-  const dlrAPIUrl = process.env.IDR_API_URL || dlr.dlrAPIUrl;
-  const dlrAPIKey = process.env.IDR_API_KEY || dlr.dlrAPIKey;
+  const idrAPIUrl = process.env.IDR_API_URL || dlr.dlrAPIUrl;
+  const idrAPIKey = process.env.IDR_API_KEY || dlr.dlrAPIKey;
 
   if (!storage?.uri) throw new Error("Storage response missing uri");
   if (!storage?.hash) throw new Error("Storage response missing hash");
@@ -335,11 +335,11 @@ async function publishCredential(
     responses,
   };
 
-  const res = await fetch(`${dlrAPIUrl}/${dlr.linkRegisterPath}`, {
+  const res = await fetch(`${idrAPIUrl}/${dlr.linkRegisterPath}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(dlrAPIKey ? { Authorization: `Bearer ${dlrAPIKey}` } : {}),
+      { Authorization: `Bearer ${idrAPIKey}` },
     },
     body: JSON.stringify(payload),
   });
