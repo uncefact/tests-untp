@@ -28,12 +28,14 @@ describe('Display Error Messages', () => {
     };
 
     cy.uploadCredential(invalidContextCredential);
-    cy.expandGroup();
-    cy.checkValidationStatus('UNTP Schema Validation', 'failure');
-
-    cy.openErrorDetailsByStepName('UNTP Schema Validation');
     cy.contains('Fix validation error').click();
-    cy.contains('Issue:').should('be.visible');
+    cy.contains('Receive value:').should('be.visible');
+    cy.contains('"@context":').should('be.visible');
+    cy.contains('"https://www.w3.org/ns/credentials/v2"').should('be.visible');
+
+    cy.contains('"type":').should('be.visible');
+    cy.contains('"VerifiableCredential"').should('be.visible');
+    cy.contains('"DigitalProductPassport"').should('be.visible');
   });
 
   it('should open error details when clicking on View Detail Upload', () => {

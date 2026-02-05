@@ -1,7 +1,7 @@
 import addFormats from 'ajv-formats';
 import Ajv2020 from 'ajv/dist/2020';
-import { VCDM_SCHEMA_URLS, VCDMVersion } from '../../constants';
-import { detectCredentialType, detectVersion } from './credentialService';
+import { shortCredentialTypes, VCDM_SCHEMA_URLS, VCDMVersion } from '../../constants';
+import { constructExtensionRegistry, detectAllTypes, detectCredentialType, detectVersion } from './credentialService';
 
 const ajv = new Ajv2020({
   allErrors: true,
@@ -12,58 +12,8 @@ addFormats(ajv);
 
 export const schemaCache = new Map<string, any>();
 
-interface CoreVersion {
-  type: string;
-  version: string;
-}
-
-interface ExtensionVersion {
-  version: string;
-  schema: string;
-  core: CoreVersion;
-}
-
-interface ExtensionConfig {
-  domain: string;
-  versions: ExtensionVersion[];
-}
-
-export const EXTENSION_VERSIONS: Record<string, ExtensionConfig> = {
-  DigitalLivestockPassport: {
-    domain: 'aatp.foodagility.com',
-    versions: [
-      {
-        version: '0.4.0',
-        schema: 'https://aatp.foodagility.com/assets/files/aatp-dlp-schema-0.4.0-9c0ad2b1ca6a9e497dedcfd8b87f35f1.json',
-        core: { type: 'DigitalProductPassport', version: '0.5.0' },
-      },
-      {
-        version: '0.4.1-beta1',
-        schema: 'https://aatp.foodagility.com/schema/aatp-dlp-schema-0.4.1-beta1.json',
-        core: { type: 'DigitalProductPassport', version: '0.6.0-beta7' },
-      },
-      {
-        version: '0.4.2-beta1',
-        schema: 'https://aatp.foodagility.com/schema/aatp-dlp-schema-0.4.2-beta1.json',
-        core: { type: 'DigitalProductPassport', version: '0.6.0-beta9' },
-      },
-    ],
-  },
-};
-
 const schemaURLConstructor = (type: string, version: string) => {
-  const shortCredentialTypes: Record<string, string> = {
-    DigitalProductPassport: 'dpp',
-    DigitalConformityCredential: 'dcc',
-    DigitalTraceabilityEvent: 'dte',
-    DigitalFacilityRecord: 'dfr',
-    DigitalIdentityAnchor: 'dia',
-  };
   return `https://test.uncefact.org/vocabulary/untp/${shortCredentialTypes[type]}/untp-${shortCredentialTypes[type]}-schema-${version}.json`;
-};
-
-const findExtensionSchemaURL = (type: string, version: string) => {
-  return EXTENSION_VERSIONS[type].versions.find((v) => v.version === version)?.schema;
 };
 
 export async function validateCredentialSchema(credential: any): Promise<{
@@ -108,23 +58,21 @@ export async function validateExtension(credential: any): Promise<{
     throw new Error('Unknown extension');
   }
 
-  const schemaUrl = findExtensionSchemaURL(extension.extension.type, extension.extension.version);
-
-  if (!schemaUrl) {
-    throw new Error('Unsupported extension version');
-  }
-
-  return validateCredentialOnSchemaUrl(credential, schemaUrl);
+  return validateCredentialOnSchemaUrl(credential, extension.extension.schema);
 }
 
 export function detectExtension(credential: any):
   | {
       core: { type: string; version: string };
-      extension: { type: string; version: string };
+      extension: { type: string; version: string; schema: string };
     }
   | undefined {
+  const credentialTypes = detectAllTypes(credential);
+  const extensionRegistry = constructExtensionRegistry(credentialTypes, credential['@context']);
+
   const credentialType = detectCredentialType(credential);
-  const extension = EXTENSION_VERSIONS[credentialType];
+  const extension = extensionRegistry[credentialType];
+
   if (!extension) {
     return undefined;
   }
@@ -136,7 +84,7 @@ export function detectExtension(credential: any):
 
   return {
     core: extensionVersion.core,
-    extension: { type: credentialType, version },
+    extension: { type: credentialType, version, schema: extensionVersion.schema },
   };
 }
 
@@ -194,3 +142,11 @@ export async function validateVcAgainstSchema(credential: any, version: Extract<
 
   return validateCredentialOnSchemaUrl(credential, schemaUrl);
 }
+
+export const validateTypeAndContext = (types: string[], urls: string[]): boolean => {
+  if (types?.length !== urls?.length) {
+    return false;
+  }
+
+  return true;
+};

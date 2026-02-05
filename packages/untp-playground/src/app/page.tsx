@@ -10,7 +10,7 @@ import { Header } from '@/components/Header';
 import { TestResults } from '@/components/TestResults';
 import { TestReportProvider } from '@/contexts/TestReportContext';
 import { decodeEnvelopedCredential, detectCredentialType, isEnvelopedProof } from '@/lib/credentialService';
-import { detectExtension } from '@/lib/schemaValidation';
+import { detectExtension, validateTypeAndContext } from '@/lib/schemaValidation';
 import { isPermittedCredentialType, validateNormalizedCredential } from '@/lib/utils';
 import type { PermittedCredentialType, StoredCredential, TestStep } from '@/types';
 import { useError } from '@/contexts/ErrorContext';
@@ -41,11 +41,30 @@ export default function Home() {
 
       const isEnveloped = isEnvelopedProof(normalizedCredential);
       const decodedCredential = isEnveloped ? decodeEnvelopedCredential(normalizedCredential) : normalizedCredential;
-
+      const typeValidationResult = validateTypeAndContext(decodedCredential.type, decodedCredential['@context']);
+      if (!typeValidationResult) {
+        dispatchError([
+          {
+            keyword: 'required',
+            instancePath: '/context',
+            params: {
+              missingProperty: 'context array with a supported context',
+              receivedValue: {
+                '@context': decodedCredential['@context'],
+                type: decodedCredential.type,
+              },
+              allowedValue: '',
+              solution: 'Ensure that the length of the context array matches the length of the type array.',
+            },
+            message: 'The credential type is missing or invalid.',
+          },
+        ]);
+        return;
+      }
       const extension = detectExtension(decodedCredential);
       let credentialType = extension ? extension.core.type : detectCredentialType(decodedCredential);
 
-      if (!credentialType || !isPermittedCredentialType(credentialType as PermittedCredentialType)) {
+      if (!credentialType || (extension && !isPermittedCredentialType(credentialType as PermittedCredentialType))) {
         dispatchError([
           {
             keyword: 'required',
