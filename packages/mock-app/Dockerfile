@@ -75,6 +75,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/.next/static ./
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/effect ./node_modules/effect
 
 # Copy built-in config files for fallback (when no runtime config is mounted)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/src/constants/app-config*.json ./src/constants/

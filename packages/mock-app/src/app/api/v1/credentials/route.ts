@@ -178,16 +178,16 @@ export async function POST(req: Request) {
  */
 async function issueCredential(params: IssueConfigParams, body: IssueRequest): Promise<VCkitIssueResponse> {
   const vckit = params.vckit;
-  const vckitAPIUrl = process.env.VCKIT_API_URL || vckit.vckitAPIUrl;
-  const vckitAuthToken = process.env.VCKIT_AUTH_TOKEN;
+  const issuerApiUrl = process.env.ISSUER_API_URL || vckit.vckitAPIUrl;
+  const issuerAuthToken = process.env.ISSUER_AUTH_TOKEN;
 
   const headers: Record<string, string> = {
     ...vckit.headers,
-    ...(vckitAuthToken && { Authorization: `Bearer ${vckitAuthToken}` }),
+    ...(issuerAuthToken && { Authorization: `Bearer ${issuerAuthToken}` }),
   };
 
   const credentialStatus = await issueCredentialStatus({
-    host: new URL(vckitAPIUrl).origin,
+    host: new URL(issuerApiUrl).origin,
     headers,
     bitstringStatusIssuer: vckit.issuer,
   });
@@ -208,7 +208,7 @@ async function issueCredential(params: IssueConfigParams, body: IssueRequest): P
     },
   };
 
-  const res = await fetch(`${vckitAPIUrl}/credentials/issue`, {
+  const res = await fetch(`${issuerApiUrl}/credentials/issue`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
