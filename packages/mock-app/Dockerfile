@@ -8,9 +8,6 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-ENV NEXT_PUBLIC_BASE_PATH=/
-ENV NEXT_PUBLIC_ASSET_PREFIX=/
-
 # Install dependencies based on the preferred package manager
 COPY package.json yarn.lock ./
 COPY packages/mock-app/package.json ./packages/mock-app/
@@ -18,7 +15,6 @@ COPY packages/components/package.json ./packages/components/
 COPY packages/services/package.json ./packages/services/
 COPY digitallink_toolkit_server ./digitallink_toolkit_server/
 RUN yarn install --frozen-lockfile
-
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -70,12 +66,9 @@ COPY --from=builder /app/packages/mock-app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/.next/static ./.next/static
 
-# Copy prisma files and only required node_modules for running migrations at runtime
-# (standalone output already bundles all other dependencies)
+# Copy prisma files and node_modules for running migrations at runtime
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/effect ./node_modules/effect
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # Copy built-in config files for fallback (when no runtime config is mounted)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/src/constants/app-config*.json ./src/constants/
