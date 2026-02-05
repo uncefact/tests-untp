@@ -83,7 +83,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/mock-app/src/constants/a
 COPY --chown=nextjs:nodejs packages/mock-app/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 
-# Create config directory for mounted configuration
+# Create config directory for runtime configuration
 RUN mkdir -p /app/config && chown nextjs:nodejs /app/config
 
 USER nextjs
