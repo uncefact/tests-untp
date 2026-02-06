@@ -7,7 +7,7 @@ import Disclaimer from '.././\_disclaimer.mdx';
 
 <Disclaimer />
 
-Before you begin installing the mock apps, ensure that you have the following prerequisites in place:
+Before you begin installing the reference implementation, ensure that you have the following prerequisites in place:
 
 ### Prerequisites
 
@@ -37,6 +37,6 @@ Once you have met the prerequisites, follow these steps to install the dependenc
    yarn install
    ```
 
-After completing these steps, you will have all the necessary mock app dependencies installed.
+After completing these steps, you will have all the necessary reference implementation dependencies installed.
 
-In the next section, we will explore the required services and their documentation to help you understand their role in the mock apps ecosystem.
+In the next section, we will explore the required services and their documentation to help you understand their role in the reference implementation ecosystem.

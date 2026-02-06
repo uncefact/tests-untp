@@ -9,7 +9,7 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 <!-- TODO: Implement Verify link generator -->
 ## Description
 
-The `Verify Link` is used to initiate the verification process for a verifiable credential, in the context of the Mock App system, a [Digital Product Passport (DPP)](https://uncefact.github.io/spec-untp/docs/specification/DigitalProductPassport), a [Digital Conformity Credential](https://uncefact.github.io/spec-untp/docs/specification/ConformityCredential) or [Digital Traceability Events](https://uncefact.github.io/spec-untp/docs/specification/DigitalTraceabilityEvents). It provides a standardised way to access, decrypt (if necessary), verify the authenticity and integrity of a credential, and render the credential on the [verify page](/docs/reference-implementation/verify-app) of the Mock App system.
+The `Verify Link` is used to initiate the verification process for a verifiable credential, in the context of the Reference implementation system, a [Digital Product Passport (DPP)](https://uncefact.github.io/spec-untp/docs/specification/DigitalProductPassport), a [Digital Conformity Credential](https://uncefact.github.io/spec-untp/docs/specification/ConformityCredential) or [Digital Traceability Events](https://uncefact.github.io/spec-untp/docs/specification/DigitalTraceabilityEvents). It provides a standardised way to access, decrypt (if necessary), verify the authenticity and integrity of a credential, and render the credential on the [verify page](/docs/reference-implementation/verify-app) of the Reference implementation system.
 
 ## Structure
 The general structure of the verify link is as follows:

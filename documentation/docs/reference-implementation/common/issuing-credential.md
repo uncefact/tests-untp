@@ -9,7 +9,7 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The Issuing Credential feature in the mock app is responsible for issuing a Verifiable Credential (VC) along with its credential status. The status is added to the VC payload before the VC is issued and is managed by the VC issuer.
+The Issuing Credential feature in the reference implementation is responsible for issuing a Verifiable Credential (VC) along with its credential status. The status is added to the VC payload before the VC is issued and is managed by the VC issuer.
 
 ## Diagram
 
@@ -21,7 +21,7 @@ sequenceDiagram
 
 participant C as Client
 
-participant MA as Mock App
+participant MA as Reference Implementation
 
 participant V as VCKit
 

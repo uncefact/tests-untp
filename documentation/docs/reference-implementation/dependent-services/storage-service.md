@@ -14,7 +14,7 @@ It offers the following capabilities:
 - Storage of documents, such as invoices, used to mimic value chain activities.
 - Support for storing credentials in plain text or encrypting them while returning the encryption key and hash.
 
-For the Mock Apps, we recommend and will be using the UN's reference implementation located within the [Identity Resolver Service repository](https://github.com/uncefact/project-identity-resolver).
+For the Reference Implementations, we recommend and will be using the UN's reference implementation located within the [Identity Resolver Service repository](https://github.com/uncefact/project-identity-resolver).
 
 ### Setup Options
 
@@ -32,7 +32,7 @@ Please go through the Storage Service documentation available [here](https://git
 
 ### Requirements
 
-To use the Storage Service with the mock apps, you will need:
+To use the Storage Service with the reference implementation, you will need:
 
 1. The Storage Service API running.
 2. The address of the Storage Service (e.g., http://localhost:3334/v1/documents)
@@ -40,6 +40,6 @@ To use the Storage Service with the mock apps, you will need:
 
 If you're using the Docker Compose setup, these requirements are already met, and the Storage Service is available at  http://localhost:3334.
 
-If you're setting up your own instance, make sure you have the Storage Service API set up and running, and note its address and API key (if applicable) before proceeding with the mock app configuration.
+If you're setting up your own instance, make sure you have the Storage Service API set up and running, and note its address and API key (if applicable) before proceeding with the reference implementation configuration.
 
 In the next section, we will explore the Identity Resolver Service and its role in the UNTP ecosystem.

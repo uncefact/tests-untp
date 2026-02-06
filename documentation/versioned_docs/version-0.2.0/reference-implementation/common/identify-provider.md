@@ -9,7 +9,7 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 ## Description
 
-The `Identify Provider` object is a key component in the Mock App system that links scanned identifiers to their corresponding [Identity Resolver Service](/docs/reference-implementation/dependent-services/identity-resolution-service), understands how to communicate with such services and encapsulates logic to interpret data retrieved from data carriers.
+The `Identify Provider` object is a key component in the Reference implementation system that links scanned identifiers to their corresponding [Identity Resolver Service](/docs/reference-implementation/dependent-services/identity-resolution-service), understands how to communicate with such services and encapsulates logic to interpret data retrieved from data carriers.
 
 It serves three main functions:
 
@@ -24,7 +24,7 @@ For instance, when dealing with a Global Trade Item Number (GTIN) from GS1:
 3. It formats the request appropriately
 4. It extracts the actor's Identity Resolver (IDR) link from the response
 
-The Mock App system can use multiple identify providers, each tailored to a specific identity registrar and service. This modular approach allows the system to work with a variety of identification standards and services.
+The Reference implementation system can use multiple identify providers, each tailored to a specific identity registrar and service. This modular approach allows the system to work with a variety of identification standards and services.
 
 ## Example
 

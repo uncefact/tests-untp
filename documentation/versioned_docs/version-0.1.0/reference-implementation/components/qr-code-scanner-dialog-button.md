@@ -28,7 +28,7 @@ The QRCodeScannerDialogButton component is responsible for rendering a button th
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant MA as Mock App
+    participant MA as Reference implementation
     participant V as VCKit
 
     U->>MA: Scan QRCode

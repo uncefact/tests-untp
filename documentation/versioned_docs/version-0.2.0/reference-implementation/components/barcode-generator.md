@@ -9,7 +9,7 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The BarcodeGenerator component generates and displays barcodes based on the provided data. It can handle both single and multiple barcode generation, making it versatile for various use cases within the Mock App system.
+The BarcodeGenerator component generates and displays barcodes based on the provided data. It can handle both single and multiple barcode generation, making it versatile for various use cases within the Reference implementation system.
 
 The component uses its `data` and `dataPath` props to extract the necessary information for barcode generation. The resulting barcodes are displayed on the screen once generated.
 

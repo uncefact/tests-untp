@@ -7,9 +7,9 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 <Disclaimer />
 
-This section provides an overview of the dependent services required for the [United Nations Transparency Protocol (UNTP)](https://uncefact.github.io/spec-untp/). Each service plays a crucial role in the UNTP ecosystem, and proper setup is essential for the functioning of the Mock App system.
+This section provides an overview of the dependent services required for the [United Nations Transparency Protocol (UNTP)](https://uncefact.github.io/spec-untp/). Each service plays a crucial role in the UNTP ecosystem, and proper setup is essential for the functioning of the Reference implementation system.
 
-Ensure all services are configured and running before proceeding with the Mock App configuration.
+Ensure all services are configured and running before proceeding with the Reference implementation configuration.
 
 - [Verifiable Credential Service](./verifiable-credential-service)
 - [Storage Service](./storage-service)
@@ -41,7 +41,7 @@ To use the Docker Compose setup:
    docker-compose down
    ```
 
-Using this Docker Compose setup allows for a quick and easy deployment of the required services, ensuring they are properly configured and ready for use with the Mock App system.
+Using this Docker Compose setup allows for a quick and easy deployment of the required services, ensuring they are properly configured and ready for use with the Reference implementation system.
 
 ## Service Endpoints
 

@@ -46,7 +46,7 @@ jest.mock('@/components/MessageText', () => ({
   MessageText: ({ text }: { text: string }) => <div>{text}</div>,
 }));
 
-// Mock app config
+// Reference implementation config
 jest.mock('@/constants/app-config.json', () => ({
   defaultVerificationServiceLink: {
     href: 'http://localhost:3332/agent/routeVerificationCredential',

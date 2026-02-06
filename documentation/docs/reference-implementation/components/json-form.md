@@ -11,7 +11,7 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 The JsonForm component renders a dynamic form based on a provided JSON schema. It allows for flexible form creation and data entry, supporting various field types and structures defined in the schema. The component can be initialised with default data and customised with CSS classes and styles. It also supports advanced features like data construction rules and external schema references, making it suitable for complex form scenarios.
 
-As a developer using the mock app system, you can now provide a remote schema URI to the JsonForm component or manually specify a local schema. This allows for the dynamic rendering of forms based on externally hosted schemas or custom local schemas, making the system more flexible and adaptable.
+As a developer using the reference implementation system, you can now provide a remote schema URI to the JsonForm component or manually specify a local schema. This allows for the dynamic rendering of forms based on externally hosted schemas or custom local schemas, making the system more flexible and adaptable.
 
 ## Definitions
 

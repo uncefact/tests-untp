@@ -2,7 +2,7 @@ import clsx from 'clsx';
 
 const FeatureList = [
   {
-    title: 'Mock Apps',
+    title: 'Reference implementations',
     Svg: require('@site/static/img/reference-implementation-icon.svg').default,
     description: (
       <>

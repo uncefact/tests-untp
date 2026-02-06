@@ -7,14 +7,14 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 <Disclaimer />
 
-This is a high-level system configuration used to brand the Mock App system, define the apps contained within the Mock App system, and define the connections to common external services that each app can use.
+This is a high-level system configuration used to brand the Reference implementation system, define the apps contained within the Reference implementation system, and define the connections to common external services that each app can use.
 
-An example of a common service that is shared across all Mock Apps is a mock or real service which serves information about products like the global VerifiedByGS1 service, which given an identifier, can return generic information about that product, but more importantly a link to the [Identity Resolver](https://uncefact.github.io/spec-untp/docs/specification/IdentityResolver) service of the value chain actor.
+An example of a common service that is shared across all Reference implementations is a mock or real service which serves information about products like the global VerifiedByGS1 service, which given an identifier, can return generic information about that product, but more importantly a link to the [Identity Resolver](https://uncefact.github.io/spec-untp/docs/specification/IdentityResolver) service of the value chain actor.
 
 ## Diagram 
 ```mermaid
 graph TD
-    A[Mock App System Config]
+    A[Reference implementation System Config]
     A --> B[Name]
     A --> C[Styles]
     A --> D[Apps]
@@ -33,7 +33,7 @@ graph TD
 
 | Property | Required | Description | Type |
 |----------|----------|-------------|------|
-| name | Yes | The name of the mock app system (displayed in the header) | String |
+| name | Yes | The name of the reference implementation system (displayed in the header) | String |
 | styles | Yes | Custom styling options for the overall system | [Style](/docs/reference-implementation/common/style) |
 | generalFeatures | Yes | A list of common features accessible across all apps | [GeneralFeature](/docs/reference-implementation/configuration/general-feature-config)[] |
 | apps | Yes | A collection of individual apps representing different actors in the value chain | [App](/docs/reference-implementation/configuration/app-config)[] |

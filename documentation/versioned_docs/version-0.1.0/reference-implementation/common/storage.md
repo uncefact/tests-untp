@@ -9,7 +9,7 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 ## Description
 
-The `Storage` object is responsible for managing the configuration of the [Storage service](/docs/reference-implementation/dependent-services/storage-service) which is used to store and manage Verifiable Credentials within the Mock App system.
+The `Storage` object is responsible for managing the configuration of the [Storage service](/docs/reference-implementation/dependent-services/storage-service) which is used to store and manage Verifiable Credentials within the Reference implementation system.
 
 ## Example
 

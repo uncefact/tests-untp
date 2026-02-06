@@ -11,7 +11,7 @@ Apps are used to represent and encapsulate the process/business logic of each ac
 
 Not only can the functionality/business logic be configured but the style of each app can be too, e.g. logo, app name and colours. This allows the implementor to create a visual distinction between value chain actors which can also help convey their role. 
 
-Each app is a page within the mock app system where the name of the value chain actor set in the config file is used as a path segment just as the general feature `{mock_app_system_base_url}/{actor_name or general_feature_name}`. Each app defined in the config file will be displayed in the sidebar menu.
+Each app is a page within the reference implementation system where the name of the value chain actor set in the config file is used as a path segment just as the general feature `{mock_app_system_base_url}/{actor_name or general_feature_name}`. Each app defined in the config file will be displayed in the sidebar menu.
 
 Apps are composed of features which have ids and names to be able to discern between features within the UI of the respective app and the entry point of each feature (button) is displayed on the home page of the respective app just as the [general features](/docs/reference-implementation/configuration/general-feature-config).
 
