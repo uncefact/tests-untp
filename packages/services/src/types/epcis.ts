@@ -9,7 +9,7 @@ export enum EPCISEventType {
 export enum EPCISEventAction {
   Observe = 'observe',
   Add = 'add',
-  Delete = 'delete'
+  Delete = 'delete',
 }
 
 export enum EPCISEventDisposition {

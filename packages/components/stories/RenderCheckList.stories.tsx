@@ -18,11 +18,13 @@ export const Default: Story = {
     checkBoxLabel: 'checkBoxLabel',
     requiredFields: ['test'],
     onChange: (data) => console.log(data),
-    nestedComponents: [{
-      name: 'ImportButton',
-      type: 'EntryData',
-      props: {}
-    }]
+    nestedComponents: [
+      {
+        name: 'ImportButton',
+        type: 'EntryData',
+        props: {},
+      },
+    ],
   },
   decorators: [
     (Story) => (

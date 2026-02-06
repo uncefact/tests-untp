@@ -354,7 +354,7 @@ describe('deleteValuesFromLocalStorageByKeyPath functionality', () => {
       hash: 'ABC123',
     });
     (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
-    
+
     jest.spyOn(identifierSchemeServices, 'constructIdentifierData').mockReturnValue({
       primary: { ai: '01', value: '9359502000010' },
       qualifiers: [{ ai: '10', value: 'ABC123' }],

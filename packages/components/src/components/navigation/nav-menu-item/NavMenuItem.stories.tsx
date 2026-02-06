@@ -1,17 +1,17 @@
-import type { Meta, StoryObj } from "@storybook/react-webpack5";
-import { NavMenuItem } from "./NavMenuItem";
-import { Settings, ChevronRight, FileCheck } from "lucide-react";
+import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import { NavMenuItem } from './NavMenuItem';
+import { Settings, ChevronRight, FileCheck } from 'lucide-react';
 
 const meta = {
-  title: "Components/Navigation/NavMenuItem",
+  title: 'Components/Navigation/NavMenuItem',
   component: NavMenuItem,
   parameters: {
-    layout: "centered",
+    layout: 'centered',
   },
   decorators: [
     (Story) => {
       return (
-        <div className="bg-background p-8" style={{ width: "288px" }}>
+        <div className='bg-background p-8' style={{ width: '288px' }}>
           <Story />
         </div>
       );
@@ -19,44 +19,44 @@ const meta = {
   ],
   argTypes: {
     label: {
-      control: "text",
-      description: "The label text for the nav item",
+      control: 'text',
+      description: 'The label text for the nav item',
     },
     icon: {
       control: false,
-      description: "Icon as a URL string or React component (optional)",
+      description: 'Icon as a URL string or React component (optional)',
     },
     onClick: {
-      action: "clicked",
-      description: "Callback when nav item is clicked",
+      action: 'clicked',
+      description: 'Callback when nav item is clicked',
     },
     onChevronClick: {
-      action: "chevron clicked",
-      description: "Callback when chevron icon is clicked (only applies if isExpandable is true)",
+      action: 'chevron clicked',
+      description: 'Callback when chevron icon is clicked (only applies if isExpandable is true)',
     },
     className: {
-      control: "text",
-      description: "Additional CSS classes to apply",
+      control: 'text',
+      description: 'Additional CSS classes to apply',
     },
     isActive: {
-      control: "boolean",
-      description: "Whether the nav item is currently active/selected",
+      control: 'boolean',
+      description: 'Whether the nav item is currently active/selected',
     },
     isExpandable: {
-      control: "boolean",
-      description: "Whether the nav item can be expanded (shows chevron icon)",
+      control: 'boolean',
+      description: 'Whether the nav item can be expanded (shows chevron icon)',
     },
     isExpanded: {
-      control: "boolean",
-      description: "Whether the nav item is currently expanded (only applies if isExpandable is true)",
+      control: 'boolean',
+      description: 'Whether the nav item is currently expanded (only applies if isExpandable is true)',
     },
     isSubItem: {
-      control: "boolean",
-      description: "Whether this is a sub-item (applies additional left padding)",
+      control: 'boolean',
+      description: 'Whether this is a sub-item (applies additional left padding)',
     },
     isExternal: {
-      control: "boolean",
-      description: "Whether this links to an external resource (shows external link indicator)",
+      control: 'boolean',
+      description: 'Whether this links to an external resource (shows external link indicator)',
     },
   },
 } satisfies Meta<typeof NavMenuItem>;
@@ -66,14 +66,14 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    label: "Configuration",
+    label: 'Configuration',
     icon: <Settings />,
   },
 };
 
 export const Active: Story = {
   args: {
-    label: "Configuration",
+    label: 'Configuration',
     icon: <Settings />,
     isActive: true,
   },
@@ -81,20 +81,20 @@ export const Active: Story = {
 
 export const WithReactIcon: Story = {
   args: {
-    label: "Settings",
+    label: 'Settings',
     icon: <Settings />,
   },
 };
 
 export const WithoutIcon: Story = {
   args: {
-    label: "Text Only Item",
+    label: 'Text Only Item',
   },
 };
 
 export const Expandable: Story = {
   args: {
-    label: "Resources",
+    label: 'Resources',
     icon: <ChevronRight />,
     isExpandable: true,
     isExpanded: false,
@@ -103,7 +103,7 @@ export const Expandable: Story = {
 
 export const ExpandableExpanded: Story = {
   args: {
-    label: "Resources",
+    label: 'Resources',
     icon: <ChevronRight />,
     isExpandable: true,
     isExpanded: true,
@@ -112,7 +112,7 @@ export const ExpandableExpanded: Story = {
 
 export const SubItem: Story = {
   args: {
-    label: "Sub Item",
+    label: 'Sub Item',
     icon: <FileCheck />,
     isSubItem: true,
   },
@@ -120,7 +120,7 @@ export const SubItem: Story = {
 
 export const ExternalLink: Story = {
   args: {
-    label: "Resources",
+    label: 'Resources',
     icon: <Settings />,
     isExternal: true,
   },
@@ -128,7 +128,7 @@ export const ExternalLink: Story = {
 
 export const ExternalLinkActive: Story = {
   args: {
-    label: "Resources",
+    label: 'Resources',
     icon: <Settings />,
     isExternal: true,
     isActive: true,

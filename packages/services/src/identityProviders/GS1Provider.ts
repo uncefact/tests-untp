@@ -6,7 +6,7 @@ export enum GS1ServiceEnum {
   certificationInfo = 'voc/certificationInfo',
   verificationService = 'voc/verificationService',
   serviceInfo = 'voc/serviceInfo',
-  sustainabilityInfo = 'voc/sustainabilityInfo'
+  sustainabilityInfo = 'voc/sustainabilityInfo',
 }
 
 export class GS1Provider implements IdentityProviderStrategy {

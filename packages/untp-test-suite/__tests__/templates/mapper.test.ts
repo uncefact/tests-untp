@@ -187,8 +187,8 @@ describe('templateMapper', () => {
     const finalReportTestSuiteResult = {
       ...testSuiteResult,
       finalStatus: 'PASS',
-      finalMessage: 'Your credentials are UNTP compliant 🎉'
-    }
+      finalMessage: 'Your credentials are UNTP compliant 🎉',
+    };
 
     const mappedJsonString = await templateMapper('finalReport', finalReportTestSuiteResult);
 

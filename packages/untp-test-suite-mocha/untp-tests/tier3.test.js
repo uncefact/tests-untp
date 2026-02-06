@@ -9,7 +9,7 @@ registerUNTPTestSuite((credentialState) => {
   let n3store;
 
   describe('Tier 3 - UNTP RDF Validation tag:tier3 tag:untp', () => {
-    before(async function() {
+    before(async function () {
       this.timeout(5000); // Standard timeout for setup
       n3store = untpTestSuite.createN3Store(); // Initialize n3store once per suite run
     });
@@ -29,11 +29,11 @@ registerUNTPTestSuite((credentialState) => {
         await expect(credential).to.be.a.validRDFDocument;
         // Pass the initialized n3store to storeQuads
         await untpTestSuite.storeQuads(credential, filePath, n3store);
-      }).timeout(30000)  // Increased timeout: Retrieving context over network takes long time
-    })
+      }).timeout(30000); // Increased timeout: Retrieving context over network takes long time
+    });
 
     describe('Verifications', () => {
-      before(async function() {
+      before(async function () {
         this.timeout(35000); // Allow extra time for inferences
         // Call runInferences with the n3store
         const inferenceSuccess = await untpTestSuite.runInferences(n3store);
@@ -52,17 +52,24 @@ registerUNTPTestSuite((credentialState) => {
           const unattestedIssuers = await untpTestSuite.getUnattestedIssuersForProduct(
             product.dppId,
             n3store,
-            untpTestSuite.trustedDIDs
+            untpTestSuite.trustedDIDs,
           );
           expect(unattestedIssuers, `Product \"${product.name}\": all issuers should be attested`).to.be.empty;
 
           for (const claim of product.claims) {
             const claimTopic = claim.topic.split('/').at(-1);
-            expect(claim.verified, `Product \"${product.name}\", Claim \"${claimTopic}\": should be verified`).to.be.true;
-            expect(claim.criteria.length, `Product \"${product.name}\", Claim \"${claimTopic}\": should have at least one criterion`).to.be.above(0);
+            expect(claim.verified, `Product \"${product.name}\", Claim \"${claimTopic}\": should be verified`).to.be
+              .true;
+            expect(
+              claim.criteria.length,
+              `Product \"${product.name}\", Claim \"${claimTopic}\": should have at least one criterion`,
+            ).to.be.above(0);
 
             for (const [index, criterion] of claim.criteria.entries()) {
-              expect(criterion.verifierName, `Product \"${product.name}\", Claim \"${claimTopic}\", Criterion \"${criterion.name}\": should be verified in Digital Conformity Credential`).to.not.be.undefined;
+              expect(
+                criterion.verifierName,
+                `Product \"${product.name}\", Claim \"${claimTopic}\", Criterion \"${criterion.name}\": should be verified in Digital Conformity Credential`,
+              ).to.not.be.undefined;
             }
           }
         }

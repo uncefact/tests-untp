@@ -94,12 +94,7 @@
     "rimraf": "^5.0.5"
   },
   "lint-staged": {
-    "packages/**/*.{js,jsx,ts,tsx}": [
-      "prettier --write",
-      "eslint --fix --max-warnings=0"
-    ],
-    "packages/**/*.{json,css,scss,md}": [
-      "prettier --write"
-    ]
+    "*.{js,jsx,ts,tsx}": "eslint",
+    "*.{js,jsx,ts,tsx,json,css,md,yml,yaml}": "prettier --write"
   }
 }

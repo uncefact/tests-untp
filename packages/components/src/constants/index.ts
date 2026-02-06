@@ -1,1 +1,1 @@
-export * from './conformityCredential.js'
+export * from './conformityCredential.js';

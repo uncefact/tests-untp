@@ -47,10 +47,7 @@
       "certificateID": "https://example.com/certificates/789",
       "referenceStandard": "https://abvtex.org.br/v4.0",
       "evidenceURL": "https://example.com/evidence/789.pdf",
-      "criteriaList": [
-        "https://example.com/criteria/001",
-        "https://example.com/criteria/002"
-      ],
+      "criteriaList": ["https://example.com/criteria/001", "https://example.com/criteria/002"],
       "assessmentLevel": "independent-certifier",
       "responsibleAgency": {
         "partyID": "https://example.com/parties/certifying-body",

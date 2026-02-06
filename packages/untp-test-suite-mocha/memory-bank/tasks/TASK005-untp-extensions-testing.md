@@ -7,18 +7,22 @@
 **Updated:** 2025-07-31
 
 ## Original Request
+
 Add a new task to test UNTP extensions, including supporting configurable custom schemas for a credential extension.
 
 ## Thought Process
+
 The UNTP test suite needs to be extensible to support custom credential types beyond the core UNTP credential types (DPP, DCC, DFR, DIA, DTE). Organizations may create their own credential extensions that build upon UNTP foundations but have additional or modified schema requirements.
 
 ### Current State Analysis
+
 - **Core UNTP Support**: The test suite currently supports all standard UNTP credential types
 - **Schema Detection**: `getUNTPCredentialType()` and `getUNTPSchemaUrlForCredential()` work for standard types
 - **Hardcoded Logic**: Schema URLs are generated using hardcoded patterns for core UNTP types
 - **Extension Gap**: No mechanism to configure custom credential types or schemas
 
 ### Extension Requirements
+
 From the project brief, the library should support extension testing by allowing users to specify additional directories containing Mocha tests. However, we also need:
 
 1. **Custom Schema Configuration**: Ability to map custom credential types to their schema URLs
@@ -27,6 +31,7 @@ From the project brief, the library should support extension testing by allowing
 4. **Extension Test Integration**: Seamless integration with existing test infrastructure
 
 ### Design Considerations
+
 - **Configuration Format**: JSON/YAML config file or programmatic API
 - **Schema Mapping**: Type → Schema URL mapping with version support
 - **Backward Compatibility**: Core UNTP functionality should remain unchanged
@@ -34,6 +39,7 @@ From the project brief, the library should support extension testing by allowing
 - **Validation Logic**: Same validation infrastructure (AJV, Chai assertions)
 
 ## Implementation Plan
+
 - Design configuration format for custom credential types and schemas
 - Decide whether `getUNTPCredentialType()` should be extended to support configurable custom types (not convinced)
 - Extend `getUNTPSchemaUrlForCredential()` to use configurable schema mappings, or a separate function for extensions of UNTP credentials.
@@ -50,25 +56,29 @@ From the project brief, the library should support extension testing by allowing
 **Overall Status:** Completed - 100%
 
 ### Task Metadata
+
 - **Priority Level:** Medium - Important for ecosystem extensibility
 - **Tags:** extensions, custom-schemas, configuration, testing, untp
 - **Dependencies:** TASK004 (core UNTP validation working)
 - **Estimated Effort:** 4-6 days
 
 ### Subtasks
-| ID | Description | Status | Updated | Notes |
-|----|-------------|--------|---------|-------|
-| 5.1 | Design extension configuration format | Complete | 2025-07-30 | Created `untp-schema-mappings.json` with flexible JSON schema-based format |
-| 5.2 | Extend credential type detection for custom types | Not Started | 2025-07-30 | Make getUNTPCredentialType() configurable |
-| 5.3 | Extend schema URL resolution for custom schemas | Complete | 2025-07-30 | Implemented `getSchemaUrlForCredential()` with configurable mappings |
-| 5.4 | Add configuration loading mechanism | Complete | 2025-07-30 | Created `SchemaMappingsManager` with browser/Node.js support |
-| 5.5 | Add CLI support for extension configuration | Complete | 2025-07-30 | Added --extension-schema-map CLI option |
-| 5.6 | Create example extension and documentation | Complete | 2025-07-30 | Created DigitalLivestockPassport example with full test integration |
-| 5.7 | Add browser support for extension configuration | Complete | 2025-07-31 | Runtime configuration in browser environment |
-| 5.8 | Test with real extension scenarios | Complete | 2025-07-30 | Successfully tested DigitalLivestockPassport with extension validation |
+
+| ID  | Description                                       | Status      | Updated    | Notes                                                                      |
+| --- | ------------------------------------------------- | ----------- | ---------- | -------------------------------------------------------------------------- |
+| 5.1 | Design extension configuration format             | Complete    | 2025-07-30 | Created `untp-schema-mappings.json` with flexible JSON schema-based format |
+| 5.2 | Extend credential type detection for custom types | Not Started | 2025-07-30 | Make getUNTPCredentialType() configurable                                  |
+| 5.3 | Extend schema URL resolution for custom schemas   | Complete    | 2025-07-30 | Implemented `getSchemaUrlForCredential()` with configurable mappings       |
+| 5.4 | Add configuration loading mechanism               | Complete    | 2025-07-30 | Created `SchemaMappingsManager` with browser/Node.js support               |
+| 5.5 | Add CLI support for extension configuration       | Complete    | 2025-07-30 | Added --extension-schema-map CLI option                                    |
+| 5.6 | Create example extension and documentation        | Complete    | 2025-07-30 | Created DigitalLivestockPassport example with full test integration        |
+| 5.7 | Add browser support for extension configuration   | Complete    | 2025-07-31 | Runtime configuration in browser environment                               |
+| 5.8 | Test with real extension scenarios                | Complete    | 2025-07-30 | Successfully tested DigitalLivestockPassport with extension validation     |
 
 ## Progress Log
+
 ### 2025-07-29
+
 - Task created to support UNTP credential extensions
 - Need to design configuration format that supports custom credential types
 - Should leverage existing validation infrastructure while adding configurability
@@ -83,6 +93,7 @@ From the project brief, the library should support extension testing by allowing
 - **Browser embedding**: Default mappings embedded in browser bundle for offline operation
 
 ### 2025-07-31
+
 - **Completed subtask 5.7**: Successfully implemented browser support for extension configuration
 - **Added browser UI**: Created collapsible file upload section for extension schema mapping files
 - **Fixed critical AJV issue**: Discovered and resolved that CLI was using regular AJV instead of ajv/dist/2020, causing prefixItems validation to fail silently
@@ -93,6 +104,7 @@ From the project brief, the library should support extension testing by allowing
 - **Task completed**: All subtasks for TASK005 are now complete, extension testing support is fully implemented
 
 ### 2025-07-30
+
 - **Completed subtask 5.5 - CLI extension support**: Added `--extension-schema-map` option to CLI for loading external schema mappings
 - **Updated UNTPTestRunner**: Modified to load extension schema mappings before test execution
 - **Enhanced schema resolution**: Updated global `getSchemaUrlForCredential` to use configured schema manager when available
@@ -115,6 +127,7 @@ From the project brief, the library should support extension testing by allowing
 - **Organized example structure**: Added extensions directory structure for future extension examples
 
 ## Success Criteria
+
 - **Configuration Format**: Clear, documented format for specifying custom credential types and schemas
 - **API Consistency**: Extensions use same clean API as core UNTP types
 - **CLI Integration**: `untp-test --config extensions.json credentials/` works seamlessly
@@ -125,6 +138,7 @@ From the project brief, the library should support extension testing by allowing
 - **Validation**: Extension configuration validated to prevent misconfigurations
 
 ## Related Resources
+
 - UNTP specification for extension guidelines
 - Existing `getUNTPCredentialType()` and `getUNTPSchemaUrlForCredential()` functions
 - Current test architecture and tag system
@@ -133,6 +147,7 @@ From the project brief, the library should support extension testing by allowing
 ## Configuration Design Ideas
 
 ### Example Extension Configuration Format
+
 ```json
 {
   "extensions": {
@@ -145,14 +160,13 @@ From the project brief, the library should support extension testing by allowing
         "description": "Custom Digital Product Passport extension"
       }
     ],
-    "testDirectories": [
-      "./extensions/tests/"
-    ]
+    "testDirectories": ["./extensions/tests/"]
   }
 }
 ```
 
 ### Programmatic API Example
+
 ```javascript
 const { configureExtensions } = require('untp-test-suite-mocha');
 
@@ -161,8 +175,8 @@ configureExtensions({
     {
       name: 'CustomConformityCredential',
       schemaUrl: 'https://company.com/schema/custom-cc-v1.json',
-      typeDetection: (credential) => credential.type?.includes('CustomConformityCredential')
-    }
-  ]
+      typeDetection: (credential) => credential.type?.includes('CustomConformityCredential'),
+    },
+  ],
 });
 ```

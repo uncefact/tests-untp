@@ -50,11 +50,11 @@ export async function validateContext(credential: Record<string, any>): Promise<
             instancePath: '@context',
             params: {
               conflictingProperty: checkSyntaxErrorResult.term,
-            }
+            },
           },
-        }
+        };
       }
-  
+
       const checkInvalidContextResult = checkInvalidContext(error);
       if (!checkInvalidContextResult.valid) {
         return {
@@ -66,7 +66,7 @@ export async function validateContext(credential: Record<string, any>): Promise<
           },
         };
       }
-  
+
       const checkInvalidPropertiesResult = await checkInvalidProperties(error, credential);
       if (!checkInvalidPropertiesResult.valid) {
         return {
@@ -76,7 +76,7 @@ export async function validateContext(credential: Record<string, any>): Promise<
             message: checkInvalidPropertiesResult.errorMessage as string,
             instancePath: checkInvalidPropertiesResult.invalidValues as string,
           },
-        }
+        };
       }
     } catch (error) {
       console.log('Context validation error:', error);
@@ -89,7 +89,7 @@ export async function validateContext(credential: Record<string, any>): Promise<
         message: 'Failed to validate context in credential',
         instancePath: '',
       },
-    }
+    };
   }
 }
 
@@ -107,46 +107,48 @@ export function validateRequiredFields(credential: Record<string, any>): Validat
   return { valid: true, errorMessage: '' };
 }
 
-export function checkSyntaxError(error: { name: string, [key: string]: any }): ValidationError {
+export function checkSyntaxError(error: { name: string; [key: string]: any }): ValidationError {
   // Check invalid JSON-LD syntax; tried to redefine a protected term.
   if (!error || error.name !== 'jsonld.SyntaxError') {
     return { valid: true };
   }
 
   if (error?.details?.term) {
-    return { 
+    return {
       keyword: 'conflictingProperties',
       valid: false,
       term: error?.details?.term,
-      errorMessage: `Invalid JSON-LD syntax: ${error?.details?.code}. "${error?.details?.term}" is a protected term.`
+      errorMessage: `Invalid JSON-LD syntax: ${error?.details?.code}. "${error?.details?.term}" is a protected term.`,
     };
   }
 
   if (error?.details?.context) {
-    return { 
+    return {
       keyword: 'const',
       valid: false,
       term: '@context',
-      errorMessage: `${error.message} Context: ${JSON.stringify(error.details.context)}`
+      errorMessage: `${error.message} Context: ${JSON.stringify(error.details.context)}`,
     };
   }
 
-  return { 
+  return {
     keyword: 'const',
     valid: false,
     term: 'unknown',
-    errorMessage: error.message
+    errorMessage: error.message,
   };
 }
 
-export function checkInvalidContext(error: { name: string, [key: string]: any }): ValidationError {
+export function checkInvalidContext(error: { name: string; [key: string]: any }): ValidationError {
   // Check if the context URL is invalid
   if (error && error.name === 'jsonld.InvalidUrl') {
     const invalidContextUrl = error?.url || error?.details?.url;
     return {
       valid: false,
       invalidContextUrl: invalidContextUrl || 'unknown',
-      errorMessage: invalidContextUrl ? `Invalid URL: "${invalidContextUrl}". Failed to resolve context url.` : 'Failed to resolve context url.'
+      errorMessage: invalidContextUrl
+        ? `Invalid URL: "${invalidContextUrl}". Failed to resolve context url.`
+        : 'Failed to resolve context url.',
     };
   }
 
@@ -154,9 +156,9 @@ export function checkInvalidContext(error: { name: string, [key: string]: any })
 }
 
 export async function checkInvalidProperties(
-  error: { name: string, [key: string]: any },
-  credential: Record<string, any>
-): Promise<{ valid: boolean, invalidValues?: string, errorMessage?: string }> {
+  error: { name: string; [key: string]: any },
+  credential: Record<string, any>,
+): Promise<{ valid: boolean; invalidValues?: string; errorMessage?: string }> {
   // Check if properties in the credential are invalid
   if (error && error.name === 'jsonld.ValidationError') {
     // Expand the credential and compact it to validate the properties
@@ -167,10 +169,12 @@ export async function checkInvalidProperties(
     const droppedProperties = getDroppedProperties(credential, compacted);
     const invalidPropertiesString = droppedProperties.join(', ');
 
-    return { 
+    return {
       valid: false,
       invalidValues: invalidPropertiesString || 'unknown',
-      errorMessage: invalidPropertiesString ? `Properties "${invalidPropertiesString}" are defined in the credential but missing from the context.` : 'Failed to validate properties in the credential.'
+      errorMessage: invalidPropertiesString
+        ? `Properties "${invalidPropertiesString}" are defined in the credential but missing from the context.`
+        : 'Failed to validate properties in the credential.',
     };
   }
 
@@ -178,7 +182,11 @@ export async function checkInvalidProperties(
 }
 
 // Get the dropped properties from the original object
-export function getDroppedProperties(originalObject: Record<string, any>, compactedObject: Record<string, any>, excludeField = '@context'): string[] {
+export function getDroppedProperties(
+  originalObject: Record<string, any>,
+  compactedObject: Record<string, any>,
+  excludeField = '@context',
+): string[] {
   let uniqueKeys: string[] = [];
 
   // Recursively find unique keys in the original object
