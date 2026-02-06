@@ -9,7 +9,7 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 ## Description
 
-The `LocalStorage` object provides configuration for managing local storage within the Mock App system. It specifies how data should be stored and retrieved from the browser's local storage.
+The `LocalStorage` object provides configuration for managing local storage within the Reference implementation system. It specifies how data should be stored and retrieved from the browser's local storage.
 
 ## Example
 

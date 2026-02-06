@@ -7,9 +7,9 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 <Disclaimer />
 
-General Features define a shared set of functionalities accessible by all Mock Apps within the Mock App system.
+General Features define a shared set of functionalities accessible by all Reference implementations within the Reference implementation system.
 
-The Mock App system can include multiple General Features, each containing various features that perform distinct functions. Each General Feature is housed on a single page within the Mock App system, accessible via the sidebar menu.
+The Reference implementation system can include multiple General Features, each containing various features that perform distinct functions. Each General Feature is housed on a single page within the Reference implementation system, accessible via the sidebar menu.
 
 Implementers can customise each General Feature page with branding elements, such as logos, colours and a title.
 

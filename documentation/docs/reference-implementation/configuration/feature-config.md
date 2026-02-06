@@ -7,7 +7,7 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 <Disclaimer />
 
-Features are the building blocks of functionality within the Mock App system. Each feature is comprised of components and services which are used to compose the business logic and orchestrate services.
+Features are the building blocks of functionality within the Reference Implementation system. Each feature is comprised of components and services which are used to compose the business logic and orchestrate services.
 
 Features encapsulate specific functionalities or processes within an app or general feature.
 
@@ -36,7 +36,7 @@ graph TD
 <!-- TODO: What is id used for -->
 | Property   | Required | Description                                    | Type   |
 | ---------- | -------- | ---------------------------------------------- | ------ |
-| name       | Yes      | The name of the feature (Displayed on buttons to access the feature within the respective mock app and used to construct the path to the feature)                       | String |
+| name       | Yes      | The name of the feature (Displayed on buttons to access the feature within the respective reference implementation and used to construct the path to the feature)                       | String |
 | id         | Yes      | The id of the feature                          | String |
 | components | Yes      | A collection of components used in the feature | [Component](/docs/reference-implementation/configuration/component-config)[]  |
 | services   | Yes      | A collection of services used in the feature   | [Service](/docs/reference-implementation/configuration/service-config)[]  |

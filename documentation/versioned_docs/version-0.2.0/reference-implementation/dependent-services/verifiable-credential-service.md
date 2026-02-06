@@ -18,7 +18,7 @@ It provides the following functionality:
 
 To learn more about why UNTP leverages verifiable credentials, refer to the [Verifiable Credentials documentation](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials) within the UNTP Spec.
 
-For the Mock Apps, we recommend and will be using the UN's Verifiable Credential reference implementation called [VCKit](https://github.com/uncefact/project-vckit).
+For the Reference implementations, we recommend and will be using the UN's Verifiable Credential reference implementation called [VCKit](https://github.com/uncefact/project-vckit).
 
 ### Setup Options
 
@@ -27,7 +27,7 @@ For the Mock Apps, we recommend and will be using the UN's Verifiable Credential
 If you've chosen to use the Docker Compose setup as described in the [Dependent Services](/docs/reference-implementation/dependent-services/) section, most of the configuration is already done for you. In this case, you only need to:
 
 1. Create an identifier (did:web) within the Verifiable Credential Service.
-2. Record this identifier for use in the mock app configuration.
+2. Record this identifier for use in the reference implementation configuration.
 
 #### Option 2: Manual Setup
 
@@ -39,13 +39,13 @@ Please go through the VCKit documentation available [here](https://uncefact.gith
 
 ### Requirements
 
-To use the Verifiable Credential Service with the mock apps, you will need:
+To use the Verifiable Credential Service with the reference implementations, you will need:
 1. The VCKit API running.
 2. An [Identifier](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials/#did-methods) (did:web) created and recorded for each actor in the value chain you would like to model.
 3. The address of the VCKit API (e.g. http://localhost:3332/v2)
 4. The API key of the VCkit API (if applicable)
 
-Make sure you have these components set up and running, and note the API address, API key and Identifiers before proceeding with the mock app configuration.
+Make sure you have these components set up and running, and note the API address, API key and Identifiers before proceeding with the reference implementation configuration.
 
 ### Creating an Identifier (did:web)
 

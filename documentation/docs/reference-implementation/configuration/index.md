@@ -7,7 +7,7 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 <Disclaimer />
 
-The Mock Apps config file is used to define the system level config, the apps within the mock app system, the apps functions and the connection to the external services.
+The Reference Implementations config file is used to define the system level config, the apps within the reference implementation system, the apps functions and the connection to the external services.
 
 ## Example Configuration
 
@@ -32,9 +32,9 @@ For example:
 }
 ```
 
-## Mock App Configuration File Lifecycle
+## Reference Implementation Configuration File Lifecycle
 
-The Mock App system can be tailored to model different value chains using a configuration file. This section explains the lifecycle of this configuration file and how to apply changes.
+The Reference Implementation system can be tailored to model different value chains using a configuration file. This section explains the lifecycle of this configuration file and how to apply changes.
 
 ### Location of the Configuration File
 
@@ -47,15 +47,15 @@ cd tests-untp
 ### Modifying the Configuration File
 
 1. Open the `app-config.json` file.
-2. Make the necessary modifications to tailor the Mock App system to your desired value chain.
+2. Make the necessary modifications to tailor the Reference Implementation system to your desired value chain.
 3. Save the changes to the file.
 
 ### Applying Configuration Changes
 
-For the modifications to take effect in the Mock Apps, follow these steps:
+For the modifications to take effect in the Reference Implementations, follow these steps:
 
-1. If the Mock App system is currently running, stop it.
-2. After saving the changes to `app-config.json`, restart the Mock App system using the following command:
+1. If the Reference Implementation system is currently running, stop it.
+2. After saving the changes to `app-config.json`, restart the Reference Implementation system using the following command:
 
 ```bash
 yarn start
@@ -63,6 +63,6 @@ yarn start
 
 ### Important Notes
 
-- Changes to the configuration file will not be reflected in the mock apps until you restart the Mock App system.
-- Always ensure you save the `app-config.json` file before restarting the Mock App system.
+- Changes to the configuration file will not be reflected in the reference implementation until you restart the Reference Implementation system.
+- Always ensure you save the `app-config.json` file before restarting the Reference Implementation system.
 - If you're using the Docker Compose setup, most service endpoints are pre-configured. You only need to update the `issuer` property in the `vckit` object and potentially the IDR service endpoint if you've changed it from the default.

@@ -14,7 +14,7 @@ Key functions of the Identity Resolver Service include:
 - Registering links of created credentials using the primary identifier of the product as the key.
 - Enabling downstream value chain actors to discover more information about products they have purchased or are considering purchasing.
 - Facilitating the connection between unique identifiers and more information about the product (e.g. [Digital Product Passports](https://uncefact.github.io/spec-untp/docs/specification/DigitalProductPassport), [Traceability Events](https://uncefact.github.io/spec-untp/docs/specification/DigitalTraceabilityEvents) and [Conformity Credentials](https://uncefact.github.io/spec-untp/docs/specification/ConformityCredential)).
-  For the Mock Apps, we currently recommend and will be using the [Pyx Identity Resolver v0.0.1](https://github.com/pyx-industries/pyx-identity-resolver/tree/v0.0.1).
+  For the Reference implementations, we currently recommend and will be using the [Pyx Identity Resolver v0.0.1](https://github.com/pyx-industries/pyx-identity-resolver/tree/v0.0.1).
 
 ### Identity Resolver Service Documentation
 
@@ -40,13 +40,13 @@ The IDR service enables:
 
 ### Requirements
 
-To use the Identity Resolver Service with the mock apps, you will need:
+To use the Identity Resolver Service with the reference implementations, you will need:
 
 1. The Identity Resolver Service API running.
 2. The address of the Identity Resolver Service API (e.g., http://localhost:8080).
 3. The API key of the Identity Resolver Service API (if applicable)
 
-Make sure you have the Identity Resolver Service API set up and running, and note its address and API key (if applicable) before proceeding with the mock app configuration.
+Make sure you have the Identity Resolver Service API set up and running, and note its address and API key (if applicable) before proceeding with the reference implementation configuration.
 
 ### Seed Script
 
@@ -118,4 +118,4 @@ Once this configuration is in place, start the container to automatically run th
 SEEDING=true docker-compose up -d
 ```
 
-In the next section, we will explore the mock app configuration file and how to customise it for your specific use case.
+In the next section, we will explore the reference implementation configuration file and how to customise it for your specific use case.

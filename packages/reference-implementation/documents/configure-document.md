@@ -1,11 +1,11 @@
 # Instruction
 
-The mock app is using some services such as [VCKit](https://github.com/uncefact/project-vckit), [digital link resolver](https://github.com/gs1/GS1_DigitalLink_Resolver_CE), and [storage service](../../storage-server/README.md) that need to be ran in the background. These services are recommended to use, in case you want to replace them with your own services, you can do so by modifying the configuration file.
+The reference implementation is using some services such as [VCKit](https://github.com/uncefact/project-vckit), [digital link resolver](https://github.com/gs1/GS1_DigitalLink_Resolver_CE), and [storage service](../../storage-server/README.md) that need to be ran in the background. These services are recommended to use, in case you want to replace them with your own services, you can do so by modifying the configuration file.
 The detail of running the services can be found in the README of each service.
 
 # Configuration file
 
-The configuration file of mock app has the following structure:
+The configuration file of reference implementation has the following structure:
 
 ```json
 {
@@ -105,7 +105,7 @@ The default verification service link configuration has the following structure:
 }
 ```
 
-# How to configure the mock app to demonstrate the working of your system
+# How to configure the reference implementation to demonstrate the working of your system
 
 First, you can copy the example configuration `packages/reference-implementation/src/constants/app-config.example.json` to `packages/reference-implementation/src/constants/app-config.json` and modify the configuration file.
 
@@ -361,7 +361,7 @@ Based on the example, you can define the features of the apps in the configurati
 
 ## The traceability events
 
-The traceability events are built as services in the `packages/services/src/epcisEvents` folder. The services integrate with the VCKit, digital link resolver, and storage service are configured in the configuration of the features in the app. You need to start the services before running the mock app.
+The traceability events are built as services in the `packages/services/src/epcisEvents` folder. The services integrate with the VCKit, digital link resolver, and storage service are configured in the configuration of the features in the app. You need to start the services before running the reference implementation.
 
 ## The conformity credentials request
 

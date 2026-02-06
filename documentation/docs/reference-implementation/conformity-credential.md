@@ -9,7 +9,7 @@ import Disclaimer from '.././\_disclaimer.mdx';
 
 ## Description
 
-This section outlines three methods for creating and using [Conformity Credentials](https://uncefact.github.io/spec-untp/docs/specification/ConformityCredential) within the Mock App system. Each method offers different levels of automation and integration with external services.
+This section outlines three methods for creating and using [Conformity Credentials](https://uncefact.github.io/spec-untp/docs/specification/ConformityCredential) within the Reference Implementation system. Each method offers different levels of automation and integration with external services.
 
 ### Manually Import Conformity Credential
 
@@ -127,11 +127,11 @@ Steps:
 }
 ```
 
-### Create Conformity Credential Within Mock App System
+### Create Conformity Credential Within Reference Implementation System
 
 **To Be Implemented**
 
-This method involves creating the conformity credential within the Mock App system by using a [feature](/docs/reference-implementation/configuration/feature-config) that is composed of the [JsonForm component](/docs/reference-implementation/components/json-form) and storing it in local storage or by using the Storage service.
+This method involves creating the conformity credential within the Reference Implementation system by using a [feature](/docs/reference-implementation/configuration/feature-config) that is composed of the [JsonForm component](/docs/reference-implementation/components/json-form) and storing it in local storage or by using the Storage service.
 
 ### Request Conformity Credential from External Service
 
@@ -322,10 +322,10 @@ The [Local Storage Loader component](/docs/reference-implementation/components/l
 
 ### Credential Import Process: Verify URL Construction
 
-In the mock app system, credentials imported from the local storage service return a URI, and optionally, a hash and key if encrypted. This URI is now used to construct the verify URL with the following format:
+In the reference implementation system, credentials imported from the local storage service return a URI, and optionally, a hash and key if encrypted. This URI is now used to construct the verify URL with the following format:
 
 ```bash
 {verify_app_address}?q={payload:{uri:{uri_of_credential}, key:{decryption_key}, hash:{hash_of_credential}}}
 ```
 
-The verify URL should include the URI, and if encryption exists, the hash and key. The verify URL directs to the "verify" page of the mock app.
+The verify URL should include the URI, and if encryption exists, the hash and key. The verify URL directs to the "verify" page of the reference implementation.

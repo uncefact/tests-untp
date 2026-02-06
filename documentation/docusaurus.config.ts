@@ -135,7 +135,7 @@ const config: Config = {
           title: 'Test Suites and Tools',
           items: [
             {
-              label: 'Mock Apps',
+              label: 'Reference Implementation',
               to: '/docs/reference-implementation/',
             },
             {

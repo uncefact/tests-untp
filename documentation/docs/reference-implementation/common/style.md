@@ -9,7 +9,7 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 <!-- TODO: Find out why we can't use the names of colours for primary colours -->
 
 ## Description
-The `Style` object allows for custom styling options for the overall system, individual mock apps and general features.
+The `Style` object allows for custom styling options for the overall system, individual reference implementation and general features.
 
 ## Example
 ```json
