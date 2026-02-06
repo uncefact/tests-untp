@@ -14,7 +14,7 @@ The repository includes a Reference Implementation and scripts for provisioning 
 
 * **Reference Implementation**: Acts as an orchestration layer with a UI, consuming APIs from dependent services to issue, store, retrieve, and verify UNTP credentials, such as Digital Product Passports (DPPs). The `app-config.json` file is used to configure the application at build time, determining its setup and the credentials it can issue.
 
-* **Dependent Services**: Essential for Reference Implementation functionality, managed via Docker Compose. These services are primarily pulled from external Docker images, except for the Documentation Site, UNTP Playground, and Seed Scripts, which are built locally. Further details about dependent service repositories are available in the [Dependent Services section](https://uncefact.github.io/tests-untp/docs/mock-apps/dependent-services/#additional-information) of the documentation website.
+* **Dependent Services**: Essential for Reference Implementation functionality, managed via Docker Compose. These services are primarily pulled from external Docker images, except for the Documentation Site, UNTP Playground, and Seed Scripts, which are built locally. Further details about dependent service repositories are available in the [Dependent Services section](https://uncefact.github.io/tests-untp/docs/reference-implementation/dependent-services/#additional-information) of the documentation website.
 
   * **Verifiable Credential Service (VCkit)**: Manages DIDs and issues, verifies, and revokes Verifiable Credentials.
   * **Storage Service**: Stores UNTP credentials.
@@ -205,7 +205,7 @@ yarn build
 yarn test
 yarn lint
 yarn storybook:components
-yarn storybook:mock-app
+yarn storybook:reference-implementation
 ```
 
 ## Release Management

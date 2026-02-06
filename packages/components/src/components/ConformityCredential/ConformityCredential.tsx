@@ -9,7 +9,7 @@ import {
   getJsonDataFromConformityAPI,
   uploadData,
   getValueByPath,
-} from '@mock-app/services';
+} from '@reference-implementation/services';
 
 import { checkStoredCredentialsConfig } from './utils.js';
 import { Status, ToastMessage, toastMessage } from '../ToastMessage/ToastMessage.js';

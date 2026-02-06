@@ -57,7 +57,7 @@ The verification process ensures that an uploaded UNTP credential complies with 
    - Verifying the credential's [Ed25519 signature](https://ed25519.cr.yp.to/) using the public key.
    - Checking the `validFrom` and `validUntil` properties to ensure the credential is within its validity period.
 
-   If the credential has been tampered with, the public key is incorrect, or it is outside the validity period, the test will fail. These checks are abstracted within a [verifiable credential service](/docs/mock-apps/dependent-services/verifiable-credential-service.md) and exposed via an API endpoint (e.g., `http://localhost:3332/agent/routeVerificationCredential`).
+   If the credential has been tampered with, the public key is incorrect, or it is outside the validity period, the test will fail. These checks are abstracted within a [verifiable credential service](/docs/reference-implementation/dependent-services/verifiable-credential-service.md) and exposed via an API endpoint (e.g., `http://localhost:3332/agent/routeVerificationCredential`).
 
 3. **Validate Schema Conformance**  
    Ensure the decoded credential adheres to the [VCDM v2 schema](https://w3c.github.io/vc-data-model/schema/verifiable-credential/verifiable-credential-schema.json), verifying correct data types, required properties, and structural integrity.
@@ -70,7 +70,7 @@ The verification process ensures that an uploaded UNTP credential complies with 
    - The expansion process completes without errors.
 
 5. **Check Credential Status**  
-   Verify the credential's status (e.g., active, revoked) using the value of `credentialStatus` within the credential, if present, ensuring the status method complies with the UNTP specification's permitted [BitstringStatusListEntry](https://www.w3.org/TR/vc-bitstring-status-list/) and that the credential has not been revoked. This process is abstracted behind an API endpoint of the [verifiable credential service](/docs/mock-apps/dependent-services/verifiable-credential-service.md) (e.g., `http://localhost:3332/agent/routeVerificationCredential`).
+   Verify the credential's status (e.g., active, revoked) using the value of `credentialStatus` within the credential, if present, ensuring the status method complies with the UNTP specification's permitted [BitstringStatusListEntry](https://www.w3.org/TR/vc-bitstring-status-list/) and that the credential has not been revoked. This process is abstracted behind an API endpoint of the [verifiable credential service](/docs/reference-implementation/dependent-services/verifiable-credential-service.md) (e.g., `http://localhost:3332/agent/routeVerificationCredential`).
 
 ## Verifying Your Implementation
 

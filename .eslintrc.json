@@ -4,7 +4,7 @@
   "ignorePatterns": [
     "documentation",
     "e2e",
-    "packages/mock-app/**"
+    "packages/reference-implementation/**"
   ],
   "plugins": [
     "@typescript-eslint",

@@ -19,7 +19,7 @@ export interface IDynamicComponentRendererProps {
 }
 
 /**
- * Dynamic component renderer that will render a component is defined in the components package @mock-app/components to allow for dynamic loading of components
+ * Dynamic component renderer that will render a component is defined in the components package @reference-implementation/components to allow for dynamic loading of components
  * @param DynamicComponentProps
  * @returns React.FC
  */

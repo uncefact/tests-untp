@@ -8825,7 +8825,7 @@
     eslint-scope "^5.1.1"
     semver "^7.3.7"
 
-"@typescript-eslint/utils@8.54.0", "@typescript-eslint/utils@^8.48.0":
+"@typescript-eslint/utils@8.54.0":
   version "8.54.0"
   resolved "https://registry.yarnpkg.com/@typescript-eslint/utils/-/utils-8.54.0.tgz#c79a4bcbeebb4f571278c0183ed1cb601d84c6c8"
   integrity sha512-9Cnda8GS57AQakvRyG0PTejJNlA2xhvyNtEVIMlDWOOeEyBkYWhGPnfrIAnqxLMTSTo6q8g12XVjjev5l1NvMA==
@@ -12828,13 +12828,6 @@ eslint-plugin-react@^7.27.1, eslint-plugin-react@^7.35.0, eslint-plugin-react@^7
     semver "^6.3.1"
     string.prototype.matchall "^4.0.12"
     string.prototype.repeat "^1.0.0"
-
-eslint-plugin-storybook@^10.0.2:
-  version "10.2.3"
-  resolved "https://registry.yarnpkg.com/eslint-plugin-storybook/-/eslint-plugin-storybook-10.2.3.tgz#f0e37f7f9efe4269dfe9d08a1718de68edac8ff0"
-  integrity sha512-5wy+OKe6VexZecAedroKv+GR+agciZqK/Su7cdo6b1mICWaWwejU/XjjTLL9zr6wiEjCN/0mhYg7yz70DoaMQQ==
-  dependencies:
-    "@typescript-eslint/utils" "^8.48.0"
 
 eslint-plugin-testing-library@^5.0.1:
   version "5.11.1"

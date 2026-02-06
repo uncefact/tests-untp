@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ConformityCredential } from '../components';
 import { FetchOptions } from '../types/conformityCredential.types';
-import { getJsonDataFromConformityAPI, uploadData, getValueByPath } from '@mock-app/services';
+import { getJsonDataFromConformityAPI, uploadData, getValueByPath } from '@reference-implementation/services';
 import { checkStoredCredentialsConfig } from '../components/ConformityCredential/utils';
 
-jest.mock('@mock-app/services', () => ({
+jest.mock('@reference-implementation/services', () => ({
   uploadData: jest.fn(),
   generateUUID: jest.fn(),
   getJsonDataFromConformityAPI: jest.fn(),

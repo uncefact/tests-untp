@@ -1,4 +1,4 @@
-# Mock app components
+# Reference Implementation components
 
 A collection of reusable React components for general-purpose use.
 
