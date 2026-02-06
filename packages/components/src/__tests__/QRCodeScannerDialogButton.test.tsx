@@ -206,12 +206,7 @@ describe('QRCodeScannerDialogButton, when type is VerifiableCredential', () => {
     }));
 
     publicAPI.get = jest.fn().mockResolvedValue(result);
-    render(
-      <QRCodeScannerDialogButton
-        type={ImportDataType.VerifiableCredential}
-        onChange={onChange}
-      />,
-    );
+    render(<QRCodeScannerDialogButton type={ImportDataType.VerifiableCredential} onChange={onChange} />);
 
     const scanButton = getByText(document.body, 'ScanQR');
     fireEvent.click(scanButton);

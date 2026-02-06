@@ -1,7 +1,7 @@
 /**
  * This function is used to find the value of a key in a nested object.
  * Recursively searches for the target key.
- * @param data 
+ * @param data
  * @param parameters targetKey: string
  * @returns any | undefined
  */
@@ -28,7 +28,10 @@ console.log(findFirstMatchingKeyValue(nestedObject, "g")); // Output: "world"
 console.log(findFirstMatchingKeyValue(nestedObject, "z")); // Output: undefined
 */
 
-export function findFirstMatchingKeyValue(data: Record<string, any>, parameters: { targetKey: string } ): any | undefined {
+export function findFirstMatchingKeyValue(
+  data: Record<string, any>,
+  parameters: { targetKey: string },
+): any | undefined {
   if (!data || !parameters?.targetKey) {
     return undefined;
   }
@@ -38,11 +41,11 @@ export function findFirstMatchingKeyValue(data: Record<string, any>, parameters:
       return data[key];
     }
 
-    if (typeof data[key] === "object" && data[key] !== null) {
+    if (typeof data[key] === 'object' && data[key] !== null) {
       // Recursively search for the target key
       const result = findFirstMatchingKeyValue(data[key], { targetKey: parameters.targetKey });
       if (result !== undefined) {
-          return result;
+        return result;
       }
     }
   }

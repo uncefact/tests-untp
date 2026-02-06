@@ -28,8 +28,11 @@ jobs:
         run: |
           yarn cache clean && yarn install --immutable
 
+      - name: Check formatting
+        run: yarn format:check
+
       - name: Check linting
-        run: yarn build && yarn lint
+        run: yarn build && yarn lint:check
 
       - name: Build
         run: yarn build

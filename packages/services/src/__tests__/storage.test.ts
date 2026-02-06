@@ -102,8 +102,7 @@ describe('storage service', () => {
     try {
       await storageService({
         url: 'https://storage.com',
-        params: {
-        },
+        params: {},
         options: {
           //@ts-ignore
           method: 'GET', // invalid method

@@ -1,6 +1,6 @@
-import { cn } from "@/lib/utils";
-import { NavMenuItem, type NavMenuItemConfig } from "../nav-menu-item";
-import { useState, useEffect } from "react";
+import { cn } from '@/lib/utils';
+import { NavMenuItem, type NavMenuItemConfig } from '../nav-menu-item';
+import { useState, useEffect } from 'react';
 
 interface NavMenuProps {
   items: NavMenuItemConfig[];
@@ -23,13 +23,7 @@ interface NavMenuProps {
  * - nav-menu: Main container element
  *
  */
-export function NavMenu({
-  items,
-  selectedNavId,
-  onNavClick,
-  className,
-  autoCollapseInactive = true,
-}: NavMenuProps) {
+export function NavMenu({ items, selectedNavId, onNavClick, className, autoCollapseInactive = true }: NavMenuProps) {
   // Track which expandable items are expanded
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
@@ -38,9 +32,7 @@ export function NavMenu({
     if (selectedNavId) {
       items.forEach((item) => {
         if (item.subItems) {
-          const hasSelectedSubItem = item.subItems.some(
-            (subItem) => subItem.id === selectedNavId
-          );
+          const hasSelectedSubItem = item.subItems.some((subItem) => subItem.id === selectedNavId);
           if (hasSelectedSubItem) {
             setExpandedItems((prev) => new Set([...prev, item.id]));
           }
@@ -98,19 +90,13 @@ export function NavMenu({
   };
 
   return (
-    <div
-      className={cn(
-        "self-stretch flex flex-col justify-start items-start gap-2",
-        className
-      )}
-      data-testid="nav-menu"
-    >
+    <div className={cn('self-stretch flex flex-col justify-start items-start gap-2', className)} data-testid='nav-menu'>
       {items.map((item) => {
         const isExpanded = expandedItems.has(item.id);
         const isActive = selectedNavId === item.id;
 
         return (
-          <div key={item.id} className="w-full">
+          <div key={item.id} className='w-full'>
             <NavMenuItem
               label={item.label}
               icon={item.icon}

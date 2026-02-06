@@ -1,5 +1,5 @@
-import { Credential, Prisma } from "../generated";
-import { prisma } from "../prisma";
+import { Credential, Prisma } from '../generated';
+import { prisma } from '../prisma';
 
 /**
  * Input for creating a new credential record
@@ -25,9 +25,7 @@ export type ListCredentialsOptions = {
 /**
  * Creates a new credential record
  */
-export async function createCredential(
-  input: CreateCredentialInput
-): Promise<Credential> {
+export async function createCredential(input: CreateCredentialInput): Promise<Credential> {
   return prisma.credential.create({
     data: {
       storageUri: input.storageUri,
@@ -42,9 +40,7 @@ export async function createCredential(
 /**
  * Retrieves a credential by its ID
  */
-export async function getCredentialById(
-  id: string
-): Promise<Credential | null> {
+export async function getCredentialById(id: string): Promise<Credential | null> {
   return prisma.credential.findUnique({
     where: { id },
   });
@@ -53,9 +49,7 @@ export async function getCredentialById(
 /**
  * Lists credentials with optional filtering and pagination
  */
-export async function listCredentials(
-  options: ListCredentialsOptions = {}
-): Promise<Credential[]> {
+export async function listCredentials(options: ListCredentialsOptions = {}): Promise<Credential[]> {
   const { credentialType, isPublished, limit, offset } = options;
 
   const where: Prisma.CredentialWhereInput = {};
@@ -72,17 +66,14 @@ export async function listCredentials(
     where,
     take: limit,
     skip: offset,
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: 'desc' },
   });
 }
 
 /**
  * Updates the published status of a credential
  */
-export async function updateCredentialPublished(
-  id: string,
-  isPublished: boolean
-): Promise<Credential> {
+export async function updateCredentialPublished(id: string, isPublished: boolean): Promise<Credential> {
   return prisma.credential.update({
     where: { id },
     data: { isPublished },

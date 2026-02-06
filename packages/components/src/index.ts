@@ -11,4 +11,4 @@ export * from './components/CheckBoxList/CheckBoxList.js';
 export * from './hooks/index.js';
 export * from './lib/utils.js';
 export * from './constants/index.js';
-export * from './types/index.js'
+export * from './types/index.js';

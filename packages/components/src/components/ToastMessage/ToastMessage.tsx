@@ -7,13 +7,10 @@ export enum Status {
   error = 'error',
   warning = 'warning',
   info = 'info',
-};
+}
 
 // The function for displaying toast messages
-export function toastMessage({ status, message }: {
-  status: Status;
-  message: string;
-}): void {
+export function toastMessage({ status, message }: { status: Status; message: string }): void {
   toast[status](message, {
     position: 'top-right',
     hideProgressBar: true,

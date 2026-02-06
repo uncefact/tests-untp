@@ -10,11 +10,7 @@ const require = createRequire(import.meta.url);
 
 const config: StorybookConfig = {
   stories: ['../src/**/*.mdx', '../src/**/*.stories.@(js|jsx|mjs|ts|tsx)', '../stories/*.stories.@(js|jsx|mjs|ts|tsx)'],
-  addons: [
-    '@storybook/addon-docs',
-    '@storybook/addon-links',
-    '@storybook/addon-onboarding',
-  ],
+  addons: ['@storybook/addon-docs', '@storybook/addon-links', '@storybook/addon-onboarding'],
   framework: {
     name: '@storybook/react-webpack5',
     options: {},
@@ -32,7 +28,7 @@ const config: StorybookConfig = {
         ...config.resolve.alias,
         '@': path.resolve(__dirname, '../src'),
         // Ensure single React instance to prevent hook errors
-        'react': path.resolve(__dirname, '../node_modules/react'),
+        react: path.resolve(__dirname, '../node_modules/react'),
         'react-dom': path.resolve(__dirname, '../node_modules/react-dom'),
       };
 
@@ -76,9 +72,7 @@ const config: StorybookConfig = {
           loader: 'postcss-loader',
           options: {
             postcssOptions: {
-              plugins: [
-                '@tailwindcss/postcss',
-              ],
+              plugins: ['@tailwindcss/postcss'],
             },
           },
         },

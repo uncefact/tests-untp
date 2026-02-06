@@ -1,16 +1,16 @@
-import type { Meta, StoryObj } from "@storybook/react-webpack5";
-import { MoreOptions } from "./MoreOptions";
+import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import { MoreOptions } from './MoreOptions';
 
 const meta: Meta<typeof MoreOptions> = {
-  title: "Components/Utility/MoreOptions",
+  title: 'Components/Utility/MoreOptions',
   component: MoreOptions,
   parameters: {
-    layout: "centered",
+    layout: 'centered',
   },
   decorators: [
     (Story) => {
       return (
-        <div className="bg-background p-8">
+        <div className='bg-background p-8'>
           <Story />
         </div>
       );
@@ -29,16 +29,16 @@ export const Default: Story = {
       {
         options: [
           {
-            label: "Edit",
-            onClick: () => console.log("Edit clicked"),
+            label: 'Edit',
+            onClick: () => console.log('Edit clicked'),
           },
           {
-            label: "Duplicate",
-            onClick: () => console.log("Duplicate clicked"),
+            label: 'Duplicate',
+            onClick: () => console.log('Duplicate clicked'),
           },
           {
-            label: "Archive",
-            onClick: () => console.log("Archive clicked"),
+            label: 'Archive',
+            onClick: () => console.log('Archive clicked'),
           },
         ],
       },
@@ -53,24 +53,24 @@ export const MultipleGroups: Story = {
       {
         options: [
           {
-            label: "View details",
-            onClick: () => console.log("View details clicked"),
+            label: 'View details',
+            onClick: () => console.log('View details clicked'),
           },
           {
-            label: "Edit",
-            onClick: () => console.log("Edit clicked"),
+            label: 'Edit',
+            onClick: () => console.log('Edit clicked'),
           },
         ],
       },
       {
         options: [
           {
-            label: "Download",
-            onClick: () => console.log("Download clicked"),
+            label: 'Download',
+            onClick: () => console.log('Download clicked'),
           },
           {
-            label: "Share",
-            onClick: () => console.log("Share clicked"),
+            label: 'Share',
+            onClick: () => console.log('Share clicked'),
           },
         ],
       },
@@ -85,17 +85,17 @@ export const WithDisabledOption: Story = {
       {
         options: [
           {
-            label: "Edit",
-            onClick: () => console.log("Edit clicked"),
+            label: 'Edit',
+            onClick: () => console.log('Edit clicked'),
           },
           {
-            label: "Duplicate",
-            onClick: () => console.log("Duplicate clicked"),
+            label: 'Duplicate',
+            onClick: () => console.log('Duplicate clicked'),
             disabled: true,
           },
           {
-            label: "Archive",
-            onClick: () => console.log("Archive clicked"),
+            label: 'Archive',
+            onClick: () => console.log('Archive clicked'),
           },
         ],
       },
@@ -110,20 +110,20 @@ export const WithDestructiveAction: Story = {
       {
         options: [
           {
-            label: "Edit",
-            onClick: () => console.log("Edit clicked"),
+            label: 'Edit',
+            onClick: () => console.log('Edit clicked'),
           },
           {
-            label: "Duplicate",
-            onClick: () => console.log("Duplicate clicked"),
+            label: 'Duplicate',
+            onClick: () => console.log('Duplicate clicked'),
           },
         ],
       },
       {
         options: [
           {
-            label: "Delete",
-            onClick: () => console.log("Delete clicked"),
+            label: 'Delete',
+            onClick: () => console.log('Delete clicked'),
             destructive: true,
           },
         ],
@@ -140,43 +140,31 @@ export const WithIconAndText: Story = {
         options: [
           {
             label: (
-              <div className="flex items-center gap-2 text-foreground">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
+              <div className='flex items-center gap-2 text-foreground'>
+                <svg width='16' height='16' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>
                   <path
-                    d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
-                    fill="currentColor"
+                    d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'
+                    fill='currentColor'
                   />
                 </svg>
                 <span>Edit</span>
               </div>
             ),
-            onClick: () => console.log("Edit clicked"),
+            onClick: () => console.log('Edit clicked'),
           },
           {
             label: (
-              <div className="flex items-center gap-2 text-foreground">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
+              <div className='flex items-center gap-2 text-foreground'>
+                <svg width='16' height='16' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>
                   <path
-                    d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
-                    fill="currentColor"
+                    d='M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z'
+                    fill='currentColor'
                   />
                 </svg>
                 <span>Duplicate</span>
               </div>
             ),
-            onClick: () => console.log("Duplicate clicked"),
+            onClick: () => console.log('Duplicate clicked'),
           },
         ],
       },
@@ -187,17 +175,17 @@ export const WithIconAndText: Story = {
 // Custom positioning - align start
 export const AlignStart: Story = {
   args: {
-    align: "start",
+    align: 'start',
     groups: [
       {
         options: [
           {
-            label: "Edit",
-            onClick: () => console.log("Edit clicked"),
+            label: 'Edit',
+            onClick: () => console.log('Edit clicked'),
           },
           {
-            label: "Duplicate",
-            onClick: () => console.log("Duplicate clicked"),
+            label: 'Duplicate',
+            onClick: () => console.log('Duplicate clicked'),
           },
         ],
       },
@@ -208,17 +196,17 @@ export const AlignStart: Story = {
 // Custom positioning - side top
 export const SideTop: Story = {
   args: {
-    side: "top",
+    side: 'top',
     groups: [
       {
         options: [
           {
-            label: "Edit",
-            onClick: () => console.log("Edit clicked"),
+            label: 'Edit',
+            onClick: () => console.log('Edit clicked'),
           },
           {
-            label: "Duplicate",
-            onClick: () => console.log("Duplicate clicked"),
+            label: 'Duplicate',
+            onClick: () => console.log('Duplicate clicked'),
           },
         ],
       },
@@ -234,12 +222,12 @@ export const LargerSideOffset: Story = {
       {
         options: [
           {
-            label: "Edit",
-            onClick: () => console.log("Edit clicked"),
+            label: 'Edit',
+            onClick: () => console.log('Edit clicked'),
           },
           {
-            label: "Duplicate",
-            onClick: () => console.log("Duplicate clicked"),
+            label: 'Duplicate',
+            onClick: () => console.log('Duplicate clicked'),
           },
         ],
       },
@@ -255,12 +243,12 @@ export const WithAlignOffset: Story = {
       {
         options: [
           {
-            label: "Edit",
-            onClick: () => console.log("Edit clicked"),
+            label: 'Edit',
+            onClick: () => console.log('Edit clicked'),
           },
           {
-            label: "Duplicate",
-            onClick: () => console.log("Duplicate clicked"),
+            label: 'Duplicate',
+            onClick: () => console.log('Duplicate clicked'),
           },
         ],
       },

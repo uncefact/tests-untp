@@ -8,10 +8,7 @@
  * @param redirectUrl - URL to redirect to after logout (defaults to home page)
  * @returns The IDP logout URL, or null if session doesn't have id_token
  */
-export function getIdpLogoutUrl(
-  session: { id_token?: string } | null,
-  redirectUrl?: string
-): string | null {
+export function getIdpLogoutUrl(session: { id_token?: string } | null, redirectUrl?: string): string | null {
   if (!session?.id_token) {
     return null;
   }
@@ -25,8 +22,8 @@ export function getIdpLogoutUrl(
 
   // OIDC standard end_session_endpoint URL
   const logoutUrl = new URL(`${issuer}/protocol/openid-connect/logout`);
-  logoutUrl.searchParams.set("id_token_hint", session.id_token);
-  logoutUrl.searchParams.set("post_logout_redirect_uri", postLogoutRedirectUri);
+  logoutUrl.searchParams.set('id_token_hint', session.id_token);
+  logoutUrl.searchParams.set('post_logout_redirect_uri', postLogoutRedirectUri);
 
   return logoutUrl.toString();
 }

@@ -16,7 +16,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     label: 'Import',
-    onChange: (data) => console.log(data)
+    onChange: (data) => console.log(data),
   },
   decorators: [
     (Story) => (

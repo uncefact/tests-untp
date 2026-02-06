@@ -7,8 +7,8 @@ import { GS1Provider } from './GS1Provider.js';
  * @returns {ProviderStrategy} An instance of the provider strategy.
  */
 export function getProviderByType(providerType: string): IdentityProviderStrategy {
-  switch(providerType) {
-    case 'gs1': 
+  switch (providerType) {
+    case 'gs1':
       return new GS1Provider();
 
     default:

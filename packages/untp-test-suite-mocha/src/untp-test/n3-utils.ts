@@ -9,12 +9,7 @@ import n3 from 'n3';
  * @param useNamedGraphs - Whether to store quads in named graphs (defaults to false)
  * @returns Promise with the RDF store and any validation results
  */
-export async function storeQuads(
-  jsonData: any,
-  filePath: string,
-  n3store: n3.Store,
-  useNamedGraphs = false,
-) {
+export async function storeQuads(jsonData: any, filePath: string, n3store: n3.Store, useNamedGraphs = false) {
   const graphName = n3.DataFactory.namedNode(`file://${filePath}` || jsonData.id || 'urn:unnamed');
 
   // Convert JSON-LD to N-Quads string jsonld.js
@@ -32,7 +27,6 @@ export async function storeQuads(
   n3store.addQuads(quads);
 }
 
-
 /**
  * Converts parsed JSON-LD data to N-Quads
  * @param jsonData - The parsed JSON-LD data
@@ -40,11 +34,7 @@ export async function storeQuads(
  * @param useNamedGraphs - Whether to store quads in named graphs (defaults to false)
  * @returns Promise with the parsed quads
  */
-export async function getQuads(
-  jsonData: any,
-  fileName?: string,
-  useNamedGraphs = false,
-): Promise<n3.Quad[]> {
+export async function getQuads(jsonData: any, fileName?: string, useNamedGraphs = false): Promise<n3.Quad[]> {
   const graphName = n3.DataFactory.namedNode(fileName || jsonData.id || 'urn:unnamed');
 
   // Convert JSON-LD to N-Quads string jsonld.js
@@ -62,7 +52,6 @@ export async function getQuads(
 
   return quads;
 }
-
 
 /**
  * Runs all inference rules in the inferences directory in numerical order
@@ -91,7 +80,8 @@ export async function runInferences(n3store: n3.Store): Promise<boolean> {
         const path = require('path');
 
         const inferencesDir = path.join(__dirname, '../../src/inferences');
-        const files = fs.readdirSync(inferencesDir)
+        const files = fs
+          .readdirSync(inferencesDir)
           .filter((file: string) => file.endsWith('.n3'))
           .sort();
 
@@ -123,7 +113,6 @@ export async function runInferences(n3store: n3.Store): Promise<boolean> {
 
         // Add the inferenced quads to the n3store
         n3store.addQuads(inferencedQuads);
-
       } catch (error) {
         console.warn(`Error executing inference rule ${fileName}:`, error);
       }
@@ -136,17 +125,13 @@ export async function runInferences(n3store: n3.Store): Promise<boolean> {
   }
 }
 
-
 /**
  * Executes given N3 entailment rules against the credentials RDF graph using EYE reasoner
  * @param n3rules - The n3 inferencing rules as sting
  * @param credentials - Credentilas graph as an array of quads
  * @returns Promise with the query results as quads
  */
-async function execRules(
-  n3rules: string,
-  credentials: n3.Quad[],
-): Promise<n3.Quad[]> {
+async function execRules(n3rules: string, credentials: n3.Quad[]): Promise<n3.Quad[]> {
   // Serialize credential quads to string
   const writer = new n3.Writer({ format: 'N3' });
   writer.addQuads(credentials);
@@ -158,11 +143,10 @@ async function execRules(
   });
 
   let eyereasoner: any;
-  
+
   if (typeof window === 'undefined') {
     eyereasoner = require('eyereasoner');
-  }
-  else {
+  } else {
     eyereasoner = (window as any).eyereasoner;
   }
 
@@ -177,11 +161,10 @@ async function execRules(
   // enabling the same query file to be used in both cases, as a pattern
   // for developing future queries.
   const eyeOptions: any = {
-    outputType: "string"
+    outputType: 'string',
   };
 
   try {
-
     // Execute the query using n3reasoner
     const result = await eyereasoner.n3reasoner(graphContent, n3rules, eyeOptions);
 
@@ -206,11 +189,10 @@ async function execRules(
 
         // If parsing still fails, try a more aggressive approach
         // Extract only lines that look like valid RDF triples (starting with '<')
-        const tripleLines = filteredResult.split('\n')
-          .filter(line => {
-            const trimmed = line.trim();
-            return trimmed.startsWith('<') && trimmed.includes('>') && !trimmed.includes('log:outputString');
-          });
+        const tripleLines = filteredResult.split('\n').filter((line) => {
+          const trimmed = line.trim();
+          return trimmed.startsWith('<') && trimmed.includes('>') && !trimmed.includes('log:outputString');
+        });
 
         if (tripleLines.length > 0) {
           const triplesOnly = tripleLines.join('\n');
@@ -237,7 +219,6 @@ async function execRules(
     throw new Error(`Error executing EYE reasoner: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
-
 
 /**
  * Initializes and returns a new N3 Store instance.

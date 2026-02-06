@@ -19,7 +19,7 @@ const Home = () => {
             },
           }}
           key={path}
-          variant="contained"
+          variant='contained'
           component={Link}
           href={path}
         >
@@ -37,12 +37,12 @@ const Home = () => {
           },
         }}
         key={'/scanning'}
-        variant="contained"
+        variant='contained'
         component={Link}
         href={'/scanning'}
       >
         Scanning
-      </Button>
+      </Button>,
     );
 
     return apps;
@@ -60,7 +60,7 @@ const Home = () => {
             },
           }}
           key={path}
-          variant="contained"
+          variant='contained'
           component={Link}
           href={path}
         >

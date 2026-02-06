@@ -1,1 +1,1 @@
-export * from "./credential.repository";
+export * from './credential.repository';

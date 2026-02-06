@@ -126,7 +126,6 @@ describe('ConformityCredential', () => {
         expect(screen.findByText(url)).not.toBeNull();
         expect(document.querySelector('table')).not.toBeNull();
       });
-
     });
 
     it('should save credential as object when trigger onClickStorageCredential function', async () => {

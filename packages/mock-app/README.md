@@ -1,4 +1,5 @@
 <!-- TODO: Harmonise READMEs -->
+
 ## Reference Implementation
 
 The **Reference Implementation (RI)** provides an environment for organisations and implementers to experiment with the **UN Transparency Protocol (UNTP)** and its extensions before committing to changes in their production systems.
@@ -6,7 +7,6 @@ It acts as an **on-ramp**, allowing users to create, issue, and test credentials
 
 The RI is also used to facilitate **pilots and demonstrations**, helping stakeholders showcase the value of UNTP and its extensions at low cost.
 Each organisation in the environment includes its own configuration (name, logo, and colours) so that pilot participants can be easily distinguished and collaborate with their colleagues within the same organisation.
-
 
 ### Persistence Layer
 
@@ -16,13 +16,12 @@ It stores the application data required to manage users, organisations, and issu
 Credential issuance and verification are handled by **VCKit**, and credentials themselves are stored in the **Storage Service**.
 The persistence layer holds the supporting data — user records, organisation details, and references to issued credentials — that allows the application to function cohesively.
 
-
 #### Environment Variables
 
 Environment variables control how the Reference Implementation is configured.
 
-* **Local development:** variables are automatically loaded from the root `.env` file.
-* **Docker Compose:** variables are passed directly into the container environment through the compose configuration.
+- **Local development:** variables are automatically loaded from the root `.env` file.
+- **Docker Compose:** variables are passed directly into the container environment through the compose configuration.
 
 The **Next.js** application also loads variables from the root `.env`.
 In local mode, values are read from the file; in Docker mode, they are injected at runtime.
@@ -55,7 +54,6 @@ tests-untp/                            # Repository root
 #### Database
 
 The Reference Implementation uses **Postgres** to store all application-level data.
-
 
 #### Database Client
 
@@ -96,13 +94,15 @@ packages/mock-app/
 The Reference Implementation uses **NextAuth.js** with **Keycloak** as the identity provider.
 
 **Current protected routes:**
-* `/dashboard` - Protected page route (will migrate to homepage once new RI functionality is built, replacing the old implementation)
-* `/api/v1/*` - All versioned API endpoints
+
+- `/dashboard` - Protected page route (will migrate to homepage once new RI functionality is built, replacing the old implementation)
+- `/api/v1/*` - All versioned API endpoints
 
 **Architecture:**
-* Protected page routes use client-side session checks in their layout
-* Protected API routes use middleware for edge-safe authentication
-* Logout flow clears both application and IDP sessions
+
+- Protected page routes use client-side session checks in their layout
+- Protected API routes use middleware for edge-safe authentication
+- Logout flow clears both application and IDP sessions
 
 ---
 
@@ -110,9 +110,9 @@ The Reference Implementation uses **NextAuth.js** with **Keycloak** as the ident
 
 #### Prerequisites
 
-* Node.js ≥ 20.12.2
-* Yarn ≥ 1.22.22
-* Docker and Docker Compose
+- Node.js ≥ 20.12.2
+- Yarn ≥ 1.22.22
+- Docker and Docker Compose
 
 #### Environment Setup
 
@@ -137,7 +137,6 @@ This starts Postgres, VCKit, Storage Service, Link Resolver, and other required 
 
 See [configure-document.md](./documents/configure-document.md) for additional configuration details.
 
-
 #### Build and Run
 
 ```bash
@@ -155,7 +154,8 @@ The Prisma client is automatically generated during build or dev startup.
 #### Login Credentials
 
 Default credentials for development:
-* **Email:** `admin@example.com`
-* **Password:** `changeme`
+
+- **Email:** `admin@example.com`
+- **Password:** `changeme`
 
 Credentials are defined in the Keycloak realm import file `keycloak-realms`.

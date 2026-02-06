@@ -25,7 +25,7 @@ const Application = ({ app }: IApplication) => {
             },
           }}
           key={childPath}
-          variant="contained"
+          variant='contained'
           component={Link}
           href={childPath}
         >

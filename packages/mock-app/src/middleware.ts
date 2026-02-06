@@ -8,13 +8,10 @@
  * 2. Service account Bearer tokens (for machine-to-machine auth)
  */
 
-import NextAuth from "next-auth";
-import { authConfig } from "@/lib/auth/auth.config";
-import { NextResponse, type NextRequest } from "next/server";
-import {
-  validateServiceAccountToken,
-  extractBearerToken,
-} from "@/lib/auth/token-validator";
+import NextAuth from 'next-auth';
+import { authConfig } from '@/lib/auth/auth.config';
+import { NextResponse, type NextRequest } from 'next/server';
+import { validateServiceAccountToken, extractBearerToken } from '@/lib/auth/token-validator';
 
 const { auth } = NextAuth(authConfig);
 
@@ -22,7 +19,7 @@ const { auth } = NextAuth(authConfig);
  * Validates a Bearer token from the Authorization header.
  */
 async function validateBearerAuth(req: NextRequest): Promise<boolean> {
-  const authHeader = req.headers.get("authorization");
+  const authHeader = req.headers.get('authorization');
   const token = extractBearerToken(authHeader);
 
   if (!token) {
@@ -38,7 +35,7 @@ export default auth(async (req) => {
   const isSessionAuthenticated = !!req.auth;
 
   // For API routes, check authentication
-  if (pathname.startsWith("/api/v1/")) {
+  if (pathname.startsWith('/api/v1/')) {
     // check session-based auth first
     if (isSessionAuthenticated) {
       return NextResponse.next();
@@ -51,10 +48,7 @@ export default auth(async (req) => {
     }
 
     // user is unauthorized
-    return NextResponse.json(
-      { error: "Unauthorized", message: "Authentication required" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
   }
 
   return NextResponse.next();
@@ -78,6 +72,6 @@ export const config = {
     /*
      * Match all versioned API routes under /api/v1/*
      */
-    "/api/v1/:path*",
+    '/api/v1/:path*',
   ],
 };

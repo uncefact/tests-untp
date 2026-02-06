@@ -19,15 +19,15 @@ export class UNCEFACTStorageAdapter implements IStorageService {
    */
   constructor(baseURL: string, headers: Record<string, string>, bucket: string) {
     if (!baseURL) {
-      throw new Error("Error creating UNCEFACTStorageAdapter. API URL is required.");
+      throw new Error('Error creating UNCEFACTStorageAdapter. API URL is required.');
     }
 
     if (!headers?.['X-API-Key']) {
-      throw new Error("Error creating UNCEFACTStorageAdapter. X-API-Key header is required.");
+      throw new Error('Error creating UNCEFACTStorageAdapter. X-API-Key header is required.');
     }
 
     if (!bucket) {
-      throw new Error("Error creating UNCEFACTStorageAdapter. Bucket is required.");
+      throw new Error('Error creating UNCEFACTStorageAdapter. Bucket is required.');
     }
 
     this.baseURL = baseURL;
@@ -57,7 +57,7 @@ export class UNCEFACTStorageAdapter implements IStorageService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...this.headers
+          ...this.headers,
         },
         body: JSON.stringify(payload),
       });
@@ -67,7 +67,7 @@ export class UNCEFACTStorageAdapter implements IStorageService {
       }
 
       const { uri, hash, key } = await response.json();
-      
+
       return {
         uri,
         hash,
