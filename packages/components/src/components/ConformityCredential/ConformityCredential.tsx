@@ -9,6 +9,7 @@ import {
   getJsonDataFromConformityAPI,
   uploadData,
   getValueByPath,
+<<<<<<< HEAD
 } from '@uncefact/untp-ri-services';
 
 import { checkStoredCredentialsConfig } from './utils.js';
