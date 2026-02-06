@@ -25,5 +25,5 @@ aws
 e2e/package.json
 e2e/yarn.lock
 
-packages/mock-app/src/constants/app-config.json
+packages/reference-implementation/src/constants/app-config.json
 packages/components/src/constants/app-config.json

@@ -9,7 +9,7 @@ import Disclaimer from './../../../\_disclaimer.mdx';
 
 The QR Link / Encryption feature is a crucial component of the UNTP ecosystem, providing a standardised way to access, verify, and render credentials.
 
-For detailed information about the Verify Link structure and usage, please refer to the [Verify Link documentation](/docs/mock-apps/common/verify-link).
+For detailed information about the Verify Link structure and usage, please refer to the [Verify Link documentation](/docs/reference-implementation/common/verify-link).
 
 ## Testing Instructions
 

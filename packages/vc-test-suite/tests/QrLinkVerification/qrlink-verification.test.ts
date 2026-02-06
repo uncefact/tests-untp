@@ -1,6 +1,6 @@
 import chai from 'chai';
 
-import { computeHash, HashAlgorithm, decryptCredential } from '@mock-app/services';
+import { computeHash, HashAlgorithm, decryptCredential } from '@reference-implementation/services';
 
 import { reportRow, setupMatrix } from '../../helpers';
 import { request } from '../../httpService';

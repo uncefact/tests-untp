@@ -1,7 +1,7 @@
 import { processVerifiableCredentialData } from '../../utils';
-import { verifyVC, decodeEnvelopedVC } from '@mock-app/services';
+import { verifyVC, decodeEnvelopedVC } from '@reference-implementation/services';
 
-jest.mock('@mock-app/services', () => ({
+jest.mock('@reference-implementation/services', () => ({
   verifyVC: jest.fn(),
   decodeEnvelopedVC: jest.fn(),
 }));

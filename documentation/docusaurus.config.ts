@@ -83,12 +83,12 @@ const config: Config = {
       items: [
         { to: '/docs/introduction', label: 'Introduction', position: 'right' },
         {
-          to: '/docs/mock-apps/',
+          to: '/docs/reference-implementation/',
           label: 'Getting started',
           position: 'right',
         },
         {
-          to: '/docs/mock-apps/',
+          to: '/docs/reference-implementation/',
           label: 'Tools and support',
           position: 'right',
         },
@@ -127,7 +127,7 @@ const config: Config = {
             },
             {
               label: 'Getting Started',
-              to: '/docs/mock-apps/',
+              to: '/docs/reference-implementation/',
             },
           ],
         },
@@ -136,19 +136,19 @@ const config: Config = {
           items: [
             {
               label: 'Mock Apps',
-              to: '/docs/mock-apps/',
+              to: '/docs/reference-implementation/',
             },
             {
               label: 'Technical Interoperability',
-              to: '/docs/mock-apps/',
+              to: '/docs/reference-implementation/',
             },
             {
               label: 'Semantic Interoperability',
-              to: '/docs/mock-apps/',
+              to: '/docs/reference-implementation/',
             },
             {
               label: 'Graph Validation',
-              to: '/docs/mock-apps/',
+              to: '/docs/reference-implementation/',
             },
           ],
         },

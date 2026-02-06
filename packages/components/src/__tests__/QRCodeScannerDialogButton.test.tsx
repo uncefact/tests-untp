@@ -1,12 +1,12 @@
 import React from 'react';
-import { publicAPI } from '@mock-app/services';
+import { publicAPI } from '@reference-implementation/services';
 import { render, screen, getByText, fireEvent, waitFor } from '@testing-library/react';
 import { processVerifiableCredentialData } from '../utils/importDataHelpers.js';
 import { QRCodeScannerDialogButton } from '../components/QRCodeScannerDialogButton/QRCodeScannerDialogButton';
 import { ScannerDialog } from '../components/QRCodeScannerDialogButton/ScannerDialog';
 import { ImportDataType } from '../types/common.types';
 
-jest.mock('@mock-app/services', () => ({
+jest.mock('@reference-implementation/services', () => ({
   publicAPI: {
     get: jest.fn(),
   },
