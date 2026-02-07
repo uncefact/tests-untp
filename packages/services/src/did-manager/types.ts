@@ -115,6 +115,8 @@ export interface IDidService {
   create(options: CreateDidOptions): Promise<DidRecord>;
   /** Get the full DID Document */
   getDocument(did: string): Promise<DidDocument>;
+  /** Verify a DID and its document against a series of checks */
+  verify(did: string): Promise<DidVerificationResult>;
   /** DID methods this adapter supports */
   getSupportedMethods(): DidMethod[];
   /** Key algorithms this adapter supports */

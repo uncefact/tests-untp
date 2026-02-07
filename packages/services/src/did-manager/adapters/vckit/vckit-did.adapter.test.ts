@@ -231,7 +231,7 @@ describe('VCKitDidAdapter', () => {
     });
 
     it('throws if DID string is empty', async () => {
-      await expect(service.verify('')).rejects.toThrow('DID string is required');
+      await expect(service.verify('')).rejects.toThrow('DID string is required for verification');
     });
 
     it('passes empty providerKeys when VCKit key fetch fails', async () => {

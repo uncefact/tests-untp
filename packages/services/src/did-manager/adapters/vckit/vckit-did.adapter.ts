@@ -131,8 +131,9 @@ export class VCKitDidAdapter implements IDidService {
         const vckitDid = await response.json();
         providerKeys = vckitDid.keys ?? [];
       }
-    } catch {
+    } catch (error) {
       // If we can't fetch keys, the key_material check will still run with empty keys
+      console.error(`Failed to fetch provider keys for DID "${did}":`, error);
     }
 
     return verifyDid(did, { providerKeys });
