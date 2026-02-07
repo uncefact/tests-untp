@@ -25,3 +25,22 @@ export type {
   VerifyResult,
   IVerifiableCredentialService,
 } from './interfaces/verifiableCredentialService.js';
+export * from './did-manager/types.js';
+export { didDocumentSchema, verificationMethodSchema } from './did-manager/schemas.js';
+export { didWebToUrl, parseDidMethod, normaliseDidAlias } from './did-manager/utils.js';
+export { VCKitDidService } from './did-manager/adapters/vckit-did.service.js';
+export { verifyDid } from './did-manager/verify.js';
+export type { VerifyDidOptions } from './did-manager/verify.js';
+
+// Encryption
+export type { IEncryptionService } from './encryption/encryption.interface.js';
+export { AesGcmEncryptionAdapter } from './encryption/adapters/aes-gcm.adapter.js';
+
+// Registry
+export { ServiceType, AdapterType } from './registry/types.js';
+export type { AdapterRegistryEntry, AdapterRegistry } from './registry/types.js';
+export { adapterRegistry } from './registry/registry.js';
+
+// Config schemas
+export { vckitDidConfigSchema, vckitDidSensitiveFields } from './did-manager/adapters/vckit-did.schema.js';
+export type { VCKitDidConfig } from './did-manager/adapters/vckit-did.schema.js';

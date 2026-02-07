@@ -1,3 +1,11 @@
+/**
+ * @todo Migrate to hex encoding (matching AesGcmEncryptionAdapter) and decouple
+ * hashing from decryption. The storage service should depend on
+ * `@mock-app/services` and reuse `AesGcmEncryptionAdapter` rather than
+ * maintaining a separate implementation. Once consumers are migrated,
+ * remove this file.
+ */
+
 import crypto from 'crypto';
 
 export enum HashAlgorithm {
