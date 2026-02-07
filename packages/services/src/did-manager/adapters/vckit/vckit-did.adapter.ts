@@ -4,11 +4,11 @@ import type {
   DidRecord,
   DidDocument,
   DidVerificationResult,
-} from '../types.js';
-import { DidMethod } from '../types.js';
-import { verifyDid } from '../verify.js';
-import { normaliseDidAlias } from '../utils.js';
-import type { AdapterRegistryEntry } from '../../registry/types.js';
+} from '../../types.js';
+import { DidMethod } from '../../types.js';
+import { verifyDid } from '../../verify.js';
+import { normaliseDidAlias } from '../../utils.js';
+import type { AdapterRegistryEntry } from '../../../registry/types.js';
 import { vckitDidConfigSchema } from './vckit-did.schema.js';
 import type { VCKitDidConfig } from './vckit-did.schema.js';
 
@@ -26,17 +26,17 @@ function toProviderString(method: DidMethod): string {
   }
 }
 
-export class VCKitDidService implements IDidService {
+export class VCKitDidAdapter implements IDidService {
   readonly baseURL: string;
   readonly headers: Record<string, string>;
   readonly keyType: 'Ed25519';
 
   constructor(baseURL: string, headers: Record<string, string>, keyType: 'Ed25519' = 'Ed25519') {
     if (!baseURL) {
-      throw new Error('Error creating VCKitDidService. API URL is required.');
+      throw new Error('Error creating VCKitDidAdapter. API URL is required.');
     }
     if (!headers?.Authorization) {
-      throw new Error('Error creating VCKitDidService. Authorization header is required.');
+      throw new Error('Error creating VCKitDidAdapter. Authorization header is required.');
     }
     this.baseURL = baseURL;
     this.headers = headers;
@@ -153,7 +153,7 @@ export const VCKIT_DID_ADAPTER_TYPE = 'VCKIT' as const;
 /** Registry entry for the VCKit DID adapter. */
 export const vckitDidRegistryEntry = {
   configSchema: vckitDidConfigSchema,
-  factory: (config: VCKitDidConfig): IDidService => new VCKitDidService(
+  factory: (config: VCKitDidConfig): IDidService => new VCKitDidAdapter(
     config.endpoint,
     { Authorization: `Bearer ${config.authToken}` },
     config.keyType,

@@ -1,6 +1,6 @@
 import { adapterRegistry } from './registry';
 import { ServiceType, AdapterType } from './types';
-import { VCKitDidService } from '../did-manager/adapters/vckit-did.service';
+import { VCKitDidAdapter } from '../did-manager/adapters/vckit/vckit-did.adapter';
 
 describe('adapterRegistry', () => {
   describe('structure', () => {
@@ -20,7 +20,7 @@ describe('adapterRegistry', () => {
   });
 
   describe('factory', () => {
-    it('creates a VCKitDidService instance with valid config', () => {
+    it('creates a VCKitDidAdapter instance with valid config', () => {
       const entry = adapterRegistry[ServiceType.DID][AdapterType.VCKIT];
       const service = entry.factory({
         endpoint: 'https://vckit.example.com',
@@ -28,16 +28,16 @@ describe('adapterRegistry', () => {
         keyType: 'Ed25519',
       });
 
-      expect(service).toBeInstanceOf(VCKitDidService);
+      expect(service).toBeInstanceOf(VCKitDidAdapter);
     });
 
-    it('passes endpoint, auth header, and keyType to VCKitDidService', () => {
+    it('passes endpoint, auth header, and keyType to VCKitDidAdapter', () => {
       const entry = adapterRegistry[ServiceType.DID][AdapterType.VCKIT];
       const service = entry.factory({
         endpoint: 'https://vckit.example.com',
         authToken: 'my-secret-token',
         keyType: 'Ed25519',
-      }) as VCKitDidService;
+      }) as VCKitDidAdapter;
 
       expect(service.baseURL).toBe('https://vckit.example.com');
       expect(service.headers).toEqual({ Authorization: 'Bearer my-secret-token' });
@@ -50,7 +50,7 @@ describe('adapterRegistry', () => {
         endpoint: 'https://vckit.example.com',
         authToken: 'my-secret-token',
       });
-      const service = entry.factory(parsed) as VCKitDidService;
+      const service = entry.factory(parsed) as VCKitDidAdapter;
 
       expect(service.keyType).toBe('Ed25519');
     });

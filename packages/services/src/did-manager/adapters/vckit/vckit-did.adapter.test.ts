@@ -1,8 +1,8 @@
-import { VCKitDidService } from './vckit-did.service';
-import { DidMethod, DidType } from '../types';
-import { verifyDid } from '../verify';
+import { VCKitDidAdapter } from './vckit-did.adapter';
+import { DidMethod, DidType } from '../../types';
+import { verifyDid } from '../../verify';
 
-jest.mock('../verify.js', () => ({
+jest.mock('../../verify.js', () => ({
   verifyDid: jest.fn(),
 }));
 
@@ -23,11 +23,11 @@ const HEADERS = { Authorization: 'Bearer test-token' };
 
 // -- Tests -------------------------------------------------------------------
 
-describe('VCKitDidService', () => {
-  let service: VCKitDidService;
+describe('VCKitDidAdapter', () => {
+  let service: VCKitDidAdapter;
 
   beforeEach(() => {
-    service = new VCKitDidService(BASE_URL, HEADERS);
+    service = new VCKitDidAdapter(BASE_URL, HEADERS);
     global.fetch = jest.fn();
   });
 
@@ -45,11 +45,11 @@ describe('VCKitDidService', () => {
 
 
     it('throws if baseURL is empty', () => {
-      expect(() => new VCKitDidService('', HEADERS)).toThrow('API URL is required');
+      expect(() => new VCKitDidAdapter('', HEADERS)).toThrow('API URL is required');
     });
 
     it('throws if Authorization header is missing', () => {
-      expect(() => new VCKitDidService(BASE_URL, {})).toThrow('Authorization header is required');
+      expect(() => new VCKitDidAdapter(BASE_URL, {})).toThrow('Authorization header is required');
     });
   });
 

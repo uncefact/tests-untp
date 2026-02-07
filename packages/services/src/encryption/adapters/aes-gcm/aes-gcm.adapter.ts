@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
-import type { IEncryptionService } from '../encryption.interface.js';
+import type { IEncryptionService } from '../../encryption.interface.js';
 
 /**
  * AES-256-GCM encryption adapter.

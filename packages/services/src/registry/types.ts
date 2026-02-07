@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { DID_SERVICE_TYPE } from '../did-manager/types.js';
-import { VCKIT_DID_ADAPTER_TYPE } from '../did-manager/adapters/vckit-did.service.js';
+import { VCKIT_DID_ADAPTER_TYPE } from '../did-manager/adapters/vckit/vckit-did.adapter.js';
 
 // Mirror Prisma enums as string constants (packages/services cannot import Prisma)
 export const ServiceType = {
