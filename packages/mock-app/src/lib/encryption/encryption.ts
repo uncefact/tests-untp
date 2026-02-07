@@ -1,4 +1,4 @@
-import { AesGcmEncryptionAdapter } from "@mock-app/services";
+import { AesGcmEncryptionAdapter } from "@mock-app/services/server";
 
 let cached: AesGcmEncryptionAdapter | null = null;
 

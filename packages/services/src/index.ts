@@ -28,18 +28,12 @@ export type {
 export * from './did-manager/types.js';
 export { didDocumentSchema, verificationMethodSchema } from './did-manager/schemas.js';
 export { didWebToUrl, parseDidMethod, normaliseDidAlias } from './did-manager/utils.js';
-export { VCKitDidAdapter } from './did-manager/adapters/vckit/vckit-did.adapter.js';
-export { verifyDid } from './did-manager/verify.js';
-export type { VerifyDidOptions } from './did-manager/verify.js';
-
-// Encryption
+// Encryption (type-only — adapter re-exported from ./server entrypoint)
 export type { IEncryptionService } from './encryption/encryption.interface.js';
-export { AesGcmEncryptionAdapter } from './encryption/adapters/aes-gcm/aes-gcm.adapter.js';
 
-// Registry
+// Registry (types only — runtime registry re-exported from ./server entrypoint)
 export { ServiceType, AdapterType } from './registry/types.js';
 export type { AdapterRegistryEntry, AdapterRegistry } from './registry/types.js';
-export { adapterRegistry } from './registry/registry.js';
 
 // Config schemas
 export { vckitDidConfigSchema, vckitDidSensitiveFields } from './did-manager/adapters/vckit/vckit-did.schema.js';

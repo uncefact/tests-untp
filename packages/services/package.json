@@ -8,6 +8,10 @@
     ".": {
       "types": "./build/index.d.ts",
       "default": "./build/index.js"
+    },
+    "./server": {
+      "types": "./build/server.d.ts",
+      "default": "./build/server.js"
     }
   },
   "scripts": {
