@@ -41,11 +41,8 @@ export async function handleSignIn(
   }
 
   if (!dbUser.organizationId) {
-    const orgName = userProfile.name
-      ? `${userProfile.name}'s Organisation`
-      : userProfile.email
-        ? `${userProfile.email}'s Organisation`
-        : "My Organisation";
+    const baseName = userProfile.name || userProfile.email?.split('@')[0] || 'My';
+    const orgName = `${baseName} Organisation`;
 
     const org = await prisma.organization.create({
       data: { name: orgName },

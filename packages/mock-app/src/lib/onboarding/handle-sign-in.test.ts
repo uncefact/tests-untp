@@ -73,7 +73,7 @@ describe("handleSignIn", () => {
     });
 
     expect(orgModel.create).toHaveBeenCalledWith({
-      data: { name: "Alice's Organisation" },
+      data: { name: "Alice Organisation" },
     });
     expect(userModel.update).toHaveBeenCalledWith({
       where: { id: "user-1" },
@@ -103,7 +103,7 @@ describe("handleSignIn", () => {
     });
 
     expect(orgModel.create).toHaveBeenCalledWith({
-      data: { name: "bob@example.com's Organisation" },
+      data: { name: "bob Organisation" },
     });
   });
 

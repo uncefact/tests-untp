@@ -23,6 +23,8 @@ describe('DID API', { testIsolation: false }, () => {
         url: '/api/v1/dids',
         body: {
           type: 'MANAGED',
+          method: 'DID_WEB',
+          alias: `e2e-test-${RUN_ID}`,
           name: `E2E Test DID ${RUN_ID}`,
           description: 'Created by Cypress E2E test',
         },
@@ -125,6 +127,8 @@ describe('DID API', { testIsolation: false }, () => {
         url: '/api/v1/dids',
         body: {
           type: 'SELF_MANAGED',
+          method: 'DID_WEB',
+          alias: `e2e-self-managed-${RUN_ID}`,
           name: `E2E Self-Managed DID ${RUN_ID}`,
         },
       }).then((response) => {
