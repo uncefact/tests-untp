@@ -12,7 +12,7 @@ export { VCKitDidAdapter } from './did-manager/adapters/vckit/vckit-did.adapter.
 export { verifyDid } from './did-manager/verify.js';
 export type { VerifyDidOptions } from './did-manager/verify.js';
 
-// Encryption adapter (node:crypto)
+// Encryption adapter (re-exported here for backwards compatibility)
 export { AesGcmEncryptionAdapter } from './encryption/adapters/aes-gcm/aes-gcm.adapter.js';
 
 // Registry (imports VCKit adapter which transitively pulls in jsonld)

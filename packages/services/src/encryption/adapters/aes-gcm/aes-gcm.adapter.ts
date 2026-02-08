@@ -1,28 +1,27 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
-import type { IEncryptionService } from '../../encryption.interface.js';
+import crypto from 'crypto';
+import { EncryptionAlgorithm, assertPermittedAlgorithm } from '../../encryption.interface.js';
+import type { EncryptedEnvelope, IEncryptionService } from '../../encryption.interface.js';
 
 /**
  * AES-256-GCM encryption adapter.
  *
- * Accepts an arbitrary-length key string which is normalised to 32 bytes
- * via SHA-256 hashing to satisfy the AES-256 key-length requirement.
- *
- * Ciphertext format: `${iv}:${authTag}:${encrypted}` (all hex-encoded).
+ * Accepts a 64-character hex string (32 bytes) as the encryption key.
  */
 export class AesGcmEncryptionAdapter implements IEncryptionService {
-  private readonly derivedKey: Buffer;
+  private readonly key: Buffer;
 
   constructor(key: string) {
-    if (!key) {
-      throw new Error('Encryption key must not be empty');
+    if (!/^[0-9a-f]{64}$/i.test(key)) {
+      throw new Error('Encryption key must be a 64-character hex string (32 bytes)');
     }
-    // Normalise arbitrary-length key to 32 bytes for AES-256
-    this.derivedKey = createHash('sha256').update(key).digest();
+    this.key = Buffer.from(key, 'hex');
   }
 
-  encrypt(plaintext: string): string {
-    const iv = randomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', this.derivedKey, iv);
+  encrypt(plaintext: string, algorithm: EncryptionAlgorithm): EncryptedEnvelope {
+    assertPermittedAlgorithm(algorithm);
+
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv(algorithm, this.key, iv);
 
     const encrypted = Buffer.concat([
       cipher.update(plaintext, 'utf8'),
@@ -31,22 +30,24 @@ export class AesGcmEncryptionAdapter implements IEncryptionService {
 
     const authTag = cipher.getAuthTag();
 
-    return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
+    return {
+      cipherText: encrypted.toString('base64'),
+      iv: iv.toString('base64'),
+      tag: authTag.toString('base64'),
+      type: algorithm,
+    };
   }
 
-  decrypt(ciphertext: string): string {
-    const parts = ciphertext.split(':');
-    if (parts.length !== 3) {
-      throw new Error('Invalid ciphertext format: expected iv:authTag:encrypted');
-    }
+  decrypt(envelope: EncryptedEnvelope): string {
+    assertPermittedAlgorithm(envelope.type);
 
-    const [ivHex, authTagHex, encryptedHex] = parts;
+    const { cipherText, iv: ivB64, tag: tagB64, type } = envelope;
 
-    const iv = Buffer.from(ivHex, 'hex');
-    const authTag = Buffer.from(authTagHex, 'hex');
-    const encrypted = Buffer.from(encryptedHex, 'hex');
+    const iv = Buffer.from(ivB64, 'base64');
+    const authTag = Buffer.from(tagB64, 'base64');
+    const encrypted = Buffer.from(cipherText, 'base64');
 
-    const decipher = createDecipheriv('aes-256-gcm', this.derivedKey, iv);
+    const decipher = crypto.createDecipheriv(type, this.key, iv);
     decipher.setAuthTag(authTag);
 
     const decrypted = Buffer.concat([
