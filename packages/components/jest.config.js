@@ -16,7 +16,10 @@ const jestConfig = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^react($|/.+)': '<rootDir>/../../node_modules/react$1',
     '^react-dom($|/.+)': '<rootDir>/../../node_modules/react-dom$1',
-    '^@uncefact/untp-ri-services$': '<rootDir>/../services/src/index.ts',
+    '^@uncefact/untp-ri-services/server$': '<rootDir>/../services/build/server.js',
+    '^@uncefact/untp-ri-services/encryption$': '<rootDir>/../services/build/encryption/index.js',
+    '^@uncefact/untp-ri-services/key-provider$': '<rootDir>/../services/build/key-provider/index.js',
+    '^@uncefact/untp-ri-services$': '<rootDir>/../services/build/index.js',
   },
   transform: {
     '^.+\\.m?tsx?$': [
