@@ -154,6 +154,7 @@ export class VCKitDidAdapter implements IDidService {
     return [DidType.MANAGED, DidType.SELF_MANAGED];
   }
 
+
   getSupportedMethods(): DidMethod[] {
     return [DidMethod.DID_WEB];
   }

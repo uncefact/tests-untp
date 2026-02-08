@@ -267,6 +267,7 @@ describe('VCKitDidAdapter', () => {
     });
   });
 
+
   describe('getSupportedMethods', () => {
     it('returns DID_WEB', () => {
       expect(service.getSupportedMethods()).toEqual(['DID_WEB']);

@@ -42,6 +42,7 @@ export async function verifyDidWeb(did: string): Promise<MethodVerificationResul
     return { document, checks };
   }
 
+
   // Check 1: Resolve — fetch the DID document
   let response: Response | null = null;
   try {
