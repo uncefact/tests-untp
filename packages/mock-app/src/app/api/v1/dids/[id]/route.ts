@@ -17,6 +17,7 @@ export const GET = withOrgAuth(async (_req, { organizationId, params }) => {
     if (e instanceof NotFoundError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
     }
+    console.error("[api] Unexpected error:", e);
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
   }
 });
@@ -51,6 +52,7 @@ export const PUT = withOrgAuth(async (req, { organizationId, params }) => {
     if (e instanceof NotFoundError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
     }
+    console.error("[api] Unexpected error:", e);
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
   }
 });

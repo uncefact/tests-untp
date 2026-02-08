@@ -100,7 +100,7 @@ export async function listDids(
 
   return prisma.did.findMany({
     where,
-    take: limit,
+    take: limit ?? 100,
     skip: offset,
     orderBy: { createdAt: "desc" },
   });

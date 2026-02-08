@@ -8,6 +8,15 @@ import {
 } from "./service-instance.repository";
 
 // Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
+const mockServiceInstance = {
+  create: jest.fn(),
+  findFirst: jest.fn(),
+  findMany: jest.fn(),
+  update: jest.fn(),
+  updateMany: jest.fn(),
+  delete: jest.fn(),
+};
+
 jest.mock("../prisma", () => ({
   prisma: {
     serviceInstance: {
@@ -18,20 +27,20 @@ jest.mock("../prisma", () => ({
       updateMany: jest.fn(),
       delete: jest.fn(),
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    $transaction: jest.fn((fn: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const prismaMock = require("../prisma").prisma;
+      return fn({ serviceInstance: prismaMock.serviceInstance });
+    }),
   },
 }));
 
 // Import the mocked prisma after jest.mock
 import { prisma } from "../prisma";
 
-const mockServiceInstance = prisma.serviceInstance as unknown as {
-  create: jest.Mock;
-  findFirst: jest.Mock;
-  findMany: jest.Mock;
-  update: jest.Mock;
-  updateMany: jest.Mock;
-  delete: jest.Mock;
-};
+// Re-assign for easier access in tests
+Object.assign(mockServiceInstance, prisma.serviceInstance);
 
 describe("service-instance.repository", () => {
   const ORG_ID = "org-1";
@@ -167,7 +176,7 @@ describe("service-instance.repository", () => {
         where: {
           OR: [{ organizationId: ORG_ID }, { organizationId: "system" }],
         },
-        take: undefined,
+        take: 100,
         skip: undefined,
         orderBy: { createdAt: "desc" },
       });
@@ -183,7 +192,7 @@ describe("service-instance.repository", () => {
         where: expect.objectContaining({
           serviceType: "DID",
         }),
-        take: undefined,
+        take: 100,
         skip: undefined,
         orderBy: { createdAt: "desc" },
       });
@@ -198,7 +207,7 @@ describe("service-instance.repository", () => {
         where: expect.objectContaining({
           adapterType: "VCKIT",
         }),
-        take: undefined,
+        take: 100,
         skip: undefined,
         orderBy: { createdAt: "desc" },
       });

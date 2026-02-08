@@ -182,7 +182,7 @@ describe("did.repository", () => {
         where: {
           OR: [{ organizationId: ORG_ID }, { isDefault: true }],
         },
-        take: undefined,
+        take: 100,
         skip: undefined,
         orderBy: { createdAt: "desc" },
       });
@@ -199,7 +199,7 @@ describe("did.repository", () => {
           type: "MANAGED",
           status: "ACTIVE",
         }),
-        take: undefined,
+        take: 100,
         skip: undefined,
         orderBy: { createdAt: "desc" },
       });
@@ -214,7 +214,7 @@ describe("did.repository", () => {
         where: expect.objectContaining({
           serviceInstanceId: "inst-1",
         }),
-        take: undefined,
+        take: 100,
         skip: undefined,
         orderBy: { createdAt: "desc" },
       });

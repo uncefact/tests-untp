@@ -9,6 +9,18 @@ import { didWebToUrl } from './utils.js';
 const C = DidVerificationCheckName;
 
 /**
+ * Blocks resolution of private and localhost URLs to prevent SSRF attacks.
+ */
+function isPrivateUrl(urlString: string): boolean {
+  try {
+    const { hostname } = new URL(urlString);
+    return /^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|0\.|localhost$|::1$|\[::1\]$)/i.test(hostname);
+  } catch {
+    return true; // Malformed URLs are blocked
+  }
+}
+
+/**
  * did:web method-specific verification.
  *
  * Runs two checks:
@@ -23,6 +35,12 @@ export async function verifyDidWeb(did: string): Promise<MethodVerificationResul
   let document: DidDocument | null = null;
 
   const url = didWebToUrl(did);
+
+  if (isPrivateUrl(url)) {
+    checks.push({ name: C.RESOLVE, passed: false, message: 'Private or localhost URLs are not permitted for DID resolution' });
+    checks.push({ name: C.HTTPS, passed: false, message: 'Could not verify HTTPS (resolution blocked)' });
+    return { document, checks };
+  }
 
   // Check 1: Resolve — fetch the DID document
   let response: Response | null = null;

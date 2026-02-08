@@ -58,7 +58,10 @@ describe("cloneSystemDefaults", () => {
     const mockPrisma = createMockPrisma();
 
     mockPrisma.serviceInstance.findMany.mockResolvedValue([SYSTEM_SERVICE_INSTANCE]);
-    mockPrisma.did.findFirst.mockResolvedValue(SYSTEM_DEFAULT_DID);
+    // First call: get system default DID, second call: check if cloned DID exists (should be null)
+    mockPrisma.did.findFirst
+      .mockResolvedValueOnce(SYSTEM_DEFAULT_DID)
+      .mockResolvedValueOnce(null);
 
     const clonedInstanceId = "cloned-instance-1";
     mockPrisma.serviceInstance.create.mockResolvedValue({
@@ -120,7 +123,10 @@ describe("cloneSystemDefaults", () => {
     const mockPrisma = createMockPrisma();
 
     mockPrisma.serviceInstance.findMany.mockResolvedValue([SYSTEM_SERVICE_INSTANCE]);
-    mockPrisma.did.findFirst.mockResolvedValue(SYSTEM_DEFAULT_DID);
+    // First call: get system default DID, second call: check if cloned DID exists (should be null)
+    mockPrisma.did.findFirst
+      .mockResolvedValueOnce(SYSTEM_DEFAULT_DID)
+      .mockResolvedValueOnce(null);
 
     const clonedInstanceId = "cloned-instance-abc";
     mockPrisma.serviceInstance.create.mockResolvedValue({
@@ -167,7 +173,10 @@ describe("cloneSystemDefaults", () => {
 
     const didWithoutService = { ...SYSTEM_DEFAULT_DID, serviceInstanceId: null };
     mockPrisma.serviceInstance.findMany.mockResolvedValue([]);
-    mockPrisma.did.findFirst.mockResolvedValue(didWithoutService);
+    // First call: get system default DID, second call: check if cloned DID exists (should be null)
+    mockPrisma.did.findFirst
+      .mockResolvedValueOnce(didWithoutService)
+      .mockResolvedValueOnce(null);
 
     await cloneSystemDefaults(mockPrisma as never, TARGET_ORG_ID);
 
@@ -182,7 +191,10 @@ describe("cloneSystemDefaults", () => {
     const mockPrisma = createMockPrisma();
 
     mockPrisma.serviceInstance.findMany.mockResolvedValue([SYSTEM_SERVICE_INSTANCE]);
-    mockPrisma.did.findFirst.mockResolvedValue(SYSTEM_DEFAULT_DID);
+    // First call: get system default DID, second call: check if cloned DID exists (should be null)
+    mockPrisma.did.findFirst
+      .mockResolvedValueOnce(SYSTEM_DEFAULT_DID)
+      .mockResolvedValueOnce(null);
     mockPrisma.serviceInstance.create.mockResolvedValue({
       ...SYSTEM_SERVICE_INSTANCE,
       id: "cloned-1",

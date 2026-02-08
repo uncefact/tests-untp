@@ -77,6 +77,7 @@ export const POST = withOrgAuth(async (req, { organizationId }) => {
       const status = e.name === "ServiceInstanceNotFoundError" ? 404 : 500;
       return NextResponse.json({ ok: false, error: e.message }, { status });
     }
+    console.error("[api] Unexpected error:", e);
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
   }
 });
@@ -104,6 +105,7 @@ export const GET = withOrgAuth(async (req, { organizationId }) => {
     if (e instanceof ValidationError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
     }
+    console.error("[api] Unexpected error:", e);
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
   }
 });

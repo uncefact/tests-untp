@@ -29,6 +29,7 @@ export const POST = withOrgAuth(async (_req, { organizationId, params }) => {
       const status = e.name === "ServiceInstanceNotFoundError" ? 404 : 500;
       return NextResponse.json({ ok: false, error: e.message }, { status });
     }
+    console.error("[api] Unexpected error:", e);
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
   }
 });

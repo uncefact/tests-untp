@@ -65,24 +65,33 @@ async function cloneWithinTransaction(
 
   // Clone the default DID, linking it to the cloned service instance
   if (systemDefaultDid) {
-    const clonedServiceInstanceId = systemDefaultDid.serviceInstanceId
-      ? instanceIdMap.get(systemDefaultDid.serviceInstanceId) ?? null
-      : null;
+    const clonedDid = `${systemDefaultDid.did}:org:${organisationId}`;
 
-    await tx.did.create({
-      data: {
-        organizationId: organisationId,
-        did: `${systemDefaultDid.did}:org:${organisationId}`,
-        type: systemDefaultDid.type,
-        method: systemDefaultDid.method,
-        name: systemDefaultDid.name,
-        description: systemDefaultDid.description,
-        keyId: systemDefaultDid.keyId,
-        status: systemDefaultDid.status,
-        isDefault: false,
-        serviceInstanceId: clonedServiceInstanceId,
-      },
+    // Skip if already cloned (idempotent on retry)
+    const existing = await tx.did.findFirst({
+      where: { did: clonedDid, organizationId: organisationId },
     });
+
+    if (!existing) {
+      const clonedServiceInstanceId = systemDefaultDid.serviceInstanceId
+        ? instanceIdMap.get(systemDefaultDid.serviceInstanceId) ?? null
+        : null;
+
+      await tx.did.create({
+        data: {
+          organizationId: organisationId,
+          did: clonedDid,
+          type: systemDefaultDid.type,
+          method: systemDefaultDid.method,
+          name: systemDefaultDid.name,
+          description: systemDefaultDid.description,
+          keyId: systemDefaultDid.keyId,
+          status: systemDefaultDid.status,
+          isDefault: false,
+          serviceInstanceId: clonedServiceInstanceId,
+        },
+      });
+    }
   }
 
   return organisationId;

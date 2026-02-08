@@ -49,7 +49,11 @@ export async function resolveDidService(
   let decryptedJson: string;
   try {
     decryptedJson = getEncryptionService().decrypt(JSON.parse(instance.config));
-  } catch {
+  } catch (error) {
+    console.error("[resolve-did-service] Config decryption failed:", {
+      instanceId: instance.id,
+      error: error instanceof Error ? error.message : error,
+    });
     throw new ConfigDecryptionError(instance.id);
   }
 
@@ -57,7 +61,11 @@ export async function resolveDidService(
   let rawConfig: unknown;
   try {
     rawConfig = JSON.parse(decryptedJson);
-  } catch {
+  } catch (error) {
+    console.error("[resolve-did-service] Config JSON parse failed:", {
+      instanceId: instance.id,
+      error: error instanceof Error ? error.message : error,
+    });
     throw new ConfigValidationError(
       instance.id,
       "Invalid JSON in decrypted config",

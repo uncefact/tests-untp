@@ -34,27 +34,29 @@ export type ListServiceInstancesOptions = {
 export async function createServiceInstance(
   input: CreateServiceInstanceInput,
 ): Promise<ServiceInstance> {
-  if (input.isPrimary) {
-    await prisma.serviceInstance.updateMany({
-      where: {
+  return prisma.$transaction(async (tx) => {
+    if (input.isPrimary) {
+      await tx.serviceInstance.updateMany({
+        where: {
+          organizationId: input.organizationId,
+          serviceType: input.serviceType as ServiceType,
+          isPrimary: true,
+        },
+        data: { isPrimary: false },
+      });
+    }
+
+    return tx.serviceInstance.create({
+      data: {
         organizationId: input.organizationId,
         serviceType: input.serviceType as ServiceType,
-        isPrimary: true,
+        adapterType: input.adapterType as AdapterType,
+        name: input.name,
+        description: input.description,
+        config: input.config,
+        isPrimary: input.isPrimary ?? false,
       },
-      data: { isPrimary: false },
     });
-  }
-
-  return prisma.serviceInstance.create({
-    data: {
-      organizationId: input.organizationId,
-      serviceType: input.serviceType as ServiceType,
-      adapterType: input.adapterType as AdapterType,
-      name: input.name,
-      description: input.description,
-      config: input.config,
-      isPrimary: input.isPrimary ?? false,
-    },
   });
 }
 
@@ -97,7 +99,7 @@ export async function listServiceInstances(
 
   return prisma.serviceInstance.findMany({
     where,
-    take: limit,
+    take: limit ?? 100,
     skip: offset,
     orderBy: { createdAt: "desc" },
   });
@@ -112,34 +114,36 @@ export async function updateServiceInstance(
   organizationId: string,
   input: UpdateServiceInstanceInput,
 ): Promise<ServiceInstance> {
-  const existing = await prisma.serviceInstance.findFirst({
-    where: { id, organizationId },
-  });
-
-  if (!existing) {
-    throw new Error("Service instance not found or access denied");
-  }
-
-  if (input.isPrimary) {
-    await prisma.serviceInstance.updateMany({
-      where: {
-        organizationId,
-        serviceType: existing.serviceType,
-        isPrimary: true,
-        NOT: { id },
-      },
-      data: { isPrimary: false },
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.serviceInstance.findFirst({
+      where: { id, organizationId },
     });
-  }
 
-  return prisma.serviceInstance.update({
-    where: { id },
-    data: {
-      ...(input.name !== undefined && { name: input.name }),
-      ...(input.description !== undefined && { description: input.description }),
-      ...(input.config !== undefined && { config: input.config }),
-      ...(input.isPrimary !== undefined && { isPrimary: input.isPrimary }),
-    },
+    if (!existing) {
+      throw new Error("Service instance not found or access denied");
+    }
+
+    if (input.isPrimary) {
+      await tx.serviceInstance.updateMany({
+        where: {
+          organizationId,
+          serviceType: existing.serviceType,
+          isPrimary: true,
+          NOT: { id },
+        },
+        data: { isPrimary: false },
+      });
+    }
+
+    return tx.serviceInstance.update({
+      where: { id },
+      data: {
+        ...(input.name !== undefined && { name: input.name }),
+        ...(input.description !== undefined && { description: input.description }),
+        ...(input.config !== undefined && { config: input.config }),
+        ...(input.isPrimary !== undefined && { isPrimary: input.isPrimary }),
+      },
+    });
   });
 }
 

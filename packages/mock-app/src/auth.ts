@@ -16,10 +16,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   events: {
     async signIn({ user, account }) {
       if (!account || !user.id) return;
-      await handleSignIn(prisma, user.id, account, {
-        name: user.name,
-        email: user.email,
-      });
+      try {
+        await handleSignIn(prisma, user.id, account, {
+          name: user.name,
+          email: user.email,
+        });
+      } catch (error) {
+        console.error("[onboarding] Failed during sign-in:", {
+          userId: user.id,
+          provider: account.provider,
+          error: error instanceof Error ? error.message : error,
+        });
+      }
     },
   },
 });
