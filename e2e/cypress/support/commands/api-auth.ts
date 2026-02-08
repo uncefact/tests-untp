@@ -1,36 +1,51 @@
 /**
  * Programmatic login via Keycloak for API testing.
  *
- * Visits the NextAuth sign-in page, follows the Keycloak redirect,
- * fills in credentials, and returns to the app with a valid session cookie.
- * Subsequent cy.request() calls automatically include the session cookie.
+ * Uses cy.request() to follow the full OAuth redirect chain without
+ * browser navigation, avoiding cross-origin issues in CI.
+ *
+ * Flow:
+ * 1. GET  /api/auth/csrf              → CSRF token
+ * 2. POST /api/auth/signin/keycloak   → redirects to Keycloak login page
+ * 3. POST Keycloak form action        → submits credentials, redirects to callback
+ * 4. NextAuth callback sets session cookie automatically
  */
 Cypress.Commands.add('apiLogin', (username?: string, password?: string) => {
   const user = username ?? 'e2e-admin@test.local';
   const pass = password ?? 'E2eTest123!';
 
-  // Visit the NextAuth sign-in endpoint which redirects to Keycloak
-  cy.visit('/api/auth/signin');
+  // Step 1: Get the CSRF token from NextAuth
+  cy.request('/api/auth/csrf')
+    .its('body.csrfToken')
+    .then((csrfToken: string) => {
+      // Step 2: Initiate the Keycloak sign-in flow.
+      // cy.request follows redirects and lands on the Keycloak login page HTML.
+      cy.request({
+        method: 'POST',
+        url: '/api/auth/signin/keycloak',
+        form: true,
+        body: { csrfToken, callbackUrl: 'http://localhost:3003/' },
+      }).then((keycloakPage) => {
+        // Step 3: Extract the Keycloak login form action URL from the HTML
+        const html: string = keycloakPage.body;
+        const match = html.match(/action="([^"]+)"/);
+        if (!match) {
+          throw new Error(
+            'Could not find Keycloak login form action URL in response. ' +
+            'Is Keycloak healthy and the realm configured?',
+          );
+        }
+        const formAction = match[1].replace(/&amp;/g, '&');
 
-  // Click the Keycloak provider button (if present)
-  cy.get('body').then(($body) => {
-    if ($body.find('button:contains("Keycloak")').length) {
-      cy.contains('button', 'Keycloak').click();
-    }
-    // If already on the Keycloak login page, continue
-  });
-
-  // Fill in Keycloak credentials
-  cy.origin(
-    'http://localhost:8081',
-    { args: { user, pass } },
-    ({ user, pass }) => {
-      cy.get('#username').type(user);
-      cy.get('#password').type(pass);
-      cy.get('#kc-login').click();
-    },
-  );
-
-  // Wait for redirect back to the app
-  cy.url().should('include', 'localhost:3003');
+        // Step 4: Submit credentials to Keycloak.
+        // cy.request follows the redirect chain back through NextAuth's
+        // callback endpoint, which sets the session cookie.
+        cy.request({
+          method: 'POST',
+          url: formAction,
+          form: true,
+          body: { username: user, password: pass },
+        });
+      });
+    });
 });
