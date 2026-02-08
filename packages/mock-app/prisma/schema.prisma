@@ -9,16 +9,43 @@ datasource db {
   url      = env("RI_DATABASE_URL")
 }
 
+enum DidType {
+  DEFAULT
+  MANAGED
+  SELF_MANAGED
+}
+
+enum DidMethod {
+  DID_WEB
+  DID_WEB_VH
+}
+
+enum DidStatus {
+  ACTIVE
+  INACTIVE
+  VERIFIED
+  UNVERIFIED
+}
+
+enum ServiceType {
+  DID
+}
+
+enum AdapterType {
+  VCKIT
+}
+
 /**
  * Auth.js + Prisma adapter tables for OAuth + JWT sessions
  */
 model User {
-  id             String    @id @default(cuid())
-  name           String?
-  email          String?   @unique
-  emailVerified  DateTime?
-  image          String?
-  organizationId String?
+  id              String    @id @default(cuid())
+  authProviderId  String?   @unique
+  name            String?
+  email           String?   @unique
+  emailVerified   DateTime?
+  image           String?
+  organizationId  String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -54,7 +81,9 @@ model Organization {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  users User[]
+  users            User[]
+  dids             Did[]
+  serviceInstances ServiceInstance[]
 }
 
 /**
@@ -69,4 +98,52 @@ model Credential {
   isPublished    Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+/**
+ * DID records scoped to organisations (tenants).
+ * Supports three tiers: DEFAULT (system-wide), MANAGED, and SELF_MANAGED.
+ */
+model Did {
+  id             String    @id @default(cuid())
+  organizationId String
+  did            String    @unique
+  type           DidType
+  method         DidMethod @default(DID_WEB)
+  name           String
+  description    String?
+  keyId          String
+  status         DidStatus @default(UNVERIFIED)
+  isDefault      Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  serviceInstanceId String?
+  serviceInstance   ServiceInstance? @relation(fields: [serviceInstanceId], references: [id], onDelete: SetNull)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+/**
+ * Registered service instances scoped to organisations (tenants).
+ * Each instance stores AES-256-GCM encrypted configuration for its adapter.
+ */
+model ServiceInstance {
+  id             String       @id @default(cuid())
+  organizationId String
+  serviceType    ServiceType
+  adapterType    AdapterType
+  name           String
+  description    String?
+  config         String       // AES-256-GCM encrypted JSON blob
+  isPrimary      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dids           Did[]
+
+  @@index([organizationId, serviceType])
 }

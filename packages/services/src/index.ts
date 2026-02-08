@@ -27,7 +27,7 @@ export type {
 } from './interfaces/verifiableCredentialService.js';
 export * from './did-manager/types.js';
 export { didDocumentSchema, verificationMethodSchema } from './did-manager/schemas.js';
-export { didWebToUrl, parseDidMethod, normaliseDidAlias } from './did-manager/utils.js';
+export { didWebToUrl, parseDidMethod, normaliseDidWebAlias } from './did-manager/utils.js';
 // Encryption
 export { AesGcmEncryptionAdapter } from './encryption/adapters/aes-gcm/aes-gcm.adapter.js';
 export { EncryptionAlgorithm, assertPermittedAlgorithm } from './encryption/encryption.interface.js';

@@ -93,7 +93,8 @@ export async function verifyDid(
     for (const providerKey of providerKeys) {
       const providerKid = providerKey.kid;
       for (const vm of docMethods) {
-        if (vm.publicKeyJwk?.kid === providerKid || vm.id?.includes(providerKid)) {
+        const vmKid = vm.id?.split('#')[1];
+        if (vm.publicKeyJwk?.kid === providerKid || vmKid === providerKid) {
           keyFound = true;
           break;
         }

@@ -141,4 +141,32 @@ describe('verifyDidWeb', () => {
     expect(result.checks).toHaveLength(2);
     expect(result.checks.map(c => c.name)).toEqual([C.RESOLVE, C.HTTPS]);
   });
+
+  describe('SSRF protection', () => {
+    it('blocks localhost URLs', async () => {
+      const result = await verifyDidWeb('did:web:localhost');
+      expect(result.document).toBeNull();
+      const resolveCheck = result.checks.find(c => c.name === C.RESOLVE);
+      expect(resolveCheck?.passed).toBe(false);
+      expect(resolveCheck?.message).toContain('not permitted');
+    });
+
+    it('blocks 127.x.x.x URLs', async () => {
+      const result = await verifyDidWeb('did:web:127.0.0.1');
+      const resolveCheck = result.checks.find(c => c.name === C.RESOLVE);
+      expect(resolveCheck?.passed).toBe(false);
+    });
+
+    it('blocks 10.x.x.x URLs', async () => {
+      const result = await verifyDidWeb('did:web:10.0.0.1');
+      const resolveCheck = result.checks.find(c => c.name === C.RESOLVE);
+      expect(resolveCheck?.passed).toBe(false);
+    });
+
+    it('blocks 192.168.x.x URLs', async () => {
+      const result = await verifyDidWeb('did:web:192.168.1.1');
+      const resolveCheck = result.checks.find(c => c.name === C.RESOLVE);
+      expect(resolveCheck?.passed).toBe(false);
+    });
+  });
 });

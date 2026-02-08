@@ -4,8 +4,21 @@ import fs from 'fs';
 import path from 'path';
 import util from 'util';
 import { Client, ClientOptions } from 'minio';
+import pg from 'pg';
+const { Client: PgClient } = pg;
 
 const execPromise = util.promisify(exec);
+
+function getDbClient() {
+  return new PgClient({
+    host: process.env.E2E_DB_HOST || 'localhost',
+    port: parseInt(process.env.E2E_DB_PORT || '5433', 10),
+    user: process.env.E2E_DB_USER || 'ri-postgres',
+    password: process.env.E2E_DB_PASSWORD || 'ri-postgres',
+    database: process.env.E2E_DB_NAME || 'ri',
+  });
+}
+
 export default defineConfig({
   env: {
     idrBucketName: process.env.OBJECT_STORAGE_BUCKET_NAME || 'idr-bucket-1',
@@ -78,9 +91,9 @@ export default defineConfig({
             }
 
             return { success: true };
-          } catch (error) {
-            console.log(error);
-            throw error;
+          } catch (error: any) {
+            console.log('clearObjectStore skipped:', error?.message ?? error);
+            return { success: false, message: error?.message ?? 'Unknown error' };
           }
         },
         async runUntpTest({ type, version, testData }) {
@@ -98,6 +111,69 @@ export default defineConfig({
               resolve(null);
             });
           });
+        },
+        async seedTestOrg({ userEmail }: { userEmail: string }) {
+          const client = getDbClient();
+          try {
+            await client.connect();
+
+            // Create or update test organisation
+            await client.query(`
+              INSERT INTO "Organization" (id, name, "createdAt", "updatedAt")
+              VALUES ('e2e-test-org', 'E2E Test Organisation', NOW(), NOW())
+              ON CONFLICT (id) DO UPDATE SET "updatedAt" = NOW()
+            `);
+
+            // Link the user (created by NextAuth on first login) to the test org
+            const result = await client.query(
+              `UPDATE "User" SET "organizationId" = 'e2e-test-org', "updatedAt" = NOW()
+               WHERE email = $1
+               RETURNING id`,
+              [userEmail],
+            );
+
+            if (result.rowCount === 0) {
+              throw new Error(`User with email ${userEmail} not found. Has the user logged in?`);
+            }
+
+            return { organizationId: 'e2e-test-org', userId: result.rows[0].id };
+          } finally {
+            await client.end();
+          }
+        },
+        async cleanupTestData({ organizationId }: { organizationId: string }) {
+          const client = getDbClient();
+          try {
+            await client.connect();
+
+            // Delete test DIDs (cascade from org)
+            await client.query(
+              `DELETE FROM "Did" WHERE "organizationId" = $1`,
+              [organizationId],
+            );
+
+            // Delete test service instances
+            await client.query(
+              `DELETE FROM "ServiceInstance" WHERE "organizationId" = $1`,
+              [organizationId],
+            );
+
+            // Unlink users from test org (don't delete users - NextAuth owns them)
+            await client.query(
+              `UPDATE "User" SET "organizationId" = NULL WHERE "organizationId" = $1`,
+              [organizationId],
+            );
+
+            // Delete test organisation
+            await client.query(
+              `DELETE FROM "Organization" WHERE id = $1`,
+              [organizationId],
+            );
+
+            return null;
+          } finally {
+            await client.end();
+          }
         },
       });
     },

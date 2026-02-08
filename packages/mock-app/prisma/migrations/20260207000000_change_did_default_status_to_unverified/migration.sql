@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Did" ALTER COLUMN "status" SET DEFAULT 'UNVERIFIED';

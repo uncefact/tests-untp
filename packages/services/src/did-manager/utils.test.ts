@@ -1,4 +1,4 @@
-import { didWebToUrl, parseDidMethod, normaliseDidAlias } from './utils';
+import { didWebToUrl, parseDidMethod, normaliseDidWebAlias } from './utils';
 
 describe('didWebToUrl', () => {
   it('converts a basic domain DID to a well-known URL', () => {
@@ -78,40 +78,40 @@ describe('parseDidMethod', () => {
   });
 });
 
-describe('normaliseDidAlias', () => {
+describe('normaliseDidWebAlias', () => {
   it('lowercases the input', () => {
-    expect(normaliseDidAlias('MyOrg')).toBe('myorg');
+    expect(normaliseDidWebAlias('MyOrg')).toBe('myorg');
   });
 
   it('replaces spaces with hyphens', () => {
-    expect(normaliseDidAlias('my org name')).toBe('my-org-name');
+    expect(normaliseDidWebAlias('my org name')).toBe('my-org-name');
   });
 
   it('strips invalid characters', () => {
-    expect(normaliseDidAlias('my_org@123!')).toBe('myorg123');
+    expect(normaliseDidWebAlias('my_org@123!')).toBe('myorg123');
   });
 
   it('collapses consecutive hyphens', () => {
-    expect(normaliseDidAlias('my---org')).toBe('my-org');
+    expect(normaliseDidWebAlias('my---org')).toBe('my-org');
   });
 
   it('trims leading and trailing hyphens', () => {
-    expect(normaliseDidAlias('-my-org-')).toBe('my-org');
+    expect(normaliseDidWebAlias('-my-org-')).toBe('my-org');
   });
 
   it('handles a mix of normalisation rules', () => {
-    expect(normaliseDidAlias('  My Org & Co.  ')).toBe('my-org-co');
+    expect(normaliseDidWebAlias('  My Org & Co.  ')).toBe('my-org-co');
   });
 
   it('throws for input that normalises to empty', () => {
-    expect(() => normaliseDidAlias('!!!')).toThrow('empty identifier after normalisation');
+    expect(() => normaliseDidWebAlias('!!!')).toThrow('empty identifier after normalisation');
   });
 
   it('throws for empty string', () => {
-    expect(() => normaliseDidAlias('')).toThrow('empty identifier after normalisation');
+    expect(() => normaliseDidWebAlias('')).toThrow('empty identifier after normalisation');
   });
 
   it('preserves already-valid aliases', () => {
-    expect(normaliseDidAlias('my-org-123')).toBe('my-org-123');
+    expect(normaliseDidWebAlias('my-org-123')).toBe('my-org-123');
   });
 });

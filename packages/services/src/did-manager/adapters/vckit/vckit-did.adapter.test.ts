@@ -135,7 +135,7 @@ describe('VCKitDidAdapter', () => {
       await expect(service.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' })).rejects.toThrow('Failed to create DID: Network error');
     });
 
-    it('normalises the alias in the payload', async () => {
+    it('passes the alias through to the payload as-is', async () => {
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce(createMockResponse({ did: 'did:web:example.com:my-org', controllerKeyId: 'key-1' }))
         .mockResolvedValueOnce(createMockResponse({ didDocument: { '@context': ['https://www.w3.org/ns/did/v1', 'https://w3id.org/security/suites/ed25519-2020/v1', 'https://w3id.org/security/suites/jws-2020/v1'], id: 'did:web:example.com:my-org', verificationMethod: [] } }));
@@ -143,7 +143,7 @@ describe('VCKitDidAdapter', () => {
       await service.create({
         type: DidType.MANAGED,
         method: DidMethod.DID_WEB,
-        alias: 'My Org',
+        alias: 'my-org',
       });
 
       const payload = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
@@ -246,6 +246,27 @@ describe('VCKitDidAdapter', () => {
       });
     });
   });
+
+  describe('normaliseAlias', () => {
+    it('normalises a did:web alias', () => {
+      expect(service.normaliseAlias('My Org', DidMethod.DID_WEB)).toBe('my-org');
+    });
+
+    it('throws for invalid alias that normalises to empty', () => {
+      expect(() => service.normaliseAlias('!!!', DidMethod.DID_WEB)).toThrow('empty identifier');
+    });
+
+    it('throws for did:webvh (not yet supported)', () => {
+      expect(() => service.normaliseAlias('test', DidMethod.DID_WEB_VH)).toThrow('not yet supported');
+    });
+  });
+
+  describe('getSupportedTypes', () => {
+    it('returns MANAGED and SELF_MANAGED', () => {
+      expect(service.getSupportedTypes()).toEqual(['MANAGED', 'SELF_MANAGED']);
+    });
+  });
+
 
   describe('getSupportedMethods', () => {
     it('returns DID_WEB', () => {

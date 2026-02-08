@@ -160,9 +160,24 @@ services:
       - RI_POSTGRES_DB=ri
       - RI_POSTGRES_HOST=e2e-ri-db
       - RI_POSTGRES_PORT=5432
+      - RI_DATABASE_URL=postgresql://ri-postgres:ri-postgres@e2e-ri-db:5432/ri?schema=public
       - RI_APP_URL=http://localhost:3003
       - DEFAULT_HUMAN_VERIFICATION_URL=http://localhost:3003
       - DEFAULT_MACHINE_VERIFICATION_URL=http://vckit-api:3332/agent/routeVerificationCredential
+      - VCKIT_API_URL=http://vckit-api:3332/v2
+      - VCKIT_AUTH_TOKEN=test123
+      - DEFAULT_ISSUER_DID=did:web:uncefact.github.io:project-vckit:test-and-development
+      - SERVICE_ENCRYPTION_KEY=dd1b7430915155b51c503806031f31f901e85563035f65421d707f042c75f44b
+      - AUTH_SECRET=e2e-super-secret-key-for-testing
+      - AUTH_TRUST_HOST=true
+      - AUTH_URL=http://localhost:3003
+      - AUTH_KEYCLOAK_CLIENT_ID=ri-app-e2e
+      - AUTH_KEYCLOAK_CLIENT_SECRET=e2e-test-secret
+      - AUTH_KEYCLOAK_ISSUER=http://localhost:8081/realms/ri-e2e
+      - AUTH_KEYCLOAK_SERVICE_ACCOUNT_CLIENT_ID=ri-service-account-e2e
+      - AUTH_KEYCLOAK_SERVICE_ACCOUNT_CLIENT_SECRET=e2e-service-account-secret
+    extra_hosts:
+      - 'localhost:host-gateway'
     depends_on:
       untp-playground:
         condition: service_started
@@ -198,7 +213,7 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_HEALTH_ENABLED: 'true'
     ports:
-      - '127.0.0.1:8081:8080' # See https://github.com/quarkusio/quarkus/discussions/48905#discussioncomment-14213858
+      - '8081:8080'
       - '9991:9000'
     volumes:
       - ./e2e/cypress/fixtures/keycloak-realm-e2e.json:/opt/keycloak/data/import/ri-e2e.json:ro
