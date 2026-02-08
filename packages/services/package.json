@@ -4,46 +4,23 @@
   "description": "Services for the UNTP reference implementation",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
+  "_exports_note": "Exports use flat types/default conditions, not nested import/require. The require conditions (.cjs/.d.cts) are only built during npm publish and do not exist in the workspace. The Next.js standalone tracer (@vercel/nft) fails when exports reference non-existent files. A publish pipeline should add import/require conditions before publishing.",
   "exports": {
     ".": {
-      "import": {
-        "types": "./build/index.d.ts",
-        "default": "./build/index.js"
-      },
-      "require": {
-        "types": "./build/index.d.cts",
-        "default": "./build/index.cjs"
-      }
+      "types": "./build/index.d.ts",
+      "default": "./build/index.js"
     },
     "./server": {
-      "import": {
-        "types": "./build/server.d.ts",
-        "default": "./build/server.js"
-      },
-      "require": {
-        "types": "./build/server.d.cts",
-        "default": "./build/server.cjs"
-      }
+      "types": "./build/server.d.ts",
+      "default": "./build/server.js"
     },
     "./encryption": {
-      "import": {
-        "types": "./build/encryption/index.d.ts",
-        "default": "./build/encryption/index.js"
-      },
-      "require": {
-        "types": "./build/encryption/index.d.cts",
-        "default": "./build/encryption/index.cjs"
-      }
+      "types": "./build/encryption/index.d.ts",
+      "default": "./build/encryption/index.js"
     },
     "./key-provider": {
-      "import": {
-        "types": "./build/key-provider/index.d.ts",
-        "default": "./build/key-provider/index.js"
-      },
-      "require": {
-        "types": "./build/key-provider/index.d.cts",
-        "default": "./build/key-provider/index.cjs"
-      }
+      "types": "./build/key-provider/index.d.ts",
+      "default": "./build/key-provider/index.js"
     }
   },
   "typesVersions": {
