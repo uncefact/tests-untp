@@ -5,9 +5,9 @@ import type {
   DidDocument,
   DidVerificationResult,
 } from '../../types.js';
-import { DidMethod } from '../../types.js';
+import { DidMethod, DidType } from '../../types.js';
 import { verifyDid } from '../../verify.js';
-import { normaliseDidAlias } from '../../utils.js';
+import { normaliseDidWebAlias } from '../../utils.js';
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
 import { vckitDidConfigSchema } from './vckit-did.schema.js';
 import type { VCKitDidConfig } from './vckit-did.schema.js';
@@ -43,10 +43,21 @@ export class VCKitDidAdapter implements IDidService {
     this.keyType = keyType;
   }
 
+  normaliseAlias(alias: string, method: DidMethod): string {
+    switch (method) {
+      case DidMethod.DID_WEB:
+        return normaliseDidWebAlias(alias);
+      case DidMethod.DID_WEB_VH:
+        throw new Error('did:webvh is not yet supported');
+      default:
+        throw new Error(`Unknown DID method: ${method}`);
+    }
+  }
+
   async create(options: CreateDidOptions): Promise<DidRecord> {
     const provider = toProviderString(options.method);
     const payload = {
-      alias: normaliseDidAlias(options.alias),
+      alias: options.alias,
       provider,
       kms: 'local',
       options: { keyType: this.keyType },
@@ -137,6 +148,10 @@ export class VCKitDidAdapter implements IDidService {
     }
 
     return verifyDid(did, { providerKeys });
+  }
+
+  getSupportedTypes(): DidType[] {
+    return [DidType.MANAGED, DidType.SELF_MANAGED];
   }
 
   getSupportedMethods(): DidMethod[] {
