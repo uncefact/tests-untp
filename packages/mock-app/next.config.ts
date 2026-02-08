@@ -18,7 +18,11 @@ const nextConfig = (phase: string): NextConfig => {
     AUTH_KEYCLOAK_ISSUER,
     RI_APP_URL,
     DEFAULT_HUMAN_VERIFICATION_URL,
-    DEFAULT_MACHINE_VERIFICATION_URL
+    DEFAULT_MACHINE_VERIFICATION_URL,
+    VCKIT_API_URL,
+    VCKIT_AUTH_TOKEN,
+    DEFAULT_ISSUER_DID,
+    SERVICE_ENCRYPTION_KEY,
   } = process.env;
 
   // Validate required environment variables (skip during build phase for Docker)
@@ -32,7 +36,11 @@ const nextConfig = (phase: string): NextConfig => {
       AUTH_KEYCLOAK_ISSUER,
       RI_APP_URL,
       DEFAULT_HUMAN_VERIFICATION_URL,
-      DEFAULT_MACHINE_VERIFICATION_URL
+      DEFAULT_MACHINE_VERIFICATION_URL,
+      VCKIT_API_URL,
+      VCKIT_AUTH_TOKEN,
+      DEFAULT_ISSUER_DID,
+      SERVICE_ENCRYPTION_KEY,
     };
 
     const missingVars = Object.entries(requiredEnvVars)

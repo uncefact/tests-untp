@@ -28,6 +28,13 @@ export enum DidMethod {
   DID_WEB_VH = 'DID_WEB_VH',
 }
 
+/** Maps DID URI method strings (e.g. "web", "webvh") to DidMethod enum values. */
+export const DID_METHOD_BY_URI: Record<string, DidMethod> = {
+  web: DidMethod.DID_WEB,
+  webvh: DidMethod.DID_WEB_VH,
+};
+
+
 export enum DidStatus {
   /** DID is active and usable (default for DEFAULT and MANAGED) */
   ACTIVE = 'ACTIVE',
@@ -38,6 +45,10 @@ export enum DidStatus {
   /** Self-managed DID created but not yet verified (initial state for SELF_MANAGED) */
   UNVERIFIED = 'UNVERIFIED',
 }
+
+/** DID types that can be created via the API (excludes DEFAULT, which is system-managed). */
+export const CREATABLE_DID_TYPES = [DidType.MANAGED, DidType.SELF_MANAGED] as const;
+
 
 // ── Input / option types ───────────────────────────────────────────────────
 
@@ -111,12 +122,16 @@ export type MethodVerificationResult = {
 // ── Service interface ──────────────────────────────────────────────────────
 
 export interface IDidService {
+  /** Normalise and validate an alias for the given DID method. Throws if invalid. */
+  normaliseAlias(alias: string, method: DidMethod): string;
   /** Create a new DID in the provider */
   create(options: CreateDidOptions): Promise<DidRecord>;
   /** Get the full DID Document */
   getDocument(did: string): Promise<DidDocument>;
   /** Verify a DID and its document against a series of checks */
   verify(did: string): Promise<DidVerificationResult>;
+  /** DID types this adapter supports */
+  getSupportedTypes(): DidType[];
   /** DID methods this adapter supports */
   getSupportedMethods(): DidMethod[];
   /** Key algorithms this adapter supports */

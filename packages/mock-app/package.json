@@ -47,6 +47,9 @@
       "last 1 safari version"
     ]
   },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
+  },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@storybook/addon-docs": "^10.0.2",

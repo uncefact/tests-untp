@@ -2,6 +2,9 @@
  * DID utility functions.
  */
 
+import { DID_METHOD_BY_URI } from './types.js';
+
+
 /**
  * Converts a did:web or did:webvh identifier to its HTTPS resolution URL.
  *
@@ -40,17 +43,15 @@ export function didWebToUrl(did: string): string {
 /**
  * Parse the DID method from a DID string (e.g. "did:web:example.com" -> "web").
  *
- * Only `web` and `webvh` are supported.
+ * Only methods listed in DID_METHOD_BY_URI are supported.
  */
-const SUPPORTED_METHODS = new Set(['web', 'webvh']);
-
 export function parseDidMethod(did: string): string {
   const match = did.match(/^did:([a-z0-9]+):.+/);
   if (!match) {
     throw new Error(`Invalid DID string: ${did}`);
   }
   const method = match[1];
-  if (!SUPPORTED_METHODS.has(method)) {
+  if (!(method in DID_METHOD_BY_URI)) {
     throw new Error(`Unsupported DID method: ${method}`);
   }
   return method;
@@ -66,7 +67,7 @@ export function parseDidMethod(did: string): string {
  * - Trims leading/trailing hyphens
  * - Throws if the result is empty
  */
-export function normaliseDidAlias(alias: string): string {
+export function normaliseDidWebAlias(alias: string): string {
   const normalised = alias
     .toLowerCase()
     .replace(/\s+/g, '-')

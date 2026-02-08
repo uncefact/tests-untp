@@ -20,6 +20,11 @@ export const authConfig: NextAuthConfig = {
       issuer: process.env.AUTH_KEYCLOAK_ISSUER!,
       clientId: process.env.AUTH_KEYCLOAK_CLIENT_ID!,
       clientSecret: process.env.AUTH_KEYCLOAK_CLIENT_SECRET!,
+      // When the OIDC issuer hostname is only reachable from within Docker,
+      // allow overriding the browser-facing authorization URL separately.
+      ...(process.env.AUTH_KEYCLOAK_AUTHORIZATION_URL && {
+        authorization: { url: process.env.AUTH_KEYCLOAK_AUTHORIZATION_URL },
+      }),
     }),
   ],
   callbacks: {
