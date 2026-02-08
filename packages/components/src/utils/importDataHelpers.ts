@@ -1,4 +1,4 @@
-import { verifyVC, decodeEnvelopedVC } from '@mock-app/services';
+import { verifyVC, decodeEnvelopedVC } from '@uncefact/untp-ri-services';
 import { VerifiableCredential } from '@vckit/core-types';
 import JSONPointer from 'jsonpointer';
 import { IVCContext } from '../types/common.types';

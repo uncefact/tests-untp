@@ -18,7 +18,7 @@ jest.mock('@mock-app/components', () => ({
   },
 }));
 
-jest.mock('@mock-app/services', () => ({
+jest.mock('@uncefact/untp-ri-services', () => ({
   logService: jest.fn().mockImplementation(() => 'logService'),
 }));
 

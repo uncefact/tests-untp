@@ -8,7 +8,7 @@ import {
   issueCredentialStatus,
   PROOF_FORMAT,
   StorageRecord,
-} from "@mock-app/services";
+} from "@uncefact/untp-ri-services";
 import { createCredential } from "@/lib/prisma/repositories";
 
 type JSONPrimitive = string | number | boolean | null;

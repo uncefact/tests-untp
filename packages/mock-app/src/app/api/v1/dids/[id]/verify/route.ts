@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveDidService } from "@/lib/services/resolve-did-service";
 import { NotFoundError, ServiceRegistryError, errorMessage } from "@/lib/api/errors";
-import { DidStatus } from "@mock-app/services";
+import { DidStatus } from "@uncefact/untp-ri-services";
 import { withOrgAuth } from "@/lib/api/with-org-auth";
 import { getDidById, updateDidStatus } from "@/lib/prisma/repositories";
 

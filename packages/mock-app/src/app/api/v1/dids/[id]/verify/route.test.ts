@@ -17,7 +17,7 @@ const mockResolveDidService = jest.fn();
 const mockGetDidById = jest.fn();
 const mockUpdateDidStatus = jest.fn();
 
-jest.mock("@mock-app/services", () => ({
+jest.mock("@uncefact/untp-ri-services", () => ({
   DidStatus: {
     ACTIVE: "ACTIVE",
     INACTIVE: "INACTIVE",

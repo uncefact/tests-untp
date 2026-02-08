@@ -5,7 +5,7 @@
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
     "@mock-app/components": "0.2.0",
-    "@mock-app/services": "0.2.0",
+    "@uncefact/untp-ri-services": "0.1.0-dev.8",
     "@mui/icons-material": "^7.3.4",
     "@mui/material": "^7.3.4",
     "@prisma/client": "^6.18.0",

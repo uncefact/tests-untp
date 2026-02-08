@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render } from '@testing-library/react';
-import { publicAPI } from '@mock-app/services';
+import { publicAPI } from '@uncefact/untp-ri-services';
 import { Scanner } from '../components/Scanner';
 import Scanning from '../app/(public)/scanning/page';
 
@@ -63,7 +63,7 @@ jest.mock('../components/CustomDialog', () => ({
   CustomDialog: jest.fn(),
 }));
 
-jest.mock('@mock-app/services', () => ({
+jest.mock('@uncefact/untp-ri-services', () => ({
   publicAPI: jest.fn(),
 }));
 

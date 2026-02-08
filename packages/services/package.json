@@ -1,19 +1,61 @@
 {
-  "name": "@mock-app/services",
-  "version": "0.2.0",
-  "description": "",
+  "name": "@uncefact/untp-ri-services",
+  "version": "0.1.0-dev.8",
+  "description": "Services for the UNTP reference implementation",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
   "exports": {
     ".": {
-      "types": "./build/index.d.ts",
-      "default": "./build/index.js"
+      "import": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      },
+      "require": {
+        "types": "./build/index.d.cts",
+        "default": "./build/index.cjs"
+      }
     },
     "./server": {
-      "types": "./build/server.d.ts",
-      "default": "./build/server.js"
+      "import": {
+        "types": "./build/server.d.ts",
+        "default": "./build/server.js"
+      },
+      "require": {
+        "types": "./build/server.d.cts",
+        "default": "./build/server.cjs"
+      }
+    },
+    "./encryption": {
+      "import": {
+        "types": "./build/encryption/index.d.ts",
+        "default": "./build/encryption/index.js"
+      },
+      "require": {
+        "types": "./build/encryption/index.d.cts",
+        "default": "./build/encryption/index.cjs"
+      }
+    },
+    "./key-provider": {
+      "import": {
+        "types": "./build/key-provider/index.d.ts",
+        "default": "./build/key-provider/index.js"
+      },
+      "require": {
+        "types": "./build/key-provider/index.d.cts",
+        "default": "./build/key-provider/index.cjs"
+      }
     }
   },
+  "typesVersions": {
+    "*": {
+      "server": ["./build/server.d.ts"],
+      "encryption": ["./build/encryption/index.d.ts"],
+      "key-provider": ["./build/key-provider/index.d.ts"]
+    }
+  },
+  "files": [
+    "build"
+  ],
   "scripts": {
     "build": "tsc --build --clean && tsc",
     "watch": "tsc -b --watch",
@@ -29,10 +71,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@babel/preset-typescript": "^7.23.3",
     "@vckit/core-types": "1.0.0-beta.7",
     "axios": "^1.6.7",
-    "babel-jest": "^29.7.0",
     "digitallink_toolkit_server": "file:../../digitallink_toolkit_server",
     "jsonpointer": "^5.0.1",
     "jose": "^5.9.3",
@@ -43,8 +83,10 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@babel/preset-typescript": "^7.23.3",
     "@types/jsonld": "^1.5.15",
     "axios-mock-adapter": "^1.19.0",
+    "babel-jest": "^29.7.0",
     "typescript": "^5.3.3"
   }
 }

@@ -27,7 +27,7 @@ jest.mock("@/lib/prisma/repositories", () => ({
 }));
 
 import { ServiceResolutionError } from "@/lib/api/errors";
-import { DidType, DidMethod, DidStatus } from "@mock-app/services";
+import { DidType, DidMethod, DidStatus } from "@uncefact/untp-ri-services";
 import { POST, GET } from "./route";
 
 function createFakeRequest(options: {

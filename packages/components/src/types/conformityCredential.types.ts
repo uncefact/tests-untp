@@ -1,4 +1,4 @@
-import { StorageServiceConfig } from '@mock-app/services';
+import { StorageServiceConfig } from '@uncefact/untp-ri-services';
 
 export type FetchOptions = {
   method: 'POST' | 'GET';

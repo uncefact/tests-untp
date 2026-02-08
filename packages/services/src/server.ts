@@ -3,7 +3,7 @@
  *
  * These modules depend on Node.js built-ins (node:crypto) or native-optional
  * packages (jsonld/rdf-canonize) that break Next.js client-side webpack.
- * Import from '@mock-app/services/server' in server components, API routes,
+ * Import from '@uncefact/untp-ri-services/server' in server components, API routes,
  * and scripts — never in client components.
  */
 

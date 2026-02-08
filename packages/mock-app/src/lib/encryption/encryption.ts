@@ -1,4 +1,4 @@
-import { AesGcmEncryptionAdapter } from "@mock-app/services/server";
+import { AesGcmEncryptionAdapter } from "@uncefact/untp-ri-services/server";
 
 let cached: AesGcmEncryptionAdapter | null = null;
 

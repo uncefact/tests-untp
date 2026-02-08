@@ -70,7 +70,7 @@ describe("getEncryptionService", () => {
   it("service can encrypt and decrypt content", async () => {
     process.env.SERVICE_ENCRYPTION_KEY = VALID_KEY;
     const { getEncryptionService } = await import("./encryption");
-    const { EncryptionAlgorithm } = await import("@mock-app/services");
+    const { EncryptionAlgorithm } = await import("@uncefact/untp-ri-services/encryption");
 
     const service = getEncryptionService();
     const plaintext = '{"apiUrl":"https://example.com"}';

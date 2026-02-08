@@ -4,7 +4,7 @@ import { ServiceRegistryError, errorMessage } from "@/lib/api/errors";
 import { ValidationError, validateEnum, parsePositiveInt, parseNonNegativeInt } from "@/lib/api/validation";
 import { withOrgAuth } from "@/lib/api/with-org-auth";
 import { createDid, listDids } from "@/lib/prisma/repositories";
-import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus } from "@mock-app/services";
+import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus } from "@uncefact/untp-ri-services";
 
 export const POST = withOrgAuth(async (req, { organizationId }) => {
   let body: {
