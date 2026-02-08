@@ -1,7 +1,7 @@
 import * as jose from 'jose';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { UnsignedCredential, VerifiableCredential } from '@uncefact/vckit-core-types';
-import { computeHash, decryptCredential, publicAPI, verifyVC } from '@mock-app/services';
+import { computeHash, decryptCredential, publicAPI, verifyVC } from '@uncefact/untp-ri-services';
 import Verify from '../app/(public)/verify/page';
 
 console.error = jest.fn();
@@ -59,7 +59,7 @@ jest.mock('@mock-app/components', () => ({
   toastMessage: jest.fn(),
   ToastMessage: jest.fn(),
 }));
-jest.mock('@mock-app/services', () => ({
+jest.mock('@uncefact/untp-ri-services', () => ({
   getDlrPassport: jest.fn(),
   IdentityProvider: jest.fn(),
   getProviderByType: jest.fn(),

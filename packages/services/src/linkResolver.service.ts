@@ -1,3 +1,4 @@
+// TODO: Replace with a published npm package (https://github.com/uncefact/tests-untp/issues/401)
 import GS1DigitalLinkToolkit from 'digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js';
 import { IDLRAI, MimeTypeEnum } from './types/index.js';
 import { GS1ServiceEnum } from './identityProviders/GS1Provider.js';

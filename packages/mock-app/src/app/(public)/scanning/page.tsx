@@ -7,7 +7,7 @@ import { VerifiableCredential } from '@vckit/core-types';
 import { Html5QrcodeResult } from 'html5-qrcode';
 import { useRouter } from 'next/navigation';
 import { toastMessage, Status, ToastMessage } from '@mock-app/components';
-import { getDlrPassport, IdentityProvider, getProviderByType } from '@mock-app/services';
+import { getDlrPassport, IdentityProvider, getProviderByType } from '@uncefact/untp-ri-services';
 import { IScannerRef } from '@/types/scanner.types';
 import { CustomDialog } from '@/components/CustomDialog';
 import appConfig from '@/constants/app-config.json';

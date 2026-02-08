@@ -1,6 +1,6 @@
-import { ServiceType, AdapterType } from "@mock-app/services";
-import { adapterRegistry } from "@mock-app/services/server";
-import type { IDidService } from "@mock-app/services";
+import { ServiceType, AdapterType } from "@uncefact/untp-ri-services";
+import { adapterRegistry } from "@uncefact/untp-ri-services/server";
+import type { IDidService } from "@uncefact/untp-ri-services";
 import { getEncryptionService } from "@/lib/encryption/encryption";
 import { getInstanceByResolution } from "@/lib/prisma/repositories";
 import {

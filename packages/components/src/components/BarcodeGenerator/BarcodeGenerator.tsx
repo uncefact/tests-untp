@@ -1,4 +1,4 @@
-import { extractFromElementString, constructIdentifierData, constructElementString } from '@mock-app/services';
+import { extractFromElementString, constructIdentifierData, constructElementString } from '@uncefact/untp-ri-services';
 import { Box } from '@mui/material';
 import { useEffect, useState } from 'react';
 import Barcode from 'react-barcode';

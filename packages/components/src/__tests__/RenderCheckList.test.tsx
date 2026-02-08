@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { RenderCheckList } from '../components/RenderCheckList/RenderCheckList';
 import { IDynamicComponentRendererProps } from '../components/DynamicComponentRenderer/DynamicComponentRenderer';
 import { processVerifiableCredentialData } from '../utils/importDataHelpers.js';
-import { publicAPI } from '@mock-app/services';
+import { publicAPI } from '@uncefact/untp-ri-services';
 import { ScannerDialog } from '../components/QRCodeScannerDialogButton/ScannerDialog';
 
 jest.mock('../components/ConformityCredential/index.ts', () => ({}));
@@ -12,7 +12,7 @@ jest.mock('../utils/importDataHelpers.js', () => ({
   processVerifiableCredentialData: jest.fn(),
 }));
 
-jest.mock('@mock-app/services', () => ({
+jest.mock('@uncefact/untp-ri-services', () => ({
   publicAPI: {
     get: jest.fn(),
   },

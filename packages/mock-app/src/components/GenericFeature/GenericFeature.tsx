@@ -80,7 +80,7 @@
 */
 
 import React from 'react';
-import * as services from '@mock-app/services';
+import * as services from '@uncefact/untp-ri-services';
 // import * as events from '@mock-app/events';
 import {
   toastMessage,

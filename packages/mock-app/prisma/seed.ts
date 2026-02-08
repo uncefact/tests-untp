@@ -1,8 +1,8 @@
 import dotenv from "dotenv";
 import path from "path";
 import { DidMethod, DidStatus, DidType, PrismaClient, ServiceType as PrismaServiceType, AdapterType as PrismaAdapterType } from "../src/lib/prisma/generated";
-import { AesGcmEncryptionAdapter } from "@mock-app/services/server";
-import { EncryptionAlgorithm } from "@mock-app/services";
+import { AesGcmEncryptionAdapter } from "@uncefact/untp-ri-services/server";
+import { EncryptionAlgorithm } from "@uncefact/untp-ri-services";
 import { getDidConfig } from "../src/lib/config/did.config";
 
 // Load .env before accessing config (seed runs outside Next.js)

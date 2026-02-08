@@ -25,7 +25,7 @@ jest.mock("@/lib/prisma/repositories", () => ({
 }));
 
 // Mock the services package (types only from main barrel)
-jest.mock("@mock-app/services", () => ({
+jest.mock("@uncefact/untp-ri-services", () => ({
   ServiceType: { DID: "DID" },
   AdapterType: { VCKIT: "VCKIT" },
 }));
@@ -35,7 +35,7 @@ const mockFactory = jest.fn();
 const mockConfigSchema = {
   safeParse: jest.fn(),
 };
-jest.mock("@mock-app/services/server", () => ({
+jest.mock("@uncefact/untp-ri-services/server", () => ({
   adapterRegistry: {
     DID: {
       VCKIT: {

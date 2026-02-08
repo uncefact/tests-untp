@@ -1,7 +1,7 @@
 import { processVerifiableCredentialData } from '../../utils';
-import { verifyVC, decodeEnvelopedVC } from '@mock-app/services';
+import { verifyVC, decodeEnvelopedVC } from '@uncefact/untp-ri-services';
 
-jest.mock('@mock-app/services', () => ({
+jest.mock('@uncefact/untp-ri-services', () => ({
   verifyVC: jest.fn(),
   decodeEnvelopedVC: jest.fn(),
 }));

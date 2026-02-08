@@ -1,7 +1,7 @@
 'use client';
 
 import { Status } from '@mock-app/components';
-import { computeHash, decryptCredential, publicAPI, verifyVC } from '@mock-app/services';
+import { computeHash, decryptCredential, publicAPI, verifyVC } from '@uncefact/untp-ri-services';
 import { IVerifyResult, VerifiableCredential } from '@vckit/core-types';
 import * as jose from 'jose';
 import _ from 'lodash';
