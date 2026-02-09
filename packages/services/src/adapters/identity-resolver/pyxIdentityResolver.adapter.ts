@@ -1,4 +1,9 @@
-import type { Link, LinkRegistration, IIdentityResolverService, PublishLinksOptions } from '../../interfaces/identityResolverService';
+import type {
+  Link,
+  LinkRegistration,
+  IIdentityResolverService,
+  PublishLinksOptions,
+} from '../../interfaces/identityResolverService';
 
 /**
  * Payload for registering links with the Identity Resolver.
@@ -118,16 +123,12 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
    * @param headers - Headers including Authorization
    * @param config - Configuration for default flags
    */
-  constructor(
-    baseURL: string,
-    headers: Record<string, string>,
-    config?: DefaultFlagsConfig,
-  ) {
+  constructor(baseURL: string, headers: Record<string, string>, config?: DefaultFlagsConfig) {
     if (!baseURL) {
-      throw new Error("Error creating PyxIdentityResolverAdapter. API URL is required.");
+      throw new Error('Error creating PyxIdentityResolverAdapter. API URL is required.');
     }
     if (!headers?.Authorization) {
-      throw new Error("Error creating PyxIdentityResolverAdapter. Authorization header is required.");
+      throw new Error('Error creating PyxIdentityResolverAdapter. Authorization header is required.');
     }
 
     this.baseURL = baseURL;

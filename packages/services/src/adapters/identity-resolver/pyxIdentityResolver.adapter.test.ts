@@ -59,9 +59,9 @@ describe('PyxIdentityResolverAdapter', () => {
     });
 
     it('should throw an error when headers is undefined', () => {
-      expect(
-        () => new PyxIdentityResolverAdapter(mockBaseURL, undefined as unknown as Record<string, string>),
-      ).toThrow('Error creating PyxIdentityResolverAdapter. Authorization header is required.');
+      expect(() => new PyxIdentityResolverAdapter(mockBaseURL, undefined as unknown as Record<string, string>)).toThrow(
+        'Error creating PyxIdentityResolverAdapter. Authorization header is required.',
+      );
     });
   });
 
@@ -95,10 +95,7 @@ describe('PyxIdentityResolverAdapter', () => {
       const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders);
       await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://resolver.example.com/resolver',
-        expect.any(Object),
-      );
+      expect(mockFetch).toHaveBeenCalledWith('https://resolver.example.com/resolver', expect.any(Object));
     });
 
     it('should use namespace from options in payload', async () => {
@@ -283,16 +280,12 @@ describe('PyxIdentityResolverAdapter', () => {
       ];
 
       // Configure adapter to only set defaultLinkType and defaultIanaLanguage
-      const adapter = new PyxIdentityResolverAdapter(
-        mockBaseURL,
-        mockHeaders,
-        {
-          defaultLinkType: true,
-          defaultMimeType: false,
-          defaultIanaLanguage: true,
-          defaultContext: false,
-        },
-      );
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, {
+        defaultLinkType: true,
+        defaultMimeType: false,
+        defaultIanaLanguage: true,
+        defaultContext: false,
+      });
       await adapter.publishLinks('abn', '51824753556', linkWithDefault, undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
@@ -371,11 +364,7 @@ describe('PyxIdentityResolverAdapter', () => {
     });
 
     it('should use fwqs from config', async () => {
-      const adapter = new PyxIdentityResolverAdapter(
-        mockBaseURL,
-        mockHeaders,
-        { fwqs: true },
-      );
+      const adapter = new PyxIdentityResolverAdapter(mockBaseURL, mockHeaders, { fwqs: true });
       await adapter.publishLinks('abn', '51824753556', [mockLinks[0]], undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
@@ -461,5 +450,4 @@ describe('PyxIdentityResolverAdapter', () => {
       });
     });
   });
-
 });

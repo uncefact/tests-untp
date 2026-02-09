@@ -1,1 +1,1 @@
-export * from "./pyxIdentityResolver.adapter.js";
+export * from './pyxIdentityResolver.adapter.js';
