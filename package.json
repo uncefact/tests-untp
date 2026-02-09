@@ -23,7 +23,7 @@
     "build": "yarn copy-config && yarn build:services && yarn build:components && yarn build:untp-test-suite && yarn build:ri",
     "build:services": "cd packages/services && yarn run build",
     "build:components": "cd packages/components && yarn run build",
-    "build:ri": "cd packages/mock-app && yarn run build",
+    "build:ri": "cd packages/reference-implementation && yarn run build",
     "build:untp-test-suite": "cd packages/untp-test-suite && yarn run build",
     "build-clean": "rimraf --glob ./yarn.lock ./node_modules ./packages/*/tsconfig.tsbuildinfo ./packages/*/build ./packages/*/node_modules",
     "test": "lerna exec -- yarn jest",
