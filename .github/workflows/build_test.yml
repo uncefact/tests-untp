@@ -48,7 +48,7 @@ jobs:
           multiple-files: |
             All packages, ./coverage/coverage-summary.json
             Components, ./packages/components/coverage/coverage-summary.json
-            Mock app, ./packages/mock-app/coverage/coverage-summary.json
+            Reference Implementation, ./packages/reference-implementation/coverage/coverage-summary.json
             Services, ./packages/services/coverage/coverage-summary.json
             UNTP test suite, ./packages/untp-test-suite/coverage/coverage-summary.json
             VC test suite, ./packages/vc-test-suite/coverage/coverage-summary.json
