@@ -28,6 +28,9 @@ jobs:
         run: |
           yarn cache clean && yarn install --frozen-lockfile
 
+      - name: Check formatting
+        run: yarn format:check
+
       - name: Check linting
         run: yarn build && yarn lint
 
