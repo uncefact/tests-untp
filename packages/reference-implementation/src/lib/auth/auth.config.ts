@@ -10,6 +10,7 @@ import { type NextAuthConfig } from 'next-auth';
 import Keycloak from 'next-auth/providers/keycloak';
 
 export const authConfig: NextAuthConfig = {
+  trustHost: process.env.AUTH_TRUST_HOST === 'true',
   session: {
     strategy: 'jwt',
     maxAge: 8 * 60 * 60,
