@@ -24,5 +24,6 @@
     }
   },
   "types": ["node", "jest", "@testing-library/jest-dom"],
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"]
 }

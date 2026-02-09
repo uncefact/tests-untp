@@ -170,10 +170,17 @@ export async function POST(req: Request) {
  */
 async function issueCredential(params: IssueConfigParams, body: IssueRequest): Promise<VCkitIssueResponse> {
   const vckit = params.vckit;
+  const issuerApiUrl = process.env.VCKIT_API_URL || vckit.vckitAPIUrl;
+  const issuerAuthToken = process.env.VCKIT_AUTH_TOKEN;
+
+  const headers: Record<string, string> = {
+    ...vckit.headers,
+    ...(issuerAuthToken && { Authorization: `Bearer ${issuerAuthToken}` }),
+  };
 
   const credentialStatus = await issueCredentialStatus({
-    host: new URL(vckit.vckitAPIUrl).origin,
-    headers: vckit.headers,
+    host: new URL(issuerApiUrl).origin,
+    headers,
     bitstringStatusIssuer: vckit.issuer,
   });
 
@@ -193,11 +200,11 @@ async function issueCredential(params: IssueConfigParams, body: IssueRequest): P
     },
   };
 
-  const res = await fetch(`${vckit.vckitAPIUrl}/credentials/issue`, {
+  const res = await fetch(`${issuerApiUrl}/credentials/issue`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(vckit.headers ?? {}),
+      ...headers,
     },
     body: JSON.stringify(payload),
   });
@@ -215,13 +222,14 @@ async function issueCredential(params: IssueConfigParams, body: IssueRequest): P
  */
 async function storeCredential(params: IssueConfigParams, envelopedVC: EnvelopedVC): Promise<StorageRecord> {
   const storage = params.storage;
+  const storageUrl = process.env.STORAGE_SERVICE_URL || storage.url;
 
   const payload = {
     bucket: storage.params.bucket,
     data: envelopedVC,
   };
 
-  const res = await fetch(storage.url, {
+  const res = await fetch(storageUrl, {
     method: storage.options.method,
     headers: {
       'Content-Type': 'application/json',
@@ -247,6 +255,8 @@ async function publishCredential(
   storage: StorageRecord,
 ): Promise<{ enabled: true; raw: JSONValue }> {
   const dlr = params.dlr;
+  const idrAPIUrl = process.env.IDR_API_URL || dlr.dlrAPIUrl;
+  const idrAPIKey = process.env.IDR_API_KEY || dlr.dlrAPIKey;
 
   if (!storage?.uri) throw new Error('Storage response missing uri');
   if (!storage?.hash) throw new Error('Storage response missing hash');
@@ -257,8 +267,8 @@ async function publishCredential(
     throw new Error('Missing credentialSubject.registeredId');
   }
 
-  const DEFAULT_MACHINE_VERIFICATION_URL = process.env.NEXT_DEFAULT_MACHINE_VERIFICATION_URL!;
-  const DEFAULT_HUMAN_VERIFICATION_URL = process.env.NEXT_DEFAULT_HUMAN_VERIFICATION_URL!;
+  const DEFAULT_MACHINE_VERIFICATION_URL = process.env.DEFAULT_MACHINE_VERIFICATION_URL!;
+  const DEFAULT_HUMAN_VERIFICATION_URL = process.env.DEFAULT_HUMAN_VERIFICATION_URL!;
 
   const baseResponses = [
     {
@@ -314,11 +324,11 @@ async function publishCredential(
     responses,
   };
 
-  const res = await fetch(`${dlr.dlrAPIUrl}/${dlr.linkRegisterPath}`, {
+  const res = await fetch(`${idrAPIUrl}/${dlr.linkRegisterPath}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(dlr.dlrAPIKey ? { Authorization: `Bearer ${dlr.dlrAPIKey}` } : {}),
+      Authorization: `Bearer ${idrAPIKey}`,
     },
     body: JSON.stringify(payload),
   });
@@ -332,13 +342,30 @@ async function publishCredential(
 }
 
 /**
- * Loads hardcoded issue configuration
+ * Loads configuration from mounted volume or falls back to built-in config
  */
 async function getConfig(): Promise<AppConfig> {
-  const configPath = path.join(process.cwd(), 'src/constants/app-config.issue.json');
+  // Runtime config path (mounted volume)
+  const runtimeConfigPath = process.env.CONFIG_PATH || '/app/config/app-config.json';
+  // Built-in fallback config
+  const builtInConfigPath = path.join(process.cwd(), 'src/constants/app-config.issue.json');
 
+  // Try runtime config first
   try {
-    const raw = await readFile(configPath, 'utf-8');
+    const raw = await readFile(runtimeConfigPath, 'utf-8');
+    return JSON.parse(raw) as AppConfig;
+  } catch (err) {
+    console.log(
+      `Runtime config not found or failed to load from ${runtimeConfigPath}. Falling back to built-in config. Error: ${
+        err instanceof Error ? err.message : 'Unknown error'
+      }`,
+    );
+    // Fall back to built-in config
+  }
+
+  // Try built-in config
+  try {
+    const raw = await readFile(builtInConfigPath, 'utf-8');
     return JSON.parse(raw) as AppConfig;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -347,7 +374,7 @@ async function getConfig(): Promise<AppConfig> {
 }
 
 /**
- * Extracts service parameters
+ * Extracts service parameters from config
  */
 function getConfigParameters(config: AppConfig): IssueConfigParams {
   const params = config?.services?.[0]?.parameters?.[0];
