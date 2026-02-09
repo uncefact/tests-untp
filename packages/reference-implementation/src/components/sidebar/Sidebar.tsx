@@ -11,8 +11,8 @@ import {
   SidebarFooter as ShadcnSidebarFooter,
   SidebarHeader as ShadcnSidebarHeader,
   type User,
-} from "@reference-implementation/components";
-import { SidebarSkeleton } from "./skeleton";
+} from '@reference-implementation/components';
+import { SidebarSkeleton } from './skeleton';
 
 interface SidebarProps {
   user: User;

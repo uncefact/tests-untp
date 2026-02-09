@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
-import { MoreOptions, UserProfile, type User, type MoreOptionGroup } from "@reference-implementation/components";
+import { cn } from '@/lib/utils';
+import { MoreOptions, UserProfile, type User, type MoreOptionGroup } from '@reference-implementation/components';
 
 interface SidebarFooterProps {
   user: User;

@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { cn } from "@/lib/utils";
-import { Sidebar } from "../Sidebar";
-import Image from "next/image";
-import type { User, NavMenuItemConfig, MoreOptionGroup } from "@reference-implementation/components";
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
+import { Sidebar } from '../Sidebar';
+import Image from 'next/image';
+import type { User, NavMenuItemConfig, MoreOptionGroup } from '@reference-implementation/components';
 
 interface MobileSidebarProps {
   user: User;

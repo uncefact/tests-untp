@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, act } from '@testing-library/react';
 import { GenericFeature } from '../components/GenericFeature/GenericFeature';
-import { ComponentType, DynamicComponentRenderer, IDynamicComponentRendererProps } from '@reference-implementation/components';
+import {
+  ComponentType,
+  DynamicComponentRenderer,
+  IDynamicComponentRendererProps,
+} from '@reference-implementation/components';
 
 jest.mock('@reference-implementation/components', () => ({
   JsonForm: jest.fn(),

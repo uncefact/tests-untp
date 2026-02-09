@@ -1,7 +1,12 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { MobileSidebar } from "./MobileSidebar";
-import { UserRole, type User, type NavMenuItemConfig, type MoreOptionGroup } from "@reference-implementation/components";
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MobileSidebar } from './MobileSidebar';
+import {
+  UserRole,
+  type User,
+  type NavMenuItemConfig,
+  type MoreOptionGroup,
+} from '@reference-implementation/components';
 
 const mockUser: User = {
   name: 'Cindy Reardon',

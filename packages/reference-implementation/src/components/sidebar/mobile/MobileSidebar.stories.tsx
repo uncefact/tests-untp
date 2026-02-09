@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from "@storybook/react-webpack5";
-import { MobileSidebar } from "./MobileSidebar";
-import { UserRole, type NavMenuItemConfig, type MoreOptionGroup } from "@reference-implementation/components";
-import { LogOut, FileText, ShieldCheck, Factory, BookOpen, Workflow, Key, Database, BookMarked } from "lucide-react";
+import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import { MobileSidebar } from './MobileSidebar';
+import { UserRole, type NavMenuItemConfig, type MoreOptionGroup } from '@reference-implementation/components';
+import { LogOut, FileText, ShieldCheck, Factory, BookOpen, Workflow, Key, Database, BookMarked } from 'lucide-react';
 
 const mockNavItems: NavMenuItemConfig[] = [
   {

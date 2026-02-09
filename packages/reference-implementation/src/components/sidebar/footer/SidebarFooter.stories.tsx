@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from "@storybook/react-webpack5";
-import { SidebarFooter } from "./SidebarFooter";
-import { UserRole, type MoreOptionGroup } from "@reference-implementation/components";
-import { LogOut } from "lucide-react";
+import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import { SidebarFooter } from './SidebarFooter';
+import { UserRole, type MoreOptionGroup } from '@reference-implementation/components';
+import { LogOut } from 'lucide-react';
 
 const mockMenuGroups: MoreOptionGroup[] = [
   {

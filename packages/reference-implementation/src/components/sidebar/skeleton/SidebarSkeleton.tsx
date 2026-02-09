@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
-import { Skeleton } from "@reference-implementation/components";
+import { cn } from '@/lib/utils';
+import { Skeleton } from '@reference-implementation/components';
 
 interface SidebarSkeletonProps {
   hideHeader?: boolean;
