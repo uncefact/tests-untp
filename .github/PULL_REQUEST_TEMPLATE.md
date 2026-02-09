@@ -52,7 +52,7 @@ https://docs.github.com/en/free-pro-team@latest/github/managing-your-work-on-git
 
 ## Added to documentation?
 
-- [ ] 📖 [Mock App docs site](https://uncefact.github.io/tests-untp/docs/mock-apps/)
+- [ ] 📖 [Reference Implementation docs site](https://uncefact.github.io/tests-untp/docs/reference-implementation/)
 - [ ] 📜 README.md
 - [ ] 📕 storybook
 - [ ] 🙅 no documentation needed

@@ -14,19 +14,23 @@ flowchart TD
 ```
 
 ### Core Files (Required)
+
 1. `01-project-brief.md`
+
    - Foundation document that shapes all other files
    - Created at project start if it doesn't exist
    - Defines core requirements and goals
    - Source of truth for project scope
 
 2. `02-product-context.md`
+
    - Why this project exists
    - Problems it solves
    - How it should work
    - User experience goals
 
 3. `03-active-context.md`
+
    - Current work focus
    - Recent changes
    - Next steps
@@ -41,6 +45,7 @@ flowchart TD
 ### Additional Context
 
 Create additional files/folders within memory-bank/ when they help organize:
+
 - Complex feature documentation
 - Integration specifications
 - API documentation
@@ -50,6 +55,7 @@ Create additional files/folders within memory-bank/ when they help organize:
 ## Core Workflows
 
 ### Plan Mode
+
 ```mermaid
 flowchart TD
     Start[Start] --> ReadFiles[Read Memory Bank]
@@ -64,6 +70,7 @@ flowchart TD
 ```
 
 ### Act Mode
+
 ```mermaid
 flowchart TD
     Start[Start] --> Context[Check Memory Bank]
@@ -74,6 +81,7 @@ flowchart TD
 ```
 
 ### Task Management
+
 ```mermaid
 flowchart TD
     Start[New Task] --> NewFile[Create Task File in tasks/ folder]
@@ -92,6 +100,7 @@ flowchart TD
 ## Documentation Updates
 
 Memory Bank updates occur when:
+
 1. Discovering new project patterns
 2. After implementing significant changes
 3. You should update the memory bank explicitly if someone prompts you with the phrase **update memory bank** (and you MUST review ALL files)
@@ -113,14 +122,16 @@ flowchart TD
     Start --> Process
 ```
 
-Note: When prompted with **update memory bank**, you MUST review every memory bank file, even if some don't require updates. Focus particularly on 03-active-context.md and the tasks/ folder (including _index.md) as they track current state.
+Note: When prompted with **update memory bank**, you MUST review every memory bank file, even if some don't require updates. Focus particularly on 03-active-context.md and the tasks/ folder (including \_index.md) as they track current state.
 
 ## Project Intelligence (instructions)
 
 The collection of files in this memory-bank form my learning journal for each project. They capture important patterns, preferences, and project intelligence that help me work more effectively. As I work with you and the project, I'll discover and document key insights that aren't obvious from the code alone.
 
 ### Communication Style
+
 When responding to feedback or corrections:
+
 - Acknowledge good points directly without excessive agreement phrases
 - Focus on the technical substance rather than validation-seeking language
 - Avoid patterns like "You're absolutely right!" or overly deferential responses
@@ -147,6 +158,7 @@ flowchart TD
 ```
 
 ### What to Capture
+
 - Critical implementation paths
 - User preferences and workflow
 - Project-specific patterns
@@ -171,19 +183,23 @@ The `tasks/_index.md` file maintains a structured record of all tasks sorted by 
 # Tasks Index
 
 ## In Progress
+
 - [TASK003] Implement user authentication - Working on OAuth integration
 - [TASK005] Create dashboard UI - Building main components
 
 ## Pending
+
 - [TASK006] Add export functionality - Planned for next sprint
 - [TASK007] Optimize database queries - Waiting for performance testing
 
 ## Completed
+
 - [TASK001] Project setup - Completed on 2025-03-15
 - [TASK002] Create database schema - Completed on 2025-03-17
 - [TASK004] Implement login page - Completed on 2025-03-20
 
 ## Abandoned
+
 - [TASK008] Integrate with legacy system - Abandoned due to API deprecation
 ```
 
@@ -201,12 +217,15 @@ Each task file follows this format:
 **Updated:** [Date Last Updated]
 
 ## Original Request
+
 [The original task description as provided by the user]
 
 ## Thought Process
+
 [Documentation of the discussion and reasoning that shaped the approach to this task]
 
 ## Implementation Plan
+
 - [Step 1]
 - [Step 2]
 - [Step 3]
@@ -216,26 +235,31 @@ Each task file follows this format:
 **Overall Status:** [Not Started/In Progress/Blocked/Completed] - [Completion Percentage]
 
 ### Task Metadata
+
 - **Priority Level:** [Low/Medium/High/Critical] - How urgent/important this task is
 - **Tags:** [List of relevant tags for filtering and organization]
 - **Dependencies:** [List of other tasks that must be completed first]
 - **Estimated Effort:** [Time estimate or complexity rating]
 
 ### Subtasks
-| ID | Description | Status | Updated | Notes |
-|----|-------------|--------|---------|-------|
-| 1.1 | [Subtask description] | [Complete/In Progress/Not Started/Blocked] | [Date] | [Any relevant notes] |
-| 1.2 | [Subtask description] | [Complete/In Progress/Not Started/Blocked] | [Date] | [Any relevant notes] |
-| 1.3 | [Subtask description] | [Complete/In Progress/Not Started/Blocked] | [Date] | [Any relevant notes] |
+
+| ID  | Description           | Status                                     | Updated | Notes                |
+| --- | --------------------- | ------------------------------------------ | ------- | -------------------- |
+| 1.1 | [Subtask description] | [Complete/In Progress/Not Started/Blocked] | [Date]  | [Any relevant notes] |
+| 1.2 | [Subtask description] | [Complete/In Progress/Not Started/Blocked] | [Date]  | [Any relevant notes] |
+| 1.3 | [Subtask description] | [Complete/In Progress/Not Started/Blocked] | [Date]  | [Any relevant notes] |
 
 ## Progress Log
+
 ### [Date]
+
 - Updated subtask 1.1 status to Complete
 - Started work on subtask 1.2
 - Encountered issue with [specific problem]
 - Made decision to [approach/solution]
 
 ### [Date]
+
 - [Additional updates as work progresses]
 ```
 
@@ -244,25 +268,27 @@ Each task file follows this format:
 1. Update the overall task status and completion percentage
 2. Update the status of relevant subtasks with the current date
 3. Add a new entry to the progress log with specific details about what was accomplished, challenges encountered, and decisions made
-4. Update the task status in the _index.md file to reflect current progress
+4. Update the task status in the \_index.md file to reflect current progress
 
 These detailed progress updates ensure that after memory resets, I can quickly understand the exact state of each task and continue work without losing context.
 
 ### Task Commands
 
 When I prompt you with **add task** or use the command **create task**, can you:
+
 1. Confirm the current date with me before proceeding
 2. Create a new task file with a unique Task ID in the tasks/ folder
 3. Document our thought process about the approach
 4. Develop an implementation plan
 5. Set an initial status with the correct date
-6. Update the _index.md file to include the new task
+6. Update the \_index.md file to include the new task
 
 For existing tasks, the prompt **update task [ID]** is asking you to:
+
 1. Open the specific task file
 2. Add a new progress log entry with today's date
 3. Update the task status if needed
-4. Update the _index.md file to reflect any status changes
+4. Update the \_index.md file to reflect any status changes
 5. Integrate any new decisions into the thought process
 
 ## Task Status Update Rules
@@ -270,12 +296,14 @@ For existing tasks, the prompt **update task [ID]** is asking you to:
 **Important**: You may update task or subtask status when you BEGIN work (e.g., changing from "Not Started" to "In Progress"), but you MUST NOT mark any task or subtask as "Complete" or "Finished" until I explicitly tell you it's complete. Only I can determine when work meets the completion criteria.
 
 This rule applies to:
+
 - Overall task status
 - Individual subtask status in the progress tracking table
 - Progress percentages (don't increase beyond work actually accepted)
-- Status updates in the _index.md file
+- Status updates in the \_index.md file
 
 To view tasks, the command **show tasks [filter]** will:
+
 1. Display a filtered list of tasks based on the specified criteria
 2. Valid filters include:
    - **all** - Show all tasks regardless of status
@@ -296,13 +324,16 @@ To view tasks, the command **show tasks [filter]** will:
 4. Example usage: **show tasks active** or **show tasks tag:frontend** or **show tasks priority:high**
 
 ### Task Tagging System
+
 Tags help organize and filter tasks effectively. Common tag categories include:
+
 - **Component tags**: frontend, backend, database, api
 - **Type tags**: feature, bugfix, refactor, documentation, testing
 - **Domain tags**: auth, ui, deployment, performance
 - **Technology tags**: react, node, typescript, docker
 
 ### Task Priority Levels
+
 - **Critical**: Must be completed immediately, blocks other work
 - **High**: Important for project success, should be prioritized
 - **Medium**: Standard priority, complete in normal workflow

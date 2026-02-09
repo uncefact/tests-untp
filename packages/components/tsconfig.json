@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -27,17 +23,7 @@
       "@/*": ["./src/*"]
     }
   },
-  "types": [
-    "node",
-    "jest",
-    "@testing-library/jest-dom"
-  ],
-  "include": [
-    "src"
-  ],
-  "exclude": [
-    "**/__tests__/**",
-    "**/*.test.ts",
-    "**/*.test.tsx"
-  ]
+  "types": ["node", "jest", "@testing-library/jest-dom"],
+  "include": ["src"],
+  "exclude": ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"]
 }

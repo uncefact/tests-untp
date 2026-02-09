@@ -13,11 +13,11 @@ const meta: any = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const args =  {
+const args = {
   fileData: { content: 'Down data!' },
   fileName: 'exampleFile',
   fileExtension: 'json',
-  fileType: DownloadFileType.json
+  fileType: DownloadFileType.json,
 };
 
 export const Default: Story = {
@@ -25,7 +25,7 @@ export const Default: Story = {
   decorators: [
     (Story) => (
       <div style={{ minWidth: '500px', height: '40vh' }}>
-          <Story />
+        <Story />
       </div>
     ),
   ],

@@ -76,24 +76,24 @@ export function GenerateReportDialog() {
               Cancel
             </Button>
             <TooltipWrapper
-              content="Enter implementation details to generate a conformance report"
+              content='Enter implementation details to generate a conformance report'
               dataTestId='dialog-generate-report-button'
               disabled={isValid}
             >
               <Button
                 onClick={handleGenerate}
                 disabled={!isValid || isGenerating}
-              data-testid='confirm-generate-dialog-button'
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                  Generating...
-                </>
-              ) : (
-                'Generate'
-              )}
-            </Button>
+                data-testid='confirm-generate-dialog-button'
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                    Generating...
+                  </>
+                ) : (
+                  'Generate'
+                )}
+              </Button>
             </TooltipWrapper>
           </DialogFooter>
         </DialogContent>

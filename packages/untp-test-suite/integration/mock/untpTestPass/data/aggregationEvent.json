@@ -38,10 +38,7 @@
       "certificateID": "https://example.com/certificate/12345",
       "referenceStandard": "https://example.com/standard/abc",
       "evidenceURL": "https://example.com/certificate/evidence",
-      "criteriaList": [
-        "https://example.com/criteria/xyz",
-        "https://example.com/criteria/123"
-      ],
+      "criteriaList": ["https://example.com/criteria/xyz", "https://example.com/criteria/123"],
       "assessmentLevel": "self-assessed",
       "responsibleAgency": {
         "partyID": "https://example.com/party/67890",

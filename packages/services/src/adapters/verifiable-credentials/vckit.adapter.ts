@@ -1,9 +1,5 @@
 import { decodeJwt } from 'jose';
-import {
-  VC_CONTEXT_V2,
-  VC_TYPE,
-  VerificationErrorCode,
-} from '../../interfaces/verifiableCredentialService.js';
+import { VC_CONTEXT_V2, VC_TYPE, VerificationErrorCode } from '../../interfaces/verifiableCredentialService.js';
 
 import type {
   CredentialPayload,
@@ -12,12 +8,10 @@ import type {
   UNTPVerifiableCredential,
   EnvelopedVerifiableCredential,
   IVerifiableCredentialService,
-  VerifyResult
+  VerifyResult,
 } from '../../interfaces/verifiableCredentialService.js';
 
-import type {
-  IVerifyResult
-} from '@vckit/core-types'
+import type { IVerifyResult } from '@vckit/core-types';
 
 const PROOF_FORMAT = 'EnvelopingProofJose';
 
@@ -43,7 +37,12 @@ function mapErrorCode(errorCode?: string): VerificationErrorCode {
   }
 
   // Check for temporal errors (expiry, validity period)
-  if (code.includes('expir') || code.includes('not_yet_valid') || code.includes('validfrom') || code.includes('validuntil')) {
+  if (
+    code.includes('expir') ||
+    code.includes('not_yet_valid') ||
+    code.includes('validfrom') ||
+    code.includes('validuntil')
+  ) {
     return VerificationErrorCode.Temporal;
   }
 
@@ -60,10 +59,12 @@ function transformVerifyResult(vckitResult: IVerifyResult): VerifyResult {
 
   return {
     verified: false,
-    error: vckitResult.error ? {
-      type: mapErrorCode(vckitResult.error.errorCode),
-      message: vckitResult.error.message || 'Verification failed'
-    } : undefined
+    error: vckitResult.error
+      ? {
+          type: mapErrorCode(vckitResult.error.errorCode),
+          message: vckitResult.error.message || 'Verification failed',
+        }
+      : undefined,
   };
 }
 
@@ -88,10 +89,10 @@ export class VCKitAdapter implements IVerifiableCredentialService {
    */
   constructor(baseURL: string, headers: Record<string, string>) {
     if (!baseURL) {
-      throw new Error("Error creating VCKitAdapter. API URL is required.");
+      throw new Error('Error creating VCKitAdapter. API URL is required.');
     }
     if (!headers?.Authorization) {
-      throw new Error("Error creating VCKitAdapter. Authorization header is required.");
+      throw new Error('Error creating VCKitAdapter. Authorization header is required.');
     }
     this.baseURL = baseURL;
     this.headers = headers;
@@ -103,14 +104,14 @@ export class VCKitAdapter implements IVerifiableCredentialService {
    * @param headers - Optional HTTP headers to include in the request
    * @returns A promise that resolves to a signed verifiable credential
    */
-  async sign(
-    credentialPayload: CredentialPayload,
-  ): Promise<EnvelopedVerifiableCredential> {
+  async sign(credentialPayload: CredentialPayload): Promise<EnvelopedVerifiableCredential> {
     // A verifiable credential MUST contain a credentialSubject property
-    if (!credentialPayload.credentialSubject ||
-        (typeof credentialPayload.credentialSubject === 'object' &&
-         Object.keys(credentialPayload.credentialSubject).length === 0)) {
-      throw new Error("Error issuing VC. credentialSubject is required in credential payload.");
+    if (
+      !credentialPayload.credentialSubject ||
+      (typeof credentialPayload.credentialSubject === 'object' &&
+        Object.keys(credentialPayload.credentialSubject).length === 0)
+    ) {
+      throw new Error('Error issuing VC. credentialSubject is required in credential payload.');
     }
 
     // Issue credential status
@@ -123,7 +124,7 @@ export class VCKitAdapter implements IVerifiableCredentialService {
     // construct verifiable credential
     const vc = this.constructVerifiableCredential({
       ...credentialPayload,
-      credentialStatus
+      credentialStatus,
     });
 
     // issue credential
@@ -153,16 +154,16 @@ export class VCKitAdapter implements IVerifiableCredentialService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...this.headers
+          ...this.headers,
         },
-        body: JSON.stringify(verifyCredentialParams)
+        body: JSON.stringify(verifyCredentialParams),
       });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const vckitResult = await response.json() as IVerifyResult;
+      const vckitResult = (await response.json()) as IVerifyResult;
       return transformVerifyResult(vckitResult);
     } catch (error) {
       if (error instanceof Error) {
@@ -200,20 +201,20 @@ export class VCKitAdapter implements IVerifiableCredentialService {
   }
 
   private constructVerifiableCredential(
-    credentialPayload: CredentialPayload & { credentialStatus: CredentialStatus }
+    credentialPayload: CredentialPayload & { credentialStatus: CredentialStatus },
   ): UNTPVerifiableCredential {
     // add or merge context from credentialPayload
-    const context = [...new Set([VC_CONTEXT_V2, ...(credentialPayload['@context'] || [])])]
+    const context = [...new Set([VC_CONTEXT_V2, ...(credentialPayload['@context'] || [])])];
     const type = [...new Set([VC_TYPE, ...(credentialPayload.type || [])])];
 
     const issuer = credentialPayload.issuer;
 
     const vc = {
       ...credentialPayload,
-      "@context": context,
+      '@context': context,
       type: type,
-      issuer: issuer
-    } as UNTPVerifiableCredential
+      issuer: issuer,
+    } as UNTPVerifiableCredential;
 
     return vc;
   }
@@ -223,14 +224,12 @@ export class VCKitAdapter implements IVerifiableCredentialService {
    * @param vc - The verifiable credential to sign
    * @returns An enveloped verifiable credential
    */
-  private async issueVerifiableCredential(
-    vc: UNTPVerifiableCredential
-  ): Promise<EnvelopedVerifiableCredential> {
+  private async issueVerifiableCredential(vc: UNTPVerifiableCredential): Promise<EnvelopedVerifiableCredential> {
     const payload = {
       credential: vc,
       options: {
         proofFormat: PROOF_FORMAT,
-      }
+      },
     };
 
     try {
@@ -238,16 +237,16 @@ export class VCKitAdapter implements IVerifiableCredentialService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...this.headers
+          ...this.headers,
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const result = await response.json() as { verifiableCredential: EnvelopedVerifiableCredential };
+      const result = (await response.json()) as { verifiableCredential: EnvelopedVerifiableCredential };
       return result.verifiableCredential;
     } catch (error) {
       if (error instanceof Error) {
@@ -263,9 +262,7 @@ export class VCKitAdapter implements IVerifiableCredentialService {
    * @returns A promise that resolves to a credential status object
    * @throws Error if required parameters are missing or invalid
    */
-  private async issueCredentialStatus(
-    params: IssueCredentialStatusParams
-  ): Promise<CredentialStatus> {
+  private async issueCredentialStatus(params: IssueCredentialStatusParams): Promise<CredentialStatus> {
     if (!params.host) {
       throw new Error('Error issuing credential status: Host is required');
     }
@@ -295,16 +292,16 @@ export class VCKitAdapter implements IVerifiableCredentialService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...headers
+          ...headers,
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      return await response.json() as CredentialStatus;
+      return (await response.json()) as CredentialStatus;
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Failed to issue credential status: ${error.message}`);

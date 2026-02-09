@@ -4,7 +4,7 @@ import {
   IDynamicComponentRendererProps,
 } from '../DynamicComponentRenderer/DynamicComponentRenderer.js';
 import { Box } from '@mui/material';
-import { IConstructObjectParameters, constructObject, genericHandlerFunctions } from '@mock-app/services';
+import { IConstructObjectParameters, constructObject, genericHandlerFunctions } from '@uncefact/untp-ri-services';
 
 export interface ILocalStorageLoaderProps {
   onChange: (data: any) => void;

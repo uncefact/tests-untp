@@ -1,17 +1,17 @@
-import type { Meta, StoryObj } from "@storybook/react-webpack5";
-import { UserProfile } from "./UserProfile";
-import { UserRole } from "@/types";
+import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import { UserProfile } from './UserProfile';
+import { UserRole } from '@/types';
 
 const meta = {
-  title: "Components/User/UserProfile",
+  title: 'Components/User/UserProfile',
   component: UserProfile,
   parameters: {
-    layout: "centered",
+    layout: 'centered',
   },
   decorators: [
     (Story) => {
       return (
-        <div className="w-[280px] bg-background p-4">
+        <div className='w-[280px] bg-background p-4'>
           <Story />
         </div>
       );
@@ -19,9 +19,8 @@ const meta = {
   ],
   argTypes: {
     user: {
-      control: "object",
-      description:
-        "User object containing name, email, and roles",
+      control: 'object',
+      description: 'User object containing name, email, and roles',
     },
   },
 } satisfies Meta<typeof UserProfile>;
@@ -32,8 +31,8 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     user: {
-      name: "John Doe",
-      email: "john@example.com",
+      name: 'John Doe',
+      email: 'john@example.com',
       roles: [UserRole.User],
     },
   },
@@ -42,8 +41,8 @@ export const Default: Story = {
 export const TruncatedName: Story = {
   args: {
     user: {
-      name: "Dr. Christopher Alexander Montgomery Wellington III",
-      email: "c.montgomery@example.com",
+      name: 'Dr. Christopher Alexander Montgomery Wellington III',
+      email: 'c.montgomery@example.com',
       roles: [UserRole.User],
     },
   },
@@ -52,9 +51,8 @@ export const TruncatedName: Story = {
 export const TruncatedEmail: Story = {
   args: {
     user: {
-      name: "Jane Doe",
-      email:
-        "jane.doe.with.a.very.long.email.address@corporate-company-domain.com",
+      name: 'Jane Doe',
+      email: 'jane.doe.with.a.very.long.email.address@corporate-company-domain.com',
       roles: [UserRole.User],
     },
   },
@@ -63,8 +61,8 @@ export const TruncatedEmail: Story = {
 export const BothTruncated: Story = {
   args: {
     user: {
-      name: "Dr. Alexander Christopher Montgomery Wellington",
-      email: "alexander.christopher.montgomery@very-long-corporate-domain.com",
+      name: 'Dr. Alexander Christopher Montgomery Wellington',
+      email: 'alexander.christopher.montgomery@very-long-corporate-domain.com',
       roles: [UserRole.User],
     },
   },

@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { RenderCheckList } from '../components/RenderCheckList/RenderCheckList';
 import { IDynamicComponentRendererProps } from '../components/DynamicComponentRenderer/DynamicComponentRenderer';
 import { processVerifiableCredentialData } from '../utils/importDataHelpers.js';
-import { publicAPI } from '@mock-app/services';
+import { publicAPI } from '@uncefact/untp-ri-services';
 import { ScannerDialog } from '../components/QRCodeScannerDialogButton/ScannerDialog';
 
 jest.mock('../components/ConformityCredential/index.ts', () => ({}));
@@ -12,7 +12,7 @@ jest.mock('../utils/importDataHelpers.js', () => ({
   processVerifiableCredentialData: jest.fn(),
 }));
 
-jest.mock('@mock-app/services', () => ({
+jest.mock('@uncefact/untp-ri-services', () => ({
   publicAPI: {
     get: jest.fn(),
   },
@@ -94,7 +94,6 @@ describe('render RenderCheckList component', () => {
     // Find the import button and simulate a change event with a JSON file
     const importButton = screen.getByTestId('file-input');
     fireEvent.change(importButton, { target: { files: [jsonFile] } });
-    
 
     // Wait for the checkbox to appear and assert that it's checked after being clicked
     await waitFor(() => {
@@ -124,7 +123,6 @@ describe('render RenderCheckList component', () => {
     // Find the import button and simulate a change event with a JSON file
     const importButton = screen.getByTestId('file-input');
     fireEvent.change(importButton, { target: { files: [jsonFile] } });
-    
 
     // Wait for the checkbox to appear, click it, and assert that the onChange prop was called with the correct data
     await waitFor(() => {
@@ -147,7 +145,6 @@ describe('render RenderCheckList component', () => {
     // Find the import button and simulate a change event with multiple JSON files
     const importButton = screen.getByTestId('file-input');
     fireEvent.change(importButton, { target: { files: importJsonFiles } });
-    
 
     // Wait for the checkboxes to appear, click them, and assert that they are checked
     await waitFor(() => {

@@ -225,7 +225,6 @@ const StatusIcon = ({
           <AlertCircle className={`${sizeClass} text-gray-400`} />
         </div>
       );
-      ``;
   }
 };
 
