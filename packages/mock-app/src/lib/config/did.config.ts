@@ -18,8 +18,7 @@ export function getDidConfig(): DidConfig {
 
   if (missing.length > 0) {
     throw new Error(
-      `Missing required DID configuration: ${missing.join(", ")}. ` +
-      `Set these in your .env file or environment.`
+      `Missing required DID configuration: ${missing.join(', ')}. ` + `Set these in your .env file or environment.`,
     );
   }
 

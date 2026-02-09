@@ -23,7 +23,7 @@ Handlebars.registerHelper('jsonStringify', (jsonObject: object | string) => {
     return JSON.stringify(jsonObject).slice(1, -1);
   }
 
-  return JSON.stringify(jsonObject,);
+  return JSON.stringify(jsonObject);
 });
 
 export async function templateMapper(templateName: string, testSuiteResult: IValidatedCredentials | IFinalReport) {

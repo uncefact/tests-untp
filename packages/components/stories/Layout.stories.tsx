@@ -11,7 +11,6 @@ const meta = {
   argTypes: {},
 } satisfies Meta<typeof Layout>;
 
-
 export default meta;
 type Story = StoryObj<typeof meta>;
 

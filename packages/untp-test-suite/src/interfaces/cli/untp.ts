@@ -5,9 +5,6 @@ import { getPackageVersion } from '../../utils/common.js';
 
 const packageVersion = getPackageVersion();
 
-const untp = new Command('untp')
-  .version(packageVersion, '-v, --version')
-  .addCommand(test)
-  .addCommand(config);
+const untp = new Command('untp').version(packageVersion, '-v, --version').addCommand(test).addCommand(config);
 
 export { untp };

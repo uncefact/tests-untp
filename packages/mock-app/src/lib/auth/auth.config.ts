@@ -6,12 +6,12 @@
  * - src/middleware.ts (edge runtime, no Prisma)
  */
 
-import { type NextAuthConfig } from "next-auth";
-import Keycloak from "next-auth/providers/keycloak";
+import { type NextAuthConfig } from 'next-auth';
+import Keycloak from 'next-auth/providers/keycloak';
 
 export const authConfig: NextAuthConfig = {
   session: {
-    strategy: "jwt",
+    strategy: 'jwt',
     maxAge: 8 * 60 * 60,
     updateAge: 5 * 60,
   },

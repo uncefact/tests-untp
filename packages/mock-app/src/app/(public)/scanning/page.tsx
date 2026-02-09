@@ -13,7 +13,7 @@ import { CustomDialog } from '@/components/CustomDialog';
 import appConfig from '@/constants/app-config.json';
 
 // Dynamic import to avoid SSR issues with navigator
-const Scanner = dynamic(() => import('@/components/Scanner').then(mod => mod.Scanner), {
+const Scanner = dynamic(() => import('@/components/Scanner').then((mod) => mod.Scanner), {
   ssr: false,
   loading: () => <CircularProgress sx={{ margin: 'auto' }} />,
 });

@@ -73,7 +73,7 @@ describe('verifyDidWeb', () => {
     const result = await verifyDidWeb('did:web:example.com:org:abc');
 
     expect(result.document).toEqual(validDidDocument);
-    const resolveCheck = result.checks.find(c => c.name === C.RESOLVE);
+    const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
     expect(resolveCheck?.passed).toBe(true);
   });
 
@@ -83,7 +83,7 @@ describe('verifyDidWeb', () => {
     const result = await verifyDidWeb('did:web:example.com:org:abc');
 
     expect(result.document).toBeNull();
-    const resolveCheck = result.checks.find(c => c.name === C.RESOLVE);
+    const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
     expect(resolveCheck?.passed).toBe(false);
     expect(resolveCheck?.message).toContain('HTTP 404');
   });
@@ -94,7 +94,7 @@ describe('verifyDidWeb', () => {
     const result = await verifyDidWeb('did:web:example.com:org:abc');
 
     expect(result.document).toBeNull();
-    const resolveCheck = result.checks.find(c => c.name === C.RESOLVE);
+    const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
     expect(resolveCheck?.passed).toBe(false);
     expect(resolveCheck?.message).toContain('Resolution failed');
   });
@@ -106,7 +106,7 @@ describe('verifyDidWeb', () => {
 
     const result = await verifyDidWeb('did:web:example.com:org:abc');
 
-    const httpsCheck = result.checks.find(c => c.name === C.HTTPS);
+    const httpsCheck = result.checks.find((c) => c.name === C.HTTPS);
     expect(httpsCheck?.passed).toBe(true);
     expect(httpsCheck?.message).toBeUndefined();
   });
@@ -118,7 +118,7 @@ describe('verifyDidWeb', () => {
 
     const result = await verifyDidWeb('did:web:example.com:org:abc');
 
-    const httpsCheck = result.checks.find(c => c.name === C.HTTPS);
+    const httpsCheck = result.checks.find((c) => c.name === C.HTTPS);
     expect(httpsCheck?.passed).toBe(false);
     expect(httpsCheck?.message).toContain('insecure connection');
   });
@@ -128,7 +128,7 @@ describe('verifyDidWeb', () => {
 
     const result = await verifyDidWeb('did:web:example.com:org:abc');
 
-    const httpsCheck = result.checks.find(c => c.name === C.HTTPS);
+    const httpsCheck = result.checks.find((c) => c.name === C.HTTPS);
     expect(httpsCheck?.passed).toBe(false);
     expect(httpsCheck?.message).toBe('Could not verify HTTPS (resolution failed)');
   });
@@ -139,33 +139,33 @@ describe('verifyDidWeb', () => {
     const result = await verifyDidWeb('did:web:example.com:org:abc');
 
     expect(result.checks).toHaveLength(2);
-    expect(result.checks.map(c => c.name)).toEqual([C.RESOLVE, C.HTTPS]);
+    expect(result.checks.map((c) => c.name)).toEqual([C.RESOLVE, C.HTTPS]);
   });
 
   describe('SSRF protection', () => {
     it('blocks localhost URLs', async () => {
       const result = await verifyDidWeb('did:web:localhost');
       expect(result.document).toBeNull();
-      const resolveCheck = result.checks.find(c => c.name === C.RESOLVE);
+      const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
       expect(resolveCheck?.message).toContain('not permitted');
     });
 
     it('blocks 127.x.x.x URLs', async () => {
       const result = await verifyDidWeb('did:web:127.0.0.1');
-      const resolveCheck = result.checks.find(c => c.name === C.RESOLVE);
+      const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
     });
 
     it('blocks 10.x.x.x URLs', async () => {
       const result = await verifyDidWeb('did:web:10.0.0.1');
-      const resolveCheck = result.checks.find(c => c.name === C.RESOLVE);
+      const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
     });
 
     it('blocks 192.168.x.x URLs', async () => {
       const result = await verifyDidWeb('did:web:192.168.1.1');
-      const resolveCheck = result.checks.find(c => c.name === C.RESOLVE);
+      const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
     });
   });

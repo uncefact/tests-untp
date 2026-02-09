@@ -7,22 +7,28 @@
 **Updated:** 2025-07-25
 
 ## Original Request
-Implement browser test loading after credential upload instead of at bundle load time. Currently we rely on the browser loading the tests automatically when the bundle loads, but we want to load tests into Mocha only *after* credential files are uploaded.
+
+Implement browser test loading after credential upload instead of at bundle load time. Currently we rely on the browser loading the tests automatically when the bundle loads, but we want to load tests into Mocha only _after_ credential files are uploaded.
 
 ## Thought Process
+
 This task addresses a fundamental architectural difference between CLI and browser environments:
 
 ### Current Architecture Problem
+
 - **CLI Flow**: Credentials loaded → Tests added to Mocha → Tests executed
 - **Browser Flow**: Tests loaded with bundle → Credentials uploaded later → Tests executed
 
 The browser currently loads tests at bundle load time (when the page loads), but credentials don't exist until the user uploads them. This creates timing issues and forces us to create tests that check for credentials at execution time rather than having per-credential test suites.
 
 ### Desired Architecture
+
 We want the browser to work more like the CLI:
+
 - **New Browser Flow**: Page loads → User uploads credentials → Tests dynamically loaded → Tests executed
 
 ### Key Benefits
+
 1. **Per-credential test suites**: Can create individual describe blocks for each credential file
 2. **Better test organization**: Each credential gets its own test suite with dedicated tests
 3. **Cleaner test output**: Test results clearly organized by credential file
@@ -30,12 +36,14 @@ We want the browser to work more like the CLI:
 5. **Extension compatibility**: Easier to add extension tests dynamically
 
 ### Technical Challenges
+
 1. **Bundle separation**: Tests currently bundled with browser-bundle.js need to be loaded separately
 2. **Dynamic test registration**: Mocha needs to load test files after credential upload
 3. **Test file management**: Need to manage which tests to load based on credential types
 4. **Error handling**: Graceful fallbacks when test loading fails
 
 ## Implementation Plan
+
 - Separate test files from the main browser bundle
 - Create dynamic test loading mechanism in UNTPTestRunner
 - Modify browser HTML to load tests after credential upload
@@ -50,25 +58,29 @@ We want the browser to work more like the CLI:
 **Overall Status:** Completed - 100%
 
 ### Task Metadata
+
 - **Priority Level:** High - Required for proper per-credential test organization
 - **Tags:** browser, architecture, mocha, dynamic-loading
 - **Dependencies:** TASK002 (completed - browser compatibility verified)
 - **Estimated Effort:** 2-3 days
 
 ### Subtasks
-| ID | Description | Status | Updated | Notes |
-|----|-------------|--------|---------|-------|
-| 3.1 | Analyze current test loading mechanism | Complete | 2025-07-25 | Tests imported in browser-bundle.ts, executed at bundle load time |
-| 3.2 | Design dynamic test loading architecture | Complete | 2025-07-25 | registerUNTPTestSuite approach - defer test registration until after credentials |
-| 3.3 | Separate test files from browser bundle | Complete | 2025-07-25 | Removed imports, added copy to build process, updated .gitignore |
-| 3.4 | Implement registerUNTPTestSuite deferred registration | Complete | 2025-07-25 | Created test suite registry and execution functions |
-| 3.5 | Update CLI to use registerUNTPTestSuite | Complete | 2025-07-25 | CLI now executes registered test suites after credentials loaded |
-| 3.6 | Create per-credential test suite generation | Complete | 2025-07-25 | Test files now create nested describe blocks for each credential |
-| 3.7 | Test multi-credential scenarios | Complete | 2025-07-25 | Verified multiple credentials create separate test suites |
-| 3.8 | Update browser to use registerUNTPTestSuite | Complete | 2025-07-25 | Browser implementation working with fresh Mocha instances |
+
+| ID  | Description                                           | Status   | Updated    | Notes                                                                            |
+| --- | ----------------------------------------------------- | -------- | ---------- | -------------------------------------------------------------------------------- |
+| 3.1 | Analyze current test loading mechanism                | Complete | 2025-07-25 | Tests imported in browser-bundle.ts, executed at bundle load time                |
+| 3.2 | Design dynamic test loading architecture              | Complete | 2025-07-25 | registerUNTPTestSuite approach - defer test registration until after credentials |
+| 3.3 | Separate test files from browser bundle               | Complete | 2025-07-25 | Removed imports, added copy to build process, updated .gitignore                 |
+| 3.4 | Implement registerUNTPTestSuite deferred registration | Complete | 2025-07-25 | Created test suite registry and execution functions                              |
+| 3.5 | Update CLI to use registerUNTPTestSuite               | Complete | 2025-07-25 | CLI now executes registered test suites after credentials loaded                 |
+| 3.6 | Create per-credential test suite generation           | Complete | 2025-07-25 | Test files now create nested describe blocks for each credential                 |
+| 3.7 | Test multi-credential scenarios                       | Complete | 2025-07-25 | Verified multiple credentials create separate test suites                        |
+| 3.8 | Update browser to use registerUNTPTestSuite           | Complete | 2025-07-25 | Browser implementation working with fresh Mocha instances                        |
 
 ## Progress Log
+
 ### 2025-07-25
+
 - Task created to address fundamental architectural issue
 - Identified that browser needs to work more like CLI with post-upload test loading
 - Current browser implementation loads tests at bundle time, causing timing issues

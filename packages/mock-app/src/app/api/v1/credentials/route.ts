@@ -1,15 +1,10 @@
-import { VerifiableCredential } from "@vckit/core-types";
-import { readFile } from "fs/promises";
-import { NextResponse } from "next/server";
-import path from "path";
+import { VerifiableCredential } from '@vckit/core-types';
+import { readFile } from 'fs/promises';
+import { NextResponse } from 'next/server';
+import path from 'path';
 
-import {
-  decodeEnvelopedVC,
-  issueCredentialStatus,
-  PROOF_FORMAT,
-  StorageRecord,
-} from "@uncefact/untp-ri-services";
-import { createCredential } from "@/lib/prisma/repositories";
+import { decodeEnvelopedVC, issueCredentialStatus, PROOF_FORMAT, StorageRecord } from '@uncefact/untp-ri-services';
+import { createCredential } from '@/lib/prisma/repositories';
 
 type JSONPrimitive = string | number | boolean | null;
 type JSONValue = JSONPrimitive | JSONObject | JSONArray;
@@ -115,15 +110,15 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as IssueRequest;
   } catch {
-    return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
   }
 
   // Validate form data
-  if (!body.formData || typeof body.formData !== "object") {
-    return NextResponse.json({ ok: false, error: "formData must be a JSON object" }, { status: 400 });
+  if (!body.formData || typeof body.formData !== 'object') {
+    return NextResponse.json({ ok: false, error: 'formData must be a JSON object' }, { status: 400 });
   }
 
-  const shouldPublish = typeof body.publish === "boolean" ? body.publish : false;
+  const shouldPublish = typeof body.publish === 'boolean' ? body.publish : false;
 
   try {
     const config = await getConfig();
@@ -135,7 +130,7 @@ export async function POST(req: Request) {
     // Decode the enveloped VC
     const decodedCredential = decodeEnvelopedVC(envelopedVC);
     if (!decodedCredential) {
-      throw new Error("Failed to decode enveloped verifiable credential");
+      throw new Error('Failed to decode enveloped verifiable credential');
     }
 
     // Store VC (enveloped format)
@@ -165,11 +160,8 @@ export async function POST(req: Request) {
       credentialId: credentialRecord.id,
     });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "An unexpected error has occurred.";
-    return NextResponse.json(
-      { ok: false, error: message },
-      { status: 500 }
-    );
+    const message = e instanceof Error ? e.message : 'An unexpected error has occurred.';
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
 
@@ -187,8 +179,8 @@ async function issueCredential(params: IssueConfigParams, body: IssueRequest): P
 
   const payload = {
     credential: {
-      "@context": ["https://www.w3.org/ns/credentials/v2", ...params.dpp.context],
-      type: ["VerifiableCredential", ...params.dpp.type],
+      '@context': ['https://www.w3.org/ns/credentials/v2', ...params.dpp.context],
+      type: ['VerifiableCredential', ...params.dpp.type],
       issuer: vckit.issuer,
       credentialSubject: body.formData,
       renderMethod: params.dpp.renderTemplate,
@@ -202,9 +194,9 @@ async function issueCredential(params: IssueConfigParams, body: IssueRequest): P
   };
 
   const res = await fetch(`${vckit.vckitAPIUrl}/credentials/issue`, {
-    method: "POST",
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
       ...(vckit.headers ?? {}),
     },
     body: JSON.stringify(payload),
@@ -221,10 +213,7 @@ async function issueCredential(params: IssueConfigParams, body: IssueRequest): P
 /**
  * Stores the enveloped credential
  */
-async function storeCredential(
-  params: IssueConfigParams,
-  envelopedVC: EnvelopedVC
-): Promise<StorageRecord> {
+async function storeCredential(params: IssueConfigParams, envelopedVC: EnvelopedVC): Promise<StorageRecord> {
   const storage = params.storage;
 
   const payload = {
@@ -235,7 +224,7 @@ async function storeCredential(
   const res = await fetch(storage.url, {
     method: storage.options.method,
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
       ...(storage.options.headers ?? {}),
     },
     body: JSON.stringify(payload),
@@ -255,17 +244,17 @@ async function storeCredential(
 async function publishCredential(
   params: IssueConfigParams,
   decodedCredential: DecodedCredential,
-  storage: StorageRecord
+  storage: StorageRecord,
 ): Promise<{ enabled: true; raw: JSONValue }> {
   const dlr = params.dlr;
 
-  if (!storage?.uri) throw new Error("Storage response missing uri");
-  if (!storage?.hash) throw new Error("Storage response missing hash");
+  if (!storage?.uri) throw new Error('Storage response missing uri');
+  if (!storage?.hash) throw new Error('Storage response missing hash');
 
   const identificationKey = decodedCredential.credentialSubject?.registeredId;
 
   if (!identificationKey) {
-    throw new Error("Missing credentialSubject.registeredId");
+    throw new Error('Missing credentialSubject.registeredId');
   }
 
   const DEFAULT_MACHINE_VERIFICATION_URL = process.env.NEXT_DEFAULT_MACHINE_VERIFICATION_URL!;
@@ -273,43 +262,43 @@ async function publishCredential(
 
   const baseResponses = [
     {
-      linkType: "gs1:verificationService",
-      title: "VCKit verify service",
+      linkType: 'gs1:verificationService',
+      title: 'VCKit verify service',
       targetUrl: DEFAULT_MACHINE_VERIFICATION_URL,
-      mimeType: "text/plain",
+      mimeType: 'text/plain',
     },
     {
-      linkType: "gs1:sustainabilityInfo",
-      title: "Product Passport",
+      linkType: 'gs1:sustainabilityInfo',
+      title: 'Product Passport',
       targetUrl: storage.uri,
-      mimeType: "application/json",
+      mimeType: 'application/json',
     },
     {
-      linkType: "gs1:sustainabilityInfo",
-      title: "Product Passport",
+      linkType: 'gs1:sustainabilityInfo',
+      title: 'Product Passport',
       targetUrl: constructVerifyURL({
         baseUrl: DEFAULT_HUMAN_VERIFICATION_URL,
         uri: storage.uri,
         hash: storage.hash,
       }),
-      mimeType: "text/html",
+      mimeType: 'text/html',
     },
   ];
 
-  const contexts = ["au", "us"];
+  const contexts = ['au', 'us'];
 
   const responses = contexts.flatMap((context) =>
     baseResponses.map((response) => ({
       ...response,
       context,
-      ianaLanguage: "en",
+      ianaLanguage: 'en',
       defaultLinkType: false,
       defaultIanaLanguage: false,
       defaultContext: false,
       defaultMimeType: false,
       fwqs: false,
       active: true,
-    }))
+    })),
   );
 
   const payload = {
@@ -318,17 +307,17 @@ async function publishCredential(
     title: params.dpp.dlrLinkTitle,
     verificationPage: params.dpp.dlrVerificationPage,
     identificationKey,
-    identificationKeyType: "01",
+    identificationKeyType: '01',
     itemDescription: params.dpp.dlrLinkTitle,
-    qualifierPath: "/",
+    qualifierPath: '/',
     active: true,
     responses,
   };
 
   const res = await fetch(`${dlr.dlrAPIUrl}/${dlr.linkRegisterPath}`, {
-    method: "POST",
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
       ...(dlr.dlrAPIKey ? { Authorization: `Bearer ${dlr.dlrAPIKey}` } : {}),
     },
     body: JSON.stringify(payload),
@@ -346,13 +335,13 @@ async function publishCredential(
  * Loads hardcoded issue configuration
  */
 async function getConfig(): Promise<AppConfig> {
-  const configPath = path.join(process.cwd(), "src/constants/app-config.issue.json");
+  const configPath = path.join(process.cwd(), 'src/constants/app-config.issue.json');
 
   try {
-    const raw = await readFile(configPath, "utf-8");
+    const raw = await readFile(configPath, 'utf-8');
     return JSON.parse(raw) as AppConfig;
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message = err instanceof Error ? err.message : 'Unknown error';
     throw new Error(`Failed to load config file: ${message}`);
   }
 }
@@ -362,21 +351,16 @@ async function getConfig(): Promise<AppConfig> {
  */
 function getConfigParameters(config: AppConfig): IssueConfigParams {
   const params = config?.services?.[0]?.parameters?.[0];
-  if (!params) throw new Error("Invalid config: missing services[0].parameters[0]");
+  if (!params) throw new Error('Invalid config: missing services[0].parameters[0]');
   return params;
 }
 
 /**
  * Builds verification URL with embedded query payload
  */
-function constructVerifyURL(opts: {
-  baseUrl: string;
-  uri: string;
-  hash: string;
-  key?: string;
-}) {
+function constructVerifyURL(opts: { baseUrl: string; uri: string; hash: string; key?: string }) {
   const { baseUrl, uri, hash, key } = opts;
-  if (!uri || !hash) throw new Error("URI and hash are required");
+  if (!uri || !hash) throw new Error('URI and hash are required');
 
   const payload: Record<string, string> = { uri, hash };
   if (key) payload.key = key;

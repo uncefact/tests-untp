@@ -86,7 +86,7 @@ describe('verifyDid', () => {
 
     expect(result.verified).toBe(true);
     expect(result.checks).toHaveLength(6);
-    expect(result.checks.every(c => c.passed)).toBe(true);
+    expect(result.checks.every((c) => c.passed)).toBe(true);
     expect(result.errors).toBeUndefined();
   });
 
@@ -97,7 +97,7 @@ describe('verifyDid', () => {
     const result = await verifyDid('did:web:example.com:org:abc', { providerKeys: [] });
 
     expect(result.verified).toBe(false);
-    const structureCheck = result.checks.find(c => c.name === C.STRUCTURE);
+    const structureCheck = result.checks.find((c) => c.name === C.STRUCTURE);
     expect(structureCheck?.passed).toBe(false);
     expect(structureCheck?.message).toBeDefined();
   });
@@ -109,7 +109,7 @@ describe('verifyDid', () => {
     const result = await verifyDid('did:web:example.com:org:abc', { providerKeys: [] });
 
     expect(result.verified).toBe(false);
-    const identityCheck = result.checks.find(c => c.name === C.IDENTITY_MATCH);
+    const identityCheck = result.checks.find((c) => c.name === C.IDENTITY_MATCH);
     expect(identityCheck?.passed).toBe(false);
     expect(identityCheck?.message).toContain('does not match');
   });
@@ -123,7 +123,7 @@ describe('verifyDid', () => {
     const result = await verifyDid('did:web:example.com:org:abc', { providerKeys: [] });
 
     expect(result.verified).toBe(false);
-    const jsonldCheck = result.checks.find(c => c.name === C.JSONLD_VALIDITY);
+    const jsonldCheck = result.checks.find((c) => c.name === C.JSONLD_VALIDITY);
     expect(jsonldCheck?.passed).toBe(false);
     expect(jsonldCheck?.message).toContain('JSON-LD');
   });
@@ -134,7 +134,7 @@ describe('verifyDid', () => {
     const result = await verifyDid('did:web:example.com:org:abc', { providerKeys: [] });
 
     expect(result.verified).toBe(false);
-    const resolveCheck = result.checks.find(c => c.name === C.RESOLVE);
+    const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
     expect(resolveCheck?.passed).toBe(false);
     expect(resolveCheck?.message).toContain('Resolution failed');
   });
@@ -148,7 +148,7 @@ describe('verifyDid', () => {
 
     const result = await verifyDid('did:web:example.com:org:abc', { providerKeys: [] });
 
-    const httpsCheck = result.checks.find(c => c.name === C.HTTPS);
+    const httpsCheck = result.checks.find((c) => c.name === C.HTTPS);
     expect(httpsCheck?.passed).toBe(false);
     expect(httpsCheck?.message).toBe('Could not verify HTTPS (resolution failed)');
   });
@@ -160,7 +160,7 @@ describe('verifyDid', () => {
       providerKeys: [],
     });
 
-    const keyCheck = result.checks.find(c => c.name === C.KEY_MATERIAL);
+    const keyCheck = result.checks.find((c) => c.name === C.KEY_MATERIAL);
     expect(keyCheck).toBeDefined();
     expect(keyCheck?.passed).toBe(true);
     expect(keyCheck?.message).toBe('No provider keys to compare');
@@ -173,7 +173,7 @@ describe('verifyDid', () => {
       providerKeys: [{ kid: 'abc123def456' }],
     });
 
-    const keyCheck = result.checks.find(c => c.name === C.KEY_MATERIAL);
+    const keyCheck = result.checks.find((c) => c.name === C.KEY_MATERIAL);
     expect(keyCheck).toBeDefined();
     expect(keyCheck?.passed).toBe(true);
   });
@@ -186,7 +186,7 @@ describe('verifyDid', () => {
     });
 
     expect(result.verified).toBe(false);
-    const keyCheck = result.checks.find(c => c.name === C.KEY_MATERIAL);
+    const keyCheck = result.checks.find((c) => c.name === C.KEY_MATERIAL);
     expect(keyCheck?.passed).toBe(false);
     expect(keyCheck?.message).toBe('No matching keys found in DID document');
   });

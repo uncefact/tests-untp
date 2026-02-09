@@ -15,8 +15,11 @@ type Story = StoryObj<typeof CredentialRender>;
 
 export const Default: Story = {
   args: { credential: storyCredentialMock },
-  decorators: [(Story) =>
-    <div style={{ minWidth: '500px', height: '60vh' }}>
-      <Story />
-    </div> ],
+  decorators: [
+    (Story) => (
+      <div style={{ minWidth: '500px', height: '60vh' }}>
+        <Story />
+      </div>
+    ),
+  ],
 };

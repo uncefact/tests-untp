@@ -23,10 +23,7 @@ export class AesGcmEncryptionAdapter implements IEncryptionService {
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv(algorithm, this.key, iv);
 
-    const encrypted = Buffer.concat([
-      cipher.update(plaintext, 'utf8'),
-      cipher.final(),
-    ]);
+    const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
 
     const authTag = cipher.getAuthTag();
 
@@ -50,10 +47,7 @@ export class AesGcmEncryptionAdapter implements IEncryptionService {
     const decipher = crypto.createDecipheriv(type, this.key, iv);
     decipher.setAuthTag(authTag);
 
-    const decrypted = Buffer.concat([
-      decipher.update(encrypted),
-      decipher.final(),
-    ]);
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
 
     return decrypted.toString('utf8');
   }

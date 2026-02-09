@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { cn } from '@/lib/utils';
+import { Loader2 } from 'lucide-react';
 
 interface LoaderProps {
   text?: string;
@@ -22,23 +22,10 @@ interface LoaderProps {
  */
 export function Loader({ text, className, size = 40 }: LoaderProps) {
   return (
-    <div
-      className={cn(
-        "flex flex-col items-center justify-center gap-2",
-        className
-      )}
-      data-testid="loader"
-    >
-      <Loader2
-        className="animate-spin text-loader"
-        size={size}
-        data-testid="loader-spinner"
-      />
+    <div className={cn('flex flex-col items-center justify-center gap-2', className)} data-testid='loader'>
+      <Loader2 className='animate-spin text-loader' size={size} data-testid='loader-spinner' />
       {text && (
-        <p
-          className="text-sm text-loader-foreground"
-          data-testid="loader-text"
-        >
+        <p className='text-sm text-loader-foreground' data-testid='loader-text'>
           {text}
         </p>
       )}

@@ -11,7 +11,7 @@
  * - Token expiry (must not be expired)
  */
 
-import * as jose from "jose";
+import * as jose from 'jose';
 
 export interface TokenValidationResult {
   valid: boolean;
@@ -40,7 +40,7 @@ export async function validateServiceAccountToken(
   options?: {
     issuer?: string;
     audience?: string;
-  }
+  },
 ): Promise<TokenValidationResult> {
   const issuer = options?.issuer ?? process.env.AUTH_KEYCLOAK_ISSUER;
   const audience = options?.audience ?? process.env.AUTH_KEYCLOAK_SERVICE_ACCOUNT_AUDIENCE;
@@ -48,7 +48,7 @@ export async function validateServiceAccountToken(
   if (!issuer) {
     return {
       valid: false,
-      error: "IdP issuer not configured",
+      error: 'IdP issuer not configured',
     };
   }
 
@@ -73,32 +73,32 @@ export async function validateServiceAccountToken(
   } catch (error) {
     if (error instanceof jose.errors.JOSEError) {
       switch (error.code) {
-        case "ERR_JWT_EXPIRED":
+        case 'ERR_JWT_EXPIRED':
           return {
             valid: false,
-            error: "Token has expired",
+            error: 'Token has expired',
           };
-        case "ERR_JWT_CLAIM_VALIDATION_FAILED":
+        case 'ERR_JWT_CLAIM_VALIDATION_FAILED':
           return {
             valid: false,
             error: `Token claim validation failed: ${error.message}`,
           };
-        case "ERR_JWS_SIGNATURE_VERIFICATION_FAILED":
+        case 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED':
           return {
             valid: false,
-            error: "Token signature verification failed",
+            error: 'Token signature verification failed',
           };
-        case "ERR_JWKS_NO_MATCHING_KEY":
+        case 'ERR_JWKS_NO_MATCHING_KEY':
           return {
             valid: false,
-            error: "No matching key found in JWKS",
+            error: 'No matching key found in JWKS',
           };
       }
     }
 
     return {
       valid: false,
-      error: error instanceof Error ? error.message : "Token validation failed",
+      error: error instanceof Error ? error.message : 'Token validation failed',
     };
   }
 }
@@ -109,15 +109,13 @@ export async function validateServiceAccountToken(
  * @param authHeader - The Authorization header value
  * @returns The token without the "Bearer " prefix, or null if invalid
  */
-export function extractBearerToken(
-  authHeader: string | null
-): string | null {
+export function extractBearerToken(authHeader: string | null): string | null {
   if (!authHeader) {
     return null;
   }
 
-  const parts = authHeader.split(" ");
-  if (parts.length !== 2 || parts[0].toLowerCase() !== "bearer") {
+  const parts = authHeader.split(' ');
+  if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer') {
     return null;
   }
 

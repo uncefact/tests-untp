@@ -46,7 +46,11 @@ describe('processDigitalConformityCredential', () => {
     (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
       credentialSubject: { id: 'https://example.com/123' },
     }));
-    (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+    (uploadData as jest.Mock).mockResolvedValueOnce({
+      uri: 'https://exampleStorage.com/vc.json',
+      key: '123',
+      hash: 'ABC123',
+    });
     (constructVerifyURL as jest.Mock).mockReturnValueOnce('https://example.com/vc.json');
 
     jest
@@ -159,7 +163,11 @@ describe('processDigitalConformityCredential', () => {
     (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
       credentialSubject: { id: 'https://example.com/123' },
     }));
-    (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+    (uploadData as jest.Mock).mockResolvedValueOnce({
+      uri: 'https://exampleStorage.com/vc.json',
+      key: '123',
+      hash: 'ABC123',
+    });
     (constructVerifyURL as jest.Mock).mockReturnValueOnce('https://example.com/vc.json');
 
     jest.spyOn(validateContext, 'validateDigitalConformityCredentialContext').mockReturnValueOnce({

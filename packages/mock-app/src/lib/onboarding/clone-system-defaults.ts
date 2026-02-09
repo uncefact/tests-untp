@@ -1,10 +1,8 @@
-import type { PrismaClient } from "@/lib/prisma/generated";
+import type { PrismaClient } from '@/lib/prisma/generated';
 
-const SYSTEM_ORG_ID = "system";
+const SYSTEM_ORG_ID = 'system';
 
-type PrismaTransactionClient = Parameters<
-  Parameters<PrismaClient["$transaction"]>[0]
->[0];
+type PrismaTransactionClient = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
 
 type TransactionalPrisma = PrismaClient | PrismaTransactionClient;
 
@@ -15,19 +13,13 @@ type TransactionalPrisma = PrismaClient | PrismaTransactionClient;
  *
  * Runs inside a Prisma interactive transaction to ensure atomicity.
  */
-export async function cloneSystemDefaults(
-  prisma: PrismaClient,
-  organisationId: string,
-): Promise<string> {
+export async function cloneSystemDefaults(prisma: PrismaClient, organisationId: string): Promise<string> {
   return prisma.$transaction(async (tx) => {
     return cloneWithinTransaction(tx, organisationId);
   });
 }
 
-async function cloneWithinTransaction(
-  tx: TransactionalPrisma,
-  organisationId: string,
-): Promise<string> {
+async function cloneWithinTransaction(tx: TransactionalPrisma, organisationId: string): Promise<string> {
   // Fetch all system service instances
   const systemInstances = await tx.serviceInstance.findMany({
     where: { organizationId: SYSTEM_ORG_ID },

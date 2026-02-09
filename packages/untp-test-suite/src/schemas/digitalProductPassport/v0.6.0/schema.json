@@ -6,10 +6,7 @@
     "type": {
       "type": "array",
       "readOnly": true,
-      "default": [
-        "DigitalProductPassport",
-        "VerifiableCredential"
-      ],
+      "default": ["DigitalProductPassport", "VerifiableCredential"],
       "items": {
         "type": "string"
       },
@@ -29,10 +26,7 @@
       ]
     },
     "@context": {
-      "example": [
-        "https://www.w3.org/ns/credentials/v2",
-        "https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/"
-      ],
+      "example": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/"],
       "type": "array",
       "items": {
         "type": "string"
@@ -49,10 +43,7 @@
           "type": "string"
         }
       ],
-      "default": [
-        "https://www.w3.org/ns/credentials/v2",
-        "https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/"
-      ],
+      "default": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/"],
       "minItems": 2,
       "uniqueItems": true
     },
@@ -86,11 +77,7 @@
     }
   },
   "description": "The Product Passport is a comprehensive data structure that encapsulates various details pertaining to a product, including its identification details, who issued it, batch information, provenance information, circularity information and a set of verifiable product conformity & sustainability claims. ",
-  "required": [
-    "@context",
-    "id",
-    "issuer"
-  ],
+  "required": ["@context", "id", "issuer"],
   "$defs": {
     "CredentialIssuer": {
       "type": "object",
@@ -99,9 +86,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "CredentialIssuer"
-          ],
+          "default": ["CredentialIssuer"],
           "items": {
             "type": "string"
           },
@@ -147,19 +132,13 @@
                 "description": "The registration number (alphanumeric) of the Party within the register. Unique within the register."
               }
             },
-            "required": [
-              "id",
-              "name"
-            ]
+            "required": ["id", "name"]
           },
           "description": "An optional list of other registered identifiers for this credential issuer "
         }
       },
       "description": "The issuer party (person or organisation) of a verifiable credential.",
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["id", "name"]
     },
     "ProductPassport": {
       "type": "object",
@@ -168,9 +147,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "ProductPassport"
-          ],
+          "default": ["ProductPassport"],
           "items": {
             "type": "string"
           },
@@ -195,11 +172,7 @@
         },
         "granularityLevel": {
           "type": "string",
-          "enum": [
-            "item",
-            "batch",
-            "model"
-          ],
+          "enum": ["item", "batch", "model"],
           "example": "item",
           "description": "Code to indicate the granularity of this digital product passport - item level, batch level or product class level."
         },
@@ -246,9 +219,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "Product"
-          ],
+          "default": ["Product"],
           "items": {
             "type": "string"
           },
@@ -333,10 +304,7 @@
               "description": "The registration number (alphanumeric) of the Party within the register. Unique within the register."
             }
           },
-          "required": [
-            "id",
-            "name"
-          ],
+          "required": ["id", "name"],
           "description": "The Party entity that manufactured the product."
         },
         "producedAtFacility": {
@@ -359,10 +327,7 @@
               "description": "The registration number (alphanumeric) of the facility within the identifier scheme. Unique within the register."
             }
           },
-          "required": [
-            "id",
-            "name"
-          ],
+          "required": ["id", "name"],
           "description": "The Facility where the product batch was produced / manufactured."
         },
         "productionDate": {
@@ -387,10 +352,7 @@
         }
       },
       "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details.",
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["id", "name"]
     },
     "IdentifierScheme": {
       "type": "object",
@@ -399,9 +361,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "IdentifierScheme"
-          ],
+          "default": ["IdentifierScheme"],
           "items": {
             "type": "string"
           },
@@ -435,9 +395,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "Link"
-          ],
+          "default": ["Link"],
           "items": {
             "type": "string"
           },
@@ -476,9 +434,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "Characteristics"
-          ],
+          "default": ["Characteristics"],
           "items": {
             "type": "string"
           },
@@ -501,9 +457,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "Classification"
-          ],
+          "default": ["Classification"],
           "items": {
             "type": "string"
           },
@@ -545,10 +499,7 @@
         }
       },
       "description": "A classification scheme and code / name representing a category value for a product, entity, or facility.",
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["id", "name"]
     },
     "Dimension": {
       "type": "object",
@@ -557,9 +508,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "Dimension"
-          ],
+          "default": ["Dimension"],
           "items": {
             "type": "string"
           },
@@ -602,9 +551,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "Measure"
-          ],
+          "default": ["Measure"],
           "items": {
             "type": "string"
           },
@@ -629,10 +576,7 @@
         }
       },
       "description": "The measure class defines a numeric measured value (eg 10) and a coded unit of measure (eg KG).",
-      "required": [
-        "value",
-        "unit"
-      ]
+      "required": ["value", "unit"]
     },
     "Claim": {
       "type": "object",
@@ -641,10 +585,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "Claim",
-            "Declaration"
-          ],
+          "default": ["Claim", "Declaration"],
           "items": {
             "type": "string"
           },
@@ -735,11 +676,7 @@
         }
       },
       "description": "A declaration of conformance with one or more criteria from a specific standard or regulation.  ",
-      "required": [
-        "id",
-        "conformance",
-        "conformityTopic"
-      ]
+      "required": ["id", "conformance", "conformityTopic"]
     },
     "Standard": {
       "type": "object",
@@ -748,9 +685,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "Standard"
-          ],
+          "default": ["Standard"],
           "items": {
             "type": "string"
           },
@@ -794,10 +729,7 @@
               "description": "The registration number (alphanumeric) of the Party within the register. Unique within the register."
             }
           },
-          "required": [
-            "id",
-            "name"
-          ],
+          "required": ["id", "name"],
           "description": "The party that issued the standard "
         },
         "issueDate": {
@@ -808,9 +740,7 @@
         }
       },
       "description": "A standard (eg ISO 14000) that specifies the criteria for conformance.",
-      "required": [
-        "issuingParty"
-      ]
+      "required": ["issuingParty"]
     },
     "Regulation": {
       "type": "object",
@@ -819,9 +749,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "Regulation"
-          ],
+          "default": ["Regulation"],
           "items": {
             "type": "string"
           },
@@ -870,10 +798,7 @@
               "description": "The registration number (alphanumeric) of the Party within the register. Unique within the register."
             }
           },
-          "required": [
-            "id",
-            "name"
-          ],
+          "required": ["id", "name"],
           "description": "the issuing body of the regulation. For example Australian Government Department of Climate Change, Energy, the Environment and Water"
         },
         "effectiveDate": {
@@ -884,9 +809,7 @@
         }
       },
       "description": "A regulation (eg EU deforestation regulation) that defines the criteria for assessment.",
-      "required": [
-        "administeredBy"
-      ]
+      "required": ["administeredBy"]
     },
     "Criterion": {
       "type": "object",
@@ -895,9 +818,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "Criterion"
-          ],
+          "default": ["Criterion"],
           "items": {
             "type": "string"
           },
@@ -950,11 +871,7 @@
         },
         "status": {
           "type": "string",
-          "enum": [
-            "proposed",
-            "active",
-            "deprecated"
-          ],
+          "enum": ["proposed", "active", "deprecated"],
           "example": "proposed",
           "description": "The lifecycle status of this criterion. "
         },
@@ -980,13 +897,7 @@
         }
       },
       "description": "A specific rule or criterion within a standard or regulation. eg a carbon intensity calculation rule within an emissions standard.",
-      "required": [
-        "id",
-        "name",
-        "description",
-        "conformityTopic",
-        "status"
-      ]
+      "required": ["id", "name", "description", "conformityTopic", "status"]
     },
     "Metric": {
       "type": "object",
@@ -995,9 +906,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "Metric"
-          ],
+          "default": ["Metric"],
           "items": {
             "type": "string"
           },
@@ -1031,10 +940,7 @@
         }
       },
       "description": "A specific measure of performance against the criteria that governs the claim.  Expressed as an array of metric (ie unit of measure) / value (ie the actual numeric value) pairs.  ",
-      "required": [
-        "metricName",
-        "metricValue"
-      ]
+      "required": ["metricName", "metricValue"]
     },
     "SecureLink": {
       "type": "object",
@@ -1043,10 +949,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "SecureLink",
-            "Link"
-          ],
+          "default": ["SecureLink", "Link"],
           "items": {
             "type": "string"
           },
@@ -1088,19 +991,13 @@
         },
         "hashMethod": {
           "type": "string",
-          "enum": [
-            "SHA-256",
-            "SHA-1"
-          ],
+          "enum": ["SHA-256", "SHA-1"],
           "example": "SHA-256",
           "description": "The hashing algorithm used to create the target hash.  SHA-265 is the recommended standard"
         },
         "encryptionMethod": {
           "type": "string",
-          "enum": [
-            "none",
-            "AES"
-          ],
+          "enum": ["none", "AES"],
           "example": "none",
           "description": "The symmetric encryption algorithm used to encrypt the link target.  AES is the recommended standard. Decryption keys are expected to be passed out of bounds."
         }
@@ -1114,9 +1011,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "EmissionsPerformance"
-          ],
+          "default": ["EmissionsPerformance"],
           "items": {
             "type": "string"
           },
@@ -1142,11 +1037,7 @@
         },
         "operationalScope": {
           "type": "string",
-          "enum": [
-            "None",
-            "CradleToGate",
-            "CradleToGrave"
-          ],
+          "enum": ["None", "CradleToGate", "CradleToGrave"],
           "example": "None",
           "description": "The operational scope of the emissions performance. Only scope 1 & 2, or including upstream scope 3 (cradle to gate) or upstream and downstream scope 3 (cradle to grave)."
         },
@@ -1162,12 +1053,7 @@
         }
       },
       "description": "Product specific characteristics.  This class is an extension point for industry specific product characteristics or performance information such as clothing size or battery capacity.",
-      "required": [
-        "carbonFootprint",
-        "declaredUnit",
-        "operationalScope",
-        "primarySourcedRatio"
-      ]
+      "required": ["carbonFootprint", "declaredUnit", "operationalScope", "primarySourcedRatio"]
     },
     "TraceabilityPerformance": {
       "type": "object",
@@ -1176,9 +1062,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "TraceabilityPerformance"
-          ],
+          "default": ["TraceabilityPerformance"],
           "items": {
             "type": "string"
           },
@@ -1218,9 +1102,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "CircularityPerformance"
-          ],
+          "default": ["CircularityPerformance"],
           "items": {
             "type": "string"
           },
@@ -1275,9 +1157,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "Material"
-          ],
+          "default": ["Material"],
           "items": {
             "type": "string"
           },
@@ -1333,9 +1213,7 @@
         }
       },
       "description": "The material class encapsulates details about the origin or source of raw materials in a product, including the country of origin and the mass fraction.",
-      "required": [
-        "name"
-      ]
+      "required": ["name"]
     }
   }
 }

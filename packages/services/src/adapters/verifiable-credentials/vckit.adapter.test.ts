@@ -2,16 +2,12 @@ import type {
   CredentialPayload,
   CredentialIssuer,
   CredentialSubject,
-  EnvelopedVerifiableCredential
-} from "../../interfaces";
+  EnvelopedVerifiableCredential,
+} from '../../interfaces';
 
-import {
-  VerificationErrorCode
-} from '../../interfaces/verifiableCredentialService';
+import { VerificationErrorCode } from '../../interfaces/verifiableCredentialService';
 
-import {
-  VCKitAdapter
-} from './vckit.adapter';
+import { VCKitAdapter } from './vckit.adapter';
 import { decodeJwt } from 'jose';
 
 jest.mock('jose', () => ({
@@ -29,13 +25,13 @@ describe('vckit.adapter', () => {
   const mockIssuer: CredentialIssuer = {
     type: ['CredentialIssuer'],
     id: 'did:web:example.issuer' as const,
-    name: 'Test Issuer'
+    name: 'Test Issuer',
   };
 
   const mockDefaultIssuer: CredentialIssuer = {
     type: ['CredentialIssuer'],
     id: 'did:web:uncefact.github.io:project-vckit:test-and-development',
-    name: 'Default Issuer'
+    name: 'Default Issuer',
   };
 
   const mockCredentialStatus = {
@@ -43,7 +39,7 @@ describe('vckit.adapter', () => {
     type: 'BitstringStatusListEntry',
     statusPurpose: 'revocation',
     statusListIndex: '94567',
-    statusListCredential: 'https://api.vc.example.com/credentials/status/3'
+    statusListCredential: 'https://api.vc.example.com/credentials/status/3',
   };
 
   beforeEach(() => {
@@ -59,7 +55,7 @@ describe('vckit.adapter', () => {
     ok,
     status,
     statusText: ok ? 'OK' : 'Error',
-    json: jest.fn().mockResolvedValue(data)
+    json: jest.fn().mockResolvedValue(data),
   });
 
   describe('sign', () => {
@@ -67,11 +63,11 @@ describe('vckit.adapter', () => {
       '@context': ['https://www.w3.org/ns/credentials/v2'],
       type: 'EnvelopedVerifiableCredential',
       id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsImlzcyI6ImRpZDp3ZWIvcmcvMjAxOC9jcmVkZWyMDIyIn1dfQ.8pUt1rZktWKGBGyJ6GH3io6f7fliAg8IWsEqTWCYvKm0fQkIlPnqqTobxgR3qmtMd_jJXc8IHwbVVOBUEvpcCg',
-      issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development'
+      issuer: 'did:web:uncefact.github.io:project-vckit:test-and-development',
     };
 
     const mockSignedCredentialResponse = {
-      verifiableCredential: mockEnvelopedVC
+      verifiableCredential: mockEnvelopedVC,
     };
 
     it('should call issue API endpoint with credential status', async () => {
@@ -80,7 +76,7 @@ describe('vckit.adapter', () => {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
         issuer: mockIssuer,
-        credentialSubject: mockCredentialSubject
+        credentialSubject: mockCredentialSubject,
       } as CredentialPayload;
 
       // Mock credential status issuance first, then VC issuance
@@ -98,10 +94,10 @@ describe('vckit.adapter', () => {
           method: 'POST',
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
-            Authorization: mockHeaders.Authorization
+            Authorization: mockHeaders.Authorization,
           }),
-          body: expect.stringContaining('"statusPurpose":"revocation"')
-        })
+          body: expect.stringContaining('"statusPurpose":"revocation"'),
+        }),
       );
 
       // Verify call to issue endpoint with credential status
@@ -112,9 +108,9 @@ describe('vckit.adapter', () => {
           method: 'POST',
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
-            Authorization: mockHeaders.Authorization
-          })
-        })
+            Authorization: mockHeaders.Authorization,
+          }),
+        }),
       );
 
       expect(result).toEqual(mockEnvelopedVC);
@@ -127,7 +123,7 @@ describe('vckit.adapter', () => {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
         issuer: mockIssuer,
-        credentialSubject: mockCredentialSubject
+        credentialSubject: mockCredentialSubject,
       } as CredentialPayload;
 
       mockFetch
@@ -142,9 +138,9 @@ describe('vckit.adapter', () => {
         expect.any(String),
         expect.objectContaining({
           headers: expect.objectContaining({
-            Authorization: 'Bearer token123'
-          })
-        })
+            Authorization: 'Bearer token123',
+          }),
+        }),
       );
 
       // Verify headers in issue call
@@ -153,9 +149,9 @@ describe('vckit.adapter', () => {
         expect.any(String),
         expect.objectContaining({
           headers: expect.objectContaining({
-            Authorization: 'Bearer token123'
-          })
-        })
+            Authorization: 'Bearer token123',
+          }),
+        }),
       );
 
       expect(result).toEqual(mockEnvelopedVC);
@@ -167,7 +163,7 @@ describe('vckit.adapter', () => {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
         issuer: mockIssuer,
-        credentialSubject: mockCredentialSubject
+        credentialSubject: mockCredentialSubject,
       } as CredentialPayload;
 
       mockFetch.mockResolvedValueOnce(createMockResponse({}, false, 500));
@@ -183,7 +179,7 @@ describe('vckit.adapter', () => {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
         issuer: mockIssuer,
-        credentialSubject: mockCredentialSubject
+        credentialSubject: mockCredentialSubject,
       } as CredentialPayload;
 
       mockFetch
@@ -201,7 +197,7 @@ describe('vckit.adapter', () => {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
         issuer: mockDefaultIssuer,
-        credentialSubject: mockCredentialSubject
+        credentialSubject: mockCredentialSubject,
       };
 
       mockFetch
@@ -215,8 +211,8 @@ describe('vckit.adapter', () => {
         1,
         `${mockAPIUrl}/agent/issueBitstringStatusList`,
         expect.objectContaining({
-          body: expect.stringContaining(mockDefaultIssuer.id)
-        })
+          body: expect.stringContaining(mockDefaultIssuer.id),
+        }),
       );
 
       expect(result).toEqual(mockEnvelopedVC);
@@ -228,15 +224,15 @@ describe('vckit.adapter', () => {
         '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/'],
         type: ['VerifiableCredential'],
         issuer: mockDefaultIssuer,
-        credentialSubject: mockCredentialSubject
+        credentialSubject: mockCredentialSubject,
       };
 
       const mockContextVC = {
         ...mockEnvelopedVC,
-        "@context": ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/']
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/'],
       };
       const mockIssueResponse = {
-        verifiableCredential: mockContextVC
+        verifiableCredential: mockContextVC,
       };
 
       mockFetch
@@ -254,15 +250,15 @@ describe('vckit.adapter', () => {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential', 'CustomType'],
         issuer: mockDefaultIssuer,
-        credentialSubject: mockCredentialSubject
+        credentialSubject: mockCredentialSubject,
       };
 
       const mockTypeVC = {
         ...mockEnvelopedVC,
-        type: ['VerifiableCredential', 'CustomType']
+        type: ['VerifiableCredential', 'CustomType'],
       };
       const mockIssueResponse = {
-        verifiableCredential: mockTypeVC
+        verifiableCredential: mockTypeVC,
       };
 
       mockFetch
@@ -279,7 +275,9 @@ describe('vckit.adapter', () => {
     });
 
     it('should throw error when Authorization header is not provided', () => {
-      expect(() => new VCKitAdapter(mockAPIUrl, {})).toThrow('Error creating VCKitAdapter. Authorization header is required.');
+      expect(() => new VCKitAdapter(mockAPIUrl, {})).toThrow(
+        'Error creating VCKitAdapter. Authorization header is required.',
+      );
     });
 
     it('should throw error when vc.credentialSubject is not provided', async () => {
@@ -287,26 +285,27 @@ describe('vckit.adapter', () => {
       const localhostIssuer: CredentialIssuer = {
         type: ['CredentialIssuer'],
         id: 'did:web:localhost',
-        name: 'Localhost Issuer'
+        name: 'Localhost Issuer',
       };
       const vc: CredentialPayload = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: ['VerifiableCredential'],
         issuer: localhostIssuer,
-        credentialSubject: {} as any
+        credentialSubject: {} as any,
       };
 
-      await expect(service.sign(vc)).rejects.toThrow('Error issuing VC. credentialSubject is required in credential payload.');
+      await expect(service.sign(vc)).rejects.toThrow(
+        'Error issuing VC. credentialSubject is required in credential payload.',
+      );
       expect(mockFetch).not.toHaveBeenCalled();
     });
-
   });
 
   describe('verify', () => {
     const mockEnvelopedCredential: EnvelopedVerifiableCredential = {
       '@context': ['https://www.w3.org/ns/credentials/v2'],
       type: 'EnvelopedVerifiableCredential',
-      id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOnVuY2VmYWN0LmdpdGh1Yi5pbyIsInN1YiI6ImRpZDpleGFtcGxlOjEyMyJ9.signature'
+      id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOnVuY2VmYWN0LmdpdGh1Yi5pbyIsInN1YiI6ImRpZDpleGFtcGxlOjEyMyJ9.signature',
     };
 
     it('should call verify API endpoint with credential', async () => {
@@ -324,7 +323,7 @@ describe('vckit.adapter', () => {
           method: 'POST',
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
-            Authorization: mockHeaders.Authorization
+            Authorization: mockHeaders.Authorization,
           }),
           body: JSON.stringify({
             credential: mockEnvelopedCredential,
@@ -332,8 +331,8 @@ describe('vckit.adapter', () => {
             policies: {
               credentialStatus: true,
             },
-          })
-        })
+          }),
+        }),
       );
       expect(result).toEqual({ verified: true });
     });
@@ -351,9 +350,9 @@ describe('vckit.adapter', () => {
         expect.any(String),
         expect.objectContaining({
           headers: expect.objectContaining({
-            Authorization: 'Bearer token123'
-          })
-        })
+            Authorization: 'Bearer token123',
+          }),
+        }),
       );
       expect(result).toEqual({ verified: true });
     });
@@ -365,8 +364,8 @@ describe('vckit.adapter', () => {
         verified: false,
         error: {
           message: 'Credential has been revoked',
-          errorCode: 'credential_status_revoked'
-        }
+          errorCode: 'credential_status_revoked',
+        },
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(vckitVerifyResult));
@@ -378,8 +377,8 @@ describe('vckit.adapter', () => {
         verified: false,
         error: {
           type: VerificationErrorCode.Status,
-          message: 'Credential has been revoked'
-        }
+          message: 'Credential has been revoked',
+        },
       });
     });
 
@@ -389,8 +388,8 @@ describe('vckit.adapter', () => {
         verified: false,
         error: {
           message: 'Invalid signature',
-          errorCode: 'signature_invalid'
-        }
+          errorCode: 'signature_invalid',
+        },
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(vckitVerifyResult));
@@ -401,8 +400,8 @@ describe('vckit.adapter', () => {
         verified: false,
         error: {
           type: VerificationErrorCode.Integrity,
-          message: 'Invalid signature'
-        }
+          message: 'Invalid signature',
+        },
       });
     });
 
@@ -412,8 +411,8 @@ describe('vckit.adapter', () => {
         verified: false,
         error: {
           message: 'Credential has expired',
-          errorCode: 'credential_expired'
-        }
+          errorCode: 'credential_expired',
+        },
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(vckitVerifyResult));
@@ -424,8 +423,8 @@ describe('vckit.adapter', () => {
         verified: false,
         error: {
           type: VerificationErrorCode.Temporal,
-          message: 'Credential has expired'
-        }
+          message: 'Credential has expired',
+        },
       });
     });
 
@@ -433,7 +432,7 @@ describe('vckit.adapter', () => {
       const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const vckitVerifyResult = {
         verified: false,
-        error: { message: 'Unknown verification error' }
+        error: { message: 'Unknown verification error' },
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(vckitVerifyResult));
@@ -445,8 +444,8 @@ describe('vckit.adapter', () => {
         verified: false,
         error: {
           type: VerificationErrorCode.Integrity,
-          message: 'Unknown verification error'
-        }
+          message: 'Unknown verification error',
+        },
       });
     });
 
@@ -454,7 +453,7 @@ describe('vckit.adapter', () => {
       const service = new VCKitAdapter(mockAPIUrl, mockHeaders);
       const vckitVerifyResult = {
         verified: false,
-        error: { errorCode: 'some_error' }
+        error: { errorCode: 'some_error' },
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(vckitVerifyResult));
@@ -465,8 +464,8 @@ describe('vckit.adapter', () => {
         verified: false,
         error: {
           type: VerificationErrorCode.Integrity,
-          message: 'Verification failed'
-        }
+          message: 'Verification failed',
+        },
       });
     });
 
@@ -482,7 +481,9 @@ describe('vckit.adapter', () => {
 
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
-      await expect(service.verify(mockEnvelopedCredential)).rejects.toThrow('Failed to verify verifiable credential: Network error');
+      await expect(service.verify(mockEnvelopedCredential)).rejects.toThrow(
+        'Failed to verify verifiable credential: Network error',
+      );
     });
 
     it('should throw error when API returns non-ok response', async () => {
@@ -490,7 +491,9 @@ describe('vckit.adapter', () => {
 
       mockFetch.mockResolvedValueOnce(createMockResponse({}, false, 500));
 
-      await expect(service.verify(mockEnvelopedCredential)).rejects.toThrow('Failed to verify verifiable credential: HTTP 500: Error');
+      await expect(service.verify(mockEnvelopedCredential)).rejects.toThrow(
+        'Failed to verify verifiable credential: HTTP 500: Error',
+      );
     });
 
     it('should handle unknown errors', async () => {
@@ -498,7 +501,9 @@ describe('vckit.adapter', () => {
 
       mockFetch.mockRejectedValueOnce('Unknown error');
 
-      await expect(service.verify(mockEnvelopedCredential)).rejects.toThrow('Failed to verify verifiable credential: Unknown error');
+      await expect(service.verify(mockEnvelopedCredential)).rejects.toThrow(
+        'Failed to verify verifiable credential: Unknown error',
+      );
     });
   });
 
@@ -506,14 +511,14 @@ describe('vckit.adapter', () => {
     const mockEnvelopedCredential: EnvelopedVerifiableCredential = {
       '@context': ['https://www.w3.org/ns/credentials/v2'],
       type: 'EnvelopedVerifiableCredential',
-      id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOnVuY2VmYWN0LmdpdGh1Yi5pbyIsInN1YiI6ImRpZDpleGFtcGxlOjEyMyJ9.signature'
+      id: 'data:application/vc-ld+jwt,eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOnVuY2VmYWN0LmdpdGh1Yi5pbyIsInN1YiI6ImRpZDpleGFtcGxlOjEyMyJ9.signature',
     };
 
     const mockDecodedCredential = {
       '@context': ['https://www.w3.org/ns/credentials/v2'],
       type: ['VerifiableCredential'],
       issuer: 'did:web:uncefact.github.io',
-      credentialSubject: { id: 'did:example:123', name: 'John Doe' }
+      credentialSubject: { id: 'did:example:123', name: 'John Doe' },
     };
 
     beforeEach(() => {
@@ -528,7 +533,7 @@ describe('vckit.adapter', () => {
       const result = await service.decode(mockEnvelopedCredential);
 
       expect(decodeJwt).toHaveBeenCalledWith(
-        'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOnVuY2VmYWN0LmdpdGh1Yi5pbyIsInN1YiI6ImRpZDpleGFtcGxlOjEyMyJ9.signature'
+        'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOnVuY2VmYWN0LmdpdGh1Yi5pbyIsInN1YiI6ImRpZDpleGFtcGxlOjEyMyJ9.signature',
       );
       expect(result).toEqual(mockDecodedCredential);
     });
@@ -546,10 +551,12 @@ describe('vckit.adapter', () => {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: 'VerifiableCredential',
         issuer: 'did:example:123',
-        credentialSubject: { id: 'did:example:456' }
+        credentialSubject: { id: 'did:example:456' },
       } as any;
 
-      await expect(service.decode(invalidCredential)).rejects.toThrow('Failed to decode verifiable credential: Credential is not an EnvelopedVerifiableCredential');
+      await expect(service.decode(invalidCredential)).rejects.toThrow(
+        'Failed to decode verifiable credential: Credential is not an EnvelopedVerifiableCredential',
+      );
     });
 
     it('should throw error when credential id is missing encoded data', async () => {
@@ -557,10 +564,12 @@ describe('vckit.adapter', () => {
       const invalidCredential = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: 'EnvelopedVerifiableCredential',
-        id: 'data:application/vc-ld+jwt'
+        id: 'data:application/vc-ld+jwt',
       } as EnvelopedVerifiableCredential;
 
-      await expect(service.decode(invalidCredential)).rejects.toThrow('Failed to decode verifiable credential: Invalid enveloped credential format: missing encoded data');
+      await expect(service.decode(invalidCredential)).rejects.toThrow(
+        'Failed to decode verifiable credential: Invalid enveloped credential format: missing encoded data',
+      );
     });
 
     it('should throw error when credential id is undefined', async () => {
@@ -568,10 +577,12 @@ describe('vckit.adapter', () => {
       const invalidCredential = {
         '@context': ['https://www.w3.org/ns/credentials/v2'],
         type: 'EnvelopedVerifiableCredential',
-        id: undefined as any
+        id: undefined as any,
       } as EnvelopedVerifiableCredential;
 
-      await expect(service.decode(invalidCredential)).rejects.toThrow('Failed to decode verifiable credential: Invalid enveloped credential format: missing encoded data');
+      await expect(service.decode(invalidCredential)).rejects.toThrow(
+        'Failed to decode verifiable credential: Invalid enveloped credential format: missing encoded data',
+      );
     });
 
     it('should handle decodeJwt errors', async () => {
@@ -581,7 +592,9 @@ describe('vckit.adapter', () => {
         throw new Error('Invalid JWT format');
       });
 
-      await expect(service.decode(mockEnvelopedCredential)).rejects.toThrow('Failed to decode verifiable credential: Invalid JWT format');
+      await expect(service.decode(mockEnvelopedCredential)).rejects.toThrow(
+        'Failed to decode verifiable credential: Invalid JWT format',
+      );
     });
 
     it('should handle unknown errors during decoding', async () => {
@@ -591,7 +604,9 @@ describe('vckit.adapter', () => {
         throw 'Unknown error';
       });
 
-      await expect(service.decode(mockEnvelopedCredential)).rejects.toThrow('Failed to decode verifiable credential: Unknown error');
+      await expect(service.decode(mockEnvelopedCredential)).rejects.toThrow(
+        'Failed to decode verifiable credential: Unknown error',
+      );
     });
   });
 });
