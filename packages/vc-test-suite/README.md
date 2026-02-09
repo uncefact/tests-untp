@@ -48,4 +48,4 @@ yarn test:package
 ### Additional Documentation
 
 - [Technical Interoperability](https://uncefact.github.io/tests-untp/docs/test-suites/technical-interoperability/)
-- [Verify Link](https://uncefact.github.io/tests-untp/docs/mock-apps/common/verify-link)
+- [Verify Link](https://uncefact.github.io/tests-untp/docs/reference-implementation/common/verify-link)

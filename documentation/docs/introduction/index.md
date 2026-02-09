@@ -10,13 +10,13 @@ import Disclaimer from './../\_disclaimer.mdx';
 The UN Transparency Protocol (UNTP) Test Suite is a comprehensive set of tools designed to ensure conformance to the [UNTP Specification](https://uncefact.github.io/spec-untp/). This robust suite enables implementers to thoroughly evaluate their UNTP implementations across various aspects, from technical interoperability to semantic validation.
 
 The Test Suite comprises four primary components:
- - Mock Apps
+ - Reference Implementations
  - Technical Interoperability
  - Semantic Interoperability
  - Graph Validation
 
-## Mock Apps
-[Mock Apps](/docs/mock-apps/) allow implementers to model a value chain using UNTP and integrate their implementation at any point within it. These apps provide a flexible environment for testing and demonstrating UNTP functionality in real-world scenarios.
+## Reference Implementations
+[Reference Implementations](/docs/reference-implementation/) allow implementers to model a value chain using UNTP and integrate their implementation at any point within it. These apps provide a flexible environment for testing and demonstrating UNTP functionality in real-world scenarios.
 
 ## Technical Interoperability
 This component tests the technical interoperability of implementations based on the UNTP specification. It ensures that the technical aspects of the implementation align with the protocol's requirements.
@@ -28,7 +28,7 @@ The [Semantic Interoperability test](/docs/test-suites/semantic-interoperability
 This component tests the entire trust graph produced by an implementation against the UNTP specification, ensuring the integrity and validity of the trust relationships within the system.
 
 ## Extensibility
-It's important to note that the Semantic Interoperability, Graph Validation, and Mock Apps components can be extended to meet the specific needs of industries or value chain actors while still conforming to the core UNTP specification. This flexibility allows for customisation without compromising the protocol's fundamental principles.
+It's important to note that the Semantic Interoperability, Graph Validation, and Reference Implementations components can be extended to meet the specific needs of industries or value chain actors while still conforming to the core UNTP specification. This flexibility allows for customisation without compromising the protocol's fundamental principles.
 
 ## Tiered Approach
 The UNTP Test Suite follows a tiered approach, with each tier building upon the previous one:
@@ -41,4 +41,4 @@ The UNTP Test Suite follows a tiered approach, with each tier building upon the 
 
 This tiered structure allows implementers to progressively validate their UNTP implementations, ensuring a thorough and systematic approach to conformance testing.
 
-By utilising the UNTP Test Suite and the Mock Apps, implementers can confidently develop, test, and deploy UNTP-compliant systems, fostering greater transparency and trust across global value chains.
+By utilising the UNTP Test Suite and the Reference Implementations, implementers can confidently develop, test, and deploy UNTP-compliant systems, fostering greater transparency and trust across global value chains.
