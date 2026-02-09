@@ -24,7 +24,7 @@ A category of capability with a defined interface contract. Examples: DID manage
 - Represented as a Prisma enum (`ServiceType`)
 - Each type has an interface in `packages/services` (e.g., `IDidService`)
 - New types require a Prisma migration to extend the enum
-- Each type gets a dedicated resolver function in `packages/mock-app`
+- Each type gets a dedicated resolver function in `packages/reference-implementation`
 
 ### Adapter
 
@@ -70,7 +70,7 @@ This package owns:
 
 **Why here?** These are framework-agnostic. They could be consumed by any TypeScript application, not just Next.js.
 
-### `packages/mock-app` (Next.js application)
+### `packages/reference-implementation` (Next.js application)
 
 This package owns:
 - Prisma schema and migrations
@@ -102,7 +102,7 @@ When adding an entirely new category of capability (e.g., a notification service
 1. **Define the interface** in `packages/services/src/{service-type}/types.ts`
 2. **Create the first adapter** following the adapter steps above
 3. **Add the service type** to the `ServiceType` Prisma enum (migration)
-4. **Create a resolver function** in `packages/mock-app/src/lib/services/resolve-{type}-service.ts`
+4. **Create a resolver function** in `packages/reference-implementation/src/lib/services/resolve-{type}-service.ts`
 5. **Seed a system default** instance in `prisma/seed.ts`
 6. **Add provenance FK** to any domain model that uses this service type (e.g., `serviceInstanceId` on `Did`)
 
