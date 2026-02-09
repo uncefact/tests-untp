@@ -13,10 +13,7 @@ jest.mock('html5-qrcode', () => {
     Html5Qrcode: class MockHtml5Qrcode {
       constructor() {}
 
-      start(
-        deviceId: { facingMode: string },
-        successCallback: (decodedText: string) => void
-      ) {
+      start(deviceId: { facingMode: string }, successCallback: (decodedText: string) => void) {
         successCallback('Mocked QR Code Data');
         return Promise.resolve(null);
       }
@@ -79,14 +76,8 @@ describe('Scanner', () => {
 
   test('handles successful scan', async () => {
     let result: string | null = null;
-    const mockFn = jest
-      .fn()
-      .mockImplementation((cb) => cb('Mocked QR Code Data'));
-    render(
-      <Scanner
-        qrCodeSuccessCallback={mockFn((cb: string) => (result = cb))}
-      />
-    );
+    const mockFn = jest.fn().mockImplementation((cb) => cb('Mocked QR Code Data'));
+    render(<Scanner qrCodeSuccessCallback={mockFn((cb: string) => (result = cb))} />);
 
     expect(result).toBe('Mocked QR Code Data');
   });
@@ -96,9 +87,7 @@ describe('Scanner', () => {
     detectMock.mockImplementation(() => 'laptop');
     mockHtml5QrcodeFn();
 
-    const { queryByTestId } = render(
-      <Scanner qrCodeSuccessCallback={() => {}} />
-    );
+    const { queryByTestId } = render(<Scanner qrCodeSuccessCallback={() => {}} />);
     const cameraSwitch = queryByTestId('switch-camera-button');
     expect(cameraSwitch).toBeNull();
   });
@@ -110,10 +99,7 @@ describe('Scanner', () => {
     });
 
     render(
-      <Scanner
-        qrCodeErrorCallback={mockFn((cb: string) => (errorResult = cb))}
-        qrCodeSuccessCallback={() => {}}
-      />
+      <Scanner qrCodeErrorCallback={mockFn((cb: string) => (errorResult = cb))} qrCodeSuccessCallback={() => {}} />,
     );
 
     expect(errorResult).toBe('Permission Denied');

@@ -9,10 +9,6 @@ export const computeHash = (
   algorithm: HashAlgorithm = HashAlgorithm.SHA256,
 ): string => {
   const data =
-    typeof input === 'string'
-      ? input
-      : input instanceof Uint8Array
-        ? Buffer.from(input)
-        : JSON.stringify(input);
+    typeof input === 'string' ? input : input instanceof Uint8Array ? Buffer.from(input) : JSON.stringify(input);
   return crypto.createHash(algorithm).update(data).digest('hex');
 };

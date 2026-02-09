@@ -43,7 +43,6 @@ describe('VCKitDidAdapter', () => {
       expect(service.keyType).toBe('Ed25519');
     });
 
-
     it('throws if baseURL is empty', () => {
       expect(() => new VCKitDidAdapter('', HEADERS)).toThrow('API URL is required');
     });
@@ -126,19 +125,35 @@ describe('VCKitDidAdapter', () => {
     it('handles HTTP errors', async () => {
       (global.fetch as jest.Mock).mockResolvedValue(createMockResponse({}, false, 500));
 
-      await expect(service.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' })).rejects.toThrow('Failed to create DID');
+      await expect(
+        service.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' }),
+      ).rejects.toThrow('Failed to create DID');
     });
 
     it('handles network errors', async () => {
       (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
 
-      await expect(service.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' })).rejects.toThrow('Failed to create DID: Network error');
+      await expect(
+        service.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' }),
+      ).rejects.toThrow('Failed to create DID: Network error');
     });
 
     it('passes the alias through to the payload as-is', async () => {
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce(createMockResponse({ did: 'did:web:example.com:my-org', controllerKeyId: 'key-1' }))
-        .mockResolvedValueOnce(createMockResponse({ didDocument: { '@context': ['https://www.w3.org/ns/did/v1', 'https://w3id.org/security/suites/ed25519-2020/v1', 'https://w3id.org/security/suites/jws-2020/v1'], id: 'did:web:example.com:my-org', verificationMethod: [] } }));
+        .mockResolvedValueOnce(
+          createMockResponse({
+            didDocument: {
+              '@context': [
+                'https://www.w3.org/ns/did/v1',
+                'https://w3id.org/security/suites/ed25519-2020/v1',
+                'https://w3id.org/security/suites/jws-2020/v1',
+              ],
+              id: 'did:web:example.com:my-org',
+              verificationMethod: [],
+            },
+          }),
+        );
 
       await service.create({
         type: DidType.MANAGED,
@@ -171,9 +186,7 @@ describe('VCKitDidAdapter', () => {
     };
 
     it('sets Host header from DID domain', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue(
-        createMockResponse({ didDocument }),
-      );
+      (global.fetch as jest.Mock).mockResolvedValue(createMockResponse({ didDocument }));
 
       await service.getDocument('did:web:example.com:org:abc');
 
@@ -189,9 +202,7 @@ describe('VCKitDidAdapter', () => {
     });
 
     it('returns the DID document', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue(
-        createMockResponse({ didDocument }),
-      );
+      (global.fetch as jest.Mock).mockResolvedValue(createMockResponse({ didDocument }));
 
       const result = await service.getDocument('did:web:example.com:org:abc');
       expect(result).toEqual(didDocument);
@@ -266,7 +277,6 @@ describe('VCKitDidAdapter', () => {
       expect(service.getSupportedTypes()).toEqual(['MANAGED', 'SELF_MANAGED']);
     });
   });
-
 
   describe('getSupportedMethods', () => {
     it('returns DID_WEB', () => {

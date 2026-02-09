@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@/lib/prisma/generated";
-import { cloneSystemDefaults } from "./clone-system-defaults";
+import type { PrismaClient } from '@/lib/prisma/generated';
+import { cloneSystemDefaults } from './clone-system-defaults';
 
 interface UserProfile {
   name?: string | null;

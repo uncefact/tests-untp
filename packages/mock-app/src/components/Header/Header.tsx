@@ -161,7 +161,10 @@ function Header() {
     setHeaderBrandInfo({
       name: convertPathToString(pathname ?? ''),
       assets: {
-        logo: subAppStyles && 'assets' in subAppStyles ? (subAppStyles as { assets?: { logo?: string } })?.assets?.logo ?? '' : '',
+        logo:
+          subAppStyles && 'assets' in subAppStyles
+            ? (subAppStyles as { assets?: { logo?: string } })?.assets?.logo ?? ''
+            : '',
       },
     });
 
@@ -173,7 +176,6 @@ function Header() {
         setHeaderBrandInfo(initialHeaderBrandInfo);
       }
     }
-
   }, [pathname]);
 
   return theme?.selectedTheme?.primaryColor &&

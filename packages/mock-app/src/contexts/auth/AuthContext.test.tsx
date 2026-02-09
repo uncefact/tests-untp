@@ -17,12 +17,12 @@ function TestComponent() {
 
   return (
     <div>
-      <div data-testid="loading">{isLoading ? 'loading' : 'not-loading'}</div>
-      <div data-testid="authenticated">{isAuthenticated ? 'authenticated' : 'not-authenticated'}</div>
+      <div data-testid='loading'>{isLoading ? 'loading' : 'not-loading'}</div>
+      <div data-testid='authenticated'>{isAuthenticated ? 'authenticated' : 'not-authenticated'}</div>
       {user && (
-        <div data-testid="user">
-          <div data-testid="user-name">{user.name}</div>
-          <div data-testid="user-email">{user.email}</div>
+        <div data-testid='user'>
+          <div data-testid='user-name'>{user.name}</div>
+          <div data-testid='user-email'>{user.email}</div>
         </div>
       )}
     </div>
@@ -45,7 +45,7 @@ describe('AuthContext', () => {
       render(
         <AuthProvider>
           <TestComponent />
-        </AuthProvider>
+        </AuthProvider>,
       );
 
       expect(screen.getByTestId('loading')).toHaveTextContent('loading');
@@ -63,7 +63,7 @@ describe('AuthContext', () => {
       render(
         <AuthProvider>
           <TestComponent />
-        </AuthProvider>
+        </AuthProvider>,
       );
 
       expect(screen.getByTestId('loading')).toHaveTextContent('not-loading');
@@ -90,7 +90,7 @@ describe('AuthContext', () => {
       render(
         <AuthProvider>
           <TestComponent />
-        </AuthProvider>
+        </AuthProvider>,
       );
 
       expect(screen.getByTestId('loading')).toHaveTextContent('not-loading');
@@ -116,7 +116,7 @@ describe('AuthContext', () => {
       render(
         <AuthProvider>
           <TestComponent />
-        </AuthProvider>
+        </AuthProvider>,
       );
 
       expect(screen.getByTestId('user-name')).toHaveTextContent('');
@@ -149,7 +149,7 @@ describe('AuthContext', () => {
       function LogoutTestComponent() {
         const { logout } = useAuth();
         return (
-          <button onClick={logout} data-testid="logout-btn">
+          <button onClick={logout} data-testid='logout-btn'>
             Logout
           </button>
         );
@@ -158,7 +158,7 @@ describe('AuthContext', () => {
       render(
         <AuthProvider>
           <LogoutTestComponent />
-        </AuthProvider>
+        </AuthProvider>,
       );
 
       const logoutBtn = screen.getByTestId('logout-btn');
@@ -189,7 +189,7 @@ describe('AuthContext', () => {
       function LogoutTestComponent() {
         const { logout } = useAuth();
         return (
-          <button onClick={logout} data-testid="logout-btn">
+          <button onClick={logout} data-testid='logout-btn'>
             Logout
           </button>
         );
@@ -198,7 +198,7 @@ describe('AuthContext', () => {
       render(
         <AuthProvider>
           <LogoutTestComponent />
-        </AuthProvider>
+        </AuthProvider>,
       );
 
       const logoutBtn = screen.getByTestId('logout-btn');
@@ -230,7 +230,7 @@ describe('AuthContext', () => {
       function LogoutTestComponent() {
         const { logout } = useAuth();
         return (
-          <button onClick={logout} data-testid="logout-btn">
+          <button onClick={logout} data-testid='logout-btn'>
             Logout
           </button>
         );
@@ -239,7 +239,7 @@ describe('AuthContext', () => {
       render(
         <AuthProvider>
           <LogoutTestComponent />
-        </AuthProvider>
+        </AuthProvider>,
       );
 
       const logoutBtn = screen.getByTestId('logout-btn');

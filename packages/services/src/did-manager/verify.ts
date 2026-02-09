@@ -1,9 +1,4 @@
-import type {
-  DidDocument,
-  DidVerificationResult,
-  DidVerificationCheck,
-  MethodVerificationResult,
-} from './types.js';
+import type { DidDocument, DidVerificationResult, DidVerificationCheck, MethodVerificationResult } from './types.js';
 import { DidVerificationCheckName } from './types.js';
 import type { JsonLdDocument } from 'jsonld';
 import { parseDidMethod } from './utils.js';
@@ -40,10 +35,7 @@ const methodVerifiers: Record<string, MethodVerifier> = {
  *   4. KEY_MATERIAL    — match provider keys against verificationMethod entries
  *   5. JSONLD_VALIDITY — JSON-LD expansion succeeds
  */
-export async function verifyDid(
-  did: string,
-  options: VerifyDidOptions,
-): Promise<DidVerificationResult> {
+export async function verifyDid(did: string, options: VerifyDidOptions): Promise<DidVerificationResult> {
   if (!did) {
     throw new Error('DID string is required for verification');
   }
@@ -66,7 +58,7 @@ export async function verifyDid(
     checks.push({
       name: C.STRUCTURE,
       passed: parsed.success,
-      message: parsed.success ? undefined : parsed.error.issues.map(i => i.message).join('; '),
+      message: parsed.success ? undefined : parsed.error.issues.map((i) => i.message).join('; '),
     });
   } else {
     checks.push({ name: C.STRUCTURE, passed: false, message: 'No document to validate' });
@@ -105,7 +97,11 @@ export async function verifyDid(
     checks.push({
       name: C.KEY_MATERIAL,
       passed: keyFound || providerKeys.length === 0,
-      message: keyFound ? undefined : (providerKeys.length === 0 ? 'No provider keys to compare' : 'No matching keys found in DID document'),
+      message: keyFound
+        ? undefined
+        : providerKeys.length === 0
+          ? 'No provider keys to compare'
+          : 'No matching keys found in DID document',
     });
   } else {
     checks.push({ name: C.KEY_MATERIAL, passed: false, message: 'No document to validate' });
@@ -130,10 +126,8 @@ export async function verifyDid(
     checks.push({ name: C.JSONLD_VALIDITY, passed: false, message: 'No document to validate' });
   }
 
-  const verified = checks.every(c => c.passed);
-  const errors = checks
-    .filter(c => !c.passed)
-    .map(c => ({ check: c.name, message: c.message ?? 'Check failed' }));
+  const verified = checks.every((c) => c.passed);
+  const errors = checks.filter((c) => !c.passed).map((c) => ({ check: c.name, message: c.message ?? 'Check failed' }));
 
   return {
     verified,

@@ -1,8 +1,8 @@
-import NextAuth from "next-auth";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "@/lib/prisma/prisma";
-import { authConfig } from "@/lib/auth/auth.config";
-import { handleSignIn } from "@/lib/onboarding";
+import NextAuth from 'next-auth';
+import { PrismaAdapter } from '@auth/prisma-adapter';
+import { prisma } from '@/lib/prisma/prisma';
+import { authConfig } from '@/lib/auth/auth.config';
+import { handleSignIn } from '@/lib/onboarding';
 
 /**
  * Full auth instance with PrismaAdapter for API routes and server components.
@@ -22,7 +22,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
         });
       } catch (error) {
-        console.error("[onboarding] Failed during sign-in:", {
+        console.error('[onboarding] Failed during sign-in:', {
           userId: user.id,
           provider: account.provider,
           error: error instanceof Error ? error.message : error,

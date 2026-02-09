@@ -1,6 +1,6 @@
-import { cn } from "@/lib/utils";
-import { ReactNode } from "react";
-import Image from "next/image";
+import { cn } from '@/lib/utils';
+import { ReactNode } from 'react';
+import Image from 'next/image';
 
 interface SidebarHeaderProps {
   className?: string;
@@ -8,38 +8,31 @@ interface SidebarHeaderProps {
   onLogoClick?: () => void;
 }
 
-export function SidebarHeader({
-  className,
-  logo,
-  onLogoClick,
-}: SidebarHeaderProps) {
-  const logoElement = typeof logo === "string" ? (
-    <Image
-      src={logo}
-      alt="Logo"
-      width={48}
-      height={48}
-      className={cn("w-12 h-12", className)}
-      data-testid="sidebar-header-logo"
-    />
-  ) : (
-    logo
-  );
+export function SidebarHeader({ className, logo, onLogoClick }: SidebarHeaderProps) {
+  const logoElement =
+    typeof logo === 'string' ? (
+      <Image
+        src={logo}
+        alt='Logo'
+        width={48}
+        height={48}
+        className={cn('w-12 h-12', className)}
+        data-testid='sidebar-header-logo'
+      />
+    ) : (
+      logo
+    );
 
   if (onLogoClick) {
     return (
-      <button
-        onClick={onLogoClick}
-        className="cursor-pointer text-left w-full"
-        data-testid="sidebar-header"
-      >
+      <button onClick={onLogoClick} className='cursor-pointer text-left w-full' data-testid='sidebar-header'>
         {logoElement}
       </button>
     );
   }
 
   return (
-    <div data-testid="sidebar-header" className="text-left w-full">
+    <div data-testid='sidebar-header' className='text-left w-full'>
       {logoElement}
     </div>
   );

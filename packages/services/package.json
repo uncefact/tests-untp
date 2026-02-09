@@ -25,9 +25,15 @@
   },
   "typesVersions": {
     "*": {
-      "server": ["./build/server.d.ts"],
-      "encryption": ["./build/encryption/index.d.ts"],
-      "key-provider": ["./build/key-provider/index.d.ts"]
+      "server": [
+        "./build/server.d.ts"
+      ],
+      "encryption": [
+        "./build/encryption/index.d.ts"
+      ],
+      "key-provider": [
+        "./build/key-provider/index.d.ts"
+      ]
     }
   },
   "files": [

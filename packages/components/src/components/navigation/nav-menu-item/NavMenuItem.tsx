@@ -1,6 +1,6 @@
-import { cn } from "@/lib/utils";
-import { ChevronDown, ArrowUpRight } from "lucide-react";
-import React from "react";
+import { cn } from '@/lib/utils';
+import { ChevronDown, ArrowUpRight } from 'lucide-react';
+import React from 'react';
 
 export interface NavMenuItemConfig {
   id: string;
@@ -55,7 +55,7 @@ export function NavMenuItem({
   isSubItem = false,
   isExternal = false,
 }: NavMenuItemProps) {
-  const testId = label.toLowerCase().replace(/\s+/g, "-");
+  const testId = label.toLowerCase().replace(/\s+/g, '-');
 
   const handleChevronClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -65,62 +65,61 @@ export function NavMenuItem({
   return (
     <div
       className={cn(
-        "w-full p-2 rounded inline-flex justify-between items-center transition-colors",
-        isActive
-          ? "bg-nav-item-active"
-          : "hover:bg-nav-item-hover",
-        isSubItem && "pl-10",
+        'w-full p-2 rounded inline-flex justify-between items-center transition-colors',
+        isActive ? 'bg-nav-item-active' : 'hover:bg-nav-item-hover',
+        isSubItem && 'pl-10',
         className,
       )}
       data-testid={`nav-menu-item-${testId}`}
     >
       <button
         onClick={onClick}
-        className="flex justify-start items-center gap-2 flex-1 text-left cursor-pointer bg-transparent border-none p-0"
+        className='flex justify-start items-center gap-2 flex-1 text-left cursor-pointer bg-transparent border-none p-0'
       >
-        {icon && (
-          typeof icon === 'string' ? (
+        {icon &&
+          (typeof icon === 'string' ? (
             <img
               src={icon}
-              alt=""
+              alt=''
               className={cn(
-                "w-6 h-6 shrink-0 pointer-events-none",
-                isActive ? "text-nav-item-foreground-active" : "text-nav-item-foreground-inactive"
+                'w-6 h-6 shrink-0 pointer-events-none',
+                isActive ? 'text-nav-item-foreground-active' : 'text-nav-item-foreground-inactive',
               )}
-              aria-hidden="true"
+              aria-hidden='true'
               data-testid={`nav-menu-item-${testId}-icon`}
             />
           ) : (
             <div
               className={cn(
-                "w-6 h-6 shrink-0 flex items-center justify-center pointer-events-none",
-                isActive ? "text-nav-item-foreground-active" : "text-nav-item-foreground-inactive"
+                'w-6 h-6 shrink-0 flex items-center justify-center pointer-events-none',
+                isActive ? 'text-nav-item-foreground-active' : 'text-nav-item-foreground-inactive',
               )}
-              aria-hidden="true"
+              aria-hidden='true'
               data-testid={`nav-menu-item-${testId}-icon`}
             >
               {icon}
             </div>
-          )
-        )}
-        <span className={cn(
-          "text-base font-normal font-roboto leading-snug",
-          isActive ? "!text-nav-item-foreground-active" : "text-nav-item-foreground-inactive"
-        )}>
+          ))}
+        <span
+          className={cn(
+            'text-base font-normal font-roboto leading-snug',
+            isActive ? '!text-nav-item-foreground-active' : 'text-nav-item-foreground-inactive',
+          )}
+        >
           {label}
         </span>
       </button>
       {isExpandable && (
         <button
           onClick={handleChevronClick}
-          className="p-1 -m-1 cursor-pointer bg-transparent border-none"
-          aria-label={isExpanded ? "Collapse" : "Expand"}
+          className='p-1 -m-1 cursor-pointer bg-transparent border-none'
+          aria-label={isExpanded ? 'Collapse' : 'Expand'}
         >
           <ChevronDown
             className={cn(
-              "w-5 h-5 shrink-0 transition-transform pointer-events-none",
-              isActive ? "!text-nav-item-foreground-active" : "text-nav-item-foreground-inactive",
-              isExpanded && "rotate-180"
+              'w-5 h-5 shrink-0 transition-transform pointer-events-none',
+              isActive ? '!text-nav-item-foreground-active' : 'text-nav-item-foreground-inactive',
+              isExpanded && 'rotate-180',
             )}
             data-testid={`nav-menu-item-${testId}-chevron`}
           />
@@ -129,8 +128,8 @@ export function NavMenuItem({
       {isExternal && !isExpandable && (
         <ArrowUpRight
           className={cn(
-            "w-5 h-5 shrink-0 pointer-events-none",
-            isActive ? "!text-nav-item-foreground-active" : "text-nav-item-foreground-inactive"
+            'w-5 h-5 shrink-0 pointer-events-none',
+            isActive ? '!text-nav-item-foreground-active' : 'text-nav-item-foreground-inactive',
           )}
           data-testid={`nav-menu-item-${testId}-external`}
         />

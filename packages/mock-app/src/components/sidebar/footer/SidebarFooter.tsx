@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
-import { MoreOptions, UserProfile, type User, type MoreOptionGroup } from "@mock-app/components";
+import { cn } from '@/lib/utils';
+import { MoreOptions, UserProfile, type User, type MoreOptionGroup } from '@mock-app/components';
 
 interface SidebarFooterProps {
   user: User;
@@ -7,24 +7,17 @@ interface SidebarFooterProps {
   className?: string;
 }
 
-export function SidebarFooter({
-  user,
-  menuGroups,
-  className,
-}: SidebarFooterProps) {
+export function SidebarFooter({ user, menuGroups, className }: SidebarFooterProps) {
   return (
     <div
       className={cn(
-        "w-full min-w-0 pt-4 border-t border-sidebar-border flex justify-between items-center gap-3",
-        className
+        'w-full min-w-0 pt-4 border-t border-sidebar-border flex justify-between items-center gap-3',
+        className,
       )}
-      data-testid="sidebar-footer"
+      data-testid='sidebar-footer'
     >
-      <UserProfile user={user} className="flex-1" />
-      <MoreOptions
-        testId="sidebar-menu"
-        groups={menuGroups}
-      />
+      <UserProfile user={user} className='flex-1' />
+      <MoreOptions testId='sidebar-menu' groups={menuGroups} />
     </div>
   );
 }

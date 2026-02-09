@@ -4,7 +4,6 @@ import * as querySparql from '@comunica/query-sparql';
 import n3 from 'n3';
 import * as n3Utils from './n3-utils';
 
-
 // Interfaces for product claim criteria
 interface Criterion {
   id: string;
@@ -25,9 +24,8 @@ interface Product {
   id: string;
   name: string;
   claims: Claim[];
-  dppId: string;  // ID of the Digital Product Passport this product belongs to
+  dppId: string; // ID of the Digital Product Passport this product belongs to
 }
-
 
 /**
  * Extracts all products with claims and criteria from the RDF graph using SPARQL querying
@@ -41,7 +39,8 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
     const mySparqlEngine = new querySparql.QueryEngine();
 
     // Execute a SPARQL query directly on the n3store to get products, claims, and criteria
-    const result = await mySparqlEngine.queryBindings(`
+    const result = await mySparqlEngine.queryBindings(
+      `
       PREFIX dpp: <https://test.uncefact.org/vocabulary/untp/dpp/0/>
       PREFIX schemaorg: <https://schema.org/>
       PREFIX untp: <https://test.uncefact.org/vocabulary/untp/core/0/>
@@ -66,9 +65,11 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
         ?claim untp:assessmentCriteria ?criterion .
         ?criterion schemaorg:name ?criterionName .
       }
-    `, {
-      sources: [n3store]
-    });
+    `,
+      {
+        sources: [n3store],
+      },
+    );
 
     // Create maps for organizing the data
     const productsMap = new Map<string, Product>();
@@ -93,7 +94,7 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
           id: productId,
           name: productName,
           claims: [],
-          dppId: dppId
+          dppId: dppId,
         });
       }
 
@@ -105,7 +106,7 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
           topic: topic,
           conformance: conformance,
           criteria: [],
-          verified: claimVerified
+          verified: claimVerified,
         };
         claimsMap.set(claimKey, claim);
         productsMap.get(productId)!.claims.push(claim);
@@ -116,20 +117,20 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
 
       // Add the criterion to the claim if it doesn't already exist
       const claim = claimsMap.get(claimKey)!;
-      if (!claim.criteria.some(c => c.id === criterionId)) {
+      if (!claim.criteria.some((c) => c.id === criterionId)) {
         const criterion: Criterion = {
           id: criterionId,
           name: criterionName,
-          verifiedBy: criterionVerified ? 'verified' : undefined
+          verifiedBy: criterionVerified ? 'verified' : undefined,
         };
         claim.criteria.push(criterion);
         //console.log(`Product ${productName}: Found criterion ${criterionName} for claim ${claim.topic}`)
       }
     }
 
-
     // Get verifier information for verified criteria
-    const verifierResult = await mySparqlEngine.queryBindings(`
+    const verifierResult = await mySparqlEngine.queryBindings(
+      `
       PREFIX dcc: <https://test.uncefact.org/vocabulary/untp/dcc/0/>
       PREFIX result: <http://example.org/result#>
       PREFIX schemaorg: <https://schema.org/>
@@ -142,9 +143,11 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
         ?dccCredential vc:issuer ?verifierId .
         ?verifierId schemaorg:name ?verifierName .
       }
-    `, {
-      sources: [n3store]
-    });
+    `,
+      {
+        sources: [n3store],
+      },
+    );
 
     // Add verifier information to criteria
     for await (const binding of verifierResult) {
@@ -154,7 +157,7 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
 
       // Find this criterion in all claims
       for (const claim of claimsMap.values()) {
-        const criterion = claim.criteria.find(c => c.id === criterionId);
+        const criterion = claim.criteria.find((c) => c.id === criterionId);
         if (criterion) {
           criterion.verifiedBy = verifierId;
           criterion.verifierName = verifierName;
@@ -163,7 +166,8 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
     }
 
     // Get simple claims (claims without criteria)
-    const simpleClaimsResult = await mySparqlEngine.queryBindings(`
+    const simpleClaimsResult = await mySparqlEngine.queryBindings(
+      `
       PREFIX dpp: <https://test.uncefact.org/vocabulary/untp/dpp/0/>
       PREFIX schemaorg: <https://schema.org/>
       PREFIX untp: <https://test.uncefact.org/vocabulary/untp/core/0/>
@@ -186,9 +190,11 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
         # Ensure this is a simple claim (no criteria)
         FILTER NOT EXISTS { ?claim untp:assessmentCriteria ?criterion }
       }
-    `, {
-      sources: [n3store]
-    });
+    `,
+      {
+        sources: [n3store],
+      },
+    );
 
     // Process simple claims
     for await (const binding of simpleClaimsResult) {
@@ -206,7 +212,7 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
           id: productId,
           name: productName,
           claims: [],
-          dppId: dppId
+          dppId: dppId,
         });
       }
 
@@ -218,7 +224,7 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
           topic: topic,
           conformance: conformance,
           criteria: [],
-          verified: claimVerified
+          verified: claimVerified,
         };
         claimsMap.set(claimKey, claim);
         productsMap.get(productId)!.claims.push(claim);
@@ -226,7 +232,7 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
         // Update verification status if this binding indicates the claim is verified
         claimsMap.get(claimKey)!.verified = true;
       }
-      console.warn(`Product ${productName}: Found claim ${topic} without any criteria!`)
+      console.warn(`Product ${productName}: Found claim ${topic} without any criteria!`);
     }
 
     return Array.from(productsMap.values());
@@ -238,7 +244,6 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
     return [];
   }
 }
-
 
 /**
  * Checks a DPP's dependencies to get a set of verifiable credentials required
@@ -264,16 +269,19 @@ export async function getUnattestedIssuersForProduct(
     const mySparqlEngine = new querySparql.QueryEngine();
 
     // Query for all Conformity Credentials that attest to claims in the DPP
-    const dccList = await mySparqlEngine.queryBindings(`
+    const dccList = await mySparqlEngine.queryBindings(
+      `
       PREFIX result: <http://example.org/result#>
 
       SELECT ?dcc
       WHERE {
         <${dppId}> result:claimsAttestedBy ?dcc .
       }
-    `, {
-      sources: [n3store]
-    });
+    `,
+      {
+        sources: [n3store],
+      },
+    );
 
     // Collect all credential IDs including the DPP itself
     const credentialIds: string[] = [dppId];
@@ -289,9 +297,9 @@ export async function getUnattestedIssuersForProduct(
     // credentialIds now contains all credentials that are relevant to the DPP,
     // for which we need to ensure we trust the issuers.
 
-
     // Use a SPARQL path query to find all identity attestation chains
-    const attestationResult = await mySparqlEngine.queryBindings(`
+    const attestationResult = await mySparqlEngine.queryBindings(
+      `
       PREFIX result: <http://example.org/result#>
 
       SELECT ?credential ?dia
@@ -299,9 +307,11 @@ export async function getUnattestedIssuersForProduct(
         # Find all DIAs in the attestation chain using property path
         ?credential result:issuerIdentityAttestedBy ?dia .
       }
-    `, {
-      sources: [n3store]
-    });
+    `,
+      {
+        sources: [n3store],
+      },
+    );
 
     // Log the attestation chains for debugging
     // console.log('Attestation chains:');
@@ -328,27 +338,30 @@ export async function getUnattestedIssuersForProduct(
     }
 
     // Find credentials without attestations
-    const unattestatedCredentials = Array.from(allCredentials).filter(id => !attestedCredentials.has(id));
+    const unattestatedCredentials = Array.from(allCredentials).filter((id) => !attestedCredentials.has(id));
 
     if (unattestatedCredentials.length === 0) {
       return [];
     }
 
     // Get the issuers of these unattested credentials
-    const unattestatedIssuersQuery = await mySparqlEngine.queryBindings(`
+    const unattestatedIssuersQuery = await mySparqlEngine.queryBindings(
+      `
       PREFIX vc: <https://www.w3.org/2018/credentials#>
 
       SELECT DISTINCT ?issuer
       WHERE {
         # Filter to only include our unattested credentials
-        VALUES ?credential { ${unattestatedCredentials.map(id => `<${id}>`).join(' ')} }
+        VALUES ?credential { ${unattestatedCredentials.map((id) => `<${id}>`).join(' ')} }
 
         # Get the issuer for each credential
         ?credential vc:issuer ?issuer .
       }
-    `, {
-      sources: [n3store]
-    });
+    `,
+      {
+        sources: [n3store],
+      },
+    );
 
     // Collect the unattested issuers
     let unattestedIssuers: string[] = [];
@@ -359,7 +372,7 @@ export async function getUnattestedIssuersForProduct(
       }
     }
 
-    unattestedIssuers = unattestedIssuers.filter(issuer => !trustedDIDs.includes(issuer));
+    unattestedIssuers = unattestedIssuers.filter((issuer) => !trustedDIDs.includes(issuer));
 
     return unattestedIssuers;
   } catch (error) {
@@ -367,4 +380,3 @@ export async function getUnattestedIssuersForProduct(
     throw error;
   }
 }
-

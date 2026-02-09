@@ -1,10 +1,4 @@
-import type {
-  IDidService,
-  CreateDidOptions,
-  DidRecord,
-  DidDocument,
-  DidVerificationResult,
-} from '../../types.js';
+import type { IDidService, CreateDidOptions, DidRecord, DidDocument, DidVerificationResult } from '../../types.js';
 import { DidMethod, DidType } from '../../types.js';
 import { verifyDid } from '../../verify.js';
 import { normaliseDidWebAlias } from '../../utils.js';
@@ -105,8 +99,8 @@ export class VCKitDidAdapter implements IDidService {
         headers: {
           'Content-Type': 'application/json',
           ...this.headers,
-          'Host': decodeURIComponent(domain),
-          'Origin': `https://${decodeURIComponent(domain)}`,
+          Host: decodeURIComponent(domain),
+          Origin: `https://${decodeURIComponent(domain)}`,
         },
         body: JSON.stringify({ didUrl: did }),
       });
@@ -144,6 +138,7 @@ export class VCKitDidAdapter implements IDidService {
       }
     } catch (error) {
       // If we can't fetch keys, the key_material check will still run with empty keys
+      // eslint-disable-next-line no-console
       console.error(`Failed to fetch provider keys for DID "${did}":`, error);
     }
 
@@ -153,7 +148,6 @@ export class VCKitDidAdapter implements IDidService {
   getSupportedTypes(): DidType[] {
     return [DidType.MANAGED, DidType.SELF_MANAGED];
   }
-
 
   getSupportedMethods(): DidMethod[] {
     return [DidMethod.DID_WEB];
@@ -170,9 +164,6 @@ export const VCKIT_DID_ADAPTER_TYPE = 'VCKIT' as const;
 /** Registry entry for the VCKit DID adapter. */
 export const vckitDidRegistryEntry = {
   configSchema: vckitDidConfigSchema,
-  factory: (config: VCKitDidConfig): IDidService => new VCKitDidAdapter(
-    config.endpoint,
-    { Authorization: `Bearer ${config.authToken}` },
-    config.keyType,
-  ),
+  factory: (config: VCKitDidConfig): IDidService =>
+    new VCKitDidAdapter(config.endpoint, { Authorization: `Bearer ${config.authToken}` }, config.keyType),
 } satisfies AdapterRegistryEntry<VCKitDidConfig, IDidService>;

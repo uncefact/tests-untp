@@ -1,23 +1,18 @@
 import React from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { Container, Box, Typography } from '@mui/material';
-import {
-  Done as DoneIcon,
-  CancelOutlined as CancelOutlinedIcon
-} from '@mui/icons-material';
+import { Done as DoneIcon, CancelOutlined as CancelOutlinedIcon } from '@mui/icons-material';
 
 // Enum defining possible statuses for the layout
 export enum LayoutStatus {
   success = 'success',
   error = 'error',
-};
+}
 
 /**
-  * FallbackErrorContent Component returns a Box component containing the MessageText component with an error status
-  */
-export const FallbackErrorContent = ({ errorMessage }: {
-  errorMessage: string;
-}) => {
+ * FallbackErrorContent Component returns a Box component containing the MessageText component with an error status
+ */
+export const FallbackErrorContent = ({ errorMessage }: { errorMessage: string }) => {
   return (
     <Box
       sx={{
@@ -33,13 +28,10 @@ export const FallbackErrorContent = ({ errorMessage }: {
 };
 
 /**
-  * MessageText Component returns a Box component containing an icon based on the status 
-  * and a Typography component with the provided text
-  */
-export function MessageText({ status, text }: {
-  status?: LayoutStatus;
-  text: string;
-}) {
+ * MessageText Component returns a Box component containing an icon based on the status
+ * and a Typography component with the provided text
+ */
+export function MessageText({ status, text }: { status?: LayoutStatus; text: string }) {
   return (
     <Box
       sx={{
@@ -63,18 +55,21 @@ export function MessageText({ status, text }: {
 }
 
 /**
-  * Layout component is used to display the header and navigation to other pages
-  */
-export const Layout = ({ children, errorMessage = 'Something went wrong! Please retry again' }: {
+ * Layout component is used to display the header and navigation to other pages
+ */
+export const Layout = ({
+  children,
+  errorMessage = 'Something went wrong! Please retry again',
+}: {
   children: React.ReactNode;
   errorMessage?: string;
 }) => {
   return (
     /**
-      * The ErrorBoundary component is used to catch errors anywhere in the component tree
-      * and provide a fallback UI in case of an error. In this case, the FallbackComponent is specified
-      * as an inline arrow function that renders the FallbackErrorContent component with the provided errorMessage.
-      */
+     * The ErrorBoundary component is used to catch errors anywhere in the component tree
+     * and provide a fallback UI in case of an error. In this case, the FallbackComponent is specified
+     * as an inline arrow function that renders the FallbackErrorContent component with the provided errorMessage.
+     */
     <ErrorBoundary FallbackComponent={() => <FallbackErrorContent errorMessage={errorMessage} />}>
       <Container
         sx={{

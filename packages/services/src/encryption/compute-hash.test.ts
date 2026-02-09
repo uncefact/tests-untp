@@ -31,30 +31,21 @@ describe('computeHash', () => {
   });
 
   it('should default to SHA256 and match a manual crypto.createHash result', () => {
-    const expected = crypto
-      .createHash('sha256')
-      .update(JSON.stringify(credential))
-      .digest('hex');
+    const expected = crypto.createHash('sha256').update(JSON.stringify(credential)).digest('hex');
     const hash = computeHash(credential);
     expect(hash).toEqual(expected);
   });
 
   it('should hash a plain string input', () => {
     const input = 'hello world';
-    const expected = crypto
-      .createHash('sha256')
-      .update(input)
-      .digest('hex');
+    const expected = crypto.createHash('sha256').update(input).digest('hex');
     const hash = computeHash(input);
     expect(hash).toEqual(expected);
   });
 
   it('should hash a Uint8Array input and match the Buffer equivalent', () => {
     const bytes = new Uint8Array([72, 101, 108, 108, 111]);
-    const expected = crypto
-      .createHash('sha256')
-      .update(Buffer.from(bytes))
-      .digest('hex');
+    const expected = crypto.createHash('sha256').update(Buffer.from(bytes)).digest('hex');
     const hash = computeHash(bytes);
     expect(hash).toEqual(expected);
   });

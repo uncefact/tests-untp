@@ -34,7 +34,6 @@ export const DID_METHOD_BY_URI: Record<string, DidMethod> = {
   webvh: DidMethod.DID_WEB_VH,
 };
 
-
 export enum DidStatus {
   /** DID is active and usable (default for DEFAULT and MANAGED) */
   ACTIVE = 'ACTIVE',
@@ -48,7 +47,6 @@ export enum DidStatus {
 
 /** DID types that can be created via the API (excludes DEFAULT, which is system-managed). */
 export const CREATABLE_DID_TYPES = [DidType.MANAGED, DidType.SELF_MANAGED] as const;
-
 
 // ── Input / option types ───────────────────────────────────────────────────
 

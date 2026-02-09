@@ -1,14 +1,14 @@
-import { ServiceType, AdapterType } from "@uncefact/untp-ri-services";
-import { adapterRegistry } from "@uncefact/untp-ri-services/server";
-import type { IDidService } from "@uncefact/untp-ri-services";
-import { getEncryptionService } from "@/lib/encryption/encryption";
-import { getInstanceByResolution } from "@/lib/prisma/repositories";
+import { ServiceType, AdapterType } from '@uncefact/untp-ri-services';
+import { adapterRegistry } from '@uncefact/untp-ri-services/server';
+import type { IDidService } from '@uncefact/untp-ri-services';
+import { getEncryptionService } from '@/lib/encryption/encryption';
+import { getInstanceByResolution } from '@/lib/prisma/repositories';
 import {
   ServiceResolutionError,
   ServiceInstanceNotFoundError,
   ConfigDecryptionError,
   ConfigValidationError,
-} from "@/lib/api/errors";
+} from '@/lib/api/errors';
 
 /**
  * Shape returned by resolveDidService — the resolved adapter
@@ -32,11 +32,7 @@ export async function resolveDidService(
   organizationId: string,
   serviceInstanceId?: string,
 ): Promise<ResolvedDidService> {
-  const instance = await getInstanceByResolution(
-    organizationId,
-    ServiceType.DID,
-    serviceInstanceId,
-  );
+  const instance = await getInstanceByResolution(organizationId, ServiceType.DID, serviceInstanceId);
 
   if (!instance) {
     if (serviceInstanceId) {
@@ -50,7 +46,7 @@ export async function resolveDidService(
   try {
     decryptedJson = getEncryptionService().decrypt(JSON.parse(instance.config));
   } catch (error) {
-    console.error("[resolve-did-service] Config decryption failed:", {
+    console.error('[resolve-did-service] Config decryption failed:', {
       instanceId: instance.id,
       error: error instanceof Error ? error.message : error,
     });
@@ -62,28 +58,21 @@ export async function resolveDidService(
   try {
     rawConfig = JSON.parse(decryptedJson);
   } catch (error) {
-    console.error("[resolve-did-service] Config JSON parse failed:", {
+    console.error('[resolve-did-service] Config JSON parse failed:', {
       instanceId: instance.id,
       error: error instanceof Error ? error.message : error,
     });
-    throw new ConfigValidationError(
-      instance.id,
-      "Invalid JSON in decrypted config",
-    );
+    throw new ConfigValidationError(instance.id, 'Invalid JSON in decrypted config');
   }
 
-  const adapterEntry =
-    adapterRegistry[ServiceType.DID]?.[instance.adapterType as AdapterType];
+  const adapterEntry = adapterRegistry[ServiceType.DID]?.[instance.adapterType as AdapterType];
   if (!adapterEntry) {
     throw new ServiceResolutionError(ServiceType.DID, organizationId);
   }
 
   const parseResult = adapterEntry.configSchema.safeParse(rawConfig);
   if (!parseResult.success) {
-    throw new ConfigValidationError(
-      instance.id,
-      parseResult.error.issues.map((i) => i.message).join(", "),
-    );
+    throw new ConfigValidationError(instance.id, parseResult.error.issues.map((i) => i.message).join(', '));
   }
 
   return {

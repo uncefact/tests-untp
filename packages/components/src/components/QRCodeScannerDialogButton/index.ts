@@ -1,1 +1,1 @@
-export * from './QRCodeScannerDialogButton.js'
+export * from './QRCodeScannerDialogButton.js';

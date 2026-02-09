@@ -95,9 +95,7 @@ describe('AesGcmEncryptionAdapter', () => {
     });
 
     it('throws when given an unsupported algorithm', () => {
-      expect(() => adapter.encrypt('test', 'aes-128-cbc' as any)).toThrow(
-        'Unsupported algorithm: aes-128-cbc',
-      );
+      expect(() => adapter.encrypt('test', 'aes-128-cbc' as any)).toThrow('Unsupported algorithm: aes-128-cbc');
     });
   });
 

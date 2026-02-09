@@ -1,8 +1,4 @@
-import type {
-  DidDocument,
-  DidVerificationCheck,
-  MethodVerificationResult,
-} from './types.js';
+import type { DidDocument, DidVerificationCheck, MethodVerificationResult } from './types.js';
 import { DidVerificationCheckName } from './types.js';
 import { didWebToUrl } from './utils.js';
 
@@ -37,11 +33,14 @@ export async function verifyDidWeb(did: string): Promise<MethodVerificationResul
   const url = didWebToUrl(did);
 
   if (isPrivateUrl(url)) {
-    checks.push({ name: C.RESOLVE, passed: false, message: 'Private or localhost URLs are not permitted for DID resolution' });
+    checks.push({
+      name: C.RESOLVE,
+      passed: false,
+      message: 'Private or localhost URLs are not permitted for DID resolution',
+    });
     checks.push({ name: C.HTTPS, passed: false, message: 'Could not verify HTTPS (resolution blocked)' });
     return { document, checks };
   }
-
 
   // Check 1: Resolve — fetch the DID document
   let response: Response | null = null;

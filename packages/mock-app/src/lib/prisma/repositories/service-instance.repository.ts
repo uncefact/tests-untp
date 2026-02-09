@@ -1,7 +1,7 @@
-import { ServiceInstance, ServiceType, AdapterType, Prisma } from "../generated";
-import { prisma } from "../prisma";
+import { ServiceInstance, ServiceType, AdapterType, Prisma } from '../generated';
+import { prisma } from '../prisma';
 
-const SYSTEM_ORG_ID = "system";
+const SYSTEM_ORG_ID = 'system';
 
 export type CreateServiceInstanceInput = {
   organizationId: string;
@@ -31,9 +31,7 @@ export type ListServiceInstancesOptions = {
  * Creates a new service instance. If isPrimary is true, first unsets
  * any existing primary for this org + serviceType combination.
  */
-export async function createServiceInstance(
-  input: CreateServiceInstanceInput,
-): Promise<ServiceInstance> {
+export async function createServiceInstance(input: CreateServiceInstanceInput): Promise<ServiceInstance> {
   return prisma.$transaction(async (tx) => {
     if (input.isPrimary) {
       await tx.serviceInstance.updateMany({
@@ -64,10 +62,7 @@ export async function createServiceInstance(
  * Gets a service instance by ID. Returns it if owned by the specified
  * org or if it's a system default.
  */
-export async function getServiceInstanceById(
-  id: string,
-  organizationId: string,
-): Promise<ServiceInstance | null> {
+export async function getServiceInstanceById(id: string, organizationId: string): Promise<ServiceInstance | null> {
   return prisma.serviceInstance.findFirst({
     where: {
       id,
@@ -101,7 +96,7 @@ export async function listServiceInstances(
     where,
     take: limit ?? 100,
     skip: offset,
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: 'desc' },
   });
 }
 
@@ -120,7 +115,7 @@ export async function updateServiceInstance(
     });
 
     if (!existing) {
-      throw new Error("Service instance not found or access denied");
+      throw new Error('Service instance not found or access denied');
     }
 
     if (input.isPrimary) {
@@ -150,16 +145,13 @@ export async function updateServiceInstance(
 /**
  * Deletes a service instance. Cannot delete system defaults.
  */
-export async function deleteServiceInstance(
-  id: string,
-  organizationId: string,
-): Promise<ServiceInstance> {
+export async function deleteServiceInstance(id: string, organizationId: string): Promise<ServiceInstance> {
   const existing = await prisma.serviceInstance.findFirst({
     where: { id, organizationId },
   });
 
   if (!existing) {
-    throw new Error("Service instance not found or access denied");
+    throw new Error('Service instance not found or access denied');
   }
 
   return prisma.serviceInstance.delete({

@@ -1,1 +1,1 @@
-export { NavMenuItem, type NavMenuItemConfig } from "./NavMenuItem";
+export { NavMenuItem, type NavMenuItemConfig } from './NavMenuItem';

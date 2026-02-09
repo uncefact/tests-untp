@@ -38,5 +38,4 @@ describe('CustomDialog Component', () => {
     // Expecting the onClose function to have been called
     expect(onCloseMock).toHaveBeenCalled();
   });
-
 });

@@ -8,7 +8,7 @@
 export class ValidationError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "ValidationError";
+    this.name = 'ValidationError';
   }
 }
 
@@ -24,9 +24,7 @@ export function validateEnum<T extends string>(
 ): T | undefined {
   if (value === undefined) return undefined;
   if (!(permitted as readonly string[]).includes(value)) {
-    throw new ValidationError(
-      `${paramName} must be one of: ${permitted.join(", ")}`,
-    );
+    throw new ValidationError(`${paramName} must be one of: ${permitted.join(', ')}`);
   }
   return value as T;
 }
@@ -39,13 +37,10 @@ export function validateEnum<T extends string>(
  * Check that a value is a non-empty string.
  */
 export function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0;
+  return typeof value === 'string' && value.length > 0;
 }
 
-export function parsePositiveInt(
-  raw: string | null | undefined,
-  paramName: string,
-): number | undefined {
+export function parsePositiveInt(raw: string | null | undefined, paramName: string): number | undefined {
   if (raw == null) return undefined;
   const parsed = parseInt(raw, 10);
   if (!Number.isFinite(parsed) || parsed < 1) {
@@ -58,16 +53,11 @@ export function parsePositiveInt(
  * Parse a string as a non-negative integer (>= 0).
  * Returns undefined if the raw value is null/undefined.
  */
-export function parseNonNegativeInt(
-  raw: string | null | undefined,
-  paramName: string,
-): number | undefined {
+export function parseNonNegativeInt(raw: string | null | undefined, paramName: string): number | undefined {
   if (raw == null) return undefined;
   const parsed = parseInt(raw, 10);
   if (!Number.isFinite(parsed) || parsed < 0) {
-    throw new ValidationError(
-      `${paramName} must be a non-negative integer`,
-    );
+    throw new ValidationError(`${paramName} must be a non-negative integer`);
   }
   return parsed;
 }

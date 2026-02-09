@@ -1,1 +1,1 @@
-export * from "./vckit.adapter.js";
+export * from './vckit.adapter.js';
