@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@mui/material';
 import { CredentialPayload } from '@vckit/core-types';
-import { publicAPI } from '@mock-app/services';
+import { publicAPI } from '@uncefact/untp-ri-services';
 import { ScannerDialog } from './ScannerDialog.js';
 import { Status, ToastMessage, toastMessage } from '../ToastMessage/ToastMessage.js';
 import { ImportDataType } from '../../types/common.types.js';

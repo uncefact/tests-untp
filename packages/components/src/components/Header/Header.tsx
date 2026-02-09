@@ -13,7 +13,12 @@ interface IProps {
 /**
  * Header component is used to display the header and navigation to other pages
  */
-export const Header = ({ routerLinks, logoTitle = 'Logo', logoTitleColor = '#000', backgroundColor = '#fff' }: IProps) => {
+export const Header = ({
+  routerLinks,
+  logoTitle = 'Logo',
+  logoTitleColor = '#000',
+  backgroundColor = '#fff',
+}: IProps) => {
   const [anchorElNav, setAnchorElNav] = useState<null | HTMLElement>(null);
 
   /**
@@ -32,13 +37,13 @@ export const Header = ({ routerLinks, logoTitle = 'Logo', logoTitleColor = '#000
 
   return (
     <BrowserRouter>
-      <AppBar data-testid="header" sx={{ background: backgroundColor }}>
-        <Container maxWidth="xl">
+      <AppBar data-testid='header' sx={{ background: backgroundColor }}>
+        <Container maxWidth='xl'>
           <Toolbar disableGutters>
             {/* Logo on desktop or tablet */}
             <Stack
               component={Link}
-              to="/"
+              to='/'
               sx={{
                 textDecoration: 'none',
                 display: { xs: 'none', md: 'flex' },
@@ -48,8 +53,8 @@ export const Header = ({ routerLinks, logoTitle = 'Logo', logoTitleColor = '#000
               }}
             >
               <Typography
-                data-testid="logo"
-                variant="h6"
+                data-testid='logo'
+                variant='h6'
                 sx={{
                   color: logoTitleColor,
                 }}
@@ -58,20 +63,20 @@ export const Header = ({ routerLinks, logoTitle = 'Logo', logoTitleColor = '#000
               </Typography>
             </Stack>
             {/* Menu on mobile */}
-            <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }} data-testid="menu">
+            <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }} data-testid='menu'>
               <IconButton
-                data-testid="icon-button"
-                size="small"
-                aria-controls="menu-appbar"
-                aria-haspopup="true"
+                data-testid='icon-button'
+                size='small'
+                aria-controls='menu-appbar'
+                aria-haspopup='true'
                 onClick={handleOpenNavMenu}
-                color="inherit"
+                color='inherit'
               >
                 <MenuIcon sx={{ color: logoTitleColor }} />
               </IconButton>
               <Menu
-                data-testid="menu-appbar"
-                id="menu-appbar"
+                data-testid='menu-appbar'
+                id='menu-appbar'
                 anchorEl={anchorElNav}
                 anchorOrigin={{
                   vertical: 'bottom',
@@ -91,7 +96,7 @@ export const Header = ({ routerLinks, logoTitle = 'Logo', logoTitleColor = '#000
                 {routerLinks.map((page) => (
                   <MenuItem key={page.title} onClick={handleCloseNavMenu}>
                     <Typography
-                      textAlign="center"
+                      textAlign='center'
                       component={Link}
                       to={page.path}
                       sx={{ textDecoration: 'none', color: 'inherit' }}
@@ -105,7 +110,7 @@ export const Header = ({ routerLinks, logoTitle = 'Logo', logoTitleColor = '#000
             {/* Logo on mobile */}
             <Stack
               component={Link}
-              to="/"
+              to='/'
               sx={{
                 flexGrow: 1,
                 textDecoration: 'none',
@@ -115,7 +120,7 @@ export const Header = ({ routerLinks, logoTitle = 'Logo', logoTitleColor = '#000
               }}
             >
               <Typography
-                variant="h6"
+                variant='h6'
                 sx={{
                   color: logoTitleColor,
                 }}
@@ -124,7 +129,7 @@ export const Header = ({ routerLinks, logoTitle = 'Logo', logoTitleColor = '#000
               </Typography>
             </Stack>
             {/* Menu item on  desktop or tablet */}
-            <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }} data-testid="menu-desktop">
+            <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }} data-testid='menu-desktop'>
               {routerLinks.map((page) => (
                 <Button
                   key={page.title}

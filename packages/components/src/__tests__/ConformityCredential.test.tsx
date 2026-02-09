@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ConformityCredential } from '../components';
 import { FetchOptions } from '../types/conformityCredential.types';
-import { getJsonDataFromConformityAPI, uploadData, getValueByPath } from '@mock-app/services';
+import { getJsonDataFromConformityAPI, uploadData, getValueByPath } from '@uncefact/untp-ri-services';
 import { checkStoredCredentialsConfig } from '../components/ConformityCredential/utils';
 
-jest.mock('@mock-app/services', () => ({
+jest.mock('@uncefact/untp-ri-services', () => ({
   uploadData: jest.fn(),
   generateUUID: jest.fn(),
   getJsonDataFromConformityAPI: jest.fn(),
@@ -126,7 +126,6 @@ describe('ConformityCredential', () => {
         expect(screen.findByText(url)).not.toBeNull();
         expect(document.querySelector('table')).not.toBeNull();
       });
-
     });
 
     it('should save credential as object when trigger onClickStorageCredential function', async () => {

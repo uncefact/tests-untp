@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { StorageServiceConfig } from '@mock-app/services';
+import { StorageServiceConfig } from '@uncefact/untp-ri-services';
 
 export type Result<T> = { ok: true; value: T } | { ok: false; value: string };
 

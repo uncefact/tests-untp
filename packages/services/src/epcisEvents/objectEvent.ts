@@ -50,7 +50,7 @@ export const processObjectEvent: IService = async (
     issuer: vckit.issuer,
     context: traceabilityEvent.context,
     type: traceabilityEvent.type,
-    restOfVC
+    restOfVC,
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(objectEventVc);

@@ -1,12 +1,12 @@
 import React from 'react';
-import { publicAPI } from '@mock-app/services';
+import { publicAPI } from '@uncefact/untp-ri-services';
 import { render, screen, getByText, fireEvent, waitFor } from '@testing-library/react';
 import { processVerifiableCredentialData } from '../utils/importDataHelpers.js';
 import { QRCodeScannerDialogButton } from '../components/QRCodeScannerDialogButton/QRCodeScannerDialogButton';
 import { ScannerDialog } from '../components/QRCodeScannerDialogButton/ScannerDialog';
 import { ImportDataType } from '../types/common.types';
 
-jest.mock('@mock-app/services', () => ({
+jest.mock('@uncefact/untp-ri-services', () => ({
   publicAPI: {
     get: jest.fn(),
   },
@@ -206,12 +206,7 @@ describe('QRCodeScannerDialogButton, when type is VerifiableCredential', () => {
     }));
 
     publicAPI.get = jest.fn().mockResolvedValue(result);
-    render(
-      <QRCodeScannerDialogButton
-        type={ImportDataType.VerifiableCredential}
-        onChange={onChange}
-      />,
-    );
+    render(<QRCodeScannerDialogButton type={ImportDataType.VerifiableCredential} onChange={onChange} />);
 
     const scanButton = getByText(document.body, 'ScanQR');
     fireEvent.click(scanButton);

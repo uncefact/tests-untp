@@ -10,11 +10,10 @@ const meta = {
   argTypes: {},
 } satisfies Meta<typeof ToastMessage>;
 
-
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const args =  {
+const args = {
   status: Status.success,
   message: 'Toast message!',
 };
@@ -24,8 +23,8 @@ export const Default: Story = {
   decorators: [
     (Story) => (
       <div style={{ minWidth: '500px', height: '40vh' }}>
-          <Story />
-          {toastMessage({ status: args.status, message: args.message }) as React.ReactNode}
+        <Story />
+        {toastMessage({ status: args.status, message: args.message }) as React.ReactNode}
       </div>
     ),
   ],

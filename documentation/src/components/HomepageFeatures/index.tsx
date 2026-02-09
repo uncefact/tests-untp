@@ -2,8 +2,8 @@ import clsx from 'clsx';
 
 const FeatureList = [
   {
-    title: 'Mock Apps',
-    Svg: require('@site/static/img/mock-app-icon.svg').default,
+    title: 'Reference implementations',
+    Svg: require('@site/static/img/reference-implementation-icon.svg').default,
     description: (
       <>
 Model a value chain using UNTP and integrate your implementation at any point within the value chain.

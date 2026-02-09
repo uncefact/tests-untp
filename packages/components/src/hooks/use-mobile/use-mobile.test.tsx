@@ -1,7 +1,7 @@
-import { renderHook, act } from "@testing-library/react";
-import { useIsMobile } from "./use-mobile";
+import { renderHook, act } from '@testing-library/react';
+import { useIsMobile } from './use-mobile';
 
-describe("useIsMobile", () => {
+describe('useIsMobile', () => {
   let matchMediaMock: jest.Mock;
   let listeners: Array<(e: MediaQueryListEvent) => void>;
 
@@ -23,7 +23,7 @@ describe("useIsMobile", () => {
       dispatchEvent: jest.fn(),
     }));
 
-    Object.defineProperty(window, "matchMedia", {
+    Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: matchMediaMock,
     });
@@ -33,8 +33,8 @@ describe("useIsMobile", () => {
     listeners = [];
   });
 
-  it("returns false when window width is >= 768px", () => {
-    Object.defineProperty(window, "innerWidth", {
+  it('returns false when window width is >= 768px', () => {
+    Object.defineProperty(window, 'innerWidth', {
       writable: true,
       configurable: true,
       value: 1024,
@@ -45,8 +45,8 @@ describe("useIsMobile", () => {
     expect(result.current).toBe(false);
   });
 
-  it("returns true when window width is < 768px", () => {
-    Object.defineProperty(window, "innerWidth", {
+  it('returns true when window width is < 768px', () => {
+    Object.defineProperty(window, 'innerWidth', {
       writable: true,
       configurable: true,
       value: 375,
@@ -57,8 +57,8 @@ describe("useIsMobile", () => {
     expect(result.current).toBe(true);
   });
 
-  it("returns false when window width is exactly 768px (breakpoint)", () => {
-    Object.defineProperty(window, "innerWidth", {
+  it('returns false when window width is exactly 768px (breakpoint)', () => {
+    Object.defineProperty(window, 'innerWidth', {
       writable: true,
       configurable: true,
       value: 768,
@@ -69,8 +69,8 @@ describe("useIsMobile", () => {
     expect(result.current).toBe(false);
   });
 
-  it("updates when window is resized from desktop to mobile", () => {
-    Object.defineProperty(window, "innerWidth", {
+  it('updates when window is resized from desktop to mobile', () => {
+    Object.defineProperty(window, 'innerWidth', {
       writable: true,
       configurable: true,
       value: 1024,
@@ -81,7 +81,7 @@ describe("useIsMobile", () => {
 
     // Simulate resize to mobile
     act(() => {
-      Object.defineProperty(window, "innerWidth", {
+      Object.defineProperty(window, 'innerWidth', {
         writable: true,
         configurable: true,
         value: 375,
@@ -93,8 +93,8 @@ describe("useIsMobile", () => {
     expect(result.current).toBe(true);
   });
 
-  it("updates when window is resized from mobile to desktop", () => {
-    Object.defineProperty(window, "innerWidth", {
+  it('updates when window is resized from mobile to desktop', () => {
+    Object.defineProperty(window, 'innerWidth', {
       writable: true,
       configurable: true,
       value: 375,
@@ -105,7 +105,7 @@ describe("useIsMobile", () => {
 
     // Simulate resize to desktop
     act(() => {
-      Object.defineProperty(window, "innerWidth", {
+      Object.defineProperty(window, 'innerWidth', {
         writable: true,
         configurable: true,
         value: 1024,
@@ -117,8 +117,8 @@ describe("useIsMobile", () => {
     expect(result.current).toBe(false);
   });
 
-  it("removes event listener on unmount", () => {
-    Object.defineProperty(window, "innerWidth", {
+  it('removes event listener on unmount', () => {
+    Object.defineProperty(window, 'innerWidth', {
       writable: true,
       configurable: true,
       value: 1024,
@@ -133,8 +133,8 @@ describe("useIsMobile", () => {
     expect(listeners.length).toBe(0);
   });
 
-  it("registers matchMedia listener with correct breakpoint", () => {
-    Object.defineProperty(window, "innerWidth", {
+  it('registers matchMedia listener with correct breakpoint', () => {
+    Object.defineProperty(window, 'innerWidth', {
       writable: true,
       configurable: true,
       value: 1024,
@@ -142,6 +142,6 @@ describe("useIsMobile", () => {
 
     renderHook(() => useIsMobile());
 
-    expect(matchMediaMock).toHaveBeenCalledWith("(max-width: 767px)");
+    expect(matchMediaMock).toHaveBeenCalledWith('(max-width: 767px)');
   });
 });

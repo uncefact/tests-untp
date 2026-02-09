@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@digitalbazaar/mocha-w3c-interop-reporter": "1.6.0",
-    "@mock-app/services": "0.2.0",
+    "@uncefact/untp-ri-services": "0.1.0-dev.8",
     "axios": "^1.7.2",
     "chai": "^4.3.6",
     "jsonwebtoken": "^9.0.2",

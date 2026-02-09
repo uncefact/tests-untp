@@ -6,10 +6,7 @@
     "type": {
       "type": "array",
       "readOnly": true,
-      "default": [
-        "DigitalTraceabilityEvent",
-        "VerifiableCredential"
-      ],
+      "default": ["DigitalTraceabilityEvent", "VerifiableCredential"],
       "items": {
         "type": "string"
       },
@@ -35,10 +32,7 @@
       "description": "A unique identifier (URI) assigned to the product passport. May be a UUID"
     },
     "@context": {
-      "example": [
-        "https://www.w3.org/ns/credentials/v2",
-        "https://test.uncefact.org/vocabulary/untp/dte/0.6.0/"
-      ],
+      "example": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dte/0.6.0/"],
       "type": "array",
       "items": {
         "type": "string"
@@ -55,10 +49,7 @@
           "type": "string"
         }
       ],
-      "default": [
-        "https://www.w3.org/ns/credentials/v2",
-        "https://test.uncefact.org/vocabulary/untp/dte/0.6.0/"
-      ],
+      "default": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dte/0.6.0/"],
       "minItems": 2,
       "uniqueItems": true
     },
@@ -82,11 +73,7 @@
     }
   },
   "description": "An array of Traceability Events as a VC",
-  "required": [
-    "id",
-    "@context",
-    "issuer"
-  ],
+  "required": ["id", "@context", "issuer"],
   "$defs": {
     "CredentialIssuer": {
       "type": "object",
@@ -95,9 +82,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "CredentialIssuer"
-          ],
+          "default": ["CredentialIssuer"],
           "items": {
             "type": "string"
           },
@@ -143,19 +128,13 @@
                 "description": "The registration number (alphanumeric) of the Party within the register. Unique within the register."
               }
             },
-            "required": [
-              "id",
-              "name"
-            ]
+            "required": ["id", "name"]
           },
           "description": "An optional list of other registered identifiers for this credential issuer "
         }
       },
       "description": "The issuer party (person or organisation) of a verifiable credential.",
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["id", "name"]
     },
     "TransformationEvent": {
       "type": "object",
@@ -164,10 +143,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "TransformationEvent",
-            "Event"
-          ],
+          "default": ["TransformationEvent", "Event"],
           "items": {
             "type": "string"
           },
@@ -206,11 +182,7 @@
         },
         "action": {
           "type": "string",
-          "enum": [
-            "observe",
-            "add",
-            "delete"
-          ],
+          "enum": ["observe", "add", "delete"],
           "example": "observe",
           "description": "Code describing how an event relates to the life-cycle of the entity impacted by the event."
         },
@@ -275,9 +247,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "SensorElement"
-          ],
+          "default": ["SensorElement"],
           "items": {
             "type": "string"
           },
@@ -316,9 +286,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "Sensor"
-          ],
+          "default": ["Sensor"],
           "items": {
             "type": "string"
           },
@@ -351,9 +319,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "Item"
-          ],
+          "default": ["Item"],
           "items": {
             "type": "string"
           },
@@ -379,10 +345,7 @@
         }
       },
       "description": "A specific serialised trade item which is an instance of a more generic product. ",
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["id", "name"]
     },
     "SensorData": {
       "type": "object",
@@ -391,9 +354,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "SensorData"
-          ],
+          "default": ["SensorData"],
           "items": {
             "type": "string"
           },
@@ -438,9 +399,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "QuantityElement"
-          ],
+          "default": ["QuantityElement"],
           "items": {
             "type": "string"
           },
@@ -476,11 +435,7 @@
         }
       },
       "description": "The quantity element is used to define the quantity (eg 100 kg of a product class. Used when serialised items are not applicable.",
-      "required": [
-        "productId",
-        "productName",
-        "quantity"
-      ]
+      "required": ["productId", "productName", "quantity"]
     },
     "ObjectEvent": {
       "type": "object",
@@ -489,10 +444,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "ObjectEvent",
-            "Event"
-          ],
+          "default": ["ObjectEvent", "Event"],
           "items": {
             "type": "string"
           },
@@ -531,11 +483,7 @@
         },
         "action": {
           "type": "string",
-          "enum": [
-            "observe",
-            "add",
-            "delete"
-          ],
+          "enum": ["observe", "add", "delete"],
           "example": "observe",
           "description": "Code describing how an event relates to the life-cycle of the entity impacted by the event."
         },
@@ -586,10 +534,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "AggregationEvent",
-            "Event"
-          ],
+          "default": ["AggregationEvent", "Event"],
           "items": {
             "type": "string"
           },
@@ -628,11 +573,7 @@
         },
         "action": {
           "type": "string",
-          "enum": [
-            "observe",
-            "add",
-            "delete"
-          ],
+          "enum": ["observe", "add", "delete"],
           "example": "observe",
           "description": "Code describing how an event relates to the life-cycle of the entity impacted by the event."
         },
@@ -687,10 +628,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "TransactionEvent",
-            "Event"
-          ],
+          "default": ["TransactionEvent", "Event"],
           "items": {
             "type": "string"
           },
@@ -729,11 +667,7 @@
         },
         "action": {
           "type": "string",
-          "enum": [
-            "observe",
-            "add",
-            "delete"
-          ],
+          "enum": ["observe", "add", "delete"],
           "example": "observe",
           "description": "Code describing how an event relates to the life-cycle of the entity impacted by the event."
         },
@@ -789,10 +723,7 @@
         }
       },
       "description": "Transaction represents an event in which one or more objects become associated or disassociated with one or more identified business transactions - such as the purchase / shipment of goods between buyer and seller.",
-      "required": [
-        "sourceParty",
-        "destinationParty"
-      ]
+      "required": ["sourceParty", "destinationParty"]
     },
     "AssociationEvent": {
       "type": "object",
@@ -801,10 +732,7 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "default": [
-            "AssociationEvent",
-            "Event"
-          ],
+          "default": ["AssociationEvent", "Event"],
           "items": {
             "type": "string"
           },
@@ -843,11 +771,7 @@
         },
         "action": {
           "type": "string",
-          "enum": [
-            "observe",
-            "add",
-            "delete"
-          ],
+          "enum": ["observe", "add", "delete"],
           "example": "observe",
           "description": "Code describing how an event relates to the life-cycle of the entity impacted by the event."
         },

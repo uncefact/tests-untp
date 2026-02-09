@@ -25,3 +25,23 @@ export type {
   VerifyResult,
   IVerifiableCredentialService,
 } from './interfaces/verifiableCredentialService.js';
+export * from './did-manager/types.js';
+export { didDocumentSchema, verificationMethodSchema } from './did-manager/schemas.js';
+export { didWebToUrl, parseDidMethod, normaliseDidWebAlias } from './did-manager/utils.js';
+// Encryption
+export { AesGcmEncryptionAdapter } from './encryption/adapters/aes-gcm/aes-gcm.adapter.js';
+export { EncryptionAlgorithm, assertPermittedAlgorithm } from './encryption/encryption.interface.js';
+export type { EncryptedEnvelope, IEncryptionService } from './encryption/encryption.interface.js';
+export { computeHash, HashAlgorithm } from './encryption/compute-hash.js';
+export { decryptCredential } from './encryption/decrypt-credential.js';
+export type { DecryptionParams } from './encryption/decrypt-credential.js';
+export type { IKeyGenerator, IKeyStore } from './key-provider/key-provider.interface.js';
+export { LocalKeyGenerator } from './key-provider/adapters/local/local.adapter.js';
+
+// Registry (types only — runtime registry re-exported from ./server entrypoint)
+export { ServiceType, AdapterType } from './registry/types.js';
+export type { AdapterRegistryEntry, AdapterRegistry } from './registry/types.js';
+
+// Config schemas
+export { vckitDidConfigSchema, vckitDidSensitiveFields } from './did-manager/adapters/vckit/vckit-did.schema.js';
+export type { VCKitDidConfig } from './did-manager/adapters/vckit/vckit-did.schema.js';

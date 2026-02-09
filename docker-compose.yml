@@ -36,7 +36,7 @@ services:
     volumes:
       - ./keycloak-realms:/keycloak-realms
       - ./initialisation/config.json:/app/config.json:ro
-      - ./packages/mock-app/prisma:/app/prisma:ro
+      - ./packages/reference-implementation/prisma:/app/prisma:ro
     depends_on:
       ri-db:
         condition: service_healthy

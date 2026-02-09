@@ -5,20 +5,11 @@
     "type": {
       "type": "array",
       "readOnly": true,
-      "const": [
-        "DigitalProductPassport",
-        "VerifiableCredential"
-      ],
-      "default": [
-        "DigitalProductPassport",
-        "VerifiableCredential"
-      ],
+      "const": ["DigitalProductPassport", "VerifiableCredential"],
+      "default": ["DigitalProductPassport", "VerifiableCredential"],
       "items": {
         "type": "string",
-        "enum": [
-          "DigitalProductPassport",
-          "VerifiableCredential"
-        ]
+        "enum": ["DigitalProductPassport", "VerifiableCredential"]
       }
     },
     "@context": {
@@ -26,21 +17,12 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": [
-          "https://www.w3.org/ns/credentials/v2",
-          "https://test.uncefact.org/vocabulary/untp/dpp/0.4.2/"
-        ]
+        "enum": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dpp/0.4.2/"]
       },
       "description": "A list of JSON-LD context URIs that define the semantic meaning of properties within the credential. ",
       "readOnly": true,
-      "const": [
-        "https://www.w3.org/ns/credentials/v2",
-        "https://test.uncefact.org/vocabulary/untp/dpp/0.4.2/"
-      ],
-      "default": [
-        "https://www.w3.org/ns/credentials/v2",
-        "https://test.uncefact.org/vocabulary/untp/dpp/0.4.2/"
-      ]
+      "const": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dpp/0.4.2/"],
+      "default": ["https://www.w3.org/ns/credentials/v2", "https://test.uncefact.org/vocabulary/untp/dpp/0.4.2/"]
     },
     "id": {
       "example": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
@@ -70,11 +52,7 @@
     }
   },
   "description": "The Product Passport is a comprehensive data structure that encapsulates various details pertaining to a product, including its identification details, who issued it, batch information, provenance information, circularity information and a set of verifiable product conformity & sustainability claims.",
-  "required": [
-    "@context",
-    "id",
-    "issuer"
-  ],
+  "required": ["@context", "id", "issuer"],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
     "CredentialIssuer": {
@@ -84,17 +62,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "CredentialIssuer"
-          ],
-          "default": [
-            "CredentialIssuer"
-          ],
+          "const": ["CredentialIssuer"],
+          "default": ["CredentialIssuer"],
           "items": {
             "type": "string",
-            "enum": [
-              "CredentialIssuer"
-            ]
+            "enum": ["CredentialIssuer"]
           }
         },
         "id": {
@@ -117,10 +89,7 @@
         }
       },
       "description": "The issuer party (person or organisation) of a verifiable credential.",
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["id", "name"]
     },
     "Identifier": {
       "type": "object",
@@ -129,17 +98,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Identifier"
-          ],
-          "default": [
-            "Identifier"
-          ],
+          "const": ["Identifier"],
+          "default": ["Identifier"],
           "items": {
             "type": "string",
-            "enum": [
-              "Identifier"
-            ]
+            "enum": ["Identifier"]
           }
         },
         "id": {
@@ -164,10 +127,7 @@
         }
       },
       "description": "The ID and Name of an identified entity such as a product, facility, party, standard, etc.  If the identifier is a W3C DID then the corresponding DID document SHOULD include a serviceEndpoint of type \"IdentityResolver\". If the identifier is not a W3C DID then the id property SHOULD be an identity resolver URL.",
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["id", "name"]
     },
     "IdentifierScheme": {
       "type": "object",
@@ -176,17 +136,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "IdentifierScheme"
-          ],
-          "default": [
-            "IdentifierScheme"
-          ],
+          "const": ["IdentifierScheme"],
+          "default": ["IdentifierScheme"],
           "items": {
             "type": "string",
-            "enum": [
-              "IdentifierScheme"
-            ]
+            "enum": ["IdentifierScheme"]
           }
         },
         "id": {
@@ -210,17 +164,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Product"
-          ],
-          "default": [
-            "Product"
-          ],
+          "const": ["Product"],
+          "default": ["Product"],
           "items": {
             "type": "string",
-            "enum": [
-              "Product"
-            ]
+            "enum": ["Product"]
           }
         },
         "id": {
@@ -301,11 +249,7 @@
         },
         "granularityLevel": {
           "type": "string",
-          "enum": [
-            "item",
-            "batch",
-            "model"
-          ],
+          "enum": ["item", "batch", "model"],
           "example": "item",
           "description": "Code to indicate the granularity of this digital product passport - item level, batch level or product class level."
         },
@@ -341,10 +285,7 @@
         }
       },
       "description": "The ProductInformation class encapsulates detailed information regarding a specific product, including its identification details, manufacturer, and other pertinent details.  ",
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["id", "name"]
     },
     "Link": {
       "type": "object",
@@ -353,17 +294,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Link"
-          ],
-          "default": [
-            "Link"
-          ],
+          "const": ["Link"],
+          "default": ["Link"],
           "items": {
             "type": "string",
-            "enum": [
-              "Link"
-            ]
+            "enum": ["Link"]
           }
         },
         "linkURL": {
@@ -392,17 +327,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Classification"
-          ],
-          "default": [
-            "Classification"
-          ],
+          "const": ["Classification"],
+          "default": ["Classification"],
           "items": {
             "type": "string",
-            "enum": [
-              "Classification"
-            ]
+            "enum": ["Classification"]
           }
         },
         "id": {
@@ -434,10 +363,7 @@
         }
       },
       "description": "A classification scheme and code / name representing a category value for a product, entity, or facility.",
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["id", "name"]
     },
     "Dimension": {
       "type": "object",
@@ -446,17 +372,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Dimension"
-          ],
-          "default": [
-            "Dimension"
-          ],
+          "const": ["Dimension"],
+          "default": ["Dimension"],
           "items": {
             "type": "string",
-            "enum": [
-              "Dimension"
-            ]
+            "enum": ["Dimension"]
           }
         },
         "weight": {
@@ -489,17 +409,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Measure"
-          ],
-          "default": [
-            "Measure"
-          ],
+          "const": ["Measure"],
+          "default": ["Measure"],
           "items": {
             "type": "string",
-            "enum": [
-              "Measure"
-            ]
+            "enum": ["Measure"]
           }
         },
         "value": {
@@ -514,10 +428,7 @@
         }
       },
       "description": "The measure class defines a numeric measured value (eg 10) and a coded unit of measure (eg KG).",
-      "required": [
-        "value",
-        "unit"
-      ]
+      "required": ["value", "unit"]
     },
     "Material": {
       "type": "object",
@@ -526,17 +437,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Material"
-          ],
-          "default": [
-            "Material"
-          ],
+          "const": ["Material"],
+          "default": ["Material"],
           "items": {
             "type": "string",
-            "enum": [
-              "Material"
-            ]
+            "enum": ["Material"]
           }
         },
         "name": {
@@ -583,9 +488,7 @@
         }
       },
       "description": "The material class encapsulates details about the origin or source of raw materials in a product, including the country of origin and the mass fraction.",
-      "required": [
-        "name"
-      ]
+      "required": ["name"]
     },
     "Claim": {
       "type": "object",
@@ -594,20 +497,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Claim",
-            "Declaration"
-          ],
-          "default": [
-            "Claim",
-            "Declaration"
-          ],
+          "const": ["Claim", "Declaration"],
+          "default": ["Claim", "Declaration"],
           "items": {
             "type": "string",
-            "enum": [
-              "Claim",
-              "Declaration"
-            ]
+            "enum": ["Claim", "Declaration"]
           }
         },
         "assessmentDate": {
@@ -684,11 +578,7 @@
         }
       },
       "description": "A declaration of conformance with one or more criteria from a specific standard or regulation.  ",
-      "required": [
-        "id",
-        "compliance",
-        "conformityTopic"
-      ]
+      "required": ["id", "compliance", "conformityTopic"]
     },
     "Metric": {
       "type": "object",
@@ -697,17 +587,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Metric"
-          ],
-          "default": [
-            "Metric"
-          ],
+          "const": ["Metric"],
+          "default": ["Metric"],
           "items": {
             "type": "string",
-            "enum": [
-              "Metric"
-            ]
+            "enum": ["Metric"]
           }
         },
         "metricName": {
@@ -731,10 +615,7 @@
         }
       },
       "description": "A specific measure of performance against the criteria that governs the claim.  Expressed as an array of metric (ie unit of measure) / value (ie the actual numeric value) pairs.  ",
-      "required": [
-        "metricName",
-        "metricValue"
-      ]
+      "required": ["metricName", "metricValue"]
     },
     "Standard": {
       "type": "object",
@@ -743,17 +624,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Standard"
-          ],
-          "default": [
-            "Standard"
-          ],
+          "const": ["Standard"],
+          "default": ["Standard"],
           "items": {
             "type": "string",
-            "enum": [
-              "Standard"
-            ]
+            "enum": ["Standard"]
           }
         },
         "id": {
@@ -779,9 +654,7 @@
         }
       },
       "description": "A standard (eg ISO 14000) that specifies the criteria for conformance.",
-      "required": [
-        "issuingParty"
-      ]
+      "required": ["issuingParty"]
     },
     "Regulation": {
       "type": "object",
@@ -790,17 +663,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Regulation"
-          ],
-          "default": [
-            "Regulation"
-          ],
+          "const": ["Regulation"],
+          "default": ["Regulation"],
           "items": {
             "type": "string",
-            "enum": [
-              "Regulation"
-            ]
+            "enum": ["Regulation"]
           }
         },
         "id": {
@@ -831,9 +698,7 @@
         }
       },
       "description": "A regulation (eg EU deforestation regulation) that defines the criteria for assessment.",
-      "required": [
-        "administeredBy"
-      ]
+      "required": ["administeredBy"]
     },
     "Criterion": {
       "type": "object",
@@ -842,17 +707,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "Criterion"
-          ],
-          "default": [
-            "Criterion"
-          ],
+          "const": ["Criterion"],
+          "default": ["Criterion"],
           "items": {
             "type": "string",
-            "enum": [
-              "Criterion"
-            ]
+            "enum": ["Criterion"]
           }
         },
         "id": {
@@ -875,10 +734,7 @@
         }
       },
       "description": "A specific rule or criterion within a standard or regulation. eg a carbon intensity calculation rule within an emissions standard.",
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["id", "name"]
     },
     "SecureLink": {
       "type": "object",
@@ -887,20 +743,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "SecureLink",
-            "Link"
-          ],
-          "default": [
-            "SecureLink",
-            "Link"
-          ],
+          "const": ["SecureLink", "Link"],
+          "default": ["SecureLink", "Link"],
           "items": {
             "type": "string",
-            "enum": [
-              "SecureLink",
-              "Link"
-            ]
+            "enum": ["SecureLink", "Link"]
           }
         },
         "linkURL": {
@@ -926,19 +773,13 @@
         },
         "hashMethod": {
           "type": "string",
-          "enum": [
-            "SHA-256",
-            "SHA-1"
-          ],
+          "enum": ["SHA-256", "SHA-1"],
           "example": "SHA-256",
           "description": "The hashing algorithm used to create the target hash.  SHA-265 is the recommended standard"
         },
         "encryptionMethod": {
           "type": "string",
-          "enum": [
-            "none",
-            "AES"
-          ],
+          "enum": ["none", "AES"],
           "example": "none",
           "description": "The symmetric encryption algorithm used to encrypt the link target.  AES is the recommended standard. Decryption keys are expected to be passed out of bounds."
         }
@@ -952,17 +793,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "CircularityPerformance"
-          ],
-          "default": [
-            "CircularityPerformance"
-          ],
+          "const": ["CircularityPerformance"],
+          "default": ["CircularityPerformance"],
           "items": {
             "type": "string",
-            "enum": [
-              "CircularityPerformance"
-            ]
+            "enum": ["CircularityPerformance"]
           }
         },
         "recyclingInformation": {
@@ -1007,17 +842,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "EmissionsPerformance"
-          ],
-          "default": [
-            "EmissionsPerformance"
-          ],
+          "const": ["EmissionsPerformance"],
+          "default": ["EmissionsPerformance"],
           "items": {
             "type": "string",
-            "enum": [
-              "EmissionsPerformance"
-            ]
+            "enum": ["EmissionsPerformance"]
           }
         },
         "carbonFootprint": {
@@ -1033,11 +862,7 @@
         },
         "operationalScope": {
           "type": "string",
-          "enum": [
-            "None",
-            "CradleToGate",
-            "CradleToGrave"
-          ],
+          "enum": ["None", "CradleToGate", "CradleToGrave"],
           "example": "None",
           "description": "The operational scope of the emissions performance. Only scope 1 & 2, or including upstream scope 3 (cradle to gate) or upstream and downstream scope 3 (cradle to grave)."
         },
@@ -1053,12 +878,7 @@
         }
       },
       "description": "Product specific characteristics.  This class is an extension point for industry specific product characteristics or performance information such as clothing size or battery capacity.",
-      "required": [
-        "carbonFootprint",
-        "declaredUnit",
-        "operationalScope",
-        "primarySourcedRatio"
-      ]
+      "required": ["carbonFootprint", "declaredUnit", "operationalScope", "primarySourcedRatio"]
     },
     "TraceabilityPerformance": {
       "type": "object",
@@ -1067,17 +887,11 @@
         "type": {
           "type": "array",
           "readOnly": true,
-          "const": [
-            "TraceabilityPerformance"
-          ],
-          "default": [
-            "TraceabilityPerformance"
-          ],
+          "const": ["TraceabilityPerformance"],
+          "default": ["TraceabilityPerformance"],
           "items": {
             "type": "string",
-            "enum": [
-              "TraceabilityPerformance"
-            ]
+            "enum": ["TraceabilityPerformance"]
           }
         },
         "valueChainProcess": {

@@ -1,5 +1,2 @@
-export { MoreOptions } from "./MoreOptions";
-export type {
-  MoreOption,
-  MoreOptionGroup,
-} from "./MoreOptions";
+export { MoreOptions } from './MoreOptions';
+export type { MoreOption, MoreOptionGroup } from './MoreOptions';

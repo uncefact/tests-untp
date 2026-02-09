@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button , Dialog, DialogActions, DialogContent, DialogTitle} from '@mui/material';
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 
 export interface ICustomDialogStyle {
   content?: React.CSSProperties;

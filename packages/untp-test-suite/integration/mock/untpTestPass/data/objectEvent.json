@@ -34,10 +34,7 @@
       "certificateID": "https://example.com/certificate/789012345",
       "referenceStandard": "https://example.com/standard/ISO12345",
       "evidenceURL": "https://example.com/certificate/evidence.pdf",
-      "criteriaList": [
-        "https://example.com/criteria/567890123",
-        "https://example.com/criteria/456789012"
-      ],
+      "criteriaList": ["https://example.com/criteria/567890123", "https://example.com/criteria/456789012"],
       "assessmentLevel": "independent-certifier",
       "responsibleAgency": {
         "partyID": "https://abr.business.gov.au/ABN/View?abn=41161080146",

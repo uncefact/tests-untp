@@ -1,3 +1,4 @@
+// TODO: Replace with a published npm package (https://github.com/uncefact/tests-untp/issues/401)
 import GS1DigitalLinkToolkit from 'digitallink_toolkit_server/src/GS1DigitalLinkToolkit.js';
 import { IDLRAI, MimeTypeEnum } from './types/index.js';
 import { GS1ServiceEnum } from './identityProviders/GS1Provider.js';
@@ -111,10 +112,7 @@ export const createLinkResolver = async (arg: ICreateLinkResolver): Promise<stri
 
   const params: LinkResolver = constructLinkResolver(namespace, linkResolver, linkResponses, qualifierPath);
   try {
-    const url =
-      linkRegisterPath && linkRegisterPath.length > 0
-        ? `${dlrAPIUrl}/${linkRegisterPath}`
-        : dlrAPIUrl;
+    const url = linkRegisterPath && linkRegisterPath.length > 0 ? `${dlrAPIUrl}/${linkRegisterPath}` : dlrAPIUrl;
 
     privateAPI.setBearerTokenAuthorizationHeaders(arg.dlrAPIKey || '');
     await privateAPI.post<string>(url, params);
@@ -250,26 +248,20 @@ export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
   }
 
   // Define the suffix we care about (Product Passport Link Type)
-  const serviceSuffix = `/${GS1ServiceEnum.sustainabilityInfo}`;  
+  const serviceSuffix = `/${GS1ServiceEnum.sustainabilityInfo}`;
 
   // Find the first linkset entry whose key matches the domain + suffix
   const certificatePassports = dlrData.linkset.find((item: any) =>
-    Object.keys(item).some(key =>
-      key.includes(rootDlrDomain) &&
-      key.endsWith(serviceSuffix)
-    )
+    Object.keys(item).some((key) => key.includes(rootDlrDomain) && key.endsWith(serviceSuffix)),
   );
   if (!certificatePassports) {
     return null;
   }
 
   // Extract the key
-  const passportKey = Object
-    .keys(certificatePassports)
-    .find(key =>
-      key.includes(rootDlrDomain) &&
-      key.endsWith(serviceSuffix)
-    );
+  const passportKey = Object.keys(certificatePassports).find(
+    (key) => key.includes(rootDlrDomain) && key.endsWith(serviceSuffix),
+  );
   if (!passportKey) {
     return null;
   }
@@ -281,9 +273,7 @@ export const getDlrPassport = async <T>(dlrUrl: string): Promise<T | null> => {
   }
 
   // Return the first text/html passport we find (Human-friendly format)
-  const dlrPassport = (dlrPassports).find(
-    p => p.type === MimeTypeEnum.textHtml
-  );
+  const dlrPassport = dlrPassports.find((p) => p.type === MimeTypeEnum.textHtml);
 
   return (dlrPassport as T) ?? null;
 };

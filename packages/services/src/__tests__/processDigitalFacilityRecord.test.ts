@@ -47,7 +47,11 @@ describe('processDigitalFacilityRecord', () => {
     (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
       credentialSubject: { id: 'https://example.com/123' },
     }));
-    (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+    (uploadData as jest.Mock).mockResolvedValueOnce({
+      uri: 'https://exampleStorage.com/vc.json',
+      key: '123',
+      hash: 'ABC123',
+    });
     (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
 
     jest
@@ -160,7 +164,11 @@ describe('processDigitalFacilityRecord', () => {
     (vckitService.issueVC as jest.Mock).mockImplementation(() => ({
       credentialSubject: { id: 'https://example.com/123' },
     }));
-    (uploadData as jest.Mock).mockResolvedValueOnce({ uri: 'https://exampleStorage.com/vc.json', key: '123', hash: 'ABC123' });
+    (uploadData as jest.Mock).mockResolvedValueOnce({
+      uri: 'https://exampleStorage.com/vc.json',
+      key: '123',
+      hash: 'ABC123',
+    });
     (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
 
     jest

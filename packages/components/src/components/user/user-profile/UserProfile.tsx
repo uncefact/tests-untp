@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
-import type { User } from "@/types";
+import { cn } from '@/lib/utils';
+import type { User } from '@/types';
 
 interface UserProfileProps {
   user: User;
@@ -22,20 +22,17 @@ interface UserProfileProps {
  */
 export function UserProfile({ user, className }: UserProfileProps) {
   return (
-    <div
-      className={cn("flex items-center gap-2 bg-user-profile min-w-0", className)}
-      data-testid="user-profile"
-    >
-      <div className="flex flex-col min-w-0 flex-1">
+    <div className={cn('flex items-center gap-2 bg-user-profile min-w-0', className)} data-testid='user-profile'>
+      <div className='flex flex-col min-w-0 flex-1'>
         <div
-          className="text-user-profile-foreground text-base font-normal leading-7 truncate"
-          data-testid="user-profile-name"
+          className='text-user-profile-foreground text-base font-normal leading-7 truncate'
+          data-testid='user-profile-name'
         >
           {user.name}
         </div>
         <div
-          className="text-user-profile-foreground text-sm font-normal leading-none truncate"
-          data-testid="user-profile-email"
+          className='text-user-profile-foreground text-sm font-normal leading-none truncate'
+          data-testid='user-profile-email'
         >
           {user.email}
         </div>
