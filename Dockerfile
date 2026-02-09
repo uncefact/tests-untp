@@ -38,4 +38,4 @@ RUN cp -r prisma .next/standalone/packages/reference-implementation/prisma
 EXPOSE 3003
 
 # Run prisma migrate from original location, then start standalone server
-CMD ["sh", "-c", "cd /app/packages/reference-implementation && npx prisma migrate deploy --config=prisma/prisma.config.ts && cd .next/standalone/packages/reference-implementation && PORT=3003 node server.js"]
+CMD ["sh", "-c", "cd /app/packages/reference-implementation && npx prisma migrate deploy --config=prisma/prisma.config.ts && npx prisma db seed && cd .next/standalone/packages/reference-implementation && PORT=3003 node server.js"]
