@@ -113,7 +113,6 @@ type DecodedCredential = JSONObject & {
  *       and optionally publishes it to the Identity Resolver.
  *     tags:
  *       - Credentials
- *     security: []
  *     requestBody:
  *       required: true
  *       content:
