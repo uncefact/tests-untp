@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-echo "Starting mock-app entrypoint..."
+echo "Starting reference-implementation entrypoint..."
 
 # Construct RI_DATABASE_URL from individual Postgres variables if not already set
 if [ -z "$RI_DATABASE_URL" ] && [ -n "$RI_POSTGRES_HOST" ]; then

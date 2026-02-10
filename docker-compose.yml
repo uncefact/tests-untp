@@ -101,13 +101,13 @@ services:
   ri:
     build:
       context: .
-      dockerfile: packages/mock-app/Dockerfile
+      dockerfile: packages/reference-implementation/Dockerfile
       args:
         CONFIG_FILE: ./app-config.json
     ports:
       - '3003:3003'
     volumes:
-      - ./packages/mock-app/src/constants/app-config.issue.json:/app/config/app-config.json:ro
+      - ./packages/reference-implementation/src/constants/app-config.issue.json:/app/config/app-config.json:ro
     environment:
       # Database (using docker internal networking)
       RI_POSTGRES_USER: ${RI_POSTGRES_USER}
