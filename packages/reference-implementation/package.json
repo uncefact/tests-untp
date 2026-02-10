@@ -4,12 +4,12 @@
   "private": true,
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
-    "@uncefact/untp-ri-services": "0.1.0-dev.8",
-    "@reference-implementation/components": "0.2.0",
     "@mui/icons-material": "^7.3.4",
     "@mui/material": "^7.3.4",
     "@prisma/client": "^6.18.0",
+    "@reference-implementation/components": "0.2.0",
     "@tailwindcss/postcss": "^4.1.16",
+    "@uncefact/untp-ri-services": "0.1.0-dev.8",
     "@uncefact/vckit-renderer": "^1.0.0-next.59",
     "clsx": "^2.1.1",
     "html5-qrcode": "^2.3.8",
@@ -18,14 +18,16 @@
     "moment": "^2.30.1",
     "next": "15.5.9",
     "next-auth": "^5.0.0-beta.30",
+    "next-swagger-doc": "^0.4.0",
     "postcss": "^8.5.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "swagger-ui-react": "5.17.14",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.16",
     "tw-animate-css": "^1.4.0",
-    "next-swagger-doc": "^0.4.0",
-    "swagger-ui-react": "5.17.14"
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.1"
   },
   "scripts": {
     "dev": "prisma generate && next dev -p 3003",
@@ -66,6 +68,7 @@
     "@types/node": "24.6.1",
     "@types/react": "19.2.4",
     "@types/react-dom": "19.2.3",
+    "@types/swagger-ui-react": "^4.18.3",
     "@uncefact/vckit-core-types": "^1.0.0-next.40",
     "@vckit/core-types": "1.0.0-beta.7",
     "css-loader": "^7.1.2",
@@ -78,7 +81,7 @@
     "prisma": "^6.18.0",
     "storybook": "^10.0.2",
     "style-loader": "^4.0.0",
-    "typescript": "5.9.3",
-    "@types/swagger-ui-react": "^4.18.3"
+    "ts-json-schema-generator": "^2.5.0",
+    "typescript": "5.9.3"
   }
 }
