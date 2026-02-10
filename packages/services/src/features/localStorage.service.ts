@@ -51,7 +51,7 @@ export const mergeToLocalStorage = (
       }
     }
   } catch (error: any) {
-    logger.error({ error, storageKey: parameters.storageKey }, 'Failed to merge to local storage');
+    logger.error({ error, storageKey }, 'Failed to merge to local storage');
     throw new Error(error.message);
   }
 };
@@ -85,7 +85,7 @@ export const getValueFromLocalStorage = (
     }
     return retrievedData;
   } catch (error: any) {
-    logger.error({ error, storageKey: parameters.storageKey }, 'Failed to get value from local storage');
+    logger.error({ error, storageKey }, 'Failed to get value from local storage');
     throw new Error(error.message);
   }
 };
@@ -110,10 +110,7 @@ export const deleteValuesFromLocalStorage = (parameters: { storageKey: string; k
       localStorage.setItem(storageKey, JSON.stringify(parsedData));
     }
   } catch (error: any) {
-    logger.error(
-      { error, storageKey: parameters.storageKey, keys: parameters.keys },
-      'Failed to delete values from local storage',
-    );
+    logger.error({ error, storageKey, keys }, 'Failed to delete values from local storage');
     throw new Error(error.message);
   }
 };
@@ -127,7 +124,7 @@ export const deleteItemFromLocalStorage = (parameters: { storageKey: string }) =
   try {
     localStorage.removeItem(storageKey);
   } catch (error: any) {
-    logger.error({ error, storageKey: parameters.storageKey }, 'Failed to delete item from local storage');
+    logger.error({ error, storageKey }, 'Failed to delete item from local storage');
     throw new Error(error.message);
   }
 };

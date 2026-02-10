@@ -4,25 +4,30 @@ import type { LoggerService, LogContext, LoggerConfig } from '../types.js';
 export class PinoLoggerAdapter implements LoggerService {
   private logger: pino.Logger;
 
-  constructor(config: LoggerConfig = {}) {
-    this.logger = pino({
-      level: config.level || process.env.LOG_LEVEL || 'info',
-      ...(config.pretty && {
-        transport: {
-          target: 'pino-pretty',
-          options: {
-            colorize: true,
-            translateTime: 'SYS:standard',
-            ignore: 'pid,hostname',
+  constructor(configOrLogger?: LoggerConfig | pino.Logger) {
+    if (configOrLogger && typeof configOrLogger === 'object' && 'child' in configOrLogger) {
+      this.logger = configOrLogger;
+    } else {
+      const config = configOrLogger || {};
+      this.logger = pino({
+        level: config.level || process.env.LOG_LEVEL || 'info',
+        ...(config.pretty && {
+          transport: {
+            target: 'pino-pretty',
+            options: {
+              colorize: true,
+              translateTime: 'SYS:standard',
+              ignore: 'pid,hostname',
+            },
           },
-        },
-      }),
-      ...(config.correlationId && {
-        base: {
-          correlationId: config.correlationId,
-        },
-      }),
-    });
+        }),
+        ...(config.correlationId && {
+          base: {
+            correlationId: config.correlationId,
+          },
+        }),
+      });
+    }
   }
 
   debug(msgOrObj: string | LogContext, msg?: string): void {
@@ -59,8 +64,6 @@ export class PinoLoggerAdapter implements LoggerService {
 
   child(bindings: LogContext): LoggerService {
     const childLogger = this.logger.child(bindings);
-    const adapter = new PinoLoggerAdapter();
-    adapter.logger = childLogger;
-    return adapter;
+    return new PinoLoggerAdapter(childLogger);
   }
 }
