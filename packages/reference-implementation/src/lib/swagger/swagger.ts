@@ -1,6 +1,10 @@
 import { createSwaggerSpec } from 'next-swagger-doc';
+import { generateOpenAPISchemas } from './schemas';
 
 export const getApiDocs = async (): Promise<Record<string, unknown>> => {
+  // Generate schemas from Zod definitions
+  const generatedSchemas = generateOpenAPISchemas();
+
   const spec = createSwaggerSpec({
     apiFolder: 'src/app/api',
     definition: {
@@ -25,6 +29,7 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
             description: 'JWT token from Keycloak authentication',
           },
         },
+        schemas: generatedSchemas,
       },
       security: [{ BearerAuth: [] }],
       tags: [
