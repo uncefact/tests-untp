@@ -3,7 +3,13 @@ import { readFile } from 'fs/promises';
 import { NextResponse } from 'next/server';
 import path from 'path';
 
-import { decodeEnvelopedVC, issueCredentialStatus, PROOF_FORMAT, StorageRecord } from '@uncefact/untp-ri-services';
+import {
+  decodeEnvelopedVC,
+  issueCredentialStatus,
+  PROOF_FORMAT,
+  StorageRecord,
+  CredentialPayload,
+} from '@uncefact/untp-ri-services';
 import { createCredential } from '@/lib/prisma/repositories';
 
 type JSONPrimitive = string | number | boolean | null;
@@ -15,7 +21,7 @@ type JSONArray = JSONValue[];
  * Incoming POST request payload
  */
 type IssueRequest = {
-  formData: JSONObject;
+  formData: CredentialPayload;
   publish?: boolean;
 };
 
@@ -98,10 +104,90 @@ type DecodedCredential = JSONObject & {
 };
 
 /**
- * POST handler:
- * - issues credential
- * - stores credential
- * - optionally publishes it
+ * @swagger
+ * /credentials:
+ *   post:
+ *     summary: Issue a verifiable credential
+ *     description: |
+ *       Issues a new Verifiable Credential, stores it in encrypted storage,
+ *       and optionally publishes it to the Identity Resolver.
+ *     tags:
+ *       - Credentials
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - formData
+ *             properties:
+ *               formData:
+ *                 $ref: '#/components/schemas/CredentialPayload'
+ *               publish:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Whether to publish the credential to the Identity Resolver
+ *     responses:
+ *       200:
+ *         description: Credential issued successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *                   example: true
+ *                 storageResponse:
+ *                   type: object
+ *                   properties:
+ *                     uri:
+ *                       type: string
+ *                       description: URI where the credential is stored
+ *                     hash:
+ *                       type: string
+ *                       description: Hash of the stored credential
+ *                     decryptionKey:
+ *                       type: string
+ *                       description: Key to decrypt the credential
+ *                 publishResponse:
+ *                   type: object
+ *                   properties:
+ *                     enabled:
+ *                       type: boolean
+ *                       description: Whether publishing was enabled
+ *                 credential:
+ *                   type: object
+ *                   description: The decoded verifiable credential
+ *                 credentialId:
+ *                   type: string
+ *                   description: Database ID of the stored credential record
+ *       400:
+ *         description: Invalid request body
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *       500:
+ *         description: Server error during credential issuance
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
  */
 export async function POST(req: Request) {
   let body: IssueRequest;
