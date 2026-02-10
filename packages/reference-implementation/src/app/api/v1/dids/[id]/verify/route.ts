@@ -5,6 +5,61 @@ import { DidStatus } from '@uncefact/untp-ri-services';
 import { withOrgAuth } from '@/lib/api/with-org-auth';
 import { getDidById, updateDidStatus } from '@/lib/prisma/repositories';
 
+/**
+ * @swagger
+ * /dids/{id}/verify:
+ *   post:
+ *     summary: Verify a DID
+ *     description: |
+ *       Verifies ownership of a DID and updates its status accordingly.
+ *       If verification succeeds, the DID status is set to VERIFIED.
+ *       If verification fails, the status remains UNVERIFIED.
+ *     tags:
+ *       - DIDs
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The database ID of the DID to verify
+ *     responses:
+ *       200:
+ *         description: Verification completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *                   example: true
+ *                 verification:
+ *                   type: object
+ *                   properties:
+ *                     verified:
+ *                       type: boolean
+ *                       description: Whether the DID was successfully verified
+ *                     message:
+ *                       type: string
+ *                       description: Verification result message
+ *                 did:
+ *                   $ref: '#/components/schemas/Did'
+ *       401:
+ *         description: Unauthorized - missing or invalid authentication
+ *       404:
+ *         description: DID or service instance not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 export const POST = withOrgAuth(async (_req, { organizationId, params }) => {
   const { id } = await params;
 
