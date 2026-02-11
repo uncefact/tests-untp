@@ -3,13 +3,7 @@ import { readFile } from 'fs/promises';
 import { NextResponse } from 'next/server';
 import path from 'path';
 
-import {
-  decodeEnvelopedVC,
-  issueCredentialStatus,
-  PROOF_FORMAT,
-  StorageRecord,
-  CredentialPayload,
-} from '@uncefact/untp-ri-services';
+import { decodeEnvelopedVC, issueCredentialStatus, PROOF_FORMAT, StorageRecord } from '@uncefact/untp-ri-services';
 import { createCredential } from '@/lib/prisma/repositories';
 
 type JSONPrimitive = string | number | boolean | null;
@@ -21,7 +15,7 @@ type JSONArray = JSONValue[];
  * Incoming POST request payload
  */
 type IssueRequest = {
-  formData: CredentialPayload;
+  formData: JSONObject;
   publish?: boolean;
 };
 
@@ -123,7 +117,8 @@ type DecodedCredential = JSONObject & {
  *               - formData
  *             properties:
  *               formData:
- *                 $ref: '#/components/schemas/CredentialPayload'
+ *                 type: object
+ *                 description: The credential subject data
  *               publish:
  *                 type: boolean
  *                 default: false
