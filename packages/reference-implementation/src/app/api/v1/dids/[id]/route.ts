@@ -34,6 +34,10 @@ import { getDidById, updateDid } from '@/lib/prisma/repositories';
  *                   $ref: '#/components/schemas/Did'
  *       401:
  *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: DID not found
  *         content:
@@ -115,6 +119,10 @@ export const GET = withOrgAuth(async (_req, { organizationId, params }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: DID not found
  *         content:

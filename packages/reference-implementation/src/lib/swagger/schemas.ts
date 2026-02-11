@@ -37,6 +37,24 @@ export const errorResponseSchema = z.object({
   error: z.string().describe('Error message'),
 });
 
+/**
+ * Verification result from DID verification.
+ */
+export const verificationResultSchema = z.object({
+  verified: z.boolean().describe('Whether the DID was successfully verified'),
+  message: z.string().describe('Verification result message'),
+});
+
+/**
+ * DID Document structure.
+ */
+export const didDocumentSchema = z.object({
+  id: z.string().describe('The DID identifier'),
+  verificationMethod: z.array(z.record(z.unknown())).optional().describe('Verification methods (public keys)'),
+  authentication: z.array(z.string()).optional().describe('Authentication methods'),
+  service: z.array(z.record(z.unknown())).optional().describe('Service endpoints'),
+});
+
 // ============================================================================
 // Schema Conversion Utility
 // ============================================================================
@@ -55,6 +73,8 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
   const schemas: Record<string, z.ZodType> = {
     Did: didSchema,
     ErrorResponse: errorResponseSchema,
+    VerificationResult: verificationResultSchema,
+    DidDocument: didDocumentSchema,
   };
 
   const openAPISchemas: Record<string, OpenAPISchema> = {};
@@ -66,8 +86,9 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     });
 
     // Remove the $schema property as it's not needed in OpenAPI
-    const { $schema, ...schemaWithoutMeta } = jsonSchema as Record<string, unknown>;
-    openAPISchemas[name] = schemaWithoutMeta as OpenAPISchema;
+    const schemaObj = jsonSchema as Record<string, unknown>;
+    delete schemaObj.$schema;
+    openAPISchemas[name] = schemaObj as OpenAPISchema;
   }
 
   return openAPISchemas;

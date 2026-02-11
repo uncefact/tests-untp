@@ -35,18 +35,15 @@ import { getDidById, updateDidStatus } from '@/lib/prisma/repositories';
  *                   type: boolean
  *                   example: true
  *                 verification:
- *                   type: object
- *                   properties:
- *                     verified:
- *                       type: boolean
- *                       description: Whether the DID was successfully verified
- *                     message:
- *                       type: string
- *                       description: Verification result message
+ *                   $ref: '#/components/schemas/VerificationResult'
  *                 did:
  *                   $ref: '#/components/schemas/Did'
  *       401:
  *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: DID or service instance not found
  *         content:

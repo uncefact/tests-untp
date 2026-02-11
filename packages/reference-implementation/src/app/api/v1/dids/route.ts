@@ -66,6 +66,10 @@ import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus } from '@uncefact/un
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Service instance not found
  *         content:
@@ -218,6 +222,10 @@ export const POST = withOrgAuth(async (req, { organizationId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:

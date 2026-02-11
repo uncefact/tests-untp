@@ -31,29 +31,13 @@ import { getDidById } from '@/lib/prisma/repositories';
  *                   type: boolean
  *                   example: true
  *                 document:
- *                   type: object
- *                   description: The DID Document
- *                   properties:
- *                     id:
- *                       type: string
- *                       description: The DID identifier
- *                     verificationMethod:
- *                       type: array
- *                       description: Verification methods (public keys)
- *                       items:
- *                         type: object
- *                     authentication:
- *                       type: array
- *                       description: Authentication methods
- *                       items:
- *                         type: string
- *                     service:
- *                       type: array
- *                       description: Service endpoints
- *                       items:
- *                         type: object
+ *                   $ref: '#/components/schemas/DidDocument'
  *       401:
  *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: DID or service instance not found
  *         content:
