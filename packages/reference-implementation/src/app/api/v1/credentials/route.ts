@@ -163,25 +163,13 @@ type DecodedCredential = JSONObject & {
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error during credential issuance
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 export async function POST(req: Request) {
   let body: IssueRequest;
