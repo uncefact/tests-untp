@@ -17,14 +17,15 @@ import zodToJsonSchema from 'zod-to-json-schema';
 export const didSchema = z.object({
   id: z.string().describe('Database ID of the DID record'),
   did: z.string().describe('The DID identifier (e.g., did:web:example.com)'),
-  type: z.enum(['MANAGED', 'SELF_MANAGED']).describe('Type of DID'),
-  method: z.enum(['did:web', 'did:key']).describe('DID method'),
+  type: z.enum(['DEFAULT', 'MANAGED', 'SELF_MANAGED']).describe('Type of DID'),
+  method: z.enum(['DID_WEB', 'DID_WEB_VH']).describe('DID method'),
   name: z.string().describe('Human-readable name'),
   description: z.string().nullable().describe('Description of the DID'),
-  status: z.enum(['ACTIVE', 'UNVERIFIED', 'VERIFIED', 'REVOKED']).describe('Current status of the DID'),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'VERIFIED', 'UNVERIFIED']).describe('Current status of the DID'),
   keyId: z.string().describe('Key identifier associated with the DID'),
   organizationId: z.string().describe('ID of the owning organization'),
   serviceInstanceId: z.string().nullable().describe('ID of the service instance used to manage this DID'),
+  isDefault: z.boolean().describe('Whether this is the default DID for the organization'),
   createdAt: z.string().datetime().describe('Timestamp when the DID was created'),
   updatedAt: z.string().datetime().describe('Timestamp when the DID was last updated'),
 });
