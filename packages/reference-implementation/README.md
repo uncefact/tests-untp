@@ -106,6 +106,16 @@ The Reference Implementation uses **NextAuth.js** with **Keycloak** as the ident
 
 ---
 
+### API Documentation
+
+The Reference Implementation provides **Swagger/OpenAPI** documentation for all API endpoints.
+
+**Accessing the API docs:**
+
+- **Swagger UI:** Available at `/api-docs` when the application is running (e.g., `http://localhost:3003/api-docs`)
+
+---
+
 ### Developer Instructions
 
 #### Prerequisites
