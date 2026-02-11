@@ -56,6 +56,46 @@ export const didDocumentSchema = z.object({
 });
 
 // ============================================================================
+// Credential Schemas
+// ============================================================================
+
+/**
+ * Storage response after storing a credential.
+ */
+export const credentialStorageResponseSchema = z.object({
+  uri: z.string().describe('URI where the credential is stored'),
+  hash: z.string().describe('Hash of the stored credential'),
+  decryptionKey: z.string().describe('Key to decrypt the credential'),
+});
+
+/**
+ * Publish response when publishing a credential.
+ */
+export const credentialPublishResponseSchema = z.object({
+  enabled: z.boolean().describe('Whether publishing was enabled'),
+  raw: z.record(z.unknown()).optional().describe('Raw response from the DLR service'),
+});
+
+/**
+ * Successful credential issue response.
+ */
+export const credentialIssueResponseSchema = z.object({
+  ok: z.literal(true),
+  storageResponse: credentialStorageResponseSchema.describe('Storage details for the credential'),
+  publishResponse: credentialPublishResponseSchema.describe('Publish status and details'),
+  credential: z.record(z.unknown()).describe('The decoded verifiable credential'),
+  credentialId: z.string().describe('Database ID of the stored credential record'),
+});
+
+/**
+ * Request body for issuing a credential.
+ */
+export const credentialIssueRequestSchema = z.object({
+  formData: z.record(z.unknown()).describe('The credential payload'),
+  publish: z.boolean().optional().default(false).describe('Whether to publish the credential to the Identity Resolver'),
+});
+
+// ============================================================================
 // Schema Conversion Utility
 // ============================================================================
 
@@ -75,6 +115,10 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     ErrorResponse: errorResponseSchema,
     VerificationResult: verificationResultSchema,
     DidDocument: didDocumentSchema,
+    CredentialStorageResponse: credentialStorageResponseSchema,
+    CredentialPublishResponse: credentialPublishResponseSchema,
+    CredentialIssueResponse: credentialIssueResponseSchema,
+    CredentialIssueRequest: credentialIssueRequestSchema,
   };
 
   const openAPISchemas: Record<string, OpenAPISchema> = {};

@@ -112,54 +112,22 @@ type DecodedCredential = JSONObject & {
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - formData
- *             properties:
- *               formData:
- *                 type: object
- *                 description: The credential subject data
- *               publish:
- *                 type: boolean
- *                 default: false
- *                 description: Whether to publish the credential to the Identity Resolver
+ *             $ref: '#/components/schemas/CredentialIssueRequest'
  *     responses:
  *       200:
  *         description: Credential issued successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 storageResponse:
- *                   type: object
- *                   properties:
- *                     uri:
- *                       type: string
- *                       description: URI where the credential is stored
- *                     hash:
- *                       type: string
- *                       description: Hash of the stored credential
- *                     decryptionKey:
- *                       type: string
- *                       description: Key to decrypt the credential
- *                 publishResponse:
- *                   type: object
- *                   properties:
- *                     enabled:
- *                       type: boolean
- *                       description: Whether publishing was enabled
- *                 credential:
- *                   type: object
- *                   description: The decoded verifiable credential
- *                 credentialId:
- *                   type: string
- *                   description: Database ID of the stored credential record
+ *               $ref: '#/components/schemas/CredentialIssueResponse'
  *       400:
  *         description: Invalid request body
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized - missing or invalid authentication
  *         content:
  *           application/json:
  *             schema:
