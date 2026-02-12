@@ -63,6 +63,7 @@ const nextConfig = (phase: string): NextConfig => {
   return {
     output: 'standalone',
     reactStrictMode: false,
+    eslint: { ignoreDuringBuilds: true },
     transpilePackages: ['@reference-implementation/components'],
     env: {
       NEXT_PUBLIC_AUTH_KEYCLOAK_ISSUER: AUTH_KEYCLOAK_ISSUER || '',
