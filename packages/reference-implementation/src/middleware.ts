@@ -12,8 +12,7 @@ import NextAuth from 'next-auth';
 import { authConfig } from '@/lib/auth/auth.config';
 import { NextResponse, type NextRequest } from 'next/server';
 import { validateServiceAccountToken, extractBearerToken } from '@/lib/auth/token-validator';
-import { runWithCorrelationId } from '@uncefact/untp-ri-services';
-import { randomUUID } from 'crypto';
+import { runWithCorrelationId } from '@uncefact/untp-ri-services/logging';
 
 const { auth } = NextAuth(authConfig);
 
@@ -33,7 +32,8 @@ async function validateBearerAuth(req: NextRequest): Promise<boolean> {
 }
 
 export default auth(async (req) => {
-  const correlationId = req.headers.get('x-correlation-id') || req.headers.get('x-amzn-trace-id') || randomUUID();
+  const correlationId =
+    req.headers.get('x-correlation-id') || req.headers.get('x-amzn-trace-id') || crypto.randomUUID();
 
   return runWithCorrelationId(correlationId, async () => {
     const { pathname } = req.nextUrl;

@@ -41,7 +41,7 @@ export { LocalKeyGenerator } from './key-provider/adapters/local/local.adapter.j
 // Logging
 export type { LoggerService, LogContext, LoggerConfig, LogLevel } from './logging/types.js';
 export { createLogger } from './logging/factory.js';
-export { getCorrelationId, setCorrelationId, runWithCorrelationId } from './logging/correlation-context.js';
+// correlation-context uses async_hooks (Node.js-only) — import from '@uncefact/untp-ri-services/logging' in server code
 
 // Registry (types only — runtime registry re-exported from ./server entrypoint)
 export { ServiceType, AdapterType } from './registry/types.js';

@@ -24,6 +24,9 @@ jest.mock('@uncefact/untp-ri-services', () => ({
     VERIFIED: 'VERIFIED',
     UNVERIFIED: 'UNVERIFIED',
   },
+  createLogger: () => ({
+    child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }),
+  }),
 }));
 
 jest.mock('@/lib/services/resolve-did-service', () => ({

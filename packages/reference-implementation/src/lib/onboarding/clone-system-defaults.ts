@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@/lib/prisma/generated';
-import { createLogger, getCorrelationId } from '@uncefact/untp-ri-services';
+import { createLogger, getCorrelationId } from '@uncefact/untp-ri-services/logging';
 
 const SYSTEM_ORG_ID = 'system';
 const logger = createLogger().child({ module: 'clone-system-defaults', correlationId: getCorrelationId() });

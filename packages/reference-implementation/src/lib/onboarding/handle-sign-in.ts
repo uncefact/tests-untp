@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@/lib/prisma/generated';
 import { cloneSystemDefaults } from './clone-system-defaults';
-import { createLogger, getCorrelationId } from '@uncefact/untp-ri-services';
+import { createLogger, getCorrelationId } from '@uncefact/untp-ri-services/logging';
 
 const logger = createLogger().child({ module: 'handle-sign-in', correlationId: getCorrelationId() });
 
