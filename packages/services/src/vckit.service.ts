@@ -10,6 +10,9 @@ import {
 import { decodeJwt } from 'jose';
 import { privateAPI } from './utils/httpService.js';
 import _ from 'lodash';
+import { createLogger } from './logging/factory.js';
+
+const logger = createLogger().child({ module: 'vckit.service' });
 
 export const contextDefault = ['https://www.w3.org/ns/credentials/v2'];
 
@@ -221,7 +224,7 @@ export const decodeEnvelopedVC = (vc: VerifiableCredential): UnsignedCredential 
       return decodeJwt(encodedCredential as string) as UnsignedCredential;
     }
   } catch (error) {
-    console.error('Error decoding enveloped VC.', error);
+    logger.error({ error }, 'Error decoding enveloped VC');
   }
   return null;
 };

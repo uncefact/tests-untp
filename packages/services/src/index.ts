@@ -38,6 +38,11 @@ export type { DecryptionParams } from './encryption/decrypt-credential.js';
 export type { IKeyGenerator, IKeyStore } from './key-provider/key-provider.interface.js';
 export { LocalKeyGenerator } from './key-provider/adapters/local/local.adapter.js';
 
+// Logging
+export type { LoggerService, LogContext, LoggerConfig, LogLevel } from './logging/types.js';
+export { createLogger } from './logging/factory.js';
+export { getCorrelationId, setCorrelationId, runWithCorrelationId } from './logging/correlation-context.js';
+
 // Registry (types only — runtime registry re-exported from ./server entrypoint)
 export { ServiceType, AdapterType } from './registry/types.js';
 export type { AdapterRegistryEntry, AdapterRegistry } from './registry/types.js';

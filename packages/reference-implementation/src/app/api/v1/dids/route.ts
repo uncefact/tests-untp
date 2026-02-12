@@ -4,7 +4,9 @@ import { ServiceRegistryError, errorMessage } from '@/lib/api/errors';
 import { ValidationError, validateEnum, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withOrgAuth } from '@/lib/api/with-org-auth';
 import { createDid, listDids } from '@/lib/prisma/repositories';
-import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus } from '@uncefact/untp-ri-services';
+import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus, createLogger } from '@uncefact/untp-ri-services';
+
+const logger = createLogger().child({ module: 'api:dids' });
 
 /**
  * @swagger
@@ -156,7 +158,7 @@ export const POST = withOrgAuth(async (req, { organizationId }) => {
       const status = e.name === 'ServiceInstanceNotFoundError' ? 404 : 500;
       return NextResponse.json({ ok: false, error: e.message }, { status });
     }
-    console.error('[api] Unexpected error:', e);
+    logger.error({ error: e }, 'Unexpected error creating DID');
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
   }
 });
@@ -256,7 +258,7 @@ export const GET = withOrgAuth(async (req, { organizationId }) => {
     if (e instanceof ValidationError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
     }
-    console.error('[api] Unexpected error:', e);
+    logger.error({ error: e }, 'Unexpected error listing DIDs');
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
   }
 });

@@ -3,6 +3,9 @@ import { resolveDidService } from '@/lib/services/resolve-did-service';
 import { NotFoundError, ServiceRegistryError, errorMessage } from '@/lib/api/errors';
 import { withOrgAuth } from '@/lib/api/with-org-auth';
 import { getDidById } from '@/lib/prisma/repositories';
+import { createLogger } from '@uncefact/untp-ri-services';
+
+const logger = createLogger().child({ module: 'api:dids:document' });
 
 /**
  * @swagger
@@ -72,7 +75,7 @@ export const GET = withOrgAuth(async (_req, { organizationId, params }) => {
       const status = e.name === 'ServiceInstanceNotFoundError' ? 404 : 500;
       return NextResponse.json({ ok: false, error: e.message }, { status });
     }
-    console.error('[api] Unexpected error:', e);
+    logger.error({ error: e, didId: id }, 'Unexpected error fetching DID document');
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
   }
 });

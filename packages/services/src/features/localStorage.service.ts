@@ -1,4 +1,7 @@
 import { getValueByPath } from '../utils/helpers.js';
+import { createLogger } from '../logging/factory.js';
+
+const logger = createLogger().child({ module: 'localStorage.service' });
 
 /**
  * This function is used to save data from the local storage
@@ -6,11 +9,11 @@ import { getValueByPath } from '../utils/helpers.js';
  * @param parameters key: string
  */
 export const saveToLocalStorage = (data: any, parameters: { storageKey: string }) => {
+  const { storageKey } = parameters;
   try {
-    const { storageKey } = parameters;
     localStorage.setItem(storageKey, JSON.stringify(data));
   } catch (error: any) {
-    console.error(error);
+    logger.error({ error, storageKey }, 'Failed to save to local storage');
     throw new Error(error.message);
   }
 };
@@ -24,8 +27,8 @@ export const mergeToLocalStorage = (
   data: any,
   parameters: { storageKey: string; objectKeyPath?: string; objectValuePath?: string },
 ) => {
+  const { storageKey } = parameters;
   try {
-    const { storageKey } = parameters;
     const existingData = localStorage.getItem(storageKey);
     const value = parameters.objectValuePath ? getValueByPath(data, parameters.objectValuePath) : data;
 
@@ -48,7 +51,7 @@ export const mergeToLocalStorage = (
       }
     }
   } catch (error: any) {
-    console.error(error);
+    logger.error({ error, storageKey: parameters.storageKey }, 'Failed to merge to local storage');
     throw new Error(error.message);
   }
 };
@@ -63,9 +66,9 @@ export const getValueFromLocalStorage = (
   data: any,
   parameters: { storageKey: string; key?: string; stateKey?: string },
 ) => {
+  const { storageKey, key } = parameters;
   try {
     const _data = { ...data };
-    const { storageKey, key } = parameters;
     const existingData = localStorage.getItem(storageKey);
     let retrievedData;
     if (existingData) {
@@ -82,7 +85,7 @@ export const getValueFromLocalStorage = (
     }
     return retrievedData;
   } catch (error: any) {
-    console.error(error);
+    logger.error({ error, storageKey: parameters.storageKey }, 'Failed to get value from local storage');
     throw new Error(error.message);
   }
 };
@@ -95,8 +98,8 @@ export const getValueFromLocalStorage = (
  * @throws {Error} If an error occurs during the deletion process.
  */
 export const deleteValuesFromLocalStorage = (parameters: { storageKey: string; keys: string[] }) => {
+  const { storageKey, keys } = parameters;
   try {
-    const { storageKey, keys } = parameters;
     const existingData = localStorage.getItem(storageKey);
 
     if (existingData) {
@@ -107,7 +110,10 @@ export const deleteValuesFromLocalStorage = (parameters: { storageKey: string; k
       localStorage.setItem(storageKey, JSON.stringify(parsedData));
     }
   } catch (error: any) {
-    console.error(error);
+    logger.error(
+      { error, storageKey: parameters.storageKey, keys: parameters.keys },
+      'Failed to delete values from local storage',
+    );
     throw new Error(error.message);
   }
 };
@@ -117,11 +123,11 @@ export const deleteValuesFromLocalStorage = (parameters: { storageKey: string; k
  * @param parameters key: string
  */
 export const deleteItemFromLocalStorage = (parameters: { storageKey: string }) => {
+  const { storageKey } = parameters;
   try {
-    const { storageKey } = parameters;
     localStorage.removeItem(storageKey);
   } catch (error: any) {
-    console.error(error);
+    logger.error({ error, storageKey: parameters.storageKey }, 'Failed to delete item from local storage');
     throw new Error(error.message);
   }
 };

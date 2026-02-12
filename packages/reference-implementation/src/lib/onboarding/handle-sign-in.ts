@@ -1,5 +1,8 @@
 import type { PrismaClient } from '@/lib/prisma/generated';
 import { cloneSystemDefaults } from './clone-system-defaults';
+import { createLogger, getCorrelationId } from '@uncefact/untp-ri-services';
+
+const logger = createLogger().child({ module: 'handle-sign-in', correlationId: getCorrelationId() });
 
 interface UserProfile {
   name?: string | null;
@@ -23,16 +26,22 @@ export async function handleSignIn(
   account: AccountInfo,
   userProfile: UserProfile,
 ): Promise<void> {
-  // Look up the user's current onboarding state
+  logger.debug({ userId }, 'Handling user sign-in');
+
   const dbUser = await prisma.user.findUnique({
     where: { id: userId },
     select: { authProviderId: true, organizationId: true },
   });
 
-  if (!dbUser) return;
+  if (!dbUser) {
+    logger.warn({ userId }, 'User not found in database');
+    return;
+  }
 
-  // Fast path: already fully onboarded
-  if (dbUser.authProviderId && dbUser.organizationId) return;
+  if (dbUser.authProviderId && dbUser.organizationId) {
+    logger.debug({ userId }, 'User already fully onboarded');
+    return;
+  }
 
   const updates: Record<string, unknown> = {};
 
@@ -44,19 +53,23 @@ export async function handleSignIn(
     const baseName = userProfile.name || userProfile.email?.split('@')[0] || 'My';
     const orgName = `${baseName} Organisation`;
 
+    logger.info({ userId, orgName }, 'Creating organisation for user');
+
     const org = await prisma.organization.create({
       data: { name: orgName },
     });
     updates.organizationId = org.id;
 
-    // Clone system service instances and default DID into the new organisation
     await cloneSystemDefaults(prisma, org.id);
   }
 
   if (Object.keys(updates).length > 0) {
+    logger.info({ userId, updates: Object.keys(updates) }, 'Updating user with onboarding data');
     await prisma.user.update({
       where: { id: userId },
       data: updates,
     });
   }
+
+  logger.info({ userId }, 'User onboarding completed successfully');
 }

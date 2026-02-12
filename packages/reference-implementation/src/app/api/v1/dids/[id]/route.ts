@@ -3,6 +3,9 @@ import { NotFoundError, errorMessage } from '@/lib/api/errors';
 import { isNonEmptyString } from '@/lib/api/validation';
 import { withOrgAuth } from '@/lib/api/with-org-auth';
 import { getDidById, updateDid } from '@/lib/prisma/repositories';
+import { createLogger } from '@uncefact/untp-ri-services';
+
+const logger = createLogger().child({ module: 'api:dids:id' });
 
 /**
  * @swagger
@@ -64,7 +67,7 @@ export const GET = withOrgAuth(async (_req, { organizationId, params }) => {
     if (e instanceof NotFoundError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
     }
-    console.error('[api] Unexpected error:', e);
+    logger.error({ error: e, didId: id }, 'Unexpected error getting DID');
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
   }
 });
@@ -163,7 +166,7 @@ export const PUT = withOrgAuth(async (req, { organizationId, params }) => {
     if (e instanceof NotFoundError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
     }
-    console.error('[api] Unexpected error:', e);
+    logger.error({ error: e, didId: id }, 'Unexpected error updating DID');
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
   }
 });

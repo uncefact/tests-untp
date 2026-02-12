@@ -1,5 +1,8 @@
 import { IFetchFunction, RequestConfig } from './types/IConformityCredential.js';
 import { publicAPI } from './utils/httpService.js';
+import { createLogger } from './logging/factory.js';
+
+const logger = createLogger().child({ module: 'api.service' });
 
 /**
  * Get the JSON data from the API
@@ -23,7 +26,7 @@ export const getJsonDataFromConformityAPI: IFetchFunction = async (config: Reque
     }
     return result;
   } catch (error: any) {
-    console.error(error);
+    logger.error({ error, url, method: options.method }, 'Conformity API request failed');
     throw new Error(error.message);
   }
 };

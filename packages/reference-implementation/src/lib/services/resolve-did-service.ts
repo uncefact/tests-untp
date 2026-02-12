@@ -1,4 +1,4 @@
-import { ServiceType, AdapterType } from '@uncefact/untp-ri-services';
+import { ServiceType, AdapterType, createLogger } from '@uncefact/untp-ri-services';
 import { adapterRegistry } from '@uncefact/untp-ri-services/server';
 import type { IDidService } from '@uncefact/untp-ri-services';
 import { getEncryptionService } from '@/lib/encryption/encryption';
@@ -9,6 +9,8 @@ import {
   ConfigDecryptionError,
   ConfigValidationError,
 } from '@/lib/api/errors';
+
+const logger = createLogger().child({ module: 'resolve-did-service' });
 
 /**
  * Shape returned by resolveDidService — the resolved adapter
@@ -46,10 +48,7 @@ export async function resolveDidService(
   try {
     decryptedJson = getEncryptionService().decrypt(JSON.parse(instance.config));
   } catch (error) {
-    console.error('[resolve-did-service] Config decryption failed:', {
-      instanceId: instance.id,
-      error: error instanceof Error ? error.message : error,
-    });
+    logger.error({ error, instanceId: instance.id }, 'Config decryption failed');
     throw new ConfigDecryptionError(instance.id);
   }
 
@@ -58,10 +57,7 @@ export async function resolveDidService(
   try {
     rawConfig = JSON.parse(decryptedJson);
   } catch (error) {
-    console.error('[resolve-did-service] Config JSON parse failed:', {
-      instanceId: instance.id,
-      error: error instanceof Error ? error.message : error,
-    });
+    logger.error({ error, instanceId: instance.id }, 'Config JSON parse failed');
     throw new ConfigValidationError(instance.id, 'Invalid JSON in decrypted config');
   }
 

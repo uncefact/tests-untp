@@ -5,6 +5,8 @@ import { normaliseDidWebAlias } from '../../utils.js';
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
 import { vckitDidConfigSchema } from './vckit-did.schema.js';
 import type { VCKitDidConfig } from './vckit-did.schema.js';
+import type { LoggerService } from '../../../logging/types.js';
+import { createLogger } from '../../../logging/factory.js';
 
 /**
  * Maps a DidMethod enum value to the VCKit provider string.
@@ -24,8 +26,14 @@ export class VCKitDidAdapter implements IDidService {
   readonly baseURL: string;
   readonly headers: Record<string, string>;
   readonly keyType: 'Ed25519';
+  private logger: LoggerService;
 
-  constructor(baseURL: string, headers: Record<string, string>, keyType: 'Ed25519' = 'Ed25519') {
+  constructor(
+    baseURL: string,
+    headers: Record<string, string>,
+    keyType: 'Ed25519' = 'Ed25519',
+    logger?: LoggerService,
+  ) {
     if (!baseURL) {
       throw new Error('Error creating VCKitDidAdapter. API URL is required.');
     }
@@ -35,6 +43,7 @@ export class VCKitDidAdapter implements IDidService {
     this.baseURL = baseURL;
     this.headers = headers;
     this.keyType = keyType;
+    this.logger = logger || createLogger().child({ service: 'VCKitDidAdapter' });
   }
 
   normaliseAlias(alias: string, method: DidMethod): string {
@@ -57,6 +66,8 @@ export class VCKitDidAdapter implements IDidService {
       options: { keyType: this.keyType },
     };
 
+    this.logger.debug({ method: options.method, alias: options.alias }, 'Creating DID');
+
     try {
       const response = await fetch(`${this.baseURL}/agent/didManagerCreate`, {
         method: 'POST',
@@ -68,6 +79,7 @@ export class VCKitDidAdapter implements IDidService {
       });
 
       if (!response.ok) {
+        this.logger.error({ status: response.status, statusText: response.statusText }, 'Failed to create DID');
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -76,8 +88,10 @@ export class VCKitDidAdapter implements IDidService {
       const keyId = result.controllerKeyId ?? '';
       const document = await this.getDocument(did);
 
+      this.logger.info({ did, keyId }, 'DID created successfully');
       return { did, keyId, document };
     } catch (error) {
+      this.logger.error({ error }, 'Failed to create DID');
       if (error instanceof Error) {
         throw new Error(`Failed to create DID: ${error.message}`);
       }
@@ -92,6 +106,7 @@ export class VCKitDidAdapter implements IDidService {
 
     // Extract domain from DID for Host header (works for did:web and did:webvh)
     const domain = did.replace(/^did:[^:]+:/, '').split(':')[0];
+    this.logger.debug({ did, domain }, 'Fetching DID document');
 
     try {
       const response = await fetch(`${this.baseURL}/agent/resolveDid`, {
@@ -106,12 +121,18 @@ export class VCKitDidAdapter implements IDidService {
       });
 
       if (!response.ok) {
+        this.logger.error(
+          { status: response.status, statusText: response.statusText, did },
+          'Failed to fetch DID document',
+        );
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const result = await response.json();
+      this.logger.debug({ did }, 'DID document fetched successfully');
       return result.didDocument ?? result;
     } catch (error) {
+      this.logger.error({ error, did }, 'Failed to get DID document');
       if (error instanceof Error) {
         throw new Error(`Failed to get DID document: ${error.message}`);
       }
@@ -125,6 +146,8 @@ export class VCKitDidAdapter implements IDidService {
     }
 
     // Fetch provider keys for the key_material check
+    this.logger.debug({ did }, 'Verifying DID');
+
     let providerKeys: Array<{ kid: string }> = [];
     try {
       const response = await fetch(`${this.baseURL}/agent/didManagerGet`, {
@@ -135,14 +158,17 @@ export class VCKitDidAdapter implements IDidService {
       if (response.ok) {
         const vckitDid = await response.json();
         providerKeys = vckitDid.keys ?? [];
+        this.logger.debug({ did, keyCount: providerKeys.length }, 'Fetched provider keys');
       }
     } catch (error) {
       // If we can't fetch keys, the key_material check will still run with empty keys
-      // eslint-disable-next-line no-console
-      console.error(`Failed to fetch provider keys for DID "${did}":`, error);
+
+      this.logger.warn({ error, did }, 'Failed to fetch provider keys, continuing with empty keys');
     }
 
-    return verifyDid(did, { providerKeys });
+    const result = await verifyDid(did, { providerKeys });
+    this.logger.info({ did, verified: result.verified }, 'DID verification completed');
+    return result;
   }
 
   getSupportedTypes(): DidType[] {

@@ -1,5 +1,8 @@
 import { IStorageService, IUploadData } from './types/storage.js';
 import { publicAPI } from './utils/httpService.js';
+import { createLogger } from './logging/factory.js';
+
+const logger = createLogger().child({ module: 'storage.service' });
 
 export const storageService: IStorageService = async (config) => {
   const { url, params, options = { method: 'POST', headers: [] } } = config;
@@ -18,7 +21,7 @@ export const storageService: IStorageService = async (config) => {
 
     return result;
   } catch (error: any) {
-    console.error(error);
+    logger.error({ error, url, method: options.method }, 'Storage service request failed');
     throw new Error(error.message);
   }
 };

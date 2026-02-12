@@ -3,8 +3,16 @@ import { readFile } from 'fs/promises';
 import { NextResponse } from 'next/server';
 import path from 'path';
 
-import { decodeEnvelopedVC, issueCredentialStatus, PROOF_FORMAT, StorageRecord } from '@uncefact/untp-ri-services';
+import {
+  decodeEnvelopedVC,
+  issueCredentialStatus,
+  PROOF_FORMAT,
+  StorageRecord,
+  createLogger,
+} from '@uncefact/untp-ri-services';
 import { createCredential } from '@/lib/prisma/repositories';
+
+const logger = createLogger().child({ module: 'api:credentials' });
 
 type JSONPrimitive = string | number | boolean | null;
 type JSONValue = JSONPrimitive | JSONObject | JSONArray;
@@ -391,10 +399,12 @@ async function getConfig(): Promise<AppConfig> {
     const raw = await readFile(runtimeConfigPath, 'utf-8');
     return JSON.parse(raw) as AppConfig;
   } catch (err) {
-    console.log(
-      `Runtime config not found or failed to load from ${runtimeConfigPath}. Falling back to built-in config. Error: ${
-        err instanceof Error ? err.message : 'Unknown error'
-      }`,
+    logger.debug(
+      {
+        error: err,
+        runtimeConfigPath,
+      },
+      'Runtime config not found, falling back to built-in config',
     );
     // Fall back to built-in config
   }
