@@ -36,8 +36,20 @@ jobs:
             /usr/share/swift
           docker image prune -af
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+
+      - name: Build E2E images with layer cache
+        run: |
+          docker buildx bake -f docker-compose.e2e.yml \
+            --set "*.cache-from=type=gha" \
+            --set "*.cache-to=type=gha,mode=max" \
+            --load
+
       - name: Start E2E docker compose
-        run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d
+        run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d --no-build
 
       - name: Stop docker compose
         run: docker compose -f docker-compose.e2e.yml down
