@@ -1,0 +1,177 @@
+name: Disk Usage Audit
+
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baseline - runner disk usage before anything
+        run: |
+          echo "=== BASELINE DISK USAGE ==="
+          df -h /
+          echo ""
+          echo "=== Known large pre-installed directories ==="
+          for d in \
+            "$AGENT_TOOLSDIRECTORY" \
+            /opt/az /opt/google /opt/hostedtoolcache /opt/microsoft /opt/pipx \
+            /usr/local/.ghcup /usr/local/graalvm* /usr/local/julia* \
+            /usr/local/lib/android /usr/local/lib/heroku \
+            /usr/local/share/chromium /usr/local/share/powershell /usr/local/share/vcpkg \
+            /usr/share/az_* /usr/share/dotnet /usr/share/miniconda /usr/share/swift; do
+            sudo du -sh "$d" 2>/dev/null || true
+          done
+          echo ""
+          echo "=== Docker images pre-loaded ==="
+          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" 2>/dev/null || true
+          echo ""
+          echo "=== Docker disk usage ==="
+          docker system df 2>/dev/null || true
+
+      - name: Apply current cleanup (matches build_test.yml)
+        run: |
+          sudo rm -rf \
+            "$AGENT_TOOLSDIRECTORY" \
+            /opt/microsoft/msedge \
+            /opt/microsoft/powershell \
+            /opt/pipx \
+            /usr/local/julia* \
+            /usr/local/lib/android \
+            /usr/local/share/powershell \
+            /usr/share/dotnet \
+            /usr/share/swift
+
+      - name: After cleanup - disk usage
+        run: |
+          echo "=== AFTER CURRENT CLEANUP ==="
+          df -h /
+          echo ""
+          echo "=== Remaining large directories (depth 1, skipping proc/sys) ==="
+          for parent in /opt /usr/local /usr/share; do
+            echo "--- $parent ---"
+            sudo du -sh --max-depth=1 "$parent" 2>/dev/null | sort -rh | head -10
+          done
+          echo ""
+          echo "=== Docker images still present ==="
+          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.12.2'
+          cache: 'yarn'
+
+      - name: After node setup - disk usage
+        run: |
+          echo "=== AFTER NODE SETUP ==="
+          df -h /
+
+      - name: Install dependencies
+        run: yarn cache clean && yarn install --frozen-lockfile
+
+      - name: After yarn install - disk usage
+        run: |
+          echo "=== AFTER YARN INSTALL ==="
+          df -h /
+          echo ""
+          echo "=== node_modules size ==="
+          du -sh node_modules
+          echo ""
+          echo "=== Largest node_modules packages ==="
+          du -sh node_modules/* 2>/dev/null | sort -rh | head -20
+          echo ""
+          echo "=== Yarn cache size ==="
+          du -sh "$(yarn cache dir)" 2>/dev/null || echo "Yarn cache already cleaned"
+
+      - name: Build
+        run: yarn build
+
+      - name: After build - disk usage
+        run: |
+          echo "=== AFTER BUILD ==="
+          df -h /
+          echo ""
+          echo "=== Package build output sizes ==="
+          du -sh packages/*/build 2>/dev/null || true
+          du -sh packages/*/.next 2>/dev/null || true
+          echo ""
+          echo "=== Next.js .next breakdown ==="
+          du -sh packages/reference-implementation/.next/* 2>/dev/null | sort -rh || true
+          du -sh packages/untp-playground/.next/* 2>/dev/null | sort -rh || true
+
+      - name: Run tests with coverage
+        run: yarn test:coverage
+
+      - name: After tests - disk usage
+        run: |
+          echo "=== AFTER TESTS ==="
+          df -h /
+          echo ""
+          echo "=== Coverage output sizes ==="
+          du -sh coverage 2>/dev/null || true
+          du -sh packages/*/coverage 2>/dev/null || true
+
+      - name: Docker pull E2E images (without starting)
+        run: |
+          echo "=== Pulling E2E Docker images ==="
+          docker compose -f docker-compose.e2e.yml pull --ignore-buildable
+          echo ""
+          echo "=== After pull - disk usage ==="
+          df -h /
+          echo ""
+          echo "=== Docker images ==="
+          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" | sort -k3 -rh
+          echo ""
+          echo "=== Docker disk usage ==="
+          docker system df
+
+      - name: Build E2E Docker images (without starting)
+        run: |
+          echo "=== Building E2E Docker images ==="
+          docker compose -f docker-compose.e2e.yml build
+          echo ""
+          echo "=== After build - disk usage ==="
+          df -h /
+          echo ""
+          echo "=== Docker images ==="
+          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" | sort -k3 -rh
+          echo ""
+          echo "=== Docker disk usage ==="
+          docker system df
+
+      - name: Final summary
+        run: |
+          echo "============================================="
+          echo "           DISK USAGE AUDIT SUMMARY          "
+          echo "============================================="
+          df -h /
+          echo ""
+          echo "=== Remaining large directories ==="
+          for parent in /opt /usr/local /usr/share; do
+            echo "--- $parent ---"
+            sudo du -sh --max-depth=1 "$parent" 2>/dev/null | sort -rh | head -10
+          done
+          echo ""
+          echo "=== Docker ==="
+          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" 2>/dev/null || true
+          echo ""
+          docker system df 2>/dev/null || true
+          echo ""
+          echo "=== RECOMMENDATIONS ==="
+          echo "1. Check which 'Potential savings' directories exist and are large"
+          echo "2. Add them to the cleanup step in build_test.yml"
+          echo "3. Consider pruning Docker build cache before E2E: docker builder prune -af"
+          echo "4. Consider cleaning yarn cache after install: yarn cache clean"
+          echo "5. Consider removing node_modules/.cache before Docker steps"
+          echo "6. The root Dockerfile COPY . . copies ALL node_modules into the image"
+          echo "   - This is the biggest Docker savings opportunity"
+          echo "   - Use .dockerignore or multi-stage build with selective copy"
