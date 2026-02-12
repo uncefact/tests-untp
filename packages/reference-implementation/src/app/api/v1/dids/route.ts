@@ -6,6 +6,83 @@ import { withOrgAuth } from '@/lib/api/with-org-auth';
 import { createDid, listDids } from '@/lib/prisma/repositories';
 import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus } from '@uncefact/untp-ri-services';
 
+/**
+ * @swagger
+ * /dids:
+ *   post:
+ *     summary: Create a new DID
+ *     description: Creates a new Decentralized Identifier (DID) for the authenticated organization
+ *     tags:
+ *       - DIDs
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - type
+ *               - method
+ *               - alias
+ *             properties:
+ *               type:
+ *                 type: string
+ *                 enum: [MANAGED, SELF_MANAGED]
+ *                 description: Type of DID to create
+ *               method:
+ *                 type: string
+ *                 enum: [did:web, did:key]
+ *                 description: DID method to use
+ *               alias:
+ *                 type: string
+ *                 description: Alias for the DID (e.g., domain for did:web)
+ *               name:
+ *                 type: string
+ *                 description: Human-readable name for the DID
+ *               description:
+ *                 type: string
+ *                 description: Description of the DID's purpose
+ *               serviceInstanceId:
+ *                 type: string
+ *                 description: Optional service instance ID to use for DID creation
+ *     responses:
+ *       201:
+ *         description: DID created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *                   example: true
+ *                 did:
+ *                   $ref: '#/components/schemas/Did'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Service instance not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 export const POST = withOrgAuth(async (req, { organizationId }) => {
   let body: {
     type?: string;
@@ -84,6 +161,78 @@ export const POST = withOrgAuth(async (req, { organizationId }) => {
   }
 });
 
+/**
+ * @swagger
+ * /dids:
+ *   get:
+ *     summary: List DIDs
+ *     description: Retrieves a list of DIDs for the authenticated organization with optional filtering
+ *     tags:
+ *       - DIDs
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [MANAGED, SELF_MANAGED]
+ *         description: Filter by DID type
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [ACTIVE, UNVERIFIED, VERIFIED, REVOKED]
+ *         description: Filter by DID status
+ *       - in: query
+ *         name: serviceInstanceId
+ *         schema:
+ *           type: string
+ *         description: Filter by service instance ID
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Maximum number of DIDs to return
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *         description: Number of DIDs to skip for pagination
+ *     responses:
+ *       200:
+ *         description: List of DIDs retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *                   example: true
+ *                 dids:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Did'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 export const GET = withOrgAuth(async (req, { organizationId }) => {
   const url = new URL(req.url);
 

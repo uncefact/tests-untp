@@ -98,10 +98,46 @@ type DecodedCredential = JSONObject & {
 };
 
 /**
- * POST handler:
- * - issues credential
- * - stores credential
- * - optionally publishes it
+ * @swagger
+ * /credentials:
+ *   post:
+ *     summary: Issue a verifiable credential
+ *     description: |
+ *       Issues a new Verifiable Credential, stores it in encrypted storage,
+ *       and optionally publishes it to the Identity Resolver.
+ *     tags:
+ *       - Credentials
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CredentialIssueRequest'
+ *     responses:
+ *       200:
+ *         description: Credential issued successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CredentialIssueResponse'
+ *       400:
+ *         description: Invalid request body
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error during credential issuance
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 export async function POST(req: Request) {
   let body: IssueRequest;
