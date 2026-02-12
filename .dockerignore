@@ -30,14 +30,15 @@ logs
 aws
 .DS_Store
 .storybook
-e2e
+e2e/package.json
+e2e/yarn.lock
+e2e/node_modules
 seeding
 minio_data
 documentation
 initialisation
 local.env
 
-packages/untp-playground
 packages/untp-test-suite
 packages/untp-test-suite-mocha
 packages/vc-test-suite
