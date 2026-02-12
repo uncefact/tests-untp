@@ -28,14 +28,14 @@ jobs:
         run: |
           yarn cache clean && yarn install --frozen-lockfile
 
+      - name: Build
+        run: yarn build
+
       - name: Check formatting
         run: yarn format:check
 
       - name: Check linting
-        run: yarn build && yarn lint
-
-      - name: Build
-        run: yarn build
+        run: yarn lint
 
       - name: Run tests
         run: |
@@ -59,15 +59,21 @@ jobs:
       - name: Free up space on ubuntu runner for E2E tests
         run: |
           sudo rm -rf \
-          "$AGENT_TOOLSDIRECTORY" \
-          /opt/microsoft/msedge \
-          /opt/microsoft/powershell \
-          /opt/pipx \
-          /usr/local/julia* \
-          /usr/local/lib/android \
-          /usr/local/share/powershell \
-          /usr/share/dotnet \
-          /usr/share/swift
+            "$AGENT_TOOLSDIRECTORY" \
+            /opt/google/chrome \
+            /opt/microsoft \
+            /opt/pipx \
+            /usr/local/.ghcup \
+            /usr/local/graalvm* \
+            /usr/local/julia* \
+            /usr/local/lib/android \
+            /usr/local/share/chromium \
+            /usr/local/share/powershell \
+            /usr/local/share/vcpkg \
+            /usr/share/dotnet \
+            /usr/share/miniconda \
+            /usr/share/swift
+          docker image prune -af
 
       - name: Start E2E docker compose
         run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d
