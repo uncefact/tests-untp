@@ -1,8 +1,8 @@
 import type { PrismaClient } from '@/lib/prisma/generated';
-import { createLogger, getCorrelationId } from '@uncefact/untp-ri-services/logging';
+import { createLogger } from '@uncefact/untp-ri-services/logging';
 
 const SYSTEM_ORG_ID = 'system';
-const logger = createLogger().child({ module: 'clone-system-defaults', correlationId: getCorrelationId() });
+const logger = createLogger().child({ module: 'clone-system-defaults' });
 
 type PrismaTransactionClient = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
 
