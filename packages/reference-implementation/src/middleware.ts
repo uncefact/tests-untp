@@ -12,6 +12,7 @@ import NextAuth from 'next-auth';
 import { authConfig } from '@/lib/auth/auth.config';
 import { NextResponse, type NextRequest } from 'next/server';
 import { validateServiceAccountToken, extractBearerToken } from '@/lib/auth/token-validator';
+import { runWithCorrelationId } from '@uncefact/untp-ri-services/logging';
 
 const { auth } = NextAuth(authConfig);
 
@@ -31,27 +32,39 @@ async function validateBearerAuth(req: NextRequest): Promise<boolean> {
 }
 
 export default auth(async (req) => {
-  const { pathname } = req.nextUrl;
-  const isSessionAuthenticated = !!req.auth;
+  const correlationId =
+    req.headers.get('x-correlation-id') || req.headers.get('x-amzn-trace-id') || crypto.randomUUID();
 
-  // For API routes, check authentication
-  if (pathname.startsWith('/api/v1/')) {
-    // check session-based auth first
-    if (isSessionAuthenticated) {
-      return NextResponse.next();
+  return runWithCorrelationId(correlationId, async () => {
+    const { pathname } = req.nextUrl;
+    const isSessionAuthenticated = !!req.auth;
+
+    // For API routes, check authentication
+    if (pathname.startsWith('/api/v1/')) {
+      // check session-based auth first
+      if (isSessionAuthenticated) {
+        const response = NextResponse.next();
+        response.headers.set('x-correlation-id', correlationId);
+        return response;
+      }
+
+      // check Bearer token for service account auth
+      const isBearerAuthenticated = await validateBearerAuth(req);
+      if (isBearerAuthenticated) {
+        const response = NextResponse.next();
+        response.headers.set('x-correlation-id', correlationId);
+        return response;
+      }
+
+      // user is unauthorized
+      return NextResponse.json(
+        { error: 'Unauthorized', message: 'Authentication required' },
+        { status: 401, headers: { 'x-correlation-id': correlationId } },
+      );
     }
 
-    // check Bearer token for service account auth
-    const isBearerAuthenticated = await validateBearerAuth(req);
-    if (isBearerAuthenticated) {
-      return NextResponse.next();
-    }
-
-    // user is unauthorized
-    return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
-  }
-
-  return NextResponse.next();
+    return NextResponse.next();
+  });
 });
 
 /**

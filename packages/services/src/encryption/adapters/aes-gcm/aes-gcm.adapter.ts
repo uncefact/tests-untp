@@ -1,6 +1,8 @@
 import crypto from 'crypto';
 import { EncryptionAlgorithm, assertPermittedAlgorithm } from '../../encryption.interface.js';
 import type { EncryptedEnvelope, IEncryptionService } from '../../encryption.interface.js';
+import type { LoggerService } from '../../../logging/types.js';
+import { createLogger } from '../../../logging/factory.js';
 
 /**
  * AES-256-GCM encryption adapter.
@@ -9,16 +11,19 @@ import type { EncryptedEnvelope, IEncryptionService } from '../../encryption.int
  */
 export class AesGcmEncryptionAdapter implements IEncryptionService {
   private readonly key: Buffer;
+  private logger: LoggerService;
 
-  constructor(key: string) {
+  constructor(key: string, logger?: LoggerService) {
     if (!/^[0-9a-f]{64}$/i.test(key)) {
       throw new Error('Encryption key must be a 64-character hex string (32 bytes)');
     }
     this.key = Buffer.from(key, 'hex');
+    this.logger = logger || createLogger().child({ service: 'AesGcmEncryptionAdapter' });
   }
 
   encrypt(plaintext: string, algorithm: EncryptionAlgorithm): EncryptedEnvelope {
     assertPermittedAlgorithm(algorithm);
+    this.logger.debug({ algorithm, plaintextLength: plaintext.length }, 'Encrypting data');
 
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv(algorithm, this.key, iv);
@@ -26,6 +31,8 @@ export class AesGcmEncryptionAdapter implements IEncryptionService {
     const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
 
     const authTag = cipher.getAuthTag();
+
+    this.logger.debug({ algorithm, cipherTextLength: encrypted.length }, 'Data encrypted successfully');
 
     return {
       cipherText: encrypted.toString('base64'),
@@ -37,6 +44,7 @@ export class AesGcmEncryptionAdapter implements IEncryptionService {
 
   decrypt(envelope: EncryptedEnvelope): string {
     assertPermittedAlgorithm(envelope.type);
+    this.logger.debug({ algorithm: envelope.type }, 'Decrypting data');
 
     const { cipherText, iv: ivB64, tag: tagB64, type } = envelope;
 
@@ -48,6 +56,8 @@ export class AesGcmEncryptionAdapter implements IEncryptionService {
     decipher.setAuthTag(authTag);
 
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+
+    this.logger.debug({ algorithm: envelope.type, decryptedLength: decrypted.length }, 'Data decrypted successfully');
 
     return decrypted.toString('utf8');
   }

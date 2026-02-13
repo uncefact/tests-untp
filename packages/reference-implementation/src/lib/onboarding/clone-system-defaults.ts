@@ -1,6 +1,8 @@
 import type { PrismaClient } from '@/lib/prisma/generated';
+import { createLogger } from '@uncefact/untp-ri-services/logging';
 
 const SYSTEM_ORG_ID = 'system';
+const logger = createLogger().child({ module: 'clone-system-defaults' });
 
 type PrismaTransactionClient = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
 
@@ -20,20 +22,25 @@ export async function cloneSystemDefaults(prisma: PrismaClient, organisationId: 
 }
 
 async function cloneWithinTransaction(tx: TransactionalPrisma, organisationId: string): Promise<string> {
-  // Fetch all system service instances
+  logger.debug({ organisationId }, 'Cloning system defaults for organisation');
+
   const systemInstances = await tx.serviceInstance.findMany({
     where: { organizationId: SYSTEM_ORG_ID },
   });
 
-  // Fetch the system default DID
   const systemDefaultDid = await tx.did.findFirst({
     where: { organizationId: SYSTEM_ORG_ID, isDefault: true },
   });
 
-  // Nothing to clone — early return
   if (systemInstances.length === 0 && !systemDefaultDid) {
+    logger.debug({ organisationId }, 'No system defaults to clone');
     return organisationId;
   }
+
+  logger.info(
+    { organisationId, instanceCount: systemInstances.length, hasDid: !!systemDefaultDid },
+    'Starting clone process',
+  );
 
   // Clone each service instance, keeping a mapping from old ID to new ID
   // so we can re-link the DID correctly.
@@ -55,11 +62,9 @@ async function cloneWithinTransaction(tx: TransactionalPrisma, organisationId: s
     instanceIdMap.set(instance.id, cloned.id);
   }
 
-  // Clone the default DID, linking it to the cloned service instance
   if (systemDefaultDid) {
     const clonedDid = `${systemDefaultDid.did}:org:${organisationId}`;
 
-    // Skip if already cloned (idempotent on retry)
     const existing = await tx.did.findFirst({
       where: { did: clonedDid, organizationId: organisationId },
     });
@@ -83,8 +88,12 @@ async function cloneWithinTransaction(tx: TransactionalPrisma, organisationId: s
           serviceInstanceId: clonedServiceInstanceId,
         },
       });
+      logger.info({ organisationId, did: clonedDid }, 'Cloned default DID');
+    } else {
+      logger.debug({ organisationId, did: clonedDid }, 'DID already exists, skipping clone');
     }
   }
 
+  logger.info({ organisationId }, 'System defaults cloned successfully');
   return organisationId;
 }

@@ -9,8 +9,10 @@ import {
   AdapterType as PrismaAdapterType,
 } from '../src/lib/prisma/generated';
 import { AesGcmEncryptionAdapter } from '@uncefact/untp-ri-services/server';
-import { EncryptionAlgorithm } from '@uncefact/untp-ri-services';
+import { EncryptionAlgorithm, createLogger } from '@uncefact/untp-ri-services';
 import { getDidConfig } from '../src/lib/config/did.config';
+
+const logger = createLogger().child({ module: 'prisma-seed' });
 
 // Load .env before accessing config (seed runs outside Next.js)
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
@@ -97,12 +99,12 @@ async function main() {
     data: { serviceInstanceId: systemDidInstance.id },
   });
 
-  console.log('Seed complete: system organisation, default DID, and DID service instance upserted');
+  logger.info('Seed complete: system organisation, default DID, and DID service instance upserted');
 }
 
 main()
   .catch((e) => {
-    console.error('Seed failed:', e);
+    logger.error({ error: e }, 'Seed failed');
     process.exit(1);
   })
   .finally(async () => {

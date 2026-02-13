@@ -27,6 +27,9 @@ jest.mock('@/lib/prisma/repositories', () => ({
 jest.mock('@uncefact/untp-ri-services', () => ({
   ServiceType: { DID: 'DID' },
   AdapterType: { VCKIT: 'VCKIT' },
+  createLogger: () => ({
+    child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }),
+  }),
 }));
 
 // Mock the server entrypoint (runtime registry)
