@@ -69,9 +69,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
-# Copy modules required by prisma/seed.ts (imports via relative paths)
+# Copy modules required by prisma/seed.ts
+# Relative imports (../src/lib/...)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/prisma/generated ./src/lib/prisma/generated
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/config ./src/lib/config
+# @uncefact/untp-ri-services (workspace symlink in node_modules points here)
+COPY --from=builder --chown=nextjs:nodejs /app/packages/services/build ./packages/services/build
+COPY --from=builder --chown=nextjs:nodejs /app/packages/services/package.json ./packages/services/package.json
 
 # Copy built-in config files for fallback (when no runtime config is mounted)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/constants/app-config*.json ./src/constants/
