@@ -23,9 +23,9 @@ jobs:
         with:
           node-version: '20.12.2'
 
-      - name: Cache node_modules
+      - name: Restore node_modules cache
         id: cache-modules
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             node_modules
@@ -35,6 +35,15 @@ jobs:
       - name: Install dependencies
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
+
+      - name: Save node_modules cache
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
       - name: Build
         run: yarn build
@@ -47,9 +56,16 @@ jobs:
 
       - name: Run tests
         run: |
-          lerna exec -- yarn jest --coverage --changedSince=origin/next && rm -rf coverage && istanbul-merge --out coverage/coverage-final.json packages/*/coverage/coverage-final.json && nyc report --temp-dir=./coverage --reporter=html --reporter=json-summary
+          export PATH="$PWD/node_modules/.bin:$PATH"
+          lerna exec -- yarn jest --coverage --changedSince=origin/next
+          rm -rf coverage
+          if ls packages/*/coverage/coverage-final.json 1>/dev/null 2>&1; then
+            istanbul-merge --out coverage/coverage-final.json packages/*/coverage/coverage-final.json
+            nyc report --temp-dir=./coverage --reporter=html --reporter=json-summary
+          fi
 
       - name: Jest Coverage Comment
+        if: always()
         uses: MishaKav/jest-coverage-comment@main
         with:
           title: Code Coverage Report
