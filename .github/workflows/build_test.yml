@@ -6,7 +6,29 @@ on:
       - next
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.filter.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            packages:
+              - 'packages/**'
+              - 'package.json'
+              - 'yarn.lock'
+              - 'tsconfig*.json'
+              - '.github/workflows/build_test.yml'
+              - '.github/workflows/package.yml'
+              - 'docker-compose*.yml'
+              - 'Dockerfile'
+
   test_and_build:
+    needs: changes
+    if: ${{ needs.changes.outputs.packages == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
