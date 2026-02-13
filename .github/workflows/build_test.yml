@@ -148,10 +148,23 @@ jobs:
       - name: Start E2E docker compose
         run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d --no-build
 
+      - name: Wait for app container and dump logs
+        run: |
+          echo "--- Waiting 30s for containers to initialise ---"
+          sleep 30
+          echo "--- App container logs ---"
+          docker compose -f docker-compose.e2e.yml logs app
+          echo "--- Container status ---"
+          docker compose -f docker-compose.e2e.yml ps
+
       - name: Run E2E tests
         run: yarn test:run-cypress
         env:
           NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module' # See issue https://github.com/cypress-io/github-action/issues/1408
+
+      - name: Dump E2E container logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.e2e.yml logs app
 
       - name: Stop docker compose
         run: docker compose -f docker-compose.e2e.yml down
