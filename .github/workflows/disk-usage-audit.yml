@@ -3,6 +3,9 @@ name: Disk Usage Audit
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   audit:
     runs-on: ubuntu-latest
@@ -33,14 +36,19 @@ jobs:
         run: |
           sudo rm -rf \
             "$AGENT_TOOLSDIRECTORY" \
-            /opt/microsoft/msedge \
-            /opt/microsoft/powershell \
+            /opt/microsoft \
             /opt/pipx \
+            /usr/local/.ghcup \
+            /usr/local/graalvm* \
             /usr/local/julia* \
             /usr/local/lib/android \
+            /usr/local/share/chromium \
             /usr/local/share/powershell \
+            /usr/local/share/vcpkg \
             /usr/share/dotnet \
+            /usr/share/miniconda \
             /usr/share/swift
+          docker image prune -af
 
       - name: After cleanup - disk usage
         run: |
@@ -68,15 +76,35 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '20.12.2'
-          cache: 'yarn'
 
       - name: After node setup - disk usage
         run: |
           echo "=== AFTER NODE SETUP ==="
           df -h /
 
+      - name: Restore node_modules cache
+        id: cache-modules
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+            ~/.cache/Cypress
+          key: node-modules-v2-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+
       - name: Install dependencies
-        run: yarn cache clean && yarn install --frozen-lockfile
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+
+      - name: Save node_modules cache
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+            ~/.cache/Cypress
+          key: node-modules-v2-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
       - name: After yarn install - disk usage
         run: |
@@ -88,12 +116,41 @@ jobs:
           echo ""
           echo "=== Largest node_modules packages ==="
           du -sh node_modules/* 2>/dev/null | sort -rh | head -20
-          echo ""
-          echo "=== Yarn cache size ==="
-          du -sh "$(yarn cache dir)" 2>/dev/null || echo "Yarn cache already cleaned"
+
+      - name: Restore RI build cache
+        id: cache-ri
+        uses: actions/cache/restore@v4
+        with:
+          path: packages/reference-implementation/.next/cache
+          key: ri-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/reference-implementation/src/**', 'packages/components/src/**', 'packages/services/src/**') }}
+          restore-keys: |
+            ri-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-
+
+      - name: Restore Playground build cache
+        id: cache-playground
+        uses: actions/cache/restore@v4
+        with:
+          path: packages/untp-playground/.next/cache
+          key: playground-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/untp-playground/src/**') }}
+          restore-keys: |
+            playground-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-
 
       - name: Build
         run: yarn build
+
+      - name: Save RI build cache
+        if: steps.cache-ri.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: packages/reference-implementation/.next/cache
+          key: ri-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/reference-implementation/src/**', 'packages/components/src/**', 'packages/services/src/**') }}
+
+      - name: Save Playground build cache
+        if: steps.cache-playground.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: packages/untp-playground/.next/cache
+          key: playground-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/untp-playground/src/**') }}
 
       - name: After build - disk usage
         run: |
@@ -134,12 +191,23 @@ jobs:
           echo "=== Docker disk usage ==="
           docker system df
 
-      - name: Build E2E Docker images (without starting)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+
+      - name: Build E2E Docker images (with layer cache)
+        uses: docker/bake-action@v5
+        with:
+          files: docker-compose.e2e.yml
+          load: true
+          set: |
+            *.cache-from=type=gha
+            *.cache-to=type=gha,mode=max
+
+      - name: After Docker build - disk usage
         run: |
-          echo "=== Building E2E Docker images ==="
-          docker compose -f docker-compose.e2e.yml build
-          echo ""
-          echo "=== After build - disk usage ==="
+          echo "=== After Docker build - disk usage ==="
           df -h /
           echo ""
           echo "=== Docker images ==="
