@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       packages: ${{ steps.filter.outputs.packages }}
+      documentation: ${{ steps.filter.outputs.documentation }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -29,6 +30,9 @@ jobs:
               - '.github/workflows/package.yml'
               - 'docker-compose*.yml'
               - 'Dockerfile'
+            documentation:
+              - 'documentation/**'
+              - '.github/workflows/buld_publish_docs.yml'
 
   test_and_build:
     needs: changes
@@ -107,6 +111,8 @@ jobs:
         run: docker compose -f docker-compose.e2e.yml down
 
   build_docs:
+    needs: changes
+    if: ${{ needs.changes.outputs.documentation == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
