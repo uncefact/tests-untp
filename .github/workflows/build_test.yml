@@ -39,7 +39,7 @@ jobs:
 
       - name: Run tests
         run: |
-          yarn test:coverage
+          lerna exec -- yarn jest --coverage --changedSince=origin/next && rm -rf coverage && istanbul-merge --out coverage/coverage-final.json packages/*/coverage/coverage-final.json && nyc report --temp-dir=./coverage --reporter=html --reporter=json-summary
 
       - name: Jest Coverage Comment
         uses: MishaKav/jest-coverage-comment@main
@@ -81,11 +81,13 @@ jobs:
           driver: docker-container
 
       - name: Build E2E images with layer cache
-        run: |
-          docker buildx bake -f docker-compose.e2e.yml \
-            --set "*.cache-from=type=gha" \
-            --set "*.cache-to=type=gha,mode=max" \
-            --load
+        uses: docker/bake-action@v5
+        with:
+          files: docker-compose.e2e.yml
+          load: true
+          set: |
+            *.cache-from=type=gha
+            *.cache-to=type=gha,mode=max
 
       - name: Start E2E docker compose
         run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d --no-build
