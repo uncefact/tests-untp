@@ -5,9 +5,45 @@ on:
     branches:
       - next
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
-  test_and_build:
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.filter.outputs.packages }}
+      documentation: ${{ steps.filter.outputs.documentation }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            packages:
+              - 'packages/**'
+              - 'package.json'
+              - 'yarn.lock'
+              - 'tsconfig*.json'
+              - '.github/workflows/build_test.yml'
+              - '.github/workflows/package.yml'
+              - 'docker-compose*.yml'
+              - 'Dockerfile'
+            documentation:
+              - 'documentation/**'
+              - '.github/workflows/buld_publish_docs.yml'
+
+  test_and_build:
+    needs: changes
+    if: ${{ needs.changes.outputs.packages == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -170,6 +206,8 @@ jobs:
         run: docker compose -f docker-compose.e2e.yml down
 
   build_docs:
+    needs: changes
+    if: ${{ needs.changes.outputs.documentation == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
