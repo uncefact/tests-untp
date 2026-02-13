@@ -85,7 +85,8 @@ ENV PORT=3003
 ENV HOSTNAME="0.0.0.0"
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
+CMD ["node", "server.js"]
 
-# ---- E2E target (runs migrations + seed + server) ----
+# ---- E2E target (runs seed before server; migrations already handled by entrypoint) ----
 FROM build AS development
-CMD ["sh", "-c", "cd /app/prisma && node /app/node_modules/prisma/build/index.js migrate deploy --config=prisma.config.ts && node /app/node_modules/prisma/build/index.js db seed --config=prisma.config.ts && cd /app && node server.js"]
+CMD ["sh", "-c", "cd /app/prisma && node /app/node_modules/prisma/build/index.js db seed --config=prisma.config.ts && cd /app && node server.js"]

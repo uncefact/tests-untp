@@ -47,8 +47,40 @@ jobs:
             ~/.cache/Cypress
           key: node-modules-v2-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
+      - name: Restore RI build cache
+        id: cache-ri
+        uses: actions/cache/restore@v4
+        with:
+          path: packages/reference-implementation/.next/cache
+          key: ri-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/reference-implementation/src/**', 'packages/components/src/**', 'packages/services/src/**') }}
+          restore-keys: |
+            ri-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-
+
+      - name: Restore Playground build cache
+        id: cache-playground
+        uses: actions/cache/restore@v4
+        with:
+          path: packages/untp-playground/.next/cache
+          key: playground-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/untp-playground/src/**') }}
+          restore-keys: |
+            playground-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-
+
       - name: Build
         run: yarn build
+
+      - name: Save RI build cache
+        if: steps.cache-ri.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: packages/reference-implementation/.next/cache
+          key: ri-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/reference-implementation/src/**', 'packages/components/src/**', 'packages/services/src/**') }}
+
+      - name: Save Playground build cache
+        if: steps.cache-playground.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: packages/untp-playground/.next/cache
+          key: playground-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/untp-playground/src/**') }}
 
       - name: Check formatting
         run: yarn format:check

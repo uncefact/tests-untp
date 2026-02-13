@@ -23,7 +23,7 @@ else
     echo "Skipping database migrations (SKIP_MIGRATIONS is set)"
 fi
 
-# Start the application
-echo "Starting Next.js server..."
+# Execute the CMD (defaults to "node server.js" in production,
+# overridden by docker-compose for E2E to include seeding)
 cd /app
-exec node server.js
+exec "$@"
