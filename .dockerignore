@@ -9,6 +9,7 @@ docker-compose.e2e.yml
 **/*.spec.*
 **/coverage
 **/build
+**/.next
 **/tsconfig.tsbuildinfo
 .git
 .gitignore

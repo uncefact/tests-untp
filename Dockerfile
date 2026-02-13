@@ -46,7 +46,7 @@ WORKDIR /app/packages/components
 RUN yarn run build
 
 WORKDIR /app/packages/reference-implementation
-RUN --mount=type=cache,target=/app/packages/reference-implementation/.next/cache yarn run build
+RUN yarn run build
 
 # ---- Runtime ----
 # "build" target: used by package.yml for published image
