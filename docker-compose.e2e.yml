@@ -1,5 +1,6 @@
 services:
   untp-playground:
+    image: untp-playground:e2e
     build:
       context: .
       dockerfile: packages/untp-playground/Dockerfile
@@ -146,6 +147,7 @@ services:
       - mock-global-gs1-resolver
 
   app:
+    image: app:e2e
     build:
       context: .
       dockerfile: Dockerfile
