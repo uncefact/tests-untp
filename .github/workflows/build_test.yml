@@ -22,11 +22,19 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '20.12.2'
-          cache: 'yarn'
+
+      - name: Cache node_modules
+        id: cache-modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
       - name: Install dependencies
-        run: |
-          yarn cache clean && yarn install --frozen-lockfile
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
 
       - name: Build
         run: yarn build
