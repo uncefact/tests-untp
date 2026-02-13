@@ -30,7 +30,8 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+            ~/.cache/Cypress
+          key: node-modules-v2-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
       - name: Install dependencies
         if: steps.cache-modules.outputs.cache-hit != 'true'
@@ -43,7 +44,8 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+            ~/.cache/Cypress
+          key: node-modules-v2-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
       - name: Build
         run: yarn build
@@ -65,7 +67,6 @@ jobs:
           fi
 
       - name: Jest Coverage Comment
-        if: always()
         uses: MishaKav/jest-coverage-comment@main
         with:
           title: Code Coverage Report

@@ -36,9 +36,6 @@ ARG CONFIG_FILE=./app-config.json
 COPY ${CONFIG_FILE} ./packages/reference-implementation/src/constants/app-config.json
 COPY ${CONFIG_FILE} ./packages/components/src/constants/app-config.json
 
-# Recreate workspace symlinks after copying source files
-RUN yarn install --frozen-lockfile
-
 # Build workspace dependencies in order: services -> components -> reference-implementation
 WORKDIR /app/packages/services
 RUN yarn run build
