@@ -32,14 +32,35 @@ jobs:
         run: |
           yarn cache clean && yarn install --immutable
 
-      - name: Check linting
-        run: yarn build && yarn lint
-
       - name: Build
         run: yarn build
 
+      - name: Check linting
+        run: yarn lint
+
       - name: Run tests
         run: yarn test
+
+      # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
+      # https://github.com/uncefact/tests-untp/issues/410
+      - name: Free up space on ubuntu runner for E2E tests
+        run: |
+          sudo rm -rf \
+            "$AGENT_TOOLSDIRECTORY" \
+            /opt/google/chrome \
+            /opt/microsoft \
+            /opt/pipx \
+            /usr/local/.ghcup \
+            /usr/local/graalvm* \
+            /usr/local/julia* \
+            /usr/local/lib/android \
+            /usr/local/share/chromium \
+            /usr/local/share/powershell \
+            /usr/local/share/vcpkg \
+            /usr/share/dotnet \
+            /usr/share/miniconda \
+            /usr/share/swift
+          docker image prune -af
 
       - name: Start E2E docker compose
         run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d
