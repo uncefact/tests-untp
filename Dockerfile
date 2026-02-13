@@ -37,6 +37,8 @@ COPY ${CONFIG_FILE} ./packages/reference-implementation/src/constants/app-config
 COPY ${CONFIG_FILE} ./packages/components/src/constants/app-config.json
 
 # Build workspace dependencies in order: services -> components -> reference-implementation
+# Cache mounts persist the Next.js build cache across Docker builds so only
+# changed modules are recompiled, even when source COPY layers invalidate.
 WORKDIR /app/packages/services
 RUN yarn run build
 
@@ -44,7 +46,7 @@ WORKDIR /app/packages/components
 RUN yarn run build
 
 WORKDIR /app/packages/reference-implementation
-RUN yarn run build
+RUN --mount=type=cache,target=/app/packages/reference-implementation/.next/cache yarn run build
 
 # ---- Runtime ----
 # "build" target: used by package.yml for published image
@@ -66,6 +68,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 # Copy prisma files and node_modules for running migrations and seeding at runtime
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+
+# Copy modules required by prisma/seed.ts (imports via relative paths)
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/prisma/generated ./src/lib/prisma/generated
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/config ./src/lib/config
 
 # Copy built-in config files for fallback (when no runtime config is mounted)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/constants/app-config*.json ./src/constants/
@@ -89,4 +95,4 @@ CMD ["node", "server.js"]
 
 # ---- E2E target (runs seed before server; migrations already handled by entrypoint) ----
 FROM build AS development
-CMD ["sh", "-c", "cd /app/prisma && node /app/node_modules/prisma/build/index.js db seed --config=prisma.config.ts && cd /app && node server.js"]
+CMD ["sh", "-c", "cd /app/prisma && npx tsx seed.ts && cd /app && node server.js"]
