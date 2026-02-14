@@ -9,8 +9,8 @@
 
 // DID adapter + verification (jsonld depends on rdf-canonize-native)
 export { VCKitDidAdapter } from './did-manager/adapters/vckit/vckit-did.adapter.js';
-export { verifyDid } from './did-manager/verify.js';
-export type { VerifyDidOptions } from './did-manager/verify.js';
+export { verifyDid } from './did-manager/common/verify.js';
+export type { VerifyDidOptions } from './did-manager/common/verify.js';
 
 // Encryption adapter (re-exported here for backwards compatibility)
 export { AesGcmEncryptionAdapter } from './encryption/adapters/aes-gcm/aes-gcm.adapter.js';

@@ -1,7 +1,7 @@
 import type { IDidService, CreateDidOptions, DidRecord, DidDocument, DidVerificationResult } from '../../types.js';
 import { DidMethod, DidType } from '../../types.js';
-import { verifyDid } from '../../verify.js';
-import { normaliseDidWebAlias } from '../../utils.js';
+import { verifyDid } from '../../common/verify.js';
+import { normaliseDidWebAlias } from '../../common/utils.js';
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
 import { vckitDidConfigSchema } from './vckit-did.schema.js';
 import type { VCKitDidConfig } from './vckit-did.schema.js';

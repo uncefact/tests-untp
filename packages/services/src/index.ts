@@ -27,7 +27,7 @@ export type {
 } from './interfaces/verifiableCredentialService.js';
 export * from './did-manager/types.js';
 export { didDocumentSchema, verificationMethodSchema } from './did-manager/schemas.js';
-export { didWebToUrl, parseDidMethod, normaliseDidWebAlias } from './did-manager/utils.js';
+export { didWebToUrl, parseDidMethod, normaliseDidWebAlias } from './did-manager/common/utils.js';
 // Encryption
 export { AesGcmEncryptionAdapter } from './encryption/adapters/aes-gcm/aes-gcm.adapter.js';
 export { EncryptionAlgorithm, assertPermittedAlgorithm } from './encryption/encryption.interface.js';
@@ -53,6 +53,15 @@ export type { VCKitDidConfig } from './did-manager/adapters/vckit/vckit-did.sche
 
 // Service errors
 export { ServiceError } from './errors.js';
+export {
+  DidError,
+  DidConfigError,
+  DidMethodNotSupportedError,
+  DidInputError,
+  DidCreateError,
+  DidDocumentFetchError,
+  DidParseError,
+} from './did-manager/errors.js';
 
 // IDR service types and constants
 export type { ResolverDescription, LinkType, PublishLinksOptions } from './interfaces/identityResolverService.js';

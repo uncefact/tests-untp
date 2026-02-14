@@ -1,10 +1,10 @@
 import { VCKitDidAdapter, vckitDidRegistryEntry } from './vckit-did.adapter';
 import { vckitDidConfigSchema } from './vckit-did.schema';
 import { DidMethod, DidType } from '../../types';
-import { verifyDid } from '../../verify';
+import { verifyDid } from '../../common/verify';
 import type { LoggerService } from '../../../logging/types';
 
-jest.mock('../../verify.js', () => ({
+jest.mock('../../common/verify.js', () => ({
   verifyDid: jest.fn(),
 }));
 
