@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { errorMessage } from '@/lib/api/errors';
 import { ValidationError, isNonEmptyString, validateEnum } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createDid } from '@/lib/prisma/repositories';
@@ -81,41 +80,33 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
+    throw new ValidationError('Invalid JSON body');
   }
 
-  try {
-    if (!isNonEmptyString(body.did)) {
-      throw new ValidationError('did is required');
-    }
-    if (!isNonEmptyString(body.keyId)) {
-      throw new ValidationError('keyId is required');
-    }
-
-    const method = validateEnum(body.method, Object.values(DidMethod), 'method');
-    if (!method) {
-      throw new ValidationError('method is required');
-    }
-
-    // Import: register locally without calling adapter create
-    const record = await createDid({
-      tenantId,
-      did: body.did,
-      type: 'SELF_MANAGED',
-      method,
-      keyId: body.keyId,
-      name: body.name ?? body.did,
-      description: body.description,
-      status: 'UNVERIFIED',
-      serviceInstanceId: body.serviceInstanceId,
-    });
-
-    return NextResponse.json({ ok: true, did: record }, { status: 201 });
-  } catch (e: unknown) {
-    if (e instanceof ValidationError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
+  if (!isNonEmptyString(body.did)) {
+    throw new ValidationError('did is required');
   }
+  if (!isNonEmptyString(body.keyId)) {
+    throw new ValidationError('keyId is required');
+  }
+
+  const method = validateEnum(body.method, Object.values(DidMethod), 'method');
+  if (!method) {
+    throw new ValidationError('method is required');
+  }
+
+  // Import: register locally without calling adapter create
+  const record = await createDid({
+    tenantId,
+    did: body.did,
+    type: 'SELF_MANAGED',
+    method,
+    keyId: body.keyId,
+    name: body.name ?? body.did,
+    description: body.description,
+    status: 'UNVERIFIED',
+    serviceInstanceId: body.serviceInstanceId,
+  });
+
+  return NextResponse.json({ ok: true, did: record }, { status: 201 });
 });

@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError, errorMessage } from '@/lib/api/errors';
-import { isNonEmptyString } from '@/lib/api/validation';
+import { NotFoundError } from '@/lib/api/errors';
+import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDidById, updateDid } from '@/lib/prisma/repositories';
-import { createLogger } from '@uncefact/untp-ri-services';
-
-const logger = createLogger().child({ module: 'api:dids:id' });
 
 /**
  * @swagger
@@ -56,20 +53,11 @@ const logger = createLogger().child({ module: 'api:dids:id' });
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-
-  try {
-    const did = await getDidById(id, tenantId);
-    if (!did) {
-      throw new NotFoundError('DID not found');
-    }
-    return NextResponse.json({ ok: true, did });
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    logger.error({ error: e, didId: id }, 'Unexpected error getting DID');
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
+  const did = await getDidById(id, tenantId);
+  if (!did) {
+    throw new NotFoundError('DID not found');
   }
+  return NextResponse.json({ ok: true, did });
 });
 
 /**
@@ -146,27 +134,19 @@ export const PUT = withTenantAuth(async (req, { tenantId, params }) => {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
+    throw new ValidationError('Invalid JSON body');
   }
 
   const hasName = isNonEmptyString(body.name);
   const hasDescription = isNonEmptyString(body.description);
 
   if (!hasName && !hasDescription) {
-    return NextResponse.json({ ok: false, error: 'At least one of name or description is required' }, { status: 400 });
+    throw new ValidationError('At least one of name or description is required');
   }
 
-  try {
-    const updated = await updateDid(id, tenantId, {
-      ...(hasName && { name: body.name }),
-      ...(hasDescription && { description: body.description }),
-    });
-    return NextResponse.json({ ok: true, did: updated });
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    logger.error({ error: e, didId: id }, 'Unexpected error updating DID');
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
-  }
+  const updated = await updateDid(id, tenantId, {
+    ...(hasName && { name: body.name }),
+    ...(hasDescription && { description: body.description }),
+  });
+  return NextResponse.json({ ok: true, did: updated });
 });

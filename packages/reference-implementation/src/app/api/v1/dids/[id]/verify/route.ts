@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { resolveDidService } from '@/lib/services/resolve-did-service';
-import { NotFoundError, ServiceRegistryError, errorMessage } from '@/lib/api/errors';
+import { NotFoundError } from '@/lib/api/errors';
 import { DidStatus } from '@uncefact/untp-ri-services';
-import { createLogger } from '@uncefact/untp-ri-services/logging';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDidById, updateDidStatus } from '@/lib/prisma/repositories';
 
@@ -58,32 +57,19 @@ import { getDidById, updateDidStatus } from '@/lib/prisma/repositories';
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-const logger = createLogger().child({ module: 'api:dids:verify' });
 export const POST = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  try {
-    const did = await getDidById(id, tenantId);
-    if (!did) {
-      throw new NotFoundError('DID not found');
-    }
-
-    const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId ?? undefined);
-    const verification = await didService.verify(did.did);
-
-    const newStatus = verification.verified ? DidStatus.VERIFIED : DidStatus.UNVERIFIED;
-    const updatedDid = await updateDidStatus(id, tenantId, newStatus);
-
-    return NextResponse.json({ ok: true, verification, did: updatedDid });
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    if (e instanceof ServiceRegistryError) {
-      const status = e.name === 'ServiceInstanceNotFoundError' ? 404 : 500;
-      return NextResponse.json({ ok: false, error: e.message }, { status });
-    }
-    logger.error({ error: e, didId: id }, 'Unexpected error verifying DID');
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
+  const did = await getDidById(id, tenantId);
+  if (!did) {
+    throw new NotFoundError('DID not found');
   }
+
+  const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId ?? undefined);
+  const verification = await didService.verify(did.did);
+
+  const newStatus = verification.verified ? DidStatus.VERIFIED : DidStatus.UNVERIFIED;
+  const updatedDid = await updateDidStatus(id, tenantId, newStatus);
+
+  return NextResponse.json({ ok: true, verification, did: updatedDid });
 });

@@ -8,10 +8,34 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withTenantAuth as passthrough
-jest.mock('@/lib/api/with-tenant-auth', () => ({
-  withTenantAuth: (handler: (...args: unknown[]) => unknown) => handler,
-}));
+// Mock withTenantAuth to mirror handleRouteError behaviour
+jest.mock('@/lib/api/with-tenant-auth', () => {
+  const { NotFoundError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
+  const { ValidationError } = jest.requireActual('@/lib/api/validation');
+
+  function jsonResponse(body: unknown, init?: { status?: number }) {
+    return { status: init?.status ?? 200, json: async () => body };
+  }
+
+  return {
+    withTenantAuth: (handler: Function) => async (req: any, ctx: any) => {
+      try {
+        return await handler(req, ctx);
+      } catch (e: unknown) {
+        if (e instanceof ValidationError) {
+          return jsonResponse({ ok: false, error: (e as Error).message }, { status: 400 });
+        }
+        if (e instanceof NotFoundError) {
+          return jsonResponse({ ok: false, error: (e as Error).message }, { status: 404 });
+        }
+        if (e instanceof ServiceRegistryError) {
+          return jsonResponse({ ok: false, error: (e as Error).message }, { status: 500 });
+        }
+        return jsonResponse({ ok: false, error: errorMessage(e) }, { status: 500 });
+      }
+    },
+  };
+});
 
 const mockGetDidById = jest.fn();
 const mockUpdateDid = jest.fn();
