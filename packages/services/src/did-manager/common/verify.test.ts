@@ -1,5 +1,6 @@
 import { verifyDid } from './verify';
 import { DidVerificationCheckName } from '../types';
+import { DidInputError, DidMethodNotSupportedError } from '../errors';
 import * as jsonld from 'jsonld';
 
 jest.mock('jsonld', () => ({
@@ -139,8 +140,8 @@ describe('verifyDid', () => {
     expect(resolveCheck?.message).toContain('Resolution failed');
   });
 
-  it('throws if DID string is empty', async () => {
-    await expect(verifyDid('', { providerKeys: [] })).rejects.toThrow('DID string is required');
+  it('throws DidInputError if DID string is empty', async () => {
+    await expect(verifyDid('', { providerKeys: [] })).rejects.toThrow(DidInputError);
   });
 
   it('fails HTTPS check when resolution fails (no response to inspect)', async () => {
@@ -191,9 +192,9 @@ describe('verifyDid', () => {
     expect(keyCheck?.message).toBe('No matching keys found in DID document');
   });
 
-  it('throws for unsupported DID method', async () => {
+  it('throws DidMethodNotSupportedError for unsupported DID method', async () => {
     await expect(
       verifyDid('did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK', { providerKeys: [] }),
-    ).rejects.toThrow('Unsupported DID method: key');
+    ).rejects.toThrow(DidMethodNotSupportedError);
   });
 });

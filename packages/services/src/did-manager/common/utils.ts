@@ -3,6 +3,7 @@
  */
 
 import { DID_METHOD_BY_URI } from '../types.js';
+import { DidParseError, DidMethodNotSupportedError, DidInputError } from '../errors.js';
 
 /**
  * Converts a did:web or did:webvh identifier to its HTTPS resolution URL.
@@ -25,7 +26,7 @@ export function didWebToUrl(did: string): string {
     method = 'web';
     rest = did.slice('did:web:'.length);
   } else {
-    throw new Error(`Unsupported DID method for URL conversion: ${did}`);
+    throw new DidParseError(did, 'unsupported DID method for URL conversion');
   }
 
   const filename = method === 'webvh' ? 'did.jsonl' : 'did.json';
@@ -47,11 +48,11 @@ export function didWebToUrl(did: string): string {
 export function parseDidMethod(did: string): string {
   const match = did.match(/^did:([a-z0-9]+):.+/);
   if (!match) {
-    throw new Error(`Invalid DID string: ${did}`);
+    throw new DidParseError(did, 'invalid format — expected did:<method>:<identifier>');
   }
   const method = match[1];
   if (!(method in DID_METHOD_BY_URI)) {
-    throw new Error(`Unsupported DID method: ${method}`);
+    throw new DidMethodNotSupportedError(method);
   }
   return method;
 }
@@ -75,7 +76,7 @@ export function normaliseDidWebAlias(alias: string): string {
     .replace(/^-|-$/g, '');
 
   if (!normalised) {
-    throw new Error(`Invalid DID alias: "${alias}" produces an empty identifier after normalisation`);
+    throw new DidInputError(`alias "${alias}" produces an empty identifier after normalisation`);
   }
 
   return normalised;

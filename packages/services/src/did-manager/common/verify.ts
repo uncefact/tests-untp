@@ -5,6 +5,7 @@ import { parseDidMethod } from './utils.js';
 import { didDocumentSchema } from '../schemas.js';
 import { verifyDidWeb } from './verify-did-web.js';
 import { verifyDidWebVh } from './verify-did-webvh.js';
+import { DidInputError } from '../errors.js';
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -37,7 +38,7 @@ const methodVerifiers: Record<string, MethodVerifier> = {
  */
 export async function verifyDid(did: string, options: VerifyDidOptions): Promise<DidVerificationResult> {
   if (!did) {
-    throw new Error('DID string is required for verification');
+    throw new DidInputError('DID string is required for verification');
   }
 
   const C = DidVerificationCheckName;

@@ -1,4 +1,5 @@
 import { didWebToUrl, parseDidMethod, normaliseDidWebAlias } from './utils';
+import { DidParseError, DidMethodNotSupportedError, DidInputError } from '../errors';
 
 describe('didWebToUrl', () => {
   it('converts a basic domain DID to a well-known URL', () => {
@@ -25,8 +26,8 @@ describe('didWebToUrl', () => {
     expect(didWebToUrl('did:webvh:example.com:org:abc')).toBe('https://example.com/org/abc/did.jsonl');
   });
 
-  it('throws for unsupported DID method', () => {
-    expect(() => didWebToUrl('did:key:z6Mk...')).toThrow('Unsupported DID method for URL conversion');
+  it('throws DidParseError for unsupported DID method', () => {
+    expect(() => didWebToUrl('did:key:z6Mk...')).toThrow(DidParseError);
   });
 });
 
@@ -39,24 +40,24 @@ describe('parseDidMethod', () => {
     expect(parseDidMethod('did:webvh:example.com:abc')).toBe('webvh');
   });
 
-  it('throws for unsupported did:key method', () => {
-    expect(() => parseDidMethod('did:key:z6Mk...')).toThrow('Unsupported DID method: key');
+  it('throws DidMethodNotSupportedError for unsupported did:key method', () => {
+    expect(() => parseDidMethod('did:key:z6Mk...')).toThrow(DidMethodNotSupportedError);
   });
 
-  it('throws for unsupported did:ethr method', () => {
-    expect(() => parseDidMethod('did:ethr:0x...')).toThrow('Unsupported DID method: ethr');
+  it('throws DidMethodNotSupportedError for unsupported did:ethr method', () => {
+    expect(() => parseDidMethod('did:ethr:0x...')).toThrow(DidMethodNotSupportedError);
   });
 
-  it('throws for an empty string', () => {
-    expect(() => parseDidMethod('')).toThrow('Invalid DID string: ');
+  it('throws DidParseError for an empty string', () => {
+    expect(() => parseDidMethod('')).toThrow(DidParseError);
   });
 
-  it('throws for an invalid format', () => {
-    expect(() => parseDidMethod('not-a-did')).toThrow('Invalid DID string: not-a-did');
+  it('throws DidParseError for an invalid format', () => {
+    expect(() => parseDidMethod('not-a-did')).toThrow(DidParseError);
   });
 
-  it('throws when the method-specific-id is missing', () => {
-    expect(() => parseDidMethod('did:web')).toThrow('Invalid DID string: did:web');
+  it('throws DidParseError when the method-specific-id is missing', () => {
+    expect(() => parseDidMethod('did:web')).toThrow(DidParseError);
   });
 });
 
@@ -85,12 +86,12 @@ describe('normaliseDidWebAlias', () => {
     expect(normaliseDidWebAlias('  My Org & Co.  ')).toBe('my-org-co');
   });
 
-  it('throws for input that normalises to empty', () => {
-    expect(() => normaliseDidWebAlias('!!!')).toThrow('empty identifier after normalisation');
+  it('throws DidInputError for input that normalises to empty', () => {
+    expect(() => normaliseDidWebAlias('!!!')).toThrow(DidInputError);
   });
 
-  it('throws for empty string', () => {
-    expect(() => normaliseDidWebAlias('')).toThrow('empty identifier after normalisation');
+  it('throws DidInputError for empty string', () => {
+    expect(() => normaliseDidWebAlias('')).toThrow(DidInputError);
   });
 
   it('preserves already-valid aliases', () => {

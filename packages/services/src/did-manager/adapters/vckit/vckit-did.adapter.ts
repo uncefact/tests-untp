@@ -7,6 +7,14 @@ import { vckitDidConfigSchema } from './vckit-did.schema.js';
 import type { VCKitDidConfig } from './vckit-did.schema.js';
 import type { LoggerService } from '../../../logging/types.js';
 import { createLogger } from '../../../logging/factory.js';
+import {
+  DidConfigError,
+  DidMethodNotSupportedError,
+  DidInputError,
+  DidCreateError,
+  DidDocumentFetchError,
+} from '../../errors.js';
+import { ServiceError } from '../../../errors.js';
 
 /**
  * Maps a DidMethod enum value to the VCKit provider string.
@@ -16,9 +24,9 @@ function toProviderString(method: DidMethod): string {
     case DidMethod.DID_WEB:
       return 'did:web';
     case DidMethod.DID_WEB_VH:
-      throw new Error('did:webvh is not yet supported');
+      throw new DidMethodNotSupportedError('did:webvh');
     default:
-      throw new Error(`Unknown DID method: ${method}`);
+      throw new DidMethodNotSupportedError(String(method));
   }
 }
 
@@ -35,10 +43,10 @@ export class VCKitDidAdapter implements IDidService {
     logger?: LoggerService,
   ) {
     if (!baseURL) {
-      throw new Error('Error creating VCKitDidAdapter. API URL is required.');
+      throw new DidConfigError('API URL');
     }
     if (!headers?.Authorization) {
-      throw new Error('Error creating VCKitDidAdapter. Authorization header is required.');
+      throw new DidConfigError('Authorization header');
     }
     this.baseURL = baseURL;
     this.headers = headers;
@@ -51,9 +59,9 @@ export class VCKitDidAdapter implements IDidService {
       case DidMethod.DID_WEB:
         return normaliseDidWebAlias(alias);
       case DidMethod.DID_WEB_VH:
-        throw new Error('did:webvh is not yet supported');
+        throw new DidMethodNotSupportedError('did:webvh');
       default:
-        throw new Error(`Unknown DID method: ${method}`);
+        throw new DidMethodNotSupportedError(String(method));
     }
   }
 
@@ -80,7 +88,7 @@ export class VCKitDidAdapter implements IDidService {
 
       if (!response.ok) {
         this.logger.error({ status: response.status, statusText: response.statusText }, 'Failed to create DID');
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new DidCreateError(`HTTP ${response.status}: ${response.statusText}`, response.status);
       }
 
       const result = await response.json();
@@ -91,17 +99,16 @@ export class VCKitDidAdapter implements IDidService {
       this.logger.info({ did, keyId }, 'DID created successfully');
       return { did, keyId, document };
     } catch (error) {
+      if (error instanceof ServiceError) throw error;
       this.logger.error({ error }, 'Failed to create DID');
-      if (error instanceof Error) {
-        throw new Error(`Failed to create DID: ${error.message}`);
-      }
-      throw new Error('Failed to create DID: Unknown error');
+      const detail = error instanceof Error ? error.message : 'Unknown error';
+      throw new DidCreateError(detail);
     }
   }
 
   async getDocument(did: string): Promise<DidDocument> {
     if (!did) {
-      throw new Error('DID string is required');
+      throw new DidInputError('DID string is required');
     }
 
     // Extract domain from DID for Host header (works for did:web and did:webvh)
@@ -125,24 +132,23 @@ export class VCKitDidAdapter implements IDidService {
           { status: response.status, statusText: response.statusText, did },
           'Failed to fetch DID document',
         );
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new DidDocumentFetchError(did, `HTTP ${response.status}: ${response.statusText}`, response.status);
       }
 
       const result = await response.json();
       this.logger.debug({ did }, 'DID document fetched successfully');
       return result.didDocument ?? result;
     } catch (error) {
+      if (error instanceof ServiceError) throw error;
       this.logger.error({ error, did }, 'Failed to get DID document');
-      if (error instanceof Error) {
-        throw new Error(`Failed to get DID document: ${error.message}`);
-      }
-      throw new Error('Failed to get DID document: Unknown error');
+      const detail = error instanceof Error ? error.message : 'Unknown error';
+      throw new DidDocumentFetchError(did, detail);
     }
   }
 
   async verify(did: string): Promise<DidVerificationResult> {
     if (!did) {
-      throw new Error('DID string is required for verification');
+      throw new DidInputError('DID string is required for verification');
     }
 
     // Fetch provider keys for the key_material check

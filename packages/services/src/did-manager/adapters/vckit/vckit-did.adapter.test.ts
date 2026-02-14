@@ -3,6 +3,13 @@ import { vckitDidConfigSchema } from './vckit-did.schema';
 import { DidMethod, DidType } from '../../types';
 import { verifyDid } from '../../common/verify';
 import type { LoggerService } from '../../../logging/types';
+import {
+  DidConfigError,
+  DidMethodNotSupportedError,
+  DidInputError,
+  DidCreateError,
+  DidDocumentFetchError,
+} from '../../errors';
 
 jest.mock('../../common/verify.js', () => ({
   verifyDid: jest.fn(),
@@ -53,12 +60,12 @@ describe('VCKitDidAdapter', () => {
       expect(service.keyType).toBe('Ed25519');
     });
 
-    it('throws if baseURL is empty', () => {
-      expect(() => new VCKitDidAdapter('', HEADERS)).toThrow('API URL is required');
+    it('throws DidConfigError if baseURL is empty', () => {
+      expect(() => new VCKitDidAdapter('', HEADERS)).toThrow(DidConfigError);
     });
 
-    it('throws if Authorization header is missing', () => {
-      expect(() => new VCKitDidAdapter(BASE_URL, {})).toThrow('Authorization header is required');
+    it('throws DidConfigError if Authorization header is missing', () => {
+      expect(() => new VCKitDidAdapter(BASE_URL, {})).toThrow(DidConfigError);
     });
   });
 
@@ -126,26 +133,26 @@ describe('VCKitDidAdapter', () => {
       expect(body.options.keyType).toBe('Ed25519');
     });
 
-    it('throws for DID_WEB_VH method', async () => {
+    it('throws DidMethodNotSupportedError for DID_WEB_VH method', async () => {
       await expect(
         service.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB_VH, alias: 'test-org' }),
-      ).rejects.toThrow('not yet supported');
+      ).rejects.toThrow(DidMethodNotSupportedError);
     });
 
-    it('handles HTTP errors', async () => {
+    it('throws DidCreateError for HTTP errors', async () => {
       (global.fetch as jest.Mock).mockResolvedValue(createMockResponse({}, false, 500));
 
       await expect(
         service.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' }),
-      ).rejects.toThrow('Failed to create DID');
+      ).rejects.toThrow(DidCreateError);
     });
 
-    it('handles network errors', async () => {
+    it('throws DidCreateError for network errors', async () => {
       (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       await expect(
         service.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' }),
-      ).rejects.toThrow('Failed to create DID: Network error');
+      ).rejects.toThrow(DidCreateError);
     });
 
     it('passes the alias through to the payload as-is', async () => {
@@ -218,8 +225,8 @@ describe('VCKitDidAdapter', () => {
       expect(result).toEqual(didDocument);
     });
 
-    it('throws if DID string is empty', async () => {
-      await expect(service.getDocument('')).rejects.toThrow('DID string is required');
+    it('throws DidInputError if DID string is empty', async () => {
+      await expect(service.getDocument('')).rejects.toThrow(DidInputError);
     });
   });
 
@@ -251,8 +258,8 @@ describe('VCKitDidAdapter', () => {
       expect(result).toEqual(mockResult);
     });
 
-    it('throws if DID string is empty', async () => {
-      await expect(service.verify('')).rejects.toThrow('DID string is required for verification');
+    it('throws DidInputError if DID string is empty', async () => {
+      await expect(service.verify('')).rejects.toThrow(DidInputError);
     });
 
     it('passes empty providerKeys when VCKit key fetch fails', async () => {
@@ -273,12 +280,12 @@ describe('VCKitDidAdapter', () => {
       expect(service.normaliseAlias('My Org', DidMethod.DID_WEB)).toBe('my-org');
     });
 
-    it('throws for invalid alias that normalises to empty', () => {
-      expect(() => service.normaliseAlias('!!!', DidMethod.DID_WEB)).toThrow('empty identifier');
+    it('throws DidInputError for invalid alias that normalises to empty', () => {
+      expect(() => service.normaliseAlias('!!!', DidMethod.DID_WEB)).toThrow(DidInputError);
     });
 
-    it('throws for did:webvh (not yet supported)', () => {
-      expect(() => service.normaliseAlias('test', DidMethod.DID_WEB_VH)).toThrow('not yet supported');
+    it('throws DidMethodNotSupportedError for did:webvh', () => {
+      expect(() => service.normaliseAlias('test', DidMethod.DID_WEB_VH)).toThrow(DidMethodNotSupportedError);
     });
   });
 

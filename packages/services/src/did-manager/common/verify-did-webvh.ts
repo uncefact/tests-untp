@@ -1,4 +1,5 @@
 import type { MethodVerificationResult } from '../types.js';
+import { DidMethodNotSupportedError } from '../errors.js';
 
 /**
  * did:webvh method-specific verification.
@@ -12,5 +13,5 @@ import type { MethodVerificationResult } from '../types.js';
  * @see https://didwebvh.info/latest/overview/
  */
 export async function verifyDidWebVh(_did: string): Promise<MethodVerificationResult> {
-  throw new Error('did:webvh verification is not yet implemented');
+  throw new DidMethodNotSupportedError('webvh', 'verification');
 }
