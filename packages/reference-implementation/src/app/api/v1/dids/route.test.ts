@@ -8,9 +8,9 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withOrgAuth as passthrough
-jest.mock('@/lib/api/with-org-auth', () => ({
-  withOrgAuth: (handler: (...args: unknown[]) => unknown) => handler,
+// Mock withTenantAuth as passthrough
+jest.mock('@/lib/api/with-tenant-auth', () => ({
+  withTenantAuth: (handler: (...args: unknown[]) => unknown) => handler,
 }));
 
 const mockResolveDidService = jest.fn();
@@ -57,7 +57,7 @@ function createBadJsonRequest(): Request {
   } as unknown as Request;
 }
 
-const AUTH_CONTEXT = { organizationId: 'org-1', params: Promise.resolve({}) };
+const AUTH_CONTEXT = { tenantId: 'org-1', params: Promise.resolve({}) };
 
 describe('POST /api/v1/dids', () => {
   const mockDidService = {

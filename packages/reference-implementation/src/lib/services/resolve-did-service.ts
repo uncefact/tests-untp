@@ -22,25 +22,22 @@ export interface ResolvedDidService {
 }
 
 /**
- * Resolves a DID service adapter for the given organisation.
+ * Resolves a DID service adapter for the given tenant.
  *
  * Resolution chain:
  * 1. Explicit instance ID (if provided)
- * 2. Tenant primary (isPrimary === true for org + DID service type)
- * 3. System default (organizationId === "system")
+ * 2. Tenant primary (isPrimary === true for tenant + DID service type)
+ * 3. System default (tenantId === "system")
  * 4. Throw ServiceResolutionError
  */
-export async function resolveDidService(
-  organizationId: string,
-  serviceInstanceId?: string,
-): Promise<ResolvedDidService> {
-  const instance = await getInstanceByResolution(organizationId, ServiceType.DID, serviceInstanceId);
+export async function resolveDidService(tenantId: string, serviceInstanceId?: string): Promise<ResolvedDidService> {
+  const instance = await getInstanceByResolution(tenantId, ServiceType.DID, serviceInstanceId);
 
   if (!instance) {
     if (serviceInstanceId) {
       throw new ServiceInstanceNotFoundError(serviceInstanceId);
     }
-    throw new ServiceResolutionError(ServiceType.DID, organizationId);
+    throw new ServiceResolutionError(ServiceType.DID, tenantId);
   }
 
   // Decrypt the config
@@ -63,7 +60,7 @@ export async function resolveDidService(
 
   const adapterEntry = adapterRegistry[ServiceType.DID]?.[instance.adapterType as AdapterType];
   if (!adapterEntry) {
-    throw new ServiceResolutionError(ServiceType.DID, organizationId);
+    throw new ServiceResolutionError(ServiceType.DID, tenantId);
   }
 
   const parseResult = adapterEntry.configSchema.safeParse(rawConfig);

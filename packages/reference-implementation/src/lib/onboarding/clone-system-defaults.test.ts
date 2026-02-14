@@ -24,7 +24,7 @@ function createMockPrisma() {
 
 const SYSTEM_SERVICE_INSTANCE = {
   id: 'system-did-vckit',
-  organizationId: 'system',
+  tenantId: 'system',
   serviceType: 'DID',
   adapterType: 'VCKIT',
   name: 'System Default VCKit (DID)',
@@ -37,7 +37,7 @@ const SYSTEM_SERVICE_INSTANCE = {
 
 const SYSTEM_DEFAULT_DID = {
   id: 'did-1',
-  organizationId: 'system',
+  tenantId: 'system',
   did: 'did:web:example.com',
   type: 'DEFAULT',
   method: 'DID_WEB',
@@ -54,7 +54,7 @@ const SYSTEM_DEFAULT_DID = {
 const TARGET_ORG_ID = 'org-new-123';
 
 describe('cloneSystemDefaults', () => {
-  it('clones service instances and DID into the target organisation', async () => {
+  it('clones service instances and DID into the target tenant', async () => {
     const mockPrisma = createMockPrisma();
 
     mockPrisma.serviceInstance.findMany.mockResolvedValue([SYSTEM_SERVICE_INSTANCE]);
@@ -65,13 +65,13 @@ describe('cloneSystemDefaults', () => {
     mockPrisma.serviceInstance.create.mockResolvedValue({
       ...SYSTEM_SERVICE_INSTANCE,
       id: clonedInstanceId,
-      organizationId: TARGET_ORG_ID,
+      tenantId: TARGET_ORG_ID,
     });
 
     mockPrisma.did.create.mockResolvedValue({
       ...SYSTEM_DEFAULT_DID,
       id: 'cloned-did-1',
-      organizationId: TARGET_ORG_ID,
+      tenantId: TARGET_ORG_ID,
       isDefault: false,
     });
 
@@ -81,18 +81,18 @@ describe('cloneSystemDefaults', () => {
 
     // Should have fetched system service instances
     expect(mockPrisma.serviceInstance.findMany).toHaveBeenCalledWith({
-      where: { organizationId: 'system' },
+      where: { tenantId: 'system' },
     });
 
     // Should have fetched system default DID
     expect(mockPrisma.did.findFirst).toHaveBeenCalledWith({
-      where: { organizationId: 'system', isDefault: true },
+      where: { tenantId: 'system', isDefault: true },
     });
 
     // Should have cloned the service instance with the new org ID
     expect(mockPrisma.serviceInstance.create).toHaveBeenCalledWith({
       data: {
-        organizationId: TARGET_ORG_ID,
+        tenantId: TARGET_ORG_ID,
         serviceType: 'DID',
         adapterType: 'VCKIT',
         name: 'System Default VCKit (DID)',
@@ -105,7 +105,7 @@ describe('cloneSystemDefaults', () => {
     // Should have cloned the DID with the new org ID
     expect(mockPrisma.did.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        organizationId: TARGET_ORG_ID,
+        tenantId: TARGET_ORG_ID,
         type: 'DEFAULT',
         method: 'DID_WEB',
         name: 'System Default DID',
@@ -128,7 +128,7 @@ describe('cloneSystemDefaults', () => {
     mockPrisma.serviceInstance.create.mockResolvedValue({
       ...SYSTEM_SERVICE_INSTANCE,
       id: clonedInstanceId,
-      organizationId: TARGET_ORG_ID,
+      tenantId: TARGET_ORG_ID,
     });
 
     await cloneSystemDefaults(mockPrisma as never, TARGET_ORG_ID);
@@ -141,7 +141,7 @@ describe('cloneSystemDefaults', () => {
     });
   });
 
-  it('is a no-op when the system org has no defaults', async () => {
+  it('is a no-op when the system tenant has no defaults', async () => {
     const mockPrisma = createMockPrisma();
 
     // No service instances and no default DID
@@ -190,7 +190,7 @@ describe('cloneSystemDefaults', () => {
     mockPrisma.serviceInstance.create.mockResolvedValue({
       ...SYSTEM_SERVICE_INSTANCE,
       id: 'cloned-1',
-      organizationId: TARGET_ORG_ID,
+      tenantId: TARGET_ORG_ID,
     });
 
     await cloneSystemDefaults(mockPrisma as never, TARGET_ORG_ID);
@@ -216,8 +216,8 @@ describe('cloneSystemDefaults', () => {
     mockPrisma.did.findFirst.mockResolvedValue(null);
 
     mockPrisma.serviceInstance.create
-      .mockResolvedValueOnce({ ...SYSTEM_SERVICE_INSTANCE, id: 'cloned-1', organizationId: TARGET_ORG_ID })
-      .mockResolvedValueOnce({ ...secondInstance, id: 'cloned-2', organizationId: TARGET_ORG_ID });
+      .mockResolvedValueOnce({ ...SYSTEM_SERVICE_INSTANCE, id: 'cloned-1', tenantId: TARGET_ORG_ID })
+      .mockResolvedValueOnce({ ...secondInstance, id: 'cloned-2', tenantId: TARGET_ORG_ID });
 
     await cloneSystemDefaults(mockPrisma as never, TARGET_ORG_ID);
 

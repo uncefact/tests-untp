@@ -27,7 +27,7 @@ if (RI_POSTGRES_USER && RI_POSTGRES_PASSWORD && RI_POSTGRES_DB && RI_POSTGRES_HO
 const prisma = new PrismaClient();
 const { defaultDid: DEFAULT_DID } = getDidConfig();
 
-const SYSTEM_ORG_ID = 'system';
+const SYSTEM_TENANT_ID = 'system';
 
 const ENCRYPTION_KEY = process.env.SERVICE_ENCRYPTION_KEY;
 if (!ENCRYPTION_KEY) {
@@ -38,12 +38,12 @@ if (!ENCRYPTION_KEY) {
 const encryptionService = new AesGcmEncryptionAdapter(ENCRYPTION_KEY);
 
 async function main() {
-  // Upsert the system organisation (used for system-wide defaults)
-  await prisma.organization.upsert({
-    where: { id: SYSTEM_ORG_ID },
+  // Upsert the system tenant (used for system-wide defaults)
+  await prisma.tenant.upsert({
+    where: { id: SYSTEM_TENANT_ID },
     update: {},
     create: {
-      id: SYSTEM_ORG_ID,
+      id: SYSTEM_TENANT_ID,
       name: 'System',
     },
   });
@@ -58,7 +58,7 @@ async function main() {
       isDefault: true,
     },
     create: {
-      organizationId: SYSTEM_ORG_ID,
+      tenantId: SYSTEM_TENANT_ID,
       did: DEFAULT_DID,
       type: DidType.DEFAULT,
       method: DidMethod.DID_WEB,
@@ -83,7 +83,7 @@ async function main() {
     update: { config: encryptedConfig },
     create: {
       id: 'system-did-vckit',
-      organizationId: SYSTEM_ORG_ID,
+      tenantId: SYSTEM_TENANT_ID,
       serviceType: PrismaServiceType.DID,
       adapterType: PrismaAdapterType.VCKIT,
       name: 'System Default VCKit (DID)',
@@ -99,7 +99,7 @@ async function main() {
     data: { serviceInstanceId: systemDidInstance.id },
   });
 
-  logger.info('Seed complete: system organisation, default DID, and DID service instance upserted');
+  logger.info('Seed complete: system tenant, default DID, and DID service instance upserted');
 }
 
 main()

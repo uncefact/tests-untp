@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { resolveDidService } from '@/lib/services/resolve-did-service';
 import { NotFoundError, ServiceRegistryError, errorMessage } from '@/lib/api/errors';
-import { withOrgAuth } from '@/lib/api/with-org-auth';
+import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDidById } from '@/lib/prisma/repositories';
 import { createLogger } from '@uncefact/untp-ri-services';
 
@@ -54,16 +54,16 @@ const logger = createLogger().child({ module: 'api:dids:document' });
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-export const GET = withOrgAuth(async (_req, { organizationId, params }) => {
+export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
   try {
-    const did = await getDidById(id, organizationId);
+    const did = await getDidById(id, tenantId);
     if (!did) {
       throw new NotFoundError('DID not found');
     }
 
-    const { service: didService } = await resolveDidService(organizationId, did.serviceInstanceId ?? undefined);
+    const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId ?? undefined);
     const document = await didService.getDocument(did.did);
 
     return NextResponse.json({ ok: true, document });

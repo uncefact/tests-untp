@@ -15,7 +15,7 @@ interface AccountInfo {
 
 /**
  * Handles auto-onboarding when a user signs in via OAuth.
- * Sets their authProviderId if missing and creates an organisation
+ * Sets their authProviderId if missing and creates a tenant
  * with cloned system defaults if they don't have one yet.
  *
  * Idempotent: no-op when the user is already fully onboarded.
@@ -30,7 +30,7 @@ export async function handleSignIn(
 
   const dbUser = await prisma.user.findUnique({
     where: { id: userId },
-    select: { authProviderId: true, organizationId: true },
+    select: { authProviderId: true, tenantId: true },
   });
 
   if (!dbUser) {
@@ -38,7 +38,7 @@ export async function handleSignIn(
     return;
   }
 
-  if (dbUser.authProviderId && dbUser.organizationId) {
+  if (dbUser.authProviderId && dbUser.tenantId) {
     logger.debug({ userId }, 'User already fully onboarded');
     return;
   }
@@ -49,18 +49,18 @@ export async function handleSignIn(
     updates.authProviderId = account.providerAccountId;
   }
 
-  if (!dbUser.organizationId) {
+  if (!dbUser.tenantId) {
     const baseName = userProfile.name || userProfile.email?.split('@')[0] || 'My';
-    const orgName = `${baseName} Organisation`;
+    const tenantName = `${baseName} Organisation`;
 
-    logger.info({ userId, orgName }, 'Creating organisation for user');
+    logger.info({ userId, tenantName }, 'Creating tenant for user');
 
-    const org = await prisma.organization.create({
-      data: { name: orgName },
+    const tenant = await prisma.tenant.create({
+      data: { name: tenantName },
     });
-    updates.organizationId = org.id;
+    updates.tenantId = tenant.id;
 
-    await cloneSystemDefaults(prisma, org.id);
+    await cloneSystemDefaults(prisma, tenant.id);
   }
 
   if (Object.keys(updates).length > 0) {

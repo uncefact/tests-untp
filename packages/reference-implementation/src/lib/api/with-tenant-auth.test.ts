@@ -8,14 +8,14 @@ jest.mock('next/server', () => ({
 }));
 
 const mockGetSessionUserId = jest.fn();
-const mockGetOrganizationId = jest.fn();
+const mockGetTenantId = jest.fn();
 
 jest.mock('@/lib/api/helpers', () => ({
   getSessionUserId: () => mockGetSessionUserId(),
-  getOrganizationId: (id: string) => mockGetOrganizationId(id),
+  getTenantId: (id: string) => mockGetTenantId(id),
 }));
 
-import { withOrgAuth } from './with-org-auth';
+import { withTenantAuth } from './with-tenant-auth';
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -27,12 +27,12 @@ function fakeRequest(method = 'GET'): Request {
 
 const emptyRouteContext = { params: Promise.resolve({}) };
 
-describe('withOrgAuth', () => {
+describe('withTenantAuth', () => {
   it('returns 401 when getSessionUserId returns null', async () => {
     mockGetSessionUserId.mockResolvedValue(null);
 
     const handler = jest.fn();
-    const wrapped = withOrgAuth(handler);
+    const wrapped = withTenantAuth(handler);
     const res = await wrapped(fakeRequest(), emptyRouteContext);
 
     expect(res.status).toBe(401);
@@ -40,25 +40,25 @@ describe('withOrgAuth', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it('returns 403 when getOrganizationId returns null', async () => {
+  it('returns 403 when getTenantId returns null', async () => {
     mockGetSessionUserId.mockResolvedValue('user-1');
-    mockGetOrganizationId.mockResolvedValue(null);
+    mockGetTenantId.mockResolvedValue(null);
 
     const handler = jest.fn();
-    const wrapped = withOrgAuth(handler);
+    const wrapped = withTenantAuth(handler);
     const res = await wrapped(fakeRequest(), emptyRouteContext);
 
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ ok: false, error: 'No organisation found for user' });
+    expect(await res.json()).toEqual({ ok: false, error: 'No tenant found for user' });
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it('calls inner handler with correct userId, organizationId, and params', async () => {
+  it('calls inner handler with correct userId, tenantId, and params', async () => {
     mockGetSessionUserId.mockResolvedValue('user-1');
-    mockGetOrganizationId.mockResolvedValue('org-1');
+    mockGetTenantId.mockResolvedValue('org-1');
 
     const handler = jest.fn().mockResolvedValue({ status: 200 });
-    const wrapped = withOrgAuth(handler);
+    const wrapped = withTenantAuth(handler);
     const req = fakeRequest('POST');
     const routeContext = { params: Promise.resolve({ id: 'test-id' }) };
 
@@ -66,17 +66,17 @@ describe('withOrgAuth', () => {
 
     expect(handler).toHaveBeenCalledWith(req, {
       userId: 'user-1',
-      organizationId: 'org-1',
+      tenantId: 'org-1',
       params: routeContext.params,
     });
   });
 
   it('passes through route params correctly', async () => {
     mockGetSessionUserId.mockResolvedValue('user-1');
-    mockGetOrganizationId.mockResolvedValue('org-1');
+    mockGetTenantId.mockResolvedValue('org-1');
 
     const handler = jest.fn().mockResolvedValue({ status: 200 });
-    const wrapped = withOrgAuth(handler);
+    const wrapped = withTenantAuth(handler);
     const routeContext = { params: Promise.resolve({ id: 'test-id' }) };
 
     await wrapped(fakeRequest(), routeContext);

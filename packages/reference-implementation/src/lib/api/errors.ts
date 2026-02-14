@@ -27,10 +27,10 @@ export class ServiceInstanceNotFoundError extends ServiceRegistryError {
 }
 
 export class ServiceResolutionError extends ServiceRegistryError {
-  constructor(serviceType: string, organizationId: string) {
+  constructor(serviceType: string, tenantId: string) {
     super(
       `No service instance available for type "${serviceType}" ` +
-        `in organisation "${organizationId}". ` +
+        `in tenant "${tenantId}". ` +
         `Configure a primary instance or ensure a system default exists.`,
     );
     this.name = 'ServiceResolutionError';

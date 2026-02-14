@@ -8,9 +8,9 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withOrgAuth as passthrough
-jest.mock('@/lib/api/with-org-auth', () => ({
-  withOrgAuth: (handler: (...args: unknown[]) => unknown) => handler,
+// Mock withTenantAuth as passthrough
+jest.mock('@/lib/api/with-tenant-auth', () => ({
+  withTenantAuth: (handler: (...args: unknown[]) => unknown) => handler,
 }));
 
 const mockResolveDidService = jest.fn();
@@ -28,7 +28,7 @@ import { ServiceResolutionError } from '@/lib/api/errors';
 import { GET } from './route';
 
 function createContext(id: string) {
-  return { organizationId: 'org-1', params: Promise.resolve({ id }) };
+  return { tenantId: 'org-1', params: Promise.resolve({ id }) };
 }
 
 function createFakeRequest(): Request {

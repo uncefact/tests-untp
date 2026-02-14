@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { resolveDidService } from '@/lib/services/resolve-did-service';
 import { NotFoundError, ServiceRegistryError, errorMessage } from '@/lib/api/errors';
-import { DidStatus, createLogger } from '@uncefact/untp-ri-services';
-import { withOrgAuth } from '@/lib/api/with-org-auth';
+import { DidStatus } from '@uncefact/untp-ri-services';
+import { createLogger } from '@uncefact/untp-ri-services/logging';
+import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDidById, updateDidStatus } from '@/lib/prisma/repositories';
 
 /**
@@ -58,20 +59,20 @@ import { getDidById, updateDidStatus } from '@/lib/prisma/repositories';
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 const logger = createLogger().child({ module: 'api:dids:verify' });
-export const POST = withOrgAuth(async (_req, { organizationId, params }) => {
+export const POST = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
   try {
-    const did = await getDidById(id, organizationId);
+    const did = await getDidById(id, tenantId);
     if (!did) {
       throw new NotFoundError('DID not found');
     }
 
-    const { service: didService } = await resolveDidService(organizationId, did.serviceInstanceId ?? undefined);
+    const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId ?? undefined);
     const verification = await didService.verify(did.did);
 
     const newStatus = verification.verified ? DidStatus.VERIFIED : DidStatus.UNVERIFIED;
-    const updatedDid = await updateDidStatus(id, organizationId, newStatus);
+    const updatedDid = await updateDidStatus(id, tenantId, newStatus);
 
     return NextResponse.json({ ok: true, verification, did: updatedDid });
   } catch (e: unknown) {

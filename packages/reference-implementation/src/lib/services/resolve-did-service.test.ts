@@ -68,7 +68,7 @@ const MOCK_ENCRYPTED_ENVELOPE = {
 
 const MOCK_INSTANCE = {
   id: 'inst-1',
-  organizationId: 'system',
+  tenantId: 'system',
   serviceType: 'DID',
   adapterType: 'VCKIT',
   name: 'System VCKit',

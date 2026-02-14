@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError, errorMessage } from '@/lib/api/errors';
 import { isNonEmptyString } from '@/lib/api/validation';
-import { withOrgAuth } from '@/lib/api/with-org-auth';
+import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDidById, updateDid } from '@/lib/prisma/repositories';
 import { createLogger } from '@uncefact/untp-ri-services';
 
@@ -54,11 +54,11 @@ const logger = createLogger().child({ module: 'api:dids:id' });
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-export const GET = withOrgAuth(async (_req, { organizationId, params }) => {
+export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
   try {
-    const did = await getDidById(id, organizationId);
+    const did = await getDidById(id, tenantId);
     if (!did) {
       throw new NotFoundError('DID not found');
     }
@@ -139,7 +139,7 @@ export const GET = withOrgAuth(async (_req, { organizationId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-export const PUT = withOrgAuth(async (req, { organizationId, params }) => {
+export const PUT = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
   let body: { name?: string; description?: string };
@@ -157,7 +157,7 @@ export const PUT = withOrgAuth(async (req, { organizationId, params }) => {
   }
 
   try {
-    const updated = await updateDid(id, organizationId, {
+    const updated = await updateDid(id, tenantId, {
       ...(hasName && { name: body.name }),
       ...(hasDescription && { description: body.description }),
     });

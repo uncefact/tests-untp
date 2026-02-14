@@ -1,10 +1,10 @@
 import { ServiceInstance, ServiceType, AdapterType, Prisma } from '../generated';
 import { prisma } from '../prisma';
 
-const SYSTEM_ORG_ID = 'system';
+const SYSTEM_TENANT_ID = 'system';
 
 export type CreateServiceInstanceInput = {
-  organizationId: string;
+  tenantId: string;
   serviceType: string;
   adapterType: string;
   name: string;
@@ -36,7 +36,7 @@ export async function createServiceInstance(input: CreateServiceInstanceInput): 
     if (input.isPrimary) {
       await tx.serviceInstance.updateMany({
         where: {
-          organizationId: input.organizationId,
+          tenantId: input.tenantId,
           serviceType: input.serviceType as ServiceType,
           isPrimary: true,
         },
@@ -46,7 +46,7 @@ export async function createServiceInstance(input: CreateServiceInstanceInput): 
 
     return tx.serviceInstance.create({
       data: {
-        organizationId: input.organizationId,
+        tenantId: input.tenantId,
         serviceType: input.serviceType as ServiceType,
         adapterType: input.adapterType as AdapterType,
         name: input.name,
@@ -62,11 +62,11 @@ export async function createServiceInstance(input: CreateServiceInstanceInput): 
  * Gets a service instance by ID. Returns it if owned by the specified
  * org or if it's a system default.
  */
-export async function getServiceInstanceById(id: string, organizationId: string): Promise<ServiceInstance | null> {
+export async function getServiceInstanceById(id: string, tenantId: string): Promise<ServiceInstance | null> {
   return prisma.serviceInstance.findFirst({
     where: {
       id,
-      OR: [{ organizationId }, { organizationId: SYSTEM_ORG_ID }],
+      OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
     },
   });
 }
@@ -75,13 +75,13 @@ export async function getServiceInstanceById(id: string, organizationId: string)
  * Lists service instances for an organisation, including system defaults.
  */
 export async function listServiceInstances(
-  organizationId: string,
+  tenantId: string,
   options: ListServiceInstancesOptions = {},
 ): Promise<ServiceInstance[]> {
   const { serviceType, adapterType, limit, offset } = options;
 
   const where: Prisma.ServiceInstanceWhereInput = {
-    OR: [{ organizationId }, { organizationId: SYSTEM_ORG_ID }],
+    OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
   };
 
   if (serviceType !== undefined) {
@@ -106,12 +106,12 @@ export async function listServiceInstances(
  */
 export async function updateServiceInstance(
   id: string,
-  organizationId: string,
+  tenantId: string,
   input: UpdateServiceInstanceInput,
 ): Promise<ServiceInstance> {
   return prisma.$transaction(async (tx) => {
     const existing = await tx.serviceInstance.findFirst({
-      where: { id, organizationId },
+      where: { id, tenantId },
     });
 
     if (!existing) {
@@ -121,7 +121,7 @@ export async function updateServiceInstance(
     if (input.isPrimary) {
       await tx.serviceInstance.updateMany({
         where: {
-          organizationId,
+          tenantId,
           serviceType: existing.serviceType,
           isPrimary: true,
           NOT: { id },
@@ -145,9 +145,9 @@ export async function updateServiceInstance(
 /**
  * Deletes a service instance. Cannot delete system defaults.
  */
-export async function deleteServiceInstance(id: string, organizationId: string): Promise<ServiceInstance> {
+export async function deleteServiceInstance(id: string, tenantId: string): Promise<ServiceInstance> {
   const existing = await prisma.serviceInstance.findFirst({
-    where: { id, organizationId },
+    where: { id, tenantId },
   });
 
   if (!existing) {
@@ -163,11 +163,11 @@ export async function deleteServiceInstance(id: string, organizationId: string):
  * Implements the instance resolution chain:
  * 1. Explicit instance ID - verify ownership or system default
  * 2. Tenant primary (isPrimary for org + serviceType)
- * 3. System default (organizationId === "system")
+ * 3. System default (tenantId === "system")
  * 4. Returns null if nothing found
  */
 export async function getInstanceByResolution(
-  organizationId: string,
+  tenantId: string,
   serviceType: string,
   instanceId?: string,
 ): Promise<ServiceInstance | null> {
@@ -176,7 +176,7 @@ export async function getInstanceByResolution(
     return prisma.serviceInstance.findFirst({
       where: {
         id: instanceId,
-        OR: [{ organizationId }, { organizationId: SYSTEM_ORG_ID }],
+        OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
       },
     });
   }
@@ -184,7 +184,7 @@ export async function getInstanceByResolution(
   // Step 2: Tenant primary
   const tenantPrimary = await prisma.serviceInstance.findFirst({
     where: {
-      organizationId,
+      tenantId,
       serviceType: serviceType as ServiceType,
       isPrimary: true,
     },
@@ -197,7 +197,7 @@ export async function getInstanceByResolution(
   // Step 3: System default
   return prisma.serviceInstance.findFirst({
     where: {
-      organizationId: SYSTEM_ORG_ID,
+      tenantId: SYSTEM_TENANT_ID,
       serviceType: serviceType as ServiceType,
     },
   });

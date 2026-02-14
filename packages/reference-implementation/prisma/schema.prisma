@@ -45,12 +45,12 @@ model User {
   email           String?   @unique
   emailVerified   DateTime?
   image           String?
-  organizationId  String?
+  tenantId        String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   accounts     Account[]
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  tenant       Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 }
 
 model Account {
@@ -72,7 +72,7 @@ model Account {
   @@unique([provider, providerAccountId])
 }
 
-model Organization {
+model Tenant {
   id             String   @id @default(cuid())
   name           String
   primaryColor   String?
@@ -84,6 +84,8 @@ model Organization {
   users            User[]
   dids             Did[]
   serviceInstances ServiceInstance[]
+
+  @@map("Tenant")
 }
 
 /**
@@ -106,7 +108,7 @@ model Credential {
  */
 model Did {
   id             String    @id @default(cuid())
-  organizationId String
+  tenantId       String
   did            String    @unique
   type           DidType
   method         DidMethod @default(DID_WEB)
@@ -121,9 +123,9 @@ model Did {
   serviceInstanceId String?
   serviceInstance   ServiceInstance? @relation(fields: [serviceInstanceId], references: [id], onDelete: SetNull)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@index([organizationId])
+  @@index([tenantId])
 }
 
 /**
@@ -132,7 +134,7 @@ model Did {
  */
 model ServiceInstance {
   id             String       @id @default(cuid())
-  organizationId String
+  tenantId       String
   serviceType    ServiceType
   adapterType    AdapterType
   name           String
@@ -142,8 +144,8 @@ model ServiceInstance {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   dids           Did[]
 
-  @@index([organizationId, serviceType])
+  @@index([tenantId, serviceType])
 }

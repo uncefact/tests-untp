@@ -23,9 +23,9 @@ export const didSchema = z.object({
   description: z.string().nullable().describe('Description of the DID'),
   status: z.enum(['ACTIVE', 'INACTIVE', 'VERIFIED', 'UNVERIFIED']).describe('Current status of the DID'),
   keyId: z.string().describe('Key identifier associated with the DID'),
-  organizationId: z.string().describe('ID of the owning organization'),
+  tenantId: z.string().describe('ID of the owning tenant'),
   serviceInstanceId: z.string().nullable().describe('ID of the service instance used to manage this DID'),
-  isDefault: z.boolean().describe('Whether this is the default DID for the organization'),
+  isDefault: z.boolean().describe('Whether this is the default DID for the tenant'),
   createdAt: z.string().datetime().describe('Timestamp when the DID was created'),
   updatedAt: z.string().datetime().describe('Timestamp when the DID was last updated'),
 });

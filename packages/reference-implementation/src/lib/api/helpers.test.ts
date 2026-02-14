@@ -1,4 +1,4 @@
-import { getOrganizationId, getSessionUserId } from './helpers';
+import { getTenantId, getSessionUserId } from './helpers';
 
 // Mock prisma - use inline object to avoid hoisting issues
 jest.mock('@/lib/prisma/prisma', () => ({
@@ -26,15 +26,15 @@ describe('API helpers', () => {
     jest.clearAllMocks();
   });
 
-  describe('getOrganizationId', () => {
-    it('returns the organization ID for a valid user', async () => {
-      mockFindUnique.mockResolvedValue({ organizationId: 'org-1' });
+  describe('getTenantId', () => {
+    it('returns the tenant ID for a valid user', async () => {
+      mockFindUnique.mockResolvedValue({ tenantId: 'org-1' });
 
-      const result = await getOrganizationId('user-1');
+      const result = await getTenantId('user-1');
 
       expect(mockFindUnique).toHaveBeenCalledWith({
         where: { id: 'user-1' },
-        select: { organizationId: true },
+        select: { tenantId: true },
       });
       expect(result).toBe('org-1');
     });
@@ -42,14 +42,14 @@ describe('API helpers', () => {
     it('returns null if user not found', async () => {
       mockFindUnique.mockResolvedValue(null);
 
-      const result = await getOrganizationId('nonexistent');
+      const result = await getTenantId('nonexistent');
       expect(result).toBeNull();
     });
 
-    it('returns null if user has no organisation', async () => {
-      mockFindUnique.mockResolvedValue({ organizationId: null });
+    it('returns null if user has no tenant', async () => {
+      mockFindUnique.mockResolvedValue({ tenantId: null });
 
-      const result = await getOrganizationId('user-1');
+      const result = await getTenantId('user-1');
       expect(result).toBeNull();
     });
   });

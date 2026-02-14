@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { resolveDidService } from '@/lib/services/resolve-did-service';
 import { ServiceRegistryError, errorMessage } from '@/lib/api/errors';
 import { ValidationError, validateEnum, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
-import { withOrgAuth } from '@/lib/api/with-org-auth';
+import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createDid, listDids } from '@/lib/prisma/repositories';
 import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus, createLogger } from '@uncefact/untp-ri-services';
 
@@ -13,7 +13,7 @@ const logger = createLogger().child({ module: 'api:dids' });
  * /dids:
  *   post:
  *     summary: Create a new DID
- *     description: Creates a new Decentralized Identifier (DID) for the authenticated organization
+ *     description: Creates a new Decentralized Identifier (DID) for the authenticated tenant
  *     tags:
  *       - DIDs
  *     requestBody:
@@ -85,7 +85,7 @@ const logger = createLogger().child({ module: 'api:dids' });
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-export const POST = withOrgAuth(async (req, { organizationId }) => {
+export const POST = withTenantAuth(async (req, { tenantId }) => {
   let body: {
     type?: string;
     method?: string;
@@ -113,7 +113,7 @@ export const POST = withOrgAuth(async (req, { organizationId }) => {
     }
 
     const { service: didService, instanceId: serviceInstanceId } = await resolveDidService(
-      organizationId,
+      tenantId,
       body.serviceInstanceId,
     );
 
@@ -138,7 +138,7 @@ export const POST = withOrgAuth(async (req, { organizationId }) => {
     const status = type === DidType.SELF_MANAGED ? DidStatus.UNVERIFIED : DidStatus.ACTIVE;
 
     const record = await createDid({
-      organizationId,
+      tenantId,
       did: providerResult.did,
       type,
       method,
@@ -168,7 +168,7 @@ export const POST = withOrgAuth(async (req, { organizationId }) => {
  * /dids:
  *   get:
  *     summary: List DIDs
- *     description: Retrieves a list of DIDs for the authenticated organization with optional filtering
+ *     description: Retrieves a list of DIDs for the authenticated tenant with optional filtering
  *     tags:
  *       - DIDs
  *     parameters:
@@ -235,7 +235,7 @@ export const POST = withOrgAuth(async (req, { organizationId }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-export const GET = withOrgAuth(async (req, { organizationId }) => {
+export const GET = withTenantAuth(async (req, { tenantId }) => {
   const url = new URL(req.url);
 
   try {
@@ -245,7 +245,7 @@ export const GET = withOrgAuth(async (req, { organizationId }) => {
     const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
     const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-    const dids = await listDids(organizationId, {
+    const dids = await listDids(tenantId, {
       type,
       status,
       serviceInstanceId,

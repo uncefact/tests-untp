@@ -8,9 +8,9 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withOrgAuth as passthrough
-jest.mock('@/lib/api/with-org-auth', () => ({
-  withOrgAuth: (handler: (...args: unknown[]) => unknown) => handler,
+// Mock withTenantAuth as passthrough
+jest.mock('@/lib/api/with-tenant-auth', () => ({
+  withTenantAuth: (handler: (...args: unknown[]) => unknown) => handler,
 }));
 
 const mockGetDidById = jest.fn();
@@ -41,7 +41,7 @@ function createFakeRequest(options: { method?: string; body?: unknown; url?: str
 }
 
 function createContext(id: string) {
-  return { organizationId: 'org-1', params: Promise.resolve({ id }) };
+  return { tenantId: 'org-1', params: Promise.resolve({ id }) };
 }
 
 describe('GET /api/v1/dids/:id', () => {
