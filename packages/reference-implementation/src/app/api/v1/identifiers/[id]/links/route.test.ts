@@ -25,6 +25,7 @@ jest.mock('@/lib/services/resolve-idr-service', () => ({
   resolveIdrService: (...args: unknown[]) => mockResolveIdrService(...args),
 }));
 
+import { IdrPublishError } from '@uncefact/untp-ri-services';
 import { POST, GET } from './route';
 
 // -- Helpers -------------------------------------------------------------------
@@ -151,6 +152,23 @@ describe('POST /api/v1/identifiers/[id]/links', () => {
 
     expect(res.status).toBe(400);
     expect(body.error).toBe('Invalid JSON body');
+  });
+
+  it('returns IDR service error with proper status when publishLinks fails', async () => {
+    MOCK_IDR_SERVICE.publishLinks.mockRejectedValue(
+      new IdrPublishError('01', '09520123456788', 500, 'upstream timeout'),
+    );
+
+    const req = createFakeRequest({
+      links: [{ href: 'https://example.com/cred.json', rel: 'untp:dpp', type: 'application/json' }],
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(502);
+    expect(body.ok).toBe(false);
+    expect(body.code).toBe('IDR_PUBLISH_FAILED');
   });
 });
 

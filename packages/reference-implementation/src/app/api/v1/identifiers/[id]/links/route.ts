@@ -4,6 +4,7 @@ import { ValidationError } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getIdentifierById, createManyLinkRegistrations, listLinkRegistrations } from '@/lib/prisma/repositories';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
+import { ServiceError } from '@uncefact/untp-ri-services';
 
 /**
  * @swagger
@@ -112,6 +113,9 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
     }
     if (e instanceof ServiceRegistryError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+    }
+    if (e instanceof ServiceError) {
+      return NextResponse.json({ ok: false, error: e.message, code: e.code }, { status: e.statusCode });
     }
     console.error('[api] Unexpected error:', e);
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });

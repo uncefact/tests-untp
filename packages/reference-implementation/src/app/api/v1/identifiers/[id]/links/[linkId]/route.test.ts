@@ -27,7 +27,7 @@ jest.mock('@/lib/services/resolve-idr-service', () => ({
   resolveIdrService: (...args: unknown[]) => mockResolveIdrService(...args),
 }));
 
-import { IdrLinkNotFoundError } from '@uncefact/untp-ri-services';
+import { IdrLinkNotFoundError, IdrLinkFetchError } from '@uncefact/untp-ri-services';
 import { GET, PATCH, DELETE } from './route';
 
 // -- Helpers -------------------------------------------------------------------
@@ -150,6 +150,18 @@ describe('GET /api/v1/identifiers/[id]/links/[linkId]', () => {
 
     expect(res.status).toBe(404);
     expect((await res.json()).ok).toBe(false);
+  });
+
+  it('returns IDR service error with proper status when getLinkById fails', async () => {
+    MOCK_IDR_SERVICE.getLinkById.mockRejectedValue(new IdrLinkFetchError('idr-link-1', 500, 'upstream timeout'));
+
+    const req = createFakeRequest();
+    const res = await GET(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(502);
+    expect(body.ok).toBe(false);
+    expect(body.code).toBe('IDR_LINK_FETCH_FAILED');
   });
 });
 

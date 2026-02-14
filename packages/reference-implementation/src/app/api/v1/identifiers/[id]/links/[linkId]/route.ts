@@ -9,7 +9,7 @@ import {
   deleteLinkRegistration,
 } from '@/lib/prisma/repositories';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
-import { IdrLinkNotFoundError } from '@uncefact/untp-ri-services';
+import { IdrLinkNotFoundError, ServiceError } from '@uncefact/untp-ri-services';
 
 /**
  * @swagger
@@ -83,6 +83,9 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
     }
     if (e instanceof ServiceRegistryError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+    }
+    if (e instanceof ServiceError) {
+      return NextResponse.json({ ok: false, error: e.message, code: e.code }, { status: e.statusCode });
     }
     console.error('[api] Unexpected error:', e);
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
@@ -180,6 +183,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     if (e instanceof ServiceRegistryError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
     }
+    if (e instanceof ServiceError) {
+      return NextResponse.json({ ok: false, error: e.message, code: e.code }, { status: e.statusCode });
+    }
     console.error('[api] Unexpected error:', e);
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
   }
@@ -264,6 +270,9 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
     }
     if (e instanceof ServiceRegistryError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+    }
+    if (e instanceof ServiceError) {
+      return NextResponse.json({ ok: false, error: e.message, code: e.code }, { status: e.statusCode });
     }
     console.error('[api] Unexpected error:', e);
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
