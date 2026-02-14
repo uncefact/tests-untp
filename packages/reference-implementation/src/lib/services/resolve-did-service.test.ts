@@ -116,16 +116,15 @@ describe('resolveDidService', () => {
     expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'DID', undefined);
     expect(mockEncryptionService.decrypt).toHaveBeenCalledWith(MOCK_ENCRYPTED_ENVELOPE);
     expect(mockConfigSchema.safeParse).toHaveBeenCalledWith(VALID_CONFIG);
-    expect(mockFactory).toHaveBeenCalledWith(VALID_CONFIG, {
-      name: 'VCKIT',
-      version: '1.1.0',
-      logger: expect.objectContaining({
+    expect(mockFactory).toHaveBeenCalledWith(
+      VALID_CONFIG,
+      expect.objectContaining({
         info: expect.any(Function),
         warn: expect.any(Function),
         error: expect.any(Function),
         debug: expect.any(Function),
       }),
-    });
+    );
     expect(result).toEqual({ service: MOCK_SERVICE, instanceId: 'inst-1' });
   });
 

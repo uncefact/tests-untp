@@ -7,6 +7,3 @@
 
 /** Service type identifier for Identity Resolver services. */
 export const IDR_SERVICE_TYPE = 'IDR' as const;
-
-/** Adapter type identifier for Pyx IDR provider. */
-export const PYX_IDR_ADAPTER_TYPE = 'PYX_IDR' as const;

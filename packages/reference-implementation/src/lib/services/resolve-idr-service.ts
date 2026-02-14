@@ -1,7 +1,8 @@
 import { ServiceType } from '@uncefact/untp-ri-services';
 import type { AdapterRegistryEntry } from '@uncefact/untp-ri-services';
 import { adapterRegistry } from '@uncefact/untp-ri-services/server';
-import type { IIdentityResolverService, Logger } from '@uncefact/untp-ri-services';
+import type { IIdentityResolverService } from '@uncefact/untp-ri-services';
+import { createLogger } from '@uncefact/untp-ri-services/logging';
 import { getEncryptionService } from '@/lib/encryption/encryption';
 import { getInstanceByResolution } from '@/lib/prisma/repositories';
 import {
@@ -10,6 +11,8 @@ import {
   ConfigDecryptionError,
   ConfigValidationError,
 } from '@/lib/api/errors';
+
+const logger = createLogger().child({ module: 'resolve-idr-service' });
 
 /**
  * Shape returned by resolveIdrService — the resolved adapter
@@ -49,10 +52,7 @@ export async function resolveIdrService(
   try {
     decryptedJson = getEncryptionService().decrypt(JSON.parse(instance.config));
   } catch (error) {
-    console.error('[resolve-idr-service] Config decryption failed:', {
-      instanceId: instance.id,
-      error: error instanceof Error ? error.message : error,
-    });
+    logger.error({ error, instanceId: instance.id }, 'Config decryption failed');
     throw new ConfigDecryptionError(instance.id);
   }
 
@@ -61,10 +61,7 @@ export async function resolveIdrService(
   try {
     rawConfig = JSON.parse(decryptedJson);
   } catch (error) {
-    console.error('[resolve-idr-service] Config JSON parse failed:', {
-      instanceId: instance.id,
-      error: error instanceof Error ? error.message : error,
-    });
+    logger.error({ error, instanceId: instance.id }, 'Config JSON parse failed');
     throw new ConfigValidationError(instance.id, 'Invalid JSON in decrypted config');
   }
 
@@ -84,19 +81,8 @@ export async function resolveIdrService(
     );
   }
 
-  const consoleLogger: Logger = {
-    info: console.log,
-    warn: console.warn,
-    error: console.error,
-    debug: console.debug,
-  };
-
   return {
-    service: adapterEntry.factory(parseResult.data, {
-      name: instance.adapterType,
-      version: instance.apiVersion,
-      logger: consoleLogger,
-    }) as IIdentityResolverService,
+    service: adapterEntry.factory(parseResult.data, logger) as IIdentityResolverService,
     instanceId: instance.id,
   };
 }

@@ -1,6 +1,6 @@
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
-import type { Logger } from '../../../registry/adapter-options.js';
-import { createPrefixedLogger } from '../../../registry/adapter-options.js';
+import type { LoggerService } from '../../../logging/types.js';
+import { createLogger } from '../../../logging/factory.js';
 import { pyxIdrConfigSchema, type PyxIdrConfig } from './pyx-idr.schema.js';
 import type {
   IIdentityResolverService,
@@ -11,7 +11,10 @@ import type {
   LinkType,
 } from '../../../interfaces/identityResolverService.js';
 
-export { IDR_SERVICE_TYPE, PYX_IDR_ADAPTER_TYPE } from '../../types.js';
+export { IDR_SERVICE_TYPE } from '../../types.js';
+
+/** Adapter type identifier for Pyx IDR provider. */
+export const PYX_IDR_ADAPTER_TYPE = 'PYX_IDR' as const;
 
 type DefaultFlagsConfig = {
   defaultLinkType: boolean;
@@ -34,10 +37,10 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
   private readonly headers: Record<string, string>;
   private readonly defaultFlags: DefaultFlagsConfig;
   private readonly defaultContext: string;
-  private readonly logger: Logger;
+  private readonly logger: LoggerService;
   private readonly apiVersion: string;
 
-  constructor(config: PyxIdrConfig, logger: Logger) {
+  constructor(config: PyxIdrConfig, logger?: LoggerService) {
     this.baseURL = config.baseUrl;
     this.headers = {
       Authorization: `Bearer ${config.apiKey}`,
@@ -52,7 +55,7 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
       fwqs: config.defaultFlags?.fwqs ?? false,
     };
     this.apiVersion = config.apiVersion;
-    this.logger = createPrefixedLogger('PYX_IDR', config.apiVersion, logger);
+    this.logger = (logger || createLogger()).child({ service: 'PyxIdrAdapter', apiVersion: config.apiVersion });
   }
 
   private get apiBasePath(): string {
@@ -244,6 +247,6 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
 /** Registry entry for the Pyx IDR adapter. */
 export const pyxIdrRegistryEntry = {
   configSchema: pyxIdrConfigSchema,
-  factory: (config: PyxIdrConfig, logger: Logger): IIdentityResolverService =>
+  factory: (config: PyxIdrConfig, logger: LoggerService): IIdentityResolverService =>
     new PyxIdentityResolverAdapter(config, logger),
 } satisfies AdapterRegistryEntry<PyxIdrConfig, IIdentityResolverService>;

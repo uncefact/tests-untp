@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const pyxIdrConfigSchema = z.object({
   baseUrl: z.string().url().describe('Base URL||The base URL of the Pyx IDR instance (no path segments)'),
   apiKey: z.string().min(1).describe('API Key||The API key for authenticating with the Pyx IDR'),
+  apiVersion: z.enum(['2.0.2']).default('2.0.2').describe('API Version||The Pyx IDR API version to use'),
   defaultContext: z
     .string()
     .optional()

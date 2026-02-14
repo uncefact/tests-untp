@@ -86,3 +86,8 @@ e2e/cypress/screenshots
 
 # keycloak generated realm files
 keycloak-realms/
+
+# Local Claude Code files
+.claude/.pr-review-done-*
+.claude/specs/
+CONTEXT.md

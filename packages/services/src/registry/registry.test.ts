@@ -1,17 +1,14 @@
 import { adapterRegistry } from './registry';
 import { ServiceType, AdapterType } from './types';
 import { VCKitDidAdapter } from '../did-manager/adapters/vckit/vckit-did.adapter';
-import type { AdapterConstructorOptions } from './adapter-options';
+import type { LoggerService } from '../logging/types';
 
-const MOCK_OPTIONS: AdapterConstructorOptions = {
-  name: 'VCKIT',
-  version: '1.1.0',
-  logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-  },
+const mockLogger: LoggerService = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+  child: jest.fn().mockReturnThis(),
 };
 
 describe('adapterRegistry', () => {
@@ -34,28 +31,24 @@ describe('adapterRegistry', () => {
   describe('factory', () => {
     it('creates a VCKitDidAdapter instance with valid config', () => {
       const entry = adapterRegistry[ServiceType.DID][AdapterType.VCKIT];
-      const service = entry.factory(
-        {
-          endpoint: 'https://vckit.example.com',
-          authToken: 'my-secret-token',
-          keyType: 'Ed25519',
-        },
-        MOCK_OPTIONS,
-      );
+      const parsed = entry.configSchema.parse({
+        endpoint: 'https://vckit.example.com',
+        authToken: 'my-secret-token',
+        keyType: 'Ed25519',
+      });
+      const service = entry.factory(parsed, mockLogger);
 
       expect(service).toBeInstanceOf(VCKitDidAdapter);
     });
 
     it('passes endpoint, auth header, and keyType to VCKitDidAdapter', () => {
       const entry = adapterRegistry[ServiceType.DID][AdapterType.VCKIT];
-      const service = entry.factory(
-        {
-          endpoint: 'https://vckit.example.com',
-          authToken: 'my-secret-token',
-          keyType: 'Ed25519',
-        },
-        MOCK_OPTIONS,
-      ) as VCKitDidAdapter;
+      const parsed = entry.configSchema.parse({
+        endpoint: 'https://vckit.example.com',
+        authToken: 'my-secret-token',
+        keyType: 'Ed25519',
+      });
+      const service = entry.factory(parsed, mockLogger) as VCKitDidAdapter;
 
       expect(service.baseURL).toBe('https://vckit.example.com');
       expect(service.headers).toEqual({ Authorization: 'Bearer my-secret-token' });
@@ -68,7 +61,7 @@ describe('adapterRegistry', () => {
         endpoint: 'https://vckit.example.com',
         authToken: 'my-secret-token',
       });
-      const service = entry.factory(parsed, MOCK_OPTIONS) as VCKitDidAdapter;
+      const service = entry.factory(parsed, mockLogger) as VCKitDidAdapter;
 
       expect(service.keyType).toBe('Ed25519');
     });

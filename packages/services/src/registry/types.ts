@@ -2,7 +2,8 @@ import { z } from 'zod';
 import type { LoggerService } from '../logging/types.js';
 import { DID_SERVICE_TYPE } from '../did-manager/types.js';
 import { VCKIT_DID_ADAPTER_TYPE } from '../did-manager/adapters/vckit/vckit-did.adapter.js';
-import { IDR_SERVICE_TYPE, PYX_IDR_ADAPTER_TYPE } from '../adapters/identity-resolver/pyxIdentityResolver.adapter.js';
+import { IDR_SERVICE_TYPE } from '../identity-resolver/types.js';
+import { PYX_IDR_ADAPTER_TYPE } from '../identity-resolver/adapters/pyx/pyx-idr.adapter.js';
 
 // Mirror Prisma enums as string constants (packages/services cannot import Prisma)
 export const ServiceType = {

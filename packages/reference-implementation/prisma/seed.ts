@@ -250,7 +250,7 @@ async function main() {
         name: 'System Default Pyx IDR',
         description: 'System-wide default Pyx Identity Resolver instance',
         config: encryptedIdrConfig,
-        apiVersion: '1.0.0',
+        apiVersion: '2.0.2',
         isPrimary: true,
       },
     });
@@ -264,7 +264,9 @@ async function main() {
 
   logger.info(
     'Seed complete: system tenant, default DID, DID service instance, ' +
-    'registrars, schemes, qualifiers' + (idrSeeded ? ', and IDR service instance' : '') + ' upserted',
+      'registrars, schemes, qualifiers' +
+      (idrSeeded ? ', and IDR service instance' : '') +
+      ' upserted',
   );
 }
 

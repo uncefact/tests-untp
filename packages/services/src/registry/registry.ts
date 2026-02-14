@@ -1,6 +1,6 @@
 import { ServiceType, AdapterType } from './types.js';
 import { vckitDidRegistryEntry } from '../did-manager/adapters/vckit/vckit-did.adapter.js';
-import { pyxIdrRegistryEntry } from '../adapters/identity-resolver/pyxIdentityResolver.adapter.js';
+import { pyxIdrRegistryEntry } from '../identity-resolver/adapters/pyx/pyx-idr.adapter.js';
 
 export const adapterRegistry = {
   [ServiceType.DID]: {

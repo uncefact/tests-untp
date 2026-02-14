@@ -1,7 +1,8 @@
-import { VCKitDidAdapter } from './vckit-did.adapter';
+import { VCKitDidAdapter, vckitDidRegistryEntry } from './vckit-did.adapter';
+import { vckitDidConfigSchema } from './vckit-did.schema';
 import { DidMethod, DidType } from '../../types';
 import { verifyDid } from '../../verify';
-import type { AdapterConstructorOptions } from '../../../registry/adapter-options';
+import type { LoggerService } from '../../../logging/types';
 
 jest.mock('../../verify.js', () => ({
   verifyDid: jest.fn(),
@@ -22,19 +23,13 @@ function createMockResponse(data: unknown, ok = true, status = 200): Response {
 const BASE_URL = 'http://localhost:3332';
 const HEADERS = { Authorization: 'Bearer test-token' };
 
-function createMockOptions(overrides?: Partial<AdapterConstructorOptions>): AdapterConstructorOptions {
-  return {
-    name: 'VCKIT',
-    version: '1.1.0',
-    logger: {
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-    },
-    ...overrides,
-  };
-}
+const mockLogger: LoggerService = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+  child: jest.fn().mockReturnThis(),
+};
 
 // -- Tests -------------------------------------------------------------------
 
@@ -64,14 +59,6 @@ describe('VCKitDidAdapter', () => {
 
     it('throws if Authorization header is missing', () => {
       expect(() => new VCKitDidAdapter(BASE_URL, {})).toThrow('Authorization header is required');
-    });
-
-    it('accepts optional AdapterConstructorOptions', () => {
-      const options = createMockOptions();
-      const adapter = new VCKitDidAdapter(BASE_URL, HEADERS, 'Ed25519', options);
-      expect(adapter.baseURL).toBe(BASE_URL);
-      expect(adapter.headers).toEqual(HEADERS);
-      expect(adapter.keyType).toBe('Ed25519');
     });
   });
 
@@ -310,6 +297,27 @@ describe('VCKitDidAdapter', () => {
   describe('getSupportedKeyTypes', () => {
     it('returns supported key types', () => {
       expect(service.getSupportedKeyTypes()).toEqual(['Ed25519']);
+    });
+  });
+
+  describe('vckitDidConfigSchema', () => {
+    it('defaults apiVersion to 1.1.0', () => {
+      const result = vckitDidConfigSchema.parse({
+        endpoint: 'https://vckit.example.com',
+        authToken: 'token',
+      });
+      expect(result.apiVersion).toBe('1.1.0');
+    });
+  });
+
+  describe('vckitDidRegistryEntry', () => {
+    it('factory creates an adapter using Logger', () => {
+      const config = vckitDidConfigSchema.parse({
+        endpoint: 'https://vckit.example.com',
+        authToken: 'my-token',
+      });
+      const adapter = vckitDidRegistryEntry.factory(config, mockLogger);
+      expect(adapter).toBeInstanceOf(VCKitDidAdapter);
     });
   });
 });

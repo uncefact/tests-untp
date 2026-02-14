@@ -16,7 +16,7 @@ export type { VerifyDidOptions } from './did-manager/verify.js';
 export { AesGcmEncryptionAdapter } from './encryption/adapters/aes-gcm/aes-gcm.adapter.js';
 
 // IDR adapter (Pyx Identity Resolver)
-export { PyxIdentityResolverAdapter } from './adapters/identity-resolver/pyxIdentityResolver.adapter.js';
+export { PyxIdentityResolverAdapter } from './identity-resolver/adapters/pyx/pyx-idr.adapter.js';
 
 // Registry (imports VCKit adapter which transitively pulls in jsonld)
 export { adapterRegistry } from './registry/registry.js';

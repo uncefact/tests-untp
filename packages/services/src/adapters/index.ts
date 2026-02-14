@@ -1,3 +1,2 @@
 export * from './storage';
 export * from './verifiable-credentials';
-export * from './identity-resolver';

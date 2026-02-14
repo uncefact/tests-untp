@@ -70,7 +70,7 @@ const MOCK_INSTANCE = {
   adapterType: 'PYX_IDR',
   name: 'System Pyx IDR',
   config: JSON.stringify(MOCK_ENCRYPTED_ENVELOPE),
-  apiVersion: '1.0.0',
+  apiVersion: '2.0.2',
   isPrimary: true,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -115,16 +115,15 @@ describe('resolveIdrService', () => {
     expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'IDR', undefined);
     expect(mockEncryptionService.decrypt).toHaveBeenCalledWith(MOCK_ENCRYPTED_ENVELOPE);
     expect(mockConfigSchema.safeParse).toHaveBeenCalledWith(VALID_CONFIG);
-    expect(mockFactory).toHaveBeenCalledWith(VALID_CONFIG, {
-      name: 'PYX_IDR',
-      version: '1.0.0',
-      logger: expect.objectContaining({
+    expect(mockFactory).toHaveBeenCalledWith(
+      VALID_CONFIG,
+      expect.objectContaining({
         info: expect.any(Function),
         warn: expect.any(Function),
         error: expect.any(Function),
         debug: expect.any(Function),
       }),
-    });
+    );
     expect(result).toEqual({ service: MOCK_SERVICE, instanceId: 'idr-inst-1' });
   });
 
