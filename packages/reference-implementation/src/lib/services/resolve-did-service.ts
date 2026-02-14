@@ -78,7 +78,7 @@ export async function resolveDidService(tenantId: string, serviceInstanceId?: st
   return {
     service: adapterEntry.factory(parseResult.data, {
       name: instance.adapterType,
-      version: (instance as any).apiVersion ?? '1.1.0',
+      version: instance.apiVersion,
       logger: consoleLogger,
     }) as IDidService,
     instanceId: instance.id,
