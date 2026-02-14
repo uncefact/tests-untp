@@ -56,7 +56,17 @@ export { ServiceError } from './errors.js';
 
 // IDR service types and constants
 export type { ResolverDescription, LinkType, PublishLinksOptions } from './interfaces/identityResolverService.js';
-export { IDR_SERVICE_TYPE, IdrLinkNotFoundError } from './identity-resolver/types.js';
+export { IDR_SERVICE_TYPE } from './identity-resolver/types.js';
+export {
+  IdrError,
+  IdrLinkNotFoundError,
+  IdrPublishError,
+  IdrLinkFetchError,
+  IdrLinkUpdateError,
+  IdrLinkDeleteError,
+  IdrResolverFetchError,
+  IdrLinkTypesFetchError,
+} from './identity-resolver/errors.js';
 export { PYX_IDR_ADAPTER_TYPE } from './identity-resolver/adapters/pyx/pyx-idr.adapter.js';
 export type { PyxIdrConfig } from './identity-resolver/adapters/pyx/pyx-idr.schema.js';
 export { pyxIdrConfigSchema, pyxIdrSensitiveFields } from './identity-resolver/adapters/pyx/pyx-idr.schema.js';
