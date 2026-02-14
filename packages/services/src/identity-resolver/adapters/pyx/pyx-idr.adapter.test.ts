@@ -5,6 +5,14 @@ import {
   IdrLinkNotFoundError,
   pyxIdrRegistryEntry,
 } from './pyx-idr.adapter';
+import {
+  IdrPublishError,
+  IdrLinkFetchError,
+  IdrLinkUpdateError,
+  IdrLinkDeleteError,
+  IdrResolverFetchError,
+  IdrLinkTypesFetchError,
+} from '../../errors';
 import type { Link } from '../../../interfaces/identityResolverService';
 import type { PyxIdrConfig } from './pyx-idr.schema';
 import type { LoggerService } from '../../../logging/types';
@@ -309,7 +317,7 @@ describe('PyxIdentityResolverAdapter', () => {
 
         await expect(
           adapter.publishLinks('abn', '51824753556', mockLinks, undefined, { namespace: 'au' }),
-        ).rejects.toThrow('Failed to publish links: HTTP 500: Server exploded');
+        ).rejects.toThrow(IdrPublishError);
       });
 
       it('should fall back to statusText when text() fails', async () => {
@@ -324,7 +332,7 @@ describe('PyxIdentityResolverAdapter', () => {
 
         await expect(
           adapter.publishLinks('abn', '51824753556', mockLinks, undefined, { namespace: 'au' }),
-        ).rejects.toThrow('Failed to publish links: HTTP 502: Bad Gateway');
+        ).rejects.toThrow(IdrPublishError);
       });
     });
   });
@@ -439,7 +447,7 @@ describe('PyxIdentityResolverAdapter', () => {
 
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
 
-      await expect(adapter.getLinkById('link-999')).rejects.toThrow('Failed to get link: HTTP 500: Server error');
+      await expect(adapter.getLinkById('link-999')).rejects.toThrow(IdrLinkFetchError);
     });
   });
 
@@ -514,9 +522,7 @@ describe('PyxIdentityResolverAdapter', () => {
 
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
 
-      await expect(adapter.updateLink('link-123', { title: 'test' })).rejects.toThrow(
-        'Failed to update link: HTTP 400: Invalid update',
-      );
+      await expect(adapter.updateLink('link-123', { title: 'test' })).rejects.toThrow(IdrLinkUpdateError);
     });
   });
 
@@ -560,7 +566,7 @@ describe('PyxIdentityResolverAdapter', () => {
 
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
 
-      await expect(adapter.deleteLink('link-999')).rejects.toThrow('Failed to delete link: HTTP 500: Server error');
+      await expect(adapter.deleteLink('link-999')).rejects.toThrow(IdrLinkDeleteError);
     });
   });
 
@@ -595,9 +601,7 @@ describe('PyxIdentityResolverAdapter', () => {
 
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
 
-      await expect(adapter.getResolverDescription()).rejects.toThrow(
-        'Failed to get resolver description: HTTP 503: Resolver down',
-      );
+      await expect(adapter.getResolverDescription()).rejects.toThrow(IdrResolverFetchError);
     });
   });
 
@@ -632,7 +636,7 @@ describe('PyxIdentityResolverAdapter', () => {
 
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
 
-      await expect(adapter.getLinkTypes()).rejects.toThrow('Failed to get link types: HTTP 500: Error');
+      await expect(adapter.getLinkTypes()).rejects.toThrow(IdrLinkTypesFetchError);
     });
   });
 

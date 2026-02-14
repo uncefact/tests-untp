@@ -11,9 +11,17 @@ import type {
   LinkType,
 } from '../../../interfaces/identityResolverService.js';
 
-import { IdrLinkNotFoundError } from '../../types.js';
-
-export { IDR_SERVICE_TYPE, IdrLinkNotFoundError } from '../../types.js';
+import {
+  IdrLinkNotFoundError,
+  IdrPublishError,
+  IdrLinkFetchError,
+  IdrLinkUpdateError,
+  IdrLinkDeleteError,
+  IdrResolverFetchError,
+  IdrLinkTypesFetchError,
+} from '../../errors.js';
+export { IDR_SERVICE_TYPE } from '../../types.js';
+export { IdrLinkNotFoundError } from '../../errors.js';
 
 /** Adapter type identifier for Pyx IDR provider. */
 export const PYX_IDR_ADAPTER_TYPE = 'PYX_IDR' as const;
@@ -104,7 +112,7 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => response.statusText);
-      throw new Error(`Failed to publish links: HTTP ${response.status}: ${errorText}`);
+      throw new IdrPublishError(identifierScheme, identifier, response.status, errorText);
     }
 
     const result = await response.json();
@@ -135,7 +143,7 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
         throw new IdrLinkNotFoundError(linkId, response.status);
       }
       const errorText = await response.text().catch(() => response.statusText);
-      throw new Error(`Failed to get link: HTTP ${response.status}: ${errorText}`);
+      throw new IdrLinkFetchError(linkId, response.status, errorText);
     }
 
     const result = await response.json();
@@ -167,7 +175,7 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
         throw new IdrLinkNotFoundError(linkId, response.status);
       }
       const errorText = await response.text().catch(() => response.statusText);
-      throw new Error(`Failed to update link: HTTP ${response.status}: ${errorText}`);
+      throw new IdrLinkUpdateError(linkId, response.status, errorText);
     }
 
     const result = await response.json();
@@ -192,7 +200,7 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
         throw new IdrLinkNotFoundError(linkId, response.status);
       }
       const errorText = await response.text().catch(() => response.statusText);
-      throw new Error(`Failed to delete link: HTTP ${response.status}: ${errorText}`);
+      throw new IdrLinkDeleteError(linkId, response.status, errorText);
     }
   }
 
@@ -204,7 +212,7 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => response.statusText);
-      throw new Error(`Failed to get resolver description: HTTP ${response.status}: ${errorText}`);
+      throw new IdrResolverFetchError(response.status, errorText);
     }
 
     return response.json();
@@ -218,7 +226,7 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => response.statusText);
-      throw new Error(`Failed to get link types: HTTP ${response.status}: ${errorText}`);
+      throw new IdrLinkTypesFetchError(response.status, errorText);
     }
 
     return response.json();
