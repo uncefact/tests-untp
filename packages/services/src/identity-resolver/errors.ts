@@ -20,13 +20,22 @@ export class IdrLinkNotFoundError extends IdrError {
 
 /** Failed to publish links to the upstream IDR. */
 export class IdrPublishError extends IdrError {
-  constructor(identifierScheme: string, identifier: string, httpStatus: number, detail: string) {
-    super(
-      `Failed to publish links for ${identifierScheme}/${identifier}: HTTP ${httpStatus}: ${detail}`,
-      'IDR_PUBLISH_FAILED',
-      502,
-      { identifierScheme, identifier, httpStatus },
-    );
+  constructor(
+    identifierScheme: string,
+    identifier: string,
+    httpStatus: number,
+    detail: string,
+    qualifierPath?: string,
+  ) {
+    const target = qualifierPath
+      ? `${identifierScheme}/${identifier}/${qualifierPath}`
+      : `${identifierScheme}/${identifier}`;
+    super(`Failed to publish links for ${target}: HTTP ${httpStatus}: ${detail}`, 'IDR_PUBLISH_FAILED', 502, {
+      identifierScheme,
+      identifier,
+      qualifierPath,
+      httpStatus,
+    });
   }
 }
 

@@ -112,7 +112,7 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => response.statusText);
-      throw new IdrPublishError(identifierScheme, identifier, response.status, errorText);
+      throw new IdrPublishError(identifierScheme, identifier, response.status, errorText, qualifierPath);
     }
 
     const result = await response.json();

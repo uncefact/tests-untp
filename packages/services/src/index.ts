@@ -26,7 +26,13 @@ export type {
   IVerifiableCredentialService,
 } from './interfaces/verifiableCredentialService.js';
 export * from './did-manager/types.js';
-export { didDocumentSchema, verificationMethodSchema } from './did-manager/schemas.js';
+export {
+  didDocumentSchema,
+  verificationMethodSchema,
+  didResponseSchema,
+  verificationResultResponseSchema,
+  didDocumentResponseSchema,
+} from './did-manager/schemas.js';
 export { didWebToUrl, parseDidMethod, normaliseDidWebAlias } from './did-manager/common/utils.js';
 // Encryption
 export { AesGcmEncryptionAdapter } from './encryption/adapters/aes-gcm/aes-gcm.adapter.js';
@@ -79,6 +85,18 @@ export {
 export { PYX_IDR_ADAPTER_TYPE } from './identity-resolver/adapters/pyx/pyx-idr.adapter.js';
 export type { PyxIdrConfig } from './identity-resolver/adapters/pyx/pyx-idr.schema.js';
 export { pyxIdrConfigSchema, pyxIdrSensitiveFields } from './identity-resolver/adapters/pyx/pyx-idr.schema.js';
+
+// IDR API response schemas
+export {
+  registrarSchema,
+  schemeQualifierSchema,
+  identifierSchemeSchema,
+  identifierSchema,
+  linkRegistrationSchema,
+} from './identity-resolver/schemas.js';
+
+// Shared API response schemas
+export { errorResponseSchema } from './schemas.js';
 
 // IDR verification utilities
 export type { VerificationWarning } from './identity-resolver/common/idr-verification.js';

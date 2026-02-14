@@ -41,13 +41,29 @@ describe('IDR errors', () => {
   describe('IdrPublishError', () => {
     it('constructs message from scheme, identifier, status, detail', () => {
       const err = new IdrPublishError('abn', '51824753556', 500, 'server error');
-      expect(err.message).toContain('abn');
-      expect(err.message).toContain('51824753556');
+      expect(err.message).toContain('abn/51824753556');
       expect(err.message).toContain('500');
       expect(err.message).toContain('server error');
       expect(err.code).toBe('IDR_PUBLISH_FAILED');
       expect(err.statusCode).toBe(502);
+      expect(err.context).toEqual({
+        identifierScheme: 'abn',
+        identifier: '51824753556',
+        qualifierPath: undefined,
+        httpStatus: 500,
+      });
       expect(err).toBeInstanceOf(IdrError);
+    });
+
+    it('includes qualifierPath in message and context when provided', () => {
+      const err = new IdrPublishError('01', '09520123456788', 502, 'timeout', '10/ABC123');
+      expect(err.message).toContain('01/09520123456788/10/ABC123');
+      expect(err.context).toEqual({
+        identifierScheme: '01',
+        identifier: '09520123456788',
+        qualifierPath: '10/ABC123',
+        httpStatus: 502,
+      });
     });
   });
 
