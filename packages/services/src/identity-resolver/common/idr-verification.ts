@@ -1,4 +1,4 @@
-import type { ResolverDescription, LinkType } from '../../interfaces/identityResolverService.js';
+import type { ResolverDescription, LinkType } from '../types.js';
 
 const REQUIRED_UNTP_LINK_TYPES = ['untp:dpp', 'untp:dcc', 'untp:dte', 'untp:idr'];
 

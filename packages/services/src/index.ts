@@ -70,8 +70,17 @@ export {
 } from './did-manager/errors.js';
 
 // IDR service types and constants
-export type { ResolverDescription, LinkType, PublishLinksOptions } from './interfaces/identityResolverService.js';
-export { IDR_SERVICE_TYPE } from './identity-resolver/types.js';
+export { IDR_SERVICE_TYPE, AccessRole } from './identity-resolver/types.js';
+export type {
+  RFC9264Link,
+  UNTPLinkExtensions,
+  Link,
+  LinkRegistration,
+  PublishLinksOptions,
+  ResolverDescription,
+  LinkType as IdrLinkType,
+  IIdentityResolverService,
+} from './identity-resolver/types.js';
 export {
   IdrError,
   IdrLinkNotFoundError,

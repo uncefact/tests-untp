@@ -9,7 +9,7 @@ import type {
   PublishLinksOptions,
   ResolverDescription,
   LinkType,
-} from '../../../interfaces/identityResolverService.js';
+} from '../../types.js';
 
 import {
   IdrLinkNotFoundError,
@@ -26,14 +26,6 @@ export { IdrLinkNotFoundError } from '../../errors.js';
 /** Adapter type identifier for Pyx IDR provider. */
 export const PYX_IDR_ADAPTER_TYPE = 'PYX_IDR' as const;
 
-type DefaultFlagsConfig = {
-  defaultLinkType: boolean;
-  defaultMimeType: boolean;
-  defaultIanaLanguage: boolean;
-  defaultContext: boolean;
-  fwqs: boolean;
-};
-
 /**
  * Pyx Identity Resolver adapter implementation.
  * Registers and manages links with a Pyx IDR instance to make them
@@ -45,10 +37,15 @@ type DefaultFlagsConfig = {
 export class PyxIdentityResolverAdapter implements IIdentityResolverService {
   private readonly baseURL: string;
   private readonly headers: Record<string, string>;
-  private readonly defaultFlags: DefaultFlagsConfig;
-  private readonly defaultContext: string;
   private readonly logger: LoggerService;
   private readonly apiVersion: string;
+  private readonly ianaLanguage: string;
+  private readonly context: string;
+  private readonly defaultLinkType: string;
+  private readonly defaultMimeType: string;
+  private readonly defaultIanaLanguage: string;
+  private readonly defaultContext: string;
+  private readonly fwqs: boolean;
 
   constructor(config: PyxIdrConfig, logger?: LoggerService) {
     this.baseURL = config.baseUrl;
@@ -56,15 +53,14 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
       Authorization: `Bearer ${config.apiKey}`,
       'Content-Type': 'application/json',
     };
-    this.defaultContext = config.defaultContext ?? 'au';
-    this.defaultFlags = {
-      defaultLinkType: config.defaultFlags?.defaultLinkType ?? false,
-      defaultMimeType: config.defaultFlags?.defaultMimeType ?? false,
-      defaultIanaLanguage: config.defaultFlags?.defaultIanaLanguage ?? false,
-      defaultContext: config.defaultFlags?.defaultContext ?? false,
-      fwqs: config.defaultFlags?.fwqs ?? false,
-    };
     this.apiVersion = config.apiVersion;
+    this.ianaLanguage = config.ianaLanguage;
+    this.context = config.context;
+    this.defaultLinkType = config.defaultLinkType;
+    this.defaultMimeType = config.defaultMimeType;
+    this.defaultIanaLanguage = config.defaultIanaLanguage;
+    this.defaultContext = config.defaultContext;
+    this.fwqs = config.fwqs;
     this.logger = (logger || createLogger()).child({ service: 'PyxIdrAdapter', apiVersion: config.apiVersion });
   }
 
@@ -76,29 +72,37 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
     identifierScheme: string,
     identifier: string,
     links: Link[],
-    qualifierPath?: string,
-    options?: PublishLinksOptions,
+    qualifierPath: string | undefined,
+    options: PublishLinksOptions,
   ): Promise<LinkRegistration> {
-    const namespace = options?.namespace ?? this.defaultContext;
+    const namespace = options.namespace;
+    const ianaLanguage = options.ianaLanguage ?? this.ianaLanguage;
+    const context = options.context ?? this.context;
+    const defaultLinkType = options.defaultLinkType ?? this.defaultLinkType;
+    const defaultMimeType = options.defaultMimeType ?? this.defaultMimeType;
+    const defaultIanaLanguage = options.defaultIanaLanguage ?? this.defaultIanaLanguage;
+    const defaultContext = options.defaultContext ?? this.defaultContext;
+    const fwqs = options.fwqs ?? this.fwqs;
+
     const payload = {
       namespace,
       identificationKeyType: identifierScheme,
       identificationKey: identifier,
-      itemDescription: options?.itemDescription ?? '',
+      itemDescription: options.itemDescription ?? '',
       qualifierPath: qualifierPath ?? '/',
       active: true,
       responses: links.map((link) => ({
         linkType: link.rel,
-        ianaLanguage: 'en',
-        context: this.defaultContext,
+        ianaLanguage,
+        context,
         mimeType: link.type,
         linkTitle: link.title,
         targetUrl: link.href,
-        defaultLinkType: link.default ?? this.defaultFlags.defaultLinkType,
-        defaultMimeType: this.defaultFlags.defaultMimeType,
-        defaultIanaLanguage: this.defaultFlags.defaultIanaLanguage,
-        defaultContext: this.defaultFlags.defaultContext,
-        fwqs: this.defaultFlags.fwqs,
+        defaultLinkType: link.rel === defaultLinkType,
+        defaultMimeType: link.type === defaultMimeType,
+        defaultIanaLanguage: ianaLanguage === defaultIanaLanguage,
+        defaultContext: context === defaultContext,
+        fwqs,
       })),
     };
 

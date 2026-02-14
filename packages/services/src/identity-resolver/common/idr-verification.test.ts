@@ -1,5 +1,5 @@
 import { verifyResolverDescription, verifyUntpLinkTypes } from './idr-verification';
-import type { ResolverDescription, LinkType } from '../../interfaces/identityResolverService';
+import type { ResolverDescription, LinkType } from '../types';
 
 describe('IDR verification utilities', () => {
   describe('verifyResolverDescription', () => {

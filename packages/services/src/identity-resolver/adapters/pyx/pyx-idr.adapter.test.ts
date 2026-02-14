@@ -13,7 +13,7 @@ import {
   IdrResolverFetchError,
   IdrLinkTypesFetchError,
 } from '../../errors';
-import type { Link } from '../../../interfaces/identityResolverService';
+import type { Link } from '../../types';
 import type { PyxIdrConfig } from './pyx-idr.schema';
 import type { LoggerService } from '../../../logging/types';
 
@@ -30,14 +30,17 @@ describe('PyxIdentityResolverAdapter', () => {
     baseUrl: 'https://resolver.example.com',
     apiKey: 'test-api-key',
     apiVersion: '2.0.2',
+    ianaLanguage: 'en',
+    context: 'au',
+    defaultLinkType: 'untp:dpp',
+    defaultMimeType: 'text/html',
+    defaultIanaLanguage: 'en',
     defaultContext: 'au',
-    defaultFlags: {
-      defaultLinkType: false,
-      defaultMimeType: false,
-      defaultIanaLanguage: false,
-      defaultContext: false,
-      fwqs: false,
-    },
+    fwqs: false,
+  };
+
+  const mockOptions = {
+    namespace: 'untp',
   };
 
   const mockLinks: Link[] = [
@@ -97,27 +100,12 @@ describe('PyxIdentityResolverAdapter', () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
       expect(adapter).toBeInstanceOf(PyxIdentityResolverAdapter);
     });
-
-    it('should use default context when not provided in config', () => {
-      // Simulate a config where defaultContext was parsed from an input without the field
-      const { defaultContext: _, ...configWithoutContext } = mockConfig;
-      const adapter = new PyxIdentityResolverAdapter(configWithoutContext as unknown as PyxIdrConfig, mockLogger);
-      expect(adapter).toBeInstanceOf(PyxIdentityResolverAdapter);
-    });
-
-    it('should use default flags when not provided in config', () => {
-      const configWithoutFlags = { ...mockConfig, defaultFlags: undefined };
-      const adapter = new PyxIdentityResolverAdapter(configWithoutFlags as PyxIdrConfig, mockLogger);
-      expect(adapter).toBeInstanceOf(PyxIdentityResolverAdapter);
-    });
   });
 
   describe('publishLinks', () => {
     it('should successfully publish links and return registration with link IDs', async () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
-      const result = await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, {
-        namespace: 'au',
-      });
+      const result = await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       expect(result).toEqual({
         resolverUri: 'https://resolver.example.com/au/abn/51824753556',
@@ -132,14 +120,14 @@ describe('PyxIdentityResolverAdapter', () => {
 
     it('should call the versioned API path', async () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
-      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, { namespace: 'au' });
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       expect(mockFetch).toHaveBeenCalledWith('https://resolver.example.com/api/2.0.2/resolver', expect.any(Object));
     });
 
     it('should include authorization and content-type headers', async () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
-      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, { namespace: 'au' });
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),
@@ -154,26 +142,20 @@ describe('PyxIdentityResolverAdapter', () => {
 
     it('should use namespace from options in the payload', async () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
-      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, { namespace: 'custom-ns' });
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, {
+        ...mockOptions,
+        namespace: 'custom-ns',
+      });
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
       expect(body.namespace).toBe('custom-ns');
     });
 
-    it('should fall back to defaultContext when namespace not provided in options', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
-      await adapter.publishLinks('abn', '51824753556', mockLinks);
-
-      const callArgs = mockFetch.mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
-      expect(body.namespace).toBe('au');
-    });
-
     it('should construct correct payload structure', async () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
       await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, {
-        namespace: 'untp',
+        ...mockOptions,
         itemDescription: 'Test item',
       });
 
@@ -193,7 +175,7 @@ describe('PyxIdentityResolverAdapter', () => {
 
     it('should use custom qualifierPath when provided', async () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
-      await adapter.publishLinks('abn', '51824753556', mockLinks, '/10/lot123', { namespace: 'au' });
+      await adapter.publishLinks('abn', '51824753556', mockLinks, '/10/lot123', mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -202,16 +184,16 @@ describe('PyxIdentityResolverAdapter', () => {
 
     it('should use "/" as qualifierPath when not provided', async () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
-      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, { namespace: 'au' });
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
       expect(body.qualifierPath).toBe('/');
     });
 
-    it('should correctly map link properties to response format', async () => {
+    it('should correctly map link properties to response format using config defaults', async () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
-      await adapter.publishLinks('abn', '51824753556', [mockLinks[0]], undefined, { namespace: 'au' });
+      await adapter.publishLinks('abn', '51824753556', [mockLinks[0]], undefined, mockOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
@@ -223,44 +205,39 @@ describe('PyxIdentityResolverAdapter', () => {
         linkTitle: 'Digital Product Passport',
         ianaLanguage: 'en',
         context: 'au',
-        defaultLinkType: true, // link.default is true
-        defaultMimeType: false,
-        defaultIanaLanguage: false,
-        defaultContext: false,
+        defaultLinkType: true, // 'untp:dpp' === config.defaultLinkType
+        defaultMimeType: false, // 'application/json' !== config.defaultMimeType ('text/html')
+        defaultIanaLanguage: true, // config.ianaLanguage === config.defaultIanaLanguage
+        defaultContext: true, // config.context === config.defaultContext
         fwqs: false,
       });
     });
 
-    it('should use default flags config values when link.default is not set', async () => {
-      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
-      await adapter.publishLinks('abn', '51824753556', [mockLinks[1]], undefined, { namespace: 'au' });
-
-      const callArgs = mockFetch.mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
-      expect(body.responses[0].defaultLinkType).toBe(false);
-      expect(body.responses[0].defaultMimeType).toBe(false);
-      expect(body.responses[0].defaultIanaLanguage).toBe(false);
-    });
-
-    it('should use custom default flags from config', async () => {
-      const configWithFlags: PyxIdrConfig = {
-        ...mockConfig,
-        defaultFlags: {
-          defaultLinkType: true,
-          defaultMimeType: true,
-          defaultIanaLanguage: false,
-          defaultContext: false,
-          fwqs: true,
-        },
+    it('should allow options to override config defaults', async () => {
+      const overrideOptions = {
+        ...mockOptions,
+        ianaLanguage: 'de',
+        context: 'us',
+        defaultLinkType: 'untp:dcc',
+        defaultMimeType: 'application/json',
+        defaultIanaLanguage: 'de',
+        defaultContext: 'us',
+        fwqs: true,
       };
-      const adapter = new PyxIdentityResolverAdapter(configWithFlags, mockLogger);
-      await adapter.publishLinks('abn', '51824753556', [mockLinks[1]], undefined, { namespace: 'au' });
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      await adapter.publishLinks('abn', '51824753556', [mockLinks[1]], undefined, overrideOptions);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
-      // link.default is undefined, so defaultLinkType falls back to config value
-      expect(body.responses[0].defaultMimeType).toBe(true);
-      expect(body.responses[0].fwqs).toBe(true);
+      expect(body.responses[0]).toMatchObject({
+        ianaLanguage: 'de',
+        context: 'us',
+        defaultLinkType: true, // 'untp:dcc' === overrideOptions.defaultLinkType
+        defaultMimeType: true, // 'application/json' === overrideOptions.defaultMimeType
+        defaultIanaLanguage: true, // 'de' === overrideOptions.defaultIanaLanguage
+        defaultContext: true, // 'us' === overrideOptions.defaultContext
+        fwqs: true,
+      });
     });
 
     it('should handle response with "responses" key instead of "linkResponses"', async () => {
@@ -273,7 +250,7 @@ describe('PyxIdentityResolverAdapter', () => {
       });
 
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
-      const result = await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, { namespace: 'au' });
+      const result = await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       expect(result.links).toEqual([
         { idrLinkId: 'resp-1', link: mockLinks[0] },
@@ -291,14 +268,14 @@ describe('PyxIdentityResolverAdapter', () => {
       });
 
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
-      const result = await adapter.publishLinks('abn', '51824753556', [mockLinks[0]], undefined, { namespace: 'au' });
+      const result = await adapter.publishLinks('abn', '51824753556', [mockLinks[0]], undefined, mockOptions);
 
       expect(result.links[0].idrLinkId).toBe('0');
     });
 
     it('should log the publish operation', async () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
-      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, { namespace: 'au' });
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Publishing 2 link(s) for abn/51824753556'));
@@ -315,9 +292,9 @@ describe('PyxIdentityResolverAdapter', () => {
 
         const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
 
-        await expect(
-          adapter.publishLinks('abn', '51824753556', mockLinks, undefined, { namespace: 'au' }),
-        ).rejects.toThrow(IdrPublishError);
+        await expect(adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions)).rejects.toThrow(
+          IdrPublishError,
+        );
       });
 
       it('should fall back to statusText when text() fails', async () => {
@@ -330,9 +307,9 @@ describe('PyxIdentityResolverAdapter', () => {
 
         const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
 
-        await expect(
-          adapter.publishLinks('abn', '51824753556', mockLinks, undefined, { namespace: 'au' }),
-        ).rejects.toThrow(IdrPublishError);
+        await expect(adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions)).rejects.toThrow(
+          IdrPublishError,
+        );
       });
     });
   });
@@ -733,24 +710,37 @@ describe('PyxIdentityResolverAdapter', () => {
       const validConfig = {
         baseUrl: 'https://resolver.example.com',
         apiKey: 'test-key',
+        ianaLanguage: 'en',
+        context: 'au',
+        defaultLinkType: 'untp:dpp',
+        defaultMimeType: 'text/html',
+        defaultIanaLanguage: 'en',
+        defaultContext: 'au',
       };
       const result = pyxIdrRegistryEntry.configSchema.parse(validConfig);
       expect(result.baseUrl).toBe('https://resolver.example.com');
       expect(result.apiKey).toBe('test-key');
-      expect(result.defaultContext).toBe('au'); // default
+      expect(result.defaultLinkType).toBe('untp:dpp');
     });
 
     it('should reject invalid config', () => {
       expect(() => pyxIdrRegistryEntry.configSchema.parse({ baseUrl: 'not-a-url', apiKey: '' })).toThrow();
     });
 
-    it('should default apiVersion to 2.0.2 when not provided', () => {
+    it('should default apiVersion and fwqs when not provided', () => {
       const config = {
         baseUrl: 'https://resolver.example.com',
         apiKey: 'test-key',
+        ianaLanguage: 'en',
+        context: 'au',
+        defaultLinkType: 'untp:dpp',
+        defaultMimeType: 'text/html',
+        defaultIanaLanguage: 'en',
+        defaultContext: 'au',
       };
       const result = pyxIdrRegistryEntry.configSchema.parse(config);
       expect(result.apiVersion).toBe('2.0.2');
+      expect(result.fwqs).toBe(false);
     });
 
     it('should reject an unsupported apiVersion', () => {
@@ -758,6 +748,12 @@ describe('PyxIdentityResolverAdapter', () => {
         baseUrl: 'https://resolver.example.com',
         apiKey: 'test-key',
         apiVersion: '1.0.0',
+        ianaLanguage: 'en',
+        context: 'au',
+        defaultLinkType: 'untp:dpp',
+        defaultMimeType: 'text/html',
+        defaultIanaLanguage: 'en',
+        defaultContext: 'au',
       };
       expect(() => pyxIdrRegistryEntry.configSchema.parse(config)).toThrow();
     });
@@ -766,6 +762,11 @@ describe('PyxIdentityResolverAdapter', () => {
       const config = {
         baseUrl: 'https://resolver.example.com',
         apiKey: 'test-key',
+        ianaLanguage: 'en',
+        context: 'au',
+        defaultLinkType: 'untp:dpp',
+        defaultMimeType: 'text/html',
+        defaultIanaLanguage: 'en',
         defaultContext: 'au',
       };
       const parsed = pyxIdrRegistryEntry.configSchema.parse(config);
