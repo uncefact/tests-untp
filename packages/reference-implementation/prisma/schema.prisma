@@ -84,6 +84,9 @@ model Tenant {
   users            User[]
   dids             Did[]
   serviceInstances ServiceInstance[]
+  registrars       Registrar[]
+  schemes          IdentifierScheme[]
+  identifiers      Identifier[]
 
   @@map("Tenant")
 }
@@ -147,6 +150,94 @@ model ServiceInstance {
 
   tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   dids           Did[]
+  registrars     Registrar[]        @relation("RegistrarIdr")
+  schemes        IdentifierScheme[] @relation("SchemeIdr")
 
   @@index([tenantId, serviceType])
+}
+
+/**
+ * Registrars are organisations that operate identifier schemes.
+ * Scoped to tenants, with system defaults available to all.
+ */
+model Registrar {
+  id                   String   @id @default(cuid())
+  tenantId             String
+  name                 String
+  namespace            String
+  url                  String?
+  idrServiceInstanceId String?
+  isDefault            Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenant             Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  idrServiceInstance ServiceInstance? @relation("RegistrarIdr", fields: [idrServiceInstanceId], references: [id], onDelete: SetNull)
+  schemes            IdentifierScheme[]
+
+  @@index([tenantId])
+}
+
+/**
+ * Identifier schemes define a type of identifier with validation rules.
+ * Each scheme belongs to a registrar and may have qualifier definitions.
+ */
+model IdentifierScheme {
+  id                   String   @id @default(cuid())
+  tenantId             String
+  registrarId          String
+  name                 String
+  primaryKey           String
+  validationPattern    String
+  namespace            String?
+  idrServiceInstanceId String?
+  isDefault            Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenant             Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  registrar          Registrar        @relation(fields: [registrarId], references: [id], onDelete: Cascade)
+  idrServiceInstance ServiceInstance? @relation("SchemeIdr", fields: [idrServiceInstanceId], references: [id], onDelete: SetNull)
+  qualifiers         SchemeQualifier[]
+  identifiers        Identifier[]
+
+  @@unique([registrarId, primaryKey, tenantId])
+  @@index([tenantId])
+}
+
+/**
+ * Qualifier definitions for identifier schemes (e.g. batch number, serial number).
+ * Each qualifier belongs to exactly one scheme.
+ */
+model SchemeQualifier {
+  id                String   @id @default(cuid())
+  schemeId          String
+  key               String
+  description       String
+  validationPattern String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  scheme IdentifierScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+
+  @@unique([schemeId, key])
+}
+
+/**
+ * Actual identifier values validated against their scheme's pattern.
+ * Scoped to a single tenant (not shared with system defaults).
+ */
+model Identifier {
+  id        String   @id @default(cuid())
+  tenantId  String
+  schemeId  String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scheme IdentifierScheme @relation(fields: [schemeId], references: [id], onDelete: Restrict)
+
+  @@unique([schemeId, value])
+  @@index([tenantId])
 }
