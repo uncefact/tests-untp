@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError, errorMessage, ServiceRegistryError } from '@/lib/api/errors';
+import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import {
@@ -9,7 +9,7 @@ import {
   deleteLinkRegistration,
 } from '@/lib/prisma/repositories';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
-import { IdrLinkNotFoundError, ServiceError } from '@uncefact/untp-ri-services';
+import { IdrLinkNotFoundError } from '@uncefact/untp-ri-services';
 
 /**
  * @swagger
@@ -37,58 +37,44 @@ import { IdrLinkNotFoundError, ServiceError } from '@uncefact/untp-ri-services';
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id: identifierId, linkId } = await params;
 
+  const identifier = await getIdentifierById(identifierId, tenantId);
+  if (!identifier) {
+    throw new NotFoundError('Identifier not found');
+  }
+
+  const localRecord = await getLinkRegistrationByIdrLinkId(linkId, identifierId, tenantId);
+  if (!localRecord) {
+    throw new NotFoundError('Link registration not found');
+  }
+
+  // Get live link data from IDR service
+  const scheme = (identifier as any).scheme;
+  const registrar = scheme?.registrar;
+
+  const { service: idrService } = await resolveIdrService(
+    tenantId,
+    scheme?.idrServiceInstanceId,
+    registrar?.idrServiceInstanceId,
+  );
+
   try {
-    const identifier = await getIdentifierById(identifierId, tenantId);
-    if (!identifier) {
-      throw new NotFoundError('Identifier not found');
+    const link = await idrService.getLinkById(linkId);
+    return NextResponse.json({ ok: true, link, localRecord });
+  } catch (idrError: unknown) {
+    if (idrError instanceof IdrLinkNotFoundError) {
+      // Link exists locally but has been removed from the upstream IDR
+      return NextResponse.json(
+        {
+          ok: true,
+          link: null,
+          localRecord,
+          desync: true,
+          warning: `Link "${linkId}" exists locally but is no longer present on the upstream IDR. It may have been removed out-of-band.`,
+        },
+        { status: 200 },
+      );
     }
-
-    const localRecord = await getLinkRegistrationByIdrLinkId(linkId, identifierId, tenantId);
-    if (!localRecord) {
-      throw new NotFoundError('Link registration not found');
-    }
-
-    // Get live link data from IDR service
-    const scheme = (identifier as any).scheme;
-    const registrar = scheme?.registrar;
-
-    const { service: idrService } = await resolveIdrService(
-      tenantId,
-      scheme?.idrServiceInstanceId,
-      registrar?.idrServiceInstanceId,
-    );
-
-    try {
-      const link = await idrService.getLinkById(linkId);
-      return NextResponse.json({ ok: true, link, localRecord });
-    } catch (idrError: unknown) {
-      if (idrError instanceof IdrLinkNotFoundError) {
-        // Link exists locally but has been removed from the upstream IDR
-        return NextResponse.json(
-          {
-            ok: true,
-            link: null,
-            localRecord,
-            desync: true,
-            warning: `Link "${linkId}" exists locally but is no longer present on the upstream IDR. It may have been removed out-of-band.`,
-          },
-          { status: 200 },
-        );
-      }
-      throw idrError;
-    }
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    if (e instanceof ServiceRegistryError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
-    }
-    if (e instanceof ServiceError) {
-      return NextResponse.json({ ok: false, error: e.message, code: e.code }, { status: e.statusCode });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
+    throw idrError;
   }
 });
 
@@ -130,29 +116,29 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
+    throw new ValidationError('Invalid JSON body');
   }
 
+  const identifier = await getIdentifierById(identifierId, tenantId);
+  if (!identifier) {
+    throw new NotFoundError('Identifier not found');
+  }
+
+  const localRecord = await getLinkRegistrationByIdrLinkId(linkId, identifierId, tenantId);
+  if (!localRecord) {
+    throw new NotFoundError('Link registration not found');
+  }
+
+  const scheme = (identifier as any).scheme;
+  const registrar = scheme?.registrar;
+
+  const { service: idrService } = await resolveIdrService(
+    tenantId,
+    scheme?.idrServiceInstanceId,
+    registrar?.idrServiceInstanceId,
+  );
+
   try {
-    const identifier = await getIdentifierById(identifierId, tenantId);
-    if (!identifier) {
-      throw new NotFoundError('Identifier not found');
-    }
-
-    const localRecord = await getLinkRegistrationByIdrLinkId(linkId, identifierId, tenantId);
-    if (!localRecord) {
-      throw new NotFoundError('Link registration not found');
-    }
-
-    const scheme = (identifier as any).scheme;
-    const registrar = scheme?.registrar;
-
-    const { service: idrService } = await resolveIdrService(
-      tenantId,
-      scheme?.idrServiceInstanceId,
-      registrar?.idrServiceInstanceId,
-    );
-
     const updatedLink = await idrService.updateLink(linkId, body);
 
     // Sync local record with upstream state
@@ -174,20 +160,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
         { status: 409 },
       );
     }
-    if (e instanceof ValidationError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
-    }
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    if (e instanceof ServiceRegistryError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
-    }
-    if (e instanceof ServiceError) {
-      return NextResponse.json({ ok: false, error: e.message, code: e.code }, { status: e.statusCode });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
+    throw e;
   }
 });
 
@@ -221,60 +194,46 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id: identifierId, linkId } = await params;
 
-  try {
-    const identifier = await getIdentifierById(identifierId, tenantId);
-    if (!identifier) {
-      throw new NotFoundError('Identifier not found');
-    }
-
-    const localRecord = await getLinkRegistrationByIdrLinkId(linkId, identifierId, tenantId);
-    if (!localRecord) {
-      throw new NotFoundError('Link registration not found');
-    }
-
-    const scheme = (identifier as any).scheme;
-    const registrar = scheme?.registrar;
-
-    const { service: idrService } = await resolveIdrService(
-      tenantId,
-      scheme?.idrServiceInstanceId,
-      registrar?.idrServiceInstanceId,
-    );
-
-    // Attempt to delete from upstream IDR; if already gone, proceed with local cleanup
-    let desync = false;
-    try {
-      await idrService.deleteLink(linkId);
-    } catch (idrError: unknown) {
-      if (idrError instanceof IdrLinkNotFoundError) {
-        desync = true;
-      } else {
-        throw idrError;
-      }
-    }
-
-    // Always clean up the local record
-    await deleteLinkRegistration(linkId, identifierId, tenantId);
-
-    return NextResponse.json({
-      ok: true,
-      deleted: true,
-      ...(desync && {
-        desync: true,
-        warning: `Link "${linkId}" was already absent from the upstream IDR. Local record cleaned up.`,
-      }),
-    });
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    if (e instanceof ServiceRegistryError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
-    }
-    if (e instanceof ServiceError) {
-      return NextResponse.json({ ok: false, error: e.message, code: e.code }, { status: e.statusCode });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
+  const identifier = await getIdentifierById(identifierId, tenantId);
+  if (!identifier) {
+    throw new NotFoundError('Identifier not found');
   }
+
+  const localRecord = await getLinkRegistrationByIdrLinkId(linkId, identifierId, tenantId);
+  if (!localRecord) {
+    throw new NotFoundError('Link registration not found');
+  }
+
+  const scheme = (identifier as any).scheme;
+  const registrar = scheme?.registrar;
+
+  const { service: idrService } = await resolveIdrService(
+    tenantId,
+    scheme?.idrServiceInstanceId,
+    registrar?.idrServiceInstanceId,
+  );
+
+  // Attempt to delete from upstream IDR; if already gone, proceed with local cleanup
+  let desync = false;
+  try {
+    await idrService.deleteLink(linkId);
+  } catch (idrError: unknown) {
+    if (idrError instanceof IdrLinkNotFoundError) {
+      desync = true;
+    } else {
+      throw idrError;
+    }
+  }
+
+  // Always clean up the local record
+  await deleteLinkRegistration(linkId, identifierId, tenantId);
+
+  return NextResponse.json({
+    ok: true,
+    deleted: true,
+    ...(desync && {
+      desync: true,
+      warning: `Link "${linkId}" was already absent from the upstream IDR. Local record cleaned up.`,
+    }),
+  });
 });
