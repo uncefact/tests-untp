@@ -54,6 +54,7 @@ async function cloneWithinTransaction(tx: TransactionalPrisma, tenantId: string)
         name: instance.name,
         description: instance.description,
         config: instance.config,
+        apiVersion: instance.apiVersion,
         isPrimary: instance.isPrimary,
       },
     });

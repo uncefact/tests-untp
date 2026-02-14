@@ -140,6 +140,7 @@ model ServiceInstance {
   name           String
   description    String?
   config         String       // AES-256-GCM encrypted JSON blob
+  apiVersion     String       // Semver without v prefix, e.g. "1.1.0"
   isPrimary      Boolean      @default(false)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

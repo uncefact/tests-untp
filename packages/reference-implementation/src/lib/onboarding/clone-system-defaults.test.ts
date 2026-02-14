@@ -30,6 +30,7 @@ const SYSTEM_SERVICE_INSTANCE = {
   name: 'System Default VCKit (DID)',
   description: 'System-wide default VCKit instance for DID management',
   config: '{"encrypted":"blob"}',
+  apiVersion: '1.1.0',
   isPrimary: false,
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
@@ -98,6 +99,7 @@ describe('cloneSystemDefaults', () => {
         name: 'System Default VCKit (DID)',
         description: 'System-wide default VCKit instance for DID management',
         config: '{"encrypted":"blob"}',
+        apiVersion: '1.1.0',
         isPrimary: false,
       },
     });

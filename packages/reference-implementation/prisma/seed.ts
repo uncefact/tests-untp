@@ -89,6 +89,7 @@ async function main() {
       name: 'System Default VCKit (DID)',
       description: 'System-wide default VCKit instance for DID management',
       config: encryptedConfig,
+      apiVersion: '1.1.0',
       isPrimary: false,
     },
   });

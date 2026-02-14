@@ -52,6 +52,7 @@ describe('service-instance.repository', () => {
     name: 'Test VCKit Instance',
     description: null,
     config: 'encrypted-config-blob',
+    apiVersion: '1.1.0',
     isPrimary: false,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
@@ -71,6 +72,7 @@ describe('service-instance.repository', () => {
         adapterType: 'VCKIT',
         name: 'Test VCKit Instance',
         config: 'encrypted-config-blob',
+        apiVersion: '1.1.0',
       });
 
       expect(mockServiceInstance.create).toHaveBeenCalledWith({
@@ -80,6 +82,7 @@ describe('service-instance.repository', () => {
           adapterType: 'VCKIT',
           name: 'Test VCKit Instance',
           config: 'encrypted-config-blob',
+          apiVersion: '1.1.0',
           isPrimary: false,
         }),
       });
@@ -95,6 +98,7 @@ describe('service-instance.repository', () => {
         adapterType: 'VCKIT',
         name: 'Test',
         config: 'encrypted',
+        apiVersion: '1.1.0',
       });
 
       expect(mockServiceInstance.create).toHaveBeenCalledWith({
@@ -115,6 +119,7 @@ describe('service-instance.repository', () => {
         adapterType: 'VCKIT',
         name: 'Primary Instance',
         config: 'encrypted',
+        apiVersion: '1.1.0',
         isPrimary: true,
       });
 

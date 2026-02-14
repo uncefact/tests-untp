@@ -10,6 +10,7 @@ export type CreateServiceInstanceInput = {
   name: string;
   description?: string;
   config: string; // Already encrypted by the caller
+  apiVersion: string; // Semver without v prefix, e.g. "1.1.0"
   isPrimary?: boolean;
 };
 
@@ -52,6 +53,7 @@ export async function createServiceInstance(input: CreateServiceInstanceInput): 
         name: input.name,
         description: input.description,
         config: input.config,
+        apiVersion: input.apiVersion,
         isPrimary: input.isPrimary ?? false,
       },
     });
