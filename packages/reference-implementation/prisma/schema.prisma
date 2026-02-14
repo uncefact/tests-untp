@@ -83,12 +83,13 @@ model Tenant {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  users            User[]
-  dids             Did[]
-  serviceInstances ServiceInstance[]
-  registrars       Registrar[]
-  schemes          IdentifierScheme[]
-  identifiers      Identifier[]
+  users              User[]
+  dids               Did[]
+  serviceInstances   ServiceInstance[]
+  registrars         Registrar[]
+  schemes            IdentifierScheme[]
+  identifiers        Identifier[]
+  linkRegistrations  LinkRegistration[]
 
   @@map("Tenant")
 }
@@ -237,9 +238,33 @@ model Identifier {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  scheme IdentifierScheme @relation(fields: [schemeId], references: [id], onDelete: Restrict)
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scheme            IdentifierScheme   @relation(fields: [schemeId], references: [id], onDelete: Restrict)
+  linkRegistrations LinkRegistration[]
 
   @@unique([schemeId, value])
   @@index([tenantId])
+}
+
+/**
+ * Audit trail for links published to IDR services.
+ * Each record maps a local identifier to an IDR-assigned link.
+ */
+model LinkRegistration {
+  id            String   @id @default(cuid())
+  tenantId      String
+  identifierId  String
+  idrLinkId     String
+  linkType      String
+  targetUrl     String
+  mimeType      String
+  resolverUri   String
+  qualifierPath String?
+  publishedAt   DateTime @default(now())
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  identifier Identifier @relation(fields: [identifierId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([identifierId])
 }

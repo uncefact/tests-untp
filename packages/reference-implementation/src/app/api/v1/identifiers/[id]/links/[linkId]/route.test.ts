@@ -1,0 +1,204 @@
+jest.mock('next/server', () => ({
+  NextResponse: {
+    json: (body: unknown, init?: { status?: number }) => ({
+      status: init?.status ?? 200,
+      json: async () => body,
+    }),
+  },
+}));
+
+jest.mock('@/lib/api/with-tenant-auth', () => ({
+  withTenantAuth: (handler: Function) => handler,
+}));
+
+const mockGetIdentifierById = jest.fn();
+const mockGetLinkRegistrationByIdrLinkId = jest.fn();
+const mockDeleteLinkRegistration = jest.fn();
+jest.mock('@/lib/prisma/repositories', () => ({
+  getIdentifierById: (...args: unknown[]) => mockGetIdentifierById(...args),
+  getLinkRegistrationByIdrLinkId: (...args: unknown[]) => mockGetLinkRegistrationByIdrLinkId(...args),
+  deleteLinkRegistration: (...args: unknown[]) => mockDeleteLinkRegistration(...args),
+}));
+
+const mockResolveIdrService = jest.fn();
+jest.mock('@/lib/services/resolve-idr-service', () => ({
+  resolveIdrService: (...args: unknown[]) => mockResolveIdrService(...args),
+}));
+
+import { GET, PATCH, DELETE } from './route';
+
+// -- Helpers -------------------------------------------------------------------
+
+function createFakeRequest(body?: unknown) {
+  return {
+    json:
+      body !== undefined
+        ? async () => body
+        : async () => {
+            throw new Error('no body');
+          },
+    url: 'http://localhost/api/v1/identifiers/ident-1/links/idr-link-1',
+  } as any;
+}
+
+function createContext(overrides: Record<string, unknown> = {}) {
+  return {
+    tenantId: 'tenant-1',
+    params: Promise.resolve({ id: 'ident-1', linkId: 'idr-link-1' }),
+    ...overrides,
+  } as any;
+}
+
+const MOCK_IDENTIFIER = {
+  id: 'ident-1',
+  tenantId: 'tenant-1',
+  schemeId: 'scheme-1',
+  value: '09520123456788',
+  scheme: {
+    id: 'scheme-1',
+    primaryKey: '01',
+    namespace: null,
+    idrServiceInstanceId: null,
+    registrar: {
+      id: 'reg-1',
+      namespace: 'gs1',
+      idrServiceInstanceId: null,
+    },
+  },
+};
+
+const MOCK_LOCAL_RECORD = {
+  id: 'lr-1',
+  idrLinkId: 'idr-link-1',
+  identifierId: 'ident-1',
+  tenantId: 'tenant-1',
+  linkType: 'untp:dpp',
+  targetUrl: 'https://example.com/cred.json',
+  mimeType: 'application/json',
+  resolverUri: 'https://resolver.example.com/01/09520123456788',
+};
+
+const MOCK_IDR_SERVICE = {
+  publishLinks: jest.fn(),
+  getLinkById: jest.fn(),
+  updateLink: jest.fn(),
+  deleteLink: jest.fn(),
+  getResolverDescription: jest.fn(),
+  getLinkTypes: jest.fn(),
+};
+
+// -- Tests ---------------------------------------------------------------------
+
+describe('GET /api/v1/identifiers/[id]/links/[linkId]', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetIdentifierById.mockResolvedValue(MOCK_IDENTIFIER);
+    mockGetLinkRegistrationByIdrLinkId.mockResolvedValue(MOCK_LOCAL_RECORD);
+    mockResolveIdrService.mockResolvedValue({ service: MOCK_IDR_SERVICE, instanceId: 'idr-1' });
+    MOCK_IDR_SERVICE.getLinkById.mockResolvedValue({
+      href: 'https://example.com/cred.json',
+      rel: 'untp:dpp',
+      type: 'application/json',
+    });
+  });
+
+  it('returns link details with local record', async () => {
+    const req = createFakeRequest();
+    const res = await GET(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.link).toBeDefined();
+    expect(body.localRecord).toBeDefined();
+  });
+
+  it('returns 404 when identifier not found', async () => {
+    mockGetIdentifierById.mockResolvedValue(null);
+
+    const req = createFakeRequest();
+    const res = await GET(req, createContext());
+
+    expect(res.status).toBe(404);
+    expect((await res.json()).ok).toBe(false);
+  });
+
+  it('returns 404 when link registration not found', async () => {
+    mockGetLinkRegistrationByIdrLinkId.mockResolvedValue(null);
+
+    const req = createFakeRequest();
+    const res = await GET(req, createContext());
+
+    expect(res.status).toBe(404);
+    expect((await res.json()).ok).toBe(false);
+  });
+});
+
+describe('PATCH /api/v1/identifiers/[id]/links/[linkId]', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetIdentifierById.mockResolvedValue(MOCK_IDENTIFIER);
+    mockGetLinkRegistrationByIdrLinkId.mockResolvedValue(MOCK_LOCAL_RECORD);
+    mockResolveIdrService.mockResolvedValue({ service: MOCK_IDR_SERVICE, instanceId: 'idr-1' });
+    MOCK_IDR_SERVICE.updateLink.mockResolvedValue({
+      href: 'https://updated.com/cred.json',
+      rel: 'untp:dpp',
+      type: 'application/json',
+    });
+  });
+
+  it('updates a link and returns 200', async () => {
+    const req = createFakeRequest({ href: 'https://updated.com/cred.json' });
+    const res = await PATCH(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(MOCK_IDR_SERVICE.updateLink).toHaveBeenCalledWith('idr-link-1', {
+      href: 'https://updated.com/cred.json',
+    });
+  });
+
+  it('returns 404 when link registration not found', async () => {
+    mockGetLinkRegistrationByIdrLinkId.mockResolvedValue(null);
+
+    const req = createFakeRequest({ href: 'https://updated.com' });
+    const res = await PATCH(req, createContext());
+
+    expect(res.status).toBe(404);
+    expect((await res.json()).ok).toBe(false);
+  });
+});
+
+describe('DELETE /api/v1/identifiers/[id]/links/[linkId]', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetIdentifierById.mockResolvedValue(MOCK_IDENTIFIER);
+    mockGetLinkRegistrationByIdrLinkId.mockResolvedValue(MOCK_LOCAL_RECORD);
+    mockResolveIdrService.mockResolvedValue({ service: MOCK_IDR_SERVICE, instanceId: 'idr-1' });
+    MOCK_IDR_SERVICE.deleteLink.mockResolvedValue(undefined);
+    mockDeleteLinkRegistration.mockResolvedValue(MOCK_LOCAL_RECORD);
+  });
+
+  it('deletes link from IDR and local record, returns 200', async () => {
+    const req = createFakeRequest();
+    const res = await DELETE(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.deleted).toBe(true);
+    expect(MOCK_IDR_SERVICE.deleteLink).toHaveBeenCalledWith('idr-link-1');
+    expect(mockDeleteLinkRegistration).toHaveBeenCalledWith('idr-link-1', 'ident-1', 'tenant-1');
+  });
+
+  it('returns 404 when link registration not found', async () => {
+    mockGetLinkRegistrationByIdrLinkId.mockResolvedValue(null);
+
+    const req = createFakeRequest();
+    const res = await DELETE(req, createContext());
+
+    expect(res.status).toBe(404);
+    expect((await res.json()).ok).toBe(false);
+  });
+});
