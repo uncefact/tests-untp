@@ -51,6 +51,9 @@ export type { AdapterRegistryEntry, AdapterRegistry } from './registry/types.js'
 export { vckitDidConfigSchema, vckitDidSensitiveFields } from './did-manager/adapters/vckit/vckit-did.schema.js';
 export type { VCKitDidConfig } from './did-manager/adapters/vckit/vckit-did.schema.js';
 
+// Service errors
+export { ServiceError } from './errors.js';
+
 // IDR service types and constants
 export type { ResolverDescription, LinkType, PublishLinksOptions } from './interfaces/identityResolverService.js';
 export { IDR_SERVICE_TYPE, IdrLinkNotFoundError } from './identity-resolver/types.js';
