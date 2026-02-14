@@ -52,6 +52,28 @@ export async function listLinkRegistrations(identifierId: string, tenantId: stri
 }
 
 /**
+ * Updates a link registration's mutable fields after a successful upstream PATCH.
+ * Scoped by IDR link ID, identifier, and tenant.
+ */
+export async function updateLinkRegistration(
+  idrLinkId: string,
+  identifierId: string,
+  tenantId: string,
+  data: { linkType?: string; targetUrl?: string; mimeType?: string },
+): Promise<LinkRegistration> {
+  const existing = await prisma.linkRegistration.findFirst({
+    where: { idrLinkId, identifierId, tenantId },
+  });
+  if (!existing) {
+    throw new NotFoundError('Link registration not found');
+  }
+  return prisma.linkRegistration.update({
+    where: { id: existing.id },
+    data,
+  });
+}
+
+/**
  * Deletes a link registration by IDR link ID.
  * Validates ownership via tenant and identifier scoping.
  */

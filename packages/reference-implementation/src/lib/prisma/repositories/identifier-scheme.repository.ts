@@ -19,7 +19,7 @@ export type CreateIdentifierSchemeInput = {
   qualifiers?: Array<{
     key: string;
     description: string;
-    validationPattern?: string;
+    validationPattern: string;
   }>;
 };
 
@@ -35,7 +35,7 @@ export type UpdateIdentifierSchemeInput = {
   qualifiers?: Array<{
     key: string;
     description: string;
-    validationPattern?: string;
+    validationPattern: string;
   }>;
 };
 

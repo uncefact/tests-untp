@@ -13,10 +13,12 @@ jest.mock('@/lib/api/with-tenant-auth', () => ({
 
 const mockGetIdentifierById = jest.fn();
 const mockGetLinkRegistrationByIdrLinkId = jest.fn();
+const mockUpdateLinkRegistration = jest.fn();
 const mockDeleteLinkRegistration = jest.fn();
 jest.mock('@/lib/prisma/repositories', () => ({
   getIdentifierById: (...args: unknown[]) => mockGetIdentifierById(...args),
   getLinkRegistrationByIdrLinkId: (...args: unknown[]) => mockGetLinkRegistrationByIdrLinkId(...args),
+  updateLinkRegistration: (...args: unknown[]) => mockUpdateLinkRegistration(...args),
   deleteLinkRegistration: (...args: unknown[]) => mockDeleteLinkRegistration(...args),
 }));
 
@@ -25,6 +27,7 @@ jest.mock('@/lib/services/resolve-idr-service', () => ({
   resolveIdrService: (...args: unknown[]) => mockResolveIdrService(...args),
 }));
 
+import { IdrLinkNotFoundError } from '@uncefact/untp-ri-services';
 import { GET, PATCH, DELETE } from './route';
 
 // -- Helpers -------------------------------------------------------------------
@@ -111,6 +114,22 @@ describe('GET /api/v1/identifiers/[id]/links/[linkId]', () => {
     expect(body.ok).toBe(true);
     expect(body.link).toBeDefined();
     expect(body.localRecord).toBeDefined();
+    expect(body.desync).toBeUndefined();
+  });
+
+  it('returns 200 with desync flag when upstream link is missing', async () => {
+    MOCK_IDR_SERVICE.getLinkById.mockRejectedValue(new IdrLinkNotFoundError('idr-link-1', 404));
+
+    const req = createFakeRequest();
+    const res = await GET(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.link).toBeNull();
+    expect(body.localRecord).toBeDefined();
+    expect(body.desync).toBe(true);
+    expect(body.warning).toContain('no longer present on the upstream IDR');
   });
 
   it('returns 404 when identifier not found', async () => {
@@ -157,6 +176,24 @@ describe('PATCH /api/v1/identifiers/[id]/links/[linkId]', () => {
     expect(MOCK_IDR_SERVICE.updateLink).toHaveBeenCalledWith('idr-link-1', {
       href: 'https://updated.com/cred.json',
     });
+    expect(mockUpdateLinkRegistration).toHaveBeenCalledWith('idr-link-1', 'ident-1', 'tenant-1', {
+      linkType: 'untp:dpp',
+      targetUrl: 'https://updated.com/cred.json',
+      mimeType: 'application/json',
+    });
+  });
+
+  it('returns 409 with desync flag when upstream link is missing', async () => {
+    MOCK_IDR_SERVICE.updateLink.mockRejectedValue(new IdrLinkNotFoundError('idr-link-1', 404));
+
+    const req = createFakeRequest({ href: 'https://updated.com/cred.json' });
+    const res = await PATCH(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body.ok).toBe(false);
+    expect(body.desync).toBe(true);
+    expect(body.error).toContain('no longer exists on the upstream IDR');
   });
 
   it('returns 404 when link registration not found', async () => {
@@ -188,7 +225,23 @@ describe('DELETE /api/v1/identifiers/[id]/links/[linkId]', () => {
     expect(res.status).toBe(200);
     expect(body.ok).toBe(true);
     expect(body.deleted).toBe(true);
+    expect(body.desync).toBeUndefined();
     expect(MOCK_IDR_SERVICE.deleteLink).toHaveBeenCalledWith('idr-link-1');
+    expect(mockDeleteLinkRegistration).toHaveBeenCalledWith('idr-link-1', 'ident-1', 'tenant-1');
+  });
+
+  it('still cleans up local record when upstream link is already gone', async () => {
+    MOCK_IDR_SERVICE.deleteLink.mockRejectedValue(new IdrLinkNotFoundError('idr-link-1', 404));
+
+    const req = createFakeRequest();
+    const res = await DELETE(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.deleted).toBe(true);
+    expect(body.desync).toBe(true);
+    expect(body.warning).toContain('already absent from the upstream IDR');
     expect(mockDeleteLinkRegistration).toHaveBeenCalledWith('idr-link-1', 'ident-1', 'tenant-1');
   });
 

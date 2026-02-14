@@ -110,13 +110,13 @@ describe('PATCH /api/v1/schemes/:id', () => {
   it('updates with qualifier replacement', async () => {
     const updated = {
       id: 'sch-1',
-      qualifiers: [{ key: 'lot', description: 'Lot number' }],
+      qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
     };
     mockUpdateIdentifierScheme.mockResolvedValue(updated);
 
     const req = createFakeRequest({
       method: 'PATCH',
-      body: { qualifiers: [{ key: 'lot', description: 'Lot number' }] },
+      body: { qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$' }] },
     });
     const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
     const json = await res.json();
@@ -127,7 +127,7 @@ describe('PATCH /api/v1/schemes/:id', () => {
       'sch-1',
       'org-1',
       expect.objectContaining({
-        qualifiers: [{ key: 'lot', description: 'Lot number' }],
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
       }),
     );
   });
@@ -167,6 +167,18 @@ describe('PATCH /api/v1/schemes/:id', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('qualifier key is required');
+  });
+
+  it('returns 400 for invalid qualifier (missing validationPattern)', async () => {
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: { qualifiers: [{ key: 'lot', description: 'Lot number' }] },
+    });
+    const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('qualifier validationPattern is required');
   });
 
   it('returns 400 for non-array qualifiers', async () => {

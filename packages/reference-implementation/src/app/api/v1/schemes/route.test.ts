@@ -81,7 +81,7 @@ describe('POST /api/v1/schemes', () => {
     const scheme = {
       id: 'sch-1',
       name: 'GTIN',
-      qualifiers: [{ key: 'lot', description: 'Lot number' }],
+      qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
     };
     mockCreateIdentifierScheme.mockResolvedValue(scheme);
 
@@ -91,7 +91,7 @@ describe('POST /api/v1/schemes', () => {
         name: 'GTIN',
         primaryKey: 'gtin',
         validationPattern: '^\\d{14}$',
-        qualifiers: [{ key: 'lot', description: 'Lot number' }],
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
       },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
@@ -102,7 +102,7 @@ describe('POST /api/v1/schemes', () => {
     expect(mockCreateIdentifierScheme).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: 'org-1',
-        qualifiers: [{ key: 'lot', description: 'Lot number' }],
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
       }),
     );
   });
@@ -206,6 +206,23 @@ describe('POST /api/v1/schemes', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('qualifier description is required');
+  });
+
+  it('returns 400 for invalid qualifier (missing validationPattern)', async () => {
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        qualifiers: [{ key: 'lot', description: 'Lot number' }],
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('qualifier validationPattern is required');
   });
 
   it('returns 400 for non-array qualifiers', async () => {

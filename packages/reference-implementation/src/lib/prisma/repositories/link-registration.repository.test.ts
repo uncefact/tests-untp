@@ -5,6 +5,7 @@ jest.mock('../prisma', () => ({
       createMany: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      update: jest.fn(),
       delete: jest.fn(),
     },
   },
@@ -16,6 +17,7 @@ import {
   createManyLinkRegistrations,
   getLinkRegistrationByIdrLinkId,
   listLinkRegistrations,
+  updateLinkRegistration,
   deleteLinkRegistration,
 } from './link-registration.repository';
 import { NotFoundError } from '@/lib/api/errors';
@@ -25,6 +27,7 @@ const mockLinkRegistration = prisma.linkRegistration as unknown as {
   createMany: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
+  update: jest.Mock;
   delete: jest.Mock;
 };
 
@@ -111,6 +114,37 @@ describe('link-registration.repository', () => {
         orderBy: { publishedAt: 'desc' },
       });
       expect(result).toEqual([SAMPLE_RECORD]);
+    });
+  });
+
+  describe('updateLinkRegistration', () => {
+    it('updates a link registration', async () => {
+      const updatedRecord = { ...SAMPLE_RECORD, targetUrl: 'https://updated.com/cred.json' };
+      mockLinkRegistration.findFirst.mockResolvedValue(SAMPLE_RECORD);
+      mockLinkRegistration.update.mockResolvedValue(updatedRecord);
+
+      const result = await updateLinkRegistration('idr-link-1', 'ident-1', 'tenant-1', {
+        targetUrl: 'https://updated.com/cred.json',
+      });
+
+      expect(mockLinkRegistration.findFirst).toHaveBeenCalledWith({
+        where: { idrLinkId: 'idr-link-1', identifierId: 'ident-1', tenantId: 'tenant-1' },
+      });
+      expect(mockLinkRegistration.update).toHaveBeenCalledWith({
+        where: { id: 'lr-1' },
+        data: { targetUrl: 'https://updated.com/cred.json' },
+      });
+      expect(result).toEqual(updatedRecord);
+    });
+
+    it('throws NotFoundError when link registration not found', async () => {
+      mockLinkRegistration.findFirst.mockResolvedValue(null);
+
+      await expect(
+        updateLinkRegistration('missing', 'ident-1', 'tenant-1', {
+          targetUrl: 'https://updated.com',
+        }),
+      ).rejects.toThrow(NotFoundError);
     });
   });
 

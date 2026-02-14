@@ -127,7 +127,7 @@ export const schemeQualifierSchema = z.object({
   schemeId: z.string().describe('Parent identifier scheme ID'),
   key: z.string().describe('Qualifier key / application identifier code'),
   description: z.string().describe('Human-readable description'),
-  validationPattern: z.string().nullable().describe('Regex for validating qualifier values'),
+  validationPattern: z.string().describe('Regex for validating qualifier values'),
   createdAt: z.string().datetime().describe('Timestamp when created'),
   updatedAt: z.string().datetime().describe('Timestamp when last updated'),
 });

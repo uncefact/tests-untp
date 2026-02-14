@@ -115,6 +115,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                   required:
  *                     - key
  *                     - description
+ *                     - validationPattern
  *                   properties:
  *                     key:
  *                       type: string
@@ -173,7 +174,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     qualifiers?: Array<{
       key: string;
       description: string;
-      validationPattern?: string;
+      validationPattern: string;
     }>;
   };
 
@@ -210,6 +211,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
       for (const q of body.qualifiers!) {
         if (!isNonEmptyString(q.key)) throw new ValidationError('qualifier key is required');
         if (!isNonEmptyString(q.description)) throw new ValidationError('qualifier description is required');
+        if (!isNonEmptyString(q.validationPattern))
+          throw new ValidationError('qualifier validationPattern is required');
       }
     }
 

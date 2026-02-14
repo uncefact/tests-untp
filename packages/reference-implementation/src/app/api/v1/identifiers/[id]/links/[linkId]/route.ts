@@ -2,8 +2,14 @@ import { NextResponse } from 'next/server';
 import { NotFoundError, errorMessage, ServiceRegistryError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { getIdentifierById, getLinkRegistrationByIdrLinkId, deleteLinkRegistration } from '@/lib/prisma/repositories';
+import {
+  getIdentifierById,
+  getLinkRegistrationByIdrLinkId,
+  updateLinkRegistration,
+  deleteLinkRegistration,
+} from '@/lib/prisma/repositories';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
+import { IdrLinkNotFoundError } from '@uncefact/untp-ri-services';
 
 /**
  * @swagger
@@ -24,7 +30,7 @@ import { resolveIdrService } from '@/lib/services/resolve-idr-service';
  *           type: string
  *     responses:
  *       200:
- *         description: Link details
+ *         description: Link details (includes desync flag if upstream link is missing)
  *       404:
  *         description: Link not found
  */
@@ -52,9 +58,25 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
       registrar?.idrServiceInstanceId,
     );
 
-    const link = await idrService.getLinkById(linkId);
-
-    return NextResponse.json({ ok: true, link, localRecord });
+    try {
+      const link = await idrService.getLinkById(linkId);
+      return NextResponse.json({ ok: true, link, localRecord });
+    } catch (idrError: unknown) {
+      if (idrError instanceof IdrLinkNotFoundError) {
+        // Link exists locally but has been removed from the upstream IDR
+        return NextResponse.json(
+          {
+            ok: true,
+            link: null,
+            localRecord,
+            desync: true,
+            warning: `Link "${linkId}" exists locally but is no longer present on the upstream IDR. It may have been removed out-of-band.`,
+          },
+          { status: 200 },
+        );
+      }
+      throw idrError;
+    }
   } catch (e: unknown) {
     if (e instanceof NotFoundError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
@@ -95,6 +117,8 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         description: Link updated
  *       404:
  *         description: Link not found
+ *       409:
+ *         description: Desynchronisation - link no longer exists on the upstream IDR
  */
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId, linkId } = await params;
@@ -128,8 +152,25 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 
     const updatedLink = await idrService.updateLink(linkId, body);
 
+    // Sync local record with upstream state
+    await updateLinkRegistration(linkId, identifierId, tenantId, {
+      linkType: updatedLink.rel,
+      targetUrl: updatedLink.href,
+      mimeType: updatedLink.type,
+    });
+
     return NextResponse.json({ ok: true, link: updatedLink });
   } catch (e: unknown) {
+    if (e instanceof IdrLinkNotFoundError) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Link "${linkId}" no longer exists on the upstream IDR. It may have been removed out-of-band. Delete the local record to resolve this desynchronisation.`,
+          desync: true,
+        },
+        { status: 409 },
+      );
+    }
     if (e instanceof ValidationError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
     }
@@ -150,6 +191,10 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *   delete:
  *     tags: [Links]
  *     summary: Delete a link
+ *     description: >
+ *       Deletes a link from both the upstream IDR and the local record.
+ *       If the link has already been removed from the upstream IDR (out-of-band),
+ *       the local record is still cleaned up and the response includes a desync warning.
  *     parameters:
  *       - in: path
  *         name: id
@@ -163,7 +208,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *           type: string
  *     responses:
  *       200:
- *         description: Link deleted
+ *         description: Link deleted (may include desync warning if upstream link was already gone)
  *       404:
  *         description: Link not found
  */
@@ -190,13 +235,29 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
       registrar?.idrServiceInstanceId,
     );
 
-    // Delete from IDR service first
-    await idrService.deleteLink(linkId);
+    // Attempt to delete from upstream IDR; if already gone, proceed with local cleanup
+    let desync = false;
+    try {
+      await idrService.deleteLink(linkId);
+    } catch (idrError: unknown) {
+      if (idrError instanceof IdrLinkNotFoundError) {
+        desync = true;
+      } else {
+        throw idrError;
+      }
+    }
 
-    // Then delete local audit record
+    // Always clean up the local record
     await deleteLinkRegistration(linkId, identifierId, tenantId);
 
-    return NextResponse.json({ ok: true, deleted: true });
+    return NextResponse.json({
+      ok: true,
+      deleted: true,
+      ...(desync && {
+        desync: true,
+        warning: `Link "${linkId}" was already absent from the upstream IDR. Local record cleaned up.`,
+      }),
+    });
   } catch (e: unknown) {
     if (e instanceof NotFoundError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 404 });

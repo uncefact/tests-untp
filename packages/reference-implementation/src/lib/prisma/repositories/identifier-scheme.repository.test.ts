@@ -94,7 +94,7 @@ describe('identifier-scheme.repository', () => {
         primaryKey: 'gtin',
         validationPattern: '^\\d{13,14}$',
         namespace: 'gs1',
-        qualifiers: [{ key: 'batch', description: 'Batch number' }],
+        qualifiers: [{ key: 'batch', description: 'Batch number', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
       });
 
       expect(mockIdentifierScheme.create).toHaveBeenCalledWith({
@@ -107,7 +107,7 @@ describe('identifier-scheme.repository', () => {
           namespace: 'gs1',
           isDefault: false,
           qualifiers: {
-            create: [{ key: 'batch', description: 'Batch number', validationPattern: undefined }],
+            create: [{ key: 'batch', description: 'Batch number', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
           },
         }),
         include: {

@@ -11,7 +11,9 @@ import type {
   LinkType,
 } from '../../../interfaces/identityResolverService.js';
 
-export { IDR_SERVICE_TYPE } from '../../types.js';
+import { IdrLinkNotFoundError } from '../../types.js';
+
+export { IDR_SERVICE_TYPE, IdrLinkNotFoundError } from '../../types.js';
 
 /** Adapter type identifier for Pyx IDR provider. */
 export const PYX_IDR_ADAPTER_TYPE = 'PYX_IDR' as const;
@@ -129,6 +131,9 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
     });
 
     if (!response.ok) {
+      if (response.status === 404 || response.status === 410) {
+        throw new IdrLinkNotFoundError(linkId, response.status);
+      }
       const errorText = await response.text().catch(() => response.statusText);
       throw new Error(`Failed to get link: HTTP ${response.status}: ${errorText}`);
     }
@@ -158,6 +163,9 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
     });
 
     if (!response.ok) {
+      if (response.status === 404 || response.status === 410) {
+        throw new IdrLinkNotFoundError(linkId, response.status);
+      }
       const errorText = await response.text().catch(() => response.statusText);
       throw new Error(`Failed to update link: HTTP ${response.status}: ${errorText}`);
     }
@@ -180,6 +188,9 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
     });
 
     if (!response.ok) {
+      if (response.status === 404 || response.status === 410) {
+        throw new IdrLinkNotFoundError(linkId, response.status);
+      }
       const errorText = await response.text().catch(() => response.statusText);
       throw new Error(`Failed to delete link: HTTP ${response.status}: ${errorText}`);
     }

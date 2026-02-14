@@ -50,6 +50,7 @@ import { createIdentifierScheme, listIdentifierSchemes } from '@/lib/prisma/repo
  *                   required:
  *                     - key
  *                     - description
+ *                     - validationPattern
  *                   properties:
  *                     key:
  *                       type: string
@@ -106,7 +107,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     qualifiers?: Array<{
       key: string;
       description: string;
-      validationPattern?: string;
+      validationPattern: string;
     }>;
   };
 
@@ -130,6 +131,8 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       for (const q of body.qualifiers) {
         if (!isNonEmptyString(q.key)) throw new ValidationError('qualifier key is required');
         if (!isNonEmptyString(q.description)) throw new ValidationError('qualifier description is required');
+        if (!isNonEmptyString(q.validationPattern))
+          throw new ValidationError('qualifier validationPattern is required');
       }
     }
 

@@ -2,6 +2,7 @@ import {
   PyxIdentityResolverAdapter,
   PYX_IDR_ADAPTER_TYPE,
   IDR_SERVICE_TYPE,
+  IdrLinkNotFoundError,
   pyxIdrRegistryEntry,
 } from './pyx-idr.adapter';
 import type { Link } from '../../../interfaces/identityResolverService';
@@ -404,17 +405,41 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(result.hreflang).toBeUndefined();
     });
 
-    it('should throw on HTTP error', async () => {
+    it('should throw IdrLinkNotFoundError on HTTP 404', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
         statusText: 'Not Found',
-        text: jest.fn().mockResolvedValue('Link not found'),
       });
 
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
 
-      await expect(adapter.getLinkById('link-999')).rejects.toThrow('Failed to get link: HTTP 404: Link not found');
+      await expect(adapter.getLinkById('link-999')).rejects.toThrow(IdrLinkNotFoundError);
+    });
+
+    it('should throw IdrLinkNotFoundError on HTTP 410', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 410,
+        statusText: 'Gone',
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+
+      await expect(adapter.getLinkById('link-999')).rejects.toThrow(IdrLinkNotFoundError);
+    });
+
+    it('should throw generic error on non-404/410 HTTP error', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        text: jest.fn().mockResolvedValue('Server error'),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+
+      await expect(adapter.getLinkById('link-999')).rejects.toThrow('Failed to get link: HTTP 500: Server error');
     });
   });
 
@@ -513,17 +538,29 @@ describe('PyxIdentityResolverAdapter', () => {
       );
     });
 
-    it('should throw on HTTP error', async () => {
+    it('should throw IdrLinkNotFoundError on HTTP 404', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
         statusText: 'Not Found',
-        text: jest.fn().mockResolvedValue('Link not found'),
       });
 
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
 
-      await expect(adapter.deleteLink('link-999')).rejects.toThrow('Failed to delete link: HTTP 404: Link not found');
+      await expect(adapter.deleteLink('link-999')).rejects.toThrow(IdrLinkNotFoundError);
+    });
+
+    it('should throw generic error on non-404/410 HTTP error', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        text: jest.fn().mockResolvedValue('Server error'),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+
+      await expect(adapter.deleteLink('link-999')).rejects.toThrow('Failed to delete link: HTTP 500: Server error');
     });
   });
 
