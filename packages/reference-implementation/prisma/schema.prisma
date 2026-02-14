@@ -29,10 +29,12 @@ enum DidStatus {
 
 enum ServiceType {
   DID
+  IDR
 }
 
 enum AdapterType {
   VCKIT
+  PYX_IDR
 }
 
 /**

@@ -54,3 +54,13 @@ export { createPrefixedLogger } from './registry/adapter-options.js';
 // Config schemas
 export { vckitDidConfigSchema, vckitDidSensitiveFields } from './did-manager/adapters/vckit/vckit-did.schema.js';
 export type { VCKitDidConfig } from './did-manager/adapters/vckit/vckit-did.schema.js';
+
+// IDR service types and constants
+export type { ResolverDescription, LinkType, PublishLinksOptions } from './interfaces/identityResolverService.js';
+export { IDR_SERVICE_TYPE, PYX_IDR_ADAPTER_TYPE } from './adapters/identity-resolver/pyxIdentityResolver.adapter.js';
+export type { PyxIdrConfig } from './identity-resolver/adapters/pyx/pyx-idr.schema.js';
+export { pyxIdrConfigSchema, pyxIdrSensitiveFields } from './identity-resolver/adapters/pyx/pyx-idr.schema.js';
+
+// IDR verification utilities
+export type { VerificationWarning } from './identity-resolver/common/idr-verification.js';
+export { verifyResolverDescription, verifyUntpLinkTypes } from './identity-resolver/common/idr-verification.js';

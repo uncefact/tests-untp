@@ -60,7 +60,7 @@ export enum AccessRole {
   Regulator = 'untp:accessRole#Regulator',
   /** Accredited recycling facilities */
   Recycler = 'untp:accessRole#Recycler',
-  /** Authorized auditors */
+  /** Authorised auditors */
   Auditor = 'untp:accessRole#Auditor',
 }
 
@@ -121,18 +121,51 @@ export type LinkRegistration = {
   identifierScheme: string;
   /** The identifier value within the scheme */
   identifier: string;
+  /** Registered links with their IDR-assigned link IDs */
+  links: Array<{
+    idrLinkId: string;
+    link: Link;
+  }>;
 };
 
 /**
  * Options for publishing links to an identity resolver.
  */
 export type PublishLinksOptions = {
+  /** Namespace for the identifier vocabulary (e.g., "untp", "gs1") */
+  namespace?: string;
   /** Human-readable description of the item being registered */
   itemDescription?: string;
 };
 
 /**
- * Service responsible for publishing links to an identity resolver.
+ * Description of a resolver service and its capabilities.
+ */
+export type ResolverDescription = {
+  /** Human-readable name of the resolver */
+  name: string;
+  /** Link types supported by this resolver */
+  supportedLinkTypes: LinkType[];
+  /** Additional resolver metadata */
+  [key: string]: unknown;
+};
+
+/**
+ * A link type supported by an identity resolver.
+ */
+export type LinkType = {
+  /** Namespace the link type belongs to (e.g., "untp", "gs1") */
+  namespace: string;
+  /** Type identifier within the namespace (e.g., "dpp", "dcc") */
+  type: string;
+  /** Human-readable title for the link type */
+  title: string;
+  /** Optional description of the link type */
+  description?: string;
+};
+
+/**
+ * Service responsible for managing links on an identity resolver.
  *
  * Identity resolvers allow identifiers (e.g., ABN, NZBN, LEI) to be resolved
  * to their associated resources. When queried, the resolver returns an
@@ -149,7 +182,7 @@ export interface IIdentityResolverService {
    * @param links - Links to publish for this identifier
    * @param qualifierPath - Qualifier path for sub-identifiers like lot/serial numbers (default: "/")
    * @param options - Additional options for the registration
-   * @returns Registration details including the canonical resolver URI
+   * @returns Registration details including the canonical resolver URI and link IDs
    */
   publishLinks(
     identifierScheme: string,
@@ -158,4 +191,42 @@ export interface IIdentityResolverService {
     qualifierPath?: string,
     options?: PublishLinksOptions,
   ): Promise<LinkRegistration>;
+
+  /**
+   * Retrieves a single link by its IDR-assigned link ID.
+   *
+   * @param linkId - The IDR-assigned link identifier
+   * @returns The link details
+   */
+  getLinkById(linkId: string): Promise<Link>;
+
+  /**
+   * Updates an existing link on the identity resolver.
+   *
+   * @param linkId - The IDR-assigned link identifier
+   * @param link - Partial link data to update
+   * @returns The updated link
+   */
+  updateLink(linkId: string, link: Partial<Link>): Promise<Link>;
+
+  /**
+   * Deletes a link from the identity resolver.
+   *
+   * @param linkId - The IDR-assigned link identifier
+   */
+  deleteLink(linkId: string): Promise<void>;
+
+  /**
+   * Retrieves the resolver's description and capabilities.
+   *
+   * @returns The resolver description including supported link types
+   */
+  getResolverDescription(): Promise<ResolverDescription>;
+
+  /**
+   * Lists the link types supported by this resolver.
+   *
+   * @returns Array of supported link types
+   */
+  getLinkTypes(): Promise<LinkType[]>;
 }
