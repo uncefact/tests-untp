@@ -1,8 +1,8 @@
-import type { DidDocument, DidVerificationResult, DidVerificationCheck, MethodVerificationResult } from './types.js';
-import { DidVerificationCheckName } from './types.js';
+import type { DidDocument, DidVerificationResult, DidVerificationCheck, MethodVerificationResult } from '../types.js';
+import { DidVerificationCheckName } from '../types.js';
 import type { JsonLdDocument } from 'jsonld';
 import { parseDidMethod } from './utils.js';
-import { didDocumentSchema } from './schemas.js';
+import { didDocumentSchema } from '../schemas.js';
 import { verifyDidWeb } from './verify-did-web.js';
 import { verifyDidWebVh } from './verify-did-webvh.js';
 

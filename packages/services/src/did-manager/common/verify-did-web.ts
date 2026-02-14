@@ -1,5 +1,5 @@
-import type { DidDocument, DidVerificationCheck, MethodVerificationResult } from './types.js';
-import { DidVerificationCheckName } from './types.js';
+import type { DidDocument, DidVerificationCheck, MethodVerificationResult } from '../types.js';
+import { DidVerificationCheckName } from '../types.js';
 import { didWebToUrl } from './utils.js';
 
 const C = DidVerificationCheckName;

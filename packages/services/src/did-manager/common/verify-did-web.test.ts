@@ -1,5 +1,5 @@
 import { verifyDidWeb } from './verify-did-web';
-import { DidVerificationCheckName } from './types';
+import { DidVerificationCheckName } from '../types';
 
 const C = DidVerificationCheckName;
 

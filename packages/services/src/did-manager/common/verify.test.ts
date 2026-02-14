@@ -1,5 +1,5 @@
 import { verifyDid } from './verify';
-import { DidVerificationCheckName } from './types';
+import { DidVerificationCheckName } from '../types';
 import * as jsonld from 'jsonld';
 
 jest.mock('jsonld', () => ({

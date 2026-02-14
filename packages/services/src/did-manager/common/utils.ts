@@ -2,7 +2,7 @@
  * DID utility functions.
  */
 
-import { DID_METHOD_BY_URI } from './types.js';
+import { DID_METHOD_BY_URI } from '../types.js';
 
 /**
  * Converts a did:web or did:webvh identifier to its HTTPS resolution URL.

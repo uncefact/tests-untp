@@ -1,4 +1,4 @@
-import type { MethodVerificationResult } from './types.js';
+import type { MethodVerificationResult } from '../types.js';
 
 /**
  * did:webvh method-specific verification.
