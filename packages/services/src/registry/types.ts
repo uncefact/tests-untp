@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { LoggerService } from '../logging/types.js';
 import { DID_SERVICE_TYPE } from '../did-manager/types.js';
 import { VCKIT_DID_ADAPTER_TYPE } from '../did-manager/adapters/vckit/vckit-did.adapter.js';
 
@@ -15,7 +16,7 @@ export type AdapterType = (typeof AdapterType)[keyof typeof AdapterType];
 
 export interface AdapterRegistryEntry<TConfig = unknown, TService = unknown> {
   configSchema: z.ZodType<TConfig, z.ZodTypeDef, any>;
-  factory: (config: TConfig) => TService;
+  factory: (config: TConfig, logger: LoggerService) => TService;
 }
 
 export type AdapterRegistry = {

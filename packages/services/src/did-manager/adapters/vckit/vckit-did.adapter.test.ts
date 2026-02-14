@@ -1,6 +1,7 @@
 import { VCKitDidAdapter } from './vckit-did.adapter';
 import { DidMethod, DidType } from '../../types';
 import { verifyDid } from '../../verify';
+import type { AdapterConstructorOptions } from '../../../registry/adapter-options';
 
 jest.mock('../../verify.js', () => ({
   verifyDid: jest.fn(),
@@ -20,6 +21,20 @@ function createMockResponse(data: unknown, ok = true, status = 200): Response {
 
 const BASE_URL = 'http://localhost:3332';
 const HEADERS = { Authorization: 'Bearer test-token' };
+
+function createMockOptions(overrides?: Partial<AdapterConstructorOptions>): AdapterConstructorOptions {
+  return {
+    name: 'VCKIT',
+    version: '1.1.0',
+    logger: {
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    },
+    ...overrides,
+  };
+}
 
 // -- Tests -------------------------------------------------------------------
 
@@ -49,6 +64,14 @@ describe('VCKitDidAdapter', () => {
 
     it('throws if Authorization header is missing', () => {
       expect(() => new VCKitDidAdapter(BASE_URL, {})).toThrow('Authorization header is required');
+    });
+
+    it('accepts optional AdapterConstructorOptions', () => {
+      const options = createMockOptions();
+      const adapter = new VCKitDidAdapter(BASE_URL, HEADERS, 'Ed25519', options);
+      expect(adapter.baseURL).toBe(BASE_URL);
+      expect(adapter.headers).toEqual(HEADERS);
+      expect(adapter.keyType).toBe('Ed25519');
     });
   });
 

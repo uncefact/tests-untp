@@ -190,6 +190,6 @@ export const VCKIT_DID_ADAPTER_TYPE = 'VCKIT' as const;
 /** Registry entry for the VCKit DID adapter. */
 export const vckitDidRegistryEntry = {
   configSchema: vckitDidConfigSchema,
-  factory: (config: VCKitDidConfig): IDidService =>
-    new VCKitDidAdapter(config.endpoint, { Authorization: `Bearer ${config.authToken}` }, config.keyType),
+  factory: (config: VCKitDidConfig, logger: LoggerService): IDidService =>
+    new VCKitDidAdapter(config.endpoint, { Authorization: `Bearer ${config.authToken}` }, config.keyType, logger),
 } satisfies AdapterRegistryEntry<VCKitDidConfig, IDidService>;

@@ -1,6 +1,18 @@
 import { adapterRegistry } from './registry';
 import { ServiceType, AdapterType } from './types';
 import { VCKitDidAdapter } from '../did-manager/adapters/vckit/vckit-did.adapter';
+import type { AdapterConstructorOptions } from './adapter-options';
+
+const MOCK_OPTIONS: AdapterConstructorOptions = {
+  name: 'VCKIT',
+  version: '1.1.0',
+  logger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  },
+};
 
 describe('adapterRegistry', () => {
   describe('structure', () => {
@@ -22,22 +34,28 @@ describe('adapterRegistry', () => {
   describe('factory', () => {
     it('creates a VCKitDidAdapter instance with valid config', () => {
       const entry = adapterRegistry[ServiceType.DID][AdapterType.VCKIT];
-      const service = entry.factory({
-        endpoint: 'https://vckit.example.com',
-        authToken: 'my-secret-token',
-        keyType: 'Ed25519',
-      });
+      const service = entry.factory(
+        {
+          endpoint: 'https://vckit.example.com',
+          authToken: 'my-secret-token',
+          keyType: 'Ed25519',
+        },
+        MOCK_OPTIONS,
+      );
 
       expect(service).toBeInstanceOf(VCKitDidAdapter);
     });
 
     it('passes endpoint, auth header, and keyType to VCKitDidAdapter', () => {
       const entry = adapterRegistry[ServiceType.DID][AdapterType.VCKIT];
-      const service = entry.factory({
-        endpoint: 'https://vckit.example.com',
-        authToken: 'my-secret-token',
-        keyType: 'Ed25519',
-      }) as VCKitDidAdapter;
+      const service = entry.factory(
+        {
+          endpoint: 'https://vckit.example.com',
+          authToken: 'my-secret-token',
+          keyType: 'Ed25519',
+        },
+        MOCK_OPTIONS,
+      ) as VCKitDidAdapter;
 
       expect(service.baseURL).toBe('https://vckit.example.com');
       expect(service.headers).toEqual({ Authorization: 'Bearer my-secret-token' });
@@ -50,7 +68,7 @@ describe('adapterRegistry', () => {
         endpoint: 'https://vckit.example.com',
         authToken: 'my-secret-token',
       });
-      const service = entry.factory(parsed) as VCKitDidAdapter;
+      const service = entry.factory(parsed, MOCK_OPTIONS) as VCKitDidAdapter;
 
       expect(service.keyType).toBe('Ed25519');
     });

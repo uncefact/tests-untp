@@ -1,6 +1,6 @@
 import { ServiceType, AdapterType, createLogger } from '@uncefact/untp-ri-services';
 import { adapterRegistry } from '@uncefact/untp-ri-services/server';
-import type { IDidService } from '@uncefact/untp-ri-services';
+import type { IDidService, Logger } from '@uncefact/untp-ri-services';
 import { getEncryptionService } from '@/lib/encryption/encryption';
 import { getInstanceByResolution } from '@/lib/prisma/repositories';
 import {
@@ -68,8 +68,19 @@ export async function resolveDidService(tenantId: string, serviceInstanceId?: st
     throw new ConfigValidationError(instance.id, parseResult.error.issues.map((i) => i.message).join(', '));
   }
 
+  const consoleLogger: Logger = {
+    info: console.log,
+    warn: console.warn,
+    error: console.error,
+    debug: console.debug,
+  };
+
   return {
-    service: adapterEntry.factory(parseResult.data) as IDidService,
+    service: adapterEntry.factory(parseResult.data, {
+      name: instance.adapterType,
+      version: (instance as any).apiVersion ?? '1.1.0',
+      logger: consoleLogger,
+    }) as IDidService,
     instanceId: instance.id,
   };
 }

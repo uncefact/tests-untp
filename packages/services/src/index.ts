@@ -47,6 +47,10 @@ export { createLogger } from './logging/factory.js';
 export { ServiceType, AdapterType } from './registry/types.js';
 export type { AdapterRegistryEntry, AdapterRegistry } from './registry/types.js';
 
+// Adapter constructor options
+export type { Logger, AdapterConstructorOptions } from './registry/adapter-options.js';
+export { createPrefixedLogger } from './registry/adapter-options.js';
+
 // Config schemas
 export { vckitDidConfigSchema, vckitDidSensitiveFields } from './did-manager/adapters/vckit/vckit-did.schema.js';
 export type { VCKitDidConfig } from './did-manager/adapters/vckit/vckit-did.schema.js';
