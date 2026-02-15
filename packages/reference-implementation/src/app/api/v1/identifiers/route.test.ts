@@ -8,10 +8,21 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withTenantAuth as passthrough
-jest.mock('@/lib/api/with-tenant-auth', () => ({
-  withTenantAuth: (handler: (...args: unknown[]) => unknown) => handler,
-}));
+// Mock withTenantAuth — skips auth but preserves error handling via handleRouteError
+jest.mock('@/lib/api/with-tenant-auth', () => {
+  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
+  return {
+    withTenantAuth:
+      (handler: (...args: unknown[]) => unknown) =>
+      async (...args: unknown[]) => {
+        try {
+          return await handler(...args);
+        } catch (e) {
+          return handleRouteError(e);
+        }
+      },
+  };
+});
 
 const mockCreateIdentifier = jest.fn();
 const mockListIdentifiers = jest.fn();

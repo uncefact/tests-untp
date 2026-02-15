@@ -3,6 +3,9 @@ import { ValidationError, isNonEmptyString, validateEnum } from '@/lib/api/valid
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createDid } from '@/lib/prisma/repositories';
 import { DidMethod } from '@uncefact/untp-ri-services';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ route: '/api/v1/dids/import' });
 
 /**
  * @swagger
@@ -95,7 +98,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('method is required');
   }
 
-  // Import: register locally without calling adapter create
+  logger.info({ tenantId, did: body.did, method }, 'Importing external DID');
   const record = await createDid({
     tenantId,
     did: body.did,
@@ -108,5 +111,6 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     serviceInstanceId: body.serviceInstanceId,
   });
 
+  logger.info({ tenantId, didId: record.id, did: record.did }, 'DID imported');
   return NextResponse.json({ ok: true, did: record }, { status: 201 });
 });

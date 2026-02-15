@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError, errorMessage } from '@/lib/api/errors';
+import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getIdentifierSchemeById, updateIdentifierScheme, deleteIdentifierScheme } from '@/lib/prisma/repositories';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ route: '/api/v1/schemes/[id]' });
 
 /**
  * @swagger
@@ -53,20 +56,12 @@ import { getIdentifierSchemeById, updateIdentifierScheme, deleteIdentifierScheme
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-
-  try {
-    const scheme = await getIdentifierSchemeById(id, tenantId);
-    if (!scheme) {
-      throw new NotFoundError('Identifier scheme not found');
-    }
-    return NextResponse.json({ ok: true, scheme });
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
+  logger.info({ tenantId, schemeId: id }, 'Looking up scheme');
+  const scheme = await getIdentifierSchemeById(id, tenantId);
+  if (!scheme) {
+    throw new NotFoundError('Identifier scheme not found');
   }
+  return NextResponse.json({ ok: true, scheme });
 });
 
 /**
@@ -181,7 +176,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
+    throw new ValidationError('Invalid JSON body');
   }
 
   const hasName = isNonEmptyString(body.name);
@@ -199,43 +194,40 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     !hasIdrServiceInstanceId &&
     !hasQualifiers
   ) {
-    return NextResponse.json({ ok: false, error: 'At least one field is required' }, { status: 400 });
+    throw new ValidationError('At least one field is required');
   }
 
-  try {
-    // Validate qualifiers if provided
-    if (hasQualifiers) {
-      if (!Array.isArray(body.qualifiers)) {
-        throw new ValidationError('qualifiers must be an array');
-      }
-      for (const q of body.qualifiers!) {
-        if (!isNonEmptyString(q.key)) throw new ValidationError('qualifier key is required');
-        if (!isNonEmptyString(q.description)) throw new ValidationError('qualifier description is required');
-        if (!isNonEmptyString(q.validationPattern))
-          throw new ValidationError('qualifier validationPattern is required');
-      }
+  // Validate qualifiers if provided
+  if (hasQualifiers) {
+    if (!Array.isArray(body.qualifiers)) {
+      throw new ValidationError('qualifiers must be an array');
     }
-
-    const updated = await updateIdentifierScheme(id, tenantId, {
-      ...(hasName && { name: body.name }),
-      ...(hasPrimaryKey && { primaryKey: body.primaryKey }),
-      ...(hasValidationPattern && { validationPattern: body.validationPattern }),
-      ...(hasNamespace && { namespace: body.namespace }),
-      ...(hasIdrServiceInstanceId && { idrServiceInstanceId: body.idrServiceInstanceId }),
-      ...(hasQualifiers && { qualifiers: body.qualifiers }),
-    });
-
-    return NextResponse.json({ ok: true, scheme: updated });
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
+    for (const q of body.qualifiers!) {
+      if (!isNonEmptyString(q.key)) throw new ValidationError('qualifier key is required');
+      if (!isNonEmptyString(q.description)) throw new ValidationError('qualifier description is required');
+      if (!isNonEmptyString(q.validationPattern)) throw new ValidationError('qualifier validationPattern is required');
     }
-    if (e instanceof ValidationError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
   }
+
+  logger.info(
+    {
+      tenantId,
+      schemeId: id,
+      fields: { hasName, hasPrimaryKey, hasValidationPattern, hasNamespace, hasIdrServiceInstanceId, hasQualifiers },
+    },
+    'Updating scheme',
+  );
+  const updated = await updateIdentifierScheme(id, tenantId, {
+    ...(hasName && { name: body.name }),
+    ...(hasPrimaryKey && { primaryKey: body.primaryKey }),
+    ...(hasValidationPattern && { validationPattern: body.validationPattern }),
+    ...(hasNamespace && { namespace: body.namespace }),
+    ...(hasIdrServiceInstanceId && { idrServiceInstanceId: body.idrServiceInstanceId }),
+    ...(hasQualifiers && { qualifiers: body.qualifiers }),
+  });
+
+  logger.info({ tenantId, schemeId: id }, 'Scheme updated');
+  return NextResponse.json({ ok: true, scheme: updated });
 });
 
 /**
@@ -286,14 +278,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  try {
-    await deleteIdentifierScheme(id, tenantId);
-    return NextResponse.json({ ok: true });
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
-  }
+  logger.info({ tenantId, schemeId: id }, 'Deleting scheme');
+  await deleteIdentifierScheme(id, tenantId);
+
+  logger.info({ tenantId, schemeId: id }, 'Scheme deleted');
+  return NextResponse.json({ ok: true });
 });

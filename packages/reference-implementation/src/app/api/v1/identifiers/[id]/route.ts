@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError, errorMessage } from '@/lib/api/errors';
+import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getIdentifierById, updateIdentifier, deleteIdentifier } from '@/lib/prisma/repositories';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]' });
 
 /**
  * @swagger
@@ -53,20 +56,12 @@ import { getIdentifierById, updateIdentifier, deleteIdentifier } from '@/lib/pri
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-
-  try {
-    const identifier = await getIdentifierById(id, tenantId);
-    if (!identifier) {
-      throw new NotFoundError('Identifier not found');
-    }
-    return NextResponse.json({ ok: true, identifier });
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
+  logger.info({ tenantId, identifierId: id }, 'Looking up identifier');
+  const identifier = await getIdentifierById(id, tenantId);
+  if (!identifier) {
+    throw new NotFoundError('Identifier not found');
   }
+  return NextResponse.json({ ok: true, identifier });
 });
 
 /**
@@ -141,30 +136,20 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
+    throw new ValidationError('Invalid JSON body');
   }
 
-  const hasValue = isNonEmptyString(body.value);
-
-  if (!hasValue) {
-    return NextResponse.json({ ok: false, error: 'value is required' }, { status: 400 });
+  if (!isNonEmptyString(body.value)) {
+    throw new ValidationError('value is required');
   }
 
-  try {
-    const updated = await updateIdentifier(id, tenantId, {
-      value: body.value,
-    });
-    return NextResponse.json({ ok: true, identifier: updated });
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    if (e instanceof ValidationError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
-  }
+  logger.info({ tenantId, identifierId: id }, 'Updating identifier');
+  const updated = await updateIdentifier(id, tenantId, {
+    value: body.value,
+  });
+
+  logger.info({ tenantId, identifierId: id }, 'Identifier updated');
+  return NextResponse.json({ ok: true, identifier: updated });
 });
 
 /**
@@ -215,14 +200,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  try {
-    await deleteIdentifier(id, tenantId);
-    return NextResponse.json({ ok: true });
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
-  }
+  logger.info({ tenantId, identifierId: id }, 'Deleting identifier');
+  await deleteIdentifier(id, tenantId);
+
+  logger.info({ tenantId, identifierId: id }, 'Identifier deleted');
+  return NextResponse.json({ ok: true });
 });

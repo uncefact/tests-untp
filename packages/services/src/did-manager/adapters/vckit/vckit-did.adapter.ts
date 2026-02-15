@@ -51,7 +51,7 @@ export class VCKitDidAdapter implements IDidService {
     this.baseURL = baseURL;
     this.headers = headers;
     this.keyType = keyType;
-    this.logger = logger || createLogger().child({ service: 'VCKitDidAdapter' });
+    this.logger = logger || createLogger().child({ service: 'DID - VCKitDid' });
   }
 
   normaliseAlias(alias: string, method: DidMethod): string {

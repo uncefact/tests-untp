@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError, errorMessage } from '@/lib/api/errors';
+import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getRegistrarById, updateRegistrar, deleteRegistrar } from '@/lib/prisma/repositories';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ route: '/api/v1/registrars/[id]' });
 
 /**
  * @swagger
@@ -53,20 +56,12 @@ import { getRegistrarById, updateRegistrar, deleteRegistrar } from '@/lib/prisma
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-
-  try {
-    const registrar = await getRegistrarById(id, tenantId);
-    if (!registrar) {
-      throw new NotFoundError('Registrar not found');
-    }
-    return NextResponse.json({ ok: true, registrar });
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
+  logger.info({ tenantId, registrarId: id }, 'Looking up registrar');
+  const registrar = await getRegistrarById(id, tenantId);
+  if (!registrar) {
+    throw new NotFoundError('Registrar not found');
   }
+  return NextResponse.json({ ok: true, registrar });
 });
 
 /**
@@ -156,7 +151,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
+    throw new ValidationError('Invalid JSON body');
   }
 
   const hasName = isNonEmptyString(body.name);
@@ -165,30 +160,22 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const hasIdrServiceInstanceId = body.idrServiceInstanceId !== undefined;
 
   if (!hasName && !hasNamespace && !hasUrl && !hasIdrServiceInstanceId) {
-    return NextResponse.json(
-      { ok: false, error: 'At least one of name, namespace, url, or idrServiceInstanceId is required' },
-      { status: 400 },
-    );
+    throw new ValidationError('At least one of name, namespace, url, or idrServiceInstanceId is required');
   }
 
-  try {
-    const updated = await updateRegistrar(id, tenantId, {
-      ...(hasName && { name: body.name }),
-      ...(hasNamespace && { namespace: body.namespace }),
-      ...(hasUrl && { url: body.url }),
-      ...(hasIdrServiceInstanceId && { idrServiceInstanceId: body.idrServiceInstanceId }),
-    });
-    return NextResponse.json({ ok: true, registrar: updated });
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    if (e instanceof ValidationError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
-  }
+  logger.info(
+    { tenantId, registrarId: id, fields: { hasName, hasNamespace, hasUrl, hasIdrServiceInstanceId } },
+    'Updating registrar',
+  );
+  const updated = await updateRegistrar(id, tenantId, {
+    ...(hasName && { name: body.name }),
+    ...(hasNamespace && { namespace: body.namespace }),
+    ...(hasUrl && { url: body.url }),
+    ...(hasIdrServiceInstanceId && { idrServiceInstanceId: body.idrServiceInstanceId }),
+  });
+
+  logger.info({ tenantId, registrarId: id }, 'Registrar updated');
+  return NextResponse.json({ ok: true, registrar: updated });
 });
 
 /**
@@ -239,14 +226,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  try {
-    await deleteRegistrar(id, tenantId);
-    return NextResponse.json({ ok: true });
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
-  }
+  logger.info({ tenantId, registrarId: id }, 'Deleting registrar');
+  await deleteRegistrar(id, tenantId);
+
+  logger.info({ tenantId, registrarId: id }, 'Registrar deleted');
+  return NextResponse.json({ ok: true });
 });

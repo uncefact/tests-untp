@@ -36,7 +36,7 @@ if (!ENCRYPTION_KEY) {
     'Missing required SERVICE_ENCRYPTION_KEY environment variable. ' + 'Set this in your .env file or environment.',
   );
 }
-const encryptionService = new AesGcmEncryptionAdapter(ENCRYPTION_KEY);
+const encryptionService = new AesGcmEncryptionAdapter(ENCRYPTION_KEY, logger);
 
 async function main() {
   // Upsert the system tenant (used for system-wide defaults)

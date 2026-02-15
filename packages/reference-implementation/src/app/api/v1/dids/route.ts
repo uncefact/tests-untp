@@ -5,6 +5,9 @@ import { ValidationError, validateEnum, parsePositiveInt, parseNonNegativeInt } 
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createDid, listDids } from '@/lib/prisma/repositories';
 import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus } from '@uncefact/untp-ri-services';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ route: '/api/v1/dids' });
 
 /**
  * @swagger
@@ -109,6 +112,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('alias is required');
   }
 
+  logger.info({ tenantId, type, method, alias: body.alias }, 'Resolving DID service');
   const { service: didService, instanceId: serviceInstanceId } = await resolveDidService(
     tenantId,
     body.serviceInstanceId,
@@ -124,6 +128,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError(errorMessage(aliasErr, 'Invalid alias'));
   }
 
+  logger.info({ tenantId, type, method, alias: normalisedAlias, serviceInstanceId }, 'Creating DID via provider');
   const providerResult = await didService.create({
     type,
     method,
@@ -134,6 +139,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   const status = type === DidType.SELF_MANAGED ? DidStatus.UNVERIFIED : DidStatus.ACTIVE;
 
+  logger.info({ tenantId, did: providerResult.did, status }, 'Saving DID record');
   const record = await createDid({
     tenantId,
     did: providerResult.did,
@@ -146,6 +152,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     serviceInstanceId,
   });
 
+  logger.info({ tenantId, didId: record.id, did: record.did }, 'DID created');
   return NextResponse.json({ ok: true, did: record }, { status: 201 });
 });
 
@@ -230,6 +237,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
+  logger.info({ tenantId, filters: { type, status, serviceInstanceId, limit, offset } }, 'Listing DIDs');
   const dids = await listDids(tenantId, {
     type,
     status,
@@ -238,5 +246,6 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
     offset,
   });
 
+  logger.info({ tenantId, count: dids.length }, 'DIDs listed');
   return NextResponse.json({ ok: true, dids });
 });

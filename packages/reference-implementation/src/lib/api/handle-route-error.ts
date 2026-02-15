@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { NotFoundError, errorMessage, ServiceRegistryError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { ServiceError } from '@uncefact/untp-ri-services';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ handler: 'error' });
 
 /**
  * Centralised error-to-HTTP-response mapper.
@@ -16,20 +19,22 @@ import { ServiceError } from '@uncefact/untp-ri-services';
  */
 export function handleRouteError(e: unknown): Response {
   if (e instanceof ValidationError) {
+    logger.warn({ err: e }, 'Validation error');
     return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
   }
   if (e instanceof NotFoundError) {
+    logger.warn({ err: e }, 'Not found');
     return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
   }
   if (e instanceof ServiceRegistryError) {
     const status = e.name === 'ServiceInstanceNotFoundError' ? 404 : 500;
-    console.error('[api] Service registry error:', e.message);
+    logger.error({ err: e, status }, 'Service registry error');
     return NextResponse.json({ ok: false, error: e.message }, { status });
   }
   if (e instanceof ServiceError) {
-    console.error(`[api] Service error [${e.code}]:`, e.message);
+    logger.error({ err: e, code: e.code, status: e.statusCode }, 'Service error');
     return NextResponse.json({ ok: false, error: e.message, code: e.code }, { status: e.statusCode });
   }
-  console.error('[api] Unexpected error:', e);
+  logger.error({ err: e }, 'Unexpected error');
   return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
 }

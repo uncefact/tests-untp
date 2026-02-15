@@ -51,6 +51,7 @@ export { createLogger } from './logging/factory.js';
 
 // Registry (types only — runtime registry re-exported from ./server entrypoint)
 export { ServiceType, AdapterType } from './registry/types.js';
+export { BaseServiceAdapter } from './registry/base-adapter.js';
 export type { AdapterRegistryEntry, AdapterRegistry } from './registry/types.js';
 
 // Config schemas

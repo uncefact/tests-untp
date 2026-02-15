@@ -3,6 +3,9 @@ import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDidById, updateDid } from '@/lib/prisma/repositories';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ route: '/api/v1/dids/[id]' });
 
 /**
  * @swagger
@@ -53,6 +56,7 @@ import { getDidById, updateDid } from '@/lib/prisma/repositories';
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
+  logger.info({ tenantId, didId: id }, 'Looking up DID');
   const did = await getDidById(id, tenantId);
   if (!did) {
     throw new NotFoundError('DID not found');
@@ -144,9 +148,12 @@ export const PUT = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('At least one of name or description is required');
   }
 
+  logger.info({ tenantId, didId: id, fields: { hasName, hasDescription } }, 'Updating DID');
   const updated = await updateDid(id, tenantId, {
     ...(hasName && { name: body.name }),
     ...(hasDescription && { description: body.description }),
   });
+
+  logger.info({ tenantId, didId: id }, 'DID updated');
   return NextResponse.json({ ok: true, did: updated });
 });

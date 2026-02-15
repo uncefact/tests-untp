@@ -4,6 +4,9 @@ import { NotFoundError } from '@/lib/api/errors';
 import { DidStatus } from '@uncefact/untp-ri-services';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDidById, updateDidStatus } from '@/lib/prisma/repositories';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ route: '/api/v1/dids/[id]/verify' });
 
 /**
  * @swagger
@@ -60,16 +63,22 @@ import { getDidById, updateDidStatus } from '@/lib/prisma/repositories';
 export const POST = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
+  logger.info({ tenantId, didId: id }, 'Looking up DID for verification');
   const did = await getDidById(id, tenantId);
   if (!did) {
     throw new NotFoundError('DID not found');
   }
 
+  logger.info({ tenantId, didId: id, did: did.did }, 'Resolving DID service for verification');
   const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId ?? undefined);
+
+  logger.info({ tenantId, didId: id, did: did.did }, 'Verifying DID ownership');
   const verification = await didService.verify(did.did);
 
   const newStatus = verification.verified ? DidStatus.VERIFIED : DidStatus.UNVERIFIED;
+  logger.info({ tenantId, didId: id, verified: verification.verified, newStatus }, 'Updating DID status');
   const updatedDid = await updateDidStatus(id, tenantId, newStatus);
 
+  logger.info({ tenantId, didId: id, verified: verification.verified }, 'DID verification complete');
   return NextResponse.json({ ok: true, verification, did: updatedDid });
 });

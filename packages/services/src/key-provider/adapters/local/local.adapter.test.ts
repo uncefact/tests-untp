@@ -1,10 +1,19 @@
 import { LocalKeyGenerator } from './local.adapter';
+import type { LoggerService } from '../../../logging/types';
+
+const mockLogger: LoggerService = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+  child: jest.fn().mockReturnThis(),
+};
 
 describe('LocalKeyGenerator', () => {
   let generator: LocalKeyGenerator;
 
   beforeEach(() => {
-    generator = new LocalKeyGenerator();
+    generator = new LocalKeyGenerator(mockLogger);
   });
 
   describe('generateKey', () => {

@@ -1,4 +1,7 @@
 import { AesGcmEncryptionAdapter } from '@uncefact/untp-ri-services/server';
+import { createLogger } from '@uncefact/untp-ri-services/logging';
+
+const logger = createLogger().child({ module: 'encryption' });
 
 let cached: AesGcmEncryptionAdapter | null = null;
 
@@ -12,6 +15,6 @@ export function getEncryptionService(): AesGcmEncryptionAdapter {
     );
   }
 
-  cached = new AesGcmEncryptionAdapter(key);
+  cached = new AesGcmEncryptionAdapter(key, logger);
   return cached;
 }

@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError, errorMessage } from '@/lib/api/errors';
 import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createRegistrar, listRegistrars } from '@/lib/prisma/repositories';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ route: '/api/v1/registrars' });
 
 /**
  * @swagger
  * /registrars:
  *   post:
  *     summary: Create a new registrar
- *     description: Creates a new identifier registrar for the authenticated tenant
+ *     description: Creates a new registrar for the authenticated tenant
  *     tags:
  *       - Registrars
  *     requestBody:
@@ -21,6 +23,7 @@ import { createRegistrar, listRegistrars } from '@/lib/prisma/repositories';
  *             required:
  *               - name
  *               - namespace
+ *               - url
  *             properties:
  *               name:
  *                 type: string
@@ -30,7 +33,7 @@ import { createRegistrar, listRegistrars } from '@/lib/prisma/repositories';
  *                 description: Namespace for the registrar (e.g. "gs1")
  *               url:
  *                 type: string
- *                 description: URL of the registrar
+ *                 description: URL for the registrar
  *               idrServiceInstanceId:
  *                 type: string
  *                 description: Optional IDR service instance ID
@@ -77,32 +80,24 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
+    throw new ValidationError('Invalid JSON body');
   }
 
-  try {
-    if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
-    if (!isNonEmptyString(body.namespace)) throw new ValidationError('namespace is required');
+  if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
+  if (!isNonEmptyString(body.namespace)) throw new ValidationError('namespace is required');
+  if (!isNonEmptyString(body.url)) throw new ValidationError('url is required');
 
-    const registrar = await createRegistrar({
-      tenantId,
-      name: body.name,
-      namespace: body.namespace,
-      url: body.url,
-      idrServiceInstanceId: body.idrServiceInstanceId,
-    });
+  logger.info({ tenantId, namespace: body.namespace }, 'Creating registrar');
+  const registrar = await createRegistrar({
+    tenantId,
+    name: body.name,
+    namespace: body.namespace,
+    url: body.url,
+    idrServiceInstanceId: body.idrServiceInstanceId,
+  });
 
-    return NextResponse.json({ ok: true, registrar }, { status: 201 });
-  } catch (e: unknown) {
-    if (e instanceof ValidationError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
-    }
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
-  }
+  logger.info({ tenantId, registrarId: registrar.id }, 'Registrar created');
+  return NextResponse.json({ ok: true, registrar }, { status: 201 });
 });
 
 /**
@@ -162,19 +157,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   const url = new URL(req.url);
+  const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  try {
-    const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-    const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  logger.info({ tenantId, limit, offset }, 'Listing registrars');
+  const registrars = await listRegistrars(tenantId, { limit, offset });
 
-    const registrars = await listRegistrars(tenantId, { limit, offset });
-
-    return NextResponse.json({ ok: true, registrars });
-  } catch (e: unknown) {
-    if (e instanceof ValidationError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
-  }
+  logger.info({ tenantId, count: registrars.length }, 'Registrars listed');
+  return NextResponse.json({ ok: true, registrars });
 });

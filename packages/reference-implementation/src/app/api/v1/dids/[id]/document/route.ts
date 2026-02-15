@@ -3,6 +3,9 @@ import { resolveDidService } from '@/lib/services/resolve-did-service';
 import { NotFoundError } from '@/lib/api/errors';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDidById } from '@/lib/prisma/repositories';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ route: '/api/v1/dids/[id]/document' });
 
 /**
  * @swagger
@@ -54,12 +57,16 @@ import { getDidById } from '@/lib/prisma/repositories';
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
+  logger.info({ tenantId, didId: id }, 'Looking up DID for document retrieval');
   const did = await getDidById(id, tenantId);
   if (!did) {
     throw new NotFoundError('DID not found');
   }
 
+  logger.info({ tenantId, didId: id, did: did.did }, 'Resolving DID service');
   const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId ?? undefined);
+
+  logger.info({ tenantId, didId: id, did: did.did }, 'Fetching DID document from provider');
   const document = await didService.getDocument(did.did);
 
   return NextResponse.json({ ok: true, document });

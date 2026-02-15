@@ -1,13 +1,11 @@
 import crypto from 'crypto';
 import type { IKeyGenerator } from '../../key-provider.interface.js';
+import { BaseServiceAdapter } from '../../../registry/base-adapter.js';
 import type { LoggerService } from '../../../logging/types.js';
-import { createLogger } from '../../../logging/factory.js';
 
-export class LocalKeyGenerator implements IKeyGenerator {
-  private logger: LoggerService;
-
-  constructor(logger?: LoggerService) {
-    this.logger = logger || createLogger().child({ service: 'LocalKeyGenerator' });
+export class LocalKeyGenerator extends BaseServiceAdapter implements IKeyGenerator {
+  constructor(logger: LoggerService) {
+    super(logger.child({ service: 'KeyProvider - LocalKeyGenerator' }));
   }
 
   async generateKey(_masterKeyId?: string): Promise<{ keyId: string; plaintextKey: string; encryptedKey: string }> {

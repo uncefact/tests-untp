@@ -88,6 +88,5 @@ e2e/cypress/screenshots
 keycloak-realms/
 
 # Local Claude Code files
-.claude/.pr-review-done-*
-.claude/specs/
+.claude/
 CONTEXT.md

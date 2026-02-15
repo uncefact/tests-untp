@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError, errorMessage } from '@/lib/api/errors';
 import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createIdentifierScheme, listIdentifierSchemes } from '@/lib/prisma/repositories';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ route: '/api/v1/schemes' });
 
 /**
  * @swagger
@@ -114,50 +116,48 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
+    throw new ValidationError('Invalid JSON body');
   }
 
-  try {
-    if (!isNonEmptyString(body.registrarId)) throw new ValidationError('registrarId is required');
-    if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
-    if (!isNonEmptyString(body.primaryKey)) throw new ValidationError('primaryKey is required');
-    if (!isNonEmptyString(body.validationPattern)) throw new ValidationError('validationPattern is required');
+  if (!isNonEmptyString(body.registrarId)) throw new ValidationError('registrarId is required');
+  if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
+  if (!isNonEmptyString(body.primaryKey)) throw new ValidationError('primaryKey is required');
+  if (!isNonEmptyString(body.validationPattern)) throw new ValidationError('validationPattern is required');
 
-    // Validate qualifiers if provided
-    if (body.qualifiers !== undefined) {
-      if (!Array.isArray(body.qualifiers)) {
-        throw new ValidationError('qualifiers must be an array');
-      }
-      for (const q of body.qualifiers) {
-        if (!isNonEmptyString(q.key)) throw new ValidationError('qualifier key is required');
-        if (!isNonEmptyString(q.description)) throw new ValidationError('qualifier description is required');
-        if (!isNonEmptyString(q.validationPattern))
-          throw new ValidationError('qualifier validationPattern is required');
-      }
+  // Validate qualifiers if provided
+  if (body.qualifiers !== undefined) {
+    if (!Array.isArray(body.qualifiers)) {
+      throw new ValidationError('qualifiers must be an array');
     }
+    for (const q of body.qualifiers) {
+      if (!isNonEmptyString(q.key)) throw new ValidationError('qualifier key is required');
+      if (!isNonEmptyString(q.description)) throw new ValidationError('qualifier description is required');
+      if (!isNonEmptyString(q.validationPattern)) throw new ValidationError('qualifier validationPattern is required');
+    }
+  }
 
-    const scheme = await createIdentifierScheme({
+  logger.info(
+    {
       tenantId,
       registrarId: body.registrarId,
-      name: body.name,
       primaryKey: body.primaryKey,
-      validationPattern: body.validationPattern,
-      namespace: body.namespace,
-      idrServiceInstanceId: body.idrServiceInstanceId,
-      qualifiers: body.qualifiers,
-    });
+      qualifierCount: body.qualifiers?.length ?? 0,
+    },
+    'Creating identifier scheme',
+  );
+  const scheme = await createIdentifierScheme({
+    tenantId,
+    registrarId: body.registrarId,
+    name: body.name,
+    primaryKey: body.primaryKey,
+    validationPattern: body.validationPattern,
+    namespace: body.namespace,
+    idrServiceInstanceId: body.idrServiceInstanceId,
+    qualifiers: body.qualifiers,
+  });
 
-    return NextResponse.json({ ok: true, scheme }, { status: 201 });
-  } catch (e: unknown) {
-    if (e instanceof ValidationError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
-    }
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
-  }
+  logger.info({ tenantId, schemeId: scheme.id }, 'Scheme created');
+  return NextResponse.json({ ok: true, scheme }, { status: 201 });
 });
 
 /**
@@ -222,20 +222,13 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   const url = new URL(req.url);
+  const registrarId = url.searchParams.get('registrarId') ?? undefined;
+  const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  try {
-    const registrarId = url.searchParams.get('registrarId') ?? undefined;
-    const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-    const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  logger.info({ tenantId, registrarId, limit, offset }, 'Listing schemes');
+  const schemes = await listIdentifierSchemes(tenantId, { registrarId, limit, offset });
 
-    const schemes = await listIdentifierSchemes(tenantId, { registrarId, limit, offset });
-
-    return NextResponse.json({ ok: true, schemes });
-  } catch (e: unknown) {
-    if (e instanceof ValidationError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
-  }
+  logger.info({ tenantId, count: schemes.length }, 'Schemes listed');
+  return NextResponse.json({ ok: true, schemes });
 });

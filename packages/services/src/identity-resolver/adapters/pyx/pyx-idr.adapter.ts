@@ -1,6 +1,6 @@
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
+import { BaseServiceAdapter } from '../../../registry/base-adapter.js';
 import type { LoggerService } from '../../../logging/types.js';
-import { createLogger } from '../../../logging/factory.js';
 import { pyxIdrConfigSchema, type PyxIdrConfig } from './pyx-idr.schema.js';
 import type {
   IIdentityResolverService,
@@ -34,10 +34,9 @@ export const PYX_IDR_ADAPTER_TYPE = 'PYX_IDR' as const;
  * @see https://github.com/pyx-industries/pyx-identity-resolver
  * @see https://pyx-industries.github.io/pyx-identity-resolver/
  */
-export class PyxIdentityResolverAdapter implements IIdentityResolverService {
+export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements IIdentityResolverService {
   private readonly baseURL: string;
   private readonly headers: Record<string, string>;
-  private readonly logger: LoggerService;
   private readonly apiVersion: string;
   private readonly ianaLanguage: string;
   private readonly context: string;
@@ -47,7 +46,8 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
   private readonly defaultContext: string;
   private readonly fwqs: boolean;
 
-  constructor(config: PyxIdrConfig, logger?: LoggerService) {
+  constructor(config: PyxIdrConfig, logger: LoggerService) {
+    super(logger.child({ service: 'IDR - PyxIdentityResolver', apiVersion: config.apiVersion }));
     this.baseURL = config.baseUrl;
     this.headers = {
       Authorization: `Bearer ${config.apiKey}`,
@@ -61,7 +61,6 @@ export class PyxIdentityResolverAdapter implements IIdentityResolverService {
     this.defaultIanaLanguage = config.defaultIanaLanguage;
     this.defaultContext = config.defaultContext;
     this.fwqs = config.fwqs;
-    this.logger = (logger || createLogger()).child({ service: 'PyxIdrAdapter', apiVersion: config.apiVersion });
   }
 
   private get apiBasePath(): string {

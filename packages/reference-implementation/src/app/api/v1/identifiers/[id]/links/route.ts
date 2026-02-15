@@ -4,10 +4,13 @@ import { ValidationError } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getIdentifierById, createManyLinkRegistrations, listLinkRegistrations } from '@/lib/prisma/repositories';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
 
 /**
  * @swagger
- * /api/v1/identifiers/{id}/links:
+ * /identifiers/{id}/links:
  *   post:
  *     tags: [Links]
  *     summary: Publish links to an IDR service
@@ -61,25 +64,24 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('links is required and must be a non-empty array');
   }
 
-  // 1. Look up identifier with full scheme + registrar relations
+  logger.info({ tenantId, identifierId, linkCount: body.links.length }, 'Looking up identifier for link publishing');
   const identifier = await getIdentifierById(identifierId, tenantId);
   if (!identifier) {
     throw new NotFoundError('Identifier not found');
   }
 
-  // 2. Get scheme and registrar for namespace resolution
   const scheme = (identifier as any).scheme;
   const registrar = scheme?.registrar;
   const namespace = scheme?.namespace ?? registrar?.namespace;
 
-  // 3. Resolve IDR service via 4-step chain
+  logger.info({ tenantId, identifierId, primaryKey: scheme?.primaryKey, namespace }, 'Resolving IDR service');
   const { service: idrService } = await resolveIdrService(
     tenantId,
     scheme?.idrServiceInstanceId,
     registrar?.idrServiceInstanceId,
   );
 
-  // 4. Publish links to the IDR service
+  logger.info({ tenantId, identifierId, linkCount: body.links.length }, 'Publishing links to IDR service');
   const registration = await idrService.publishLinks(
     scheme.primaryKey,
     identifier.value,
@@ -88,7 +90,7 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
     { namespace, itemDescription: body.itemDescription },
   );
 
-  // 5. Store audit records locally
+  logger.info({ tenantId, identifierId, publishedCount: registration.links.length }, 'Storing audit records');
   const auditRecords = registration.links.map((l: any) => ({
     tenantId,
     identifierId,
@@ -101,12 +103,13 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   }));
   await createManyLinkRegistrations(auditRecords);
 
+  logger.info({ tenantId, identifierId, linkCount: registration.links.length }, 'Links published');
   return NextResponse.json({ ok: true, registration }, { status: 201 });
 });
 
 /**
  * @swagger
- * /api/v1/identifiers/{id}/links:
+ * /identifiers/{id}/links:
  *   get:
  *     tags: [Links]
  *     summary: List link registrations for an identifier
@@ -125,12 +128,13 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id: identifierId } = await params;
 
-  // Verify identifier exists and is owned by tenant
+  logger.info({ tenantId, identifierId }, 'Looking up identifier for link listing');
   const identifier = await getIdentifierById(identifierId, tenantId);
   if (!identifier) {
     throw new NotFoundError('Identifier not found');
   }
 
   const linkRegistrations = await listLinkRegistrations(identifierId, tenantId);
+  logger.info({ tenantId, identifierId, count: linkRegistrations.length }, 'Link registrations listed');
   return NextResponse.json({ ok: true, linkRegistrations });
 });

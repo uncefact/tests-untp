@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError, errorMessage } from '@/lib/api/errors';
 import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createIdentifier, listIdentifiers } from '@/lib/prisma/repositories';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ route: '/api/v1/identifiers' });
 
 /**
  * @swagger
@@ -75,30 +77,21 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
+    throw new ValidationError('Invalid JSON body');
   }
 
-  try {
-    if (!isNonEmptyString(body.schemeId)) throw new ValidationError('schemeId is required');
-    if (!isNonEmptyString(body.value)) throw new ValidationError('value is required');
+  if (!isNonEmptyString(body.schemeId)) throw new ValidationError('schemeId is required');
+  if (!isNonEmptyString(body.value)) throw new ValidationError('value is required');
 
-    const identifier = await createIdentifier({
-      tenantId,
-      schemeId: body.schemeId,
-      value: body.value,
-    });
+  logger.info({ tenantId, schemeId: body.schemeId }, 'Creating identifier');
+  const identifier = await createIdentifier({
+    tenantId,
+    schemeId: body.schemeId,
+    value: body.value,
+  });
 
-    return NextResponse.json({ ok: true, identifier }, { status: 201 });
-  } catch (e: unknown) {
-    if (e instanceof ValidationError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
-    }
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
-  }
+  logger.info({ tenantId, identifierId: identifier.id, schemeId: body.schemeId }, 'Identifier created');
+  return NextResponse.json({ ok: true, identifier }, { status: 201 });
 });
 
 /**
@@ -163,20 +156,13 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   const url = new URL(req.url);
+  const schemeId = url.searchParams.get('schemeId') ?? undefined;
+  const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  try {
-    const schemeId = url.searchParams.get('schemeId') ?? undefined;
-    const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-    const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  logger.info({ tenantId, schemeId, limit, offset }, 'Listing identifiers');
+  const identifiers = await listIdentifiers(tenantId, { schemeId, limit, offset });
 
-    const identifiers = await listIdentifiers(tenantId, { schemeId, limit, offset });
-
-    return NextResponse.json({ ok: true, identifiers });
-  } catch (e: unknown) {
-    if (e instanceof ValidationError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
-    }
-    console.error('[api] Unexpected error:', e);
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
-  }
+  logger.info({ tenantId, count: identifiers.length }, 'Identifiers listed');
+  return NextResponse.json({ ok: true, identifiers });
 });
