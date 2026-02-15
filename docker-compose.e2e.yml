@@ -45,7 +45,9 @@ services:
       - DOMAIN=localhost
       - PORT=3334
       - AVAILABLE_BUCKETS=verifiable-credentials,private-verifiable-credentials,epcis-events
+      - DEFAULT_BUCKET=verifiable-credentials
       - STORAGE_TYPE=local
+      - API_KEY=test123
 
   identity-resolver-service:
     image: ghcr.io/pyx-industries/pyx-identity-resolver:2.0.2

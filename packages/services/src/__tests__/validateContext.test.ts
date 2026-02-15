@@ -156,19 +156,6 @@ describe('validateContext', () => {
       expect(result.value).toEqual('Invalid storage url');
     });
 
-    it('should return error when params in storage context is invalid', () => {
-      const newContext = {
-        ...contextDPP,
-        storage: {
-          ...contextDPP.storage,
-          params: {},
-        },
-      };
-      const result = validateContextDPP(newContext as any);
-      expect(result.ok).toBe(false);
-      expect(result.value).toEqual('Invalid storage params');
-    });
-
     it('should return error when dlrAPIUrl in dlr context is invalid', () => {
       const newContext = {
         ...contextDPP,
@@ -343,19 +330,6 @@ describe('validateTraceabilityEventContext', () => {
     const result = validateTraceabilityEventContext(newContext as any);
     expect(result.ok).toBe(false);
     expect(result.value).toEqual('Invalid storage url');
-  });
-
-  it('should return error when params in storage context is invalid', () => {
-    const newContext = {
-      ...traceabilityEventContext,
-      storage: {
-        ...traceabilityEventContext.storage,
-        params: {},
-      },
-    };
-    const result = validateTraceabilityEventContext(newContext as any);
-    expect(result.ok).toBe(false);
-    expect(result.value).toEqual('Invalid storage params');
   });
 
   it('should return error when dlrAPIUrl in dlr context is invalid', () => {

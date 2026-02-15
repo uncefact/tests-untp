@@ -21,7 +21,6 @@ describe('UncefactStorageAdapter', () => {
     baseUrl: 'https://storage.example.com',
     apiKey: 'test-api-key',
     apiVersion: '3.0.0',
-    bucket: 'test-bucket',
   };
 
   const mockCredential: EnvelopedVerifiableCredential = {
@@ -82,7 +81,6 @@ describe('UncefactStorageAdapter', () => {
       const configWithoutKey: UncefactStorageConfig = {
         baseUrl: 'https://storage.example.com',
         apiVersion: '3.0.0',
-        bucket: 'test-bucket',
       };
       const adapter = new UncefactStorageAdapter(configWithoutKey, mockLogger);
       await adapter.store(mockCredential);
@@ -130,14 +128,13 @@ describe('UncefactStorageAdapter', () => {
       expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.0.0/private', expect.any(Object));
     });
 
-    it('should send correct payload with bucket and data', async () => {
+    it('should send correct payload with data', async () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
       expect(body).toEqual({
-        bucket: 'test-bucket',
         data: mockCredential,
       });
     });
@@ -203,6 +200,47 @@ describe('UncefactStorageAdapter', () => {
       expect(result.decryptionKey).toBeUndefined();
     });
 
+    describe('bucket selection', () => {
+      it('should include publicBucket in payload when configured and encrypt is false', async () => {
+        const adapter = new UncefactStorageAdapter({ ...mockConfig, publicBucket: 'public-vc' }, mockLogger);
+        await adapter.store(mockCredential, false);
+
+        const callArgs = mockFetch.mock.calls[0];
+        const body = JSON.parse(callArgs[1].body);
+        expect(body.bucket).toBe('public-vc');
+      });
+
+      it('should include privateBucket in payload when configured and encrypt is true', async () => {
+        const adapter = new UncefactStorageAdapter({ ...mockConfig, privateBucket: 'private-vc' }, mockLogger);
+        await adapter.store(mockCredential, true);
+
+        const callArgs = mockFetch.mock.calls[0];
+        const body = JSON.parse(callArgs[1].body);
+        expect(body.bucket).toBe('private-vc');
+      });
+
+      it('should not include bucket in payload when no buckets are configured and encrypt is true', async () => {
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+        await adapter.store(mockCredential, true);
+
+        const callArgs = mockFetch.mock.calls[0];
+        const body = JSON.parse(callArgs[1].body);
+        expect(body).not.toHaveProperty('bucket');
+      });
+
+      it('should use publicBucket for default (non-encrypted) storage', async () => {
+        const adapter = new UncefactStorageAdapter(
+          { ...mockConfig, publicBucket: 'pub', privateBucket: 'priv' },
+          mockLogger,
+        );
+        await adapter.store(mockCredential);
+
+        const callArgs = mockFetch.mock.calls[0];
+        const body = JSON.parse(callArgs[1].body);
+        expect(body.bucket).toBe('pub');
+      });
+    });
+
     describe('logging', () => {
       it('should call logger.debug before making the request', async () => {
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -213,7 +251,7 @@ describe('UncefactStorageAdapter', () => {
           expect.objectContaining({
             url: 'https://storage.example.com/api/3.0.0/public',
             encrypt: false,
-            bucket: 'test-bucket',
+            bucket: undefined,
           }),
           'Storing credential',
         );
@@ -354,36 +392,16 @@ describe('UncefactStorageAdapter', () => {
       const validConfig = {
         baseUrl: 'https://storage.example.com',
         apiKey: 'test-key',
-        bucket: 'my-bucket',
       };
       const result = uncefactStorageRegistryEntry.configSchema.parse(validConfig);
       expect(result.baseUrl).toBe('https://storage.example.com');
       expect(result.apiKey).toBe('test-key');
-      expect(result.bucket).toBe('my-bucket');
     });
 
     it('should reject invalid config (invalid URL)', () => {
       expect(() =>
         uncefactStorageRegistryEntry.configSchema.parse({
           baseUrl: 'not-a-url',
-          bucket: 'test',
-        }),
-      ).toThrow();
-    });
-
-    it('should reject invalid config (missing bucket)', () => {
-      expect(() =>
-        uncefactStorageRegistryEntry.configSchema.parse({
-          baseUrl: 'https://storage.example.com',
-        }),
-      ).toThrow();
-    });
-
-    it('should reject invalid config (empty bucket)', () => {
-      expect(() =>
-        uncefactStorageRegistryEntry.configSchema.parse({
-          baseUrl: 'https://storage.example.com',
-          bucket: '',
         }),
       ).toThrow();
     });
@@ -391,7 +409,6 @@ describe('UncefactStorageAdapter', () => {
     it('should default apiVersion to "3.0.0" when not provided', () => {
       const config = {
         baseUrl: 'https://storage.example.com',
-        bucket: 'test-bucket',
       };
       const result = uncefactStorageRegistryEntry.configSchema.parse(config);
       expect(result.apiVersion).toBe('3.0.0');
@@ -401,7 +418,6 @@ describe('UncefactStorageAdapter', () => {
       const config = {
         baseUrl: 'https://storage.example.com',
         apiVersion: '2.0.0',
-        bucket: 'test-bucket',
       };
       expect(() => uncefactStorageRegistryEntry.configSchema.parse(config)).toThrow();
     });
@@ -409,17 +425,49 @@ describe('UncefactStorageAdapter', () => {
     it('should allow apiKey to be omitted (optional)', () => {
       const config = {
         baseUrl: 'https://storage.example.com',
-        bucket: 'test-bucket',
       };
       const result = uncefactStorageRegistryEntry.configSchema.parse(config);
       expect(result.apiKey).toBeUndefined();
+    });
+
+    it('should accept optional publicBucket', () => {
+      const config = {
+        baseUrl: 'https://storage.example.com',
+        publicBucket: 'my-bucket',
+      };
+      const result = uncefactStorageRegistryEntry.configSchema.parse(config);
+      expect(result.publicBucket).toBe('my-bucket');
+    });
+
+    it('should accept optional privateBucket', () => {
+      const config = {
+        baseUrl: 'https://storage.example.com',
+        privateBucket: 'my-private-bucket',
+      };
+      const result = uncefactStorageRegistryEntry.configSchema.parse(config);
+      expect(result.privateBucket).toBe('my-private-bucket');
+    });
+
+    it('should reject empty string publicBucket', () => {
+      const config = {
+        baseUrl: 'https://storage.example.com',
+        publicBucket: '',
+      };
+      expect(() => uncefactStorageRegistryEntry.configSchema.parse(config)).toThrow();
+    });
+
+    it('should reject empty string privateBucket', () => {
+      const config = {
+        baseUrl: 'https://storage.example.com',
+        privateBucket: '',
+      };
+      expect(() => uncefactStorageRegistryEntry.configSchema.parse(config)).toThrow();
     });
 
     it('should create an adapter instance via factory', () => {
       const config = {
         baseUrl: 'https://storage.example.com',
         apiKey: 'test-key',
-        bucket: 'test-bucket',
       };
       const parsed = uncefactStorageRegistryEntry.configSchema.parse(config);
       const adapter = uncefactStorageRegistryEntry.factory(parsed, mockLogger);

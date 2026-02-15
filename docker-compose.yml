@@ -154,7 +154,9 @@ services:
       - DOMAIN=localhost
       - PORT=3334
       - AVAILABLE_BUCKETS=verifiable-credentials,private-verifiable-credentials,epcis-events
+      - DEFAULT_BUCKET=verifiable-credentials
       - STORAGE_TYPE=local
+      - API_KEY=test123
     volumes:
       - storage_service_data:/app/src/uploads
 

@@ -54,7 +54,6 @@ type DppConfig = {
  */
 type StorageConfig = {
   url: string;
-  params: { bucket: string };
   options: {
     method: string;
     headers?: Record<string, string>;
@@ -269,7 +268,6 @@ async function storeCredential(params: IssueConfigParams, envelopedVC: Enveloped
   const storageUrl = process.env.STORAGE_SERVICE_URL || storage.url;
 
   const payload = {
-    bucket: storage.params.bucket,
     data: envelopedVC,
   };
 

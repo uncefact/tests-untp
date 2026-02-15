@@ -44,7 +44,6 @@ export const validateContextDPP = (context: IDppContext): Result<IContext> => {
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
-  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
@@ -70,7 +69,6 @@ export const validateContextTransformationEvent = (
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
-  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
@@ -108,7 +106,6 @@ export const validateDigitalIdentityAnchorContext = (
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
-  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
@@ -134,7 +131,6 @@ export const validateDigitalFacilityRecordContext = (
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
-  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
@@ -161,7 +157,6 @@ export const validateDigitalConformityCredentialContext = (
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
-  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');
@@ -190,7 +185,6 @@ export const validateTraceabilityEventContext = (
 
   if (_.isEmpty(context.storage)) return error('Invalid storage context');
   if (_.isEmpty(context.storage.url)) return error('Invalid storage url');
-  if (_.isEmpty(context.storage.params)) return error('Invalid storage params');
 
   if (_.isEmpty(context.dlr.dlrAPIUrl)) return error('Invalid dlrAPIUrl');
   if (_.isEmpty(context.dlr.dlrAPIKey)) return error('Invalid dlrAPIKey');

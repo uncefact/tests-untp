@@ -1399,9 +1399,7 @@
                   },
                   "storage": {
                     "url": "http://localhost:3334/api/3.0.0/public",
-                    "params": {
-                      "bucket": "verifiable-credentials"
-                    },
+                    "params": {},
                     "options": {
                       "method": "POST",
                       "headers": {
@@ -1573,9 +1571,7 @@
                   },
                   "storage": {
                     "url": "http://localhost:3334/api/3.0.0/public",
-                    "params": {
-                      "bucket": "verifiable-credentials"
-                    },
+                    "params": {},
                     "options": {
                       "method": "POST",
                       "headers": {
@@ -2857,9 +2853,7 @@
                   },
                   "storage": {
                     "url": "http://localhost:3334/api/3.0.0/public",
-                    "params": {
-                      "bucket": "verifiable-credentials"
-                    },
+                    "params": {},
                     "options": {
                       "method": "POST",
                       "headers": {
@@ -4389,9 +4383,7 @@
                   },
                   "storage": {
                     "url": "http://localhost:3334/api/3.0.0/public",
-                    "params": {
-                      "bucket": "verifiable-credentials"
-                    },
+                    "params": {},
                     "options": {
                       "method": "POST",
                       "headers": {
@@ -4842,9 +4834,7 @@
                   },
                   "storage": {
                     "url": "http://localhost:3334/api/3.0.0/public",
-                    "params": {
-                      "bucket": "verifiable-credentials"
-                    },
+                    "params": {},
                     "options": {
                       "method": "POST",
                       "headers": {
@@ -5299,9 +5289,7 @@
                   },
                   "storage": {
                     "url": "http://localhost:3334/api/3.0.0/public",
-                    "params": {
-                      "bucket": "verifiable-credentials"
-                    },
+                    "params": {},
                     "options": {
                       "method": "POST",
                       "headers": {
@@ -5734,9 +5722,7 @@
                   },
                   "storage": {
                     "url": "http://localhost:3334/api/3.0.0/public",
-                    "params": {
-                      "bucket": "verifiable-credentials"
-                    },
+                    "params": {},
                     "options": {
                       "method": "POST",
                       "headers": {
@@ -6182,9 +6168,7 @@
                   },
                   "storage": {
                     "url": "http://localhost:3334/api/3.0.0/public",
-                    "params": {
-                      "bucket": "verifiable-credentials"
-                    },
+                    "params": {},
                     "options": {
                       "method": "POST",
                       "headers": {
@@ -6626,9 +6610,7 @@
                   },
                   "storage": {
                     "url": "http://localhost:3334/api/3.0.0/public",
-                    "params": {
-                      "bucket": "verifiable-credentials"
-                    },
+                    "params": {},
                     "options": {
                       "method": "POST",
                       "headers": {

@@ -67,7 +67,6 @@ export interface IConfigDLR {
 
 export interface IStorageContext {
   storageAPIUrl: string;
-  bucket: string;
 }
 export interface IContext {
   vckit: IVCKitContext;

@@ -271,7 +271,8 @@ async function main() {
     const storageServiceConfig = JSON.stringify({
       baseUrl: new URL(storageServiceUrl).origin,
       apiVersion: '3.0.0',
-      bucket: 'verifiable-credentials',
+      publicBucket: 'verifiable-credentials',
+      privateBucket: 'private-verifiable-credentials',
     });
     const encryptedStorageConfig = JSON.stringify(
       encryptionService.encrypt(storageServiceConfig, EncryptionAlgorithm.AES_256_GCM),
