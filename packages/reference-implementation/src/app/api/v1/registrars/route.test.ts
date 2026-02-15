@@ -69,10 +69,10 @@ describe('POST /api/v1/registrars', () => {
   });
 
   it('creates a registrar and returns 201', async () => {
-    const registrar = { id: 'reg-1', name: 'GS1', namespace: 'gs1' };
+    const registrar = { id: 'reg-1', name: 'GS1', namespace: 'gs1', url: 'https://gs1.org' };
     mockCreateRegistrar.mockResolvedValue(registrar);
 
-    const req = createFakeRequest({ body: { name: 'GS1', namespace: 'gs1' } });
+    const req = createFakeRequest({ body: { name: 'GS1', namespace: 'gs1', url: 'https://gs1.org' } });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
@@ -140,7 +140,7 @@ describe('POST /api/v1/registrars', () => {
   it('returns 500 when repository throws', async () => {
     mockCreateRegistrar.mockRejectedValue(new Error('Database error'));
 
-    const req = createFakeRequest({ body: { name: 'GS1', namespace: 'gs1' } });
+    const req = createFakeRequest({ body: { name: 'GS1', namespace: 'gs1', url: 'https://gs1.org' } });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
