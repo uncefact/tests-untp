@@ -40,7 +40,7 @@ describe('PyxIdentityResolverAdapter', () => {
   };
 
   const mockOptions = {
-    namespace: 'untp',
+    namespace: 'ato',
   };
 
   const mockLinks: Link[] = [
@@ -162,7 +162,7 @@ describe('PyxIdentityResolverAdapter', () => {
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
       expect(body).toMatchObject({
-        namespace: 'untp',
+        namespace: 'ato',
         identificationKey: '51824753556',
         identificationKeyType: 'abn',
         itemDescription: 'Test item',
@@ -271,6 +271,39 @@ describe('PyxIdentityResolverAdapter', () => {
       const result = await adapter.publishLinks('abn', '51824753556', [mockLinks[0]], undefined, mockOptions);
 
       expect(result.links[0].idrLinkId).toBe('0');
+    });
+
+    it('should construct resolverUri from parts when API response omits it', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          linkResponses: [
+            { id: 'link-1', linkType: 'untp:dpp' },
+            { id: 'link-2', linkType: 'untp:dcc' },
+          ],
+        }),
+        text: jest.fn().mockResolvedValue(''),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      const result = await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
+
+      expect(result.resolverUri).toBe('https://resolver.example.com/ato/abn/51824753556');
+    });
+
+    it('should return empty links array when API response has no linkResponses or responses', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          resolverUri: 'https://resolver.example.com/ato/abn/51824753556',
+        }),
+        text: jest.fn().mockResolvedValue(''),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      const result = await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
+
+      expect(result.links).toEqual([]);
     });
 
     it('should log the publish operation', async () => {
@@ -489,6 +522,30 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(body.linkType).toBeUndefined();
     });
 
+    it('should throw IdrLinkNotFoundError on HTTP 404', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+
+      await expect(adapter.updateLink('link-123', { title: 'test' })).rejects.toThrow(IdrLinkNotFoundError);
+    });
+
+    it('should throw IdrLinkNotFoundError on HTTP 410', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 410,
+        statusText: 'Gone',
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+
+      await expect(adapter.updateLink('link-123', { title: 'test' })).rejects.toThrow(IdrLinkNotFoundError);
+    });
+
     it('should throw on HTTP error', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -526,6 +583,18 @@ describe('PyxIdentityResolverAdapter', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+
+      await expect(adapter.deleteLink('link-999')).rejects.toThrow(IdrLinkNotFoundError);
+    });
+
+    it('should throw IdrLinkNotFoundError on HTTP 410', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 410,
+        statusText: 'Gone',
       });
 
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
