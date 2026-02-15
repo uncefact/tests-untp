@@ -14,7 +14,7 @@ function buildMockPrisma(overrides: Record<string, unknown> = {}) {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
-    organization: {
+    tenant: {
       create: jest.fn(),
     },
     ...overrides,
@@ -37,7 +37,7 @@ describe('handleSignIn', () => {
 
     userModel.findUnique.mockResolvedValue({
       authProviderId: null,
-      organizationId: 'org-1',
+      tenantId: 'org-1',
     });
 
     await handleSignIn(prisma, 'user-1', ACCOUNT, {
@@ -51,58 +51,58 @@ describe('handleSignIn', () => {
     });
   });
 
-  it("creates an organisation with the user's name when organizationId is missing", async () => {
+  it("creates an organisation with the user's name when tenant is missing", async () => {
     const prisma = buildMockPrisma();
     const userModel = prisma.user as unknown as {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
-    const orgModel = prisma.organization as unknown as {
+    const tenantModel = prisma.tenant as unknown as {
       create: jest.Mock;
     };
 
     userModel.findUnique.mockResolvedValue({
       authProviderId: 'kc-12345',
-      organizationId: null,
+      tenantId: null,
     });
-    orgModel.create.mockResolvedValue({ id: 'new-org-1' });
+    tenantModel.create.mockResolvedValue({ id: 'new-org-1' });
 
     await handleSignIn(prisma, 'user-1', ACCOUNT, {
       name: 'Alice',
       email: 'alice@example.com',
     });
 
-    expect(orgModel.create).toHaveBeenCalledWith({
+    expect(tenantModel.create).toHaveBeenCalledWith({
       data: { name: 'Alice Organisation' },
     });
     expect(userModel.update).toHaveBeenCalledWith({
       where: { id: 'user-1' },
-      data: { organizationId: 'new-org-1' },
+      data: { tenantId: 'new-org-1' },
     });
   });
 
-  it('falls back to email for org name when name is absent', async () => {
+  it('falls back to email for tenant name when name is absent', async () => {
     const prisma = buildMockPrisma();
     const userModel = prisma.user as unknown as {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
-    const orgModel = prisma.organization as unknown as {
+    const tenantModel = prisma.tenant as unknown as {
       create: jest.Mock;
     };
 
     userModel.findUnique.mockResolvedValue({
       authProviderId: 'kc-12345',
-      organizationId: null,
+      tenantId: null,
     });
-    orgModel.create.mockResolvedValue({ id: 'new-org-2' });
+    tenantModel.create.mockResolvedValue({ id: 'new-org-2' });
 
     await handleSignIn(prisma, 'user-2', ACCOUNT, {
       name: null,
       email: 'bob@example.com',
     });
 
-    expect(orgModel.create).toHaveBeenCalledWith({
+    expect(tenantModel.create).toHaveBeenCalledWith({
       data: { name: 'bob Organisation' },
     });
   });
@@ -113,22 +113,22 @@ describe('handleSignIn', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
-    const orgModel = prisma.organization as unknown as {
+    const tenantModel = prisma.tenant as unknown as {
       create: jest.Mock;
     };
 
     userModel.findUnique.mockResolvedValue({
       authProviderId: 'kc-12345',
-      organizationId: null,
+      tenantId: null,
     });
-    orgModel.create.mockResolvedValue({ id: 'new-org-3' });
+    tenantModel.create.mockResolvedValue({ id: 'new-org-3' });
 
     await handleSignIn(prisma, 'user-3', ACCOUNT, {
       name: null,
       email: null,
     });
 
-    expect(orgModel.create).toHaveBeenCalledWith({
+    expect(tenantModel.create).toHaveBeenCalledWith({
       data: { name: 'My Organisation' },
     });
   });
@@ -139,13 +139,13 @@ describe('handleSignIn', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
-    const orgModel = prisma.organization as unknown as {
+    const tenantModel = prisma.tenant as unknown as {
       create: jest.Mock;
     };
 
     userModel.findUnique.mockResolvedValue({
       authProviderId: 'kc-12345',
-      organizationId: 'org-1',
+      tenantId: 'org-1',
     });
 
     await handleSignIn(prisma, 'user-1', ACCOUNT, {
@@ -154,7 +154,7 @@ describe('handleSignIn', () => {
     });
 
     expect(userModel.update).not.toHaveBeenCalled();
-    expect(orgModel.create).not.toHaveBeenCalled();
+    expect(tenantModel.create).not.toHaveBeenCalled();
     expect(mockCloneSystemDefaults).not.toHaveBeenCalled();
   });
 
@@ -174,21 +174,21 @@ describe('handleSignIn', () => {
     expect(userModel.update).not.toHaveBeenCalled();
   });
 
-  it('calls cloneSystemDefaults with the new organisation ID', async () => {
+  it('calls cloneSystemDefaults with the new tenant ID', async () => {
     const prisma = buildMockPrisma();
     const userModel = prisma.user as unknown as {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
-    const orgModel = prisma.organization as unknown as {
+    const tenantModel = prisma.tenant as unknown as {
       create: jest.Mock;
     };
 
     userModel.findUnique.mockResolvedValue({
       authProviderId: 'kc-12345',
-      organizationId: null,
+      tenantId: null,
     });
-    orgModel.create.mockResolvedValue({ id: 'new-org-4' });
+    tenantModel.create.mockResolvedValue({ id: 'new-org-4' });
 
     await handleSignIn(prisma, 'user-4', ACCOUNT, {
       name: 'Charlie',
@@ -197,21 +197,21 @@ describe('handleSignIn', () => {
     expect(mockCloneSystemDefaults).toHaveBeenCalledWith(prisma, 'new-org-4');
   });
 
-  it('sets both authProviderId and organisationId when both are missing', async () => {
+  it('sets both authProviderId and tenantId when both are missing', async () => {
     const prisma = buildMockPrisma();
     const userModel = prisma.user as unknown as {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
-    const orgModel = prisma.organization as unknown as {
+    const tenantModel = prisma.tenant as unknown as {
       create: jest.Mock;
     };
 
     userModel.findUnique.mockResolvedValue({
       authProviderId: null,
-      organizationId: null,
+      tenantId: null,
     });
-    orgModel.create.mockResolvedValue({ id: 'new-org-5' });
+    tenantModel.create.mockResolvedValue({ id: 'new-org-5' });
 
     await handleSignIn(prisma, 'user-5', ACCOUNT, {
       name: 'Dana',
@@ -222,7 +222,7 @@ describe('handleSignIn', () => {
       where: { id: 'user-5' },
       data: {
         authProviderId: 'kc-12345',
-        organizationId: 'new-org-5',
+        tenantId: 'new-org-5',
       },
     });
     expect(mockCloneSystemDefaults).toHaveBeenCalledWith(prisma, 'new-org-5');

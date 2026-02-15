@@ -7,6 +7,7 @@ export const vckitDidConfigSchema = z.object({
     .describe('API Endpoint||The base URL of your VCKit instance, e.g. https://vckit.example.com'),
   authToken: z.string().min(1).describe('Auth Token||The Bearer token for authenticating with VCKit'),
   keyType: z.literal('Ed25519').default('Ed25519').describe('Key Algorithm||The key algorithm used when creating DIDs'),
+  apiVersion: z.enum(['1.1.0']).default('1.1.0').describe('API Version||The VCKit API version to use'),
 });
 
 /** Fields whose values should be treated as sensitive (e.g. masked in UI, encrypted at rest). */

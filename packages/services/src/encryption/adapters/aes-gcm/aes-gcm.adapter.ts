@@ -1,24 +1,23 @@
 import crypto from 'crypto';
 import { EncryptionAlgorithm, assertPermittedAlgorithm } from '../../encryption.interface.js';
 import type { EncryptedEnvelope, IEncryptionService } from '../../encryption.interface.js';
+import { BaseServiceAdapter } from '../../../registry/base-adapter.js';
 import type { LoggerService } from '../../../logging/types.js';
-import { createLogger } from '../../../logging/factory.js';
 
 /**
  * AES-256-GCM encryption adapter.
  *
  * Accepts a 64-character hex string (32 bytes) as the encryption key.
  */
-export class AesGcmEncryptionAdapter implements IEncryptionService {
+export class AesGcmEncryptionAdapter extends BaseServiceAdapter implements IEncryptionService {
   private readonly key: Buffer;
-  private logger: LoggerService;
 
-  constructor(key: string, logger?: LoggerService) {
+  constructor(key: string, logger: LoggerService) {
+    super(logger.child({ service: 'Encryption - AesGcmEncryption' }));
     if (!/^[0-9a-f]{64}$/i.test(key)) {
       throw new Error('Encryption key must be a 64-character hex string (32 bytes)');
     }
     this.key = Buffer.from(key, 'hex');
-    this.logger = logger || createLogger().child({ service: 'AesGcmEncryptionAdapter' });
   }
 
   encrypt(plaintext: string, algorithm: EncryptionAlgorithm): EncryptedEnvelope {

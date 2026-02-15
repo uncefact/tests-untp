@@ -68,11 +68,12 @@ const MOCK_ENCRYPTED_ENVELOPE = {
 
 const MOCK_INSTANCE = {
   id: 'inst-1',
-  organizationId: 'system',
+  tenantId: 'system',
   serviceType: 'DID',
   adapterType: 'VCKIT',
   name: 'System VCKit',
   config: JSON.stringify(MOCK_ENCRYPTED_ENVELOPE),
+  apiVersion: '1.1.0',
   isPrimary: false,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -115,7 +116,15 @@ describe('resolveDidService', () => {
     expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'DID', undefined);
     expect(mockEncryptionService.decrypt).toHaveBeenCalledWith(MOCK_ENCRYPTED_ENVELOPE);
     expect(mockConfigSchema.safeParse).toHaveBeenCalledWith(VALID_CONFIG);
-    expect(mockFactory).toHaveBeenCalledWith(VALID_CONFIG);
+    expect(mockFactory).toHaveBeenCalledWith(
+      VALID_CONFIG,
+      expect.objectContaining({
+        info: expect.any(Function),
+        warn: expect.any(Function),
+        error: expect.any(Function),
+        debug: expect.any(Function),
+      }),
+    );
     expect(result).toEqual({ service: MOCK_SERVICE, instanceId: 'inst-1' });
   });
 

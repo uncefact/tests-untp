@@ -6,7 +6,7 @@ import { NotFoundError } from '@/lib/api/errors';
  * Input for creating a new DID record
  */
 export type CreateDidInput = {
-  organizationId: string;
+  tenantId: string;
   did: string;
   type: 'DEFAULT' | 'MANAGED' | 'SELF_MANAGED';
   method?: 'DID_WEB' | 'DID_WEB_VH';
@@ -43,7 +43,7 @@ export type ListDidsOptions = {
 export async function createDid(input: CreateDidInput): Promise<Did> {
   return prisma.did.create({
     data: {
-      organizationId: input.organizationId,
+      tenantId: input.tenantId,
       did: input.did,
       type: input.type,
       method: input.method ?? 'DID_WEB',
@@ -61,11 +61,11 @@ export async function createDid(input: CreateDidInput): Promise<Did> {
  * Retrieves a DID by ID, scoped to an organisation.
  * Returns null if the DID does not exist or belongs to a different organisation.
  */
-export async function getDidById(id: string, organizationId: string): Promise<Did | null> {
+export async function getDidById(id: string, tenantId: string): Promise<Did | null> {
   return prisma.did.findFirst({
     where: {
       id,
-      OR: [{ organizationId }, { isDefault: true }],
+      OR: [{ tenantId }, { isDefault: true }],
     },
   });
 }
@@ -73,11 +73,11 @@ export async function getDidById(id: string, organizationId: string): Promise<Di
 /**
  * Lists DIDs for an organisation, including system defaults.
  */
-export async function listDids(organizationId: string, options: ListDidsOptions = {}): Promise<Did[]> {
+export async function listDids(tenantId: string, options: ListDidsOptions = {}): Promise<Did[]> {
   const { type, status, serviceInstanceId, limit, offset } = options;
 
   const where: Prisma.DidWhereInput = {
-    OR: [{ organizationId }, { isDefault: true }],
+    OR: [{ tenantId }, { isDefault: true }],
   };
 
   if (type !== undefined) {
@@ -104,10 +104,10 @@ export async function listDids(organizationId: string, options: ListDidsOptions 
  * Updates a DID's name and/or description.
  * Validates that the DID belongs to the specified organisation.
  */
-export async function updateDid(id: string, organizationId: string, input: UpdateDidInput): Promise<Did> {
+export async function updateDid(id: string, tenantId: string, input: UpdateDidInput): Promise<Did> {
   // Verify ownership before updating
   const existing = await prisma.did.findFirst({
-    where: { id, organizationId },
+    where: { id, tenantId },
   });
 
   if (!existing) {
@@ -127,9 +127,9 @@ export async function updateDid(id: string, organizationId: string, input: Updat
  * Updates a DID's status (used for verification flow).
  * Validates that the DID belongs to the specified organisation.
  */
-export async function updateDidStatus(id: string, organizationId: string, status: DidStatus): Promise<Did> {
+export async function updateDidStatus(id: string, tenantId: string, status: DidStatus): Promise<Did> {
   const existing = await prisma.did.findFirst({
-    where: { id, organizationId },
+    where: { id, tenantId },
   });
 
   if (!existing) {

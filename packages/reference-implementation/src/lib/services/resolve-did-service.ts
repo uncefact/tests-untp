@@ -1,6 +1,8 @@
-import { ServiceType, AdapterType, createLogger } from '@uncefact/untp-ri-services';
+import { ServiceType } from '@uncefact/untp-ri-services';
+import type { AdapterRegistryEntry } from '@uncefact/untp-ri-services';
 import { adapterRegistry } from '@uncefact/untp-ri-services/server';
 import type { IDidService } from '@uncefact/untp-ri-services';
+import { createLogger } from '@uncefact/untp-ri-services/logging';
 import { getEncryptionService } from '@/lib/encryption/encryption';
 import { getInstanceByResolution } from '@/lib/prisma/repositories';
 import {
@@ -22,25 +24,22 @@ export interface ResolvedDidService {
 }
 
 /**
- * Resolves a DID service adapter for the given organisation.
+ * Resolves a DID service adapter for the given tenant.
  *
  * Resolution chain:
  * 1. Explicit instance ID (if provided)
- * 2. Tenant primary (isPrimary === true for org + DID service type)
- * 3. System default (organizationId === "system")
+ * 2. Tenant primary (isPrimary === true for tenant + DID service type)
+ * 3. System default (tenantId === "system")
  * 4. Throw ServiceResolutionError
  */
-export async function resolveDidService(
-  organizationId: string,
-  serviceInstanceId?: string,
-): Promise<ResolvedDidService> {
-  const instance = await getInstanceByResolution(organizationId, ServiceType.DID, serviceInstanceId);
+export async function resolveDidService(tenantId: string, serviceInstanceId?: string): Promise<ResolvedDidService> {
+  const instance = await getInstanceByResolution(tenantId, ServiceType.DID, serviceInstanceId);
 
   if (!instance) {
     if (serviceInstanceId) {
       throw new ServiceInstanceNotFoundError(serviceInstanceId);
     }
-    throw new ServiceResolutionError(ServiceType.DID, organizationId);
+    throw new ServiceResolutionError(ServiceType.DID, tenantId);
   }
 
   // Decrypt the config
@@ -61,18 +60,24 @@ export async function resolveDidService(
     throw new ConfigValidationError(instance.id, 'Invalid JSON in decrypted config');
   }
 
-  const adapterEntry = adapterRegistry[ServiceType.DID]?.[instance.adapterType as AdapterType];
+  const serviceEntry = (adapterRegistry as Record<string, Record<string, AdapterRegistryEntry> | undefined>)[
+    ServiceType.DID
+  ];
+  const adapterEntry = serviceEntry?.[instance.adapterType];
   if (!adapterEntry) {
-    throw new ServiceResolutionError(ServiceType.DID, organizationId);
+    throw new ServiceResolutionError(ServiceType.DID, tenantId);
   }
 
   const parseResult = adapterEntry.configSchema.safeParse(rawConfig);
   if (!parseResult.success) {
-    throw new ConfigValidationError(instance.id, parseResult.error.issues.map((i) => i.message).join(', '));
+    throw new ConfigValidationError(
+      instance.id,
+      parseResult.error.issues.map((i: { message: string }) => i.message).join(', '),
+    );
   }
 
   return {
-    service: adapterEntry.factory(parseResult.data) as IDidService,
+    service: adapterEntry.factory(parseResult.data, logger) as IDidService,
     instanceId: instance.id,
   };
 }

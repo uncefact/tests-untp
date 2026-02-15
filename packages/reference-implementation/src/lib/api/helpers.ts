@@ -2,18 +2,18 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma/prisma';
 
 /**
- * Resolves the organisation ID for the current authenticated user.
+ * Resolves the tenant ID for the current authenticated user.
  * Looks up the User by their OAuth sub (which is stored as User.id),
- * then returns their organizationId.
+ * then returns their tenantId.
  *
- * Returns null if the user is not found or has no organisation.
+ * Returns null if the user is not found or has no tenant.
  */
-export async function getOrganizationId(userId: string): Promise<string | null> {
+export async function getTenantId(userId: string): Promise<string | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { organizationId: true },
+    select: { tenantId: true },
   });
-  return user?.organizationId ?? null;
+  return user?.tenantId ?? null;
 }
 
 /**

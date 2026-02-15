@@ -1,25 +1,34 @@
 import crypto from 'crypto';
 import { AesGcmEncryptionAdapter } from './aes-gcm.adapter';
 import { EncryptionAlgorithm } from '../../encryption.interface';
+import type { LoggerService } from '../../../logging/types';
 
 const TEST_KEY = crypto.randomBytes(32).toString('hex');
 const ALG = EncryptionAlgorithm.AES_256_GCM;
 
+const mockLogger: LoggerService = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+  child: jest.fn().mockReturnThis(),
+};
+
 describe('AesGcmEncryptionAdapter', () => {
   describe('constructor', () => {
     it('creates instance with a valid 64-character hex key', () => {
-      const adapter = new AesGcmEncryptionAdapter(TEST_KEY);
+      const adapter = new AesGcmEncryptionAdapter(TEST_KEY, mockLogger);
       expect(adapter).toBeInstanceOf(AesGcmEncryptionAdapter);
     });
 
     it('throws if key is not a 64-character hex string', () => {
-      expect(() => new AesGcmEncryptionAdapter('short-key')).toThrow(
+      expect(() => new AesGcmEncryptionAdapter('short-key', mockLogger)).toThrow(
         'Encryption key must be a 64-character hex string (32 bytes)',
       );
     });
 
     it('throws if key is empty', () => {
-      expect(() => new AesGcmEncryptionAdapter('')).toThrow(
+      expect(() => new AesGcmEncryptionAdapter('', mockLogger)).toThrow(
         'Encryption key must be a 64-character hex string (32 bytes)',
       );
     });
@@ -29,7 +38,7 @@ describe('AesGcmEncryptionAdapter', () => {
     let adapter: AesGcmEncryptionAdapter;
 
     beforeEach(() => {
-      adapter = new AesGcmEncryptionAdapter(TEST_KEY);
+      adapter = new AesGcmEncryptionAdapter(TEST_KEY, mockLogger);
     });
 
     it('round-trips a simple string', () => {
@@ -91,7 +100,7 @@ describe('AesGcmEncryptionAdapter', () => {
     let adapter: AesGcmEncryptionAdapter;
 
     beforeEach(() => {
-      adapter = new AesGcmEncryptionAdapter(TEST_KEY);
+      adapter = new AesGcmEncryptionAdapter(TEST_KEY, mockLogger);
     });
 
     it('throws when given an unsupported algorithm', () => {
@@ -103,7 +112,7 @@ describe('AesGcmEncryptionAdapter', () => {
     let adapter: AesGcmEncryptionAdapter;
 
     beforeEach(() => {
-      adapter = new AesGcmEncryptionAdapter(TEST_KEY);
+      adapter = new AesGcmEncryptionAdapter(TEST_KEY, mockLogger);
     });
 
     it('throws when envelope has an unsupported algorithm type', () => {
@@ -123,7 +132,7 @@ describe('AesGcmEncryptionAdapter', () => {
 
     it('throws when decrypting with a different key', () => {
       const otherKey = crypto.randomBytes(32).toString('hex');
-      const otherAdapter = new AesGcmEncryptionAdapter(otherKey);
+      const otherAdapter = new AesGcmEncryptionAdapter(otherKey, mockLogger);
       const envelope = adapter.encrypt('secret message', ALG);
       expect(() => otherAdapter.decrypt(envelope)).toThrow();
     });

@@ -29,10 +29,12 @@ enum DidStatus {
 
 enum ServiceType {
   DID
+  IDR
 }
 
 enum AdapterType {
   VCKIT
+  PYX_IDR
 }
 
 /**
@@ -45,12 +47,12 @@ model User {
   email           String?   @unique
   emailVerified   DateTime?
   image           String?
-  organizationId  String?
+  tenantId        String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   accounts     Account[]
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  tenant       Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 }
 
 model Account {
@@ -72,7 +74,7 @@ model Account {
   @@unique([provider, providerAccountId])
 }
 
-model Organization {
+model Tenant {
   id             String   @id @default(cuid())
   name           String
   primaryColor   String?
@@ -81,9 +83,15 @@ model Organization {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  users            User[]
-  dids             Did[]
-  serviceInstances ServiceInstance[]
+  users              User[]
+  dids               Did[]
+  serviceInstances   ServiceInstance[]
+  registrars         Registrar[]
+  schemes            IdentifierScheme[]
+  identifiers        Identifier[]
+  linkRegistrations  LinkRegistration[]
+
+  @@map("Tenant")
 }
 
 /**
@@ -106,7 +114,7 @@ model Credential {
  */
 model Did {
   id             String    @id @default(cuid())
-  organizationId String
+  tenantId       String
   did            String    @unique
   type           DidType
   method         DidMethod @default(DID_WEB)
@@ -121,9 +129,9 @@ model Did {
   serviceInstanceId String?
   serviceInstance   ServiceInstance? @relation(fields: [serviceInstanceId], references: [id], onDelete: SetNull)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@index([organizationId])
+  @@index([tenantId])
 }
 
 /**
@@ -132,18 +140,131 @@ model Did {
  */
 model ServiceInstance {
   id             String       @id @default(cuid())
-  organizationId String
+  tenantId       String
   serviceType    ServiceType
   adapterType    AdapterType
   name           String
   description    String?
   config         String       // AES-256-GCM encrypted JSON blob
+  apiVersion     String       @default("1.0.0") // Semver without v prefix, e.g. "1.0.0"
   isPrimary      Boolean      @default(false)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   dids           Did[]
+  registrars     Registrar[]        @relation("RegistrarIdr")
+  schemes        IdentifierScheme[] @relation("SchemeIdr")
 
-  @@index([organizationId, serviceType])
+  @@index([tenantId, serviceType])
+}
+
+/**
+ * Registrars are organisations that operate identifier schemes.
+ * Scoped to tenants, with system defaults available to all.
+ */
+model Registrar {
+  id                   String   @id @default(cuid())
+  tenantId             String
+  name                 String
+  namespace            String
+  url                  String?
+  idrServiceInstanceId String?
+  isDefault            Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenant             Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  idrServiceInstance ServiceInstance? @relation("RegistrarIdr", fields: [idrServiceInstanceId], references: [id], onDelete: SetNull)
+  schemes            IdentifierScheme[]
+
+  @@index([tenantId])
+}
+
+/**
+ * Identifier schemes define a type of identifier with validation rules.
+ * Each scheme belongs to a registrar and may have qualifier definitions.
+ */
+model IdentifierScheme {
+  id                   String   @id @default(cuid())
+  tenantId             String
+  registrarId          String
+  name                 String
+  primaryKey           String
+  validationPattern    String
+  namespace            String?
+  idrServiceInstanceId String?
+  isDefault            Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenant             Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  registrar          Registrar        @relation(fields: [registrarId], references: [id], onDelete: Cascade)
+  idrServiceInstance ServiceInstance? @relation("SchemeIdr", fields: [idrServiceInstanceId], references: [id], onDelete: SetNull)
+  qualifiers         SchemeQualifier[]
+  identifiers        Identifier[]
+
+  @@unique([registrarId, primaryKey, tenantId])
+  @@index([tenantId])
+}
+
+/**
+ * Qualifier definitions for identifier schemes (e.g. batch number, serial number).
+ * Each qualifier belongs to exactly one scheme.
+ */
+model SchemeQualifier {
+  id                String   @id @default(cuid())
+  schemeId          String
+  key               String
+  description       String
+  validationPattern String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  scheme IdentifierScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+
+  @@unique([schemeId, key])
+}
+
+/**
+ * Actual identifier values validated against their scheme's pattern.
+ * Scoped to a single tenant (not shared with system defaults).
+ */
+model Identifier {
+  id        String   @id @default(cuid())
+  tenantId  String
+  schemeId  String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scheme            IdentifierScheme   @relation(fields: [schemeId], references: [id], onDelete: Restrict)
+  linkRegistrations LinkRegistration[]
+
+  @@unique([schemeId, value])
+  @@index([tenantId])
+}
+
+/**
+ * Audit trail for links published to IDR services.
+ * Each record maps a local identifier to an IDR-assigned link.
+ */
+model LinkRegistration {
+  id            String   @id @default(cuid())
+  tenantId      String
+  identifierId  String
+  idrLinkId     String
+  linkType      String
+  targetUrl     String
+  mimeType      String
+  resolverUri   String
+  qualifierPath String?
+  publishedAt   DateTime @default(now())
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  identifier Identifier @relation(fields: [identifierId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([identifierId])
 }

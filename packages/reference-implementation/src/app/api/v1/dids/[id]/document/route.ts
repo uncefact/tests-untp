@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { resolveDidService } from '@/lib/services/resolve-did-service';
-import { NotFoundError, ServiceRegistryError, errorMessage } from '@/lib/api/errors';
-import { withOrgAuth } from '@/lib/api/with-org-auth';
+import { NotFoundError } from '@/lib/api/errors';
+import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDidById } from '@/lib/prisma/repositories';
-import { createLogger } from '@uncefact/untp-ri-services';
+import { apiLogger } from '@/lib/api/logger';
 
-const logger = createLogger().child({ module: 'api:dids:document' });
+const logger = apiLogger.child({ route: '/api/v1/dids/[id]/document' });
 
 /**
  * @swagger
@@ -54,28 +54,20 @@ const logger = createLogger().child({ module: 'api:dids:document' });
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-export const GET = withOrgAuth(async (_req, { organizationId, params }) => {
+export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  try {
-    const did = await getDidById(id, organizationId);
-    if (!did) {
-      throw new NotFoundError('DID not found');
-    }
-
-    const { service: didService } = await resolveDidService(organizationId, did.serviceInstanceId ?? undefined);
-    const document = await didService.getDocument(did.did);
-
-    return NextResponse.json({ ok: true, document });
-  } catch (e: unknown) {
-    if (e instanceof NotFoundError) {
-      return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
-    }
-    if (e instanceof ServiceRegistryError) {
-      const status = e.name === 'ServiceInstanceNotFoundError' ? 404 : 500;
-      return NextResponse.json({ ok: false, error: e.message }, { status });
-    }
-    logger.error({ error: e, didId: id }, 'Unexpected error fetching DID document');
-    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 500 });
+  logger.info({ tenantId, didId: id }, 'Looking up DID for document retrieval');
+  const did = await getDidById(id, tenantId);
+  if (!did) {
+    throw new NotFoundError('DID not found');
   }
+
+  logger.info({ tenantId, didId: id, did: did.did }, 'Resolving DID service');
+  const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId ?? undefined);
+
+  logger.info({ tenantId, didId: id, did: did.did }, 'Fetching DID document from provider');
+  const document = await didService.getDocument(did.did);
+
+  return NextResponse.json({ ok: true, document });
 });

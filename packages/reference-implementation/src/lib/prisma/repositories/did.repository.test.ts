@@ -27,7 +27,7 @@ describe('did.repository', () => {
   const ORG_ID = 'org-1';
   const DID_RECORD = {
     id: 'did-record-1',
-    organizationId: ORG_ID,
+    tenantId: ORG_ID,
     did: 'did:web:example.com:org:123',
     type: 'MANAGED',
     method: 'DID_WEB',
@@ -49,7 +49,7 @@ describe('did.repository', () => {
       mockDid.create.mockResolvedValue(DID_RECORD);
 
       const result = await createDid({
-        organizationId: ORG_ID,
+        tenantId: ORG_ID,
         did: 'did:web:example.com:org:123',
         type: 'MANAGED',
         keyId: 'key-1',
@@ -58,7 +58,7 @@ describe('did.repository', () => {
 
       expect(mockDid.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          organizationId: ORG_ID,
+          tenantId: ORG_ID,
           did: 'did:web:example.com:org:123',
           type: 'MANAGED',
           method: 'DID_WEB',
@@ -75,7 +75,7 @@ describe('did.repository', () => {
       mockDid.create.mockResolvedValue(DID_RECORD);
 
       await createDid({
-        organizationId: ORG_ID,
+        tenantId: ORG_ID,
         did: 'did:web:example.com:org:123',
         type: 'MANAGED',
         keyId: 'key-1',
@@ -92,7 +92,7 @@ describe('did.repository', () => {
       mockDid.create.mockResolvedValue({ ...DID_RECORD, status: 'UNVERIFIED' });
 
       await createDid({
-        organizationId: ORG_ID,
+        tenantId: ORG_ID,
         did: 'did:web:example.com:org:123',
         type: 'SELF_MANAGED',
         keyId: 'key-1',
@@ -110,7 +110,7 @@ describe('did.repository', () => {
       mockDid.create.mockResolvedValue({ ...DID_RECORD, serviceInstanceId: 'si-1' });
 
       await createDid({
-        organizationId: ORG_ID,
+        tenantId: ORG_ID,
         did: 'did:web:example.com:org:123',
         type: 'MANAGED',
         keyId: 'key-1',
@@ -128,7 +128,7 @@ describe('did.repository', () => {
       mockDid.create.mockResolvedValue(DID_RECORD);
 
       await createDid({
-        organizationId: ORG_ID,
+        tenantId: ORG_ID,
         did: 'did:web:example.com:org:123',
         type: 'MANAGED',
         keyId: 'key-1',
@@ -151,7 +151,7 @@ describe('did.repository', () => {
       expect(mockDid.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'did-record-1',
-          OR: [{ organizationId: ORG_ID }, { isDefault: true }],
+          OR: [{ tenantId: ORG_ID }, { isDefault: true }],
         },
       });
       expect(result).toEqual(DID_RECORD);
@@ -173,7 +173,7 @@ describe('did.repository', () => {
 
       expect(mockDid.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [{ organizationId: ORG_ID }, { isDefault: true }],
+          OR: [{ tenantId: ORG_ID }, { isDefault: true }],
         },
         take: 100,
         skip: undefined,

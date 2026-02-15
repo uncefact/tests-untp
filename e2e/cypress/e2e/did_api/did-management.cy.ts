@@ -13,7 +13,7 @@ describe('DID API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    cy.task('cleanupTestData', { organizationId: TEST_ORG_ID });
+    cy.task('cleanupTestData', { tenantId: TEST_ORG_ID });
   });
 
   describe('CRUD operations', () => {
@@ -173,6 +173,86 @@ describe('DID API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+      });
+    });
+  });
+
+  describe('DID import flow', () => {
+    let importedDidId: string;
+    const importedDidString = `did:web:imported-${RUN_ID}.example.com`;
+
+    it('POST /api/v1/dids/import — imports an external DID with UNVERIFIED status', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids/import',
+        body: {
+          did: importedDidString,
+          method: 'DID_WEB',
+          keyId: `imported-key-${RUN_ID}`,
+          name: `E2E Imported DID ${RUN_ID}`,
+          description: 'Imported by Cypress E2E test',
+        },
+      }).then((response) => {
+        expect(response.status).to.eq(201);
+        expect(response.body.ok).to.be.true;
+        expect(response.body.did.type).to.eq('SELF_MANAGED');
+        expect(response.body.did.status).to.eq('UNVERIFIED');
+        expect(response.body.did.did).to.eq(importedDidString);
+
+        importedDidId = response.body.did.id;
+      });
+    });
+
+    it('GET /api/v1/dids/:id — retrieves the imported DID', () => {
+      cy.request(`/api/v1/dids/${importedDidId}`).then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.ok).to.be.true;
+        expect(response.body.did.name).to.eq(`E2E Imported DID ${RUN_ID}`);
+        expect(response.body.did.type).to.eq('SELF_MANAGED');
+        expect(response.body.did.status).to.eq('UNVERIFIED');
+      });
+    });
+
+    it('POST /api/v1/dids/:id/verify — verification updates imported DID status', () => {
+      cy.request({
+        method: 'POST',
+        url: `/api/v1/dids/${importedDidId}/verify`,
+      }).then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.ok).to.be.true;
+        expect(response.body.verification).to.exist;
+        expect(response.body.did.status).to.be.oneOf([
+          'VERIFIED',
+          'UNVERIFIED',
+        ]);
+      });
+    });
+
+    it('POST /api/v1/dids/import — returns 400 for missing required fields', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids/import',
+        body: {},
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+      });
+    });
+
+    it('POST /api/v1/dids/import — returns error for duplicate DID', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids/import',
+        body: {
+          did: importedDidString,
+          method: 'DID_WEB',
+          keyId: `imported-key-duplicate-${RUN_ID}`,
+          name: `E2E Duplicate Imported DID ${RUN_ID}`,
+          description: 'Duplicate import by Cypress E2E test',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.not.eq(201);
       });
     });
   });

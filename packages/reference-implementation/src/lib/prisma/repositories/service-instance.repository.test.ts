@@ -46,12 +46,13 @@ describe('service-instance.repository', () => {
   const ORG_ID = 'org-1';
   const INSTANCE_RECORD = {
     id: 'instance-1',
-    organizationId: ORG_ID,
+    tenantId: ORG_ID,
     serviceType: 'DID',
     adapterType: 'VCKIT',
     name: 'Test VCKit Instance',
     description: null,
     config: 'encrypted-config-blob',
+    apiVersion: '1.1.0',
     isPrimary: false,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
@@ -66,20 +67,22 @@ describe('service-instance.repository', () => {
       mockServiceInstance.create.mockResolvedValue(INSTANCE_RECORD);
 
       const result = await createServiceInstance({
-        organizationId: ORG_ID,
+        tenantId: ORG_ID,
         serviceType: 'DID',
         adapterType: 'VCKIT',
         name: 'Test VCKit Instance',
         config: 'encrypted-config-blob',
+        apiVersion: '1.1.0',
       });
 
       expect(mockServiceInstance.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          organizationId: ORG_ID,
+          tenantId: ORG_ID,
           serviceType: 'DID',
           adapterType: 'VCKIT',
           name: 'Test VCKit Instance',
           config: 'encrypted-config-blob',
+          apiVersion: '1.1.0',
           isPrimary: false,
         }),
       });
@@ -90,11 +93,12 @@ describe('service-instance.repository', () => {
       mockServiceInstance.create.mockResolvedValue(INSTANCE_RECORD);
 
       await createServiceInstance({
-        organizationId: ORG_ID,
+        tenantId: ORG_ID,
         serviceType: 'DID',
         adapterType: 'VCKIT',
         name: 'Test',
         config: 'encrypted',
+        apiVersion: '1.1.0',
       });
 
       expect(mockServiceInstance.create).toHaveBeenCalledWith({
@@ -110,17 +114,18 @@ describe('service-instance.repository', () => {
       mockServiceInstance.create.mockResolvedValue(primaryRecord);
 
       await createServiceInstance({
-        organizationId: ORG_ID,
+        tenantId: ORG_ID,
         serviceType: 'DID',
         adapterType: 'VCKIT',
         name: 'Primary Instance',
         config: 'encrypted',
+        apiVersion: '1.1.0',
         isPrimary: true,
       });
 
       expect(mockServiceInstance.updateMany).toHaveBeenCalledWith({
         where: {
-          organizationId: ORG_ID,
+          tenantId: ORG_ID,
           serviceType: 'DID',
           isPrimary: true,
         },
@@ -143,14 +148,14 @@ describe('service-instance.repository', () => {
       expect(mockServiceInstance.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'instance-1',
-          OR: [{ organizationId: ORG_ID }, { organizationId: 'system' }],
+          OR: [{ tenantId: ORG_ID }, { tenantId: 'system' }],
         },
       });
       expect(result).toEqual(INSTANCE_RECORD);
     });
 
     it('returns system default', async () => {
-      const systemRecord = { ...INSTANCE_RECORD, organizationId: 'system' };
+      const systemRecord = { ...INSTANCE_RECORD, tenantId: 'system' };
       mockServiceInstance.findFirst.mockResolvedValue(systemRecord);
 
       const result = await getServiceInstanceById('instance-1', ORG_ID);
@@ -174,7 +179,7 @@ describe('service-instance.repository', () => {
 
       expect(mockServiceInstance.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [{ organizationId: ORG_ID }, { organizationId: 'system' }],
+          OR: [{ tenantId: ORG_ID }, { tenantId: 'system' }],
         },
         take: 100,
         skip: undefined,
@@ -276,7 +281,7 @@ describe('service-instance.repository', () => {
 
       expect(mockServiceInstance.updateMany).toHaveBeenCalledWith({
         where: {
-          organizationId: ORG_ID,
+          tenantId: ORG_ID,
           serviceType: 'DID',
           isPrimary: true,
           NOT: { id: 'instance-1' },
@@ -298,7 +303,7 @@ describe('service-instance.repository', () => {
       const result = await deleteServiceInstance('instance-1', ORG_ID);
 
       expect(mockServiceInstance.findFirst).toHaveBeenCalledWith({
-        where: { id: 'instance-1', organizationId: ORG_ID },
+        where: { id: 'instance-1', tenantId: ORG_ID },
       });
       expect(mockServiceInstance.delete).toHaveBeenCalledWith({
         where: { id: 'instance-1' },
@@ -332,14 +337,14 @@ describe('service-instance.repository', () => {
       expect(mockServiceInstance.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'instance-1',
-          OR: [{ organizationId: ORG_ID }, { organizationId: 'system' }],
+          OR: [{ tenantId: ORG_ID }, { tenantId: 'system' }],
         },
       });
       expect(result).toEqual(INSTANCE_RECORD);
     });
 
     it('returns explicit instance by ID (system default)', async () => {
-      const systemRecord = { ...INSTANCE_RECORD, organizationId: 'system' };
+      const systemRecord = { ...INSTANCE_RECORD, tenantId: 'system' };
       mockServiceInstance.findFirst.mockResolvedValue(systemRecord);
 
       const result = await getInstanceByResolution(ORG_ID, 'DID', 'instance-1');
@@ -363,7 +368,7 @@ describe('service-instance.repository', () => {
 
       expect(mockServiceInstance.findFirst).toHaveBeenCalledWith({
         where: {
-          organizationId: ORG_ID,
+          tenantId: ORG_ID,
           serviceType: 'DID',
           isPrimary: true,
         },
@@ -372,7 +377,7 @@ describe('service-instance.repository', () => {
     });
 
     it('returns system default when no tenant primary', async () => {
-      const systemRecord = { ...INSTANCE_RECORD, organizationId: 'system' };
+      const systemRecord = { ...INSTANCE_RECORD, tenantId: 'system' };
       // First call: tenant primary lookup returns null
       mockServiceInstance.findFirst.mockResolvedValueOnce(null);
       // Second call: system default lookup returns the system record
@@ -383,14 +388,14 @@ describe('service-instance.repository', () => {
       expect(mockServiceInstance.findFirst).toHaveBeenCalledTimes(2);
       expect(mockServiceInstance.findFirst).toHaveBeenNthCalledWith(1, {
         where: {
-          organizationId: ORG_ID,
+          tenantId: ORG_ID,
           serviceType: 'DID',
           isPrimary: true,
         },
       });
       expect(mockServiceInstance.findFirst).toHaveBeenNthCalledWith(2, {
         where: {
-          organizationId: 'system',
+          tenantId: 'system',
           serviceType: 'DID',
         },
       });
