@@ -125,7 +125,7 @@ services:
       ISSUER_API_URL: http://vckit-api:3332/v2
       ISSUER_AUTH_TOKEN: ${ISSUER_AUTH_TOKEN}
       STORAGE_SERVICE_URL: http://storage-service:3334/api/1.0.0/documents
-      IDR_API_URL: http://identity-resolver-service:3000/api/1.0.0
+      IDR_API_URL: http://identity-resolver-service:3000/api/2.0.0
       IDR_API_KEY: ${IDR_API_KEY}
     depends_on:
       keycloak:
@@ -161,7 +161,7 @@ services:
 
   identity-resolver-service:
     # Replace with local or deployed image
-    image: ghcr.io/pyx-industries/pyx-identity-resolver:1.1.3
+    image: ghcr.io/pyx-industries/pyx-identity-resolver:2.0.2
     ports:
       - '3000:3000'
     environment:
@@ -176,8 +176,8 @@ services:
       - API_KEY=test123
       - APP_ENDPOINT=http://localhost:3000
       - APP_NAME=IDR-1
-      - RESOLVER_DOMAIN=http://localhost:3000/api/1.0.0
-      - LINK_TYPE_VOC_DOMAIN=http://localhost:3000/api/1.0.0/voc
+      - RESOLVER_DOMAIN=http://localhost:3000/api/2.0.0
+      - LINK_TYPE_VOC_DOMAIN=http://localhost:3000/api/2.0.0/voc
       - PORT=3000
     depends_on:
       - identity-resolver-service-object-store
@@ -196,7 +196,7 @@ services:
 
   mock-global-gs1-resolver:
     # Replace with local or deployed image
-    image: ghcr.io/pyx-industries/pyx-identity-resolver:1.1.3
+    image: ghcr.io/pyx-industries/pyx-identity-resolver:2.0.2
     ports:
       - '3001:3001'
     environment:
@@ -211,8 +211,8 @@ services:
       - API_KEY=test456
       - APP_ENDPOINT=http://localhost:3001
       - APP_NAME=IDR-2
-      - RESOLVER_DOMAIN=http://localhost:3001/api/1.0.0
-      - LINK_TYPE_VOC_DOMAIN=http://localhost:3001/api/1.0.0/voc
+      - RESOLVER_DOMAIN=http://localhost:3001/api/2.0.0
+      - LINK_TYPE_VOC_DOMAIN=http://localhost:3001/api/2.0.0/voc
       - PORT=3001
     depends_on:
       - mock-global-gs1-resolver-object-store
@@ -234,14 +234,14 @@ services:
     environment:
       # IDR service environment variables
       - IDR_SERVICE_HOST=identity-resolver-service
-      - IDR_SERVICE_API_VERSION=1.0.0
+      - IDR_SERVICE_API_VERSION=2.0.0
       - IDR_SERVICE_PORT=3000
       - IDR_SERVICE_API_KEY=test123
 
       # Mock GS1 service environment variables
       - IDR_SERVICE_DOMAIN=http://localhost:3000
       - MOCK_GS1_SERVICE_HOST=mock-global-gs1-resolver
-      - MOCK_GS1_SERVICE_API_VERSION=1.0.0
+      - MOCK_GS1_SERVICE_API_VERSION=2.0.0
       - MOCK_GS1_SERVICE_PORT=3001
       - MOCK_GS1_SERVICE_API_KEY=test456
     command:

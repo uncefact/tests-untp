@@ -108,7 +108,7 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
+                    "dlrAPIUrl": "http://localhost:3000/api/2.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
                     "linkRegisterPath": "resolver"
@@ -497,7 +497,7 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
+                    "dlrAPIUrl": "http://localhost:3000/api/2.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
                     "linkRegisterPath": "resolver"
@@ -800,7 +800,7 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
+                    "dlrAPIUrl": "http://localhost:3000/api/2.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
                     "linkRegisterPath": "resolver"
@@ -1144,7 +1144,7 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
+                    "dlrAPIUrl": "http://localhost:3000/api/2.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
                     "linkRegisterPath": "resolver"
@@ -1274,7 +1274,7 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
+                    "dlrAPIUrl": "http://localhost:3000/api/2.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
                     "linkRegisterPath": "resolver"
@@ -1403,7 +1403,7 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
+                    "dlrAPIUrl": "http://localhost:3000/api/2.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
                     "linkRegisterPath": "resolver"
@@ -1541,7 +1541,7 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
+                    "dlrAPIUrl": "http://localhost:3000/api/2.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
                     "linkRegisterPath": "resolver"
@@ -1675,7 +1675,7 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
+                    "dlrAPIUrl": "http://localhost:3000/api/2.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
                     "linkRegisterPath": "resolver"
@@ -1812,7 +1812,7 @@
                     "dlrVerificationPage": "http://localhost:3003/verify"
                   },
                   "dlr": {
-                    "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
+                    "dlrAPIUrl": "http://localhost:3000/api/2.0.0",
                     "dlrAPIKey": "test123",
                     "namespace": "gs1",
                     "linkRegisterPath": "resolver"
@@ -1841,7 +1841,7 @@
   ],
   "identifyProvider": {
     "type": "gs1",
-    "url": "http://localhost:3001/api/1.0.0",
+    "url": "http://localhost:3001/api/2.0.0",
     "namespace": "gs1"
   },
   "identifierSchemes": [

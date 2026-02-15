@@ -250,7 +250,7 @@ async function main() {
         name: 'System Default Pyx IDR',
         description: 'System-wide default Pyx Identity Resolver instance',
         config: encryptedIdrConfig,
-        apiVersion: '2.0.2',
+        apiVersion: '2.0.0',
         isPrimary: true,
       },
     });

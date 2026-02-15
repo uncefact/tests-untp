@@ -70,7 +70,7 @@ const MOCK_INSTANCE = {
   adapterType: 'PYX_IDR',
   name: 'System Pyx IDR',
   config: JSON.stringify(MOCK_ENCRYPTED_ENVELOPE),
-  apiVersion: '2.0.2',
+  apiVersion: '2.0.0',
   isPrimary: true,
   createdAt: new Date(),
   updatedAt: new Date(),

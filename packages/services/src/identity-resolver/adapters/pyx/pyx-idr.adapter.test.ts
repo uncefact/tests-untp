@@ -29,7 +29,7 @@ describe('PyxIdentityResolverAdapter', () => {
   const mockConfig: PyxIdrConfig = {
     baseUrl: 'https://resolver.example.com',
     apiKey: 'test-api-key',
-    apiVersion: '2.0.2',
+    apiVersion: '2.0.0',
     ianaLanguage: 'en',
     context: 'au',
     defaultLinkType: 'untp:dpp',
@@ -122,7 +122,7 @@ describe('PyxIdentityResolverAdapter', () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
       await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://resolver.example.com/api/2.0.2/resolver', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://resolver.example.com/api/2.0.0/resolver', expect.any(Object));
     });
 
     it('should include authorization and content-type headers', async () => {
@@ -386,7 +386,7 @@ describe('PyxIdentityResolverAdapter', () => {
       await adapter.getLinkById('link-123');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://resolver.example.com/api/2.0.2/resolver/links/link-123',
+        'https://resolver.example.com/api/2.0.0/resolver/links/link-123',
         expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer test-api-key' }) }),
       );
     });
@@ -490,7 +490,7 @@ describe('PyxIdentityResolverAdapter', () => {
       });
 
       const callArgs = mockFetch.mock.calls[0];
-      expect(callArgs[0]).toBe('https://resolver.example.com/api/2.0.2/resolver/links/link-123');
+      expect(callArgs[0]).toBe('https://resolver.example.com/api/2.0.0/resolver/links/link-123');
       expect(callArgs[1].method).toBe('PUT');
 
       const body = JSON.parse(callArgs[1].body);
@@ -570,7 +570,7 @@ describe('PyxIdentityResolverAdapter', () => {
       await adapter.deleteLink('link-123');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://resolver.example.com/api/2.0.2/resolver/links/link-123',
+        'https://resolver.example.com/api/2.0.0/resolver/links/link-123',
         expect.objectContaining({
           method: 'DELETE',
           headers: expect.objectContaining({ Authorization: 'Bearer test-api-key' }),
@@ -667,7 +667,7 @@ describe('PyxIdentityResolverAdapter', () => {
 
       expect(result).toEqual(mockLinkTypes);
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://resolver.example.com/api/2.0.2/voc?show=linktypes',
+        'https://resolver.example.com/api/2.0.0/voc?show=linktypes',
         expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer test-api-key' }) }),
       );
     });
@@ -727,14 +727,14 @@ describe('PyxIdentityResolverAdapter', () => {
 
       expect(mockFetch).toHaveBeenCalledTimes(2);
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://resolver.example.com/api/2.0.2/identifiers',
+        'https://resolver.example.com/api/2.0.0/identifiers',
         expect.objectContaining({
           method: 'POST',
           body: expect.stringContaining('"namespace":"untp"'),
         }),
       );
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://resolver.example.com/api/2.0.2/identifiers',
+        'https://resolver.example.com/api/2.0.0/identifiers',
         expect.objectContaining({
           method: 'POST',
           body: expect.stringContaining('"namespace":"gs1"'),
@@ -808,7 +808,7 @@ describe('PyxIdentityResolverAdapter', () => {
         defaultContext: 'au',
       };
       const result = pyxIdrRegistryEntry.configSchema.parse(config);
-      expect(result.apiVersion).toBe('2.0.2');
+      expect(result.apiVersion).toBe('2.0.0');
       expect(result.fwqs).toBe(false);
     });
 

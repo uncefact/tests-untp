@@ -319,7 +319,7 @@
             "dlrVerificationPage": "http://localhost:3003/verify"
           },
           "dlr": {
-            "dlrAPIUrl": "http://localhost:3000/api/1.0.0",
+            "dlrAPIUrl": "http://localhost:3000/api/2.0.0",
             "dlrAPIKey": "test123",
             "namespace": "gs1",
             "linkRegisterPath": "resolver"
