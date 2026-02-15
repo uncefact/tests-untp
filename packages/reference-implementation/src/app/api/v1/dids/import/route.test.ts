@@ -249,4 +249,96 @@ describe('POST /api/v1/dids/import', () => {
     // Only createDid should be called -- no service resolution or adapter calls
     expect(mockCreateDid).toHaveBeenCalledTimes(1);
   });
+
+  it('returns 500 when createDid throws a unique constraint error (duplicate DID)', async () => {
+    mockCreateDid.mockRejectedValueOnce(
+      Object.assign(new Error('Unique constraint failed on the fields: (`did`)'), {
+        code: 'P2002',
+      }),
+    );
+
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(body.ok).toBe(false);
+    expect(body.error).toBeDefined();
+  });
+
+  it('returns 500 when createDid rejects with a generic error', async () => {
+    mockCreateDid.mockRejectedValueOnce(new Error('Database connection lost'));
+
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(body.ok).toBe(false);
+    expect(body.error).toBeDefined();
+  });
+
+  it('returns 400 when did is an empty string', async () => {
+    const req = createFakeRequest({ did: '', method: 'DID_WEB', keyId: 'key-1' });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain('did is required');
+  });
+
+  it('returns 400 when keyId is an empty string', async () => {
+    const req = createFakeRequest({ did: 'did:web:example.com', method: 'DID_WEB', keyId: '' });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain('keyId is required');
+  });
+
+  it('returns 400 when method is an empty string', async () => {
+    const req = createFakeRequest({ did: 'did:web:example.com', keyId: 'key-1', method: '' });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain('method');
+  });
+
+  it('succeeds when description is omitted', async () => {
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+      name: 'No Description DID',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body.ok).toBe(true);
+
+    expect(mockCreateDid).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: undefined,
+      }),
+    );
+  });
 });
