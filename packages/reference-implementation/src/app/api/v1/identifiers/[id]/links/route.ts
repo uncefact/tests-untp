@@ -5,6 +5,7 @@ import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getIdentifierById, createManyLinkRegistrations, listLinkRegistrations } from '@/lib/prisma/repositories';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { apiLogger } from '@/lib/api/logger';
+import type { Link } from '@uncefact/untp-ri-services';
 
 const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
 
@@ -70,28 +71,28 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
     throw new NotFoundError('Identifier not found');
   }
 
-  const scheme = (identifier as any).scheme;
-  const registrar = scheme?.registrar;
-  const namespace = scheme?.namespace ?? registrar?.namespace;
+  const scheme = identifier.scheme;
+  const registrar = scheme.registrar;
+  const namespace = scheme.namespace ?? registrar.namespace;
 
-  logger.info({ tenantId, identifierId, primaryKey: scheme?.primaryKey, namespace }, 'Resolving IDR service');
+  logger.info({ tenantId, identifierId, primaryKey: scheme.primaryKey, namespace }, 'Resolving IDR service');
   const { service: idrService } = await resolveIdrService(
     tenantId,
-    scheme?.idrServiceInstanceId,
-    registrar?.idrServiceInstanceId,
+    scheme.idrServiceInstanceId,
+    registrar.idrServiceInstanceId,
   );
 
   logger.info({ tenantId, identifierId, linkCount: body.links.length }, 'Publishing links to IDR service');
   const registration = await idrService.publishLinks(
     scheme.primaryKey,
     identifier.value,
-    body.links as any[],
+    body.links as Link[],
     body.qualifierPath,
     { namespace, itemDescription: body.itemDescription },
   );
 
   logger.info({ tenantId, identifierId, publishedCount: registration.links.length }, 'Storing audit records');
-  const auditRecords = registration.links.map((l: any) => ({
+  const auditRecords = registration.links.map((l) => ({
     tenantId,
     identifierId,
     idrLinkId: l.idrLinkId,

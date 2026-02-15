@@ -51,14 +51,14 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
     throw new NotFoundError('Link registration not found');
   }
 
-  const scheme = (identifier as any).scheme;
-  const registrar = scheme?.registrar;
+  const scheme = identifier.scheme;
+  const registrar = scheme.registrar;
 
   logger.info({ tenantId, identifierId, linkId }, 'Resolving IDR service for link retrieval');
   const { service: idrService } = await resolveIdrService(
     tenantId,
-    scheme?.idrServiceInstanceId,
-    registrar?.idrServiceInstanceId,
+    scheme.idrServiceInstanceId,
+    registrar.idrServiceInstanceId,
   );
 
   try {
@@ -135,14 +135,14 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new NotFoundError('Link registration not found');
   }
 
-  const scheme = (identifier as any).scheme;
-  const registrar = scheme?.registrar;
+  const scheme = identifier.scheme;
+  const registrar = scheme.registrar;
 
   logger.info({ tenantId, identifierId, linkId }, 'Resolving IDR service for link update');
   const { service: idrService } = await resolveIdrService(
     tenantId,
-    scheme?.idrServiceInstanceId,
-    registrar?.idrServiceInstanceId,
+    scheme.idrServiceInstanceId,
+    registrar.idrServiceInstanceId,
   );
 
   try {
@@ -215,14 +215,14 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
     throw new NotFoundError('Link registration not found');
   }
 
-  const scheme = (identifier as any).scheme;
-  const registrar = scheme?.registrar;
+  const scheme = identifier.scheme;
+  const registrar = scheme.registrar;
 
   logger.info({ tenantId, identifierId, linkId }, 'Resolving IDR service for link deletion');
   const { service: idrService } = await resolveIdrService(
     tenantId,
-    scheme?.idrServiceInstanceId,
-    registrar?.idrServiceInstanceId,
+    scheme.idrServiceInstanceId,
+    registrar.idrServiceInstanceId,
   );
 
   let desync = false;

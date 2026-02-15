@@ -4,6 +4,21 @@ import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 
 /**
+ * An identifier with its full scheme relation (including registrar and qualifiers).
+ * Matches the include shape used by `getIdentifierById`.
+ */
+export type IdentifierWithScheme = Prisma.IdentifierGetPayload<{
+  include: {
+    scheme: {
+      include: {
+        registrar: true;
+        qualifiers: true;
+      };
+    };
+  };
+}>;
+
+/**
  * Input for creating a new identifier
  */
 export type CreateIdentifierInput = {
@@ -78,7 +93,7 @@ export async function createIdentifier(input: CreateIdentifierInput): Promise<Id
  * Identifiers belong to a single tenant — no system default sharing.
  * Includes the full scheme with registrar and qualifiers.
  */
-export async function getIdentifierById(id: string, tenantId: string): Promise<Identifier | null> {
+export async function getIdentifierById(id: string, tenantId: string): Promise<IdentifierWithScheme | null> {
   return prisma.identifier.findFirst({
     where: {
       id,

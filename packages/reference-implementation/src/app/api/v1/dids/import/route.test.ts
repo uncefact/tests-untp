@@ -16,22 +16,23 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
   }
 
   return {
-    withTenantAuth: (handler: Function) => async (req: any, ctx: any) => {
-      try {
-        return await handler(req, ctx);
-      } catch (e: unknown) {
-        if (e instanceof ValidationError) {
-          return jsonResponse({ ok: false, error: (e as Error).message }, { status: 400 });
+    withTenantAuth:
+      (handler: (req: unknown, ctx: unknown) => Promise<unknown>) => async (req: unknown, ctx: unknown) => {
+        try {
+          return await handler(req, ctx);
+        } catch (e: unknown) {
+          if (e instanceof ValidationError) {
+            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 400 });
+          }
+          if (e instanceof NotFoundError) {
+            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 404 });
+          }
+          if (e instanceof ServiceRegistryError) {
+            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 500 });
+          }
+          return jsonResponse({ ok: false, error: errorMessage(e) }, { status: 500 });
         }
-        if (e instanceof NotFoundError) {
-          return jsonResponse({ ok: false, error: (e as Error).message }, { status: 404 });
-        }
-        if (e instanceof ServiceRegistryError) {
-          return jsonResponse({ ok: false, error: (e as Error).message }, { status: 500 });
-        }
-        return jsonResponse({ ok: false, error: errorMessage(e) }, { status: 500 });
-      }
-    },
+      },
   };
 });
 
@@ -49,7 +50,7 @@ import { POST } from './route';
 // -- Helpers ------------------------------------------------------------------
 
 function createFakeRequest(body: unknown) {
-  return { json: async () => body } as any;
+  return { json: async () => body } as unknown as Request;
 }
 
 function createContext(overrides: Record<string, unknown> = {}) {
@@ -57,7 +58,7 @@ function createContext(overrides: Record<string, unknown> = {}) {
     tenantId: 'tenant-1',
     params: Promise.resolve({}),
     ...overrides,
-  } as any;
+  } as unknown as Parameters<typeof POST>[1];
 }
 
 const MOCK_DID_RECORD = {
@@ -228,7 +229,7 @@ describe('POST /api/v1/dids/import', () => {
       json: async () => {
         throw new Error('bad json');
       },
-    } as any;
+    } as unknown as Request;
 
     const res = await POST(req, createContext());
     const body = await res.json();

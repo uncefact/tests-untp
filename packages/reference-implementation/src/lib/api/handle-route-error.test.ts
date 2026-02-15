@@ -19,6 +19,10 @@ import { ValidationError } from '@/lib/api/validation';
 import { ServiceError } from '@uncefact/untp-ri-services';
 import { handleRouteError } from './handle-route-error';
 
+interface MockResponse {
+  json: () => Promise<{ ok: boolean; error: string; code?: string }>;
+}
+
 beforeEach(() => {
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -32,7 +36,7 @@ describe('handleRouteError', () => {
     const res = handleRouteError(new ValidationError('bad input'));
 
     expect(res.status).toBe(400);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body).toEqual({ ok: false, error: 'bad input' });
   });
 
@@ -40,7 +44,7 @@ describe('handleRouteError', () => {
     const res = handleRouteError(new NotFoundError('missing'));
 
     expect(res.status).toBe(404);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body).toEqual({ ok: false, error: 'missing' });
   });
 
@@ -50,7 +54,7 @@ describe('handleRouteError', () => {
     const res = handleRouteError(new ServiceInstanceNotFoundError('inst-42'));
 
     expect(res.status).toBe(404);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body).toEqual({ ok: false, error: 'Service instance not found: inst-42' });
   });
 
@@ -58,7 +62,7 @@ describe('handleRouteError', () => {
     const res = handleRouteError(new ServiceResolutionError('idr', 'tenant-1'));
 
     expect(res.status).toBe(500);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body.ok).toBe(false);
     expect(body.error).toContain('No service instance available');
   });
@@ -67,7 +71,7 @@ describe('handleRouteError', () => {
     const res = handleRouteError(new ConfigDecryptionError('inst-7'));
 
     expect(res.status).toBe(500);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body.ok).toBe(false);
     expect(body.error).toContain('Failed to decrypt');
   });
@@ -76,7 +80,7 @@ describe('handleRouteError', () => {
     const res = handleRouteError(new ConfigValidationError('inst-7', 'missing field'));
 
     expect(res.status).toBe(500);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body.ok).toBe(false);
     expect(body.error).toContain('Configuration validation failed');
   });
@@ -85,7 +89,7 @@ describe('handleRouteError', () => {
     const res = handleRouteError(new ServiceRegistryError('config bad'));
 
     expect(res.status).toBe(500);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body).toEqual({ ok: false, error: 'config bad' });
   });
 
@@ -95,7 +99,7 @@ describe('handleRouteError', () => {
     const res = handleRouteError(new ServiceError('upstream fail', 'TEST_ERR', 502));
 
     expect(res.status).toBe(502);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body).toEqual({ ok: false, error: 'upstream fail', code: 'TEST_ERR' });
   });
 
@@ -105,7 +109,7 @@ describe('handleRouteError', () => {
     const res = handleRouteError(new Error('kaboom'));
 
     expect(res.status).toBe(500);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body).toEqual({ ok: false, error: 'kaboom' });
   });
 
@@ -113,7 +117,7 @@ describe('handleRouteError', () => {
     const res = handleRouteError('string error');
 
     expect(res.status).toBe(500);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body).toEqual({ ok: false, error: 'An unexpected error has occurred.' });
   });
 });

@@ -17,28 +17,30 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
   }
 
   return {
-    withTenantAuth: (handler: Function) => async (req: any, ctx: any) => {
-      try {
-        return await handler(req, ctx);
-      } catch (e: unknown) {
-        if (e instanceof ValidationError) {
-          return jsonResponse({ ok: false, error: (e as Error).message }, { status: 400 });
+    withTenantAuth:
+      (handler: (req: unknown, ctx: unknown) => Promise<unknown>) => async (req: unknown, ctx: unknown) => {
+        try {
+          return await handler(req, ctx);
+        } catch (e: unknown) {
+          if (e instanceof ValidationError) {
+            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 400 });
+          }
+          if (e instanceof NotFoundError) {
+            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 404 });
+          }
+          if (e instanceof ServiceRegistryError) {
+            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 500 });
+          }
+          if (e instanceof ServiceError) {
+            const serviceErr = e as Error & { code?: string; statusCode?: number };
+            return jsonResponse(
+              { ok: false, error: serviceErr.message, code: serviceErr.code },
+              { status: serviceErr.statusCode },
+            );
+          }
+          return jsonResponse({ ok: false, error: errorMessage(e) }, { status: 500 });
         }
-        if (e instanceof NotFoundError) {
-          return jsonResponse({ ok: false, error: (e as Error).message }, { status: 404 });
-        }
-        if (e instanceof ServiceRegistryError) {
-          return jsonResponse({ ok: false, error: (e as Error).message }, { status: 500 });
-        }
-        if (e instanceof ServiceError) {
-          return jsonResponse(
-            { ok: false, error: (e as Error).message, code: (e as any).code },
-            { status: (e as any).statusCode },
-          );
-        }
-        return jsonResponse({ ok: false, error: errorMessage(e) }, { status: 500 });
-      }
-    },
+      },
   };
 });
 
@@ -62,7 +64,7 @@ import { POST, GET } from './route';
 // -- Helpers -------------------------------------------------------------------
 
 function createFakeRequest(body: unknown) {
-  return { json: async () => body, url: 'http://localhost/api/v1/identifiers/ident-1/links' } as any;
+  return { json: async () => body, url: 'http://localhost/api/v1/identifiers/ident-1/links' } as unknown as Request;
 }
 
 function createContext(overrides: Record<string, unknown> = {}) {
@@ -70,7 +72,7 @@ function createContext(overrides: Record<string, unknown> = {}) {
     tenantId: 'tenant-1',
     params: Promise.resolve({ id: 'ident-1' }),
     ...overrides,
-  } as any;
+  } as unknown as { params: Promise<Record<string, string>> };
 }
 
 const MOCK_IDENTIFIER = {
@@ -176,7 +178,7 @@ describe('POST /api/v1/identifiers/[id]/links', () => {
         throw new Error('bad json');
       },
       url: 'http://localhost/test',
-    } as any;
+    } as unknown as Request;
 
     const res = await POST(req, createContext());
     const body = await res.json();
@@ -212,7 +214,7 @@ describe('GET /api/v1/identifiers/[id]/links', () => {
     mockGetIdentifierById.mockResolvedValue(MOCK_IDENTIFIER);
     mockListLinkRegistrations.mockResolvedValue([{ id: 'lr-1', idrLinkId: 'idr-link-1', linkType: 'untp:dpp' }]);
 
-    const req = { url: 'http://localhost/test' } as any;
+    const req = { url: 'http://localhost/test' } as unknown as Request;
     const res = await GET(req, createContext());
     const body = await res.json();
 
@@ -224,7 +226,7 @@ describe('GET /api/v1/identifiers/[id]/links', () => {
   it('returns 404 when identifier not found', async () => {
     mockGetIdentifierById.mockResolvedValue(null);
 
-    const req = { url: 'http://localhost/test' } as any;
+    const req = { url: 'http://localhost/test' } as unknown as Request;
     const res = await GET(req, createContext());
     const body = await res.json();
 

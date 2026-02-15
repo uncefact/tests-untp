@@ -20,6 +20,10 @@ import { ValidationError } from '@/lib/api/validation';
 import { ServiceError } from '@uncefact/untp-ri-services';
 import { withTenantAuth, handleRouteError } from './with-tenant-auth';
 
+interface MockResponse {
+  json: () => Promise<{ ok: boolean; error: string; code?: string }>;
+}
+
 beforeEach(() => {
   jest.resetAllMocks();
 });
@@ -105,7 +109,7 @@ describe('handleRouteError', () => {
   it('maps ValidationError to 400', async () => {
     const res = handleRouteError(new ValidationError('bad input'));
     expect(res.status).toBe(400);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body.ok).toBe(false);
     expect(body.error).toBe('bad input');
   });
@@ -113,7 +117,7 @@ describe('handleRouteError', () => {
   it('maps NotFoundError to 404', async () => {
     const res = handleRouteError(new NotFoundError('missing'));
     expect(res.status).toBe(404);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body.ok).toBe(false);
     expect(body.error).toBe('missing');
   });
@@ -121,7 +125,7 @@ describe('handleRouteError', () => {
   it('maps ServiceRegistryError to 500', async () => {
     const res = handleRouteError(new ServiceRegistryError('config bad'));
     expect(res.status).toBe(500);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body.ok).toBe(false);
     expect(body.error).toBe('config bad');
   });
@@ -129,7 +133,7 @@ describe('handleRouteError', () => {
   it('maps ServiceError to its statusCode with code', async () => {
     const res = handleRouteError(new ServiceError('upstream fail', 'TEST_ERR', 502));
     expect(res.status).toBe(502);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body.ok).toBe(false);
     expect(body.error).toBe('upstream fail');
     expect(body.code).toBe('TEST_ERR');
@@ -138,7 +142,7 @@ describe('handleRouteError', () => {
   it('maps unknown errors to 500', async () => {
     const res = handleRouteError(new Error('kaboom'));
     expect(res.status).toBe(500);
-    const body = await (res as any).json();
+    const body = await (res as unknown as MockResponse).json();
     expect(body.ok).toBe(false);
     expect(body.error).toBe('kaboom');
   });
