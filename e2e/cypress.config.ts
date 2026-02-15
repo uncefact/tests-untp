@@ -117,16 +117,16 @@ export default defineConfig({
           try {
             await client.connect();
 
-            // Create or update test organisation
+            // Create or update test tenant
             await client.query(`
-              INSERT INTO "Organization" (id, name, "createdAt", "updatedAt")
+              INSERT INTO "Tenant" (id, name, "createdAt", "updatedAt")
               VALUES ('e2e-test-org', 'E2E Test Organisation', NOW(), NOW())
               ON CONFLICT (id) DO UPDATE SET "updatedAt" = NOW()
             `);
 
-            // Link the user (created by NextAuth on first login) to the test org
+            // Link the user (created by NextAuth on first login) to the test tenant
             const result = await client.query(
-              `UPDATE "User" SET "organizationId" = 'e2e-test-org', "updatedAt" = NOW()
+              `UPDATE "User" SET "tenantId" = 'e2e-test-org', "updatedAt" = NOW()
                WHERE email = $1
                RETURNING id`,
               [userEmail],
@@ -136,38 +136,56 @@ export default defineConfig({
               throw new Error(`User with email ${userEmail} not found. Has the user logged in?`);
             }
 
-            return { organizationId: 'e2e-test-org', userId: result.rows[0].id };
+            return { tenantId: 'e2e-test-org', userId: result.rows[0].id };
           } finally {
             await client.end();
           }
         },
-        async cleanupTestData({ organizationId }: { organizationId: string }) {
+        async cleanupTestData({ tenantId }: { tenantId: string }) {
           const client = getDbClient();
           try {
             await client.connect();
 
-            // Delete test DIDs (cascade from org)
+            // Delete in dependency order (children first)
             await client.query(
-              `DELETE FROM "Did" WHERE "organizationId" = $1`,
-              [organizationId],
+              `DELETE FROM "LinkRegistration" WHERE "tenantId" = $1`,
+              [tenantId],
+            );
+            await client.query(
+              `DELETE FROM "Identifier" WHERE "tenantId" = $1`,
+              [tenantId],
+            );
+            await client.query(
+              `DELETE FROM "SchemeQualifier" WHERE "schemeId" IN (SELECT id FROM "IdentifierScheme" WHERE "tenantId" = $1)`,
+              [tenantId],
+            );
+            await client.query(
+              `DELETE FROM "IdentifierScheme" WHERE "tenantId" = $1`,
+              [tenantId],
+            );
+            await client.query(
+              `DELETE FROM "Registrar" WHERE "tenantId" = $1`,
+              [tenantId],
+            );
+            await client.query(
+              `DELETE FROM "Did" WHERE "tenantId" = $1`,
+              [tenantId],
+            );
+            await client.query(
+              `DELETE FROM "ServiceInstance" WHERE "tenantId" = $1`,
+              [tenantId],
             );
 
-            // Delete test service instances
+            // Unlink users from test tenant (don't delete users - NextAuth owns them)
             await client.query(
-              `DELETE FROM "ServiceInstance" WHERE "organizationId" = $1`,
-              [organizationId],
+              `UPDATE "User" SET "tenantId" = NULL WHERE "tenantId" = $1`,
+              [tenantId],
             );
 
-            // Unlink users from test org (don't delete users - NextAuth owns them)
+            // Delete test tenant
             await client.query(
-              `UPDATE "User" SET "organizationId" = NULL WHERE "organizationId" = $1`,
-              [organizationId],
-            );
-
-            // Delete test organisation
-            await client.query(
-              `DELETE FROM "Organization" WHERE id = $1`,
-              [organizationId],
+              `DELETE FROM "Tenant" WHERE id = $1`,
+              [tenantId],
             );
 
             return null;

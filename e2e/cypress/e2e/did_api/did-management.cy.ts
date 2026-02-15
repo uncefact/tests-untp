@@ -13,7 +13,7 @@ describe('DID API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    cy.task('cleanupTestData', { organizationId: TEST_ORG_ID });
+    cy.task('cleanupTestData', { tenantId: TEST_ORG_ID });
   });
 
   describe('CRUD operations', () => {

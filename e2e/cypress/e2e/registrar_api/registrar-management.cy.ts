@@ -8,7 +8,7 @@ describe('Registrar API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    cy.task('cleanupTestData', { organizationId: 'e2e-test-org' });
+    cy.task('cleanupTestData', { tenantId: 'e2e-test-org' });
   });
 
   describe('CRUD operations', () => {
