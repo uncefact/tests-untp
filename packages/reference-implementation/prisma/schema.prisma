@@ -30,11 +30,13 @@ enum DidStatus {
 enum ServiceType {
   DID
   IDR
+  STORAGE
 }
 
 enum AdapterType {
   VCKIT
   PYX_IDR
+  UNCEFACT_STORAGE
 }
 
 /**

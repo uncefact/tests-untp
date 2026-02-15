@@ -12,6 +12,7 @@ import { AesGcmEncryptionAdapter } from '@uncefact/untp-ri-services/server';
 import { EncryptionAlgorithm, createLogger } from '@uncefact/untp-ri-services';
 import { getDidConfig } from '../src/lib/config/did.config';
 import { getIdrConfig } from '../src/lib/config/idr.config';
+import { getStorageConfig } from '../src/lib/config/storage.config';
 
 const logger = createLogger().child({ module: 'prisma-seed' });
 
@@ -262,10 +263,48 @@ async function main() {
     );
   }
 
+  // ── Seed system UNCEFACT storage service instance ───────────────────────────
+
+  let storageSeeded = false;
+  try {
+    const { storageServiceUrl } = getStorageConfig();
+    const storageServiceConfig = JSON.stringify({
+      baseUrl: new URL(storageServiceUrl).origin,
+      apiVersion: '1.0.0',
+      bucket: 'verifiable-credentials',
+    });
+    const encryptedStorageConfig = JSON.stringify(
+      encryptionService.encrypt(storageServiceConfig, EncryptionAlgorithm.AES_256_GCM),
+    );
+
+    await prisma.serviceInstance.upsert({
+      where: { id: 'system-storage-uncefact' },
+      update: { config: encryptedStorageConfig },
+      create: {
+        id: 'system-storage-uncefact',
+        tenantId: SYSTEM_TENANT_ID,
+        serviceType: PrismaServiceType.STORAGE,
+        adapterType: PrismaAdapterType.UNCEFACT_STORAGE,
+        name: 'System Default UNCEFACT Storage',
+        description: 'System-wide default UNCEFACT storage instance for credential persistence',
+        config: encryptedStorageConfig,
+        apiVersion: '1.0.0',
+        isPrimary: true,
+      },
+    });
+    storageSeeded = true;
+  } catch (error) {
+    logger.warn(
+      { error: error instanceof Error ? error.message : error },
+      'Skipping storage service instance seed: storage configuration not available',
+    );
+  }
+
   logger.info(
     'Seed complete: system tenant, default DID, DID service instance, ' +
       'registrars, schemes, qualifiers' +
-      (idrSeeded ? ', and IDR service instance' : '') +
+      (idrSeeded ? ', IDR service instance' : '') +
+      (storageSeeded ? ', storage service instance' : '') +
       ' upserted',
   );
 }
