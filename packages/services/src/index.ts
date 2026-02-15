@@ -111,3 +111,14 @@ export { errorResponseSchema } from './schemas.js';
 // IDR verification utilities
 export type { VerificationWarning } from './identity-resolver/common/idr-verification.js';
 export { verifyResolverDescription, verifyUntpLinkTypes } from './identity-resolver/common/idr-verification.js';
+
+// Storage service types and constants
+export { STORAGE_SERVICE_TYPE } from './storage/types.js';
+export type { IStorageService as IStorageServiceV2, StorageRecord as StorageRecordV2 } from './storage/types.js';
+export { StorageError, StorageStoreError } from './storage/errors.js';
+export { UNCEFACT_STORAGE_ADAPTER_TYPE } from './storage/adapters/uncefact/uncefact-storage.adapter.js';
+export type { UncefactStorageConfig } from './storage/adapters/uncefact/uncefact-storage.schema.js';
+export {
+  uncefactStorageConfigSchema,
+  uncefactStorageSensitiveFields,
+} from './storage/adapters/uncefact/uncefact-storage.schema.js';

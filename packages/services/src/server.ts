@@ -18,5 +18,8 @@ export { AesGcmEncryptionAdapter } from './encryption/adapters/aes-gcm/aes-gcm.a
 // IDR adapter (Pyx Identity Resolver)
 export { PyxIdentityResolverAdapter } from './identity-resolver/adapters/pyx/pyx-idr.adapter.js';
 
+// Storage adapter (UNCEFACT)
+export { UncefactStorageAdapter } from './storage/adapters/uncefact/uncefact-storage.adapter.js';
+
 // Registry (imports VCKit adapter which transitively pulls in jsonld)
 export { adapterRegistry } from './registry/registry.js';
