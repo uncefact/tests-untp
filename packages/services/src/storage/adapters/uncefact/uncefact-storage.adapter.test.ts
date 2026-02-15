@@ -20,7 +20,7 @@ describe('UncefactStorageAdapter', () => {
   const mockConfig: UncefactStorageConfig = {
     baseUrl: 'https://storage.example.com',
     apiKey: 'test-api-key',
-    apiVersion: '1.0.0',
+    apiVersion: '3.0.0',
     bucket: 'test-bucket',
   };
 
@@ -40,7 +40,7 @@ describe('UncefactStorageAdapter', () => {
       json: jest.fn().mockResolvedValue({
         uri: 'https://storage.example.com/documents/abc-123',
         hash: 'sha256-abc123def456',
-        key: undefined,
+        decryptionKey: undefined,
       }),
     });
     global.fetch = mockFetch;
@@ -81,7 +81,7 @@ describe('UncefactStorageAdapter', () => {
     it('should not include X-API-Key header when apiKey is omitted', async () => {
       const configWithoutKey: UncefactStorageConfig = {
         baseUrl: 'https://storage.example.com',
-        apiVersion: '1.0.0',
+        apiVersion: '3.0.0',
         bucket: 'test-bucket',
       };
       const adapter = new UncefactStorageAdapter(configWithoutKey, mockLogger);
@@ -106,28 +106,28 @@ describe('UncefactStorageAdapter', () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/1.0.0/documents', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.0.0/public', expect.any(Object));
     });
 
-    it('should use /documents endpoint for unencrypted storage (encrypt = false)', async () => {
+    it('should use /public endpoint for unencrypted storage (encrypt = false)', async () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential, false);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/1.0.0/documents', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.0.0/public', expect.any(Object));
     });
 
-    it('should use /documents endpoint when encrypt is not specified (defaults to false)', async () => {
+    it('should use /public endpoint when encrypt is not specified (defaults to false)', async () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/1.0.0/documents', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.0.0/public', expect.any(Object));
     });
 
-    it('should use /credentials endpoint for encrypted storage (encrypt = true)', async () => {
+    it('should use /private endpoint for encrypted storage (encrypt = true)', async () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential, true);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/1.0.0/credentials', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.0.0/private', expect.any(Object));
     });
 
     it('should send correct payload with bucket and data', async () => {
@@ -174,7 +174,7 @@ describe('UncefactStorageAdapter', () => {
         json: jest.fn().mockResolvedValue({
           uri: 'https://storage.example.com/credentials/xyz-789',
           hash: 'sha256-xyz789',
-          key: 'decryption-key-abc',
+          decryptionKey: 'decryption-key-abc',
         }),
       });
 
@@ -211,7 +211,7 @@ describe('UncefactStorageAdapter', () => {
         // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(mockLogger.debug).toHaveBeenCalledWith(
           expect.objectContaining({
-            url: 'https://storage.example.com/api/1.0.0/documents',
+            url: 'https://storage.example.com/api/3.0.0/public',
             encrypt: false,
             bucket: 'test-bucket',
           }),
@@ -255,7 +255,7 @@ describe('UncefactStorageAdapter', () => {
         // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(mockLogger.error).toHaveBeenCalledWith(
           expect.objectContaining({
-            url: 'https://storage.example.com/api/1.0.0/documents',
+            url: 'https://storage.example.com/api/3.0.0/public',
             httpStatus: 500,
             detail: 'Internal Server Error',
           }),
@@ -388,13 +388,13 @@ describe('UncefactStorageAdapter', () => {
       ).toThrow();
     });
 
-    it('should default apiVersion to "1.0.0" when not provided', () => {
+    it('should default apiVersion to "3.0.0" when not provided', () => {
       const config = {
         baseUrl: 'https://storage.example.com',
         bucket: 'test-bucket',
       };
       const result = uncefactStorageRegistryEntry.configSchema.parse(config);
-      expect(result.apiVersion).toBe('1.0.0');
+      expect(result.apiVersion).toBe('3.0.0');
     });
 
     it('should reject an unsupported apiVersion', () => {

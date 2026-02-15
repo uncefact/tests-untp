@@ -54,7 +54,7 @@ export const processTransformationEventOnly: IService = async (
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(transformationEventVc);
-  const { uri, key, hash } = await uploadData(storage, transformationEventVc, credentialId);
+  const { uri, decryptionKey: key, hash } = await uploadData(storage, transformationEventVc, credentialId);
   const verifyURL = constructVerifyURL({ uri, key, hash });
 
   const transformationEventLinkResolver = await registerLinkResolver(

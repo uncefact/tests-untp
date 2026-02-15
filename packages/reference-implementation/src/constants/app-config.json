@@ -114,7 +114,7 @@
                     "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/api/1.0.0/documents",
+                    "url": "http://localhost:3334/api/3.0.0/public",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -503,7 +503,7 @@
                     "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/api/1.0.0/documents",
+                    "url": "http://localhost:3334/api/3.0.0/public",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -806,7 +806,7 @@
                     "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/api/1.0.0/documents",
+                    "url": "http://localhost:3334/api/3.0.0/public",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -1150,7 +1150,7 @@
                     "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/api/1.0.0/documents",
+                    "url": "http://localhost:3334/api/3.0.0/public",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -1280,7 +1280,7 @@
                     "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/api/1.0.0/documents",
+                    "url": "http://localhost:3334/api/3.0.0/public",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -1409,7 +1409,7 @@
                     "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/api/1.0.0/documents",
+                    "url": "http://localhost:3334/api/3.0.0/public",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -1547,7 +1547,7 @@
                     "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/api/1.0.0/documents",
+                    "url": "http://localhost:3334/api/3.0.0/public",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -1681,7 +1681,7 @@
                     "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/api/1.0.0/documents",
+                    "url": "http://localhost:3334/api/3.0.0/public",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },
@@ -1818,7 +1818,7 @@
                     "linkRegisterPath": "resolver"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/api/1.0.0/documents",
+                    "url": "http://localhost:3334/api/3.0.0/public",
                     "params": {
                       "bucket": "verifiable-credentials"
                     },

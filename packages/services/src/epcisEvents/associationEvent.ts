@@ -54,7 +54,7 @@ export const processAssociationEvent: IService = async (
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(associationEventVc);
-  const { uri, key, hash } = await uploadData(storage, associationEventVc, credentialId);
+  const { uri, decryptionKey: key, hash } = await uploadData(storage, associationEventVc, credentialId);
   const verifyURL = constructVerifyURL({ uri, key, hash });
 
   const associationEventLinkResolver = await registerLinkResolver(

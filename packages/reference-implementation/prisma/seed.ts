@@ -270,7 +270,7 @@ async function main() {
     const { storageServiceUrl } = getStorageConfig();
     const storageServiceConfig = JSON.stringify({
       baseUrl: new URL(storageServiceUrl).origin,
-      apiVersion: '1.0.0',
+      apiVersion: '3.0.0',
       bucket: 'verifiable-credentials',
     });
     const encryptedStorageConfig = JSON.stringify(
@@ -288,7 +288,7 @@ async function main() {
         name: 'System Default UNCEFACT Storage',
         description: 'System-wide default UNCEFACT storage instance for credential persistence',
         config: encryptedStorageConfig,
-        apiVersion: '1.0.0',
+        apiVersion: '3.0.0',
         isPrimary: true,
       },
     });

@@ -45,7 +45,7 @@ export const processAggregationEvent: IService = async (
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(aggregationVC);
-  const { uri, key, hash } = await uploadData(storage, aggregationVC, credentialId);
+  const { uri, decryptionKey: key, hash } = await uploadData(storage, aggregationVC, credentialId);
   const verifyURL = constructVerifyURL({ uri, key, hash });
 
   const aggregationLinkResolver = await registerLinkResolver(

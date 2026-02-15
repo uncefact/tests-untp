@@ -27,7 +27,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
   }
 
   async store(credential: EnvelopedVerifiableCredential, encrypt = false): Promise<StorageRecord> {
-    const endpoint = encrypt ? 'credentials' : 'documents';
+    const endpoint = encrypt ? 'private' : 'public';
     const url = `${this.baseUrl}/api/${this.apiVersion}/${endpoint}`;
 
     const payload = {
@@ -49,14 +49,14 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       throw new StorageStoreError(response.status, detail);
     }
 
-    const { uri, hash, key } = await response.json();
+    const { uri, hash, decryptionKey } = await response.json();
 
     this.logger.info({ uri, encrypt }, 'Credential stored successfully');
 
     return {
       uri,
       hash,
-      decryptionKey: key,
+      decryptionKey,
     };
   }
 }
