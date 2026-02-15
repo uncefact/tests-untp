@@ -37,7 +37,7 @@ services:
     restart: always
 
   storage-service:
-    image: ghcr.io/uncefact/project-storage-service:3.0.1
+    image: ghcr.io/uncefact/project-storage-service:next
     ports:
       - 3334:3334
     environment:
