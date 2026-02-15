@@ -1,7 +1,7 @@
 {
   "realm": "ri-e2e",
   "enabled": true,
-  "sslRequired": "external",
+  "sslRequired": "none",
   "registrationAllowed": false,
   "verifyEmail": false,
   "loginWithEmailAllowed": true,
