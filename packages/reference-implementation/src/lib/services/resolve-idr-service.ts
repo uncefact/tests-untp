@@ -1,7 +1,7 @@
 import { ServiceType } from '@uncefact/untp-ri-services';
 import type { IIdentityResolverService } from '@uncefact/untp-ri-services';
-import { resolveService } from './resolve-service.js';
-import type { ResolvedService } from './resolve-service.js';
+import { resolveService } from './resolve-service';
+import type { ResolvedService } from './resolve-service';
 
 export type ResolvedIdrService = ResolvedService<IIdentityResolverService>;
 
