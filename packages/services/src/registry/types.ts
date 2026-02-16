@@ -26,6 +26,7 @@ export type AdapterType = (typeof AdapterType)[keyof typeof AdapterType];
 
 export interface AdapterRegistryEntry<TConfig = unknown, TService = unknown> {
   configSchema: z.ZodType<TConfig, z.ZodTypeDef, any>;
+  sensitiveFields: readonly string[];
   factory: (config: TConfig, logger: LoggerService) => TService;
 }
 

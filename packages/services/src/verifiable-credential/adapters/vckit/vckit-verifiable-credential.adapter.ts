@@ -15,7 +15,10 @@ import type {
 import { VC_CONTEXT_V2, VC_TYPE, VerificationErrorCode } from '../../types.js';
 import { VcSignError, VcVerifyError, VcDecodeError, VcCredentialStatusError } from '../../errors.js';
 import type { VCKitVerifiableCredentialConfig } from './vckit-verifiable-credential.schema.js';
-import { vckitVerifiableCredentialConfigSchema } from './vckit-verifiable-credential.schema.js';
+import {
+  vckitVerifiableCredentialConfigSchema,
+  vckitVerifiableCredentialSensitiveFields,
+} from './vckit-verifiable-credential.schema.js';
 
 const PROOF_FORMAT = 'EnvelopingProofJose';
 
@@ -181,6 +184,7 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
 
 export const vckitVerifiableCredentialRegistryEntry = {
   configSchema: vckitVerifiableCredentialConfigSchema,
+  sensitiveFields: vckitVerifiableCredentialSensitiveFields,
   factory: (config: VCKitVerifiableCredentialConfig, logger: LoggerService): IVerifiableCredentialService =>
     new VCKitVerifiableCredentialService(config, logger),
 } satisfies AdapterRegistryEntry<VCKitVerifiableCredentialConfig, IVerifiableCredentialService>;

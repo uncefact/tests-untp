@@ -5,7 +5,7 @@ import type { IStorageService, StorageRecord } from '../../types.js';
 import type { EnvelopedVerifiableCredential } from '../../../verifiable-credential/types.js';
 import { StorageStoreError } from '../../errors.js';
 import type { UncefactStorageConfig } from './uncefact-storage.schema.js';
-import { uncefactStorageConfigSchema } from './uncefact-storage.schema.js';
+import { uncefactStorageConfigSchema, uncefactStorageSensitiveFields } from './uncefact-storage.schema.js';
 
 export const UNCEFACT_STORAGE_ADAPTER_TYPE = 'UNCEFACT_STORAGE' as const;
 
@@ -92,6 +92,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
 
 export const uncefactStorageRegistryEntry = {
   configSchema: uncefactStorageConfigSchema,
+  sensitiveFields: uncefactStorageSensitiveFields,
   factory: (config: UncefactStorageConfig, logger: LoggerService): IStorageService =>
     new UncefactStorageAdapter(config, logger),
 } satisfies AdapterRegistryEntry<UncefactStorageConfig, IStorageService>;
