@@ -25,8 +25,8 @@ export enum SupportedProviderTypesEnum {
 
 export interface IVerifyURLPayload {
   uri: string;
+  hash: string;
   key?: string;
-  hash?: string;
 }
 
 export interface IVCKitContext {

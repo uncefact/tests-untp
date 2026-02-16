@@ -354,26 +354,21 @@ export const isValidUrl = (url: string): boolean => {
   }
 };
 
-export const constructVerifyURL = ({ uri, key, hash }: IVerifyURLPayload) => {
-  if (!uri) {
-    throw new Error('URI is required');
+export const constructVerifyURL = ({ baseUrl, uri, hash, key }: IVerifyURLPayload & { baseUrl?: string }) => {
+  if (!uri || !hash) {
+    throw new Error('URI and hash are required');
   }
 
-  const url = new URL(window.location.href);
-  const baseUrl = `${url.protocol}//${url.host}`;
+  if (!baseUrl) {
+    const url = new URL(window.location.href);
+    baseUrl = `${url.protocol}//${url.host}`;
+  }
 
-  const payload: IVerifyURLPayload = { uri };
-  if (key) {
-    payload.key = key;
-  }
-  if (hash) {
-    payload.hash = hash;
-  }
+  const payload: Record<string, string> = { uri, hash };
+  if (key) payload.key = key;
 
   const queryString = `q=${encodeURIComponent(JSON.stringify({ payload }))}`;
-  const verifyURL = `${baseUrl}/verify?${queryString}`;
-
-  return verifyURL;
+  return `${baseUrl}/verify?${queryString}`;
 };
 
 export const validateAndConstructVerifyURL = (value: any) => {
@@ -381,9 +376,9 @@ export const validateAndConstructVerifyURL = (value: any) => {
     throw new Error('Invalid data');
   }
 
-  // Handle string value as URI
+  // Handle string value as URI (hash required — caller must provide object form for full verify URL)
   if (_.isString(value)) {
-    return constructVerifyURL({ uri: value });
+    throw new Error('Hash is required — pass an object with uri and hash');
   }
 
   // Handle object with 'uri' key
