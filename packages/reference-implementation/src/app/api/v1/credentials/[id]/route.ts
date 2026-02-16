@@ -45,6 +45,9 @@ const logger = apiLogger.child({ route: '/api/v1/credentials/[id]' });
  *                     createdAt:
  *                       type: string
  *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
  *       401:
  *         description: Unauthorised — missing or invalid authentication
  *         content:
@@ -68,10 +71,11 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
   logger.info({ tenantId, credentialId: id }, 'Looking up credential');
 
-  const credential = await getCredentialById(id);
+  const credential = await getCredentialById(id, tenantId);
   if (!credential) {
     throw new NotFoundError('Credential not found');
   }
 
-  return NextResponse.json({ credential });
+  const { decryptionKey: _, ...safeCredential } = credential;
+  return NextResponse.json({ credential: safeCredential });
 });

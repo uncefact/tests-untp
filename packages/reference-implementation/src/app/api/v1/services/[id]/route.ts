@@ -37,9 +37,6 @@ const logger = apiLogger.child({ route: '/api/v1/services/[id]' });
  *             schema:
  *               type: object
  *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
  *                 service:
  *                   $ref: '#/components/schemas/ServiceInstance'
  *       401:
@@ -70,7 +67,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
     throw new NotFoundError('Service instance not found');
   }
 
-  return NextResponse.json({ service: maskInstanceConfig(instance, getEncryptionService()) });
+  return NextResponse.json({ service: maskInstanceConfig(instance, getEncryptionService(), logger) });
 });
 
 // ---------------------------------------------------------------------------
@@ -120,9 +117,6 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               type: object
  *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
  *                 service:
  *                   $ref: '#/components/schemas/ServiceInstance'
  *       400:
@@ -181,7 +175,13 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     }
 
     // Decrypt existing config and merge with user-supplied fields
-    const existingConfig = JSON.parse(getEncryptionService().decrypt(JSON.parse(existing.config)));
+    let existingConfig: Record<string, unknown>;
+    try {
+      existingConfig = JSON.parse(getEncryptionService().decrypt(JSON.parse(existing.config)));
+    } catch (error) {
+      logger.error({ error, serviceInstanceId: id }, 'Failed to decrypt existing config for merge');
+      throw new ValidationError('Cannot update configuration: existing config could not be decrypted.');
+    }
     const mergedConfig = { ...existingConfig, ...config };
 
     // Validate the merged config against the adapter schema
@@ -191,11 +191,15 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     ];
     const entry = serviceAdapters?.[adapterType];
 
-    if (entry) {
-      const result = entry.configSchema.safeParse(mergedConfig);
-      if (!result.success) {
-        throw new ValidationError(`Invalid configuration: ${result.error.message}`);
-      }
+    if (!entry) {
+      throw new ValidationError(
+        `No registered adapter '${adapterType}' for service type '${serviceType}'. Cannot validate configuration.`,
+      );
+    }
+
+    const result = entry.configSchema.safeParse(mergedConfig);
+    if (!result.success) {
+      throw new ValidationError(`Invalid configuration: ${result.error.message}`);
     }
 
     encryptedConfig = JSON.stringify(
@@ -216,7 +220,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   });
 
   logger.info({ tenantId, serviceInstanceId: id }, 'Service instance updated');
-  return NextResponse.json({ service: maskInstanceConfig(updated, getEncryptionService()) });
+  return NextResponse.json({ service: maskInstanceConfig(updated, getEncryptionService(), logger) });
 });
 
 // ---------------------------------------------------------------------------
@@ -228,11 +232,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  * /services/{id}:
  *   delete:
  *     summary: Delete a service instance
- *     description: >
- *       Deletes a service instance. If the instance has dependent entities
- *       (DIDs, registrars, or identifier schemes) a warning is returned
- *       and the instance is not deleted unless the `force` query parameter
- *       is set to `true`.
+ *     description: "Deletes a service instance. Requires the `force` query parameter set to `true` to confirm deletion."
  *     tags:
  *       - Services
  *     parameters:
@@ -249,24 +249,20 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *           type: string
  *           enum:
  *             - 'true'
- *         description: Set to "true" to delete even when dependent entities exist
+ *         description: Set to "true" to confirm deletion
  *     responses:
  *       200:
- *         description: Service instance deleted successfully
+ *         description: Service instance deleted successfully (or warning if force not set)
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
  *                 deleted:
  *                   type: boolean
- *                   example: true
  *                 warning:
  *                   type: string
- *                   description: Present if the instance had dependent entities
+ *                   description: Present when force is not set to true
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -288,6 +284,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  */
 export const DELETE = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
+
+  const existing = await getServiceInstanceById(id, tenantId);
+  if (!existing) {
+    throw new NotFoundError('Service instance not found');
+  }
+
   const url = new URL(req.url);
   const force = url.searchParams.get('force') === 'true';
 

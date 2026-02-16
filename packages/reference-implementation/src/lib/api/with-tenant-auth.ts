@@ -50,7 +50,8 @@ export function withTenantAuth(handler: RouteHandler) {
       return response;
     } catch (e: unknown) {
       const errorResponse = handleRouteError(e);
-      apiLogger.info(
+      const logLevel = errorResponse.status >= 500 ? 'error' : 'warn';
+      apiLogger[logLevel](
         { method, path, tenantId, status: errorResponse.status, durationMs: Date.now() - start },
         'Request completed with error',
       );

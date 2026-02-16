@@ -66,7 +66,11 @@ export async function resolveService<TService>(
   ];
   const adapterEntry = serviceEntry?.[instance.adapterType];
   if (!adapterEntry) {
-    throw new ServiceResolutionError(serviceType, tenantId);
+    throw new ConfigValidationError(
+      instance.id,
+      `Adapter type "${instance.adapterType}" is not registered for service type "${serviceType}". ` +
+        'The service instance exists but its adapter implementation is missing.',
+    );
   }
 
   const parseResult = adapterEntry.configSchema.safeParse(rawConfig);

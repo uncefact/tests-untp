@@ -71,11 +71,9 @@ const logger = apiLogger.child({ route: '/api/v1/services' });
  *             schema:
  *               type: object
  *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 service:
- *                   $ref: '#/components/schemas/ServiceInstance'
+ *                 serviceInstanceId:
+ *                   type: string
+ *                   description: Database record ID for the new service instance
  *       400:
  *         description: Validation error
  *         content:
@@ -219,9 +217,6 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *             schema:
  *               type: object
  *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
  *                 services:
  *                   type: array
  *                   items:
@@ -270,7 +265,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
     offset,
   });
 
-  const services = instances.map((i) => maskInstanceConfig(i, getEncryptionService()));
+  const services = instances.map((i) => maskInstanceConfig(i, getEncryptionService(), logger));
 
   logger.info({ tenantId, count: services.length }, 'Service instances listed');
   return NextResponse.json({ services });

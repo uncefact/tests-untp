@@ -178,7 +178,7 @@ describe('resolveService', () => {
     );
   });
 
-  it('throws ServiceResolutionError when adapter not in registry', async () => {
+  it('throws ConfigValidationError when adapter not in registry', async () => {
     const instanceWithUnknownAdapter = {
       ...MOCK_INSTANCE,
       adapterType: 'UNKNOWN_ADAPTER',
@@ -186,7 +186,7 @@ describe('resolveService', () => {
     mockGetInstanceByResolution.mockResolvedValue(instanceWithUnknownAdapter);
     (mockEncryptionService.decrypt as jest.Mock).mockReturnValue(VALID_JSON);
 
-    await expect(resolveService('org-1', 'STORAGE' as any)).rejects.toThrow(ServiceResolutionError);
+    await expect(resolveService('org-1', 'STORAGE' as any)).rejects.toThrow(ConfigValidationError);
   });
 
   it('returns the adapter and instance ID from the factory (end-to-end flow)', async () => {

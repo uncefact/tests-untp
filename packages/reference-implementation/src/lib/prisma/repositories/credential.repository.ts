@@ -5,6 +5,7 @@ import { prisma } from '../prisma';
  * Input for creating a new credential record
  */
 export type CreateCredentialInput = {
+  tenantId: string;
   storageUri: string;
   hash: string;
   decryptionKey?: string;
@@ -16,6 +17,7 @@ export type CreateCredentialInput = {
  * Options for listing credentials
  */
 export type ListCredentialsOptions = {
+  tenantId?: string;
   credentialType?: string;
   isPublished?: boolean;
   limit?: number;
@@ -28,6 +30,7 @@ export type ListCredentialsOptions = {
 export async function createCredential(input: CreateCredentialInput): Promise<Credential> {
   return prisma.credential.create({
     data: {
+      tenantId: input.tenantId,
       storageUri: input.storageUri,
       hash: input.hash,
       decryptionKey: input.decryptionKey,
@@ -40,9 +43,9 @@ export async function createCredential(input: CreateCredentialInput): Promise<Cr
 /**
  * Retrieves a credential by its ID
  */
-export async function getCredentialById(id: string): Promise<Credential | null> {
-  return prisma.credential.findUnique({
-    where: { id },
+export async function getCredentialById(id: string, tenantId: string): Promise<Credential | null> {
+  return prisma.credential.findFirst({
+    where: { id, tenantId },
   });
 }
 
@@ -50,9 +53,13 @@ export async function getCredentialById(id: string): Promise<Credential | null> 
  * Lists credentials with optional filtering and pagination
  */
 export async function listCredentials(options: ListCredentialsOptions = {}): Promise<Credential[]> {
-  const { credentialType, isPublished, limit, offset } = options;
+  const { tenantId, credentialType, isPublished, limit, offset } = options;
 
   const where: Prisma.CredentialWhereInput = {};
+
+  if (tenantId !== undefined) {
+    where.tenantId = tenantId;
+  }
 
   if (credentialType !== undefined) {
     where.credentialType = credentialType;

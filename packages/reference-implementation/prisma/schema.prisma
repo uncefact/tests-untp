@@ -102,6 +102,7 @@ model Tenant {
  */
 model Credential {
   id             String   @id @default(cuid())
+  tenantId       String
   storageUri     String
   hash           String
   decryptionKey  String?
