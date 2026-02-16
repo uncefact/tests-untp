@@ -265,7 +265,7 @@ async function issueCredential(params: IssueConfigParams, body: IssueRequest): P
  */
 async function storeCredential(params: IssueConfigParams, envelopedVC: EnvelopedVC): Promise<StorageRecord> {
   const storage = params.storage;
-  const storageUrl = process.env.STORAGE_SERVICE_URL || storage.url;
+  const storageUrl = process.env.UNCEFACT_STORAGE_URL || storage.url;
 
   const payload = {
     data: envelopedVC,

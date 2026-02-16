@@ -124,7 +124,7 @@ services:
       # Service URLs (using docker internal networking)
       ISSUER_API_URL: http://vckit-api:3332/v2
       ISSUER_AUTH_TOKEN: ${ISSUER_AUTH_TOKEN}
-      STORAGE_SERVICE_URL: http://storage-service:3334/api/3.0.0/public
+      UNCEFACT_STORAGE_URL: http://storage-service:3334/api/3.0.0/public
       IDR_API_URL: http://identity-resolver-service:3000/api/2.0.0
       IDR_API_KEY: ${IDR_API_KEY}
     depends_on:
@@ -156,7 +156,7 @@ services:
       - AVAILABLE_BUCKETS=verifiable-credentials,private-verifiable-credentials,epcis-events
       - DEFAULT_BUCKET=verifiable-credentials
       - STORAGE_TYPE=local
-      - API_KEY=test123
+      - API_KEY=${UNCEFACT_STORAGE_API_KEY:-test123}
     volumes:
       - storage_service_data:/app/src/uploads
 
