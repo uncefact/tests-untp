@@ -1,5 +1,5 @@
 import { ServiceType } from '@uncefact/untp-ri-services';
-import type { IStorageServiceV2 as IStorageService } from '@uncefact/untp-ri-services';
+import type { IStorageService } from '@uncefact/untp-ri-services';
 import { resolveService } from './resolve-service.js';
 import type { ResolvedService } from './resolve-service.js';
 
