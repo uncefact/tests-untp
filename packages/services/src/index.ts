@@ -47,10 +47,13 @@ export type { LoggerService, LogContext, LoggerConfig, LogLevel } from './loggin
 export { createLogger } from './logging/factory.js';
 // correlation-context uses async_hooks (Node.js-only) — import from '@uncefact/untp-ri-services/logging' in server code
 
-// Registry (types only — runtime registry re-exported from ./server entrypoint)
+// Registry
 export { ServiceType, AdapterType } from './registry/types.js';
 export { BaseServiceAdapter } from './registry/base-adapter.js';
+export { adapterRegistry } from './registry/registry.js';
+export { getSensitiveFields } from './registry/common/get-sensitive-fields.js';
 export type { AdapterRegistryEntry, AdapterRegistry } from './registry/types.js';
+export { maskInstanceConfig } from './registry/common/mask-instance-config.js';
 
 // Config schemas
 export { vckitDidConfigSchema, vckitDidSensitiveFields } from './did-manager/adapters/vckit/vckit-did.schema.js';
@@ -110,9 +113,17 @@ export { errorResponseSchema } from './schemas.js';
 export type { VerificationWarning } from './identity-resolver/common/idr-verification.js';
 export { verifyResolverDescription, verifyUntpLinkTypes } from './identity-resolver/common/idr-verification.js';
 
+// IDR publish utilities
+export type {
+  BuildPublishLinksOptions,
+  PublishCredentialOptions,
+  PublishCredentialResult,
+} from './identity-resolver/common/publish-credential.js';
+export { buildPublishLinks, publishCredential } from './identity-resolver/common/publish-credential.js';
+
 // Storage service types and constants
 export { STORAGE_SERVICE_TYPE } from './storage/types.js';
-export type { IStorageService as IStorageServiceV2, StorageRecord as StorageRecordV2 } from './storage/types.js';
+export type { IStorageService, StorageRecord } from './storage/types.js';
 export { StorageError, StorageStoreError } from './storage/errors.js';
 export { UNCEFACT_STORAGE_ADAPTER_TYPE } from './storage/adapters/uncefact/uncefact-storage.adapter.js';
 export type { UncefactStorageConfig } from './storage/adapters/uncefact/uncefact-storage.schema.js';
