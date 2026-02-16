@@ -266,6 +266,7 @@ async function issueCredential(params: IssueConfigParams, body: IssueRequest): P
 async function storeCredential(params: IssueConfigParams, envelopedVC: EnvelopedVC): Promise<StorageRecord> {
   const storage = params.storage;
   const storageUrl = process.env.UNCEFACT_STORAGE_URL || storage.url;
+  const storageApiKey = process.env.UNCEFACT_STORAGE_API_KEY;
 
   const payload = {
     data: envelopedVC,
@@ -276,6 +277,7 @@ async function storeCredential(params: IssueConfigParams, envelopedVC: Enveloped
     headers: {
       'Content-Type': 'application/json',
       ...(storage.options.headers ?? {}),
+      ...(storageApiKey && { 'X-API-Key': storageApiKey }),
     },
     body: JSON.stringify(payload),
   });

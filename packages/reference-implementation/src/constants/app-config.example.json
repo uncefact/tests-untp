@@ -720,7 +720,8 @@
                     "options": {
                       "method": "POST",
                       "headers": {
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "X-API-Key": "test123"
                       }
                     }
                   },
@@ -1199,7 +1200,8 @@
                     "options": {
                       "method": "POST",
                       "headers": {
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "X-API-Key": "test123"
                       }
                     }
                   },
