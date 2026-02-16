@@ -18,4 +18,5 @@ export const uncefactStorageConfigSchema = z.object({
 
 export type UncefactStorageConfig = z.infer<typeof uncefactStorageConfigSchema>;
 
-export const uncefactStorageSensitiveFields = ['apiKey'] as const;
+/** Fields whose values should be treated as sensitive (e.g. masked in UI, encrypted at rest). */
+export const uncefactStorageSensitiveFields: (keyof UncefactStorageConfig)[] = ['apiKey'];

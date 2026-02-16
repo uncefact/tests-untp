@@ -21,20 +21,23 @@ export type PublishCredentialOptions = {
   verificationUrls?: BuildPublishLinksOptions;
 };
 
-export type PublishCredentialResult = {
-  enabled: boolean;
-  registration?: LinkRegistration;
-};
+export type PublishCredentialResult = { enabled: false } | { enabled: true; registration: LinkRegistration };
 
 // ── buildPublishLinks ────────────────────────────────────────────────────────
 
 /**
  * Builds the link set for publishing a credential to an Identity Resolver.
  *
- * @param storage - The storage record containing the credential URI and hash
- * @param linkTitle - Human-readable title for the credential links
- * @param options - Optional verification URLs for machine and human verification
- * @returns Array of links to register with the IDR
+ * Always includes a credential storage URI link (`gs1:sustainabilityInfo`).
+ * Optionally prepends a machine verification link and appends a human
+ * verification link depending on the provided options.
+ *
+ * @param storage   - The storage record containing the credential URI and hash.
+ * @param linkTitle - Human-readable title for the credential links.
+ * @param options   - Optional verification URLs for machine and human verification.
+ * @returns Array of 1–3 links: always includes the credential storage URI;
+ *          optionally preceded by a machine verification link and followed
+ *          by a human verification link.
  */
 export function buildPublishLinks(
   storage: StorageRecord,
@@ -43,6 +46,8 @@ export function buildPublishLinks(
 ): Link[] {
   const links: Link[] = [];
 
+  // GS1 link relation types per UNTP specification.
+  // TODO: Make configurable via credential type mapper service.
   if (options?.machineVerificationUrl) {
     links.push({
       href: options.machineVerificationUrl,
@@ -75,7 +80,8 @@ export function buildPublishLinks(
   return links;
 }
 
-// TODO: Review implementation once the credential type mapper service is created.
+// TODO: Replace hardcoded GS1 link relation types and 'Product Passport'
+// fallback with credential type mapper configuration.
 
 // ── publishCredential ────────────────────────────────────────────────────────
 
@@ -87,7 +93,8 @@ export function buildPublishLinks(
  * provided IDR service.
  *
  * @param idrService - An already-resolved Identity Resolver service instance
- * @param decodedCredential - The decoded (unsigned) verifiable credential
+ * @param decodedCredential - The credential content (decoded from the enveloped form).
+ *                            Must include `credentialSubject.registeredId`.
  * @param storage - The storage record from storing the signed credential
  * @param options - Publishing configuration (namespace, identifier scheme, verification URLs)
  * @returns The publish result including the link registration
@@ -110,6 +117,8 @@ export async function publishCredential(
     throw new Error('Missing credentialSubject.registeredId — cannot publish');
   }
 
+  // Use the second type entry (the specific credential type) as the link title,
+  // falling back to 'Product Passport' if only 'VerifiableCredential' is present.
   const linkTitle = (decodedCredential.type as string[] | undefined)?.[1] ?? 'Product Passport';
 
   const links = buildPublishLinks(storage, linkTitle, options.verificationUrls);

@@ -376,9 +376,10 @@ export const validateAndConstructVerifyURL = (value: any) => {
     throw new Error('Invalid data');
   }
 
-  // Handle string value as URI (hash required — caller must provide object form for full verify URL)
+  // Legacy: accept a bare string URI. Callers should migrate to passing
+  // an object with { uri, hash } for full verification URL construction.
   if (_.isString(value)) {
-    throw new Error('Hash is required — pass an object with uri and hash');
+    return value;
   }
 
   // Handle object with 'uri' key

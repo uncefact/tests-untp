@@ -334,8 +334,8 @@ describe('validateAndConstructVerifyURL', () => {
     expect(() => validateAndConstructVerifyURL(undefined)).toThrow('Invalid data');
   });
 
-  it('should throw an error when value is a string (hash required)', () => {
-    expect(() => validateAndConstructVerifyURL('http://example.com/credential')).toThrow('Hash is required');
+  it('should return string values as-is for backward compatibility', () => {
+    expect(validateAndConstructVerifyURL('http://example.com/credential')).toBe('http://example.com/credential');
   });
 
   it('should return the verify URL when value is an object with URI, key, and hash', () => {
