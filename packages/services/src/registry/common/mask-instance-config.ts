@@ -19,7 +19,7 @@ import { getSensitiveFields } from './get-sensitive-fields.js';
 export function maskInstanceConfig(
   instance: { adapterType: string; config: string; [key: string]: unknown },
   encryptionService: IEncryptionService,
-  logger: { error: (...args: unknown[]) => void },
+  logger: { error(obj: Record<string, unknown>, msg: string): void },
 ): { config: Record<string, unknown>; [key: string]: unknown } {
   try {
     const decrypted = encryptionService.decrypt(JSON.parse(instance.config));

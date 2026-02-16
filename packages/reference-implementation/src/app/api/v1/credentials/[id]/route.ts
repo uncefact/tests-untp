@@ -40,6 +40,10 @@ const logger = apiLogger.child({ route: '/api/v1/credentials/[id]' });
  *                       type: string
  *                     credentialType:
  *                       type: string
+ *                     decryptionKey:
+ *                       type: string
+ *                       nullable: true
+ *                       description: Decryption key for encrypted credentials (null if unencrypted)
  *                     isPublished:
  *                       type: boolean
  *                     createdAt:
@@ -76,6 +80,5 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
     throw new NotFoundError('Credential not found');
   }
 
-  const { decryptionKey: _, ...safeCredential } = credential;
-  return NextResponse.json({ credential: safeCredential });
+  return NextResponse.json({ credential });
 });

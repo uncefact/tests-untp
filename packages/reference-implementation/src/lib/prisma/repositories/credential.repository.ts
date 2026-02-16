@@ -17,7 +17,7 @@ export type CreateCredentialInput = {
  * Options for listing credentials
  */
 export type ListCredentialsOptions = {
-  tenantId?: string;
+  tenantId: string;
   credentialType?: string;
   isPublished?: boolean;
   limit?: number;
@@ -52,14 +52,10 @@ export async function getCredentialById(id: string, tenantId: string): Promise<C
 /**
  * Lists credentials with optional filtering and pagination
  */
-export async function listCredentials(options: ListCredentialsOptions = {}): Promise<Credential[]> {
+export async function listCredentials(options: ListCredentialsOptions): Promise<Credential[]> {
   const { tenantId, credentialType, isPublished, limit, offset } = options;
 
-  const where: Prisma.CredentialWhereInput = {};
-
-  if (tenantId !== undefined) {
-    where.tenantId = tenantId;
-  }
+  const where: Prisma.CredentialWhereInput = { tenantId };
 
   if (credentialType !== undefined) {
     where.credentialType = credentialType;
@@ -80,9 +76,13 @@ export async function listCredentials(options: ListCredentialsOptions = {}): Pro
 /**
  * Updates the published status of a credential
  */
-export async function updateCredentialPublished(id: string, isPublished: boolean): Promise<Credential> {
+export async function updateCredentialPublished(
+  id: string,
+  tenantId: string,
+  isPublished: boolean,
+): Promise<Credential> {
   return prisma.credential.update({
-    where: { id },
+    where: { id, tenantId },
     data: { isPublished },
   });
 }
