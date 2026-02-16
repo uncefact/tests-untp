@@ -512,6 +512,43 @@ describe('product.repository', () => {
       expect(result.secondaryIdentifiers).toEqual([]);
     });
 
+    it('validates hierarchy when setting parentId on a MODEL product', async () => {
+      mockProduct.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS); // existing is MODEL
+
+      await expect(updateProduct(PRODUCT_ID, TENANT_ID, { parentId: PARENT_ID })).rejects.toThrow(
+        'MODEL products cannot have a parent',
+      );
+    });
+
+    it('validates hierarchy when clearing parentId on a BATCH product', async () => {
+      const batchProduct = { ...PRODUCT_WITH_RELATIONS, level: 'BATCH', parentId: PARENT_ID };
+      mockProduct.findFirst.mockResolvedValue(batchProduct);
+
+      await expect(updateProduct(PRODUCT_ID, TENANT_ID, { parentId: null })).rejects.toThrow(
+        'BATCH products require a MODEL parent',
+      );
+    });
+
+    it('validates parent level when updating parentId on a BATCH product', async () => {
+      const batchProduct = { ...PRODUCT_WITH_RELATIONS, level: 'BATCH', parentId: PARENT_ID };
+      mockProduct.findFirst
+        .mockResolvedValueOnce(batchProduct) // existing product
+        .mockResolvedValueOnce(BATCH_PRODUCT); // parent lookup returns a BATCH (invalid)
+
+      await expect(updateProduct(PRODUCT_ID, TENANT_ID, { parentId: 'batch-1' })).rejects.toThrow(
+        'BATCH parent must be a MODEL product',
+      );
+    });
+
+    it('validates primary identifier ownership on update', async () => {
+      mockProduct.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockIdentifier.findFirst.mockResolvedValue(null);
+
+      await expect(updateProduct(PRODUCT_ID, TENANT_ID, { primaryIdentifierId: 'nonexistent-ident' })).rejects.toThrow(
+        'Identifier not found: nonexistent-ident',
+      );
+    });
+
     it('throws NotFoundError for ownership check failure', async () => {
       mockProduct.findFirst.mockResolvedValue(null);
 

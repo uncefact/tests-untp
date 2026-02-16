@@ -320,13 +320,23 @@ export async function updateProduct(
     }
   }
 
-  // Validate parent belongs to tenant (if provided and not null)
-  if (input.parentId !== undefined && input.parentId !== null) {
-    const parent = await prisma.product.findFirst({
-      where: { id: input.parentId, tenantId },
-    });
-    if (!parent) {
-      throw new NotFoundError(`Parent product not found: ${input.parentId}`);
+  // Validate hierarchy when parentId is being changed
+  if (input.parentId !== undefined) {
+    let parent: Product | null = null;
+    if (input.parentId !== null) {
+      parent = await prisma.product.findFirst({
+        where: { id: input.parentId, tenantId },
+      });
+    }
+    // validateProductHierarchy expects undefined for "no parent"
+    validateProductHierarchy(existing.level, input.parentId ?? undefined, parent);
+  }
+
+  // Validate primary identifier belongs to tenant (if provided and not null)
+  if (input.primaryIdentifierId !== undefined && input.primaryIdentifierId !== null) {
+    const ident = await prisma.identifier.findFirst({ where: { id: input.primaryIdentifierId, tenantId } });
+    if (!ident) {
+      throw new NotFoundError(`Identifier not found: ${input.primaryIdentifierId}`);
     }
   }
 
