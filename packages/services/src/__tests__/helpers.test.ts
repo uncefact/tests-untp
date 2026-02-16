@@ -359,7 +359,7 @@ describe('validateAndConstructVerifyURL', () => {
     };
     const result = validateAndConstructVerifyURL(value);
     expect(result).toBe(
-      'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22key%22%3A%22someDecryptionKey%22%2C%22hash%22%3A%22someHash%22%7D%7D',
+      'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22hash%22%3A%22someHash%22%2C%22key%22%3A%22someDecryptionKey%22%7D%7D',
     );
   });
 
@@ -372,7 +372,7 @@ describe('validateAndConstructVerifyURL', () => {
     };
     const result = validateAndConstructVerifyURL(value);
     expect(result).toBe(
-      'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22key%22%3A%22primaryKey%22%2C%22hash%22%3A%22someHash%22%7D%7D',
+      'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22hash%22%3A%22someHash%22%2C%22key%22%3A%22primaryKey%22%7D%7D',
     );
   });
 
