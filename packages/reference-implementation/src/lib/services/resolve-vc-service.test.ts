@@ -91,7 +91,7 @@ const MOCK_SERVICE = {
 
 function setupHappyPath() {
   mockGetInstanceByResolution.mockResolvedValue(MOCK_INSTANCE);
-  (mockEncryptionService.decrypt as jest.Mock).mockReturnValue(VALID_JSON);
+  mockEncryptionService.decrypt.mockReturnValue(VALID_JSON);
   mockConfigSchema.safeParse.mockReturnValue({
     success: true,
     data: VALID_CONFIG,
@@ -148,7 +148,7 @@ describe('resolveVcService', () => {
 
   it('throws ConfigDecryptionError on decrypt failure', async () => {
     mockGetInstanceByResolution.mockResolvedValue(MOCK_INSTANCE);
-    (mockEncryptionService.decrypt as jest.Mock).mockImplementation(() => {
+    mockEncryptionService.decrypt.mockImplementation(() => {
       throw new Error('bad key');
     });
 
@@ -157,14 +157,14 @@ describe('resolveVcService', () => {
 
   it('throws ConfigValidationError on invalid JSON', async () => {
     mockGetInstanceByResolution.mockResolvedValue(MOCK_INSTANCE);
-    (mockEncryptionService.decrypt as jest.Mock).mockReturnValue('not-json{{{');
+    mockEncryptionService.decrypt.mockReturnValue('not-json{{{');
 
     await expect(resolveVcService('org-1')).rejects.toThrow(ConfigValidationError);
   });
 
   it('throws ConfigValidationError on schema validation failure', async () => {
     mockGetInstanceByResolution.mockResolvedValue(MOCK_INSTANCE);
-    (mockEncryptionService.decrypt as jest.Mock).mockReturnValue(VALID_JSON);
+    mockEncryptionService.decrypt.mockReturnValue(VALID_JSON);
     mockConfigSchema.safeParse.mockReturnValue({
       success: false,
       error: {
