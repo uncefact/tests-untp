@@ -101,22 +101,24 @@ export async function listRegistrars(tenantId: string, options: ListRegistrarsOp
  * Validates that the registrar belongs to the specified organisation.
  */
 export async function updateRegistrar(id: string, tenantId: string, input: UpdateRegistrarInput): Promise<Registrar> {
-  const existing = await prisma.registrar.findFirst({
-    where: { id, tenantId },
-  });
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.registrar.findFirst({
+      where: { id, tenantId },
+    });
 
-  if (!existing) {
-    throw new NotFoundError('Registrar not found or access denied');
-  }
+    if (!existing) {
+      throw new NotFoundError('Registrar not found or access denied');
+    }
 
-  return prisma.registrar.update({
-    where: { id },
-    data: {
-      ...(input.name !== undefined && { name: input.name }),
-      ...(input.namespace !== undefined && { namespace: input.namespace }),
-      ...(input.url !== undefined && { url: input.url }),
-      ...(input.idrServiceInstanceId !== undefined && { idrServiceInstanceId: input.idrServiceInstanceId }),
-    },
+    return tx.registrar.update({
+      where: { id },
+      data: {
+        ...(input.name !== undefined && { name: input.name }),
+        ...(input.namespace !== undefined && { namespace: input.namespace }),
+        ...(input.url !== undefined && { url: input.url }),
+        ...(input.idrServiceInstanceId !== undefined && { idrServiceInstanceId: input.idrServiceInstanceId }),
+      },
+    });
   });
 }
 
@@ -125,15 +127,17 @@ export async function updateRegistrar(id: string, tenantId: string, input: Updat
  * Validates that the registrar belongs to the specified organisation.
  */
 export async function deleteRegistrar(id: string, tenantId: string): Promise<Registrar> {
-  const existing = await prisma.registrar.findFirst({
-    where: { id, tenantId },
-  });
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.registrar.findFirst({
+      where: { id, tenantId },
+    });
 
-  if (!existing) {
-    throw new NotFoundError('Registrar not found or access denied');
-  }
+    if (!existing) {
+      throw new NotFoundError('Registrar not found or access denied');
+    }
 
-  return prisma.registrar.delete({
-    where: { id },
+    return tx.registrar.delete({
+      where: { id },
+    });
   });
 }

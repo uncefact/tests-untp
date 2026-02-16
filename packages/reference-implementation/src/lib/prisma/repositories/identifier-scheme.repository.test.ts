@@ -11,6 +11,7 @@ const mockTx = {
   identifierScheme: {
     findFirst: jest.fn(),
     update: jest.fn(),
+    delete: jest.fn(),
   },
   schemeQualifier: {
     deleteMany: jest.fn(),
@@ -24,7 +25,6 @@ jest.mock('../prisma', () => ({
       create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
-      delete: jest.fn(),
     },
     $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   },
@@ -37,7 +37,6 @@ const mockIdentifierScheme = prisma.identifierScheme as unknown as {
   create: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
-  delete: jest.Mock;
 };
 
 describe('identifier-scheme.repository', () => {
@@ -339,22 +338,22 @@ describe('identifier-scheme.repository', () => {
 
   describe('deleteIdentifierScheme', () => {
     it('deletes a scheme owned by the tenant', async () => {
-      mockIdentifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
-      mockIdentifierScheme.delete.mockResolvedValue(SCHEME_RECORD);
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.identifierScheme.delete.mockResolvedValue(SCHEME_RECORD);
 
       const result = await deleteIdentifierScheme('scheme-1', TENANT_ID);
 
-      expect(mockIdentifierScheme.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.identifierScheme.findFirst).toHaveBeenCalledWith({
         where: { id: 'scheme-1', tenantId: TENANT_ID },
       });
-      expect(mockIdentifierScheme.delete).toHaveBeenCalledWith({
+      expect(mockTx.identifierScheme.delete).toHaveBeenCalledWith({
         where: { id: 'scheme-1' },
       });
       expect(result).toEqual(SCHEME_RECORD);
     });
 
     it('throws if scheme does not belong to the tenant', async () => {
-      mockIdentifierScheme.findFirst.mockResolvedValue(null);
+      mockTx.identifierScheme.findFirst.mockResolvedValue(null);
 
       await expect(deleteIdentifierScheme('scheme-1', 'other-tenant')).rejects.toThrow(
         'Identifier scheme not found or access denied',

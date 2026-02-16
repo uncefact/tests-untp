@@ -61,15 +61,17 @@ export async function updateLinkRegistration(
   tenantId: string,
   data: { linkType?: string; targetUrl?: string; mimeType?: string },
 ): Promise<LinkRegistration> {
-  const existing = await prisma.linkRegistration.findFirst({
-    where: { idrLinkId, identifierId, tenantId },
-  });
-  if (!existing) {
-    throw new NotFoundError('Link registration not found');
-  }
-  return prisma.linkRegistration.update({
-    where: { id: existing.id },
-    data,
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.linkRegistration.findFirst({
+      where: { idrLinkId, identifierId, tenantId },
+    });
+    if (!existing) {
+      throw new NotFoundError('Link registration not found');
+    }
+    return tx.linkRegistration.update({
+      where: { id: existing.id },
+      data,
+    });
   });
 }
 
@@ -82,11 +84,13 @@ export async function deleteLinkRegistration(
   identifierId: string,
   tenantId: string,
 ): Promise<LinkRegistration> {
-  const existing = await prisma.linkRegistration.findFirst({
-    where: { idrLinkId, identifierId, tenantId },
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.linkRegistration.findFirst({
+      where: { idrLinkId, identifierId, tenantId },
+    });
+    if (!existing) {
+      throw new NotFoundError('Link registration not found');
+    }
+    return tx.linkRegistration.delete({ where: { id: existing.id } });
   });
-  if (!existing) {
-    throw new NotFoundError('Link registration not found');
-  }
-  return prisma.linkRegistration.delete({ where: { id: existing.id } });
 }

@@ -6,6 +6,15 @@ import {
   deleteRegistrar,
 } from './registrar.repository';
 
+// Transaction mock — functions called via $transaction callback
+const mockTx = {
+  registrar: {
+    findFirst: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+};
+
 // Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
 jest.mock('../prisma', () => ({
   prisma: {
@@ -13,9 +22,8 @@ jest.mock('../prisma', () => ({
       create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
     },
+    $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   },
 }));
 
@@ -26,8 +34,6 @@ const mockRegistrar = prisma.registrar as unknown as {
   create: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
-  update: jest.Mock;
-  delete: jest.Mock;
 };
 
 describe('registrar.repository', () => {
@@ -184,18 +190,18 @@ describe('registrar.repository', () => {
 
   describe('updateRegistrar', () => {
     it('updates name and namespace', async () => {
-      mockRegistrar.findFirst.mockResolvedValue(REGISTRAR_RECORD);
-      mockRegistrar.update.mockResolvedValue({ ...REGISTRAR_RECORD, name: 'GS1 Updated', namespace: 'gs1-v2' });
+      mockTx.registrar.findFirst.mockResolvedValue(REGISTRAR_RECORD);
+      mockTx.registrar.update.mockResolvedValue({ ...REGISTRAR_RECORD, name: 'GS1 Updated', namespace: 'gs1-v2' });
 
       const result = await updateRegistrar('reg-1', TENANT_ID, {
         name: 'GS1 Updated',
         namespace: 'gs1-v2',
       });
 
-      expect(mockRegistrar.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.registrar.findFirst).toHaveBeenCalledWith({
         where: { id: 'reg-1', tenantId: TENANT_ID },
       });
-      expect(mockRegistrar.update).toHaveBeenCalledWith({
+      expect(mockTx.registrar.update).toHaveBeenCalledWith({
         where: { id: 'reg-1' },
         data: { name: 'GS1 Updated', namespace: 'gs1-v2' },
       });
@@ -203,19 +209,19 @@ describe('registrar.repository', () => {
     });
 
     it('allows setting idrServiceInstanceId to null', async () => {
-      mockRegistrar.findFirst.mockResolvedValue({ ...REGISTRAR_RECORD, idrServiceInstanceId: 'si-1' });
-      mockRegistrar.update.mockResolvedValue({ ...REGISTRAR_RECORD, idrServiceInstanceId: null });
+      mockTx.registrar.findFirst.mockResolvedValue({ ...REGISTRAR_RECORD, idrServiceInstanceId: 'si-1' });
+      mockTx.registrar.update.mockResolvedValue({ ...REGISTRAR_RECORD, idrServiceInstanceId: null });
 
       await updateRegistrar('reg-1', TENANT_ID, { idrServiceInstanceId: null });
 
-      expect(mockRegistrar.update).toHaveBeenCalledWith({
+      expect(mockTx.registrar.update).toHaveBeenCalledWith({
         where: { id: 'reg-1' },
         data: { idrServiceInstanceId: null },
       });
     });
 
     it('throws if registrar does not belong to the tenant', async () => {
-      mockRegistrar.findFirst.mockResolvedValue(null);
+      mockTx.registrar.findFirst.mockResolvedValue(null);
 
       await expect(updateRegistrar('reg-1', 'other-tenant', { name: 'New' })).rejects.toThrow(
         'Registrar not found or access denied',
@@ -224,7 +230,7 @@ describe('registrar.repository', () => {
 
     it('does not allow updating system defaults', async () => {
       // findFirst with tenantId filter excludes system defaults
-      mockRegistrar.findFirst.mockResolvedValue(null);
+      mockTx.registrar.findFirst.mockResolvedValue(null);
 
       await expect(updateRegistrar('reg-1', TENANT_ID, { name: 'New' })).rejects.toThrow(
         'Registrar not found or access denied',
@@ -234,22 +240,22 @@ describe('registrar.repository', () => {
 
   describe('deleteRegistrar', () => {
     it('deletes a registrar owned by the tenant', async () => {
-      mockRegistrar.findFirst.mockResolvedValue(REGISTRAR_RECORD);
-      mockRegistrar.delete.mockResolvedValue(REGISTRAR_RECORD);
+      mockTx.registrar.findFirst.mockResolvedValue(REGISTRAR_RECORD);
+      mockTx.registrar.delete.mockResolvedValue(REGISTRAR_RECORD);
 
       const result = await deleteRegistrar('reg-1', TENANT_ID);
 
-      expect(mockRegistrar.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.registrar.findFirst).toHaveBeenCalledWith({
         where: { id: 'reg-1', tenantId: TENANT_ID },
       });
-      expect(mockRegistrar.delete).toHaveBeenCalledWith({
+      expect(mockTx.registrar.delete).toHaveBeenCalledWith({
         where: { id: 'reg-1' },
       });
       expect(result).toEqual(REGISTRAR_RECORD);
     });
 
     it('throws if registrar does not belong to the tenant', async () => {
-      mockRegistrar.findFirst.mockResolvedValue(null);
+      mockTx.registrar.findFirst.mockResolvedValue(null);
 
       await expect(deleteRegistrar('reg-1', 'other-tenant')).rejects.toThrow('Registrar not found or access denied');
     });

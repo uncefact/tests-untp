@@ -3,6 +3,8 @@ import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 
+type TransactionClient = Prisma.TransactionClient;
+
 /**
  * An identifier with its full scheme relation (including registrar and qualifiers).
  * Matches the include shape used by `getIdentifierById`.
@@ -49,8 +51,13 @@ export type ListIdentifiersOptions = {
  * Throws NotFoundError if the scheme does not exist.
  * Throws ValidationError if the value does not match the pattern.
  */
-async function validateIdentifierValue(schemeId: string, value: string, tenantId: string): Promise<void> {
-  const scheme = await prisma.identifierScheme.findFirst({
+async function validateIdentifierValue(
+  tx: TransactionClient,
+  schemeId: string,
+  value: string,
+  tenantId: string,
+): Promise<void> {
+  const scheme = await tx.identifierScheme.findFirst({
     where: {
       id: schemeId,
       OR: [{ tenantId }, { tenantId: 'system' }],
@@ -74,17 +81,19 @@ async function validateIdentifierValue(schemeId: string, value: string, tenantId
  * Identifiers are scoped to a single tenant (not shared with system defaults).
  */
 export async function createIdentifier(input: CreateIdentifierInput): Promise<Identifier> {
-  await validateIdentifierValue(input.schemeId, input.value, input.tenantId);
+  return prisma.$transaction(async (tx) => {
+    await validateIdentifierValue(tx, input.schemeId, input.value, input.tenantId);
 
-  return prisma.identifier.create({
-    data: {
-      tenantId: input.tenantId,
-      schemeId: input.schemeId,
-      value: input.value,
-    },
-    include: {
-      scheme: true,
-    },
+    return tx.identifier.create({
+      data: {
+        tenantId: input.tenantId,
+        schemeId: input.schemeId,
+        value: input.value,
+      },
+      include: {
+        scheme: true,
+      },
+    });
   });
 }
 
@@ -145,26 +154,28 @@ export async function updateIdentifier(
   tenantId: string,
   input: UpdateIdentifierInput,
 ): Promise<Identifier> {
-  const existing = await prisma.identifier.findFirst({
-    where: { id, tenantId },
-  });
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.identifier.findFirst({
+      where: { id, tenantId },
+    });
 
-  if (!existing) {
-    throw new NotFoundError('Identifier not found or access denied');
-  }
+    if (!existing) {
+      throw new NotFoundError('Identifier not found or access denied');
+    }
 
-  if (input.value !== undefined) {
-    await validateIdentifierValue(existing.schemeId, input.value, tenantId);
-  }
+    if (input.value !== undefined) {
+      await validateIdentifierValue(tx, existing.schemeId, input.value, tenantId);
+    }
 
-  return prisma.identifier.update({
-    where: { id },
-    data: {
-      ...(input.value !== undefined && { value: input.value }),
-    },
-    include: {
-      scheme: true,
-    },
+    return tx.identifier.update({
+      where: { id },
+      data: {
+        ...(input.value !== undefined && { value: input.value }),
+      },
+      include: {
+        scheme: true,
+      },
+    });
   });
 }
 
@@ -173,15 +184,17 @@ export async function updateIdentifier(
  * Validates that the identifier belongs to the specified organisation.
  */
 export async function deleteIdentifier(id: string, tenantId: string): Promise<Identifier> {
-  const existing = await prisma.identifier.findFirst({
-    where: { id, tenantId },
-  });
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.identifier.findFirst({
+      where: { id, tenantId },
+    });
 
-  if (!existing) {
-    throw new NotFoundError('Identifier not found or access denied');
-  }
+    if (!existing) {
+      throw new NotFoundError('Identifier not found or access denied');
+    }
 
-  return prisma.identifier.delete({
-    where: { id },
+    return tx.identifier.delete({
+      where: { id },
+    });
   });
 }

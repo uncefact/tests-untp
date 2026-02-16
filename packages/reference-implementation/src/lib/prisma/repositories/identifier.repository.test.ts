@@ -6,19 +6,27 @@ import {
   deleteIdentifier,
 } from './identifier.repository';
 
+// Transaction mock — functions called via $transaction callback
+const mockTx = {
+  identifier: {
+    create: jest.fn(),
+    findFirst: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  identifierScheme: {
+    findFirst: jest.fn(),
+  },
+};
+
 // Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
 jest.mock('../prisma', () => ({
   prisma: {
     identifier: {
-      create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
     },
-    identifierScheme: {
-      findFirst: jest.fn(),
-    },
+    $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   },
 }));
 
@@ -26,14 +34,9 @@ jest.mock('../prisma', () => ({
 import { prisma } from '../prisma';
 
 const mockIdentifier = prisma.identifier as unknown as {
-  create: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
-  update: jest.Mock;
-  delete: jest.Mock;
 };
-
-const mockIdentifierScheme = (prisma as unknown as { identifierScheme: { findFirst: jest.Mock } }).identifierScheme;
 
 describe('identifier.repository', () => {
   const TENANT_ID = 'tenant-1';
@@ -67,8 +70,8 @@ describe('identifier.repository', () => {
 
   describe('createIdentifier', () => {
     it('creates an identifier after validating the value', async () => {
-      mockIdentifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
-      mockIdentifier.create.mockResolvedValue(IDENTIFIER_RECORD);
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.identifier.create.mockResolvedValue(IDENTIFIER_RECORD);
 
       const result = await createIdentifier({
         tenantId: TENANT_ID,
@@ -76,13 +79,13 @@ describe('identifier.repository', () => {
         value: '1234567890123',
       });
 
-      expect(mockIdentifierScheme.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.identifierScheme.findFirst).toHaveBeenCalledWith({
         where: {
           id: SCHEME_ID,
           OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
         },
       });
-      expect(mockIdentifier.create).toHaveBeenCalledWith({
+      expect(mockTx.identifier.create).toHaveBeenCalledWith({
         data: {
           tenantId: TENANT_ID,
           schemeId: SCHEME_ID,
@@ -96,7 +99,7 @@ describe('identifier.repository', () => {
     });
 
     it('throws NotFoundError if the scheme does not exist', async () => {
-      mockIdentifierScheme.findFirst.mockResolvedValue(null);
+      mockTx.identifierScheme.findFirst.mockResolvedValue(null);
 
       await expect(
         createIdentifier({
@@ -108,7 +111,7 @@ describe('identifier.repository', () => {
     });
 
     it('throws ValidationError if the value does not match the pattern', async () => {
-      mockIdentifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
 
       await expect(
         createIdentifier({
@@ -201,22 +204,22 @@ describe('identifier.repository', () => {
 
   describe('updateIdentifier', () => {
     it('updates the value after re-validating', async () => {
-      mockIdentifier.findFirst.mockResolvedValue(IDENTIFIER_RECORD);
-      mockIdentifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
-      mockIdentifier.update.mockResolvedValue({ ...IDENTIFIER_RECORD, value: '9876543210123' });
+      mockTx.identifier.findFirst.mockResolvedValue(IDENTIFIER_RECORD);
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.identifier.update.mockResolvedValue({ ...IDENTIFIER_RECORD, value: '9876543210123' });
 
       const result = await updateIdentifier('ident-1', TENANT_ID, { value: '9876543210123' });
 
-      expect(mockIdentifier.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.identifier.findFirst).toHaveBeenCalledWith({
         where: { id: 'ident-1', tenantId: TENANT_ID },
       });
-      expect(mockIdentifierScheme.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.identifierScheme.findFirst).toHaveBeenCalledWith({
         where: {
           id: SCHEME_ID,
           OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
         },
       });
-      expect(mockIdentifier.update).toHaveBeenCalledWith({
+      expect(mockTx.identifier.update).toHaveBeenCalledWith({
         where: { id: 'ident-1' },
         data: { value: '9876543210123' },
         include: {
@@ -227,8 +230,8 @@ describe('identifier.repository', () => {
     });
 
     it('throws ValidationError if the new value does not match the pattern', async () => {
-      mockIdentifier.findFirst.mockResolvedValue(IDENTIFIER_RECORD);
-      mockIdentifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.identifier.findFirst.mockResolvedValue(IDENTIFIER_RECORD);
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
 
       await expect(updateIdentifier('ident-1', TENANT_ID, { value: 'invalid' })).rejects.toThrow(
         /does not match scheme validation pattern/,
@@ -236,7 +239,7 @@ describe('identifier.repository', () => {
     });
 
     it('throws if identifier does not belong to the tenant', async () => {
-      mockIdentifier.findFirst.mockResolvedValue(null);
+      mockTx.identifier.findFirst.mockResolvedValue(null);
 
       await expect(updateIdentifier('ident-1', 'other-tenant', { value: '123' })).rejects.toThrow(
         'Identifier not found or access denied',
@@ -246,22 +249,22 @@ describe('identifier.repository', () => {
 
   describe('deleteIdentifier', () => {
     it('deletes an identifier owned by the tenant', async () => {
-      mockIdentifier.findFirst.mockResolvedValue(IDENTIFIER_RECORD);
-      mockIdentifier.delete.mockResolvedValue(IDENTIFIER_RECORD);
+      mockTx.identifier.findFirst.mockResolvedValue(IDENTIFIER_RECORD);
+      mockTx.identifier.delete.mockResolvedValue(IDENTIFIER_RECORD);
 
       const result = await deleteIdentifier('ident-1', TENANT_ID);
 
-      expect(mockIdentifier.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.identifier.findFirst).toHaveBeenCalledWith({
         where: { id: 'ident-1', tenantId: TENANT_ID },
       });
-      expect(mockIdentifier.delete).toHaveBeenCalledWith({
+      expect(mockTx.identifier.delete).toHaveBeenCalledWith({
         where: { id: 'ident-1' },
       });
       expect(result).toEqual(IDENTIFIER_RECORD);
     });
 
     it('throws if identifier does not belong to the tenant', async () => {
-      mockIdentifier.findFirst.mockResolvedValue(null);
+      mockTx.identifier.findFirst.mockResolvedValue(null);
 
       await expect(deleteIdentifier('ident-1', 'other-tenant')).rejects.toThrow(
         'Identifier not found or access denied',

@@ -1,3 +1,12 @@
+// Transaction mock — functions called via $transaction callback
+const mockTx = {
+  linkRegistration: {
+    findFirst: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+};
+
 jest.mock('../prisma', () => ({
   prisma: {
     linkRegistration: {
@@ -5,9 +14,8 @@ jest.mock('../prisma', () => ({
       createMany: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
     },
+    $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   },
 }));
 
@@ -27,8 +35,6 @@ const mockLinkRegistration = prisma.linkRegistration as unknown as {
   createMany: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
-  update: jest.Mock;
-  delete: jest.Mock;
 };
 
 const SAMPLE_INPUT = {
@@ -120,17 +126,17 @@ describe('link-registration.repository', () => {
   describe('updateLinkRegistration', () => {
     it('updates a link registration', async () => {
       const updatedRecord = { ...SAMPLE_RECORD, targetUrl: 'https://updated.com/cred.json' };
-      mockLinkRegistration.findFirst.mockResolvedValue(SAMPLE_RECORD);
-      mockLinkRegistration.update.mockResolvedValue(updatedRecord);
+      mockTx.linkRegistration.findFirst.mockResolvedValue(SAMPLE_RECORD);
+      mockTx.linkRegistration.update.mockResolvedValue(updatedRecord);
 
       const result = await updateLinkRegistration('idr-link-1', 'ident-1', 'tenant-1', {
         targetUrl: 'https://updated.com/cred.json',
       });
 
-      expect(mockLinkRegistration.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.linkRegistration.findFirst).toHaveBeenCalledWith({
         where: { idrLinkId: 'idr-link-1', identifierId: 'ident-1', tenantId: 'tenant-1' },
       });
-      expect(mockLinkRegistration.update).toHaveBeenCalledWith({
+      expect(mockTx.linkRegistration.update).toHaveBeenCalledWith({
         where: { id: 'lr-1' },
         data: { targetUrl: 'https://updated.com/cred.json' },
       });
@@ -138,7 +144,7 @@ describe('link-registration.repository', () => {
     });
 
     it('throws NotFoundError when link registration not found', async () => {
-      mockLinkRegistration.findFirst.mockResolvedValue(null);
+      mockTx.linkRegistration.findFirst.mockResolvedValue(null);
 
       await expect(
         updateLinkRegistration('missing', 'ident-1', 'tenant-1', {
@@ -150,20 +156,20 @@ describe('link-registration.repository', () => {
 
   describe('deleteLinkRegistration', () => {
     it('deletes a link registration', async () => {
-      mockLinkRegistration.findFirst.mockResolvedValue(SAMPLE_RECORD);
-      mockLinkRegistration.delete.mockResolvedValue(SAMPLE_RECORD);
+      mockTx.linkRegistration.findFirst.mockResolvedValue(SAMPLE_RECORD);
+      mockTx.linkRegistration.delete.mockResolvedValue(SAMPLE_RECORD);
 
       const result = await deleteLinkRegistration('idr-link-1', 'ident-1', 'tenant-1');
 
-      expect(mockLinkRegistration.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.linkRegistration.findFirst).toHaveBeenCalledWith({
         where: { idrLinkId: 'idr-link-1', identifierId: 'ident-1', tenantId: 'tenant-1' },
       });
-      expect(mockLinkRegistration.delete).toHaveBeenCalledWith({ where: { id: 'lr-1' } });
+      expect(mockTx.linkRegistration.delete).toHaveBeenCalledWith({ where: { id: 'lr-1' } });
       expect(result).toEqual(SAMPLE_RECORD);
     });
 
     it('throws NotFoundError when link registration not found', async () => {
-      mockLinkRegistration.findFirst.mockResolvedValue(null);
+      mockTx.linkRegistration.findFirst.mockResolvedValue(null);
 
       await expect(deleteLinkRegistration('missing', 'ident-1', 'tenant-1')).rejects.toThrow(NotFoundError);
     });
