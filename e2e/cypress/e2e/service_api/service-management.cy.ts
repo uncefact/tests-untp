@@ -1,3 +1,14 @@
+interface ServiceInstance {
+  id: string;
+  serviceType: string;
+  adapterType: string;
+  name: string;
+  description?: string;
+  config: Record<string, unknown>;
+  apiVersion: string;
+  isPrimary: boolean;
+}
+
 describe('Service API', { testIsolation: false }, () => {
   const RUN_ID = Date.now();
   let createdServiceId: string;
@@ -41,7 +52,7 @@ describe('Service API', { testIsolation: false }, () => {
         expect(response.body.services).to.be.an('array');
 
         const created = response.body.services.find(
-          (s: any) => s.id === createdServiceId,
+          (s: ServiceInstance) => s.id === createdServiceId,
         );
         expect(created).to.exist;
         expect(created.name).to.eq(`E2E Test VC Service ${RUN_ID}`);
@@ -214,12 +225,13 @@ describe('Service API', { testIsolation: false }, () => {
     });
 
     it('second instance is primary, first is demoted', () => {
-      cy.request(`/api/v1/services/${secondServiceId}`).then((response) => {
-        expect(response.body.service.isPrimary).to.be.true;
-      });
+      cy.request('/api/v1/services').then((response) => {
+        const services = response.body.services;
+        const second = services.find((s: ServiceInstance) => s.id === secondServiceId);
+        const first = services.find((s: ServiceInstance) => s.id === primaryServiceId);
 
-      cy.request(`/api/v1/services/${primaryServiceId}`).then((response) => {
-        expect(response.body.service.isPrimary).to.be.false;
+        expect(second?.isPrimary).to.be.true;
+        expect(first?.isPrimary).to.be.false;
       });
     });
 
@@ -228,12 +240,15 @@ describe('Service API', { testIsolation: false }, () => {
         method: 'PATCH',
         url: `/api/v1/services/${primaryServiceId}`,
         body: { isPrimary: true },
-      }).then((response) => {
-        expect(response.body.service.isPrimary).to.be.true;
-      });
+      }).then(() => {
+        cy.request('/api/v1/services').then((response) => {
+          const services = response.body.services;
+          const first = services.find((s: ServiceInstance) => s.id === primaryServiceId);
+          const second = services.find((s: ServiceInstance) => s.id === secondServiceId);
 
-      cy.request(`/api/v1/services/${secondServiceId}`).then((response) => {
-        expect(response.body.service.isPrimary).to.be.false;
+          expect(first?.isPrimary).to.be.true;
+          expect(second?.isPrimary).to.be.false;
+        });
       });
     });
 
@@ -248,7 +263,7 @@ describe('Service API', { testIsolation: false }, () => {
     it('filters by serviceType', () => {
       cy.request('/api/v1/services?serviceType=DID').then((response) => {
         expect(response.status).to.eq(200);
-        response.body.services.forEach((s: any) => {
+        response.body.services.forEach((s: ServiceInstance) => {
           expect(s.serviceType).to.eq('DID');
         });
       });
@@ -257,7 +272,7 @@ describe('Service API', { testIsolation: false }, () => {
     it('filters by adapterType', () => {
       cy.request('/api/v1/services?adapterType=VCKIT').then((response) => {
         expect(response.status).to.eq(200);
-        response.body.services.forEach((s: any) => {
+        response.body.services.forEach((s: ServiceInstance) => {
           expect(s.adapterType).to.eq('VCKIT');
         });
       });
@@ -267,7 +282,7 @@ describe('Service API', { testIsolation: false }, () => {
       cy.request('/api/v1/services?serviceType=DID&adapterType=VCKIT').then(
         (response) => {
           expect(response.status).to.eq(200);
-          response.body.services.forEach((s: any) => {
+          response.body.services.forEach((s: ServiceInstance) => {
             expect(s.serviceType).to.eq('DID');
             expect(s.adapterType).to.eq('VCKIT');
           });
@@ -516,12 +531,12 @@ describe('Service API', { testIsolation: false }, () => {
           failOnStatusCode: false,
         }).then((response) => {
           expect(response.status).to.eq(400);
-        });
-
-        // Clean up
-        cy.request({
-          method: 'DELETE',
-          url: `/api/v1/services/${tempId}?force=true`,
+        }).then(() => {
+          // Clean up
+          cy.request({
+            method: 'DELETE',
+            url: `/api/v1/services/${tempId}?force=true`,
+          });
         });
       });
     });
@@ -550,12 +565,12 @@ describe('Service API', { testIsolation: false }, () => {
           failOnStatusCode: false,
         }).then((response) => {
           expect(response.status).to.eq(400);
-        });
-
-        // Clean up
-        cy.request({
-          method: 'DELETE',
-          url: `/api/v1/services/${tempId}?force=true`,
+        }).then(() => {
+          // Clean up
+          cy.request({
+            method: 'DELETE',
+            url: `/api/v1/services/${tempId}?force=true`,
+          });
         });
       });
     });
