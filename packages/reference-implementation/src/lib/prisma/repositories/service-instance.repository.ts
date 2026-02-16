@@ -1,5 +1,6 @@
 import { ServiceInstance, ServiceType, AdapterType, Prisma } from '../generated';
 import { prisma } from '../prisma';
+import { NotFoundError } from '@/lib/api/errors';
 
 const SYSTEM_TENANT_ID = 'system';
 
@@ -117,7 +118,7 @@ export async function updateServiceInstance(
     });
 
     if (!existing) {
-      throw new Error('Service instance not found or access denied');
+      throw new NotFoundError('Service instance not found or access denied');
     }
 
     if (input.isPrimary) {
@@ -154,7 +155,7 @@ export async function deleteServiceInstance(id: string, tenantId: string): Promi
     });
 
     if (!existing) {
-      throw new Error('Service instance not found or access denied');
+      throw new NotFoundError('Service instance not found or access denied');
     }
 
     return tx.serviceInstance.delete({
