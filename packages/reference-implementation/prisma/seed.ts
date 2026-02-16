@@ -236,6 +236,14 @@ async function main() {
     const idrServiceConfig = JSON.stringify({
       baseUrl: new URL(pyxIdrApiUrl).origin,
       apiKey: pyxIdrApiKey,
+      apiVersion: '2.0.0',
+      ianaLanguage: 'en',
+      context: 'au',
+      defaultLinkType: 'untp:dpp',
+      defaultMimeType: 'text/html',
+      defaultIanaLanguage: 'en',
+      defaultContext: 'au',
+      fwqs: false,
     });
     const encryptedIdrConfig = JSON.stringify(
       encryptionService.encrypt(idrServiceConfig, EncryptionAlgorithm.AES_256_GCM),
