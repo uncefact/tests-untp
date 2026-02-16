@@ -5,3 +5,6 @@ export * from './registrar.repository';
 export * from './identifier-scheme.repository';
 export * from './identifier.repository';
 export * from './link-registration.repository';
+export * from './organisation.repository';
+export * from './facility.repository';
+export * from './product.repository';
