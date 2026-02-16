@@ -1,20 +1,13 @@
-import { decodeJwt } from 'jose';
 import {
   VCKitVerifiableCredentialService,
   VCKIT_VC_ADAPTER_TYPE,
   vckitVerifiableCredentialRegistryEntry,
 } from './vckit-verifiable-credential.adapter';
-import { VcSignError, VcVerifyError, VcDecodeError, VcCredentialStatusError } from '../../errors';
+import { VcSignError, VcVerifyError, VcCredentialStatusError } from '../../errors';
 import { VerificationErrorCode } from '../../types';
 import type { VCKitVerifiableCredentialConfig } from './vckit-verifiable-credential.schema';
 import type { LoggerService } from '../../../logging/types';
 import type { CredentialPayload, EnvelopedVerifiableCredential, CredentialStatus } from '../../types';
-
-jest.mock('jose', () => ({
-  decodeJwt: jest.fn(),
-}));
-
-const mockedDecodeJwt = decodeJwt as jest.MockedFunction<typeof decodeJwt>;
 
 describe('VCKitVerifiableCredentialService', () => {
   const mockLogger: LoggerService = {
@@ -331,75 +324,6 @@ describe('VCKitVerifiableCredentialService', () => {
     });
   });
 
-  describe('decode', () => {
-    it('should decode valid JWT from enveloped credential', async () => {
-      const decodedPayload = {
-        '@context': ['https://www.w3.org/ns/credentials/v2'],
-        type: ['VerifiableCredential', 'DigitalProductPassport'],
-        issuer: { type: ['CredentialIssuer'], id: 'did:web:example.com', name: 'Test Issuer' },
-        credentialSubject: { type: ['Product'], id: 'https://example.com/product/1' },
-        credentialStatus: mockCredentialStatus,
-        id: 'urn:uuid:test-credential',
-      };
-
-      mockedDecodeJwt.mockReturnValue(decodedPayload as never);
-
-      const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
-      const result = await adapter.decode(mockEnvelopedCredential);
-
-      expect(mockedDecodeJwt).toHaveBeenCalledWith(
-        'eyJhbGciOiJFZERTQSJ9.eyJpc3MiOiJkaWQ6d2ViOmV4YW1wbGUuY29tIn0.signature',
-      );
-      expect(result).toEqual(decodedPayload);
-    });
-
-    it('should throw VcDecodeError when credential is falsy', async () => {
-      const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
-
-      await expect(adapter.decode(null as unknown as EnvelopedVerifiableCredential)).rejects.toThrow(VcDecodeError);
-      await expect(adapter.decode(null as unknown as EnvelopedVerifiableCredential)).rejects.toThrow(
-        'Credential is required',
-      );
-    });
-
-    it('should throw VcDecodeError when type is not EnvelopedVerifiableCredential', async () => {
-      const credential = {
-        '@context': ['https://www.w3.org/ns/credentials/v2'] as ['https://www.w3.org/ns/credentials/v2'],
-        id: 'data:application/vc+jwt,some-jwt',
-        type: 'SomeOtherType' as const,
-      } as unknown as EnvelopedVerifiableCredential;
-
-      const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
-
-      await expect(adapter.decode(credential)).rejects.toThrow(VcDecodeError);
-      await expect(adapter.decode(credential)).rejects.toThrow('not an EnvelopedVerifiableCredential');
-    });
-
-    it('should throw VcDecodeError when encoded data is missing (no comma in id)', async () => {
-      const credential: EnvelopedVerifiableCredential = {
-        '@context': ['https://www.w3.org/ns/credentials/v2'] as ['https://www.w3.org/ns/credentials/v2'],
-        id: 'data:application/vc+jwt',
-        type: 'EnvelopedVerifiableCredential' as const,
-      };
-
-      const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
-
-      await expect(adapter.decode(credential)).rejects.toThrow(VcDecodeError);
-      await expect(adapter.decode(credential)).rejects.toThrow('missing encoded data');
-    });
-
-    it('should throw VcDecodeError when JWT is malformed', async () => {
-      mockedDecodeJwt.mockImplementation(() => {
-        throw new Error('Invalid JWT format');
-      });
-
-      const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
-
-      await expect(adapter.decode(mockEnvelopedCredential)).rejects.toThrow(VcDecodeError);
-      await expect(adapter.decode(mockEnvelopedCredential)).rejects.toThrow('Invalid JWT format');
-    });
-  });
-
   describe('mapErrorCode (tested indirectly via verify)', () => {
     const verifyWithError = async (errorCode: string | undefined, expectedType: VerificationErrorCode) => {
       mockFetch.mockResolvedValueOnce({
@@ -547,7 +471,6 @@ describe('VCKitVerifiableCredentialService', () => {
       expect(adapter).toBeDefined();
       expect(typeof adapter.sign).toBe('function');
       expect(typeof adapter.verify).toBe('function');
-      expect(typeof adapter.decode).toBe('function');
     });
   });
 });

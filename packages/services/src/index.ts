@@ -147,3 +147,4 @@ export {
   vckitVerifiableCredentialConfigSchema,
   vckitVerifiableCredentialSensitiveFields,
 } from './verifiable-credential/adapters/vckit/vckit-verifiable-credential.schema.js';
+export { decodeCredential } from './verifiable-credential/common/decode-credential.js';

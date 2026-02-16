@@ -291,7 +291,4 @@ export interface IVerifiableCredentialService {
 
   /** Verifies an enveloped credential's signature and status. */
   verify(credential: EnvelopedVerifiableCredential): Promise<VerifyResult>;
-
-  /** Decodes an enveloped credential to extract the unsigned credential content. */
-  decode(credential: EnvelopedVerifiableCredential): Promise<UNTPVerifiableCredential>;
 }

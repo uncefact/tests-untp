@@ -1,4 +1,3 @@
-import { decodeJwt } from 'jose';
 import type { IVerifyResult } from '@vckit/core-types';
 import { BaseServiceAdapter } from '../../../registry/base-adapter.js';
 import type { LoggerService } from '../../../logging/types.js';
@@ -13,7 +12,7 @@ import type {
   VerifyResult,
 } from '../../types.js';
 import { VC_CONTEXT_V2, VC_TYPE, VerificationErrorCode } from '../../types.js';
-import { VcSignError, VcVerifyError, VcDecodeError, VcCredentialStatusError } from '../../errors.js';
+import { VcSignError, VcVerifyError, VcCredentialStatusError } from '../../errors.js';
 import type { VCKitVerifiableCredentialConfig } from './vckit-verifiable-credential.schema.js';
 import {
   vckitVerifiableCredentialConfigSchema,
@@ -111,26 +110,6 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
     const result = transformVerifyResult(vckitResult);
     this.logger.info({ verified: result.verified }, 'Credential verification complete');
     return result;
-  }
-
-  async decode(credential: EnvelopedVerifiableCredential): Promise<UNTPVerifiableCredential> {
-    if (!credential) throw new VcDecodeError('Credential is required');
-
-    if (credential.type !== 'EnvelopedVerifiableCredential') {
-      throw new VcDecodeError('Credential is not an EnvelopedVerifiableCredential');
-    }
-
-    const encodedCredential = credential.id?.split(',')[1];
-    if (!encodedCredential) {
-      throw new VcDecodeError('Invalid enveloped credential format: missing encoded data');
-    }
-
-    try {
-      return decodeJwt(encodedCredential) as UNTPVerifiableCredential;
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : 'Unknown error';
-      throw new VcDecodeError(detail);
-    }
   }
 
   // -- Private helpers ----------------------------------------------------
