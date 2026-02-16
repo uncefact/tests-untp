@@ -7,16 +7,16 @@ let cached: StorageConfig | null = null;
 export function getStorageConfig(): StorageConfig {
   if (cached) return cached;
 
-  const { STORAGE_SERVICE_URL } = process.env;
+  const { UNCEFACT_STORAGE_URL } = process.env;
 
-  if (!STORAGE_SERVICE_URL) {
+  if (!UNCEFACT_STORAGE_URL) {
     throw new Error(
-      'Missing required storage configuration: STORAGE_SERVICE_URL. Set this in your .env file or environment.',
+      'Missing required storage configuration: UNCEFACT_STORAGE_URL. Set this in your .env file or environment.',
     );
   }
 
   cached = {
-    storageServiceUrl: STORAGE_SERVICE_URL,
+    storageServiceUrl: UNCEFACT_STORAGE_URL,
   };
   return cached;
 }

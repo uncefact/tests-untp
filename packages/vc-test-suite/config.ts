@@ -17,11 +17,11 @@ export default {
       method: 'POST',
     },
     Storage: {
-      url: 'http://localhost:3334/v1/documents',
-      encryptionUrl: 'http://localhost:3334/v1/credentials',
+      url: 'http://localhost:3334/api/3.0.0/public',
+      encryptionUrl: 'http://localhost:3334/api/3.0.0/private',
       headers: {},
       additionalParams: {},
-      additionalPayload: { bucket: 'verifiable-credentials' },
+      additionalPayload: {},
     },
   },
 };

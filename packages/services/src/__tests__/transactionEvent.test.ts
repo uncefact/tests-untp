@@ -79,7 +79,7 @@ describe('processTransactionEvent', () => {
     (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue(transactionVCMock);
     (uploadData as jest.Mock).mockResolvedValueOnce({
       uri: 'https://exampleStorage.com/vc.json',
-      key: '123',
+      decryptionKey: '123',
       hash: 'ABC123',
     });
     (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
@@ -273,7 +273,7 @@ describe('processTransactionEvent', () => {
       (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
       (uploadData as jest.Mock).mockResolvedValueOnce({
         uri: 'https://exampleStorage.com/vc.json',
-        key: '123',
+        decryptionKey: '123',
         hash: 'ABC123',
       });
       (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
@@ -316,7 +316,7 @@ describe('processTransactionEvent', () => {
     (vckitService.issueVC as jest.Mock).mockImplementationOnce(() => transactionVCMock);
     (uploadData as jest.Mock).mockResolvedValueOnce({
       uri: 'https://exampleStorage.com/vc.json',
-      key: '123',
+      decryptionKey: '123',
       hash: 'ABC123',
     });
     (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');
@@ -350,7 +350,7 @@ describe('deleteValuesFromLocalStorageByKeyPath functionality', () => {
     (vckitService.decodeEnvelopedVC as jest.Mock).mockReturnValue(transactionVCMock);
     (uploadData as jest.Mock).mockResolvedValueOnce({
       uri: 'https://exampleStorage.com/vc.json',
-      key: '123',
+      decryptionKey: '123',
       hash: 'ABC123',
     });
     (constructVerifyURL as jest.Mock).mockReturnValueOnce('http://localhost/event/1234');

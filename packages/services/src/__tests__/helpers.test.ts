@@ -359,6 +359,42 @@ describe('validateAndConstructVerifyURL', () => {
     expect(result).toBe(expectedURL);
   });
 
+  it('should return the verify URL when value has decryptionKey instead of key', () => {
+    const value = {
+      uri: 'http://example.com/credential',
+      decryptionKey: 'someDecryptionKey',
+      hash: 'someHash',
+    };
+    const result = validateAndConstructVerifyURL(value);
+    expect(result).toBe(
+      'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22key%22%3A%22someDecryptionKey%22%2C%22hash%22%3A%22someHash%22%7D%7D',
+    );
+  });
+
+  it('should prefer key over decryptionKey when both are present', () => {
+    const value = {
+      uri: 'http://example.com/credential',
+      key: 'primaryKey',
+      decryptionKey: 'fallbackKey',
+      hash: 'someHash',
+    };
+    const result = validateAndConstructVerifyURL(value);
+    expect(result).toBe(
+      'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22key%22%3A%22primaryKey%22%2C%22hash%22%3A%22someHash%22%7D%7D',
+    );
+  });
+
+  it('should handle missing key and decryptionKey gracefully', () => {
+    const value = {
+      uri: 'http://example.com/credential',
+      hash: 'someHash',
+    };
+    const result = validateAndConstructVerifyURL(value);
+    expect(result).toBe(
+      'http://localhost:3003/verify?q=%7B%22payload%22%3A%7B%22uri%22%3A%22http%3A%2F%2Fexample.com%2Fcredential%22%2C%22hash%22%3A%22someHash%22%7D%7D',
+    );
+  });
+
   it('should throw an error if the value is not a string or object', () => {
     expect(() => validateAndConstructVerifyURL(123)).toThrow('Invalid data');
     expect(() => validateAndConstructVerifyURL({ notUri: 'http://example.com/credential' })).toThrow(

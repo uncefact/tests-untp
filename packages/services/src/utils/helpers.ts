@@ -388,8 +388,8 @@ export const validateAndConstructVerifyURL = (value: any) => {
 
   // Handle object with 'uri' key
   if (_.isPlainObject(value) && 'uri' in value) {
-    const { uri, key, hash } = value;
-    return constructVerifyURL({ uri, key, hash });
+    const { uri, key, decryptionKey, hash } = value;
+    return constructVerifyURL({ uri, key: key ?? decryptionKey, hash });
   }
 
   throw new Error('Unsupported value type');

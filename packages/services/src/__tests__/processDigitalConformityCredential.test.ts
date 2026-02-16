@@ -48,7 +48,7 @@ describe('processDigitalConformityCredential', () => {
     }));
     (uploadData as jest.Mock).mockResolvedValueOnce({
       uri: 'https://exampleStorage.com/vc.json',
-      key: '123',
+      decryptionKey: '123',
       hash: 'ABC123',
     });
     (constructVerifyURL as jest.Mock).mockReturnValueOnce('https://example.com/vc.json');
@@ -165,7 +165,7 @@ describe('processDigitalConformityCredential', () => {
     }));
     (uploadData as jest.Mock).mockResolvedValueOnce({
       uri: 'https://exampleStorage.com/vc.json',
-      key: '123',
+      decryptionKey: '123',
       hash: 'ABC123',
     });
     (constructVerifyURL as jest.Mock).mockReturnValueOnce('https://example.com/vc.json');

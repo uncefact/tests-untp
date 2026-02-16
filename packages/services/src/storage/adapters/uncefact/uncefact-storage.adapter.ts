@@ -12,14 +12,16 @@ export const UNCEFACT_STORAGE_ADAPTER_TYPE = 'UNCEFACT_STORAGE' as const;
 export class UncefactStorageAdapter extends BaseServiceAdapter implements IStorageService {
   private readonly baseUrl: string;
   private readonly headers: Record<string, string>;
-  private readonly bucket: string;
   private readonly apiVersion: string;
+  private readonly publicBucket?: string;
+  private readonly privateBucket?: string;
 
   constructor(config: UncefactStorageConfig, logger: LoggerService) {
     super(logger.child({ service: 'Storage - UncefactStorage' }));
     this.baseUrl = config.baseUrl;
     this.apiVersion = config.apiVersion;
-    this.bucket = config.bucket;
+    this.publicBucket = config.publicBucket;
+    this.privateBucket = config.privateBucket;
     this.headers = { 'Content-Type': 'application/json' };
     if (config.apiKey) {
       this.headers['X-API-Key'] = config.apiKey;
@@ -27,15 +29,16 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
   }
 
   async store(credential: EnvelopedVerifiableCredential, encrypt = false): Promise<StorageRecord> {
-    const endpoint = encrypt ? 'credentials' : 'documents';
+    const endpoint = encrypt ? 'private' : 'public';
     const url = `${this.baseUrl}/api/${this.apiVersion}/${endpoint}`;
 
-    const payload = {
-      bucket: this.bucket,
-      data: credential,
-    };
+    const bucket = encrypt ? this.privateBucket : this.publicBucket;
+    const payload: Record<string, unknown> = { data: credential };
+    if (bucket) {
+      payload.bucket = bucket;
+    }
 
-    this.logger.debug({ url, encrypt, bucket: this.bucket }, 'Storing credential');
+    this.logger.debug({ url, encrypt, bucket }, 'Storing credential');
 
     const response = await fetch(url, {
       method: 'POST',
@@ -45,18 +48,44 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
 
     if (!response.ok) {
       const detail = response.statusText || 'Unknown error';
-      this.logger.error({ url, httpStatus: response.status, detail }, 'Storage API request failed');
+      this.logger.error({ httpStatus: response.status, detail }, 'Storage API request failed');
       throw new StorageStoreError(response.status, detail);
     }
 
-    const { uri, hash, key } = await response.json();
+    let body: Record<string, unknown>;
+    try {
+      body = await response.json();
+    } catch {
+      this.logger.error({ httpStatus: response.status }, 'Storage API returned non-JSON response');
+      throw new StorageStoreError(response.status, 'Storage API returned invalid JSON response');
+    }
+
+    const { uri, hash, decryptionKey } = body as StorageRecord;
+
+    if (!uri || typeof uri !== 'string') {
+      this.logger.error({ uri }, 'Storage API response missing required "uri" field');
+      throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "uri"');
+    }
+
+    if (!hash || typeof hash !== 'string') {
+      this.logger.error({ hash }, 'Storage API response missing required "hash" field');
+      throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "hash"');
+    }
+
+    if (encrypt && (!decryptionKey || typeof decryptionKey !== 'string')) {
+      this.logger.error(
+        { decryptionKey },
+        'Storage API response missing required "decryptionKey" field for encrypted storage',
+      );
+      throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "decryptionKey"');
+    }
 
     this.logger.info({ uri, encrypt }, 'Credential stored successfully');
 
     return {
       uri,
       hash,
-      decryptionKey: key,
+      decryptionKey,
     };
   }
 }

@@ -161,7 +161,7 @@ describe('processTransformationEventOnly', () => {
     });
     (uploadData as jest.Mock).mockResolvedValueOnce({
       uri: 'https://exampleStorage.com/vc.json',
-      key: '123',
+      decryptionKey: '123',
       hash: 'ABC123',
     });
     (constructVerifyURL as jest.Mock).mockReturnValueOnce(
@@ -292,7 +292,7 @@ describe('processTransformationEventOnly', () => {
     }));
     (uploadData as jest.Mock).mockResolvedValueOnce({
       uri: 'https://exampleStorage.com/vc.json',
-      key: '123',
+      decryptionKey: '123',
       hash: 'ABC123',
     });
     (constructVerifyURL as jest.Mock).mockReturnValueOnce(

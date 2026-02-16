@@ -713,15 +713,15 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/v1/documents",
+                    "url": "http://localhost:3334/api/3.0.0/public",
                     "params": {
-                      "resultPath": "/uri",
-                      "bucket": "verifiable-credentials"
+                      "resultPath": "/uri"
                     },
                     "options": {
                       "method": "POST",
                       "headers": {
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "X-API-Key": "test123"
                       }
                     }
                   },
@@ -1193,15 +1193,15 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/v1/documents",
+                    "url": "http://localhost:3334/api/3.0.0/public",
                     "params": {
-                      "resultPath": "/uri",
-                      "bucket": "verifiable-credentials"
+                      "resultPath": "/uri"
                     },
                     "options": {
                       "method": "POST",
                       "headers": {
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "X-API-Key": "test123"
                       }
                     }
                   },

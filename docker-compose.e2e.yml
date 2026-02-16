@@ -37,16 +37,17 @@ services:
     restart: always
 
   storage-service:
-    image: ghcr.io/uncefact/project-identity-resolver:latest@sha256:06a69d27ee0547cc0e3ce56243b0d3fbff164f804e586de4c78e580b61d971ca
+    image: ghcr.io/uncefact/project-storage-service:3.1.0
     ports:
       - 3334:3334
     environment:
-      - API_VERSION=v1
       - PROTOCOL=http
       - DOMAIN=localhost
       - PORT=3334
       - AVAILABLE_BUCKETS=verifiable-credentials,private-verifiable-credentials,epcis-events
+      - DEFAULT_BUCKET=verifiable-credentials
       - STORAGE_TYPE=local
+      - API_KEY=${UNCEFACT_STORAGE_API_KEY:-test123}
 
   identity-resolver-service:
     image: ghcr.io/pyx-industries/pyx-identity-resolver:2.0.2
@@ -178,6 +179,8 @@ services:
       - AUTH_KEYCLOAK_ISSUER=http://localhost:8081/realms/ri-e2e
       - AUTH_KEYCLOAK_SERVICE_ACCOUNT_CLIENT_ID=ri-service-account-e2e
       - AUTH_KEYCLOAK_SERVICE_ACCOUNT_CLIENT_SECRET=e2e-service-account-secret
+      - UNCEFACT_STORAGE_URL=http://storage-service:3334/api/3.0.0/public
+      - UNCEFACT_STORAGE_API_KEY=test123
       - PYX_IDR_API_URL=http://identity-resolver-service:3000
       - PYX_IDR_API_KEY=test123
     extra_hosts:

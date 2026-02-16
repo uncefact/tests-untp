@@ -191,8 +191,8 @@ export const issueEpcisTransformationEvent = async (
  * @returns string - url of the uploaded verifiable credential
  */
 export const uploadVC = async (id: string, vc: VerifiableCredential, storageContext: StorageServiceConfig) => {
-  const result = await uploadData(storageContext, vc, id);
-  return result;
+  const { uri, decryptionKey: key, hash } = await uploadData(storageContext, vc, id);
+  return { uri, key, hash };
 };
 
 /**

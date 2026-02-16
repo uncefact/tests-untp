@@ -46,7 +46,7 @@ export const processTransactionEvent: IService = async (
   });
 
   const decodedEnvelopedVC = decodeEnvelopedVC(vc);
-  const { uri, key, hash } = await uploadData(storage, vc, credentialId);
+  const { uri, decryptionKey: key, hash } = await uploadData(storage, vc, credentialId);
   const verifyURL = constructVerifyURL({ uri, key, hash });
 
   const linkResolver = await registerLinkResolver(

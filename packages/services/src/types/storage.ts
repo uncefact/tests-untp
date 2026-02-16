@@ -1,3 +1,5 @@
+import type { StorageRecord } from '../storage/types.js';
+
 export type StorageServiceOptions = {
   method: 'POST' | 'PUT';
   headers?: any;
@@ -14,9 +16,9 @@ export type StorageServiceConfig = {
 };
 
 export interface IStorageService {
-  (config: StorageServiceConfig): Promise<string>;
+  (config: StorageServiceConfig): Promise<StorageRecord>;
 }
 
 export interface IUploadData {
-  (storage: StorageServiceConfig, data: any, id: string): Promise<any>;
+  (storage: StorageServiceConfig, data: any, id: string): Promise<StorageRecord>;
 }

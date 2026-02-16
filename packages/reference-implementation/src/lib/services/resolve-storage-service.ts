@@ -1,7 +1,7 @@
 import { ServiceType } from '@uncefact/untp-ri-services';
 import type { AdapterRegistryEntry } from '@uncefact/untp-ri-services';
 import { adapterRegistry } from '@uncefact/untp-ri-services/server';
-import type { IStorageService as IStorageServiceV2 } from '@uncefact/untp-ri-services';
+import type { IStorageService } from '@uncefact/untp-ri-services';
 import { createLogger } from '@uncefact/untp-ri-services/logging';
 import { getEncryptionService } from '@/lib/encryption/encryption';
 import { getInstanceByResolution } from '@/lib/prisma/repositories';
@@ -19,7 +19,7 @@ const logger = createLogger().child({ module: 'resolve-storage-service' });
  * plus the service instance ID for provenance tracking.
  */
 export interface ResolvedStorageService {
-  service: IStorageServiceV2;
+  service: IStorageService;
   instanceId: string;
 }
 
@@ -77,7 +77,7 @@ export async function resolveStorageService(
   }
 
   return {
-    service: adapterEntry.factory(parseResult.data, logger) as IStorageServiceV2,
+    service: adapterEntry.factory(parseResult.data, logger.child({ instanceId: instance.id })) as IStorageService,
     instanceId: instance.id,
   };
 }

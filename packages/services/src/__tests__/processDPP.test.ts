@@ -61,7 +61,7 @@ describe('processDPP', () => {
       const mockVerifyURL = 'https://example.com/vc.json';
       (uploadData as jest.Mock).mockResolvedValueOnce({
         uri: 'https://exampleStorage.com/vc.json',
-        key: '123',
+        decryptionKey: '123',
         hash: 'ABC123',
       });
       (constructVerifyURL as jest.Mock).mockReturnValueOnce(mockVerifyURL);
@@ -192,7 +192,7 @@ describe('processDPP', () => {
 
       (uploadData as jest.Mock).mockResolvedValueOnce({
         uri: 'https://exampleStorage.com/vc.json',
-        key: '123',
+        decryptionKey: '123',
         hash: 'ABC123',
       });
       (constructVerifyURL as jest.Mock).mockReturnValueOnce('https://example.com/vc.json');

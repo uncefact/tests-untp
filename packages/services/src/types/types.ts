@@ -65,10 +65,6 @@ export interface IConfigDLR {
   linkRegisterPath?: string;
 }
 
-export interface IStorageContext {
-  storageAPIUrl: string;
-  bucket: string;
-}
 export interface IContext {
   vckit: IVCKitContext;
   dlr: IConfigDLR;

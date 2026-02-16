@@ -47,9 +47,7 @@ export const contextTransformationEvent = {
   },
   storage: {
     url: 'https://storage.example.com',
-    params: {
-      bucket: 'transformation-event-bucket',
-    },
+    params: {},
   },
   productTransformation: {
     inputItems: [{ quantity: 1, uom: 'head', productClass: 'cattle' }],
@@ -147,9 +145,7 @@ export const contextDPP = {
   },
   storage: {
     url: 'https://storage.example.com',
-    params: {
-      bucket: 'dpp-bucket',
-    },
+    params: {},
   },
   identifierKeyPath: '/herd/identifier',
 };
@@ -227,9 +223,7 @@ export const traceabilityEventContext = {
   },
   storage: {
     url: 'https://storage.example.com/upload',
-    params: {
-      bucket: 'traceability-event-bucket',
-    },
+    params: {},
   },
   dlr: {
     dlrAPIUrl: 'https://dlr.example.com/api',

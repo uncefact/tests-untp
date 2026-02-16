@@ -70,7 +70,7 @@ const MOCK_INSTANCE = {
   adapterType: 'UNCEFACT_STORAGE',
   name: 'System UNCEFACT Storage',
   config: JSON.stringify(MOCK_ENCRYPTED_ENVELOPE),
-  apiVersion: '1.0.0',
+  apiVersion: '3.0.0',
   isPrimary: true,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -78,8 +78,7 @@ const MOCK_INSTANCE = {
 
 const VALID_CONFIG = {
   baseUrl: 'https://storage.example.com',
-  apiVersion: '1.0.0',
-  bucket: 'verifiable-credentials',
+  apiVersion: '3.0.0',
 };
 const VALID_JSON = JSON.stringify(VALID_CONFIG);
 
@@ -168,12 +167,12 @@ describe('resolveStorageService', () => {
     mockConfigSchema.safeParse.mockReturnValue({
       success: false,
       error: {
-        issues: [{ message: 'baseUrl is required' }, { message: 'bucket must be a string' }],
+        issues: [{ message: 'baseUrl is required' }],
       },
     });
 
     await expect(resolveStorageService('org-1')).rejects.toThrow(ConfigValidationError);
-    await expect(resolveStorageService('org-1')).rejects.toThrow(/baseUrl is required, bucket must be a string/);
+    await expect(resolveStorageService('org-1')).rejects.toThrow(/baseUrl is required/);
   });
 
   it('returns the adapter and instance ID from the factory (end-to-end flow)', async () => {

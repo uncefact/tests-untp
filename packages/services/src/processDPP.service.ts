@@ -49,7 +49,7 @@ export const processDPP: IService = async (data: any, context: IDppContext): Pro
     const decodedEnvelopedVC = decodeEnvelopedVC(vc);
 
     const storageContext = context.storage;
-    const { uri, key, hash } = await uploadData(storageContext, vc, credentialId);
+    const { uri, decryptionKey: key, hash } = await uploadData(storageContext, vc, credentialId);
     const verifyURL = constructVerifyURL({ uri, key, hash });
 
     const linkResolverContext = context.dlr;
