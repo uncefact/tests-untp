@@ -21,5 +21,8 @@ export { PyxIdentityResolverAdapter } from './identity-resolver/adapters/pyx/pyx
 // Storage adapter (UNCEFACT)
 export { UncefactStorageAdapter } from './storage/adapters/uncefact/uncefact-storage.adapter.js';
 
+// VC adapter
+export { VCKitVerifiableCredentialService } from './verifiable-credential/adapters/vckit/vckit-verifiable-credential.adapter.js';
+
 // Registry (imports VCKit adapter which transitively pulls in jsonld)
 export { adapterRegistry } from './registry/registry.js';

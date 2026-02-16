@@ -120,3 +120,19 @@ export {
   uncefactStorageConfigSchema,
   uncefactStorageSensitiveFields,
 } from './storage/adapters/uncefact/uncefact-storage.schema.js';
+
+// VC service types and constants
+export { VC_SERVICE_TYPE } from './verifiable-credential/types.js';
+export {
+  VcServiceError,
+  VcSignError,
+  VcVerifyError,
+  VcDecodeError,
+  VcCredentialStatusError,
+} from './verifiable-credential/errors.js';
+export { VCKIT_VC_ADAPTER_TYPE } from './verifiable-credential/adapters/vckit/vckit-verifiable-credential.adapter.js';
+export type { VCKitVerifiableCredentialConfig } from './verifiable-credential/adapters/vckit/vckit-verifiable-credential.schema.js';
+export {
+  vckitVerifiableCredentialConfigSchema,
+  vckitVerifiableCredentialSensitiveFields,
+} from './verifiable-credential/adapters/vckit/vckit-verifiable-credential.schema.js';
