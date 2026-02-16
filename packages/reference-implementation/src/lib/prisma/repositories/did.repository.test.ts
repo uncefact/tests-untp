@@ -1,6 +1,14 @@
 import { createDid, getDidById, listDids, updateDid, updateDidStatus, getDefaultDid } from './did.repository';
 import type { DidStatus } from '../generated';
 
+// Transaction mock — functions called via $transaction callback
+const mockTx = {
+  did: {
+    findFirst: jest.fn(),
+    update: jest.fn(),
+  },
+};
+
 // Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
 jest.mock('../prisma', () => ({
   prisma: {
@@ -8,8 +16,8 @@ jest.mock('../prisma', () => ({
       create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
-      update: jest.fn(),
     },
+    $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   },
 }));
 
@@ -20,7 +28,6 @@ const mockDid = prisma.did as unknown as {
   create: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
-  update: jest.Mock;
 };
 
 describe('did.repository', () => {
@@ -229,15 +236,15 @@ describe('did.repository', () => {
 
   describe('updateDid', () => {
     it('updates name and description', async () => {
-      mockDid.findFirst.mockResolvedValue(DID_RECORD);
-      mockDid.update.mockResolvedValue({ ...DID_RECORD, name: 'New Name', description: 'New desc' });
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      mockTx.did.update.mockResolvedValue({ ...DID_RECORD, name: 'New Name', description: 'New desc' });
 
       const result = await updateDid('did-record-1', ORG_ID, {
         name: 'New Name',
         description: 'New desc',
       });
 
-      expect(mockDid.update).toHaveBeenCalledWith({
+      expect(mockTx.did.update).toHaveBeenCalledWith({
         where: { id: 'did-record-1' },
         data: { name: 'New Name', description: 'New desc' },
       });
@@ -245,7 +252,7 @@ describe('did.repository', () => {
     });
 
     it('throws if DID does not belong to the organisation', async () => {
-      mockDid.findFirst.mockResolvedValue(null);
+      mockTx.did.findFirst.mockResolvedValue(null);
 
       await expect(updateDid('did-record-1', 'other-org', { name: 'New' })).rejects.toThrow(
         'DID not found or access denied',
@@ -255,12 +262,12 @@ describe('did.repository', () => {
 
   describe('updateDidStatus', () => {
     it('updates the status', async () => {
-      mockDid.findFirst.mockResolvedValue(DID_RECORD);
-      mockDid.update.mockResolvedValue({ ...DID_RECORD, status: 'VERIFIED' });
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      mockTx.did.update.mockResolvedValue({ ...DID_RECORD, status: 'VERIFIED' });
 
       const result = await updateDidStatus('did-record-1', ORG_ID, 'VERIFIED' as DidStatus);
 
-      expect(mockDid.update).toHaveBeenCalledWith({
+      expect(mockTx.did.update).toHaveBeenCalledWith({
         where: { id: 'did-record-1' },
         data: { status: 'VERIFIED' },
       });
@@ -268,7 +275,7 @@ describe('did.repository', () => {
     });
 
     it('throws if DID does not belong to the organisation', async () => {
-      mockDid.findFirst.mockResolvedValue(null);
+      mockTx.did.findFirst.mockResolvedValue(null);
 
       await expect(updateDidStatus('did-record-1', 'other-org', 'VERIFIED' as DidStatus)).rejects.toThrow(
         'DID not found or access denied',

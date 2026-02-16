@@ -148,16 +148,18 @@ export async function updateServiceInstance(
  * Deletes a service instance. Cannot delete system defaults.
  */
 export async function deleteServiceInstance(id: string, tenantId: string): Promise<ServiceInstance> {
-  const existing = await prisma.serviceInstance.findFirst({
-    where: { id, tenantId },
-  });
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.serviceInstance.findFirst({
+      where: { id, tenantId },
+    });
 
-  if (!existing) {
-    throw new Error('Service instance not found or access denied');
-  }
+    if (!existing) {
+      throw new Error('Service instance not found or access denied');
+    }
 
-  return prisma.serviceInstance.delete({
-    where: { id },
+    return tx.serviceInstance.delete({
+      where: { id },
+    });
   });
 }
 

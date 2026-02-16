@@ -105,21 +105,22 @@ export async function listDids(tenantId: string, options: ListDidsOptions = {}):
  * Validates that the DID belongs to the specified organisation.
  */
 export async function updateDid(id: string, tenantId: string, input: UpdateDidInput): Promise<Did> {
-  // Verify ownership before updating
-  const existing = await prisma.did.findFirst({
-    where: { id, tenantId },
-  });
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.did.findFirst({
+      where: { id, tenantId },
+    });
 
-  if (!existing) {
-    throw new NotFoundError('DID not found or access denied');
-  }
+    if (!existing) {
+      throw new NotFoundError('DID not found or access denied');
+    }
 
-  return prisma.did.update({
-    where: { id },
-    data: {
-      ...(input.name !== undefined && { name: input.name }),
-      ...(input.description !== undefined && { description: input.description }),
-    },
+    return tx.did.update({
+      where: { id },
+      data: {
+        ...(input.name !== undefined && { name: input.name }),
+        ...(input.description !== undefined && { description: input.description }),
+      },
+    });
   });
 }
 
@@ -128,17 +129,19 @@ export async function updateDid(id: string, tenantId: string, input: UpdateDidIn
  * Validates that the DID belongs to the specified organisation.
  */
 export async function updateDidStatus(id: string, tenantId: string, status: DidStatus): Promise<Did> {
-  const existing = await prisma.did.findFirst({
-    where: { id, tenantId },
-  });
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.did.findFirst({
+      where: { id, tenantId },
+    });
 
-  if (!existing) {
-    throw new NotFoundError('DID not found or access denied');
-  }
+    if (!existing) {
+      throw new NotFoundError('DID not found or access denied');
+    }
 
-  return prisma.did.update({
-    where: { id },
-    data: { status },
+    return tx.did.update({
+      where: { id },
+      data: { status },
+    });
   });
 }
 

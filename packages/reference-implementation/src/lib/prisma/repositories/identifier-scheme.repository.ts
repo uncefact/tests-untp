@@ -186,15 +186,17 @@ export async function updateIdentifierScheme(
  * Validates that the scheme belongs to the specified organisation.
  */
 export async function deleteIdentifierScheme(id: string, tenantId: string): Promise<IdentifierScheme> {
-  const existing = await prisma.identifierScheme.findFirst({
-    where: { id, tenantId },
-  });
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.identifierScheme.findFirst({
+      where: { id, tenantId },
+    });
 
-  if (!existing) {
-    throw new NotFoundError('Identifier scheme not found or access denied');
-  }
+    if (!existing) {
+      throw new NotFoundError('Identifier scheme not found or access denied');
+    }
 
-  return prisma.identifierScheme.delete({
-    where: { id },
+    return tx.identifierScheme.delete({
+      where: { id },
+    });
   });
 }
