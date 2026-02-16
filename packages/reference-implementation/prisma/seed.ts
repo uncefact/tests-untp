@@ -13,6 +13,7 @@ import { EncryptionAlgorithm, createLogger } from '@uncefact/untp-ri-services';
 import { getDidConfig } from '../src/lib/config/did.config';
 import { getIdrConfig } from '../src/lib/config/idr.config';
 import { getStorageConfig } from '../src/lib/config/storage.config';
+import { getVcConfig } from '../src/lib/config/vc.config';
 
 const logger = createLogger().child({ module: 'prisma-seed' });
 
@@ -301,11 +302,47 @@ async function main() {
     );
   }
 
+  // ── Seed system VCKit VC service instance ─────────────────────────────────
+  let vcSeeded = false;
+  try {
+    const { vckitApiUrl, vckitApiKey } = getVcConfig();
+    const vcServiceConfig = JSON.stringify({
+      endpoint: new URL(vckitApiUrl).origin,
+      apiKey: vckitApiKey,
+    });
+    const encryptedVcConfig = JSON.stringify(
+      encryptionService.encrypt(vcServiceConfig, EncryptionAlgorithm.AES_256_GCM),
+    );
+
+    await prisma.serviceInstance.upsert({
+      where: { id: 'system-vc-vckit' },
+      update: { config: encryptedVcConfig },
+      create: {
+        id: 'system-vc-vckit',
+        tenantId: SYSTEM_TENANT_ID,
+        serviceType: PrismaServiceType.VC,
+        adapterType: PrismaAdapterType.VCKIT,
+        name: 'System Default VCKit (VC)',
+        description: 'System-wide default VCKit instance for verifiable credential operations',
+        config: encryptedVcConfig,
+        apiVersion: '1.0.0',
+        isPrimary: true,
+      },
+    });
+    vcSeeded = true;
+  } catch (error) {
+    logger.warn(
+      { error: error instanceof Error ? error.message : error },
+      'Skipping VC service instance seed: VC configuration not available',
+    );
+  }
+
   logger.info(
     'Seed complete: system tenant, default DID, DID service instance, ' +
       'registrars, schemes, qualifiers' +
       (idrSeeded ? ', IDR service instance' : '') +
       (storageSeeded ? ', storage service instance' : '') +
+      (vcSeeded ? ', VC service instance' : '') +
       ' upserted',
   );
 }
