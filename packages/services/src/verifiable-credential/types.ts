@@ -278,24 +278,20 @@ export type VerifyResult = {
   error?: VerificationError;
 };
 
+export const VC_SERVICE_TYPE = 'VC' as const;
+
 /**
  * Service responsible for issuing and verifying UNTP verifiable credentials.
  *
  * Implementations use enveloping proofs (JOSE/JWT) as required by the UNTP VCDM profile.
  */
 export interface IVerifiableCredentialService {
-  /**
-   * Signs a credential payload and returns an enveloped (JWT-wrapped) credential.
-   */
+  /** Signs a credential payload and returns an enveloped (JWT-wrapped) credential. */
   sign(payload: CredentialPayload): Promise<EnvelopedVerifiableCredential>;
 
-  /**
-   * Verifies an enveloped credential's signature and status.
-   */
+  /** Verifies an enveloped credential's signature and status. */
   verify(credential: EnvelopedVerifiableCredential): Promise<VerifyResult>;
 
-  /**
-   * Decodes an enveloped credential to extract the unsigned credential content.
-   */
+  /** Decodes an enveloped credential to extract the unsigned credential content. */
   decode(credential: EnvelopedVerifiableCredential): Promise<UNTPVerifiableCredential>;
 }

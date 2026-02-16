@@ -6,7 +6,7 @@ import {
 import { StorageStoreError } from '../../errors';
 import type { UncefactStorageConfig } from './uncefact-storage.schema';
 import type { LoggerService } from '../../../logging/types';
-import type { EnvelopedVerifiableCredential } from '../../../interfaces/verifiableCredentialService';
+import type { EnvelopedVerifiableCredential } from '../../../verifiable-credential/types';
 
 describe('UncefactStorageAdapter', () => {
   const mockLogger: LoggerService = {

@@ -1,5 +1,4 @@
 export * from './types/index.js';
-export * from './interfaces/index.js';
 export * from './epcisEvents/index.js';
 export * from './processDPP.service.js';
 export * from './processDigitalIdentityAnchor.service.js';
@@ -13,7 +12,6 @@ export * from './identityProviders/index.js';
 export * from './features/index.js';
 export * from './api.service.js';
 export * from './identifierSchemes/index.js';
-export * from './adapters/index.js';
 export type {
   CredentialPayload,
   CredentialIssuer,
@@ -24,7 +22,7 @@ export type {
   RenderMethod,
   VerifyResult,
   IVerifiableCredentialService,
-} from './interfaces/verifiableCredentialService.js';
+} from './verifiable-credential/types.js';
 export * from './did-manager/types.js';
 export {
   didDocumentSchema,

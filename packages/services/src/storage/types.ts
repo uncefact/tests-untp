@@ -1,4 +1,4 @@
-import type { EnvelopedVerifiableCredential } from '../interfaces/verifiableCredentialService.js';
+import type { EnvelopedVerifiableCredential } from '../verifiable-credential/types.js';
 
 export const STORAGE_SERVICE_TYPE = 'STORAGE' as const;
 

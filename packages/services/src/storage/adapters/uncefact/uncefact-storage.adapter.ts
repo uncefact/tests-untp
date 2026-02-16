@@ -2,7 +2,7 @@ import { BaseServiceAdapter } from '../../../registry/base-adapter.js';
 import type { LoggerService } from '../../../logging/types.js';
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
 import type { IStorageService, StorageRecord } from '../../types.js';
-import type { EnvelopedVerifiableCredential } from '../../../interfaces/verifiableCredentialService.js';
+import type { EnvelopedVerifiableCredential } from '../../../verifiable-credential/types.js';
 import { StorageStoreError } from '../../errors.js';
 import type { UncefactStorageConfig } from './uncefact-storage.schema.js';
 import { uncefactStorageConfigSchema } from './uncefact-storage.schema.js';
