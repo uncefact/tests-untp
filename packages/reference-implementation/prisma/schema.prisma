@@ -40,6 +40,12 @@ enum AdapterType {
   UNCEFACT_STORAGE
 }
 
+enum ProductLevel {
+  MODEL
+  BATCH
+  ITEM
+}
+
 /**
  * Auth.js + Prisma adapter tables for OAuth + JWT sessions
  */
@@ -93,6 +99,9 @@ model Tenant {
   schemes            IdentifierScheme[]
   identifiers        Identifier[]
   linkRegistrations  LinkRegistration[]
+  organisations      OrganisationEntity[]
+  facilities         Facility[]
+  products           Product[]
 
   @@map("Tenant")
 }
@@ -246,6 +255,13 @@ model Identifier {
   scheme            IdentifierScheme   @relation(fields: [schemeId], references: [id], onDelete: Restrict)
   linkRegistrations LinkRegistration[]
 
+  organisationPrimary     OrganisationEntity?              @relation("OrganisationPrimaryIdentifier")
+  facilityPrimary         Facility?                        @relation("FacilityPrimaryIdentifier")
+  productPrimary          Product?                         @relation("ProductPrimaryIdentifier")
+  organisationSecondaries OrganisationSecondaryIdentifier[] @relation("OrganisationSecondaryIdentifiers")
+  facilitySecondaries     FacilitySecondaryIdentifier[]     @relation("FacilitySecondaryIdentifiers")
+  productSecondaries      ProductSecondaryIdentifier[]      @relation("ProductSecondaryIdentifiers")
+
   @@unique([schemeId, value])
   @@index([tenantId])
 }
@@ -271,4 +287,111 @@ model LinkRegistration {
 
   @@index([tenantId])
   @@index([identifierId])
+}
+
+/**
+ * Organisation entities representing trading partners, suppliers, or self.
+ * Distinct from the Tenant model which represents auth tenants.
+ */
+model OrganisationEntity {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  name                  String
+  description           String?
+  location              Json?
+  primaryIdentifierId   String?  @unique
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenant                Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  primaryIdentifier     Identifier? @relation("OrganisationPrimaryIdentifier", fields: [primaryIdentifierId], references: [id], onDelete: SetNull)
+
+  secondaryIdentifiers  OrganisationSecondaryIdentifier[]
+  facilities            Facility[]
+  products              Product[]
+
+  @@index([tenantId])
+}
+
+/**
+ * Physical locations (factories, farms, warehouses) operated by organisations.
+ */
+model Facility {
+  id                        String   @id @default(cuid())
+  tenantId                  String
+  name                      String
+  description               String?
+  location                  Json?
+  operatingOrganisationId   String?
+  primaryIdentifierId       String?  @unique
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  tenant                    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operatingOrganisation     OrganisationEntity? @relation(fields: [operatingOrganisationId], references: [id], onDelete: SetNull)
+  primaryIdentifier         Identifier?         @relation("FacilityPrimaryIdentifier", fields: [primaryIdentifierId], references: [id], onDelete: SetNull)
+
+  secondaryIdentifiers      FacilitySecondaryIdentifier[]
+  products                  Product[]
+
+  @@index([tenantId])
+}
+
+/**
+ * Products at three levels per UNTP spec: Model, Batch, Serialised Item.
+ */
+model Product {
+  id                        String       @id @default(cuid())
+  tenantId                  String
+  name                      String
+  description               String?
+  level                     ProductLevel
+  parentId                  String?
+  producedByOrganisationId       String?
+  manufacturingFacilityId   String?
+  primaryIdentifierId       String?      @unique
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+
+  tenant                    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent                    Product?            @relation("ProductHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children                  Product[]           @relation("ProductHierarchy")
+  producedByOrganisation         OrganisationEntity? @relation(fields: [producedByOrganisationId], references: [id], onDelete: SetNull)
+  manufacturingFacility     Facility?           @relation(fields: [manufacturingFacilityId], references: [id], onDelete: SetNull)
+  primaryIdentifier         Identifier?         @relation("ProductPrimaryIdentifier", fields: [primaryIdentifierId], references: [id], onDelete: SetNull)
+
+  secondaryIdentifiers      ProductSecondaryIdentifier[]
+
+  @@index([tenantId])
+  @@index([parentId])
+}
+
+model OrganisationSecondaryIdentifier {
+  organisationId  String
+  identifierId    String
+
+  organisation    OrganisationEntity @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  identifier      Identifier         @relation("OrganisationSecondaryIdentifiers", fields: [identifierId], references: [id], onDelete: Cascade)
+
+  @@id([organisationId, identifierId])
+}
+
+model FacilitySecondaryIdentifier {
+  facilityId    String
+  identifierId  String
+
+  facility      Facility   @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  identifier    Identifier @relation("FacilitySecondaryIdentifiers", fields: [identifierId], references: [id], onDelete: Cascade)
+
+  @@id([facilityId, identifierId])
+}
+
+model ProductSecondaryIdentifier {
+  productId     String
+  identifierId  String
+
+  product       Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  identifier    Identifier @relation("ProductSecondaryIdentifiers", fields: [identifierId], references: [id], onDelete: Cascade)
+
+  @@id([productId, identifierId])
 }

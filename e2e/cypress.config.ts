@@ -147,6 +147,39 @@ export default defineConfig({
             await client.connect();
 
             // Delete in dependency order (children first)
+
+            // Master data secondary identifier join tables
+            await client.query(
+              `DELETE FROM "ProductSecondaryIdentifier" WHERE "productId" IN (SELECT id FROM "Product" WHERE "tenantId" = $1)`,
+              [tenantId],
+            );
+            await client.query(
+              `DELETE FROM "FacilitySecondaryIdentifier" WHERE "facilityId" IN (SELECT id FROM "Facility" WHERE "tenantId" = $1)`,
+              [tenantId],
+            );
+            await client.query(
+              `DELETE FROM "OrganisationSecondaryIdentifier" WHERE "organisationId" IN (SELECT id FROM "OrganisationEntity" WHERE "tenantId" = $1)`,
+              [tenantId],
+            );
+
+            // Master data entities (products have hierarchy — children first)
+            await client.query(
+              `DELETE FROM "Product" WHERE "tenantId" = $1 AND "parentId" IS NOT NULL`,
+              [tenantId],
+            );
+            await client.query(
+              `DELETE FROM "Product" WHERE "tenantId" = $1`,
+              [tenantId],
+            );
+            await client.query(
+              `DELETE FROM "Facility" WHERE "tenantId" = $1`,
+              [tenantId],
+            );
+            await client.query(
+              `DELETE FROM "OrganisationEntity" WHERE "tenantId" = $1`,
+              [tenantId],
+            );
+
             await client.query(
               `DELETE FROM "LinkRegistration" WHERE "tenantId" = $1`,
               [tenantId],

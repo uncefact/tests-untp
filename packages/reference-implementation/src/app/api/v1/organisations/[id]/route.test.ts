@@ -1,0 +1,211 @@
+// Mock next/server before importing route handlers
+jest.mock('next/server', () => ({
+  NextResponse: {
+    json: (body: unknown, init?: { status?: number }) => ({
+      status: init?.status ?? 200,
+      json: async () => body,
+    }),
+  },
+}));
+
+// Mock withTenantAuth — skips auth but preserves error handling via handleRouteError
+jest.mock('@/lib/api/with-tenant-auth', () => {
+  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
+  return {
+    withTenantAuth:
+      (handler: (...args: unknown[]) => unknown) =>
+      async (...args: unknown[]) => {
+        try {
+          return await handler(...args);
+        } catch (e) {
+          return handleRouteError(e);
+        }
+      },
+  };
+});
+
+const mockGetOrganisationById = jest.fn();
+const mockUpdateOrganisation = jest.fn();
+const mockDeleteOrganisation = jest.fn();
+
+jest.mock('@/lib/prisma/repositories', () => ({
+  getOrganisationById: (id: string, tenantId: string) => mockGetOrganisationById(id, tenantId),
+  updateOrganisation: (id: string, tenantId: string, input: unknown) => mockUpdateOrganisation(id, tenantId, input),
+  deleteOrganisation: (id: string, tenantId: string) => mockDeleteOrganisation(id, tenantId),
+}));
+
+import { NotFoundError } from '@/lib/api/errors';
+import { GET, PATCH, DELETE } from './route';
+
+function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
+  const { method = 'GET', body, url = 'http://localhost/api/v1/organisations/org-a' } = options;
+  const bodyString = body !== undefined ? JSON.stringify(body) : undefined;
+  return {
+    method,
+    url,
+    headers: new Headers({ 'Content-Type': 'application/json' }),
+    json:
+      bodyString !== undefined
+        ? async () => JSON.parse(bodyString)
+        : async () => {
+            throw new SyntaxError('Unexpected token');
+          },
+  } as unknown as Request;
+}
+
+function createContext(id: string) {
+  return { tenantId: 'org-1', params: Promise.resolve({ id }) };
+}
+
+describe('GET /api/v1/organisations/:id', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns the organisation record', async () => {
+    const organisation = { id: 'org-a', name: 'Acme Corp' };
+    mockGetOrganisationById.mockResolvedValue(organisation);
+
+    const req = createFakeRequest({});
+    const res = await GET(req, createContext('org-a') as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.organisation).toEqual(organisation);
+  });
+
+  it('returns 404 when organisation not found', async () => {
+    mockGetOrganisationById.mockResolvedValue(null);
+
+    const req = createFakeRequest({});
+    const res = await GET(req, createContext('nonexistent') as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(json.error).toContain('Organisation not found');
+  });
+
+  it('returns 500 on unexpected error', async () => {
+    mockGetOrganisationById.mockRejectedValue(new Error('Database error'));
+
+    const req = createFakeRequest({});
+    const res = await GET(req, createContext('org-a') as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(json.error).toContain('Database error');
+  });
+});
+
+describe('PATCH /api/v1/organisations/:id', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('updates the organisation', async () => {
+    const updated = { id: 'org-a', name: 'Updated Corp' };
+    mockUpdateOrganisation.mockResolvedValue(updated);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { name: 'Updated Corp' } });
+    const res = await PATCH(req, createContext('org-a') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.organisation).toEqual(updated);
+  });
+
+  it('returns 400 when no updatable fields are provided', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: {} });
+    const res = await PATCH(req, createContext('org-a') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('At least one updatable field must be provided');
+  });
+
+  it('returns 400 when name is empty string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { name: '' } });
+    const res = await PATCH(req, createContext('org-a') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('name must be a non-empty string');
+  });
+
+  it('returns 400 for invalid JSON body', async () => {
+    const req = {
+      method: 'PATCH',
+      url: 'http://localhost/api/v1/organisations/org-a',
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      json: async () => {
+        throw new SyntaxError('Unexpected token');
+      },
+    } as unknown as Request;
+    const res = await PATCH(req, createContext('org-a') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('Invalid JSON body');
+  });
+
+  it('returns 404 when organisation not found', async () => {
+    mockUpdateOrganisation.mockRejectedValue(new NotFoundError('Organisation not found or access denied'));
+
+    const req = createFakeRequest({ method: 'PATCH', body: { name: 'Updated Corp' } });
+    const res = await PATCH(req, createContext('org-a') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(json.error).toContain('Organisation not found');
+  });
+
+  it('returns 500 on unexpected error', async () => {
+    mockUpdateOrganisation.mockRejectedValue(new Error('Database error'));
+
+    const req = createFakeRequest({ method: 'PATCH', body: { name: 'Updated Corp' } });
+    const res = await PATCH(req, createContext('org-a') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(json.error).toContain('Database error');
+  });
+});
+
+describe('DELETE /api/v1/organisations/:id', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('deletes the organisation and returns empty body', async () => {
+    mockDeleteOrganisation.mockResolvedValue({ id: 'org-a' });
+
+    const req = createFakeRequest({});
+    const res = await DELETE(req, createContext('org-a') as unknown as Parameters<typeof DELETE>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json).toEqual({});
+  });
+
+  it('returns 404 when organisation not found', async () => {
+    mockDeleteOrganisation.mockRejectedValue(new NotFoundError('Organisation not found or access denied'));
+
+    const req = createFakeRequest({});
+    const res = await DELETE(req, createContext('nonexistent') as unknown as Parameters<typeof DELETE>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(json.error).toContain('Organisation not found');
+  });
+
+  it('returns 500 on unexpected error', async () => {
+    mockDeleteOrganisation.mockRejectedValue(new Error('Database error'));
+
+    const req = createFakeRequest({});
+    const res = await DELETE(req, createContext('org-a') as unknown as Parameters<typeof DELETE>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(json.error).toContain('Database error');
+  });
+});
