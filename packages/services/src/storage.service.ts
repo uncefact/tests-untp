@@ -1,4 +1,5 @@
 import { IStorageService, IUploadData } from './types/storage.js';
+import type { StorageRecord } from './storage/types.js';
 import { publicAPI } from './utils/httpService.js';
 import { createLogger } from './logging/factory.js';
 
@@ -10,10 +11,10 @@ export const storageService: IStorageService = async (config) => {
     let result;
     switch (options.method) {
       case 'PUT':
-        result = await publicAPI.put<string>(url, params, options);
+        result = await publicAPI.put<StorageRecord>(url, params, options);
         break;
       case 'POST':
-        result = await publicAPI.post<string>(url, params, options);
+        result = await publicAPI.post<StorageRecord>(url, params, options);
         break;
       default:
         throw new Error(`Unsupported method`);

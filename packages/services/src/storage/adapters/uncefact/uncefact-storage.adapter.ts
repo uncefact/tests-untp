@@ -48,11 +48,37 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
 
     if (!response.ok) {
       const detail = response.statusText || 'Unknown error';
-      this.logger.error({ url, httpStatus: response.status, detail }, 'Storage API request failed');
+      this.logger.error({ httpStatus: response.status, detail }, 'Storage API request failed');
       throw new StorageStoreError(response.status, detail);
     }
 
-    const { uri, hash, decryptionKey } = await response.json();
+    let body: Record<string, unknown>;
+    try {
+      body = await response.json();
+    } catch {
+      this.logger.error({ httpStatus: response.status }, 'Storage API returned non-JSON response');
+      throw new StorageStoreError(response.status, 'Storage API returned invalid JSON response');
+    }
+
+    const { uri, hash, decryptionKey } = body as StorageRecord;
+
+    if (!uri || typeof uri !== 'string') {
+      this.logger.error({ uri }, 'Storage API response missing required "uri" field');
+      throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "uri"');
+    }
+
+    if (!hash || typeof hash !== 'string') {
+      this.logger.error({ hash }, 'Storage API response missing required "hash" field');
+      throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "hash"');
+    }
+
+    if (encrypt && (!decryptionKey || typeof decryptionKey !== 'string')) {
+      this.logger.error(
+        { decryptionKey },
+        'Storage API response missing required "decryptionKey" field for encrypted storage',
+      );
+      throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "decryptionKey"');
+    }
 
     this.logger.info({ uri, encrypt }, 'Credential stored successfully');
 

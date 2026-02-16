@@ -122,6 +122,16 @@ describe('UncefactStorageAdapter', () => {
     });
 
     it('should use /private endpoint for encrypted storage (encrypt = true)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          uri: 'https://storage.example.com/credentials/xyz-789',
+          hash: 'sha256-xyz789',
+          decryptionKey: 'decryption-key-abc',
+        }),
+      });
+
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential, true);
 
@@ -211,6 +221,16 @@ describe('UncefactStorageAdapter', () => {
       });
 
       it('should include privateBucket in payload when configured and encrypt is true', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/credentials/xyz-789',
+            hash: 'sha256-xyz789',
+            decryptionKey: 'decryption-key-abc',
+          }),
+        });
+
         const adapter = new UncefactStorageAdapter({ ...mockConfig, privateBucket: 'private-vc' }, mockLogger);
         await adapter.store(mockCredential, true);
 
@@ -220,6 +240,16 @@ describe('UncefactStorageAdapter', () => {
       });
 
       it('should not include bucket in payload when no buckets are configured and encrypt is true', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/credentials/xyz-789',
+            hash: 'sha256-xyz789',
+            decryptionKey: 'decryption-key-abc',
+          }),
+        });
+
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
         await adapter.store(mockCredential, true);
 
@@ -293,7 +323,6 @@ describe('UncefactStorageAdapter', () => {
         // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(mockLogger.error).toHaveBeenCalledWith(
           expect.objectContaining({
-            url: 'https://storage.example.com/api/3.0.0/public',
             httpStatus: 500,
             detail: 'Internal Server Error',
           }),
@@ -362,6 +391,83 @@ describe('UncefactStorageAdapter', () => {
             message: expect.stringContaining('Unknown error'),
           }),
         );
+      });
+
+      it('should throw StorageStoreError when response is not valid JSON', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockRejectedValue(new SyntaxError('Unexpected token')),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.store(mockCredential)).rejects.toThrow(
+          expect.objectContaining({
+            message: expect.stringContaining('invalid JSON'),
+          }),
+        );
+      });
+
+      it('should throw StorageStoreError when response is missing "uri"', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({ hash: 'sha256-abc123' }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.store(mockCredential)).rejects.toThrow(StorageStoreError);
+      });
+
+      it('should throw StorageStoreError when response is missing "hash"', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({ uri: 'https://storage.example.com/documents/abc-123' }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.store(mockCredential)).rejects.toThrow(StorageStoreError);
+      });
+
+      it('should throw StorageStoreError when encrypt is true and response is missing "decryptionKey"', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/credentials/xyz-789',
+            hash: 'sha256-xyz789',
+          }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.store(mockCredential, true)).rejects.toThrow(StorageStoreError);
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.objectContaining({ decryptionKey: undefined }),
+          expect.stringContaining('decryptionKey'),
+        );
+      });
+
+      it('should not require decryptionKey when encrypt is false', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/documents/abc-123',
+            hash: 'sha256-abc123',
+          }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+        const result = await adapter.store(mockCredential, false);
+
+        expect(result.uri).toBe('https://storage.example.com/documents/abc-123');
+        expect(result.decryptionKey).toBeUndefined();
       });
 
       it('should set statusCode to 502 (Bad Gateway) on StorageStoreError', async () => {
