@@ -238,9 +238,9 @@ describe('Service API', { testIsolation: false }, () => {
     });
 
     after(() => {
-      // Clean up both instances
-      cy.request({ method: 'DELETE', url: `/api/v1/services/${primaryServiceId}?force=true` });
-      cy.request({ method: 'DELETE', url: `/api/v1/services/${secondServiceId}?force=true` });
+      // Clean up both instances (ignore 404 if already deleted or never created)
+      cy.request({ method: 'DELETE', url: `/api/v1/services/${primaryServiceId}?force=true`, failOnStatusCode: false });
+      cy.request({ method: 'DELETE', url: `/api/v1/services/${secondServiceId}?force=true`, failOnStatusCode: false });
     });
   });
 
@@ -424,6 +424,57 @@ describe('Service API', { testIsolation: false }, () => {
       });
     });
 
+    it('returns 400 when config is null', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/services',
+        body: {
+          serviceType: 'VC',
+          adapterType: 'VCKIT',
+          name: 'Test',
+          config: null,
+          apiVersion: '1.0.0',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+      });
+    });
+
+    it('returns 400 when config is an array', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/services',
+        body: {
+          serviceType: 'VC',
+          adapterType: 'VCKIT',
+          name: 'Test',
+          config: [],
+          apiVersion: '1.0.0',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+      });
+    });
+
+    it('returns 400 when config is a string', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/services',
+        body: {
+          serviceType: 'VC',
+          adapterType: 'VCKIT',
+          name: 'Test',
+          config: 'not an object',
+          apiVersion: '1.0.0',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+      });
+    });
+
     it('returns 400 when config fails schema validation', () => {
       cy.request({
         method: 'POST',
@@ -462,6 +513,40 @@ describe('Service API', { testIsolation: false }, () => {
           method: 'PATCH',
           url: `/api/v1/services/${tempId}`,
           body: {},
+          failOnStatusCode: false,
+        }).then((response) => {
+          expect(response.status).to.eq(400);
+        });
+
+        // Clean up
+        cy.request({
+          method: 'DELETE',
+          url: `/api/v1/services/${tempId}?force=true`,
+        });
+      });
+    });
+
+    it('returns 400 when PATCH config is not an object', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/services',
+        body: {
+          serviceType: 'VC',
+          adapterType: 'VCKIT',
+          name: `Temp Config Type ${RUN_ID}`,
+          config: {
+            endpoint: 'https://temp.example.com',
+            apiKey: 'temp-key',
+          },
+          apiVersion: '1.0.0',
+        },
+      }).then((createResponse) => {
+        const tempId = createResponse.body.serviceInstanceId;
+
+        cy.request({
+          method: 'PATCH',
+          url: `/api/v1/services/${tempId}`,
+          body: { config: 'not an object' },
           failOnStatusCode: false,
         }).then((response) => {
           expect(response.status).to.eq(400);
