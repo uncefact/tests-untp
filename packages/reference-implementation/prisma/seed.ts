@@ -74,10 +74,10 @@ async function main() {
   });
 
   // Upsert the system default VCKit DID service instance
-  const { vckitApiUrl, vckitAuthToken } = getDidConfig();
+  const { vckitApiUrl, vckitApiKey: vckitDidApiKey } = getDidConfig();
   const didServiceConfig = JSON.stringify({
     endpoint: new URL(vckitApiUrl).origin,
-    authToken: vckitAuthToken,
+    authToken: vckitDidApiKey,
   });
   const encryptedConfig = JSON.stringify(encryptionService.encrypt(didServiceConfig, EncryptionAlgorithm.AES_256_GCM));
 
@@ -236,6 +236,14 @@ async function main() {
     const idrServiceConfig = JSON.stringify({
       baseUrl: new URL(pyxIdrApiUrl).origin,
       apiKey: pyxIdrApiKey,
+      apiVersion: '2.0.0',
+      ianaLanguage: 'en',
+      context: 'au',
+      defaultLinkType: 'untp:dpp',
+      defaultMimeType: 'text/html',
+      defaultIanaLanguage: 'en',
+      defaultContext: 'au',
+      fwqs: false,
     });
     const encryptedIdrConfig = JSON.stringify(
       encryptionService.encrypt(idrServiceConfig, EncryptionAlgorithm.AES_256_GCM),
@@ -269,8 +277,10 @@ async function main() {
   let storageSeeded = false;
   try {
     const { storageServiceUrl } = getStorageConfig();
+    const storageApiKey = process.env.UNCEFACT_STORAGE_API_KEY;
     const storageServiceConfig = JSON.stringify({
       baseUrl: new URL(storageServiceUrl).origin,
+      ...(storageApiKey && { apiKey: storageApiKey }),
       apiVersion: '3.0.0',
       publicBucket: 'verifiable-credentials',
       privateBucket: 'private-verifiable-credentials',

@@ -148,6 +148,10 @@ export default defineConfig({
 
             // Delete in dependency order (children first)
             await client.query(
+              `DELETE FROM "Credential" WHERE "tenantId" = $1`,
+              [tenantId],
+            );
+            await client.query(
               `DELETE FROM "LinkRegistration" WHERE "tenantId" = $1`,
               [tenantId],
             );

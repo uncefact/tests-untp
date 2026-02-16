@@ -15,7 +15,7 @@ describe('did.config', () => {
 
   const validEnv = {
     VCKIT_API_URL: 'https://vckit.example.com',
-    VCKIT_AUTH_TOKEN: 'test-token-123',
+    VCKIT_API_KEY: 'test-token-123',
     DEFAULT_ISSUER_DID: 'did:web:example.com:org:123',
   };
 
@@ -26,14 +26,14 @@ describe('did.config', () => {
 
     expect(config).toEqual({
       vckitApiUrl: validEnv.VCKIT_API_URL,
-      vckitAuthToken: validEnv.VCKIT_AUTH_TOKEN,
+      vckitApiKey: validEnv.VCKIT_API_KEY,
       defaultDid: validEnv.DEFAULT_ISSUER_DID,
     });
   });
 
   it('throws listing ALL missing vars when none are set', () => {
     delete process.env.VCKIT_API_URL;
-    delete process.env.VCKIT_AUTH_TOKEN;
+    delete process.env.VCKIT_API_KEY;
     delete process.env.DEFAULT_ISSUER_DID;
 
     expect(() => getDidConfig()).toThrow('Missing required DID configuration');
@@ -43,14 +43,14 @@ describe('did.config', () => {
     } catch (error) {
       const message = (error as Error).message;
       expect(message).toContain('VCKIT_API_URL');
-      expect(message).toContain('VCKIT_AUTH_TOKEN');
+      expect(message).toContain('VCKIT_API_KEY');
       expect(message).toContain('DEFAULT_ISSUER_DID');
     }
   });
 
   it('includes .env guidance text in the error message', () => {
     delete process.env.VCKIT_API_URL;
-    delete process.env.VCKIT_AUTH_TOKEN;
+    delete process.env.VCKIT_API_KEY;
     delete process.env.DEFAULT_ISSUER_DID;
 
     expect(() => getDidConfig()).toThrow('Set these in your .env file or environment.');
@@ -93,11 +93,11 @@ describe('did.config', () => {
     expect(() => getDidConfig()).toThrow('VCKIT_API_URL');
   });
 
-  it('throws when VCKIT_AUTH_TOKEN is missing', () => {
+  it('throws when VCKIT_API_KEY is missing', () => {
     Object.assign(process.env, validEnv);
-    delete process.env.VCKIT_AUTH_TOKEN;
+    delete process.env.VCKIT_API_KEY;
 
-    expect(() => getDidConfig()).toThrow('VCKIT_AUTH_TOKEN');
+    expect(() => getDidConfig()).toThrow('VCKIT_API_KEY');
   });
 
   it('throws when DEFAULT_ISSUER_DID is missing', () => {
