@@ -45,7 +45,6 @@ import { prisma } from '../prisma';
 const mockFacility = prisma.facility as unknown as {
   findFirst: jest.Mock;
   findMany: jest.Mock;
-  delete: jest.Mock;
 };
 
 describe('facility.repository', () => {
@@ -376,22 +375,22 @@ describe('facility.repository', () => {
 
   describe('deleteFacility', () => {
     it('deletes a facility owned by the tenant', async () => {
-      mockFacility.findFirst.mockResolvedValue(FACILITY_RECORD);
-      mockFacility.delete.mockResolvedValue(FACILITY_RECORD);
+      mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
+      mockTx.facility.delete.mockResolvedValue(FACILITY_RECORD);
 
       const result = await deleteFacility('facility-1', TENANT_ID);
 
-      expect(mockFacility.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.facility.findFirst).toHaveBeenCalledWith({
         where: { id: 'facility-1', tenantId: TENANT_ID },
       });
-      expect(mockFacility.delete).toHaveBeenCalledWith({
+      expect(mockTx.facility.delete).toHaveBeenCalledWith({
         where: { id: 'facility-1' },
       });
       expect(result).toEqual(FACILITY_RECORD);
     });
 
     it('throws NotFoundError for a facility from another tenant', async () => {
-      mockFacility.findFirst.mockResolvedValue(null);
+      mockTx.facility.findFirst.mockResolvedValue(null);
 
       await expect(deleteFacility('facility-1', OTHER_TENANT)).rejects.toThrow('Facility not found or access denied');
     });

@@ -169,7 +169,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   // Strip the immutable level field if provided
   const { level: _level, ...updateFields } = body;
 
-  const hasUpdatableField = UPDATABLE_FIELDS.some((field) => updateFields[field] !== undefined);
+  const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in updateFields);
   if (!hasUpdatableField) {
     throw new ValidationError(`At least one updatable field must be provided: ${UPDATABLE_FIELDS.join(', ')}`);
   }

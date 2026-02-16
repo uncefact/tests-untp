@@ -291,136 +291,115 @@ export async function updateProduct(
   tenantId: string,
   input: UpdateProductInput,
 ): Promise<ProductWithRelations> {
-  // Ownership check
-  const existing = await prisma.product.findFirst({
-    where: { id, tenantId },
-  });
-
-  if (!existing) {
-    throw new NotFoundError('Product not found or access denied');
-  }
-
-  // Validate brand organisation belongs to tenant (if provided and not null)
-  if (input.producedByOrganisationId !== undefined && input.producedByOrganisationId !== null) {
-    const org = await prisma.organisationEntity.findFirst({
-      where: { id: input.producedByOrganisationId, tenantId },
+  return prisma.$transaction(async (tx) => {
+    // Ownership check
+    const existing = await tx.product.findFirst({
+      where: { id, tenantId },
     });
-    if (!org) {
-      throw new NotFoundError(`Organisation not found: ${input.producedByOrganisationId}`);
-    }
-  }
 
-  // Validate manufacturing facility belongs to tenant (if provided and not null)
-  if (input.manufacturingFacilityId !== undefined && input.manufacturingFacilityId !== null) {
-    const facility = await prisma.facility.findFirst({
-      where: { id: input.manufacturingFacilityId, tenantId },
-    });
-    if (!facility) {
-      throw new NotFoundError(`Facility not found: ${input.manufacturingFacilityId}`);
+    if (!existing) {
+      throw new NotFoundError('Product not found or access denied');
     }
-  }
 
-  // Validate hierarchy when parentId is being changed
-  if (input.parentId !== undefined) {
-    let parent: Product | null = null;
-    if (input.parentId !== null) {
-      parent = await prisma.product.findFirst({
-        where: { id: input.parentId, tenantId },
+    // Validate brand organisation belongs to tenant (if provided and not null)
+    if (input.producedByOrganisationId !== undefined && input.producedByOrganisationId !== null) {
+      const org = await tx.organisationEntity.findFirst({
+        where: { id: input.producedByOrganisationId, tenantId },
       });
-    }
-    // validateProductHierarchy expects undefined for "no parent"
-    validateProductHierarchy(existing.level, input.parentId ?? undefined, parent);
-  }
-
-  // Validate primary identifier belongs to tenant (if provided and not null)
-  if (input.primaryIdentifierId !== undefined && input.primaryIdentifierId !== null) {
-    const ident = await prisma.identifier.findFirst({ where: { id: input.primaryIdentifierId, tenantId } });
-    if (!ident) {
-      throw new NotFoundError(`Identifier not found: ${input.primaryIdentifierId}`);
-    }
-  }
-
-  // Build the data object with only explicitly provided fields
-  const data: Prisma.ProductUpdateInput = {
-    ...(input.name !== undefined && { name: input.name }),
-    ...(input.description !== undefined && { description: input.description }),
-  };
-
-  // Handle parentId: null = clear, string = set, undefined = no change
-  if (input.parentId === null) {
-    data.parent = { disconnect: true };
-  } else if (input.parentId !== undefined) {
-    data.parent = { connect: { id: input.parentId } };
-  }
-
-  // Handle producedByOrganisationId: null = clear, string = set, undefined = no change
-  if (input.producedByOrganisationId === null) {
-    data.producedByOrganisation = { disconnect: true };
-  } else if (input.producedByOrganisationId !== undefined) {
-    data.producedByOrganisation = { connect: { id: input.producedByOrganisationId } };
-  }
-
-  // Handle manufacturingFacilityId: null = clear, string = set, undefined = no change
-  if (input.manufacturingFacilityId === null) {
-    data.manufacturingFacility = { disconnect: true };
-  } else if (input.manufacturingFacilityId !== undefined) {
-    data.manufacturingFacility = { connect: { id: input.manufacturingFacilityId } };
-  }
-
-  // Handle primaryIdentifierId: null = clear, string = set, undefined = no change
-  if (input.primaryIdentifierId === null) {
-    data.primaryIdentifier = { disconnect: true };
-  } else if (input.primaryIdentifierId !== undefined) {
-    data.primaryIdentifier = { connect: { id: input.primaryIdentifierId } };
-  }
-
-  // Determine the effective primary identifier ID for overlap validation
-  const effectivePrimaryId =
-    input.primaryIdentifierId !== undefined ? input.primaryIdentifierId : existing.primaryIdentifierId;
-
-  if (input.secondaryIdentifierIds !== undefined) {
-    // Validate all secondary identifiers belong to tenant
-    for (const secId of input.secondaryIdentifierIds) {
-      const ident = await prisma.identifier.findFirst({ where: { id: secId, tenantId } });
-      if (!ident) {
-        throw new NotFoundError(`Identifier not found: ${secId}`);
+      if (!org) {
+        throw new NotFoundError(`Organisation not found: ${input.producedByOrganisationId}`);
       }
     }
 
-    // Validate no overlap with effective primary
-    validateNoPrimarySecondaryOverlap(effectivePrimaryId, input.secondaryIdentifierIds);
+    // Validate manufacturing facility belongs to tenant (if provided and not null)
+    if (input.manufacturingFacilityId !== undefined && input.manufacturingFacilityId !== null) {
+      const facility = await tx.facility.findFirst({
+        where: { id: input.manufacturingFacilityId, tenantId },
+      });
+      if (!facility) {
+        throw new NotFoundError(`Facility not found: ${input.manufacturingFacilityId}`);
+      }
+    }
 
-    // Use transaction to replace secondary identifiers atomically
-    return prisma.$transaction(async (tx) => {
-      // Remove existing secondary identifier join rows
+    // Validate hierarchy when parentId is being changed
+    if (input.parentId !== undefined) {
+      let parent: Product | null = null;
+      if (input.parentId !== null) {
+        parent = await tx.product.findFirst({
+          where: { id: input.parentId, tenantId },
+        });
+      }
+      validateProductHierarchy(existing.level, input.parentId ?? undefined, parent);
+    }
+
+    // Validate primary identifier belongs to tenant (if provided and not null)
+    if (input.primaryIdentifierId !== undefined && input.primaryIdentifierId !== null) {
+      await validateIdentifierOwnership(tx, input.primaryIdentifierId, tenantId);
+    }
+
+    // Validate secondary identifiers and check for overlap with primary
+    if (input.secondaryIdentifierIds !== undefined) {
+      const effectivePrimaryId =
+        input.primaryIdentifierId !== undefined ? input.primaryIdentifierId : existing.primaryIdentifierId;
+      validateNoPrimarySecondaryOverlap(effectivePrimaryId, input.secondaryIdentifierIds);
+
+      for (const secId of input.secondaryIdentifierIds) {
+        await validateIdentifierOwnership(tx, secId, tenantId);
+      }
+
+      // Replace secondary identifiers: delete existing, create new
       await tx.productSecondaryIdentifier.deleteMany({
         where: { productId: id },
       });
-
-      // Create new join rows
-      if (input.secondaryIdentifierIds!.length > 0) {
+      if (input.secondaryIdentifierIds.length > 0) {
         await tx.productSecondaryIdentifier.createMany({
-          data: input.secondaryIdentifierIds!.map((identifierId) => ({
+          data: input.secondaryIdentifierIds.map((identifierId) => ({
             productId: id,
             identifierId,
           })),
         });
       }
+    }
 
-      // Update the entity
-      return tx.product.update({
-        where: { id },
-        data,
-        include: PRODUCT_INCLUDE,
-      });
+    // Build the data object with only explicitly provided fields
+    const data: Prisma.ProductUpdateInput = {
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.description !== undefined && { description: input.description }),
+    };
+
+    // Handle parentId: null = clear, string = set, undefined = no change
+    if (input.parentId === null) {
+      data.parent = { disconnect: true };
+    } else if (input.parentId !== undefined) {
+      data.parent = { connect: { id: input.parentId } };
+    }
+
+    // Handle producedByOrganisationId: null = clear, string = set, undefined = no change
+    if (input.producedByOrganisationId === null) {
+      data.producedByOrganisation = { disconnect: true };
+    } else if (input.producedByOrganisationId !== undefined) {
+      data.producedByOrganisation = { connect: { id: input.producedByOrganisationId } };
+    }
+
+    // Handle manufacturingFacilityId: null = clear, string = set, undefined = no change
+    if (input.manufacturingFacilityId === null) {
+      data.manufacturingFacility = { disconnect: true };
+    } else if (input.manufacturingFacilityId !== undefined) {
+      data.manufacturingFacility = { connect: { id: input.manufacturingFacilityId } };
+    }
+
+    // Handle primaryIdentifierId: null = clear, string = set, undefined = no change
+    if (input.primaryIdentifierId === null) {
+      data.primaryIdentifier = { disconnect: true };
+    } else if (input.primaryIdentifierId !== undefined) {
+      data.primaryIdentifier = { connect: { id: input.primaryIdentifierId } };
+    }
+
+    return tx.product.update({
+      where: { id },
+      data,
+      include: PRODUCT_INCLUDE,
     });
-  }
-
-  // No secondary identifier changes — simple update
-  return prisma.product.update({
-    where: { id },
-    data,
-    include: PRODUCT_INCLUDE,
   });
 }
 
@@ -430,16 +409,16 @@ export async function updateProduct(
  * Detaches ITEM children (sets parentId to null) before deleting.
  */
 export async function deleteProduct(id: string, tenantId: string): Promise<Product> {
-  const existing = await prisma.product.findFirst({ where: { id, tenantId } });
-  if (!existing) throw new NotFoundError('Product not found or access denied');
-
-  const children = await prisma.product.findMany({ where: { parentId: id, tenantId } });
-  const batches = children.filter((c) => c.level === 'BATCH');
-  if (batches.length > 0) {
-    throw new ValidationError(`Cannot delete: ${batches.length} BATCH product(s) depend on this MODEL`);
-  }
-
   return prisma.$transaction(async (tx) => {
+    const existing = await tx.product.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new NotFoundError('Product not found or access denied');
+
+    const children = await tx.product.findMany({ where: { parentId: id, tenantId } });
+    const batches = children.filter((c) => c.level === 'BATCH');
+    if (batches.length > 0) {
+      throw new ValidationError(`Cannot delete: ${batches.length} BATCH product(s) depend on this MODEL`);
+    }
+
     const items = children.filter((c) => c.level === 'ITEM');
     if (items.length > 0) {
       await tx.product.updateMany({ where: { parentId: id, level: 'ITEM' }, data: { parentId: null } });

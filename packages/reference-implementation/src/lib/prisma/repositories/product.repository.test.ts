@@ -57,14 +57,7 @@ import { prisma } from '../prisma';
 const mockProduct = prisma.product as unknown as {
   findFirst: jest.Mock;
   findMany: jest.Mock;
-  update: jest.Mock;
-  delete: jest.Mock;
 };
-
-const mockIdentifier = (prisma as unknown as { identifier: { findFirst: jest.Mock } }).identifier;
-const mockOrganisationEntity = (prisma as unknown as { organisationEntity: { findFirst: jest.Mock } })
-  .organisationEntity;
-const mockFacility = (prisma as unknown as { facility: { findFirst: jest.Mock } }).facility;
 
 describe('product.repository', () => {
   const TENANT_ID = 'tenant-1';
@@ -430,15 +423,15 @@ describe('product.repository', () => {
 
   describe('updateProduct', () => {
     it('performs a partial update (name only)', async () => {
-      mockProduct.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
-      mockProduct.update.mockResolvedValue({ ...PRODUCT_WITH_RELATIONS, name: 'Updated Name' });
+      mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockTx.product.update.mockResolvedValue({ ...PRODUCT_WITH_RELATIONS, name: 'Updated Name' });
 
       const result = await updateProduct(PRODUCT_ID, TENANT_ID, { name: 'Updated Name' });
 
-      expect(mockProduct.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.product.findFirst).toHaveBeenCalledWith({
         where: { id: PRODUCT_ID, tenantId: TENANT_ID },
       });
-      expect(mockProduct.update).toHaveBeenCalledWith({
+      expect(mockTx.product.update).toHaveBeenCalledWith({
         where: { id: PRODUCT_ID },
         data: { name: 'Updated Name' },
         include: {
@@ -453,8 +446,8 @@ describe('product.repository', () => {
     });
 
     it('validates producedByOrganisationId FK on update', async () => {
-      mockProduct.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
-      mockOrganisationEntity.findFirst.mockResolvedValue(null);
+      mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockTx.organisationEntity.findFirst.mockResolvedValue(null);
 
       await expect(
         updateProduct(PRODUCT_ID, TENANT_ID, { producedByOrganisationId: 'nonexistent-org' }),
@@ -462,8 +455,8 @@ describe('product.repository', () => {
     });
 
     it('validates manufacturingFacilityId FK on update', async () => {
-      mockProduct.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
-      mockFacility.findFirst.mockResolvedValue(null);
+      mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockTx.facility.findFirst.mockResolvedValue(null);
 
       await expect(
         updateProduct(PRODUCT_ID, TENANT_ID, { manufacturingFacilityId: 'nonexistent-facility' }),
@@ -471,8 +464,8 @@ describe('product.repository', () => {
     });
 
     it('replaces secondary identifiers', async () => {
-      mockProduct.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
-      mockIdentifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_1, tenantId: TENANT_ID });
+      mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockTx.identifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_1, tenantId: TENANT_ID });
       mockTx.productSecondaryIdentifier.deleteMany.mockResolvedValue({ count: 0 });
       mockTx.productSecondaryIdentifier.createMany.mockResolvedValue({ count: 1 });
       mockTx.product.update.mockResolvedValue({
@@ -494,7 +487,7 @@ describe('product.repository', () => {
     });
 
     it('clears secondary identifiers with empty array', async () => {
-      mockProduct.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
       mockTx.productSecondaryIdentifier.deleteMany.mockResolvedValue({ count: 1 });
       mockTx.product.update.mockResolvedValue({
         ...PRODUCT_WITH_RELATIONS,
@@ -513,7 +506,7 @@ describe('product.repository', () => {
     });
 
     it('validates hierarchy when setting parentId on a MODEL product', async () => {
-      mockProduct.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS); // existing is MODEL
+      mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS); // existing is MODEL
 
       await expect(updateProduct(PRODUCT_ID, TENANT_ID, { parentId: PARENT_ID })).rejects.toThrow(
         'MODEL products cannot have a parent',
@@ -522,7 +515,7 @@ describe('product.repository', () => {
 
     it('validates hierarchy when clearing parentId on a BATCH product', async () => {
       const batchProduct = { ...PRODUCT_WITH_RELATIONS, level: 'BATCH', parentId: PARENT_ID };
-      mockProduct.findFirst.mockResolvedValue(batchProduct);
+      mockTx.product.findFirst.mockResolvedValue(batchProduct);
 
       await expect(updateProduct(PRODUCT_ID, TENANT_ID, { parentId: null })).rejects.toThrow(
         'BATCH products require a MODEL parent',
@@ -531,7 +524,7 @@ describe('product.repository', () => {
 
     it('validates parent level when updating parentId on a BATCH product', async () => {
       const batchProduct = { ...PRODUCT_WITH_RELATIONS, level: 'BATCH', parentId: PARENT_ID };
-      mockProduct.findFirst
+      mockTx.product.findFirst
         .mockResolvedValueOnce(batchProduct) // existing product
         .mockResolvedValueOnce(BATCH_PRODUCT); // parent lookup returns a BATCH (invalid)
 
@@ -541,8 +534,8 @@ describe('product.repository', () => {
     });
 
     it('validates primary identifier ownership on update', async () => {
-      mockProduct.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
-      mockIdentifier.findFirst.mockResolvedValue(null);
+      mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockTx.identifier.findFirst.mockResolvedValue(null);
 
       await expect(updateProduct(PRODUCT_ID, TENANT_ID, { primaryIdentifierId: 'nonexistent-ident' })).rejects.toThrow(
         'Identifier not found: nonexistent-ident',
@@ -550,7 +543,7 @@ describe('product.repository', () => {
     });
 
     it('throws NotFoundError for ownership check failure', async () => {
-      mockProduct.findFirst.mockResolvedValue(null);
+      mockTx.product.findFirst.mockResolvedValue(null);
 
       await expect(updateProduct(PRODUCT_ID, 'other-tenant', { name: 'Updated' })).rejects.toThrow(
         'Product not found or access denied',
@@ -560,16 +553,16 @@ describe('product.repository', () => {
 
   describe('deleteProduct', () => {
     it('deletes a product with no children', async () => {
-      mockProduct.findFirst.mockResolvedValue(MODEL_PRODUCT);
-      mockProduct.findMany.mockResolvedValue([]);
+      mockTx.product.findFirst.mockResolvedValue(MODEL_PRODUCT);
+      mockTx.product.findMany.mockResolvedValue([]);
       mockTx.product.delete.mockResolvedValue(MODEL_PRODUCT);
 
       const result = await deleteProduct(PARENT_ID, TENANT_ID);
 
-      expect(mockProduct.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.product.findFirst).toHaveBeenCalledWith({
         where: { id: PARENT_ID, tenantId: TENANT_ID },
       });
-      expect(mockProduct.findMany).toHaveBeenCalledWith({
+      expect(mockTx.product.findMany).toHaveBeenCalledWith({
         where: { parentId: PARENT_ID, tenantId: TENANT_ID },
       });
       expect(mockTx.product.delete).toHaveBeenCalledWith({
@@ -579,8 +572,8 @@ describe('product.repository', () => {
     });
 
     it('blocks deletion when BATCH children exist', async () => {
-      mockProduct.findFirst.mockResolvedValue(MODEL_PRODUCT);
-      mockProduct.findMany.mockResolvedValue([
+      mockTx.product.findFirst.mockResolvedValue(MODEL_PRODUCT);
+      mockTx.product.findMany.mockResolvedValue([
         { ...BATCH_PRODUCT, id: 'batch-1' },
         { ...BATCH_PRODUCT, id: 'batch-2' },
       ]);
@@ -599,8 +592,8 @@ describe('product.repository', () => {
         parentId: BATCH_PRODUCT.id,
       };
 
-      mockProduct.findFirst.mockResolvedValue(BATCH_PRODUCT);
-      mockProduct.findMany.mockResolvedValue([itemChild]);
+      mockTx.product.findFirst.mockResolvedValue(BATCH_PRODUCT);
+      mockTx.product.findMany.mockResolvedValue([itemChild]);
       mockTx.product.updateMany.mockResolvedValue({ count: 1 });
       mockTx.product.delete.mockResolvedValue(BATCH_PRODUCT);
 
@@ -617,7 +610,7 @@ describe('product.repository', () => {
     });
 
     it('throws NotFoundError for another tenant', async () => {
-      mockProduct.findFirst.mockResolvedValue(null);
+      mockTx.product.findFirst.mockResolvedValue(null);
 
       await expect(deleteProduct(PRODUCT_ID, 'other-tenant')).rejects.toThrow('Product not found or access denied');
     });

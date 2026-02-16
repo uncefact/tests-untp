@@ -282,15 +282,17 @@ export async function updateFacility(
  * Deletes a facility. Validates tenant ownership before deletion.
  */
 export async function deleteFacility(id: string, tenantId: string): Promise<Facility> {
-  const existing = await prisma.facility.findFirst({
-    where: { id, tenantId },
-  });
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.facility.findFirst({
+      where: { id, tenantId },
+    });
 
-  if (!existing) {
-    throw new NotFoundError('Facility not found or access denied');
-  }
+    if (!existing) {
+      throw new NotFoundError('Facility not found or access denied');
+    }
 
-  return prisma.facility.delete({
-    where: { id },
+    return tx.facility.delete({
+      where: { id },
+    });
   });
 }

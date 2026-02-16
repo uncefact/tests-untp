@@ -49,18 +49,18 @@ describe('Product API', { testIsolation: false }, () => {
           },
         }).then((identResponse) => {
           identifierId = identResponse.body.identifier.id;
+        });
 
-          // Create secondary identifier
-          cy.request({
-            method: 'POST',
-            url: '/api/v1/identifiers',
-            body: {
-              schemeId,
-              value: '22222222222',
-            },
-          }).then((secIdentResponse) => {
-            secondaryIdentifierId = secIdentResponse.body.identifier.id;
-          });
+        // Create secondary identifier
+        cy.request({
+          method: 'POST',
+          url: '/api/v1/identifiers',
+          body: {
+            schemeId,
+            value: '22222222222',
+          },
+        }).then((secIdentResponse) => {
+          secondaryIdentifierId = secIdentResponse.body.identifier.id;
         });
       });
     });
@@ -322,7 +322,7 @@ describe('Product API', { testIsolation: false }, () => {
         expect(product.primaryIdentifier.id).to.eq(identifierId);
         expect(product.secondaryIdentifiers).to.be.an('array');
         expect(product.secondaryIdentifiers).to.have.length(1);
-        expect(product.secondaryIdentifiers[0].id).to.eq(
+        expect(product.secondaryIdentifiers[0].identifier.id).to.eq(
           secondaryIdentifierId,
         );
       });

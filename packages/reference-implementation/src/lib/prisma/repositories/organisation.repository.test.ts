@@ -32,15 +32,9 @@ jest.mock('../prisma', () => ({
 import { prisma } from '../prisma';
 
 const mockOrganisationEntity = prisma.organisationEntity as unknown as {
-  create: jest.Mock;
   findFirst: jest.Mock;
-  findUniqueOrThrow: jest.Mock;
   findMany: jest.Mock;
-  update: jest.Mock;
-  delete: jest.Mock;
 };
-
-const mockIdentifier = (prisma as unknown as { identifier: { findFirst: jest.Mock } }).identifier;
 
 const mockTransaction = prisma.$transaction as unknown as jest.Mock;
 
@@ -396,15 +390,26 @@ describe('organisation.repository', () => {
   describe('updateOrganisation', () => {
     it('performs a partial update (name only)', async () => {
       const updatedOrg = { ...ORG_RECORD, name: 'Acme Industries' };
-      mockOrganisationEntity.findFirst.mockResolvedValue(ORG_RECORD);
-      mockOrganisationEntity.update.mockResolvedValue(updatedOrg);
+      const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(ORG_RECORD),
+          update: jest.fn().mockResolvedValue(updatedOrg),
+        },
+        identifier: { findFirst: jest.fn() },
+        organisationSecondaryIdentifier: {
+          deleteMany: jest.fn(),
+          createMany: jest.fn(),
+        },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
 
       const result = await updateOrganisation('org-1', TENANT_ID, { name: 'Acme Industries' });
 
-      expect(mockOrganisationEntity.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.organisationEntity.findFirst).toHaveBeenCalledWith({
         where: { id: 'org-1', tenantId: TENANT_ID },
       });
-      expect(mockOrganisationEntity.update).toHaveBeenCalledWith({
+      expect(mockTx.organisationEntity.update).toHaveBeenCalledWith({
         where: { id: 'org-1' },
         data: { name: 'Acme Industries' },
         include: {
@@ -416,21 +421,22 @@ describe('organisation.repository', () => {
     });
 
     it('replaces secondary identifiers via deleteMany + createMany in transaction', async () => {
-      mockOrganisationEntity.findFirst.mockResolvedValue(ORG_RECORD);
-      mockIdentifier.findFirst.mockResolvedValue(IDENTIFIER_RECORD_2);
-
       const updatedOrg = {
         ...ORG_RECORD,
         secondaryIdentifiers: [{ organisationId: 'org-1', identifierId: 'ident-2', identifier: IDENTIFIER_RECORD_2 }],
       };
 
       const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(ORG_RECORD),
+          update: jest.fn().mockResolvedValue(updatedOrg),
+        },
+        identifier: {
+          findFirst: jest.fn().mockResolvedValue(IDENTIFIER_RECORD_2),
+        },
         organisationSecondaryIdentifier: {
           deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
           createMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-        organisationEntity: {
-          update: jest.fn().mockResolvedValue(updatedOrg),
         },
       };
 
@@ -455,16 +461,16 @@ describe('organisation.repository', () => {
         ...ORG_RECORD,
         secondaryIdentifiers: [{ organisationId: 'org-1', identifierId: 'ident-2', identifier: IDENTIFIER_RECORD_2 }],
       };
-      mockOrganisationEntity.findFirst.mockResolvedValue(orgWithSecondaries);
-
       const clearedOrg = { ...ORG_RECORD, secondaryIdentifiers: [] };
       const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(orgWithSecondaries),
+          update: jest.fn().mockResolvedValue(clearedOrg),
+        },
+        identifier: { findFirst: jest.fn() },
         organisationSecondaryIdentifier: {
           deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
           createMany: jest.fn(),
-        },
-        organisationEntity: {
-          update: jest.fn().mockResolvedValue(clearedOrg),
         },
       };
 
@@ -477,13 +483,24 @@ describe('organisation.repository', () => {
       expect(mockTx.organisationSecondaryIdentifier.deleteMany).toHaveBeenCalledWith({
         where: { organisationId: 'org-1' },
       });
-      // createMany should not be called with empty array
       expect(mockTx.organisationSecondaryIdentifier.createMany).not.toHaveBeenCalled();
       expect(result.secondaryIdentifiers).toHaveLength(0);
     });
 
     it('throws NotFoundError if organisation does not belong to tenant', async () => {
-      mockOrganisationEntity.findFirst.mockResolvedValue(null);
+      const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(null),
+          update: jest.fn(),
+        },
+        identifier: { findFirst: jest.fn() },
+        organisationSecondaryIdentifier: {
+          deleteMany: jest.fn(),
+          createMany: jest.fn(),
+        },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
 
       await expect(updateOrganisation('org-1', OTHER_TENANT_ID, { name: 'Updated' })).rejects.toThrow(
         'Organisation not found or access denied',
@@ -493,15 +510,21 @@ describe('organisation.repository', () => {
 
   describe('deleteOrganisation', () => {
     it('deletes an organisation owned by the tenant', async () => {
-      mockOrganisationEntity.findFirst.mockResolvedValue(ORG_RECORD);
-      mockOrganisationEntity.delete.mockResolvedValue(ORG_RECORD);
+      const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(ORG_RECORD),
+          delete: jest.fn().mockResolvedValue(ORG_RECORD),
+        },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
 
       const result = await deleteOrganisation('org-1', TENANT_ID);
 
-      expect(mockOrganisationEntity.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.organisationEntity.findFirst).toHaveBeenCalledWith({
         where: { id: 'org-1', tenantId: TENANT_ID },
       });
-      expect(mockOrganisationEntity.delete).toHaveBeenCalledWith({
+      expect(mockTx.organisationEntity.delete).toHaveBeenCalledWith({
         where: { id: 'org-1' },
         include: {
           primaryIdentifier: { include: { scheme: true } },
@@ -512,7 +535,14 @@ describe('organisation.repository', () => {
     });
 
     it('throws NotFoundError if organisation does not belong to tenant', async () => {
-      mockOrganisationEntity.findFirst.mockResolvedValue(null);
+      const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(null),
+          delete: jest.fn(),
+        },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
 
       await expect(deleteOrganisation('org-1', OTHER_TENANT_ID)).rejects.toThrow(
         'Organisation not found or access denied',

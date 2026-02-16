@@ -206,86 +206,64 @@ export async function updateOrganisation(
   tenantId: string,
   input: UpdateOrganisationInput,
 ): Promise<OrganisationEntityWithRelations> {
-  // Ownership check
-  const existing = await prisma.organisationEntity.findFirst({
-    where: { id, tenantId },
-  });
-
-  if (!existing) {
-    throw new NotFoundError('Organisation not found or access denied');
-  }
-
-  // Validate primary identifier belongs to tenant (if provided and not null)
-  if (input.primaryIdentifierId !== undefined && input.primaryIdentifierId !== null) {
-    const ident = await prisma.identifier.findFirst({
-      where: { id: input.primaryIdentifierId, tenantId },
+  return prisma.$transaction(async (tx) => {
+    // Ownership check
+    const existing = await tx.organisationEntity.findFirst({
+      where: { id, tenantId },
     });
-    if (!ident) {
-      throw new NotFoundError(`Identifier not found: ${input.primaryIdentifierId}`);
+
+    if (!existing) {
+      throw new NotFoundError('Organisation not found or access denied');
     }
-  }
 
-  // Build the data object with only explicitly provided fields
-  const data: Prisma.OrganisationEntityUpdateInput = {
-    ...(input.name !== undefined && { name: input.name }),
-    ...(input.description !== undefined && { description: input.description }),
-    ...(input.location !== undefined && { location: input.location as Prisma.InputJsonValue }),
-  };
+    // Validate primary identifier belongs to tenant (if provided and not null)
+    if (input.primaryIdentifierId !== undefined && input.primaryIdentifierId !== null) {
+      await validateIdentifierOwnership(tx, input.primaryIdentifierId, tenantId);
+    }
 
-  // Handle primaryIdentifierId: null = clear, string = set, undefined = no change
-  if (input.primaryIdentifierId === null) {
-    data.primaryIdentifier = { disconnect: true };
-  } else if (input.primaryIdentifierId !== undefined) {
-    data.primaryIdentifier = { connect: { id: input.primaryIdentifierId } };
-  }
+    // Validate secondary identifiers and check for overlap with primary
+    if (input.secondaryIdentifierIds !== undefined) {
+      const effectivePrimaryId =
+        input.primaryIdentifierId !== undefined ? input.primaryIdentifierId : existing.primaryIdentifierId;
+      validateNoPrimarySecondaryOverlap(effectivePrimaryId, input.secondaryIdentifierIds);
 
-  // Determine the effective primary identifier ID for overlap validation
-  const effectivePrimaryId =
-    input.primaryIdentifierId !== undefined ? input.primaryIdentifierId : existing.primaryIdentifierId;
-
-  if (input.secondaryIdentifierIds !== undefined) {
-    // Validate all secondary identifiers belong to tenant
-    for (const secId of input.secondaryIdentifierIds) {
-      const ident = await prisma.identifier.findFirst({ where: { id: secId, tenantId } });
-      if (!ident) {
-        throw new NotFoundError(`Identifier not found: ${secId}`);
+      for (const secId of input.secondaryIdentifierIds) {
+        await validateIdentifierOwnership(tx, secId, tenantId);
       }
-    }
 
-    // Validate no overlap with effective primary
-    validateNoPrimarySecondaryOverlap(effectivePrimaryId, input.secondaryIdentifierIds);
-
-    // Use transaction to replace secondary identifiers atomically
-    return prisma.$transaction(async (tx) => {
-      // Remove existing secondary identifier join rows
+      // Replace secondary identifiers: delete existing, create new
       await tx.organisationSecondaryIdentifier.deleteMany({
         where: { organisationId: id },
       });
-
-      // Create new join rows
-      if (input.secondaryIdentifierIds!.length > 0) {
+      if (input.secondaryIdentifierIds.length > 0) {
         await tx.organisationSecondaryIdentifier.createMany({
-          data: input.secondaryIdentifierIds!.map((identifierId) => ({
+          data: input.secondaryIdentifierIds.map((identifierId) => ({
             organisationId: id,
             identifierId,
           })),
         });
       }
+    }
 
-      // Update the entity
-      return tx.organisationEntity.update({
-        where: { id },
-        data,
-        include: ORGANISATION_INCLUDE,
-      });
+    // Build the data object with only explicitly provided fields
+    const data: Prisma.OrganisationEntityUpdateInput = {
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.description !== undefined && { description: input.description }),
+      ...(input.location !== undefined && { location: input.location as Prisma.InputJsonValue }),
+    };
+
+    // Handle primaryIdentifierId: null = clear, string = set, undefined = no change
+    if (input.primaryIdentifierId === null) {
+      data.primaryIdentifier = { disconnect: true };
+    } else if (input.primaryIdentifierId !== undefined) {
+      data.primaryIdentifier = { connect: { id: input.primaryIdentifierId } };
+    }
+
+    return tx.organisationEntity.update({
+      where: { id },
+      data,
+      include: ORGANISATION_INCLUDE,
     });
-  }
-
-  // No secondary identifier changes — simple update
-  return prisma.organisationEntity.update({
-    where: { id },
-    data,
-    include: ORGANISATION_INCLUDE,
   });
 }
 
@@ -294,16 +272,18 @@ export async function updateOrganisation(
  * Join table rows (secondary identifiers) cascade automatically.
  */
 export async function deleteOrganisation(id: string, tenantId: string): Promise<OrganisationEntityWithRelations> {
-  const existing = await prisma.organisationEntity.findFirst({
-    where: { id, tenantId },
-  });
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.organisationEntity.findFirst({
+      where: { id, tenantId },
+    });
 
-  if (!existing) {
-    throw new NotFoundError('Organisation not found or access denied');
-  }
+    if (!existing) {
+      throw new NotFoundError('Organisation not found or access denied');
+    }
 
-  return prisma.organisationEntity.delete({
-    where: { id },
-    include: ORGANISATION_INCLUDE,
+    return tx.organisationEntity.delete({
+      where: { id },
+      include: ORGANISATION_INCLUDE,
+    });
   });
 }

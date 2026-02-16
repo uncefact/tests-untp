@@ -44,18 +44,18 @@ describe('Organisation API', { testIsolation: false }, () => {
           },
         }).then((identResponse) => {
           identifierId = identResponse.body.identifier.id;
+        });
 
-          // Create secondary identifier
-          cy.request({
-            method: 'POST',
-            url: '/api/v1/identifiers',
-            body: {
-              schemeId,
-              value: '22222222222',
-            },
-          }).then((secIdentResponse) => {
-            secondaryIdentifierId = secIdentResponse.body.identifier.id;
-          });
+        // Create secondary identifier
+        cy.request({
+          method: 'POST',
+          url: '/api/v1/identifiers',
+          body: {
+            schemeId,
+            value: '22222222222',
+          },
+        }).then((secIdentResponse) => {
+          secondaryIdentifierId = secIdentResponse.body.identifier.id;
         });
       });
     });
@@ -179,7 +179,7 @@ describe('Organisation API', { testIsolation: false }, () => {
         expect(org.primaryIdentifier.id).to.eq(identifierId);
         expect(org.secondaryIdentifiers).to.be.an('array');
         expect(org.secondaryIdentifiers).to.have.length(1);
-        expect(org.secondaryIdentifiers[0].id).to.eq(secondaryIdentifierId);
+        expect(org.secondaryIdentifiers[0].identifier.id).to.eq(secondaryIdentifierId);
       });
     });
 
