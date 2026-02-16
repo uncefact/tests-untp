@@ -165,15 +165,18 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('At least one of name, description, config, or isPrimary is required');
   }
 
+  if (hasConfig && (typeof config !== 'object' || Array.isArray(config) || config === null)) {
+    throw new ValidationError('config must be an object');
+  }
+
+  const existing = await getServiceInstanceById(id, tenantId);
+  if (!existing) {
+    throw new NotFoundError('Service instance not found');
+  }
+
   let encryptedConfig: string | undefined;
 
   if (hasConfig) {
-    // Fetch existing instance to merge config
-    const existing = await getServiceInstanceById(id, tenantId);
-    if (!existing) {
-      throw new NotFoundError('Service instance not found');
-    }
-
     // Decrypt existing config and merge with user-supplied fields
     let existingConfig: Record<string, unknown>;
     try {
