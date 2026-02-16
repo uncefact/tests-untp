@@ -1,16 +1,15 @@
 import { adapterRegistry } from '../registry.js';
 
 /**
- * Searches across all service types in the adapter registry and returns the
- * sensitive fields for the first matching adapter type.
+ * Looks up the sensitive fields for a specific service type and adapter type
+ * combination in the adapter registry.
  *
- * Returns an empty array if the adapter type is not found, meaning no fields
+ * Returns an empty array if the combination is not found, meaning no fields
  * will be masked by {@link maskInstanceConfig}.
  */
-export function getSensitiveFields(adapterType: string): readonly string[] {
-  for (const serviceAdapters of Object.values(adapterRegistry)) {
-    const entry = (serviceAdapters as Record<string, { sensitiveFields: readonly string[] }>)[adapterType];
-    if (entry) return entry.sensitiveFields;
-  }
-  return [];
+export function getSensitiveFields(serviceType: string, adapterType: string): readonly string[] {
+  const serviceAdapters = (
+    adapterRegistry as Record<string, Record<string, { sensitiveFields: readonly string[] }> | undefined>
+  )[serviceType];
+  return serviceAdapters?.[adapterType]?.sensitiveFields ?? [];
 }

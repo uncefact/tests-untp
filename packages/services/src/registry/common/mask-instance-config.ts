@@ -17,14 +17,14 @@ import { getSensitiveFields } from './get-sensitive-fields.js';
  *          `{ error: 'Unable to decrypt configuration' }`.
  */
 export function maskInstanceConfig(
-  instance: { adapterType: string; config: string; [key: string]: unknown },
+  instance: { serviceType: string; adapterType: string; config: string; [key: string]: unknown },
   encryptionService: IEncryptionService,
   logger: { error(obj: Record<string, unknown>, msg: string): void },
 ): { config: Record<string, unknown>; [key: string]: unknown } {
   try {
     const decrypted = encryptionService.decrypt(JSON.parse(instance.config));
     const parsed = JSON.parse(decrypted) as Record<string, unknown>;
-    const fields = getSensitiveFields(instance.adapterType);
+    const fields = getSensitiveFields(instance.serviceType, instance.adapterType);
 
     for (const field of fields) {
       if (field in parsed) {

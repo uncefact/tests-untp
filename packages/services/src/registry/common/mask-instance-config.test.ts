@@ -34,6 +34,7 @@ describe('maskInstanceConfig', () => {
 
       const instance = {
         id: 'inst-1',
+        serviceType: 'VC',
         adapterType: 'VCKIT',
         config: JSON.stringify({ encrypted: 'data' }),
       };
@@ -57,6 +58,7 @@ describe('maskInstanceConfig', () => {
       (mockEncryptionService.decrypt as jest.Mock).mockReturnValue(JSON.stringify(decryptedConfig));
 
       const instance = {
+        serviceType: 'VC',
         adapterType: 'VCKIT',
         config: JSON.stringify({ encrypted: 'data' }),
       };
@@ -78,6 +80,7 @@ describe('maskInstanceConfig', () => {
       (mockEncryptionService.decrypt as jest.Mock).mockReturnValue(JSON.stringify(decryptedConfig));
 
       const instance = {
+        serviceType: 'VC',
         adapterType: 'VCKIT',
         config: JSON.stringify({ encrypted: 'data' }),
       };
@@ -98,6 +101,7 @@ describe('maskInstanceConfig', () => {
       (mockEncryptionService.decrypt as jest.Mock).mockReturnValue(JSON.stringify(decryptedConfig));
 
       const instance = {
+        serviceType: 'VC',
         adapterType: 'SOME_ADAPTER',
         config: JSON.stringify({ encrypted: 'data' }),
       };
@@ -141,6 +145,7 @@ describe('maskInstanceConfig', () => {
       });
 
       const instance = {
+        serviceType: 'VC',
         adapterType: 'VCKIT',
         config: JSON.stringify({ encrypted: 'data' }),
       };
@@ -154,6 +159,7 @@ describe('maskInstanceConfig', () => {
       (mockEncryptionService.decrypt as jest.Mock).mockReturnValue('not valid json {{{');
 
       const instance = {
+        serviceType: 'VC',
         adapterType: 'VCKIT',
         config: JSON.stringify({ encrypted: 'data' }),
       };
@@ -165,6 +171,7 @@ describe('maskInstanceConfig', () => {
 
     it('returns error indicator when outer JSON.parse fails (malformed encrypted envelope)', () => {
       const instance = {
+        serviceType: 'VC',
         adapterType: 'VCKIT',
         config: 'this is not valid json at all',
       };
@@ -181,6 +188,7 @@ describe('maskInstanceConfig', () => {
 
       const instance = {
         id: 'inst-99',
+        serviceType: 'VC',
         adapterType: 'VCKIT',
         config: JSON.stringify({ encrypted: 'data' }),
         name: 'Failing Service',
@@ -202,6 +210,7 @@ describe('maskInstanceConfig', () => {
       (mockEncryptionService.decrypt as jest.Mock).mockReturnValue(JSON.stringify({ baseUrl: 'http://example.com' }));
 
       const instance = {
+        serviceType: 'VC',
         adapterType: 'VCKIT',
         config: JSON.stringify(envelope),
       };
@@ -212,18 +221,19 @@ describe('maskInstanceConfig', () => {
       expect(mockEncryptionService.decrypt).toHaveBeenCalledWith(envelope);
     });
 
-    it('calls getSensitiveFields with the instance adapterType', () => {
+    it('calls getSensitiveFields with the instance serviceType and adapterType', () => {
       mockGetSensitiveFields.mockReturnValue([]);
       (mockEncryptionService.decrypt as jest.Mock).mockReturnValue(JSON.stringify({ baseUrl: 'http://example.com' }));
 
       const instance = {
+        serviceType: 'IDR',
         adapterType: 'PYX_IDR',
         config: JSON.stringify({ encrypted: 'data' }),
       };
 
       maskInstanceConfig(instance, mockEncryptionService, mockLogger);
 
-      expect(mockGetSensitiveFields).toHaveBeenCalledWith('PYX_IDR');
+      expect(mockGetSensitiveFields).toHaveBeenCalledWith('IDR', 'PYX_IDR');
     });
   });
 });

@@ -7,28 +7,44 @@ jest.mock('jose', () => ({
 
 describe('getSensitiveFields', () => {
   it('returns sensitiveFields for VCKit DID adapter (contains "authToken")', () => {
-    const fields = getSensitiveFields('VCKIT');
+    const fields = getSensitiveFields('DID', 'VCKIT');
     expect(fields).toContain('authToken');
   });
 
+  it('returns sensitiveFields for VCKit VC adapter (contains "apiKey")', () => {
+    const fields = getSensitiveFields('VC', 'VCKIT');
+    expect(fields).toContain('apiKey');
+  });
+
   it('returns sensitiveFields for PYX_IDR adapter (contains "apiKey")', () => {
-    const fields = getSensitiveFields('PYX_IDR');
+    const fields = getSensitiveFields('IDR', 'PYX_IDR');
     expect(fields).toContain('apiKey');
   });
 
   it('returns sensitiveFields for UNCEFACT_STORAGE adapter (contains "apiKey")', () => {
-    const fields = getSensitiveFields('UNCEFACT_STORAGE');
+    const fields = getSensitiveFields('STORAGE', 'UNCEFACT_STORAGE');
     expect(fields).toContain('apiKey');
   });
 
   it('returns an empty array for an unknown adapter type', () => {
-    const fields = getSensitiveFields('NONEXISTENT_ADAPTER');
+    const fields = getSensitiveFields('VC', 'NONEXISTENT_ADAPTER');
     expect(fields).toEqual([]);
   });
 
-  it('returns an array (not undefined or null) for every known adapter type', () => {
-    for (const adapterType of ['VCKIT', 'PYX_IDR', 'UNCEFACT_STORAGE']) {
-      const fields = getSensitiveFields(adapterType);
+  it('returns an empty array for an unknown service type', () => {
+    const fields = getSensitiveFields('NONEXISTENT_SERVICE', 'VCKIT');
+    expect(fields).toEqual([]);
+  });
+
+  it('returns an array (not undefined or null) for every known combination', () => {
+    const combos: [string, string][] = [
+      ['DID', 'VCKIT'],
+      ['VC', 'VCKIT'],
+      ['IDR', 'PYX_IDR'],
+      ['STORAGE', 'UNCEFACT_STORAGE'],
+    ];
+    for (const [serviceType, adapterType] of combos) {
+      const fields = getSensitiveFields(serviceType, adapterType);
       expect(Array.isArray(fields)).toBe(true);
     }
   });
