@@ -3,7 +3,7 @@ import { DidMethod, DidType } from '../../types.js';
 import { verifyDid } from '../../common/verify.js';
 import { normaliseDidWebAlias } from '../../common/utils.js';
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
-import { vckitDidConfigSchema } from './vckit-did.schema.js';
+import { vckitDidConfigSchema, vckitDidSensitiveFields } from './vckit-did.schema.js';
 import type { VCKitDidConfig } from './vckit-did.schema.js';
 import type { LoggerService } from '../../../logging/types.js';
 import { createLogger } from '../../../logging/factory.js';
@@ -196,6 +196,7 @@ export const VCKIT_DID_ADAPTER_TYPE = 'VCKIT' as const;
 /** Registry entry for the VCKit DID adapter. */
 export const vckitDidRegistryEntry = {
   configSchema: vckitDidConfigSchema,
+  sensitiveFields: vckitDidSensitiveFields,
   factory: (config: VCKitDidConfig, logger: LoggerService): IDidService =>
     new VCKitDidAdapter(config.endpoint, { Authorization: `Bearer ${config.authToken}` }, config.keyType, logger),
 } satisfies AdapterRegistryEntry<VCKitDidConfig, IDidService>;

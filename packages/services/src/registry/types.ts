@@ -6,12 +6,14 @@ import { IDR_SERVICE_TYPE } from '../identity-resolver/types.js';
 import { PYX_IDR_ADAPTER_TYPE } from '../identity-resolver/adapters/pyx/pyx-idr.adapter.js';
 import { STORAGE_SERVICE_TYPE } from '../storage/types.js';
 import { UNCEFACT_STORAGE_ADAPTER_TYPE } from '../storage/adapters/uncefact/uncefact-storage.adapter.js';
+import { VC_SERVICE_TYPE } from '../verifiable-credential/types.js';
 
 // Mirror Prisma enums as string constants (packages/services cannot import Prisma)
 export const ServiceType = {
   DID: DID_SERVICE_TYPE,
   IDR: IDR_SERVICE_TYPE,
   STORAGE: STORAGE_SERVICE_TYPE,
+  VC: VC_SERVICE_TYPE,
 } as const;
 export type ServiceType = (typeof ServiceType)[keyof typeof ServiceType];
 
@@ -24,6 +26,7 @@ export type AdapterType = (typeof AdapterType)[keyof typeof AdapterType];
 
 export interface AdapterRegistryEntry<TConfig = unknown, TService = unknown> {
   configSchema: z.ZodType<TConfig, z.ZodTypeDef, any>;
+  sensitiveFields: readonly string[];
   factory: (config: TConfig, logger: LoggerService) => TService;
 }
 

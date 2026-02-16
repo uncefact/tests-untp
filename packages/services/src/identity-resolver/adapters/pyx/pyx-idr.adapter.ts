@@ -1,7 +1,7 @@
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
 import { BaseServiceAdapter } from '../../../registry/base-adapter.js';
 import type { LoggerService } from '../../../logging/types.js';
-import { pyxIdrConfigSchema, type PyxIdrConfig } from './pyx-idr.schema.js';
+import { pyxIdrConfigSchema, pyxIdrSensitiveFields, type PyxIdrConfig } from './pyx-idr.schema.js';
 import type {
   IIdentityResolverService,
   Link,
@@ -269,6 +269,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
 /** Registry entry for the Pyx IDR adapter. */
 export const pyxIdrRegistryEntry = {
   configSchema: pyxIdrConfigSchema,
+  sensitiveFields: pyxIdrSensitiveFields,
   factory: (config: PyxIdrConfig, logger: LoggerService): IIdentityResolverService =>
     new PyxIdentityResolverAdapter(config, logger),
 } satisfies AdapterRegistryEntry<PyxIdrConfig, IIdentityResolverService>;

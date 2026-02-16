@@ -25,11 +25,8 @@ jest.mock('@/lib/prisma/repositories', () => ({
 
 // Mock the services package (types only from main barrel)
 jest.mock('@uncefact/untp-ri-services', () => ({
-  ServiceType: { DID: 'DID' },
-  AdapterType: { VCKIT: 'VCKIT' },
-  createLogger: () => ({
-    child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }),
-  }),
+  ServiceType: { DID: 'DID', IDR: 'IDR', STORAGE: 'STORAGE', VC: 'VC' },
+  AdapterType: { VCKIT: 'VCKIT', PYX_IDR: 'PYX_IDR', UNCEFACT_STORAGE: 'UNCEFACT_STORAGE', VCKIT_VC: 'VCKIT_VC' },
 }));
 
 // Mock the server entrypoint (runtime registry)
@@ -39,8 +36,8 @@ const mockConfigSchema = {
 };
 jest.mock('@uncefact/untp-ri-services/server', () => ({
   adapterRegistry: {
-    DID: {
-      VCKIT: {
+    VC: {
+      VCKIT_VC: {
         configSchema: mockConfigSchema,
         factory: (...args: unknown[]) => mockFactory(...args),
       },
@@ -48,7 +45,7 @@ jest.mock('@uncefact/untp-ri-services/server', () => ({
   },
 }));
 
-import { resolveDidService } from './resolve-did-service';
+import { resolveVcService } from './resolve-vc-service';
 
 import {
   ServiceResolutionError,
@@ -67,26 +64,27 @@ const MOCK_ENCRYPTED_ENVELOPE = {
 };
 
 const MOCK_INSTANCE = {
-  id: 'inst-1',
+  id: 'vc-inst-1',
   tenantId: 'system',
-  serviceType: 'DID',
-  adapterType: 'VCKIT',
-  name: 'System VCKit',
+  serviceType: 'VC',
+  adapterType: 'VCKIT_VC',
+  name: 'System VCKit VC',
   config: JSON.stringify(MOCK_ENCRYPTED_ENVELOPE),
-  apiVersion: '1.1.0',
-  isPrimary: false,
+  apiVersion: '1.0.0',
+  isPrimary: true,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
 
-const VALID_CONFIG = { endpoint: 'https://vckit.example.com', authToken: 'tok' };
+const VALID_CONFIG = {
+  endpoint: 'https://vckit.example.com',
+  authToken: 'tok',
+};
 const VALID_JSON = JSON.stringify(VALID_CONFIG);
 
 const MOCK_SERVICE = {
-  create: jest.fn(),
-  resolve: jest.fn(),
-  getDocument: jest.fn(),
-  verify: jest.fn(),
+  issueCredential: jest.fn(),
+  verifyCredential: jest.fn(),
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -103,17 +101,17 @@ function setupHappyPath() {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe('resolveDidService', () => {
+describe('resolveVcService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('resolves DID service from system default', async () => {
+  it('resolves VC service from system default', async () => {
     setupHappyPath();
 
-    const result = await resolveDidService('org-1');
+    const result = await resolveVcService('org-1');
 
-    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'DID', undefined);
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'VC', undefined);
     expect(mockEncryptionService.decrypt).toHaveBeenCalledWith(MOCK_ENCRYPTED_ENVELOPE);
     expect(mockConfigSchema.safeParse).toHaveBeenCalledWith(VALID_CONFIG);
     expect(mockFactory).toHaveBeenCalledWith(
@@ -125,27 +123,27 @@ describe('resolveDidService', () => {
         debug: expect.any(Function),
       }),
     );
-    expect(result).toEqual({ service: MOCK_SERVICE, instanceId: 'inst-1' });
+    expect(result).toEqual({ service: MOCK_SERVICE, instanceId: 'vc-inst-1' });
   });
 
-  it('resolves from explicit instance ID', async () => {
+  it('resolves using explicit instance ID when provided', async () => {
     setupHappyPath();
 
-    await resolveDidService('org-1', 'inst-42');
+    await resolveVcService('org-1', 'explicit-vc-inst');
 
-    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'DID', 'inst-42');
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'VC', 'explicit-vc-inst');
   });
 
   it('throws ServiceInstanceNotFoundError for explicit ID not found', async () => {
     mockGetInstanceByResolution.mockResolvedValue(null);
 
-    await expect(resolveDidService('org-1', 'missing-id')).rejects.toThrow(ServiceInstanceNotFoundError);
+    await expect(resolveVcService('org-1', 'missing-id')).rejects.toThrow(ServiceInstanceNotFoundError);
   });
 
   it('throws ServiceResolutionError when no instance found', async () => {
     mockGetInstanceByResolution.mockResolvedValue(null);
 
-    await expect(resolveDidService('org-1')).rejects.toThrow(ServiceResolutionError);
+    await expect(resolveVcService('org-1')).rejects.toThrow(ServiceResolutionError);
   });
 
   it('throws ConfigDecryptionError on decrypt failure', async () => {
@@ -154,14 +152,14 @@ describe('resolveDidService', () => {
       throw new Error('bad key');
     });
 
-    await expect(resolveDidService('org-1')).rejects.toThrow(ConfigDecryptionError);
+    await expect(resolveVcService('org-1')).rejects.toThrow(ConfigDecryptionError);
   });
 
   it('throws ConfigValidationError on invalid JSON', async () => {
     mockGetInstanceByResolution.mockResolvedValue(MOCK_INSTANCE);
     mockEncryptionService.decrypt.mockReturnValue('not-json{{{');
 
-    await expect(resolveDidService('org-1')).rejects.toThrow(ConfigValidationError);
+    await expect(resolveVcService('org-1')).rejects.toThrow(ConfigValidationError);
   });
 
   it('throws ConfigValidationError on schema validation failure', async () => {
@@ -174,20 +172,20 @@ describe('resolveDidService', () => {
       },
     });
 
-    await expect(resolveDidService('org-1')).rejects.toThrow(ConfigValidationError);
-    await expect(resolveDidService('org-1')).rejects.toThrow(/endpoint is required, authToken must be a string/);
+    await expect(resolveVcService('org-1')).rejects.toThrow(ConfigValidationError);
+    await expect(resolveVcService('org-1')).rejects.toThrow(/endpoint is required, authToken must be a string/);
   });
 
   it('returns the adapter and instance ID from the factory (end-to-end flow)', async () => {
     setupHappyPath();
 
-    const result = await resolveDidService('tenant-abc');
+    const result = await resolveVcService('tenant-abc');
 
     // Verify the complete chain executed
     expect(mockGetInstanceByResolution).toHaveBeenCalledTimes(1);
     expect(mockEncryptionService.decrypt).toHaveBeenCalledTimes(1);
     expect(mockConfigSchema.safeParse).toHaveBeenCalledTimes(1);
     expect(mockFactory).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({ service: MOCK_SERVICE, instanceId: 'inst-1' });
+    expect(result).toEqual({ service: MOCK_SERVICE, instanceId: 'vc-inst-1' });
   });
 });

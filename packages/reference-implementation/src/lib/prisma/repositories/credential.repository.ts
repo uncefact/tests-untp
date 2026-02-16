@@ -5,6 +5,7 @@ import { prisma } from '../prisma';
  * Input for creating a new credential record
  */
 export type CreateCredentialInput = {
+  tenantId: string;
   storageUri: string;
   hash: string;
   decryptionKey?: string;
@@ -16,6 +17,7 @@ export type CreateCredentialInput = {
  * Options for listing credentials
  */
 export type ListCredentialsOptions = {
+  tenantId: string;
   credentialType?: string;
   isPublished?: boolean;
   limit?: number;
@@ -28,6 +30,7 @@ export type ListCredentialsOptions = {
 export async function createCredential(input: CreateCredentialInput): Promise<Credential> {
   return prisma.credential.create({
     data: {
+      tenantId: input.tenantId,
       storageUri: input.storageUri,
       hash: input.hash,
       decryptionKey: input.decryptionKey,
@@ -40,19 +43,19 @@ export async function createCredential(input: CreateCredentialInput): Promise<Cr
 /**
  * Retrieves a credential by its ID
  */
-export async function getCredentialById(id: string): Promise<Credential | null> {
-  return prisma.credential.findUnique({
-    where: { id },
+export async function getCredentialById(id: string, tenantId: string): Promise<Credential | null> {
+  return prisma.credential.findFirst({
+    where: { id, tenantId },
   });
 }
 
 /**
  * Lists credentials with optional filtering and pagination
  */
-export async function listCredentials(options: ListCredentialsOptions = {}): Promise<Credential[]> {
-  const { credentialType, isPublished, limit, offset } = options;
+export async function listCredentials(options: ListCredentialsOptions): Promise<Credential[]> {
+  const { tenantId, credentialType, isPublished, limit, offset } = options;
 
-  const where: Prisma.CredentialWhereInput = {};
+  const where: Prisma.CredentialWhereInput = { tenantId };
 
   if (credentialType !== undefined) {
     where.credentialType = credentialType;
@@ -73,9 +76,13 @@ export async function listCredentials(options: ListCredentialsOptions = {}): Pro
 /**
  * Updates the published status of a credential
  */
-export async function updateCredentialPublished(id: string, isPublished: boolean): Promise<Credential> {
+export async function updateCredentialPublished(
+  id: string,
+  tenantId: string,
+  isPublished: boolean,
+): Promise<Credential> {
   return prisma.credential.update({
-    where: { id },
+    where: { id, tenantId },
     data: { isPublished },
   });
 }

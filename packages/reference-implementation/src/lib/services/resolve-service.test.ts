@@ -25,11 +25,8 @@ jest.mock('@/lib/prisma/repositories', () => ({
 
 // Mock the services package (types only from main barrel)
 jest.mock('@uncefact/untp-ri-services', () => ({
-  ServiceType: { DID: 'DID' },
-  AdapterType: { VCKIT: 'VCKIT' },
-  createLogger: () => ({
-    child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }),
-  }),
+  ServiceType: { DID: 'DID', IDR: 'IDR', STORAGE: 'STORAGE', VC: 'VC' },
+  AdapterType: { VCKIT: 'VCKIT', PYX_IDR: 'PYX_IDR', UNCEFACT_STORAGE: 'UNCEFACT_STORAGE' },
 }));
 
 // Mock the server entrypoint (runtime registry)
@@ -39,8 +36,8 @@ const mockConfigSchema = {
 };
 jest.mock('@uncefact/untp-ri-services/server', () => ({
   adapterRegistry: {
-    DID: {
-      VCKIT: {
+    STORAGE: {
+      UNCEFACT_STORAGE: {
         configSchema: mockConfigSchema,
         factory: (...args: unknown[]) => mockFactory(...args),
       },
@@ -48,7 +45,8 @@ jest.mock('@uncefact/untp-ri-services/server', () => ({
   },
 }));
 
-import { resolveDidService } from './resolve-did-service';
+import { resolveService } from './resolve-service';
+import { ServiceType } from '@uncefact/untp-ri-services';
 
 import {
   ServiceResolutionError,
@@ -67,26 +65,27 @@ const MOCK_ENCRYPTED_ENVELOPE = {
 };
 
 const MOCK_INSTANCE = {
-  id: 'inst-1',
+  id: 'storage-inst-1',
   tenantId: 'system',
-  serviceType: 'DID',
-  adapterType: 'VCKIT',
-  name: 'System VCKit',
+  serviceType: 'STORAGE',
+  adapterType: 'UNCEFACT_STORAGE',
+  name: 'System UNCEFACT Storage',
   config: JSON.stringify(MOCK_ENCRYPTED_ENVELOPE),
-  apiVersion: '1.1.0',
-  isPrimary: false,
+  apiVersion: '1.0.0',
+  isPrimary: true,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
 
-const VALID_CONFIG = { endpoint: 'https://vckit.example.com', authToken: 'tok' };
+const VALID_CONFIG = {
+  baseUrl: 'https://storage.example.com',
+  apiVersion: '1.0.0',
+  bucket: 'verifiable-credentials',
+};
 const VALID_JSON = JSON.stringify(VALID_CONFIG);
 
 const MOCK_SERVICE = {
-  create: jest.fn(),
-  resolve: jest.fn(),
-  getDocument: jest.fn(),
-  verify: jest.fn(),
+  store: jest.fn(),
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -103,17 +102,25 @@ function setupHappyPath() {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe('resolveDidService', () => {
+describe('resolveService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('resolves DID service from system default', async () => {
+  it('resolves with explicit instance ID', async () => {
     setupHappyPath();
 
-    const result = await resolveDidService('org-1');
+    await resolveService('org-1', ServiceType.STORAGE, 'explicit-inst');
 
-    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'DID', undefined);
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'STORAGE', 'explicit-inst');
+  });
+
+  it('falls back to tenant primary / system default', async () => {
+    setupHappyPath();
+
+    const result = await resolveService('org-1', ServiceType.STORAGE);
+
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'STORAGE', undefined);
     expect(mockEncryptionService.decrypt).toHaveBeenCalledWith(MOCK_ENCRYPTED_ENVELOPE);
     expect(mockConfigSchema.safeParse).toHaveBeenCalledWith(VALID_CONFIG);
     expect(mockFactory).toHaveBeenCalledWith(
@@ -125,69 +132,76 @@ describe('resolveDidService', () => {
         debug: expect.any(Function),
       }),
     );
-    expect(result).toEqual({ service: MOCK_SERVICE, instanceId: 'inst-1' });
+    expect(result).toEqual({ service: MOCK_SERVICE, instanceId: 'storage-inst-1' });
   });
 
-  it('resolves from explicit instance ID', async () => {
-    setupHappyPath();
-
-    await resolveDidService('org-1', 'inst-42');
-
-    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'DID', 'inst-42');
-  });
-
-  it('throws ServiceInstanceNotFoundError for explicit ID not found', async () => {
+  it('throws ServiceInstanceNotFoundError when explicit ID not found', async () => {
     mockGetInstanceByResolution.mockResolvedValue(null);
 
-    await expect(resolveDidService('org-1', 'missing-id')).rejects.toThrow(ServiceInstanceNotFoundError);
+    await expect(resolveService('org-1', ServiceType.STORAGE, 'missing-id')).rejects.toThrow(
+      ServiceInstanceNotFoundError,
+    );
   });
 
   it('throws ServiceResolutionError when no instance found', async () => {
     mockGetInstanceByResolution.mockResolvedValue(null);
 
-    await expect(resolveDidService('org-1')).rejects.toThrow(ServiceResolutionError);
+    await expect(resolveService('org-1', ServiceType.STORAGE)).rejects.toThrow(ServiceResolutionError);
   });
 
-  it('throws ConfigDecryptionError on decrypt failure', async () => {
+  it('throws ConfigDecryptionError when decryption fails', async () => {
     mockGetInstanceByResolution.mockResolvedValue(MOCK_INSTANCE);
     mockEncryptionService.decrypt.mockImplementation(() => {
       throw new Error('bad key');
     });
 
-    await expect(resolveDidService('org-1')).rejects.toThrow(ConfigDecryptionError);
+    await expect(resolveService('org-1', ServiceType.STORAGE)).rejects.toThrow(ConfigDecryptionError);
   });
 
-  it('throws ConfigValidationError on invalid JSON', async () => {
+  it('throws ConfigValidationError when config is invalid JSON', async () => {
     mockGetInstanceByResolution.mockResolvedValue(MOCK_INSTANCE);
     mockEncryptionService.decrypt.mockReturnValue('not-json{{{');
 
-    await expect(resolveDidService('org-1')).rejects.toThrow(ConfigValidationError);
+    await expect(resolveService('org-1', ServiceType.STORAGE)).rejects.toThrow(ConfigValidationError);
   });
 
-  it('throws ConfigValidationError on schema validation failure', async () => {
+  it('throws ConfigValidationError when config fails schema validation', async () => {
     mockGetInstanceByResolution.mockResolvedValue(MOCK_INSTANCE);
     mockEncryptionService.decrypt.mockReturnValue(VALID_JSON);
     mockConfigSchema.safeParse.mockReturnValue({
       success: false,
       error: {
-        issues: [{ message: 'endpoint is required' }, { message: 'authToken must be a string' }],
+        issues: [{ message: 'baseUrl is required' }, { message: 'bucket must be a string' }],
       },
     });
 
-    await expect(resolveDidService('org-1')).rejects.toThrow(ConfigValidationError);
-    await expect(resolveDidService('org-1')).rejects.toThrow(/endpoint is required, authToken must be a string/);
+    await expect(resolveService('org-1', ServiceType.STORAGE)).rejects.toThrow(ConfigValidationError);
+    await expect(resolveService('org-1', ServiceType.STORAGE)).rejects.toThrow(
+      /baseUrl is required, bucket must be a string/,
+    );
+  });
+
+  it('throws ConfigValidationError when adapter not in registry', async () => {
+    const instanceWithUnknownAdapter = {
+      ...MOCK_INSTANCE,
+      adapterType: 'UNKNOWN_ADAPTER',
+    };
+    mockGetInstanceByResolution.mockResolvedValue(instanceWithUnknownAdapter);
+    mockEncryptionService.decrypt.mockReturnValue(VALID_JSON);
+
+    await expect(resolveService('org-1', ServiceType.STORAGE)).rejects.toThrow(ConfigValidationError);
   });
 
   it('returns the adapter and instance ID from the factory (end-to-end flow)', async () => {
     setupHappyPath();
 
-    const result = await resolveDidService('tenant-abc');
+    const result = await resolveService('tenant-abc', ServiceType.STORAGE);
 
     // Verify the complete chain executed
     expect(mockGetInstanceByResolution).toHaveBeenCalledTimes(1);
     expect(mockEncryptionService.decrypt).toHaveBeenCalledTimes(1);
     expect(mockConfigSchema.safeParse).toHaveBeenCalledTimes(1);
     expect(mockFactory).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({ service: MOCK_SERVICE, instanceId: 'inst-1' });
+    expect(result).toEqual({ service: MOCK_SERVICE, instanceId: 'storage-inst-1' });
   });
 });
