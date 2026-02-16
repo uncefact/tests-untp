@@ -74,10 +74,10 @@ async function main() {
   });
 
   // Upsert the system default VCKit DID service instance
-  const { vckitApiUrl, vckitAuthToken } = getDidConfig();
+  const { vckitApiUrl, vckitApiKey: vckitDidApiKey } = getDidConfig();
   const didServiceConfig = JSON.stringify({
     endpoint: new URL(vckitApiUrl).origin,
-    authToken: vckitAuthToken,
+    authToken: vckitDidApiKey,
   });
   const encryptedConfig = JSON.stringify(encryptionService.encrypt(didServiceConfig, EncryptionAlgorithm.AES_256_GCM));
 
@@ -269,8 +269,10 @@ async function main() {
   let storageSeeded = false;
   try {
     const { storageServiceUrl } = getStorageConfig();
+    const storageApiKey = process.env.UNCEFACT_STORAGE_API_KEY;
     const storageServiceConfig = JSON.stringify({
       baseUrl: new URL(storageServiceUrl).origin,
+      ...(storageApiKey && { apiKey: storageApiKey }),
       apiVersion: '3.0.0',
       publicBucket: 'verifiable-credentials',
       privateBucket: 'private-verifiable-credentials',

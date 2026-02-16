@@ -20,7 +20,7 @@ const nextConfig = (phase: string): NextConfig => {
     DEFAULT_HUMAN_VERIFICATION_URL,
     DEFAULT_MACHINE_VERIFICATION_URL,
     VCKIT_API_URL,
-    VCKIT_AUTH_TOKEN,
+    VCKIT_API_KEY,
     DEFAULT_ISSUER_DID,
     SERVICE_ENCRYPTION_KEY,
   } = process.env;
@@ -38,7 +38,7 @@ const nextConfig = (phase: string): NextConfig => {
       DEFAULT_HUMAN_VERIFICATION_URL,
       DEFAULT_MACHINE_VERIFICATION_URL,
       VCKIT_API_URL,
-      VCKIT_AUTH_TOKEN,
+      VCKIT_API_KEY,
       DEFAULT_ISSUER_DID,
       SERVICE_ENCRYPTION_KEY,
     };

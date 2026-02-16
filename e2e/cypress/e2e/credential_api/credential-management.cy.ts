@@ -30,6 +30,45 @@ describe('Credential API', { testIsolation: false }, () => {
   before(() => {
     cy.apiLogin();
     cy.task('seedTestOrg', { userEmail: 'e2e-admin@test.local' });
+
+    // Create VC service instance (required for signing credentials)
+    cy.request({
+      method: 'POST',
+      url: '/api/v1/services',
+      body: {
+        serviceType: 'VC',
+        adapterType: 'VCKIT',
+        name: 'E2E VCKit VC',
+        config: {
+          endpoint: 'http://vckit-api:3332/v2',
+          apiKey: 'test123',
+        },
+        apiVersion: '1.0.0',
+        isPrimary: true,
+      },
+    }).then((res) => {
+      expect(res.status).to.eq(201);
+    });
+
+    // Create STORAGE service instance (required for storing credentials)
+    cy.request({
+      method: 'POST',
+      url: '/api/v1/services',
+      body: {
+        serviceType: 'STORAGE',
+        adapterType: 'UNCEFACT_STORAGE',
+        name: 'E2E Storage',
+        config: {
+          baseUrl: 'http://storage-service:3334',
+          apiKey: 'test123',
+          apiVersion: '3.0.0',
+        },
+        apiVersion: '3.0.0',
+        isPrimary: true,
+      },
+    }).then((res) => {
+      expect(res.status).to.eq(201);
+    });
   });
 
   after(() => {
