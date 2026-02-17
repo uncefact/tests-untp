@@ -46,6 +46,14 @@ enum ProductLevel {
   ITEM
 }
 
+enum CredentialType {
+  DigitalProductPassport
+  DigitalConformityCredential
+  DigitalFacilityRecord
+  DigitalIdentityAnchor
+  DigitalTraceabilityEvent
+}
+
 /**
  * Auth.js + Prisma adapter tables for OAuth + JWT sessions
  */
@@ -101,7 +109,9 @@ model Tenant {
   linkRegistrations  LinkRegistration[]
   organisations      OrganisationEntity[]
   facilities         Facility[]
-  products           Product[]
+  products             Product[]
+  credentialTypeConfigs CredentialTypeConfig[]
+  renderTemplates      RenderTemplate[]
 
   @@map("Tenant")
 }
@@ -394,4 +404,58 @@ model ProductSecondaryIdentifier {
   identifier    Identifier @relation("ProductSecondaryIdentifiers", fields: [identifierId], references: [id], onDelete: Cascade)
 
   @@id([productId, identifierId])
+}
+
+/**
+ * Credential type configuration for both core UNTP types and tenant extensions.
+ * Stores schema URLs, context URLs, and version information.
+ * Extensions reference a parent config via the self-relation.
+ */
+model CredentialTypeConfig {
+  id               String    @id @default(cuid())
+  tenantId         String?
+  tenant           Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name             String
+  credentialType   CredentialType
+  version          String
+
+  isExtension      Boolean   @default(true)
+  parentConfigId   String?
+  parentConfig     CredentialTypeConfig?  @relation("ExtensionParent", fields: [parentConfigId], references: [id], onDelete: Cascade)
+  extensions       CredentialTypeConfig[] @relation("ExtensionParent")
+
+  schemaUrl        String
+  contextUrl       String
+  websiteUrl       String?
+
+  renderTemplates  RenderTemplate[]
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([credentialType, version, tenantId, isExtension, name])
+}
+
+/**
+ * Render template references for credential types.
+ * Stores storage URLs and hashes, with an isPrimary flag for tenant default selection.
+ */
+model RenderTemplate {
+  id                       String                @id @default(cuid())
+  tenantId                 String
+  tenant                   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  credentialTypeConfigId   String
+  credentialTypeConfig     CredentialTypeConfig   @relation(fields: [credentialTypeConfigId], references: [id], onDelete: Cascade)
+
+  name                     String
+  storageUrl               String
+  hash                     String
+  isPrimary                Boolean   @default(false)
+
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@index([tenantId, credentialTypeConfigId])
 }
