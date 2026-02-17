@@ -198,8 +198,8 @@ describe('facility.repository', () => {
       expect(mockFacility.findFirst).toHaveBeenCalledWith({
         where: { id: 'facility-1', tenantId: TENANT_ID },
         include: {
-          primaryIdentifier: { include: { scheme: true } },
-          secondaryIdentifiers: { include: { identifier: { include: { scheme: true } } } },
+          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
+          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
           operatingOrganisation: true,
         },
       });
@@ -223,8 +223,8 @@ describe('facility.repository', () => {
       expect(mockFacility.findMany).toHaveBeenCalledWith({
         where: { tenantId: TENANT_ID },
         include: {
-          primaryIdentifier: { include: { scheme: true } },
-          secondaryIdentifiers: { include: { identifier: { include: { scheme: true } } } },
+          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
+          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
           operatingOrganisation: true,
         },
         take: 100,
@@ -310,8 +310,8 @@ describe('facility.repository', () => {
         where: { id: 'facility-1' },
         data: { name: 'Renamed Warehouse' },
         include: {
-          primaryIdentifier: { include: { scheme: true } },
-          secondaryIdentifiers: { include: { identifier: { include: { scheme: true } } } },
+          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
+          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
           operatingOrganisation: true,
         },
       });

@@ -6,11 +6,12 @@ import { UntpLocation } from '@/lib/types';
 
 /**
  * Include shape for facility queries — eagerly loads primary and secondary
- * identifiers (with their schemes) and the operating organisation.
+ * identifiers (with their schemes and registrars) and the operating organisation.
+ * The registrar is needed to construct ISO 18975 resolver URIs for UNTP credentials.
  */
 const FACILITY_INCLUDE = {
-  primaryIdentifier: { include: { scheme: true } },
-  secondaryIdentifiers: { include: { identifier: { include: { scheme: true } } } },
+  primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
+  secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
   operatingOrganisation: true,
 } as const;
 

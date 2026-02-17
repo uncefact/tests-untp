@@ -280,11 +280,11 @@ describe('product.repository', () => {
       expect(mockProduct.findFirst).toHaveBeenCalledWith({
         where: { id: PRODUCT_ID, tenantId: TENANT_ID },
         include: {
-          primaryIdentifier: { include: { scheme: true } },
-          secondaryIdentifiers: { include: { identifier: { include: { scheme: true } } } },
+          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
+          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
           producedByOrganisation: true,
           manufacturingFacility: true,
-          parent: true,
+          parent: { include: { primaryIdentifier: { include: { scheme: { include: { registrar: true } } } } } },
         },
       });
       expect(result).toEqual(PRODUCT_WITH_RELATIONS);
@@ -307,11 +307,11 @@ describe('product.repository', () => {
       expect(mockProduct.findMany).toHaveBeenCalledWith({
         where: { tenantId: TENANT_ID },
         include: {
-          primaryIdentifier: { include: { scheme: true } },
-          secondaryIdentifiers: { include: { identifier: { include: { scheme: true } } } },
+          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
+          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
           producedByOrganisation: true,
           manufacturingFacility: true,
-          parent: true,
+          parent: { include: { primaryIdentifier: { include: { scheme: { include: { registrar: true } } } } } },
         },
         take: 100,
         skip: undefined,
@@ -435,11 +435,11 @@ describe('product.repository', () => {
         where: { id: PRODUCT_ID },
         data: { name: 'Updated Name' },
         include: {
-          primaryIdentifier: { include: { scheme: true } },
-          secondaryIdentifiers: { include: { identifier: { include: { scheme: true } } } },
+          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
+          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
           producedByOrganisation: true,
           manufacturingFacility: true,
-          parent: true,
+          parent: { include: { primaryIdentifier: { include: { scheme: { include: { registrar: true } } } } } },
         },
       });
       expect(result.name).toBe('Updated Name');
