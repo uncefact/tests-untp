@@ -107,6 +107,10 @@ export {
   linkRegistrationSchema,
 } from './identity-resolver/schemas.js';
 
+// Schema cache
+export { SchemaFetchError, fetchSchema, clearSchemaCache, getSchemaCache } from './schema/index.js';
+export type { CachedSchema } from './schema/index.js';
+
 // Shared API response schemas
 export { errorResponseSchema } from './schemas.js';
 
