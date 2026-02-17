@@ -156,6 +156,7 @@ async function main() {
       name: 'Australian Business Number',
       primaryKey: 'abn',
       validationPattern: '^\\d{11}$',
+      linkTemplate: '/{primaryKey}/{value}',
       isDefault: true,
     },
   });
@@ -170,6 +171,7 @@ async function main() {
       name: 'Australian Company Number',
       primaryKey: 'acn',
       validationPattern: '^\\d{9}$',
+      linkTemplate: '/{primaryKey}/{value}',
       isDefault: true,
     },
   });
@@ -184,6 +186,7 @@ async function main() {
       name: 'GS1 Global Location Number',
       primaryKey: 'gln',
       validationPattern: '^\\d{13}$',
+      linkTemplate: '/{primaryKey}/{value}',
       isDefault: true,
     },
   });
@@ -198,6 +201,7 @@ async function main() {
       name: 'GS1 Global Trade Item Number',
       primaryKey: '01',
       validationPattern: '^\\d{14}$',
+      linkTemplate: '/{primaryKey}/{value}',
       isDefault: true,
     },
   });
@@ -213,6 +217,7 @@ async function main() {
       key: '10',
       description: 'Batch/Lot Number',
       validationPattern: '^[A-Za-z0-9]{1,20}$',
+      order: 0,
     },
   });
 
@@ -225,6 +230,7 @@ async function main() {
       key: '21',
       description: 'Serial Number',
       validationPattern: '^[A-Za-z0-9]{1,20}$',
+      order: 1,
     },
   });
 

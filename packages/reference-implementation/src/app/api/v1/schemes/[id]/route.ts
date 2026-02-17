@@ -95,6 +95,9 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *               validationPattern:
  *                 type: string
  *                 description: New validation pattern
+ *               linkTemplate:
+ *                 type: string
+ *                 description: New ISO 18975 link template for URI construction
  *               namespace:
  *                 type: string
  *                 description: New namespace
@@ -164,12 +167,14 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     name?: string;
     primaryKey?: string;
     validationPattern?: string;
+    linkTemplate?: string;
     namespace?: string;
     idrServiceInstanceId?: string | null;
     qualifiers?: Array<{
       key: string;
       description: string;
       validationPattern: string;
+      order?: number;
     }>;
   };
 
@@ -182,6 +187,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const hasName = isNonEmptyString(body.name);
   const hasPrimaryKey = isNonEmptyString(body.primaryKey);
   const hasValidationPattern = isNonEmptyString(body.validationPattern);
+  const hasLinkTemplate = isNonEmptyString(body.linkTemplate);
   const hasNamespace = isNonEmptyString(body.namespace);
   const hasIdrServiceInstanceId = body.idrServiceInstanceId !== undefined;
   const hasQualifiers = body.qualifiers !== undefined;
@@ -190,6 +196,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     !hasName &&
     !hasPrimaryKey &&
     !hasValidationPattern &&
+    !hasLinkTemplate &&
     !hasNamespace &&
     !hasIdrServiceInstanceId &&
     !hasQualifiers
@@ -213,7 +220,15 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     {
       tenantId,
       schemeId: id,
-      fields: { hasName, hasPrimaryKey, hasValidationPattern, hasNamespace, hasIdrServiceInstanceId, hasQualifiers },
+      fields: {
+        hasName,
+        hasPrimaryKey,
+        hasValidationPattern,
+        hasLinkTemplate,
+        hasNamespace,
+        hasIdrServiceInstanceId,
+        hasQualifiers,
+      },
     },
     'Updating scheme',
   );
@@ -221,6 +236,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     ...(hasName && { name: body.name }),
     ...(hasPrimaryKey && { primaryKey: body.primaryKey }),
     ...(hasValidationPattern && { validationPattern: body.validationPattern }),
+    ...(hasLinkTemplate && { linkTemplate: body.linkTemplate }),
     ...(hasNamespace && { namespace: body.namespace }),
     ...(hasIdrServiceInstanceId && { idrServiceInstanceId: body.idrServiceInstanceId }),
     ...(hasQualifiers && { qualifiers: body.qualifiers }),

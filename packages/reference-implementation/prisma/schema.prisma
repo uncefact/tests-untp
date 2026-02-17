@@ -215,6 +215,7 @@ model IdentifierScheme {
   name                 String
   primaryKey           String
   validationPattern    String
+  linkTemplate         String   // ISO 18975 link template, e.g. "/{primaryKey}/{value}"
   namespace            String?
   idrServiceInstanceId String?
   isDefault            Boolean  @default(false)
@@ -241,6 +242,7 @@ model SchemeQualifier {
   key               String
   description       String
   validationPattern String
+  order             Int      @default(0)  // Qualifier precedence in URI (ascending)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

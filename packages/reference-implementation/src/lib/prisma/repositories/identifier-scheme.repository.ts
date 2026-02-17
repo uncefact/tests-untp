@@ -13,6 +13,7 @@ export type CreateIdentifierSchemeInput = {
   name: string;
   primaryKey: string;
   validationPattern: string;
+  linkTemplate: string;
   namespace?: string;
   idrServiceInstanceId?: string;
   isDefault?: boolean;
@@ -20,6 +21,7 @@ export type CreateIdentifierSchemeInput = {
     key: string;
     description: string;
     validationPattern: string;
+    order?: number;
   }>;
 };
 
@@ -30,12 +32,14 @@ export type UpdateIdentifierSchemeInput = {
   name?: string;
   primaryKey?: string;
   validationPattern?: string;
+  linkTemplate?: string;
   namespace?: string;
   idrServiceInstanceId?: string | null;
   qualifiers?: Array<{
     key: string;
     description: string;
     validationPattern: string;
+    order?: number;
   }>;
 };
 
@@ -59,6 +63,7 @@ export async function createIdentifierScheme(input: CreateIdentifierSchemeInput)
       name: input.name,
       primaryKey: input.primaryKey,
       validationPattern: input.validationPattern,
+      linkTemplate: input.linkTemplate,
       namespace: input.namespace,
       idrServiceInstanceId: input.idrServiceInstanceId,
       isDefault: input.isDefault ?? false,
@@ -68,6 +73,7 @@ export async function createIdentifierScheme(input: CreateIdentifierSchemeInput)
             key: q.key,
             description: q.description,
             validationPattern: q.validationPattern,
+            ...(q.order !== undefined && { order: q.order }),
           })),
         },
       }),
@@ -159,6 +165,7 @@ export async function updateIdentifierScheme(
         ...(input.name !== undefined && { name: input.name }),
         ...(input.primaryKey !== undefined && { primaryKey: input.primaryKey }),
         ...(input.validationPattern !== undefined && { validationPattern: input.validationPattern }),
+        ...(input.linkTemplate !== undefined && { linkTemplate: input.linkTemplate }),
         ...(input.namespace !== undefined && { namespace: input.namespace }),
         ...(input.idrServiceInstanceId !== undefined && {
           idrServiceInstanceId: input.idrServiceInstanceId,
@@ -169,6 +176,7 @@ export async function updateIdentifierScheme(
               key: q.key,
               description: q.description,
               validationPattern: q.validationPattern,
+              ...(q.order !== undefined && { order: q.order }),
             })),
           },
         }),

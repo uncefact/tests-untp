@@ -25,6 +25,7 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *               - name
  *               - primaryKey
  *               - validationPattern
+ *               - linkTemplate
  *             properties:
  *               registrarId:
  *                 type: string
@@ -38,6 +39,9 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *               validationPattern:
  *                 type: string
  *                 description: Regular expression pattern for validating identifier values
+ *               linkTemplate:
+ *                 type: string
+ *                 description: ISO 18975 link template for URI construction (e.g. "/{primaryKey}/{value}")
  *               namespace:
  *                 type: string
  *                 description: Optional namespace for the scheme
@@ -104,12 +108,14 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     name?: string;
     primaryKey?: string;
     validationPattern?: string;
+    linkTemplate?: string;
     namespace?: string;
     idrServiceInstanceId?: string;
     qualifiers?: Array<{
       key: string;
       description: string;
       validationPattern: string;
+      order?: number;
     }>;
   };
 
@@ -123,6 +129,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
   if (!isNonEmptyString(body.primaryKey)) throw new ValidationError('primaryKey is required');
   if (!isNonEmptyString(body.validationPattern)) throw new ValidationError('validationPattern is required');
+  if (!isNonEmptyString(body.linkTemplate)) throw new ValidationError('linkTemplate is required');
 
   // Validate qualifiers if provided
   if (body.qualifiers !== undefined) {
@@ -151,6 +158,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     name: body.name,
     primaryKey: body.primaryKey,
     validationPattern: body.validationPattern,
+    linkTemplate: body.linkTemplate,
     namespace: body.namespace,
     idrServiceInstanceId: body.idrServiceInstanceId,
     qualifiers: body.qualifiers,

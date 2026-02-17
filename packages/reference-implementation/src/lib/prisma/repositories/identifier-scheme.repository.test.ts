@@ -49,6 +49,7 @@ describe('identifier-scheme.repository', () => {
     name: 'GTIN',
     primaryKey: 'gtin',
     validationPattern: '^\\d{13,14}$',
+    linkTemplate: '/{primaryKey}/{value}',
     namespace: 'gs1',
     idrServiceInstanceId: null,
     isDefault: false,
@@ -61,6 +62,7 @@ describe('identifier-scheme.repository', () => {
         key: 'batch',
         description: 'Batch number',
         validationPattern: null,
+        order: 0,
         createdAt: new Date('2024-01-01'),
         updatedAt: new Date('2024-01-01'),
       },
@@ -92,6 +94,7 @@ describe('identifier-scheme.repository', () => {
         name: 'GTIN',
         primaryKey: 'gtin',
         validationPattern: '^\\d{13,14}$',
+        linkTemplate: '/{primaryKey}/{value}',
         namespace: 'gs1',
         qualifiers: [{ key: 'batch', description: 'Batch number', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
       });
@@ -103,6 +106,7 @@ describe('identifier-scheme.repository', () => {
           name: 'GTIN',
           primaryKey: 'gtin',
           validationPattern: '^\\d{13,14}$',
+          linkTemplate: '/{primaryKey}/{value}',
           namespace: 'gs1',
           isDefault: false,
           qualifiers: {
@@ -127,6 +131,7 @@ describe('identifier-scheme.repository', () => {
         name: 'GTIN',
         primaryKey: 'gtin',
         validationPattern: '^\\d{13,14}$',
+        linkTemplate: '/{primaryKey}/{value}',
       });
 
       expect(mockIdentifierScheme.create).toHaveBeenCalledWith({
@@ -149,6 +154,7 @@ describe('identifier-scheme.repository', () => {
         name: 'GTIN',
         primaryKey: 'gtin',
         validationPattern: '^\\d{13,14}$',
+        linkTemplate: '/{primaryKey}/{value}',
       });
 
       expect(mockIdentifierScheme.create).toHaveBeenCalledWith({
