@@ -121,6 +121,7 @@ const MOCK_IDR_SERVICE = {
   deleteLink: jest.fn(),
   getResolverDescription: jest.fn(),
   getLinkTypes: jest.fn(),
+  buildResolverUri: jest.fn(),
 };
 
 // -- Tests ---------------------------------------------------------------------

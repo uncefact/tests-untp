@@ -28,6 +28,7 @@ export const schemeQualifierSchema = z.object({
   key: z.string().describe('Qualifier key / application identifier code'),
   description: z.string().describe('Human-readable description'),
   validationPattern: z.string().describe('Regex for validating qualifier values'),
+  order: z.number().int().describe('Qualifier precedence in URI ordering (ascending)'),
   createdAt: z.string().datetime().describe('Timestamp when created'),
   updatedAt: z.string().datetime().describe('Timestamp when last updated'),
 });
@@ -42,6 +43,7 @@ export const identifierSchemeSchema = z.object({
   name: z.string().describe('Human-readable scheme name'),
   primaryKey: z.string().describe('Primary identifier key per ISO 18975'),
   validationPattern: z.string().describe('Regex for validating identifier values'),
+  linkTemplate: z.string().describe('ISO 18975 link template for URI construction'),
   namespace: z.string().nullable().describe('Optional namespace override'),
   idrServiceInstanceId: z.string().nullable().describe('Associated IDR service instance'),
   isDefault: z.boolean().describe('Whether this is a system default'),
