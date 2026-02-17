@@ -195,6 +195,24 @@ export type LinkType = {
   description?: string;
 };
 
+// ── Resolver URI types ───────────────────────────────────────────────────
+
+/**
+ * Parts needed to construct a resolver URI.
+ */
+export type ResolverUriParts = {
+  /** The ISO 18975 link template from the identifier scheme (e.g., "/{primaryKey}/{value}") */
+  linkTemplate: string;
+  /** Primary identifier key (e.g., "01" for GTIN, "abn" for ABN) */
+  primaryKey: string;
+  /** Primary identifier value */
+  value: string;
+  /** Namespace for the identifier scheme */
+  namespace: string;
+  /** Qualifiers in order of precedence, already sorted by order field */
+  qualifiers?: Array<{ key: string; value: string }>;
+};
+
 // ── Service interface ──────────────────────────────────────────────────────
 
 /**
@@ -262,4 +280,14 @@ export interface IIdentityResolverService {
    * @returns Array of supported link types
    */
   getLinkTypes(): Promise<LinkType[]>;
+
+  /**
+   * Builds a canonical resolver URI for an identifier.
+   * Combines the IDR service's base URL, any IDR-specific prefix, and the scheme's
+   * ISO 18975 link template, rendered with the given identifier parts.
+   *
+   * @param parts - The identifier parts to render into the URI
+   * @returns The fully constructed resolver URI
+   */
+  buildResolverUri(parts: ResolverUriParts): string;
 }

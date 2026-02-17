@@ -4,17 +4,25 @@ import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 
 /**
+ * Shared include fragment for an identifier with its scheme and registrar.
+ * Used for primary identifiers on both the product and its parent.
+ */
+const IDENTIFIER_INCLUDE = { include: { scheme: { include: { registrar: true } } } } as const;
+
+/**
  * Include shape used by all product queries.
- * Includes the primary identifier (with scheme), secondary identifiers
- * (via the join table, each with its identifier and scheme),
- * brand organisation, manufacturing facility, and parent product.
+ * Includes the primary identifier (with scheme and registrar), secondary
+ * identifiers (via the join table, each with its identifier, scheme, and
+ * registrar), brand organisation, manufacturing facility, and parent product
+ * (with its primary identifier for qualifier-based URI construction).
+ * The registrar is needed to construct ISO 18975 resolver URIs for UNTP credentials.
  */
 const PRODUCT_INCLUDE = {
-  primaryIdentifier: { include: { scheme: true } },
-  secondaryIdentifiers: { include: { identifier: { include: { scheme: true } } } },
+  primaryIdentifier: IDENTIFIER_INCLUDE,
+  secondaryIdentifiers: { include: { identifier: IDENTIFIER_INCLUDE } },
   producedByOrganisation: true,
   manufacturingFacility: true,
-  parent: true,
+  parent: { include: { primaryIdentifier: IDENTIFIER_INCLUDE } },
 } as const;
 
 /**

@@ -1,0 +1,556 @@
+// Mock next/server before importing route handlers
+jest.mock('next/server', () => ({
+  NextResponse: {
+    json: (body: unknown, init?: { status?: number }) => ({
+      status: init?.status ?? 200,
+      json: async () => body,
+    }),
+  },
+}));
+
+// Mock withTenantAuth — skips auth but preserves error handling via handleRouteError
+jest.mock('@/lib/api/with-tenant-auth', () => {
+  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
+  return {
+    withTenantAuth:
+      (handler: (...args: unknown[]) => unknown) =>
+      async (...args: unknown[]) => {
+        try {
+          return await handler(...args);
+        } catch (e) {
+          return handleRouteError(e);
+        }
+      },
+  };
+});
+
+const mockListDataModels = jest.fn();
+const mockCreateDataModel = jest.fn();
+
+jest.mock('@/lib/prisma/repositories', () => ({
+  listDataModels: (tenantId: string, opts: unknown) => mockListDataModels(tenantId, opts),
+  createDataModel: (tenantId: string, input: unknown) => mockCreateDataModel(tenantId, input),
+}));
+
+import { NotFoundError } from '@/lib/api/errors';
+import { GET, POST } from './route';
+
+function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
+  const { method = 'POST', body, url = 'http://localhost/api/v1/data-models' } = options;
+  const bodyString = body !== undefined ? JSON.stringify(body) : undefined;
+  return {
+    method,
+    url,
+    headers: new Headers({ 'Content-Type': 'application/json' }),
+    json:
+      bodyString !== undefined
+        ? async () => JSON.parse(bodyString)
+        : async () => {
+            throw new SyntaxError('Unexpected token');
+          },
+  } as unknown as Request;
+}
+
+function createBadJsonRequest(): Request {
+  return {
+    method: 'POST',
+    url: 'http://localhost/api/v1/data-models',
+    headers: new Headers({ 'Content-Type': 'application/json' }),
+    json: async () => {
+      throw new SyntaxError('Unexpected token n in JSON at position 0');
+    },
+  } as unknown as Request;
+}
+
+const AUTH_CONTEXT = { tenantId: 'tenant-1', params: Promise.resolve({}) };
+
+describe('GET /api/v1/data-models', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('lists data models for the tenant with no filters', async () => {
+    const dataModels = [
+      { id: 'cfg-1', name: 'DPP v0.6.0', credentialType: 'DigitalProductPassport' },
+      { id: 'cfg-2', name: 'DCC v0.6.0', credentialType: 'DigitalConformityCredential' },
+    ];
+    mockListDataModels.mockResolvedValue(dataModels);
+
+    const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/data-models' });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(json.dataModels).toEqual(dataModels);
+    expect(mockListDataModels).toHaveBeenCalledWith('tenant-1', {
+      isExtension: undefined,
+      credentialType: undefined,
+      version: undefined,
+      limit: undefined,
+      offset: undefined,
+    });
+  });
+
+  it('passes isExtension=true filter correctly', async () => {
+    mockListDataModels.mockResolvedValue([]);
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/data-models?isExtension=true',
+    });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListDataModels).toHaveBeenCalledWith('tenant-1', {
+      isExtension: true,
+      credentialType: undefined,
+      version: undefined,
+      limit: undefined,
+      offset: undefined,
+    });
+  });
+
+  it('passes isExtension=false filter correctly', async () => {
+    mockListDataModels.mockResolvedValue([]);
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/data-models?isExtension=false',
+    });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListDataModels).toHaveBeenCalledWith('tenant-1', {
+      isExtension: false,
+      credentialType: undefined,
+      version: undefined,
+      limit: undefined,
+      offset: undefined,
+    });
+  });
+
+  it('returns 400 for invalid isExtension value', async () => {
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/data-models?isExtension=maybe',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.ok).toBe(false);
+    expect(json.error).toContain('isExtension must be "true" or "false"');
+  });
+
+  it('passes credentialType filter correctly', async () => {
+    mockListDataModels.mockResolvedValue([]);
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/data-models?credentialType=DigitalProductPassport',
+    });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListDataModels).toHaveBeenCalledWith('tenant-1', {
+      isExtension: undefined,
+      credentialType: 'DigitalProductPassport',
+      version: undefined,
+      limit: undefined,
+      offset: undefined,
+    });
+  });
+
+  it('returns 400 for invalid credentialType', async () => {
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/data-models?credentialType=InvalidType',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.ok).toBe(false);
+    expect(json.error).toContain('credentialType must be one of');
+  });
+
+  it('passes version filter correctly', async () => {
+    mockListDataModels.mockResolvedValue([]);
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/data-models?version=0.6.0',
+    });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListDataModels).toHaveBeenCalledWith('tenant-1', {
+      isExtension: undefined,
+      credentialType: undefined,
+      version: '0.6.0',
+      limit: undefined,
+      offset: undefined,
+    });
+  });
+
+  it('passes pagination parameters correctly', async () => {
+    mockListDataModels.mockResolvedValue([]);
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/data-models?limit=10&offset=20',
+    });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListDataModels).toHaveBeenCalledWith('tenant-1', {
+      isExtension: undefined,
+      credentialType: undefined,
+      version: undefined,
+      limit: 10,
+      offset: 20,
+    });
+  });
+
+  it('passes all filters together', async () => {
+    mockListDataModels.mockResolvedValue([]);
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/data-models?isExtension=true&credentialType=DigitalFacilityRecord&version=0.6.0&limit=5&offset=0',
+    });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListDataModels).toHaveBeenCalledWith('tenant-1', {
+      isExtension: true,
+      credentialType: 'DigitalFacilityRecord',
+      version: '0.6.0',
+      limit: 5,
+      offset: 0,
+    });
+  });
+
+  it('returns 400 for non-numeric limit', async () => {
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/data-models?limit=abc',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('limit must be a positive integer');
+  });
+
+  it('returns 400 for negative offset', async () => {
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/data-models?offset=-1',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('offset must be a non-negative integer');
+  });
+
+  it('returns 500 when listDataModels throws', async () => {
+    mockListDataModels.mockRejectedValue(new Error('Database error'));
+
+    const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/data-models' });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(json.error).toContain('Database error');
+  });
+});
+
+describe('POST /api/v1/data-models', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('creates a data model extension and returns 201', async () => {
+    const created = {
+      id: 'cfg-new',
+      name: 'Custom DPP Extension',
+      credentialType: 'DigitalProductPassport',
+      version: '0.6.0',
+      schemaUrl: 'https://example.com/schema.json',
+      contextUrl: 'https://example.com/context.jsonld',
+      isExtension: true,
+      parentConfigId: 'cfg-parent',
+    };
+    mockCreateDataModel.mockResolvedValue(created);
+
+    const req = createFakeRequest({
+      body: {
+        name: 'Custom DPP Extension',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(json.ok).toBe(true);
+    expect(json.dataModel).toEqual(created);
+  });
+
+  it('passes isExtension=true and all fields to the repository', async () => {
+    mockCreateDataModel.mockResolvedValue({ id: 'cfg-new' });
+
+    const req = createFakeRequest({
+      body: {
+        name: 'My Extension',
+        credentialType: 'DigitalConformityCredential',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+        websiteUrl: 'https://example.com',
+      },
+    });
+    await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(mockCreateDataModel).toHaveBeenCalledWith('tenant-1', {
+      name: 'My Extension',
+      credentialType: 'DigitalConformityCredential',
+      version: '0.6.0',
+      schemaUrl: 'https://example.com/schema.json',
+      contextUrl: 'https://example.com/context.jsonld',
+      parentConfigId: 'cfg-parent',
+      websiteUrl: 'https://example.com',
+      isExtension: true,
+    });
+  });
+
+  it('defaults isExtension to true even when not provided', async () => {
+    mockCreateDataModel.mockResolvedValue({ id: 'cfg-new' });
+
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+      },
+    });
+    await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(mockCreateDataModel).toHaveBeenCalledWith('tenant-1', expect.objectContaining({ isExtension: true }));
+  });
+
+  it('returns 400 when name is missing', async () => {
+    const req = createFakeRequest({
+      body: {
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('name is required');
+  });
+
+  it('returns 400 when credentialType is missing', async () => {
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('credentialType is required');
+  });
+
+  it('returns 400 when credentialType is invalid', async () => {
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        credentialType: 'InvalidType',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('credentialType must be one of');
+  });
+
+  it('returns 400 when version is missing', async () => {
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        credentialType: 'DigitalProductPassport',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('version is required');
+  });
+
+  it('returns 400 when schemaUrl is missing', async () => {
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('schemaUrl is required');
+  });
+
+  it('returns 400 when contextUrl is missing', async () => {
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        parentConfigId: 'cfg-parent',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('contextUrl is required');
+  });
+
+  it('returns 400 when parentConfigId is missing', async () => {
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('parentConfigId is required');
+  });
+
+  it('returns 400 for invalid JSON body', async () => {
+    const req = createBadJsonRequest();
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('Invalid JSON body');
+  });
+
+  it('returns 404 when repository throws NotFoundError', async () => {
+    mockCreateDataModel.mockRejectedValue(new NotFoundError('Parent config not found'));
+
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-nonexistent',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(json.error).toContain('Parent config not found');
+  });
+
+  it('returns 500 on unexpected error', async () => {
+    mockCreateDataModel.mockRejectedValue(new Error('Database error'));
+
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(json.error).toContain('Database error');
+  });
+
+  it('includes optional websiteUrl when provided', async () => {
+    mockCreateDataModel.mockResolvedValue({ id: 'cfg-new' });
+
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+        websiteUrl: 'https://example.com',
+      },
+    });
+    await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(mockCreateDataModel).toHaveBeenCalledWith(
+      'tenant-1',
+      expect.objectContaining({ websiteUrl: 'https://example.com' }),
+    );
+  });
+
+  it('omits websiteUrl when not provided', async () => {
+    mockCreateDataModel.mockResolvedValue({ id: 'cfg-new' });
+
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+      },
+    });
+    await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    const callArgs = mockCreateDataModel.mock.calls[0][1];
+    expect(callArgs).not.toHaveProperty('websiteUrl');
+  });
+});

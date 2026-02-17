@@ -28,6 +28,7 @@ describe('PyxIdentityResolverAdapter', () => {
 
   const mockConfig: PyxIdrConfig = {
     baseUrl: 'https://resolver.example.com',
+    uriPrefix: '/{namespace}',
     apiKey: 'test-api-key',
     apiVersion: '2.0.0',
     ianaLanguage: 'en',
@@ -273,7 +274,7 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(result.links[0].idrLinkId).toBe('0');
     });
 
-    it('should construct resolverUri from parts when API response omits it', async () => {
+    it('should construct resolverUri via buildResolverUri when API response omits it', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: jest.fn().mockResolvedValue({
@@ -288,6 +289,7 @@ describe('PyxIdentityResolverAdapter', () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
       const result = await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
+      // buildResolverUri uses uriPrefix (/{namespace}) + fallback linkTemplate (/abn/51824753556)
       expect(result.resolverUri).toBe('https://resolver.example.com/ato/abn/51824753556');
     });
 
@@ -686,6 +688,87 @@ describe('PyxIdentityResolverAdapter', () => {
     });
   });
 
+  describe('buildResolverUri', () => {
+    it('builds URI with namespace prefix and simple template', () => {
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      const result = adapter.buildResolverUri({
+        linkTemplate: '/{primaryKey}/{value}',
+        primaryKey: 'abn',
+        value: '51824753556',
+        namespace: 'ato',
+      });
+
+      expect(result).toBe('https://resolver.example.com/ato/abn/51824753556');
+    });
+
+    it('builds URI with qualifiers appended in order', () => {
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      const result = adapter.buildResolverUri({
+        linkTemplate: '/{primaryKey}/{value}',
+        primaryKey: '01',
+        value: '09520123456788',
+        namespace: 'untp',
+        qualifiers: [
+          { key: '10', value: 'ABC123' },
+          { key: '21', value: 'SER456' },
+        ],
+      });
+
+      expect(result).toBe('https://resolver.example.com/untp/01/09520123456788/10/ABC123/21/SER456');
+    });
+
+    it('builds URI with no qualifiers', () => {
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      const result = adapter.buildResolverUri({
+        linkTemplate: '/{primaryKey}/{value}',
+        primaryKey: '01',
+        value: '09520123456788',
+        namespace: 'gs1',
+      });
+
+      expect(result).toBe('https://resolver.example.com/gs1/01/09520123456788');
+    });
+
+    it('builds URI with empty qualifiers array', () => {
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      const result = adapter.buildResolverUri({
+        linkTemplate: '/{primaryKey}/{value}',
+        primaryKey: 'abn',
+        value: '51824753556',
+        namespace: 'ato',
+        qualifiers: [],
+      });
+
+      expect(result).toBe('https://resolver.example.com/ato/abn/51824753556');
+    });
+
+    it('uses custom uriPrefix from config', () => {
+      const customConfig = { ...mockConfig, uriPrefix: '/custom-prefix/{namespace}' };
+      const adapter = new PyxIdentityResolverAdapter(customConfig, mockLogger);
+      const result = adapter.buildResolverUri({
+        linkTemplate: '/{primaryKey}/{value}',
+        primaryKey: 'abn',
+        value: '51824753556',
+        namespace: 'ato',
+      });
+
+      expect(result).toBe('https://resolver.example.com/custom-prefix/ato/abn/51824753556');
+    });
+
+    it('handles empty uriPrefix', () => {
+      const customConfig = { ...mockConfig, uriPrefix: '' };
+      const adapter = new PyxIdentityResolverAdapter(customConfig, mockLogger);
+      const result = adapter.buildResolverUri({
+        linkTemplate: '/{primaryKey}/{value}',
+        primaryKey: '01',
+        value: '09520123456788',
+        namespace: 'gs1',
+      });
+
+      expect(result).toBe('https://resolver.example.com/01/09520123456788');
+    });
+  });
+
   describe('registerSchemes', () => {
     it('should POST each scheme to the identifiers endpoint', async () => {
       mockFetch.mockResolvedValue({
@@ -796,7 +879,7 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(() => pyxIdrRegistryEntry.configSchema.parse({ baseUrl: 'not-a-url', apiKey: '' })).toThrow();
     });
 
-    it('should default apiVersion and fwqs when not provided', () => {
+    it('should default apiVersion, fwqs, and uriPrefix when not provided', () => {
       const config = {
         baseUrl: 'https://resolver.example.com',
         apiKey: 'test-key',
@@ -810,6 +893,7 @@ describe('PyxIdentityResolverAdapter', () => {
       const result = pyxIdrRegistryEntry.configSchema.parse(config);
       expect(result.apiVersion).toBe('2.0.0');
       expect(result.fwqs).toBe(false);
+      expect(result.uriPrefix).toBe('/{namespace}');
     });
 
     it('should reject an unsupported apiVersion', () => {

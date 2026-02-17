@@ -1,6 +1,9 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
+import crypto from 'crypto';
 import {
+  CredentialType,
   DidMethod,
   DidStatus,
   DidType,
@@ -156,6 +159,7 @@ async function main() {
       name: 'Australian Business Number',
       primaryKey: 'abn',
       validationPattern: '^\\d{11}$',
+      linkTemplate: '/{primaryKey}/{value}',
       isDefault: true,
     },
   });
@@ -170,6 +174,7 @@ async function main() {
       name: 'Australian Company Number',
       primaryKey: 'acn',
       validationPattern: '^\\d{9}$',
+      linkTemplate: '/{primaryKey}/{value}',
       isDefault: true,
     },
   });
@@ -184,6 +189,7 @@ async function main() {
       name: 'GS1 Global Location Number',
       primaryKey: 'gln',
       validationPattern: '^\\d{13}$',
+      linkTemplate: '/{primaryKey}/{value}',
       isDefault: true,
     },
   });
@@ -198,6 +204,7 @@ async function main() {
       name: 'GS1 Global Trade Item Number',
       primaryKey: '01',
       validationPattern: '^\\d{14}$',
+      linkTemplate: '/{primaryKey}/{value}',
       isDefault: true,
     },
   });
@@ -213,6 +220,7 @@ async function main() {
       key: '10',
       description: 'Batch/Lot Number',
       validationPattern: '^[A-Za-z0-9]{1,20}$',
+      order: 0,
     },
   });
 
@@ -225,6 +233,7 @@ async function main() {
       key: '21',
       description: 'Serial Number',
       validationPattern: '^[A-Za-z0-9]{1,20}$',
+      order: 1,
     },
   });
 
@@ -347,9 +356,180 @@ async function main() {
     );
   }
 
+  // ── Seed core data model configs ────────────────────────────────────────────
+  // Static UUIDs ensure idempotent seeding — if the record already exists, skip.
+
+  const UNTP_BASE = 'https://test.uncefact.org/vocabulary/untp';
+
+  const coreDataModels = [
+    {
+      id: 'a1b2c3d4-0001-4000-8000-000000000001',
+      templateId: 'b2c3d4e5-0001-4000-8000-000000000001',
+      credentialType: CredentialType.DigitalProductPassport,
+      version: '0.6.1',
+      name: 'Digital Product Passport v0.6.1',
+      slug: 'dpp/0.6.1',
+      templateDir: 'digital_product_passport',
+    },
+    {
+      id: 'a1b2c3d4-0002-4000-8000-000000000002',
+      templateId: 'b2c3d4e5-0002-4000-8000-000000000002',
+      credentialType: CredentialType.DigitalConformityCredential,
+      version: '0.6.1',
+      name: 'Digital Conformity Credential v0.6.1',
+      slug: 'dcc/0.6.1',
+      templateDir: 'digital_conformity_credential',
+    },
+    {
+      id: 'a1b2c3d4-0003-4000-8000-000000000003',
+      templateId: 'b2c3d4e5-0003-4000-8000-000000000003',
+      credentialType: CredentialType.DigitalFacilityRecord,
+      version: '0.6.1',
+      name: 'Digital Facility Record v0.6.1',
+      slug: 'dfr/0.6.1',
+      templateDir: 'digital_facility_record',
+    },
+    {
+      id: 'a1b2c3d4-0004-4000-8000-000000000004',
+      templateId: 'b2c3d4e5-0004-4000-8000-000000000004',
+      credentialType: CredentialType.DigitalIdentityAnchor,
+      version: '0.6.1',
+      name: 'Digital Identity Anchor v0.6.1',
+      slug: 'dia/0.6.1',
+      templateDir: 'digital_identity_anchor',
+    },
+    {
+      id: 'a1b2c3d4-0005-4000-8000-000000000005',
+      templateId: 'b2c3d4e5-0005-4000-8000-000000000005',
+      credentialType: CredentialType.DigitalTraceabilityEvent,
+      version: '0.6.1',
+      name: 'Digital Traceability Event v0.6.1',
+      slug: 'dte/0.6.1',
+      templateDir: 'digital_traceability_event',
+    },
+  ];
+
+  for (const dm of coreDataModels) {
+    const exists = await prisma.dataModel.findUnique({ where: { id: dm.id } });
+    if (exists) {
+      logger.info({ dataModelId: dm.id, credentialType: dm.credentialType }, 'Data model already exists, skipping');
+      continue;
+    }
+
+    await prisma.dataModel.create({
+      data: {
+        id: dm.id,
+        tenantId: SYSTEM_TENANT_ID,
+        name: dm.name,
+        credentialType: dm.credentialType,
+        version: dm.version,
+        isExtension: false,
+        schemaUrl: `${UNTP_BASE}/${dm.slug}/schema.json`,
+        contextUrl: `${UNTP_BASE}/${dm.slug}/`,
+      },
+    });
+
+    logger.info({ dataModelId: dm.id, credentialType: dm.credentialType }, 'Data model created');
+  }
+
+  // ── Seed default render templates ───────────────────────────────────────────
+  // Upload .hbs templates to the storage service and record the returned URIs.
+  // Requires the storage service to be available (skipped otherwise).
+
+  let templatesSeeded = false;
+  if (storageSeeded) {
+    try {
+      const { storageServiceUrl } = getStorageConfig();
+      const storageApiKey = process.env.UNCEFACT_STORAGE_API_KEY;
+      const storageBaseUrl = new URL(storageServiceUrl).origin;
+      const storageHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (storageApiKey) {
+        storageHeaders['X-API-Key'] = storageApiKey;
+      }
+
+      const TEMPLATES_DIR = path.resolve(__dirname, '../src/templates/v0.6.0');
+
+      for (const dm of coreDataModels) {
+        const exists = await prisma.renderTemplate.findUnique({ where: { id: dm.templateId } });
+        if (exists) {
+          logger.info(
+            { templateId: dm.templateId, credentialType: dm.credentialType },
+            'Template already exists, skipping',
+          );
+          continue;
+        }
+
+        const templatePath = path.join(TEMPLATES_DIR, dm.templateDir, 'template.hbs');
+        if (!fs.existsSync(templatePath)) {
+          logger.warn({ templatePath, credentialType: dm.credentialType }, 'Template file not found, skipping');
+          continue;
+        }
+
+        const templateContent = fs.readFileSync(templatePath, 'utf-8');
+        const hash = crypto.createHash('sha256').update(templateContent).digest('hex');
+
+        // Upload to the storage service public bucket
+        const uploadUrl = `${storageBaseUrl}/api/3.0.0/public`;
+        const response = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: storageHeaders,
+          body: JSON.stringify({ data: templateContent, bucket: 'render-templates' }),
+        });
+
+        if (!response.ok) {
+          logger.warn(
+            { httpStatus: response.status, credentialType: dm.credentialType },
+            'Failed to upload template to storage, skipping',
+          );
+          continue;
+        }
+
+        const result: unknown = await response.json();
+        if (
+          typeof result !== 'object' ||
+          result === null ||
+          typeof (result as Record<string, unknown>).uri !== 'string'
+        ) {
+          logger.warn(
+            { credentialType: dm.credentialType, responseBody: result },
+            'Storage service returned unexpected response shape, skipping template',
+          );
+          continue;
+        }
+        const { uri } = result as { uri: string };
+
+        await prisma.renderTemplate.create({
+          data: {
+            id: dm.templateId,
+            tenantId: SYSTEM_TENANT_ID,
+            dataModelId: dm.id,
+            name: `${dm.name} Default Template`,
+            storageUrl: uri,
+            hash,
+            isPrimary: true,
+          },
+        });
+
+        logger.info(
+          { templateId: dm.templateId, uri, credentialType: dm.credentialType },
+          'Template uploaded and seeded',
+        );
+      }
+      templatesSeeded = true;
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : error },
+        'Skipping render template seed: storage service not available',
+      );
+    }
+  } else {
+    logger.warn('Skipping render template seed: storage service was not seeded');
+  }
+
   logger.info(
     'Seed complete: system tenant, default DID, DID service instance, ' +
-      'registrars, schemes, qualifiers' +
+      'registrars, schemes, qualifiers, data models' +
+      (templatesSeeded ? ', render templates' : '') +
       (idrSeeded ? ', IDR service instance' : '') +
       (storageSeeded ? ', storage service instance' : '') +
       (vcSeeded ? ', VC service instance' : '') +

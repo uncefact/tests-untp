@@ -30,6 +30,7 @@ describe('Organisation API', { testIsolation: false }, () => {
           name: `Org Test ABN Scheme ${RUN_ID}`,
           primaryKey: `abn-${RUN_ID}`,
           validationPattern: '^\\d{11}$',
+          linkTemplate: '/{primaryKey}/{value}',
         },
       }).then((schemeResponse) => {
         schemeId = schemeResponse.body.scheme.id;

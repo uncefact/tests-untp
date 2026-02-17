@@ -69,7 +69,13 @@ describe('POST /api/v1/schemes', () => {
   });
 
   it('creates a scheme and returns 201', async () => {
-    const scheme = { id: 'sch-1', name: 'GTIN', primaryKey: 'gtin', validationPattern: '^\\d{14}$' };
+    const scheme = {
+      id: 'sch-1',
+      name: 'GTIN',
+      primaryKey: 'gtin',
+      validationPattern: '^\\d{14}$',
+      linkTemplate: '/{primaryKey}/{value}',
+    };
     mockCreateIdentifierScheme.mockResolvedValue(scheme);
 
     const req = createFakeRequest({
@@ -78,6 +84,7 @@ describe('POST /api/v1/schemes', () => {
         name: 'GTIN',
         primaryKey: 'gtin',
         validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
       },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
@@ -102,6 +109,7 @@ describe('POST /api/v1/schemes', () => {
         name: 'GTIN',
         primaryKey: 'gtin',
         validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
         qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
       },
     });
@@ -127,6 +135,7 @@ describe('POST /api/v1/schemes', () => {
         name: 'GTIN',
         primaryKey: 'gtin',
         validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
         namespace: 'gs1',
         idrServiceInstanceId: 'inst-1',
       },
@@ -192,6 +201,7 @@ describe('POST /api/v1/schemes', () => {
         name: 'GTIN',
         primaryKey: 'gtin',
         validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
         qualifiers: [{ description: 'Lot number' }],
       },
     });
@@ -209,6 +219,7 @@ describe('POST /api/v1/schemes', () => {
         name: 'GTIN',
         primaryKey: 'gtin',
         validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
         qualifiers: [{ key: 'lot' }],
       },
     });
@@ -226,6 +237,7 @@ describe('POST /api/v1/schemes', () => {
         name: 'GTIN',
         primaryKey: 'gtin',
         validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
         qualifiers: [{ key: 'lot', description: 'Lot number' }],
       },
     });
@@ -243,6 +255,7 @@ describe('POST /api/v1/schemes', () => {
         name: 'GTIN',
         primaryKey: 'gtin',
         validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
         qualifiers: 'not-an-array',
       },
     });
@@ -262,6 +275,17 @@ describe('POST /api/v1/schemes', () => {
     expect(json.error).toBe('Invalid JSON body');
   });
 
+  it('returns 400 for missing linkTemplate', async () => {
+    const req = createFakeRequest({
+      body: { registrarId: 'reg-1', name: 'GTIN', primaryKey: 'gtin', validationPattern: '^\\d{14}$' },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('linkTemplate is required');
+  });
+
   it('returns 500 when repository throws', async () => {
     mockCreateIdentifierScheme.mockRejectedValue(new Error('Database error'));
 
@@ -271,6 +295,7 @@ describe('POST /api/v1/schemes', () => {
         name: 'GTIN',
         primaryKey: 'gtin',
         validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
       },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);

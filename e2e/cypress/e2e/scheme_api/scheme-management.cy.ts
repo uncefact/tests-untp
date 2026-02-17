@@ -35,6 +35,7 @@ describe('Scheme API', { testIsolation: false }, () => {
           name: `E2E ABN Scheme ${RUN_ID}`,
           primaryKey: `abn-${RUN_ID}`,
           validationPattern: '^\\d{11}$',
+          linkTemplate: '/{primaryKey}/{value}',
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
@@ -58,6 +59,7 @@ describe('Scheme API', { testIsolation: false }, () => {
           name: `E2E GTIN Scheme ${RUN_ID}`,
           primaryKey: `gtin-${RUN_ID}`,
           validationPattern: '^\\d{14}$',
+          linkTemplate: '/{primaryKey}/{value}',
           qualifiers: [
             {
               key: 'lot',
@@ -269,6 +271,7 @@ describe('Scheme API', { testIsolation: false }, () => {
           name: 'Test',
           primaryKey: `pk-${RUN_ID}`,
           validationPattern: '.*',
+          linkTemplate: '/{primaryKey}/{value}',
           qualifiers: [{ description: 'desc', validationPattern: '.*' }],
         },
         failOnStatusCode: false,
@@ -287,6 +290,7 @@ describe('Scheme API', { testIsolation: false }, () => {
           name: `Temp Scheme ${RUN_ID}`,
           primaryKey: `temp-pk-${RUN_ID}`,
           validationPattern: '.*',
+          linkTemplate: '/{primaryKey}/{value}',
         },
       }).then((createResponse) => {
         const tempId = createResponse.body.scheme.id;

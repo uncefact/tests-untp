@@ -180,6 +180,21 @@ export default defineConfig({
               [tenantId],
             );
 
+            // Render templates (FK to DataModel)
+            await client.query(
+              `DELETE FROM "RenderTemplate" WHERE "tenantId" = $1`,
+              [tenantId],
+            );
+            // Data model extensions (self-referencing — children first)
+            await client.query(
+              `DELETE FROM "DataModel" WHERE "tenantId" = $1 AND "parentConfigId" IS NOT NULL`,
+              [tenantId],
+            );
+            await client.query(
+              `DELETE FROM "DataModel" WHERE "tenantId" = $1`,
+              [tenantId],
+            );
+
             await client.query(
               `DELETE FROM "Credential" WHERE "tenantId" = $1`,
               [tenantId],

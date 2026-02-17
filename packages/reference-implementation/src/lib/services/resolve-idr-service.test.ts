@@ -86,6 +86,7 @@ const MOCK_SERVICE = {
   deleteLink: jest.fn(),
   getResolverDescription: jest.fn(),
   getLinkTypes: jest.fn(),
+  buildResolverUri: jest.fn(),
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

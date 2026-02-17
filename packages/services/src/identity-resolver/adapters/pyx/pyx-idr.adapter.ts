@@ -9,6 +9,7 @@ import type {
   PublishLinksOptions,
   ResolverDescription,
   LinkType,
+  ResolverUriParts,
 } from '../../types.js';
 
 import {
@@ -36,6 +37,7 @@ export const PYX_IDR_ADAPTER_TYPE = 'PYX_IDR' as const;
  */
 export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements IIdentityResolverService {
   private readonly baseURL: string;
+  private readonly uriPrefix: string;
   private readonly headers: Record<string, string>;
   private readonly apiVersion: string;
   private readonly ianaLanguage: string;
@@ -49,6 +51,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
   constructor(config: PyxIdrConfig, logger: LoggerService) {
     super(logger.child({ service: 'IDR - PyxIdentityResolver', apiVersion: config.apiVersion }));
     this.baseURL = config.baseUrl;
+    this.uriPrefix = config.uriPrefix;
     this.headers = {
       Authorization: `Bearer ${config.apiKey}`,
       'Content-Type': 'application/json',
@@ -128,7 +131,14 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
     }));
 
     return {
-      resolverUri: result.resolverUri ?? `${this.baseURL}/${namespace}/${identifierScheme}/${identifier}`,
+      resolverUri:
+        result.resolverUri ??
+        this.buildResolverUri({
+          linkTemplate: `/${identifierScheme}/${identifier}`,
+          primaryKey: identifierScheme,
+          value: identifier,
+          namespace,
+        }),
       identifierScheme,
       identifier,
       links: registeredLinks,
@@ -233,6 +243,23 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
     }
 
     return response.json();
+  }
+
+  buildResolverUri(parts: ResolverUriParts): string {
+    // Render IDR-specific prefix
+    const prefix = this.uriPrefix.replace('{namespace}', parts.namespace);
+
+    // Render scheme link template
+    let path = parts.linkTemplate.replace('{primaryKey}', parts.primaryKey).replace('{value}', parts.value);
+
+    // Append qualifiers in order
+    if (parts.qualifiers?.length) {
+      for (const q of parts.qualifiers) {
+        path += `/${q.key}/${q.value}`;
+      }
+    }
+
+    return `${this.baseURL}${prefix}${path}`;
   }
 
   /** Pyx-specific: Register identifier schemes with the IDR */

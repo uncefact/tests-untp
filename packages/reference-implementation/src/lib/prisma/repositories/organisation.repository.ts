@@ -6,12 +6,13 @@ import { UntpLocation } from '@/lib/types';
 
 /**
  * Include shape used by all organisation queries.
- * Includes the primary identifier (with scheme) and all secondary identifiers
- * (via the join table, each with its identifier and scheme).
+ * Includes the primary identifier (with scheme and registrar) and all secondary
+ * identifiers (via the join table, each with its identifier, scheme, and registrar).
+ * The registrar is needed to construct ISO 18975 resolver URIs for UNTP credentials.
  */
 const ORGANISATION_INCLUDE = {
-  primaryIdentifier: { include: { scheme: true } },
-  secondaryIdentifiers: { include: { identifier: { include: { scheme: true } } } },
+  primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
+  secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
 } as const;
 
 /**

@@ -62,6 +62,7 @@ function makeMockIdrService(): jest.Mocked<IIdentityResolverService> {
     deleteLink: jest.fn(),
     getResolverDescription: jest.fn(),
     getLinkTypes: jest.fn(),
+    buildResolverUri: jest.fn(),
   };
 }
 

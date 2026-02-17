@@ -150,8 +150,8 @@ describe('organisation.repository', () => {
           primaryIdentifierId: 'ident-1',
         }),
         include: {
-          primaryIdentifier: { include: { scheme: true } },
-          secondaryIdentifiers: { include: { identifier: { include: { scheme: true } } } },
+          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
+          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
         },
       });
       expect(mockTx.organisationSecondaryIdentifier.createMany).toHaveBeenCalledWith({
@@ -293,8 +293,8 @@ describe('organisation.repository', () => {
       expect(mockOrganisationEntity.findFirst).toHaveBeenCalledWith({
         where: { id: 'org-1', tenantId: TENANT_ID },
         include: {
-          primaryIdentifier: { include: { scheme: true } },
-          secondaryIdentifiers: { include: { identifier: { include: { scheme: true } } } },
+          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
+          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
         },
       });
       expect(result).toEqual(ORG_RECORD);
@@ -317,8 +317,8 @@ describe('organisation.repository', () => {
       expect(mockOrganisationEntity.findMany).toHaveBeenCalledWith({
         where: { tenantId: TENANT_ID },
         include: {
-          primaryIdentifier: { include: { scheme: true } },
-          secondaryIdentifiers: { include: { identifier: { include: { scheme: true } } } },
+          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
+          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
         },
         take: 100,
         skip: undefined,
@@ -413,8 +413,8 @@ describe('organisation.repository', () => {
         where: { id: 'org-1' },
         data: { name: 'Acme Industries' },
         include: {
-          primaryIdentifier: { include: { scheme: true } },
-          secondaryIdentifiers: { include: { identifier: { include: { scheme: true } } } },
+          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
+          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
         },
       });
       expect(result.name).toBe('Acme Industries');
@@ -527,8 +527,8 @@ describe('organisation.repository', () => {
       expect(mockTx.organisationEntity.delete).toHaveBeenCalledWith({
         where: { id: 'org-1' },
         include: {
-          primaryIdentifier: { include: { scheme: true } },
-          secondaryIdentifiers: { include: { identifier: { include: { scheme: true } } } },
+          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
+          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
         },
       });
       expect(result).toEqual(ORG_RECORD);
