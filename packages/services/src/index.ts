@@ -17,6 +17,7 @@ export type {
   CredentialIssuer,
   CredentialSubject,
   CredentialStatus,
+  IdentifierScheme,
   EnvelopedVerifiableCredential,
   UNTPVerifiableCredential,
   RenderMethod,

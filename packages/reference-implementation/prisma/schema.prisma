@@ -358,6 +358,8 @@ model Product {
   name                      String
   description               String?
   level                     ProductLevel
+  batchNumber               String?
+  serialNumber              String?
   parentId                  String?
   producedByOrganisationId       String?
   manufacturingFacilityId   String?

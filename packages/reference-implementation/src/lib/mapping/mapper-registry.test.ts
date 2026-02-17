@@ -1,5 +1,5 @@
 import { registerMapper, getMapper, listRegisteredMappers, clearRegistry } from './mapper-registry';
-import type { ICredentialMapper } from './types';
+import { ICredentialMapper } from './types';
 
 // -- Helpers ------------------------------------------------------------------
 
