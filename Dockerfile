@@ -155,4 +155,4 @@ CMD ["node", "server.js"]
 
 # ---- E2E target (runs seed before server; migrations already handled by entrypoint) ----
 FROM build AS development
-CMD ["sh", "-c", "cd /app/prisma && npx tsx seed.ts && cd /app && node server.js"]
+CMD ["sh", "-c", "cd /app/prisma && node /app/node_modules/tsx/dist/cli.mjs seed.ts && cd /app && node server.js"]
