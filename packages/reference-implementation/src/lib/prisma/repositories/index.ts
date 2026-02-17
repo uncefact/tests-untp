@@ -9,3 +9,4 @@ export * from './organisation.repository';
 export * from './facility.repository';
 export * from './product.repository';
 export * from './credential-type-config.repository';
+export * from './render-template.repository';
