@@ -12,7 +12,7 @@ COPY packages/reference-implementation/package.json ./packages/reference-impleme
 COPY packages/components/package.json ./packages/components/
 COPY packages/services/package.json ./packages/services/
 COPY digitallink_toolkit_server ./digitallink_toolkit_server/
-RUN yarn install --frozen-lockfile
+RUN yarn install --frozen-lockfile --network-timeout 600000
 
 # ---- Builder ----
 FROM base AS builder
