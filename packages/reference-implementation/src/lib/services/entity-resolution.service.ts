@@ -24,12 +24,17 @@ export interface EntityReferences {
 
 type EntityType = 'organisation' | 'facility' | 'product';
 
-const entityRequirements: Record<string, EntityType[]> = {
-  [CredentialType.DigitalProductPassport]: ['organisation', 'facility', 'product'],
-  [CredentialType.DigitalConformityCredential]: ['organisation'],
-  [CredentialType.DigitalFacilityRecord]: ['organisation', 'facility'],
-  [CredentialType.DigitalIdentityAnchor]: ['organisation'],
-  [CredentialType.DigitalTraceabilityEvent]: ['organisation', 'product'],
+type EntityRequirement = {
+  required: EntityType[];
+  optional: EntityType[];
+};
+
+const entityRequirements: Record<string, EntityRequirement> = {
+  [CredentialType.DigitalProductPassport]: { required: ['organisation', 'facility', 'product'], optional: [] },
+  [CredentialType.DigitalConformityCredential]: { required: ['organisation'], optional: ['facility', 'product'] },
+  [CredentialType.DigitalFacilityRecord]: { required: ['organisation', 'facility'], optional: [] },
+  [CredentialType.DigitalIdentityAnchor]: { required: ['organisation'], optional: [] },
+  [CredentialType.DigitalTraceabilityEvent]: { required: ['organisation', 'product'], optional: [] },
 };
 
 /**
@@ -47,45 +52,65 @@ export async function resolveEntities(
   refs: EntityReferences,
   tenantId: string,
 ): Promise<ResolvedEntities> {
-  const requirements = entityRequirements[credentialType];
-  if (!requirements) {
+  const requirement = entityRequirements[credentialType];
+  if (!requirement) {
     throw new ValidationError(`Unknown credential type: ${credentialType}`);
   }
 
   const resolved: ResolvedEntities = {};
 
-  if (requirements.includes('organisation')) {
-    if (!refs.organisationId) {
-      throw new ValidationError('organisationId is required for ' + credentialType);
-    }
-    const organisation = await getOrganisationById(refs.organisationId, tenantId);
-    if (!organisation) {
-      throw new NotFoundError(`Organisation not found: ${refs.organisationId}`);
-    }
-    resolved.organisation = organisation;
+  // Resolve required entities — throw if ref is missing or entity not found
+  for (const entity of requirement.required) {
+    await resolveEntity(entity, refs, tenantId, resolved, true);
   }
 
-  if (requirements.includes('facility')) {
-    if (!refs.facilityId) {
-      throw new ValidationError('facilityId is required for ' + credentialType);
-    }
-    const facility = await getFacilityById(refs.facilityId, tenantId);
-    if (!facility) {
-      throw new NotFoundError(`Facility not found: ${refs.facilityId}`);
-    }
-    resolved.facility = facility;
-  }
-
-  if (requirements.includes('product')) {
-    if (!refs.productId) {
-      throw new ValidationError('productId is required for ' + credentialType);
-    }
-    const product = await getProductById(refs.productId, tenantId);
-    if (!product) {
-      throw new NotFoundError(`Product not found: ${refs.productId}`);
-    }
-    resolved.product = product;
+  // Resolve optional entities — only if ref is provided, throw if provided but not found
+  for (const entity of requirement.optional) {
+    await resolveEntity(entity, refs, tenantId, resolved, false);
   }
 
   return resolved;
+}
+
+const refKeys: Record<EntityType, keyof EntityReferences> = {
+  organisation: 'organisationId',
+  facility: 'facilityId',
+  product: 'productId',
+};
+
+const fetchers: Record<EntityType, (id: string, tenantId: string) => Promise<unknown>> = {
+  organisation: getOrganisationById,
+  facility: getFacilityById,
+  product: getProductById,
+};
+
+const labels: Record<EntityType, string> = {
+  organisation: 'Organisation',
+  facility: 'Facility',
+  product: 'Product',
+};
+
+async function resolveEntity(
+  entity: EntityType,
+  refs: EntityReferences,
+  tenantId: string,
+  resolved: ResolvedEntities,
+  required: boolean,
+): Promise<void> {
+  const refKey = refKeys[entity];
+  const refId = refs[refKey];
+
+  if (!refId) {
+    if (required) {
+      throw new ValidationError(`${refKey} is required for this credential type`);
+    }
+    return; // Optional and not provided — skip
+  }
+
+  const result = await fetchers[entity](refId, tenantId);
+  if (!result) {
+    throw new NotFoundError(`${labels[entity]} not found: ${refId}`);
+  }
+
+  (resolved as Record<string, unknown>)[entity] = result;
 }

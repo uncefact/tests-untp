@@ -58,10 +58,25 @@ describe('resolveEntities', () => {
     });
   });
 
-  it('fetches only organisation for DigitalConformityCredential', async () => {
+  it('fetches organisation and optional facility and product for DigitalConformityCredential when refs provided', async () => {
     setupAllEntitiesFound();
 
     const result = await resolveEntities('DigitalConformityCredential', ALL_REFS, TENANT_ID);
+
+    expect(mockGetOrganisationById).toHaveBeenCalledWith('org-1', TENANT_ID);
+    expect(mockGetFacilityById).toHaveBeenCalledWith('fac-1', TENANT_ID);
+    expect(mockGetProductById).toHaveBeenCalledWith('prod-1', TENANT_ID);
+    expect(result).toEqual({
+      organisation: MOCK_ORGANISATION,
+      facility: MOCK_FACILITY,
+      product: MOCK_PRODUCT,
+    });
+  });
+
+  it('fetches only organisation for DigitalConformityCredential when optional refs omitted', async () => {
+    setupAllEntitiesFound();
+
+    const result = await resolveEntities('DigitalConformityCredential', { organisationId: 'org-1' }, TENANT_ID);
 
     expect(mockGetOrganisationById).toHaveBeenCalledWith('org-1', TENANT_ID);
     expect(mockGetFacilityById).not.toHaveBeenCalled();
@@ -194,7 +209,7 @@ describe('resolveEntities', () => {
 
   // ── Does not call unnecessary repos ──────────────────────────────────────
 
-  it('does not call facility or product repos for DigitalConformityCredential', async () => {
+  it('does not call facility or product repos for DigitalConformityCredential when optional refs omitted', async () => {
     mockGetOrganisationById.mockResolvedValue(MOCK_ORGANISATION);
 
     await resolveEntities('DigitalConformityCredential', { organisationId: 'org-1' }, TENANT_ID);
@@ -202,6 +217,19 @@ describe('resolveEntities', () => {
     expect(mockGetOrganisationById).toHaveBeenCalledTimes(1);
     expect(mockGetFacilityById).not.toHaveBeenCalled();
     expect(mockGetProductById).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFoundError when optional facility ref is provided but not found for DCC', async () => {
+    mockGetOrganisationById.mockResolvedValue(MOCK_ORGANISATION);
+    mockGetFacilityById.mockResolvedValue(null);
+
+    await expect(
+      resolveEntities('DigitalConformityCredential', { organisationId: 'org-1', facilityId: 'missing-fac' }, TENANT_ID),
+    ).rejects.toThrow(NotFoundError);
+
+    await expect(
+      resolveEntities('DigitalConformityCredential', { organisationId: 'org-1', facilityId: 'missing-fac' }, TENANT_ID),
+    ).rejects.toThrow(/Facility not found: missing-fac/);
   });
 
   it('does not call product repo for DigitalFacilityRecord', async () => {
