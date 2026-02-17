@@ -35,6 +35,7 @@ describe('Product API', { testIsolation: false }, () => {
           name: `Prod Test Scheme ${RUN_ID}`,
           primaryKey: `prod-key-${RUN_ID}`,
           validationPattern: '^\\d{11}$',
+          linkTemplate: '/{primaryKey}/{value}',
         },
       }).then((schemeResponse) => {
         schemeId = schemeResponse.body.scheme.id;

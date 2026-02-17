@@ -33,6 +33,7 @@ describe('Facility API', { testIsolation: false }, () => {
           name: `Fac Test Scheme ${RUN_ID}`,
           primaryKey: `fac-pk-${RUN_ID}`,
           validationPattern: '^\\d{11}$',
+          linkTemplate: '/{primaryKey}/{value}',
         },
       }).then((schemeResponse) => {
         schemeId = schemeResponse.body.scheme.id;
