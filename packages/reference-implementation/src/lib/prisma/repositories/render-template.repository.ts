@@ -4,14 +4,14 @@ import { NotFoundError } from '@/lib/api/errors';
 
 /**
  * Include shape used by all render template queries.
- * Includes the parent credential type config.
+ * Includes the parent data model.
  */
 const RENDER_TEMPLATE_INCLUDE = {
-  credentialTypeConfig: true,
+  dataModel: true,
 } as const;
 
 /**
- * A render template with its credential type config relation.
+ * A render template with its data model relation.
  * Matches the include shape defined by RENDER_TEMPLATE_INCLUDE.
  */
 export type RenderTemplateWithRelations = Prisma.RenderTemplateGetPayload<{
@@ -23,7 +23,7 @@ export type RenderTemplateWithRelations = Prisma.RenderTemplateGetPayload<{
  */
 export type CreateRenderTemplateInput = {
   name: string;
-  credentialTypeConfigId: string;
+  dataModelId: string;
   storageUrl: string;
   hash: string;
   isPrimary?: boolean;
@@ -43,7 +43,7 @@ export type UpdateRenderTemplateInput = {
  * Options for listing render templates.
  */
 export type ListRenderTemplatesOptions = {
-  credentialTypeConfigId?: string;
+  dataModelId?: string;
   limit?: number;
   offset?: number;
 };
@@ -51,7 +51,7 @@ export type ListRenderTemplatesOptions = {
 /**
  * Creates a new render template scoped to a tenant.
  * When isPrimary is true, first unsets any existing primary for the same
- * tenant + credentialTypeConfigId combination.
+ * tenant + dataModelId combination.
  */
 export async function createRenderTemplate(
   tenantId: string,
@@ -62,7 +62,7 @@ export async function createRenderTemplate(
       await tx.renderTemplate.updateMany({
         where: {
           tenantId,
-          credentialTypeConfigId: input.credentialTypeConfigId,
+          dataModelId: input.dataModelId,
           isPrimary: true,
         },
         data: { isPrimary: false },
@@ -73,7 +73,7 @@ export async function createRenderTemplate(
       data: {
         tenantId,
         name: input.name,
-        credentialTypeConfigId: input.credentialTypeConfigId,
+        dataModelId: input.dataModelId,
         storageUrl: input.storageUrl,
         hash: input.hash,
         isPrimary: input.isPrimary ?? false,
@@ -99,20 +99,20 @@ export async function getRenderTemplateById(id: string, tenantId: string): Promi
 
 /**
  * Lists render templates for a tenant.
- * Supports filtering by credentialTypeConfigId and pagination.
+ * Supports filtering by dataModelId and pagination.
  */
 export async function listRenderTemplates(
   tenantId: string,
   options: ListRenderTemplatesOptions = {},
 ): Promise<RenderTemplateWithRelations[]> {
-  const { credentialTypeConfigId, limit, offset } = options;
+  const { dataModelId, limit, offset } = options;
 
   const where: Prisma.RenderTemplateWhereInput = {
     tenantId,
   };
 
-  if (credentialTypeConfigId !== undefined) {
-    where.credentialTypeConfigId = credentialTypeConfigId;
+  if (dataModelId !== undefined) {
+    where.dataModelId = dataModelId;
   }
 
   return prisma.renderTemplate.findMany({
@@ -127,7 +127,7 @@ export async function listRenderTemplates(
 /**
  * Updates a render template. Only tenant-owned templates can be updated.
  * When setting isPrimary to true, unsets any existing primary for the same
- * tenant + credentialTypeConfigId combination (excluding self).
+ * tenant + dataModelId combination (excluding self).
  */
 export async function updateRenderTemplate(
   id: string,
@@ -147,7 +147,7 @@ export async function updateRenderTemplate(
       await tx.renderTemplate.updateMany({
         where: {
           tenantId,
-          credentialTypeConfigId: existing.credentialTypeConfigId,
+          dataModelId: existing.dataModelId,
           isPrimary: true,
           NOT: { id },
         },
@@ -189,17 +189,17 @@ export async function deleteRenderTemplate(id: string, tenantId: string): Promis
 }
 
 /**
- * Returns the primary render template for a tenant + credentialTypeConfigId
+ * Returns the primary render template for a tenant + dataModelId
  * combination, or null if none is set.
  */
 export async function getPrimaryRenderTemplate(
   tenantId: string,
-  credentialTypeConfigId: string,
+  dataModelId: string,
 ): Promise<RenderTemplateWithRelations | null> {
   return prisma.renderTemplate.findFirst({
     where: {
       tenantId,
-      credentialTypeConfigId,
+      dataModelId,
       isPrimary: true,
     },
     include: RENDER_TEMPLATE_INCLUDE,

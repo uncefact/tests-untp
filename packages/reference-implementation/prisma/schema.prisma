@@ -110,7 +110,7 @@ model Tenant {
   organisations      OrganisationEntity[]
   facilities         Facility[]
   products             Product[]
-  credentialTypeConfigs CredentialTypeConfig[]
+  dataModels             DataModel[]
   renderTemplates      RenderTemplate[]
 
   @@map("Tenant")
@@ -407,11 +407,11 @@ model ProductSecondaryIdentifier {
 }
 
 /**
- * Credential type configuration for both core UNTP types and tenant extensions.
+ * Data model configuration for both core UNTP types and tenant extensions.
  * Stores schema URLs, context URLs, and version information.
  * Extensions reference a parent config via the self-relation.
  */
-model CredentialTypeConfig {
+model DataModel {
   id               String    @id @default(cuid())
   tenantId         String?
   tenant           Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -422,8 +422,8 @@ model CredentialTypeConfig {
 
   isExtension      Boolean   @default(true)
   parentConfigId   String?
-  parentConfig     CredentialTypeConfig?  @relation("ExtensionParent", fields: [parentConfigId], references: [id], onDelete: Cascade)
-  extensions       CredentialTypeConfig[] @relation("ExtensionParent")
+  parentConfig     DataModel?  @relation("ExtensionParent", fields: [parentConfigId], references: [id], onDelete: Cascade)
+  extensions       DataModel[] @relation("ExtensionParent")
 
   schemaUrl        String
   contextUrl       String
@@ -446,8 +446,8 @@ model RenderTemplate {
   tenantId                 String
   tenant                   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  credentialTypeConfigId   String
-  credentialTypeConfig     CredentialTypeConfig   @relation(fields: [credentialTypeConfigId], references: [id], onDelete: Cascade)
+  dataModelId              String
+  dataModel                DataModel              @relation(fields: [dataModelId], references: [id], onDelete: Cascade)
 
   name                     String
   storageUrl               String
@@ -457,5 +457,5 @@ model RenderTemplate {
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 
-  @@index([tenantId, credentialTypeConfigId])
+  @@index([tenantId, dataModelId])
 }

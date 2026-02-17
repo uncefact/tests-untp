@@ -1,14 +1,14 @@
 import {
-  createCredentialTypeConfig,
-  getCredentialTypeConfigById,
-  listCredentialTypeConfigs,
-  updateCredentialTypeConfig,
-  deleteCredentialTypeConfig,
-} from './credential-type-config.repository';
+  createDataModel,
+  getDataModelById,
+  listDataModels,
+  updateDataModel,
+  deleteDataModel,
+} from './data-model.repository';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
-  credentialTypeConfig: {
+  dataModel: {
     create: jest.fn(),
     findFirst: jest.fn(),
     findMany: jest.fn(),
@@ -20,7 +20,7 @@ const mockTx = {
 // Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
 jest.mock('../prisma', () => ({
   prisma: {
-    credentialTypeConfig: {
+    dataModel: {
       create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -32,7 +32,7 @@ jest.mock('../prisma', () => ({
 // Import the mocked prisma after jest.mock
 import { prisma } from '../prisma';
 
-const mockCredentialTypeConfig = prisma.credentialTypeConfig as unknown as {
+const mockDataModel = prisma.dataModel as unknown as {
   create: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
@@ -44,7 +44,7 @@ const INCLUDE_SHAPE = {
   renderTemplates: true,
 };
 
-describe('credential-type-config.repository', () => {
+describe('data-model.repository', () => {
   const TENANT_ID = 'tenant-1';
   const CONFIG_RECORD = {
     id: 'config-1',
@@ -78,11 +78,11 @@ describe('credential-type-config.repository', () => {
     jest.clearAllMocks();
   });
 
-  describe('createCredentialTypeConfig', () => {
+  describe('createDataModel', () => {
     it('creates a core config successfully', async () => {
-      mockTx.credentialTypeConfig.create.mockResolvedValue(CONFIG_RECORD);
+      mockTx.dataModel.create.mockResolvedValue(CONFIG_RECORD);
 
-      const result = await createCredentialTypeConfig(TENANT_ID, {
+      const result = await createDataModel(TENANT_ID, {
         name: 'Digital Product Passport v0.6.0',
         credentialType: 'DigitalProductPassport' as never,
         version: '0.6.0',
@@ -91,7 +91,7 @@ describe('credential-type-config.repository', () => {
         isExtension: false,
       });
 
-      expect(mockTx.credentialTypeConfig.create).toHaveBeenCalledWith({
+      expect(mockTx.dataModel.create).toHaveBeenCalledWith({
         data: {
           tenantId: TENANT_ID,
           name: 'Digital Product Passport v0.6.0',
@@ -107,10 +107,10 @@ describe('credential-type-config.repository', () => {
     });
 
     it('creates an extension config with valid parent', async () => {
-      mockTx.credentialTypeConfig.findFirst.mockResolvedValue(CONFIG_RECORD);
-      mockTx.credentialTypeConfig.create.mockResolvedValue(EXTENSION_RECORD);
+      mockTx.dataModel.findFirst.mockResolvedValue(CONFIG_RECORD);
+      mockTx.dataModel.create.mockResolvedValue(EXTENSION_RECORD);
 
-      const result = await createCredentialTypeConfig(TENANT_ID, {
+      const result = await createDataModel(TENANT_ID, {
         name: 'Custom DPP Extension',
         credentialType: 'DigitalProductPassport' as never,
         version: '0.6.0',
@@ -120,16 +120,16 @@ describe('credential-type-config.repository', () => {
         parentConfigId: 'config-1',
       });
 
-      expect(mockTx.credentialTypeConfig.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.dataModel.findFirst).toHaveBeenCalledWith({
         where: { id: 'config-1' },
       });
-      expect(mockTx.credentialTypeConfig.create).toHaveBeenCalled();
+      expect(mockTx.dataModel.create).toHaveBeenCalled();
       expect(result).toEqual(EXTENSION_RECORD);
     });
 
     it('throws when isExtension is true but parentConfigId is missing', async () => {
       await expect(
-        createCredentialTypeConfig(TENANT_ID, {
+        createDataModel(TENANT_ID, {
           name: 'Extension Without Parent',
           credentialType: 'DigitalProductPassport' as never,
           version: '0.6.0',
@@ -141,10 +141,10 @@ describe('credential-type-config.repository', () => {
     });
 
     it('throws when parent config does not exist', async () => {
-      mockTx.credentialTypeConfig.findFirst.mockResolvedValue(null);
+      mockTx.dataModel.findFirst.mockResolvedValue(null);
 
       await expect(
-        createCredentialTypeConfig(TENANT_ID, {
+        createDataModel(TENANT_ID, {
           name: 'Extension With Invalid Parent',
           credentialType: 'DigitalProductPassport' as never,
           version: '0.6.0',
@@ -157,13 +157,13 @@ describe('credential-type-config.repository', () => {
     });
 
     it('throws when parent config is itself an extension', async () => {
-      mockTx.credentialTypeConfig.findFirst.mockResolvedValue({
+      mockTx.dataModel.findFirst.mockResolvedValue({
         ...CONFIG_RECORD,
         isExtension: true,
       });
 
       await expect(
-        createCredentialTypeConfig(TENANT_ID, {
+        createDataModel(TENANT_ID, {
           name: 'Extension With Extension Parent',
           credentialType: 'DigitalProductPassport' as never,
           version: '0.6.0',
@@ -176,10 +176,10 @@ describe('credential-type-config.repository', () => {
     });
 
     it('defaults isExtension to true when not provided', async () => {
-      mockTx.credentialTypeConfig.findFirst.mockResolvedValue(CONFIG_RECORD);
-      mockTx.credentialTypeConfig.create.mockResolvedValue(EXTENSION_RECORD);
+      mockTx.dataModel.findFirst.mockResolvedValue(CONFIG_RECORD);
+      mockTx.dataModel.create.mockResolvedValue(EXTENSION_RECORD);
 
-      await createCredentialTypeConfig(TENANT_ID, {
+      await createDataModel(TENANT_ID, {
         name: 'Default Extension',
         credentialType: 'DigitalProductPassport' as never,
         version: '0.6.0',
@@ -188,7 +188,7 @@ describe('credential-type-config.repository', () => {
         parentConfigId: 'config-1',
       });
 
-      expect(mockTx.credentialTypeConfig.create).toHaveBeenCalledWith({
+      expect(mockTx.dataModel.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           isExtension: true,
           parentConfigId: 'config-1',
@@ -198,13 +198,13 @@ describe('credential-type-config.repository', () => {
     });
   });
 
-  describe('getCredentialTypeConfigById', () => {
+  describe('getDataModelById', () => {
     it('returns config visible to tenant or system-provisioned', async () => {
-      mockCredentialTypeConfig.findFirst.mockResolvedValue(CONFIG_RECORD);
+      mockDataModel.findFirst.mockResolvedValue(CONFIG_RECORD);
 
-      const result = await getCredentialTypeConfigById('config-1', TENANT_ID);
+      const result = await getDataModelById('config-1', TENANT_ID);
 
-      expect(mockCredentialTypeConfig.findFirst).toHaveBeenCalledWith({
+      expect(mockDataModel.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'config-1',
           OR: [{ tenantId: TENANT_ID }, { tenantId: null }],
@@ -215,20 +215,20 @@ describe('credential-type-config.repository', () => {
     });
 
     it('returns null when config is not found', async () => {
-      mockCredentialTypeConfig.findFirst.mockResolvedValue(null);
+      mockDataModel.findFirst.mockResolvedValue(null);
 
-      const result = await getCredentialTypeConfigById('nonexistent', TENANT_ID);
+      const result = await getDataModelById('nonexistent', TENANT_ID);
       expect(result).toBeNull();
     });
   });
 
-  describe('listCredentialTypeConfigs', () => {
+  describe('listDataModels', () => {
     it('returns system and tenant configs', async () => {
-      mockCredentialTypeConfig.findMany.mockResolvedValue([CONFIG_RECORD, EXTENSION_RECORD]);
+      mockDataModel.findMany.mockResolvedValue([CONFIG_RECORD, EXTENSION_RECORD]);
 
-      const result = await listCredentialTypeConfigs(TENANT_ID);
+      const result = await listDataModels(TENANT_ID);
 
-      expect(mockCredentialTypeConfig.findMany).toHaveBeenCalledWith({
+      expect(mockDataModel.findMany).toHaveBeenCalledWith({
         where: {
           OR: [{ tenantId: TENANT_ID }, { tenantId: null }],
         },
@@ -241,11 +241,11 @@ describe('credential-type-config.repository', () => {
     });
 
     it('applies isExtension filter', async () => {
-      mockCredentialTypeConfig.findMany.mockResolvedValue([CONFIG_RECORD]);
+      mockDataModel.findMany.mockResolvedValue([CONFIG_RECORD]);
 
-      await listCredentialTypeConfigs(TENANT_ID, { isExtension: false });
+      await listDataModels(TENANT_ID, { isExtension: false });
 
-      expect(mockCredentialTypeConfig.findMany).toHaveBeenCalledWith({
+      expect(mockDataModel.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
           isExtension: false,
         }),
@@ -257,13 +257,13 @@ describe('credential-type-config.repository', () => {
     });
 
     it('applies credentialType filter', async () => {
-      mockCredentialTypeConfig.findMany.mockResolvedValue([]);
+      mockDataModel.findMany.mockResolvedValue([]);
 
-      await listCredentialTypeConfigs(TENANT_ID, {
+      await listDataModels(TENANT_ID, {
         credentialType: 'DigitalProductPassport' as never,
       });
 
-      expect(mockCredentialTypeConfig.findMany).toHaveBeenCalledWith({
+      expect(mockDataModel.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
           credentialType: 'DigitalProductPassport',
         }),
@@ -275,11 +275,11 @@ describe('credential-type-config.repository', () => {
     });
 
     it('applies version filter', async () => {
-      mockCredentialTypeConfig.findMany.mockResolvedValue([]);
+      mockDataModel.findMany.mockResolvedValue([]);
 
-      await listCredentialTypeConfigs(TENANT_ID, { version: '0.6.0' });
+      await listDataModels(TENANT_ID, { version: '0.6.0' });
 
-      expect(mockCredentialTypeConfig.findMany).toHaveBeenCalledWith({
+      expect(mockDataModel.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
           version: '0.6.0',
         }),
@@ -291,11 +291,11 @@ describe('credential-type-config.repository', () => {
     });
 
     it('applies pagination', async () => {
-      mockCredentialTypeConfig.findMany.mockResolvedValue([]);
+      mockDataModel.findMany.mockResolvedValue([]);
 
-      await listCredentialTypeConfigs(TENANT_ID, { limit: 10, offset: 20 });
+      await listDataModels(TENANT_ID, { limit: 10, offset: 20 });
 
-      expect(mockCredentialTypeConfig.findMany).toHaveBeenCalledWith(
+      expect(mockDataModel.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           take: 10,
           skip: 20,
@@ -304,20 +304,20 @@ describe('credential-type-config.repository', () => {
     });
   });
 
-  describe('updateCredentialTypeConfig', () => {
+  describe('updateDataModel', () => {
     it('updates a tenant-owned extension config', async () => {
-      mockTx.credentialTypeConfig.findFirst.mockResolvedValue(EXTENSION_RECORD);
+      mockTx.dataModel.findFirst.mockResolvedValue(EXTENSION_RECORD);
       const updatedRecord = { ...EXTENSION_RECORD, name: 'Updated Name' };
-      mockTx.credentialTypeConfig.update.mockResolvedValue(updatedRecord);
+      mockTx.dataModel.update.mockResolvedValue(updatedRecord);
 
-      const result = await updateCredentialTypeConfig('config-ext-1', TENANT_ID, {
+      const result = await updateDataModel('config-ext-1', TENANT_ID, {
         name: 'Updated Name',
       });
 
-      expect(mockTx.credentialTypeConfig.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.dataModel.findFirst).toHaveBeenCalledWith({
         where: { id: 'config-ext-1', tenantId: TENANT_ID, isExtension: true },
       });
-      expect(mockTx.credentialTypeConfig.update).toHaveBeenCalledWith({
+      expect(mockTx.dataModel.update).toHaveBeenCalledWith({
         where: { id: 'config-ext-1' },
         data: { name: 'Updated Name' },
         include: INCLUDE_SHAPE,
@@ -326,33 +326,33 @@ describe('credential-type-config.repository', () => {
     });
 
     it('throws when config is not tenant-owned', async () => {
-      mockTx.credentialTypeConfig.findFirst.mockResolvedValue(null);
+      mockTx.dataModel.findFirst.mockResolvedValue(null);
 
-      await expect(updateCredentialTypeConfig('config-1', 'other-tenant', { name: 'Updated' })).rejects.toThrow(
-        'Credential type config not found or access denied',
+      await expect(updateDataModel('config-1', 'other-tenant', { name: 'Updated' })).rejects.toThrow(
+        'Data model not found or access denied',
       );
     });
 
     it('throws when config is not an extension', async () => {
-      mockTx.credentialTypeConfig.findFirst.mockResolvedValue(null);
+      mockTx.dataModel.findFirst.mockResolvedValue(null);
 
-      await expect(updateCredentialTypeConfig('config-1', TENANT_ID, { name: 'Updated' })).rejects.toThrow(
-        'Credential type config not found or access denied',
+      await expect(updateDataModel('config-1', TENANT_ID, { name: 'Updated' })).rejects.toThrow(
+        'Data model not found or access denied',
       );
     });
 
     it('applies partial update with conditional spreads', async () => {
-      mockTx.credentialTypeConfig.findFirst.mockResolvedValue(EXTENSION_RECORD);
-      mockTx.credentialTypeConfig.update.mockResolvedValue({
+      mockTx.dataModel.findFirst.mockResolvedValue(EXTENSION_RECORD);
+      mockTx.dataModel.update.mockResolvedValue({
         ...EXTENSION_RECORD,
         schemaUrl: 'https://example.com/new-schema.json',
       });
 
-      await updateCredentialTypeConfig('config-ext-1', TENANT_ID, {
+      await updateDataModel('config-ext-1', TENANT_ID, {
         schemaUrl: 'https://example.com/new-schema.json',
       });
 
-      expect(mockTx.credentialTypeConfig.update).toHaveBeenCalledWith({
+      expect(mockTx.dataModel.update).toHaveBeenCalledWith({
         where: { id: 'config-ext-1' },
         data: { schemaUrl: 'https://example.com/new-schema.json' },
         include: INCLUDE_SHAPE,
@@ -360,17 +360,17 @@ describe('credential-type-config.repository', () => {
     });
   });
 
-  describe('deleteCredentialTypeConfig', () => {
+  describe('deleteDataModel', () => {
     it('deletes a tenant-owned extension config', async () => {
-      mockTx.credentialTypeConfig.findFirst.mockResolvedValue(EXTENSION_RECORD);
-      mockTx.credentialTypeConfig.delete.mockResolvedValue(EXTENSION_RECORD);
+      mockTx.dataModel.findFirst.mockResolvedValue(EXTENSION_RECORD);
+      mockTx.dataModel.delete.mockResolvedValue(EXTENSION_RECORD);
 
-      const result = await deleteCredentialTypeConfig('config-ext-1', TENANT_ID);
+      const result = await deleteDataModel('config-ext-1', TENANT_ID);
 
-      expect(mockTx.credentialTypeConfig.findFirst).toHaveBeenCalledWith({
+      expect(mockTx.dataModel.findFirst).toHaveBeenCalledWith({
         where: { id: 'config-ext-1', tenantId: TENANT_ID, isExtension: true },
       });
-      expect(mockTx.credentialTypeConfig.delete).toHaveBeenCalledWith({
+      expect(mockTx.dataModel.delete).toHaveBeenCalledWith({
         where: { id: 'config-ext-1' },
         include: INCLUDE_SHAPE,
       });
@@ -378,10 +378,10 @@ describe('credential-type-config.repository', () => {
     });
 
     it('throws when config is not tenant-owned', async () => {
-      mockTx.credentialTypeConfig.findFirst.mockResolvedValue(null);
+      mockTx.dataModel.findFirst.mockResolvedValue(null);
 
-      await expect(deleteCredentialTypeConfig('config-1', 'other-tenant')).rejects.toThrow(
-        'Credential type config not found or access denied',
+      await expect(deleteDataModel('config-1', 'other-tenant')).rejects.toThrow(
+        'Data model not found or access denied',
       );
     });
   });

@@ -47,7 +47,7 @@ const mockRenderTemplate = prisma.renderTemplate as unknown as {
 };
 
 const INCLUDE_SHAPE = {
-  credentialTypeConfig: true,
+  dataModel: true,
 };
 
 describe('render-template.repository', () => {
@@ -56,12 +56,12 @@ describe('render-template.repository', () => {
   const TEMPLATE_RECORD = {
     id: 'template-1',
     tenantId: TENANT_ID,
-    credentialTypeConfigId: CONFIG_ID,
+    dataModelId: CONFIG_ID,
     name: 'DPP Default Template',
     storageUrl: 'https://storage.example.com/templates/dpp-default.html',
     hash: 'sha256-abc123',
     isPrimary: false,
-    credentialTypeConfig: {
+    dataModel: {
       id: CONFIG_ID,
       name: 'Digital Product Passport v0.6.0',
     },
@@ -79,7 +79,7 @@ describe('render-template.repository', () => {
 
       const result = await createRenderTemplate(TENANT_ID, {
         name: 'DPP Default Template',
-        credentialTypeConfigId: CONFIG_ID,
+        dataModelId: CONFIG_ID,
         storageUrl: 'https://storage.example.com/templates/dpp-default.html',
         hash: 'sha256-abc123',
       });
@@ -88,7 +88,7 @@ describe('render-template.repository', () => {
         data: {
           tenantId: TENANT_ID,
           name: 'DPP Default Template',
-          credentialTypeConfigId: CONFIG_ID,
+          dataModelId: CONFIG_ID,
           storageUrl: 'https://storage.example.com/templates/dpp-default.html',
           hash: 'sha256-abc123',
           isPrimary: false,
@@ -103,7 +103,7 @@ describe('render-template.repository', () => {
 
       await createRenderTemplate(TENANT_ID, {
         name: 'DPP Default Template',
-        credentialTypeConfigId: CONFIG_ID,
+        dataModelId: CONFIG_ID,
         storageUrl: 'https://storage.example.com/templates/dpp-default.html',
         hash: 'sha256-abc123',
       });
@@ -123,7 +123,7 @@ describe('render-template.repository', () => {
 
       await createRenderTemplate(TENANT_ID, {
         name: 'DPP Primary Template',
-        credentialTypeConfigId: CONFIG_ID,
+        dataModelId: CONFIG_ID,
         storageUrl: 'https://storage.example.com/templates/dpp-primary.html',
         hash: 'sha256-def456',
         isPrimary: true,
@@ -132,7 +132,7 @@ describe('render-template.repository', () => {
       expect(mockTx.renderTemplate.updateMany).toHaveBeenCalledWith({
         where: {
           tenantId: TENANT_ID,
-          credentialTypeConfigId: CONFIG_ID,
+          dataModelId: CONFIG_ID,
           isPrimary: true,
         },
         data: { isPrimary: false },
@@ -188,15 +188,15 @@ describe('render-template.repository', () => {
       expect(result).toEqual([TEMPLATE_RECORD]);
     });
 
-    it('filters by credentialTypeConfigId', async () => {
+    it('filters by dataModelId', async () => {
       mockRenderTemplate.findMany.mockResolvedValue([TEMPLATE_RECORD]);
 
-      await listRenderTemplates(TENANT_ID, { credentialTypeConfigId: CONFIG_ID });
+      await listRenderTemplates(TENANT_ID, { dataModelId: CONFIG_ID });
 
       expect(mockRenderTemplate.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
           tenantId: TENANT_ID,
-          credentialTypeConfigId: CONFIG_ID,
+          dataModelId: CONFIG_ID,
         }),
         include: INCLUDE_SHAPE,
         take: 100,
@@ -261,7 +261,7 @@ describe('render-template.repository', () => {
       expect(mockTx.renderTemplate.updateMany).toHaveBeenCalledWith({
         where: {
           tenantId: TENANT_ID,
-          credentialTypeConfigId: CONFIG_ID,
+          dataModelId: CONFIG_ID,
           isPrimary: true,
           NOT: { id: 'template-1' },
         },
@@ -334,7 +334,7 @@ describe('render-template.repository', () => {
       expect(mockRenderTemplate.findFirst).toHaveBeenCalledWith({
         where: {
           tenantId: TENANT_ID,
-          credentialTypeConfigId: CONFIG_ID,
+          dataModelId: CONFIG_ID,
           isPrimary: true,
         },
         include: INCLUDE_SHAPE,

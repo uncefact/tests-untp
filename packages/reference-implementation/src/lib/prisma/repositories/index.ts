@@ -8,5 +8,5 @@ export * from './link-registration.repository';
 export * from './organisation.repository';
 export * from './facility.repository';
 export * from './product.repository';
-export * from './credential-type-config.repository';
+export * from './data-model.repository';
 export * from './render-template.repository';

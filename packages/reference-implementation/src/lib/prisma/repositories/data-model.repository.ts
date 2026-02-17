@@ -4,27 +4,27 @@ import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 
 /**
- * Include shape used by all credential type config queries.
+ * Include shape used by all data model queries.
  * Includes the parent config, extensions, and render templates.
  */
-const CREDENTIAL_TYPE_CONFIG_INCLUDE = {
+const DATA_MODEL_INCLUDE = {
   parentConfig: true,
   extensions: true,
   renderTemplates: true,
 } as const;
 
 /**
- * A credential type config with its full relations.
- * Matches the include shape defined by CREDENTIAL_TYPE_CONFIG_INCLUDE.
+ * A data model with its full relations.
+ * Matches the include shape defined by DATA_MODEL_INCLUDE.
  */
-export type CredentialTypeConfigWithRelations = Prisma.CredentialTypeConfigGetPayload<{
-  include: typeof CREDENTIAL_TYPE_CONFIG_INCLUDE;
+export type DataModelWithRelations = Prisma.DataModelGetPayload<{
+  include: typeof DATA_MODEL_INCLUDE;
 }>;
 
 /**
- * Input for creating a new credential type config.
+ * Input for creating a new data model.
  */
-export type CreateCredentialTypeConfigInput = {
+export type CreateDataModelInput = {
   name: string;
   credentialType: CredentialType;
   version: string;
@@ -36,10 +36,10 @@ export type CreateCredentialTypeConfigInput = {
 };
 
 /**
- * Input for updating an existing credential type config.
+ * Input for updating an existing data model.
  * Only name, schemaUrl, contextUrl, and websiteUrl may be changed.
  */
-export type UpdateCredentialTypeConfigInput = {
+export type UpdateDataModelInput = {
   name?: string;
   schemaUrl?: string;
   contextUrl?: string;
@@ -47,9 +47,9 @@ export type UpdateCredentialTypeConfigInput = {
 };
 
 /**
- * Options for listing credential type configs.
+ * Options for listing data models.
  */
-export type ListCredentialTypeConfigOptions = {
+export type ListDataModelOptions = {
   isExtension?: boolean;
   credentialType?: CredentialType;
   version?: string;
@@ -58,14 +58,11 @@ export type ListCredentialTypeConfigOptions = {
 };
 
 /**
- * Creates a new credential type config scoped to a tenant.
+ * Creates a new data model scoped to a tenant.
  * If isExtension is true (the default), validates that parentConfigId is
  * provided and that the parent is a core type (isExtension=false).
  */
-export async function createCredentialTypeConfig(
-  tenantId: string,
-  input: CreateCredentialTypeConfigInput,
-): Promise<CredentialTypeConfigWithRelations> {
+export async function createDataModel(tenantId: string, input: CreateDataModelInput): Promise<DataModelWithRelations> {
   const isExtension = input.isExtension ?? true;
 
   return prisma.$transaction(async (tx) => {
@@ -74,7 +71,7 @@ export async function createCredentialTypeConfig(
         throw new ValidationError('parentConfigId is required for extension configs');
       }
 
-      const parent = await tx.credentialTypeConfig.findFirst({
+      const parent = await tx.dataModel.findFirst({
         where: { id: input.parentConfigId },
       });
 
@@ -87,7 +84,7 @@ export async function createCredentialTypeConfig(
       }
     }
 
-    return tx.credentialTypeConfig.create({
+    return tx.dataModel.create({
       data: {
         tenantId,
         name: input.name,
@@ -99,39 +96,36 @@ export async function createCredentialTypeConfig(
         ...(input.websiteUrl !== undefined && { websiteUrl: input.websiteUrl }),
         ...(input.parentConfigId !== undefined && { parentConfigId: input.parentConfigId }),
       },
-      include: CREDENTIAL_TYPE_CONFIG_INCLUDE,
+      include: DATA_MODEL_INCLUDE,
     });
   });
 }
 
 /**
- * Retrieves a credential type config by ID.
- * Returns configs visible to the tenant OR system-provisioned (tenantId=null).
+ * Retrieves a data model by ID.
+ * Returns models visible to the tenant OR system-provisioned (tenantId=null).
  */
-export async function getCredentialTypeConfigById(
-  id: string,
-  tenantId: string,
-): Promise<CredentialTypeConfigWithRelations | null> {
-  return prisma.credentialTypeConfig.findFirst({
+export async function getDataModelById(id: string, tenantId: string): Promise<DataModelWithRelations | null> {
+  return prisma.dataModel.findFirst({
     where: {
       id,
       OR: [{ tenantId }, { tenantId: null }],
     },
-    include: CREDENTIAL_TYPE_CONFIG_INCLUDE,
+    include: DATA_MODEL_INCLUDE,
   });
 }
 
 /**
- * Lists credential type configs for a tenant, including system-provisioned configs.
+ * Lists data models for a tenant, including system-provisioned configs.
  * Supports filtering by isExtension, credentialType, and version.
  */
-export async function listCredentialTypeConfigs(
+export async function listDataModels(
   tenantId: string,
-  options: ListCredentialTypeConfigOptions = {},
-): Promise<CredentialTypeConfigWithRelations[]> {
+  options: ListDataModelOptions = {},
+): Promise<DataModelWithRelations[]> {
   const { isExtension, credentialType, version, limit, offset } = options;
 
-  const where: Prisma.CredentialTypeConfigWhereInput = {
+  const where: Prisma.DataModelWhereInput = {
     OR: [{ tenantId }, { tenantId: null }],
   };
 
@@ -147,9 +141,9 @@ export async function listCredentialTypeConfigs(
     where.version = version;
   }
 
-  return prisma.credentialTypeConfig.findMany({
+  return prisma.dataModel.findMany({
     where,
-    include: CREDENTIAL_TYPE_CONFIG_INCLUDE,
+    include: DATA_MODEL_INCLUDE,
     take: limit ?? 100,
     skip: offset,
     orderBy: { createdAt: 'desc' },
@@ -157,25 +151,25 @@ export async function listCredentialTypeConfigs(
 }
 
 /**
- * Updates a credential type config.
+ * Updates a data model.
  * Only tenant-owned extension configs can be updated.
  * System-provisioned and core configs are immutable from the tenant's perspective.
  */
-export async function updateCredentialTypeConfig(
+export async function updateDataModel(
   id: string,
   tenantId: string,
-  input: UpdateCredentialTypeConfigInput,
-): Promise<CredentialTypeConfigWithRelations> {
+  input: UpdateDataModelInput,
+): Promise<DataModelWithRelations> {
   return prisma.$transaction(async (tx) => {
-    const existing = await tx.credentialTypeConfig.findFirst({
+    const existing = await tx.dataModel.findFirst({
       where: { id, tenantId, isExtension: true },
     });
 
     if (!existing) {
-      throw new NotFoundError('Credential type config not found or access denied');
+      throw new NotFoundError('Data model not found or access denied');
     }
 
-    return tx.credentialTypeConfig.update({
+    return tx.dataModel.update({
       where: { id },
       data: {
         ...(input.name !== undefined && { name: input.name }),
@@ -183,32 +177,29 @@ export async function updateCredentialTypeConfig(
         ...(input.contextUrl !== undefined && { contextUrl: input.contextUrl }),
         ...(input.websiteUrl !== undefined && { websiteUrl: input.websiteUrl }),
       },
-      include: CREDENTIAL_TYPE_CONFIG_INCLUDE,
+      include: DATA_MODEL_INCLUDE,
     });
   });
 }
 
 /**
- * Deletes a credential type config.
+ * Deletes a data model.
  * Only tenant-owned extension configs can be deleted.
  * System-provisioned and core configs cannot be removed by tenants.
  */
-export async function deleteCredentialTypeConfig(
-  id: string,
-  tenantId: string,
-): Promise<CredentialTypeConfigWithRelations> {
+export async function deleteDataModel(id: string, tenantId: string): Promise<DataModelWithRelations> {
   return prisma.$transaction(async (tx) => {
-    const existing = await tx.credentialTypeConfig.findFirst({
+    const existing = await tx.dataModel.findFirst({
       where: { id, tenantId, isExtension: true },
     });
 
     if (!existing) {
-      throw new NotFoundError('Credential type config not found or access denied');
+      throw new NotFoundError('Data model not found or access denied');
     }
 
-    return tx.credentialTypeConfig.delete({
+    return tx.dataModel.delete({
       where: { id },
-      include: CREDENTIAL_TYPE_CONFIG_INCLUDE,
+      include: DATA_MODEL_INCLUDE,
     });
   });
 }
