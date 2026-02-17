@@ -4,7 +4,7 @@ import type { IdentifierScheme } from '@uncefact/untp-ri-services';
 import type { UntpLocation } from '@/lib/types';
 
 /**
- * DPP v0.6.0 UNTP schema types.
+ * DPP v0.6.1 UNTP schema types.
  * These mirror the JSON schema definitions for the Digital Product Passport.
  */
 type DppProduct = {
@@ -55,7 +55,7 @@ type DppFacility = {
 };
 
 /**
- * Mapper for Digital Product Passport v0.6.0.
+ * Mapper for Digital Product Passport v0.6.1.
  * Builds a UNTP DPP credential payload from product, facility, and organisation entities.
  *
  * Output structure follows the UNTP DPP JSON schema:
@@ -65,7 +65,7 @@ type DppFacility = {
  *   - organisation maps to producedByParty with idScheme + description
  *   - facility maps to producedAtFacility with idScheme, description, location, address
  */
-export class DppV060Mapper implements ICredentialMapper {
+export class DppV061Mapper implements ICredentialMapper {
   async buildPayload(entities: ResolvedEntities, config: DataModelConfig): Promise<MapperOutput> {
     const { organisation, facility, product } = entities;
 
@@ -200,4 +200,4 @@ export class DppV060Mapper implements ICredentialMapper {
 }
 
 // Self-register on import
-registerMapper('DigitalProductPassport', '0.6.0', new DppV060Mapper());
+registerMapper('DigitalProductPassport', '0.6.1', new DppV061Mapper());

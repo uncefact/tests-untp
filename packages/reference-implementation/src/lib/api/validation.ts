@@ -30,16 +30,16 @@ export function validateEnum<T extends string>(
 }
 
 /**
- * Parse a string as a positive integer (>= 1).
- * Returns undefined if the raw value is null/undefined.
- */
-/**
  * Check that a value is a non-empty string.
  */
 export function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }
 
+/**
+ * Parse a string as a positive integer (>= 1).
+ * Returns undefined if the raw value is null/undefined.
+ */
 export function parsePositiveInt(raw: string | null | undefined, paramName: string): number | undefined {
   if (raw == null) return undefined;
   const parsed = parseInt(raw, 10);

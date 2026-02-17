@@ -158,6 +158,15 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   if (body.name !== undefined && !isNonEmptyString(body.name)) {
     throw new ValidationError('name must be a non-empty string');
   }
+  if (body.storageUrl !== undefined && !isNonEmptyString(body.storageUrl)) {
+    throw new ValidationError('storageUrl must be a non-empty string');
+  }
+  if (body.hash !== undefined && !isNonEmptyString(body.hash)) {
+    throw new ValidationError('hash must be a non-empty string');
+  }
+  if (body.isPrimary !== undefined && typeof body.isPrimary !== 'boolean') {
+    throw new ValidationError('isPrimary must be a boolean');
+  }
 
   logger.info({ tenantId, renderTemplateId: id }, 'Updating render template');
   const renderTemplate = await updateRenderTemplate(id, tenantId, {
@@ -197,6 +206,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *                 ok:
  *                   type: boolean
  *                   example: true
+ *                 renderTemplate:
+ *                   $ref: '#/components/schemas/RenderTemplate'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -220,8 +231,8 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
   logger.info({ tenantId, renderTemplateId: id }, 'Deleting render template');
-  await deleteRenderTemplate(id, tenantId);
+  const renderTemplate = await deleteRenderTemplate(id, tenantId);
 
   logger.info({ tenantId, renderTemplateId: id }, 'Render template deleted');
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, renderTemplate });
 });

@@ -1,4 +1,4 @@
-import { DppV060Mapper } from './dpp-v060.mapper';
+import { DppV061Mapper } from './dpp-v061.mapper';
 import { getMapper } from '../mapper-registry';
 import { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
 
@@ -7,16 +7,16 @@ import { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
 const mockCoreDataModel = {
   id: 'dm-core-1',
   tenantId: null,
-  name: 'Digital Product Passport v0.6.0',
+  name: 'Digital Product Passport v0.6.1',
   credentialType: 'DigitalProductPassport',
-  version: '0.6.0',
+  version: '0.6.1',
   isExtension: false,
   parentConfigId: null,
   parentConfig: null,
   extensions: [],
   renderTemplates: [],
-  schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/schema.json',
-  contextUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/',
+  schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/schema.json',
+  contextUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/',
   websiteUrl: null,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -27,7 +27,7 @@ const mockExtensionDataModel = {
   tenantId: 'tenant-1',
   name: 'Australian Agriculture Extension',
   credentialType: 'DigitalProductPassport',
-  version: '0.6.0',
+  version: '0.6.1',
   isExtension: true,
   parentConfigId: 'dm-core-1',
   parentConfig: mockCoreDataModel,
@@ -112,8 +112,8 @@ const mockProduct = {
 
 // -- Tests --------------------------------------------------------------------
 
-describe('DppV060Mapper', () => {
-  const mapper = new DppV060Mapper();
+describe('DppV061Mapper', () => {
+  const mapper = new DppV061Mapper();
   const coreConfig: DataModelConfig = { core: mockCoreDataModel };
 
   const fullEntities: ResolvedEntities = {
@@ -128,7 +128,7 @@ describe('DppV060Mapper', () => {
     it('returns @context array containing the core context URL', async () => {
       const result = await mapper.buildPayload(fullEntities, coreConfig);
 
-      expect(result['@context']).toEqual(['https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/']);
+      expect(result['@context']).toEqual(['https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/']);
     });
 
     it('merges extension context URL into @context when extension is present', async () => {
@@ -140,7 +140,7 @@ describe('DppV060Mapper', () => {
       const result = await mapper.buildPayload(fullEntities, configWithExt);
 
       expect(result['@context']).toEqual([
-        'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/',
+        'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/',
         'https://example.org/aus-agri/v1/',
       ]);
     });
@@ -171,7 +171,7 @@ describe('DppV060Mapper', () => {
       const result = await mapper.buildPayload(fullEntities, configWithDifferentType);
 
       expect(result['@context']).toEqual([
-        'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/',
+        'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/',
         'https://example.org/conformity-ext/v1/',
       ]);
       expect(result.type).toEqual(['DigitalProductPassport', 'DigitalConformityCredential']);
@@ -413,7 +413,7 @@ describe('DppV060Mapper', () => {
   // -- extractEntityRefs ------------------------------------------------------
 
   describe('extractEntityRefs', () => {
-    const stubContext = ['https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/'];
+    const stubContext = ['https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/'];
     const stubType = ['DigitalProductPassport'];
 
     it('extracts registered IDs from a valid payload', () => {
@@ -498,10 +498,10 @@ describe('DppV060Mapper', () => {
   // -- Self-registration ------------------------------------------------------
 
   describe('self-registration', () => {
-    it('registers itself in the mapper registry as DigitalProductPassport / 0.6.0', () => {
-      const registered = getMapper('DigitalProductPassport', '0.6.0');
+    it('registers itself in the mapper registry as DigitalProductPassport / 0.6.1', () => {
+      const registered = getMapper('DigitalProductPassport', '0.6.1');
       expect(registered).toBeDefined();
-      expect(registered).toBeInstanceOf(DppV060Mapper);
+      expect(registered).toBeInstanceOf(DppV061Mapper);
     });
   });
 });

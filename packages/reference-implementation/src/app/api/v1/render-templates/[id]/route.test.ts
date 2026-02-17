@@ -191,6 +191,33 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     expect(json.error).toContain('name must be a non-empty string');
   });
 
+  it('returns 400 when storageUrl is empty string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { storageUrl: '' } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('storageUrl must be a non-empty string');
+  });
+
+  it('returns 400 when hash is empty string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { hash: '' } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('hash must be a non-empty string');
+  });
+
+  it('returns 400 when isPrimary is not a boolean', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { isPrimary: 'yes' } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('isPrimary must be a boolean');
+  });
+
   it('returns 404 when repository throws NotFoundError', async () => {
     mockUpdateRenderTemplate.mockRejectedValue(new NotFoundError('Render template not found or access denied'));
 
@@ -219,7 +246,7 @@ describe('DELETE /api/v1/render-templates/:id', () => {
     jest.clearAllMocks();
   });
 
-  it('deletes the render template', async () => {
+  it('deletes the render template and returns it', async () => {
     const deleted = { id: 'rt-1', name: 'Deleted Template' };
     mockDeleteRenderTemplate.mockResolvedValue(deleted);
 
@@ -229,6 +256,7 @@ describe('DELETE /api/v1/render-templates/:id', () => {
 
     expect(res.status).toBe(200);
     expect(json.ok).toBe(true);
+    expect(json.renderTemplate).toEqual(deleted);
     expect(mockDeleteRenderTemplate).toHaveBeenCalledWith('rt-1', 'tenant-1');
   });
 

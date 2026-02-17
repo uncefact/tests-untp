@@ -163,6 +163,24 @@ describe('PATCH /api/v1/data-models/:id', () => {
     expect(json.error).toContain('name must be a non-empty string');
   });
 
+  it('returns 400 when schemaUrl is empty string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { schemaUrl: '' } });
+    const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('schemaUrl must be a non-empty string');
+  });
+
+  it('returns 400 when contextUrl is empty string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { contextUrl: '' } });
+    const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('contextUrl must be a non-empty string');
+  });
+
   it('returns 400 for invalid JSON body', async () => {
     const req = {
       method: 'PATCH',

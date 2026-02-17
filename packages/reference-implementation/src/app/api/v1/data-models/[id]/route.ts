@@ -158,6 +158,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   if (body.name !== undefined && !isNonEmptyString(body.name)) {
     throw new ValidationError('name must be a non-empty string');
   }
+  if (body.schemaUrl !== undefined && !isNonEmptyString(body.schemaUrl)) {
+    throw new ValidationError('schemaUrl must be a non-empty string');
+  }
+  if (body.contextUrl !== undefined && !isNonEmptyString(body.contextUrl)) {
+    throw new ValidationError('contextUrl must be a non-empty string');
+  }
 
   logger.info({ tenantId, dataModelId: id }, 'Updating data model');
   const dataModel = await updateDataModel(id, tenantId, {
