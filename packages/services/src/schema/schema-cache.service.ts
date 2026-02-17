@@ -3,6 +3,9 @@
  *
  * Fetches JSON Schema from a URL and caches it in memory with a configurable
  * TTL. Used downstream to validate credential payloads against their schema.
+ *
+ * Concurrent requests for the same uncached URL are deduplicated: only one
+ * network request is made and all callers receive the same result.
  */
 
 // ── Custom Error ────────────────────────────────────────────────────────────
@@ -24,6 +27,7 @@ export interface CachedSchema {
 // ── Cache ───────────────────────────────────────────────────────────────────
 
 const schemaCache = new Map<string, CachedSchema>();
+const inflightRequests = new Map<string, Promise<object>>();
 
 /** Default TTL: 1 hour (3 600 000 ms). Override with SCHEMA_CACHE_TTL_MS. */
 const DEFAULT_TTL_MS = 3_600_000;
@@ -39,23 +43,9 @@ function getTtlMs(): number {
   return DEFAULT_TTL_MS;
 }
 
-// ── Public API ──────────────────────────────────────────────────────────────
+// ── Internal ────────────────────────────────────────────────────────────────
 
-/**
- * Fetch a JSON Schema from the given URL, returning a cached copy when
- * available and not yet expired.
- *
- * @throws {SchemaFetchError} If the network request fails, the server returns
- *   a non-200 status, or the response body is not valid JSON.
- */
-export async function fetchSchema(schemaUrl: string): Promise<object> {
-  const ttl = getTtlMs();
-  const cached = schemaCache.get(schemaUrl);
-
-  if (cached && Date.now() - cached.fetchedAt < ttl) {
-    return cached.schema;
-  }
-
+async function doFetch(schemaUrl: string): Promise<object> {
   let response: Response;
   try {
     response = await fetch(schemaUrl);
@@ -80,9 +70,42 @@ export async function fetchSchema(schemaUrl: string): Promise<object> {
   return schema;
 }
 
-/** Clear all cached schema entries. */
+// ── Public API ──────────────────────────────────────────────────────────────
+
+/**
+ * Fetch a JSON Schema from the given URL, returning a cached copy when
+ * available and not yet expired. Concurrent requests for the same URL are
+ * deduplicated so only one network call is made.
+ *
+ * @throws {SchemaFetchError} If the network request fails, the server returns
+ *   a non-200 status, or the response body is not valid JSON.
+ */
+export async function fetchSchema(schemaUrl: string): Promise<object> {
+  const ttl = getTtlMs();
+  const cached = schemaCache.get(schemaUrl);
+
+  if (cached && Date.now() - cached.fetchedAt < ttl) {
+    return cached.schema;
+  }
+
+  const inflight = inflightRequests.get(schemaUrl);
+  if (inflight) {
+    return inflight;
+  }
+
+  const promise = doFetch(schemaUrl).finally(() => {
+    inflightRequests.delete(schemaUrl);
+  });
+
+  inflightRequests.set(schemaUrl, promise);
+
+  return promise;
+}
+
+/** Clear all cached schema entries and in-flight requests. */
 export function clearSchemaCache(): void {
   schemaCache.clear();
+  inflightRequests.clear();
 }
 
 /** Expose the cache map (for testing / diagnostics only). */

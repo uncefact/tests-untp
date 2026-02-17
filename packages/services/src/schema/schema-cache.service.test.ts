@@ -96,6 +96,34 @@ describe('schema-cache.service', () => {
     await expect(fetchSchema(SCHEMA_URL)).rejects.toThrow(/Invalid JSON/);
   });
 
+  it('deduplicates concurrent fetches for the same URL', async () => {
+    mockFetch.mockReturnValue(
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => MOCK_SCHEMA,
+      }),
+    );
+
+    const [r1, r2] = await Promise.all([fetchSchema(SCHEMA_URL), fetchSchema(SCHEMA_URL)]);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(r1).toEqual(MOCK_SCHEMA);
+    expect(r2).toEqual(MOCK_SCHEMA);
+  });
+
+  it('allows retry after a failed in-flight fetch', async () => {
+    mockFetch
+      .mockRejectedValueOnce(new Error('Network failure'))
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => MOCK_SCHEMA });
+
+    await expect(fetchSchema(SCHEMA_URL)).rejects.toThrow(SchemaFetchError);
+
+    const result = await fetchSchema(SCHEMA_URL);
+    expect(result).toEqual(MOCK_SCHEMA);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
   it('clears all cached entries', async () => {
     mockFetch.mockResolvedValue({
       ok: true,

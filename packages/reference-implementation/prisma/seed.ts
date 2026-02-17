@@ -484,7 +484,19 @@ async function main() {
           continue;
         }
 
-        const result = (await response.json()) as { uri: string; hash: string };
+        const result: unknown = await response.json();
+        if (
+          typeof result !== 'object' ||
+          result === null ||
+          typeof (result as Record<string, unknown>).uri !== 'string'
+        ) {
+          logger.warn(
+            { credentialType: dm.credentialType, responseBody: result },
+            'Storage service returned unexpected response shape, skipping template',
+          );
+          continue;
+        }
+        const { uri } = result as { uri: string };
 
         await prisma.renderTemplate.create({
           data: {
@@ -492,14 +504,14 @@ async function main() {
             tenantId: SYSTEM_TENANT_ID,
             dataModelId: dm.id,
             name: `${dm.name} Default Template`,
-            storageUrl: result.uri,
+            storageUrl: uri,
             hash,
             isPrimary: true,
           },
         });
 
         logger.info(
-          { templateId: dm.templateId, uri: result.uri, credentialType: dm.credentialType },
+          { templateId: dm.templateId, uri, credentialType: dm.credentialType },
           'Template uploaded and seeded',
         );
       }
