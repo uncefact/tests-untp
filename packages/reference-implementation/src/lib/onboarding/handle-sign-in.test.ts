@@ -1,12 +1,6 @@
 jest.mock('@/lib/prisma/generated', () => ({}));
-jest.mock('./clone-system-defaults', () => ({
-  cloneSystemDefaults: jest.fn().mockResolvedValue(undefined),
-}));
 
 import { handleSignIn } from './handle-sign-in';
-import { cloneSystemDefaults } from './clone-system-defaults';
-
-const mockCloneSystemDefaults = cloneSystemDefaults as jest.Mock;
 
 function buildMockPrisma(overrides: Record<string, unknown> = {}) {
   return {
@@ -155,7 +149,6 @@ describe('handleSignIn', () => {
 
     expect(userModel.update).not.toHaveBeenCalled();
     expect(tenantModel.create).not.toHaveBeenCalled();
-    expect(mockCloneSystemDefaults).not.toHaveBeenCalled();
   });
 
   it('handles missing user gracefully (no-op)', async () => {
@@ -172,29 +165,6 @@ describe('handleSignIn', () => {
     });
 
     expect(userModel.update).not.toHaveBeenCalled();
-  });
-
-  it('calls cloneSystemDefaults with the new tenant ID', async () => {
-    const prisma = buildMockPrisma();
-    const userModel = prisma.user as unknown as {
-      findUnique: jest.Mock;
-      update: jest.Mock;
-    };
-    const tenantModel = prisma.tenant as unknown as {
-      create: jest.Mock;
-    };
-
-    userModel.findUnique.mockResolvedValue({
-      authProviderId: 'kc-12345',
-      tenantId: null,
-    });
-    tenantModel.create.mockResolvedValue({ id: 'new-org-4' });
-
-    await handleSignIn(prisma, 'user-4', ACCOUNT, {
-      name: 'Charlie',
-    });
-
-    expect(mockCloneSystemDefaults).toHaveBeenCalledWith(prisma, 'new-org-4');
   });
 
   it('sets both authProviderId and tenantId when both are missing', async () => {
@@ -225,6 +195,5 @@ describe('handleSignIn', () => {
         tenantId: 'new-org-5',
       },
     });
-    expect(mockCloneSystemDefaults).toHaveBeenCalledWith(prisma, 'new-org-5');
   });
 });

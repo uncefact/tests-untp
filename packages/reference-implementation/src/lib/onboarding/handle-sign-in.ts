@@ -1,5 +1,4 @@
 import type { PrismaClient } from '@/lib/prisma/generated';
-import { cloneSystemDefaults } from './clone-system-defaults';
 import { createLogger } from '@uncefact/untp-ri-services/logging';
 
 const logger = createLogger().child({ module: 'handle-sign-in' });
@@ -16,7 +15,7 @@ interface AccountInfo {
 /**
  * Handles auto-onboarding when a user signs in via OAuth.
  * Sets their authProviderId if missing and creates a tenant
- * with cloned system defaults if they don't have one yet.
+ * if they don't have one yet.
  *
  * Idempotent: no-op when the user is already fully onboarded.
  */
@@ -59,8 +58,6 @@ export async function handleSignIn(
       data: { name: tenantName },
     });
     updates.tenantId = tenant.id;
-
-    await cloneSystemDefaults(prisma, tenant.id);
   }
 
   if (Object.keys(updates).length > 0) {
