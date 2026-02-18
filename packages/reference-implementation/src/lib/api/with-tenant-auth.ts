@@ -61,7 +61,17 @@ export function withTenantAuth(handler: RouteHandler) {
       const email = req.headers.get('x-auth-email') ?? undefined;
       const azp = req.headers.get('x-auth-azp') ?? undefined;
 
-      const resolved = await resolveServiceAccountUser({ sub, name, email });
+      let resolved: { userId: string; tenantId: string } | null;
+      try {
+        resolved = await resolveServiceAccountUser({ sub, name, email });
+      } catch (error) {
+        apiLogger.error(
+          { method, path, sub, error, durationMs: Date.now() - start },
+          'Service account user resolution failed unexpectedly',
+        );
+        return NextResponse.json({ ok: false, error: 'Internal server error' }, { status: 500 });
+      }
+
       if (!resolved) {
         apiLogger.warn(
           { method, path, sub, durationMs: Date.now() - start },

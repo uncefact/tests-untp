@@ -76,10 +76,16 @@ export default auth(async (req) => {
       // Check Bearer token for service account auth
       const payload = await validateBearerAuth(req);
       if (payload) {
-        // Propagate JWT claims as request headers for downstream route handlers
-        if (payload.sub) {
-          requestHeaders.set('x-auth-sub', payload.sub);
+        // sub is required for the service account flow to work
+        if (!payload.sub) {
+          return NextResponse.json(
+            { error: 'Unauthorized', message: 'Token missing required "sub" claim' },
+            { status: 401, headers: { 'x-correlation-id': correlationId } },
+          );
         }
+
+        // Propagate JWT claims as request headers for downstream route handlers
+        requestHeaders.set('x-auth-sub', payload.sub);
 
         const azp = payload['azp'];
         if (azp && typeof azp === 'string') {
