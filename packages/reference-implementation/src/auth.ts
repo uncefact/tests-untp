@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma/prisma';
 import { authConfig } from '@/lib/auth/auth.config';
 import { handleSignIn } from '@/lib/onboarding';
 import { createLogger } from '@uncefact/untp-ri-services';
+import { withPreProvisionedUserLookup } from '@/lib/auth/adapter-wrapper';
 
 const logger = createLogger().child({ module: 'auth' });
 
@@ -15,7 +16,7 @@ const logger = createLogger().child({ module: 'auth' });
  */
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
-  adapter: PrismaAdapter(prisma),
+  adapter: withPreProvisionedUserLookup(PrismaAdapter(prisma), prisma),
   events: {
     async signIn({ user, account }) {
       if (!account || !user.id) return;
