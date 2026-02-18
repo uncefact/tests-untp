@@ -21,10 +21,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ user, account }) {
       if (!account || !user.id) return;
       try {
-        await handleSignIn(prisma, user.id, account, {
-          name: user.name,
-          email: user.email,
-        });
+        await handleSignIn(
+          prisma,
+          user.id,
+          {
+            providerAccountId: account.providerAccountId,
+            access_token: account.access_token ?? undefined,
+          },
+          {
+            name: user.name,
+            email: user.email,
+          },
+        );
       } catch (error) {
         logger.error(
           {
