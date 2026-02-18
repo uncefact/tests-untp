@@ -2,10 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma/prisma';
 
 /**
- * Resolves the tenant ID for the current authenticated user.
- * Looks up the User by their OAuth sub (which is stored as User.id),
- * then returns their tenantId.
- *
+ * Resolves the tenant ID for the given internal user ID (cuid).
  * Returns null if the user is not found or has no tenant.
  */
 export async function getTenantId(userId: string): Promise<string | null> {
