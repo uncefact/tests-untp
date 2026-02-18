@@ -92,9 +92,10 @@ model Account {
 }
 
 model Tenant {
-  id             String   @id @default(cuid())
-  name           String
-  primaryColor   String?
+  id                 String   @id @default(cuid())
+  name               String
+  externalIdpGroupId String?  @unique
+  primaryColor       String?
   secondaryColor String?
   logo           String?
   createdAt      DateTime @default(now())
