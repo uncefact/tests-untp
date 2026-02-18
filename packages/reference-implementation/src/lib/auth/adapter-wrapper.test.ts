@@ -92,6 +92,18 @@ describe('withPreProvisionedUserLookup', () => {
       expect(baseAdapter.createUser).not.toHaveBeenCalled();
     });
 
+    it('falls back to profile email when pre-provisioned user has null email', async () => {
+      const userWithNullEmail = { ...preProvisionedUser, email: null };
+      const mockPrisma = createMockPrisma(userWithNullEmail);
+      const baseAdapter = createMockBaseAdapter();
+      const wrappedAdapter = withPreProvisionedUserLookup(baseAdapter, mockPrisma);
+
+      const result = await wrappedAdapter.createUser!(profileData);
+
+      expect(result.email).toBe('provisioned@example.com');
+      expect(baseAdapter.createUser).not.toHaveBeenCalled();
+    });
+
     it('delegates to the base adapter when no pre-provisioned user is found', async () => {
       const mockPrisma = createMockPrisma(null);
       const baseAdapter = createMockBaseAdapter();

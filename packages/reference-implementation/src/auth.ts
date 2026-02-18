@@ -12,7 +12,7 @@ const logger = createLogger().child({ module: 'auth' });
  * Full auth instance with PrismaAdapter for API routes and server components.
  *
  * The signIn event handles auto-onboarding: it sets the user's authProviderId
- * and creates an organisation with cloned system defaults on first login.
+ * and creates an organisation on first login.
  */
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,

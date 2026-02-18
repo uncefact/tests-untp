@@ -34,7 +34,7 @@ export function withPreProvisionedUserLookup(baseAdapter: Adapter, prisma: Prism
           return {
             id: existing.id,
             name: existing.name,
-            email: existing.email!,
+            email: existing.email ?? data.email ?? '',
             emailVerified: existing.emailVerified,
             image: existing.image,
           };
