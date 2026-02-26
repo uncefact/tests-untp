@@ -130,7 +130,7 @@ export default defineConfig({
     baseUrl: 'http://localhost:3003', // Replace with your application's base URL
     supportFile: 'cypress/support/e2e.ts',
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
-    excludeSpecPattern: ['cypress/e2e/closed_mode/**'],
+    excludeSpecPattern: process.env.CYPRESS_INCLUDE_CLOSED_MODE === 'true' ? [] : ['cypress/e2e/closed_mode/**'],
     video: false, // Disable video recording (optional)
     chromeWebSecurity: false, // Helps bypass security restrictions (if needed)
     retries: {
