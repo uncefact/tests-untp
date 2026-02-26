@@ -7,6 +7,10 @@
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
+  "groups": [
+    { "name": "e2e-org-alpha", "path": "/e2e-org-alpha" },
+    { "name": "e2e-org-beta", "path": "/e2e-org-beta" }
+  ],
   "users": [
     {
       "username": "e2e-admin@test.local",
@@ -21,7 +25,8 @@
           "value": "E2eTest123!",
           "temporary": false
         }
-      ]
+      ],
+      "groups": ["/e2e-org-alpha"]
     },
     {
       "username": "e2e-user@test.local",
@@ -36,7 +41,8 @@
           "value": "E2eTest123!",
           "temporary": false
         }
-      ]
+      ],
+      "groups": ["/e2e-org-alpha"]
     }
   ],
   "clients": [
@@ -60,7 +66,21 @@
       "serviceAccountsEnabled": false,
       "authorizationServicesEnabled": false,
       "consentRequired": false,
-      "defaultClientScopes": ["profile", "email", "roles"]
+      "defaultClientScopes": ["profile", "email", "roles"],
+      "protocolMappers": [
+        {
+          "name": "group-membership",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "ri-service-account-e2e",
@@ -77,7 +97,21 @@
       "serviceAccountsEnabled": true,
       "authorizationServicesEnabled": false,
       "consentRequired": false,
-      "defaultClientScopes": ["profile", "email", "roles"]
+      "defaultClientScopes": ["profile", "email", "roles"],
+      "protocolMappers": [
+        {
+          "name": "group-membership",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
     }
   ]
 }
