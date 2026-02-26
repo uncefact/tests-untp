@@ -1,17 +1,18 @@
 /**
  * Service Account Token Validator
  *
- * Validates Bearer tokens issued by the configured IdP (Keycloak).
+ * Validates Bearer tokens issued by the configured OIDC provider.
  * Used for machine-to-machine authentication with the API.
  *
  * Validates:
- * - Token signature (using IdP's JWKS)
+ * - Token signature (using JWKS from OIDC discovery)
  * - Token issuer (must match configured issuer)
  * - Token audience (must include expected audience)
  * - Token expiry (must not be expired)
  */
 
 import * as jose from 'jose';
+import { getOidcEndpoints } from '@/lib/auth/oidc-discovery';
 
 export interface TokenValidationResult {
   valid: boolean;
@@ -20,16 +21,16 @@ export interface TokenValidationResult {
 }
 
 /**
- * Get JWKS remote key set
+ * Get JWKS remote key set from discovered OIDC endpoint.
  */
-function getJWKS(issuer: string): jose.JWTVerifyGetKey {
-  const jwksUri = `${issuer}/protocol/openid-connect/certs`;
+async function getJWKS(): Promise<jose.JWTVerifyGetKey> {
+  const { jwks_uri } = await getOidcEndpoints();
 
-  return jose.createRemoteJWKSet(new URL(jwksUri));
+  return jose.createRemoteJWKSet(new URL(jwks_uri));
 }
 
 /**
- * Validates a Bearer token against the configured IdP.
+ * Validates a Bearer token against the configured OIDC provider.
  *
  * @param token - The JWT token to validate (without "Bearer " prefix)
  * @param options - Validation options
@@ -42,8 +43,8 @@ export async function validateServiceAccountToken(
     audience?: string;
   },
 ): Promise<TokenValidationResult> {
-  const issuer = options?.issuer ?? process.env.AUTH_KEYCLOAK_ISSUER;
-  const audience = options?.audience ?? process.env.AUTH_KEYCLOAK_SERVICE_ACCOUNT_AUDIENCE;
+  const issuer = options?.issuer ?? process.env.AUTH_OIDC_ISSUER;
+  const audience = options?.audience ?? process.env.AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE;
 
   if (!issuer) {
     return {
@@ -53,7 +54,7 @@ export async function validateServiceAccountToken(
   }
 
   try {
-    const jwks = getJWKS(issuer);
+    const jwks = await getJWKS();
 
     const verifyOptions: jose.JWTVerifyOptions = {
       issuer,

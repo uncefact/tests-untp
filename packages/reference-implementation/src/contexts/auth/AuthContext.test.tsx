@@ -1,15 +1,17 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { useSession, signOut } from 'next-auth/react';
 import { AuthProvider, useAuth } from './AuthContext';
-import { getIdpLogoutUrl } from '@/lib/auth/helpers';
+import { getLogoutUrl } from '@/lib/auth/actions';
 
 // Mock dependencies
 jest.mock('next-auth/react');
-jest.mock('@/lib/auth/helpers');
+jest.mock('@/lib/auth/actions', () => ({
+  getLogoutUrl: jest.fn(),
+}));
 
 const mockUseSession = useSession as jest.MockedFunction<typeof useSession>;
 const mockSignOut = signOut as jest.MockedFunction<typeof signOut>;
-const mockGetIdpLogoutUrl = getIdpLogoutUrl as jest.MockedFunction<typeof getIdpLogoutUrl>;
+const mockGetLogoutUrl = getLogoutUrl as jest.MockedFunction<typeof getLogoutUrl>;
 
 // Test component that uses the useAuth hook
 function TestComponent() {
@@ -143,7 +145,7 @@ describe('AuthContext', () => {
         update: jest.fn(),
       });
 
-      mockGetIdpLogoutUrl.mockReturnValue('https://idp.example.com/logout');
+      mockGetLogoutUrl.mockResolvedValue('https://idp.example.com/logout');
       mockSignOut.mockResolvedValue({} as never);
 
       function LogoutTestComponent() {
@@ -165,7 +167,7 @@ describe('AuthContext', () => {
       logoutBtn.click();
 
       await waitFor(() => {
-        expect(mockGetIdpLogoutUrl).toHaveBeenCalledWith(mockSession);
+        expect(mockGetLogoutUrl).toHaveBeenCalled();
         expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
         expect(window.location.href).toBe('https://idp.example.com/logout');
       });
@@ -183,7 +185,7 @@ describe('AuthContext', () => {
         update: jest.fn(),
       });
 
-      mockGetIdpLogoutUrl.mockReturnValue(null);
+      mockGetLogoutUrl.mockResolvedValue(null);
       mockSignOut.mockResolvedValue({} as never);
 
       function LogoutTestComponent() {

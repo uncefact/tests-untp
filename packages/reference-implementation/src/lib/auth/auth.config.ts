@@ -10,10 +10,10 @@
  */
 
 import { type NextAuthConfig } from 'next-auth';
-import Keycloak from 'next-auth/providers/keycloak';
 import { getTenantConfig } from '@/lib/auth/tenant-config';
 import { extractGroupClaim } from '@/lib/auth/group-claim';
-import { refreshKeycloakToken, decodeAccessToken } from '@/lib/auth/keycloak-token';
+import { refreshOidcToken, decodeAccessToken } from '@/lib/auth/oidc-token';
+import { getOidcProvider } from '@/lib/auth/oidc-provider';
 
 const tenantConfig = getTenantConfig();
 
@@ -24,18 +24,7 @@ export const authConfig: NextAuthConfig = {
     maxAge: 8 * 60 * 60,
     updateAge: 5 * 60,
   },
-  providers: [
-    Keycloak({
-      issuer: process.env.AUTH_KEYCLOAK_ISSUER!,
-      clientId: process.env.AUTH_KEYCLOAK_CLIENT_ID!,
-      clientSecret: process.env.AUTH_KEYCLOAK_CLIENT_SECRET!,
-      // When the OIDC issuer hostname is only reachable from within Docker,
-      // allow overriding the browser-facing authorization URL separately.
-      ...(process.env.AUTH_KEYCLOAK_AUTHORIZATION_URL && {
-        authorization: { url: process.env.AUTH_KEYCLOAK_AUTHORIZATION_URL },
-      }),
-    }),
-  ],
+  providers: [getOidcProvider()],
   callbacks: {
     async jwt({ token, account }) {
       // Initial sign-in
@@ -63,7 +52,7 @@ export const authConfig: NextAuthConfig = {
 
         // Refresh
         try {
-          const refreshed = await refreshKeycloakToken(token.refresh_token as string);
+          const refreshed = await refreshOidcToken(token.refresh_token as string);
           token.access_token = refreshed.access_token;
           token.refresh_token = refreshed.refresh_token ?? token.refresh_token;
           token.expires_at = refreshed.expires_at;

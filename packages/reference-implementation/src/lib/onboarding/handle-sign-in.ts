@@ -2,7 +2,7 @@ import type { PrismaClient } from '@/lib/prisma/generated';
 import { createLogger } from '@uncefact/untp-ri-services/logging';
 import { getTenantConfig } from '@/lib/auth/tenant-config';
 import { extractGroupClaim } from '@/lib/auth/group-claim';
-import { decodeAccessToken } from '@/lib/auth/keycloak-token';
+import { decodeAccessToken } from '@/lib/auth/oidc-token';
 
 const logger = createLogger().child({ module: 'handle-sign-in' });
 
