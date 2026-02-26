@@ -183,6 +183,8 @@ jobs:
 
       - name: Run closed mode E2E tests
         run: yarn test:run-cypress:closed-mode
+        env:
+          NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module'
 
       - name: Dump closed mode container logs on failure
         if: failure()
