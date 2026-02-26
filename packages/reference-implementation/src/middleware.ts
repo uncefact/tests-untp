@@ -6,6 +6,14 @@
  * Supports two authentication methods:
  * 1. Session-based auth (NextAuth.js session cookies)
  * 2. Service account Bearer tokens (for machine-to-machine auth)
+ *
+ * For service account (Bearer) auth, JWT claims are propagated as
+ * request headers (x-auth-sub, x-auth-azp, x-auth-name, x-auth-email)
+ * so downstream route handlers can identify the caller without
+ * re-validating the token.
+ *
+ * All incoming x-auth-* headers are stripped before auth logic runs
+ * to prevent header spoofing.
  */
 
 import NextAuth from 'next-auth';
@@ -13,22 +21,36 @@ import { authConfig } from '@/lib/auth/auth.config';
 import { NextResponse, type NextRequest } from 'next/server';
 import { validateServiceAccountToken, extractBearerToken } from '@/lib/auth/token-validator';
 import { runWithCorrelationId } from '@uncefact/untp-ri-services/logging';
+import type { JWTPayload } from 'jose';
 
 const { auth } = NextAuth(authConfig);
 
 /**
- * Validates a Bearer token from the Authorization header.
+ * Strips all x-auth-* headers from the incoming request to prevent spoofing.
  */
-async function validateBearerAuth(req: NextRequest): Promise<boolean> {
+function stripAuthHeaders(headers: Headers): Headers {
+  const cleaned = new Headers(headers);
+  for (const key of [...cleaned.keys()]) {
+    if (key.startsWith('x-auth-')) {
+      cleaned.delete(key);
+    }
+  }
+  return cleaned;
+}
+
+/**
+ * Validates a Bearer token and returns the JWT payload if valid.
+ */
+async function validateBearerAuth(req: NextRequest): Promise<JWTPayload | null> {
   const authHeader = req.headers.get('authorization');
   const token = extractBearerToken(authHeader);
 
   if (!token) {
-    return false;
+    return null;
   }
 
   const result = await validateServiceAccountToken(token);
-  return result.valid;
+  return result.valid && result.payload ? result.payload : null;
 }
 
 export default auth(async (req) => {
@@ -41,22 +63,51 @@ export default auth(async (req) => {
 
     // For API routes, check authentication
     if (pathname.startsWith('/api/v1/')) {
-      // check session-based auth first
+      // Strip x-auth-* headers from incoming request to prevent spoofing
+      const requestHeaders = stripAuthHeaders(req.headers);
+
+      // Check session-based auth first
       if (isSessionAuthenticated) {
-        const response = NextResponse.next();
+        const response = NextResponse.next({ request: { headers: requestHeaders } });
         response.headers.set('x-correlation-id', correlationId);
         return response;
       }
 
-      // check Bearer token for service account auth
-      const isBearerAuthenticated = await validateBearerAuth(req);
-      if (isBearerAuthenticated) {
-        const response = NextResponse.next();
+      // Check Bearer token for service account auth
+      const payload = await validateBearerAuth(req);
+      if (payload) {
+        // sub is required for the service account flow to work
+        if (!payload.sub) {
+          return NextResponse.json(
+            { error: 'Unauthorized', message: 'Token missing required "sub" claim' },
+            { status: 401, headers: { 'x-correlation-id': correlationId } },
+          );
+        }
+
+        // Propagate JWT claims as request headers for downstream route handlers
+        requestHeaders.set('x-auth-sub', payload.sub);
+
+        const azp = payload['azp'];
+        if (azp && typeof azp === 'string') {
+          requestHeaders.set('x-auth-azp', azp);
+        }
+
+        const name = payload['name'];
+        if (name && typeof name === 'string') {
+          requestHeaders.set('x-auth-name', name);
+        }
+
+        const email = payload['email'];
+        if (email && typeof email === 'string') {
+          requestHeaders.set('x-auth-email', email);
+        }
+
+        const response = NextResponse.next({ request: { headers: requestHeaders } });
         response.headers.set('x-correlation-id', correlationId);
         return response;
       }
 
-      // user is unauthorized
+      // User is unauthorised
       return NextResponse.json(
         { error: 'Unauthorized', message: 'Authentication required' },
         { status: 401, headers: { 'x-correlation-id': correlationId } },

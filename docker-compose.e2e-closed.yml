@@ -1,0 +1,11 @@
+# Docker Compose override for closed mode E2E tests.
+# Usage:
+#   SEEDING=true docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml up -d --build
+#   cd e2e && npx cypress run --spec 'cypress/e2e/closed_mode/**'
+#   docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml down -v
+services:
+  app:
+    environment:
+      - TENANT_MODE=closed
+      - TENANT_CLAIM_NAME=groups
+      - TENANT_CLAIM_FORMAT=array_first

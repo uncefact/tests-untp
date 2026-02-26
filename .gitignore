@@ -90,3 +90,6 @@ keycloak-realms/
 # Local Claude Code files
 .claude/
 CONTEXT.md
+
+# Git worktrees
+.worktrees/

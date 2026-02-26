@@ -37,6 +37,7 @@
     "test:untp-playground": "cd packages/untp-playground && yarn run test",
     "test:integration:untp-test-suite": "cd packages/untp-test-suite && yarn run test:integration",
     "test:run-cypress": "cd e2e && npx cypress run",
+    "test:run-cypress:closed-mode": "cd e2e && CYPRESS_INCLUDE_CLOSED_MODE=true npx cypress run --spec 'cypress/e2e/closed_mode/**/*.cy.ts'",
     "test:open-cypress": "cd e2e && npx cypress open",
     "storybook:components": "cd packages/components && yarn run storybook",
     "storybook:reference-implementation": "cd packages/reference-implementation && yarn run storybook",

@@ -19,6 +19,102 @@ function getDbClient() {
   });
 }
 
+async function deleteTenantData(client: any, tenantId: string) {
+  // Delete in dependency order (children first)
+
+  // Master data secondary identifier join tables
+  await client.query(
+    `DELETE FROM "ProductSecondaryIdentifier" WHERE "productId" IN (SELECT id FROM "Product" WHERE "tenantId" = $1)`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "FacilitySecondaryIdentifier" WHERE "facilityId" IN (SELECT id FROM "Facility" WHERE "tenantId" = $1)`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "OrganisationSecondaryIdentifier" WHERE "organisationId" IN (SELECT id FROM "OrganisationEntity" WHERE "tenantId" = $1)`,
+    [tenantId],
+  );
+
+  // Master data entities (products have hierarchy — children first)
+  await client.query(
+    `DELETE FROM "Product" WHERE "tenantId" = $1 AND "parentId" IS NOT NULL`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "Product" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "Facility" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "OrganisationEntity" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+
+  // Render templates (FK to DataModel)
+  await client.query(
+    `DELETE FROM "RenderTemplate" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+  // Data model extensions (self-referencing — children first)
+  await client.query(
+    `DELETE FROM "DataModel" WHERE "tenantId" = $1 AND "parentConfigId" IS NOT NULL`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "DataModel" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+
+  await client.query(
+    `DELETE FROM "Credential" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "LinkRegistration" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "Identifier" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "SchemeQualifier" WHERE "schemeId" IN (SELECT id FROM "IdentifierScheme" WHERE "tenantId" = $1)`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "IdentifierScheme" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "Registrar" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "Did" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "ServiceInstance" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+
+  // Unlink users from tenant (don't delete users - NextAuth owns them)
+  await client.query(
+    `UPDATE "User" SET "tenantId" = NULL WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+
+  // Delete tenant
+  await client.query(
+    `DELETE FROM "Tenant" WHERE id = $1`,
+    [tenantId],
+  );
+}
+
 export default defineConfig({
   env: {
     idrBucketName: process.env.OBJECT_STORAGE_BUCKET_NAME || 'idr-bucket-1',
@@ -33,7 +129,8 @@ export default defineConfig({
   e2e: {
     baseUrl: 'http://localhost:3003', // Replace with your application's base URL
     supportFile: 'cypress/support/e2e.ts',
-    specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}', // Specifies the test file pattern
+    specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
+    excludeSpecPattern: process.env.CYPRESS_INCLUDE_CLOSED_MODE === 'true' ? [] : ['cypress/e2e/closed_mode/**'],
     video: false, // Disable video recording (optional)
     chromeWebSecurity: false, // Helps bypass security restrictions (if needed)
     retries: {
@@ -145,102 +242,136 @@ export default defineConfig({
           const client = getDbClient();
           try {
             await client.connect();
-
-            // Delete in dependency order (children first)
-
-            // Master data secondary identifier join tables
-            await client.query(
-              `DELETE FROM "ProductSecondaryIdentifier" WHERE "productId" IN (SELECT id FROM "Product" WHERE "tenantId" = $1)`,
-              [tenantId],
-            );
-            await client.query(
-              `DELETE FROM "FacilitySecondaryIdentifier" WHERE "facilityId" IN (SELECT id FROM "Facility" WHERE "tenantId" = $1)`,
-              [tenantId],
-            );
-            await client.query(
-              `DELETE FROM "OrganisationSecondaryIdentifier" WHERE "organisationId" IN (SELECT id FROM "OrganisationEntity" WHERE "tenantId" = $1)`,
-              [tenantId],
-            );
-
-            // Master data entities (products have hierarchy — children first)
-            await client.query(
-              `DELETE FROM "Product" WHERE "tenantId" = $1 AND "parentId" IS NOT NULL`,
-              [tenantId],
-            );
-            await client.query(
-              `DELETE FROM "Product" WHERE "tenantId" = $1`,
-              [tenantId],
-            );
-            await client.query(
-              `DELETE FROM "Facility" WHERE "tenantId" = $1`,
-              [tenantId],
-            );
-            await client.query(
-              `DELETE FROM "OrganisationEntity" WHERE "tenantId" = $1`,
-              [tenantId],
-            );
-
-            // Render templates (FK to DataModel)
-            await client.query(
-              `DELETE FROM "RenderTemplate" WHERE "tenantId" = $1`,
-              [tenantId],
-            );
-            // Data model extensions (self-referencing — children first)
-            await client.query(
-              `DELETE FROM "DataModel" WHERE "tenantId" = $1 AND "parentConfigId" IS NOT NULL`,
-              [tenantId],
-            );
-            await client.query(
-              `DELETE FROM "DataModel" WHERE "tenantId" = $1`,
-              [tenantId],
-            );
-
-            await client.query(
-              `DELETE FROM "Credential" WHERE "tenantId" = $1`,
-              [tenantId],
-            );
-            await client.query(
-              `DELETE FROM "LinkRegistration" WHERE "tenantId" = $1`,
-              [tenantId],
-            );
-            await client.query(
-              `DELETE FROM "Identifier" WHERE "tenantId" = $1`,
-              [tenantId],
-            );
-            await client.query(
-              `DELETE FROM "SchemeQualifier" WHERE "schemeId" IN (SELECT id FROM "IdentifierScheme" WHERE "tenantId" = $1)`,
-              [tenantId],
-            );
-            await client.query(
-              `DELETE FROM "IdentifierScheme" WHERE "tenantId" = $1`,
-              [tenantId],
-            );
-            await client.query(
-              `DELETE FROM "Registrar" WHERE "tenantId" = $1`,
-              [tenantId],
-            );
-            await client.query(
-              `DELETE FROM "Did" WHERE "tenantId" = $1`,
-              [tenantId],
-            );
-            await client.query(
-              `DELETE FROM "ServiceInstance" WHERE "tenantId" = $1`,
-              [tenantId],
-            );
-
-            // Unlink users from test tenant (don't delete users - NextAuth owns them)
-            await client.query(
-              `UPDATE "User" SET "tenantId" = NULL WHERE "tenantId" = $1`,
-              [tenantId],
-            );
-
-            // Delete test tenant
-            await client.query(
-              `DELETE FROM "Tenant" WHERE id = $1`,
-              [tenantId],
-            );
-
+            await deleteTenantData(client, tenantId);
             return null;
+          } finally {
+            await client.end();
+          }
+        },
+        async cleanupClosedModeData({ externalIdpGroupId }: { externalIdpGroupId: string }) {
+          const client = getDbClient();
+          try {
+            await client.connect();
+
+            // Find tenant by externalIdpGroupId
+            const tenantResult = await client.query(
+              `SELECT id FROM "Tenant" WHERE "externalIdpGroupId" = $1`,
+              [externalIdpGroupId],
+            );
+
+            if (tenantResult.rowCount === 0) {
+              return null;
+            }
+
+            const tenantId = tenantResult.rows[0].id;
+            await deleteTenantData(client, tenantId);
+
+            return { tenantId };
+          } finally {
+            await client.end();
+          }
+        },
+        async verifyClosedModeTenant({ externalIdpGroupId }: { externalIdpGroupId: string }) {
+          const client = getDbClient();
+          try {
+            await client.connect();
+
+            const result = await client.query(
+              `SELECT id, name, "externalIdpGroupId" FROM "Tenant" WHERE "externalIdpGroupId" = $1`,
+              [externalIdpGroupId],
+            );
+
+            if (result.rowCount === 0) {
+              return null;
+            }
+
+            return result.rows[0];
+          } finally {
+            await client.end();
+          }
+        },
+        async verifyUsersShareTenant({ emails }: { emails: string[] }) {
+          const client = getDbClient();
+          try {
+            await client.connect();
+
+            const result = await client.query(
+              `SELECT email, "tenantId" FROM "User" WHERE email = ANY($1)`,
+              [emails],
+            );
+
+            if (result.rowCount === 0) {
+              return { sameTenant: false, tenantId: null, externalIdpGroupId: null };
+            }
+
+            const tenantIds = new Set(result.rows.map((r: any) => r.tenantId).filter(Boolean));
+            const sameTenant = tenantIds.size === 1;
+            const tenantId = sameTenant ? result.rows[0].tenantId : null;
+
+            let externalIdpGroupId = null;
+            if (tenantId) {
+              const tenantResult = await client.query(
+                `SELECT "externalIdpGroupId" FROM "Tenant" WHERE id = $1`,
+                [tenantId],
+              );
+              externalIdpGroupId = tenantResult.rows[0]?.externalIdpGroupId ?? null;
+            }
+
+            return { sameTenant, tenantId, externalIdpGroupId };
+          } finally {
+            await client.end();
+          }
+        },
+        async getServiceAccountToken() {
+          const tokenUrl = 'http://localhost:8081/realms/ri-e2e/protocol/openid-connect/token';
+          const clientId = 'ri-service-account-e2e';
+          const clientSecret = 'e2e-service-account-secret';
+
+          const params = new URLSearchParams({
+            grant_type: 'client_credentials',
+            client_id: clientId,
+            client_secret: clientSecret,
+          });
+
+          const response = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString(),
+          });
+
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Failed to get service account token: ${response.status} ${text}`);
+          }
+
+          const data = await response.json();
+          return { accessToken: data.access_token };
+        },
+        async cleanupServiceAccountData({ sub }: { sub: string }) {
+          const client = getDbClient();
+          try {
+            await client.connect();
+
+            // Find user by authProviderId (Keycloak sub claim)
+            const userResult = await client.query(
+              `SELECT id, "tenantId" FROM "User" WHERE "authProviderId" = $1`,
+              [sub],
+            );
+
+            if (userResult.rowCount === 0) {
+              return null;
+            }
+
+            const { id: userId, tenantId } = userResult.rows[0];
+
+            if (tenantId) {
+              await deleteTenantData(client, tenantId);
+            }
+
+            // Delete the auto-provisioned user itself
+            await client.query(`DELETE FROM "User" WHERE id = $1`, [userId]);
+
+            return { userId, tenantId };
           } finally {
             await client.end();
           }

@@ -166,8 +166,32 @@ jobs:
         if: failure()
         run: docker compose -f docker-compose.e2e.yml logs app
 
-      - name: Stop docker compose
-        run: docker compose -f docker-compose.e2e.yml down
+      - name: Stop docker compose (with volumes for clean closed mode DB)
+        run: docker compose -f docker-compose.e2e.yml down -v
+
+      - name: Start closed mode E2E docker compose
+        run: SEEDING=true docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml up -d --no-build
+
+      - name: Wait for closed mode app container
+        run: |
+          echo "--- Waiting 30s for containers to initialise ---"
+          sleep 30
+          echo "--- App container logs ---"
+          docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml logs app
+          echo "--- Container status ---"
+          docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml ps
+
+      - name: Run closed mode E2E tests
+        run: yarn test:run-cypress:closed-mode
+        env:
+          NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module'
+
+      - name: Dump closed mode container logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml logs app
+
+      - name: Stop closed mode docker compose
+        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml down
 
   build_docs:
     runs-on: ubuntu-latest

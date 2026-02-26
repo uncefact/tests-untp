@@ -7,12 +7,60 @@ jest.mock('next/server', () => ({
   },
 }));
 
+// Open mode mocks
 const mockGetSessionUserId = jest.fn();
 const mockGetTenantId = jest.fn();
-
 jest.mock('@/lib/api/helpers', () => ({
   getSessionUserId: () => mockGetSessionUserId(),
   getTenantId: (id: string) => mockGetTenantId(id),
+}));
+
+const mockResolveServiceAccountUser = jest.fn();
+jest.mock('@/lib/api/service-account-user', () => ({
+  resolveServiceAccountUser: (claims: unknown) => mockResolveServiceAccountUser(claims),
+}));
+
+// Tenant config mock — controlled by mockTenantMode
+let mockTenantMode: 'open' | 'closed' = 'open';
+jest.mock('@/lib/auth/tenant-config', () => ({
+  getTenantConfig: () => {
+    if (mockTenantMode === 'closed') {
+      return { mode: 'closed', claimName: 'groups', claimFormat: 'array_first' };
+    }
+    return { mode: 'open' };
+  },
+}));
+
+// Closed mode mocks
+const mockAuth = jest.fn();
+jest.mock('@/auth', () => ({
+  auth: () => mockAuth(),
+}));
+
+const mockPrismaTenant = { findUnique: jest.fn() };
+const mockPrismaUser = { findUnique: jest.fn(), update: jest.fn() };
+jest.mock('@/lib/prisma/prisma', () => ({
+  prisma: {
+    tenant: mockPrismaTenant,
+    user: mockPrismaUser,
+  },
+}));
+
+const mockResolveClosedModeTenant = jest.fn();
+jest.mock('@/lib/api/resolve-closed-mode-tenant', () => ({
+  resolveClosedModeTenant: (...args: unknown[]) => mockResolveClosedModeTenant(...args),
+}));
+
+const mockValidateServiceAccountToken = jest.fn();
+const mockExtractBearerToken = jest.fn();
+jest.mock('@/lib/auth/token-validator', () => ({
+  validateServiceAccountToken: (...args: unknown[]) => mockValidateServiceAccountToken(...args),
+  extractBearerToken: (...args: unknown[]) => mockExtractBearerToken(...args),
+}));
+
+const mockExtractGroupClaim = jest.fn();
+jest.mock('@/lib/auth/group-claim', () => ({
+  extractGroupClaim: (...args: unknown[]) => mockExtractGroupClaim(...args),
 }));
 
 import { NotFoundError, ServiceRegistryError } from '@/lib/api/errors';
@@ -26,16 +74,28 @@ interface MockResponse {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockTenantMode = 'open';
 });
 
-function fakeRequest(method = 'GET'): Request {
-  return { method, url: 'http://localhost/api/v1/test' } as unknown as Request;
+function fakeRequest(method = 'GET', headers: Record<string, string> = {}): Request {
+  const headersMap = new Map(Object.entries(headers));
+  return {
+    method,
+    url: 'http://localhost/api/v1/test',
+    headers: {
+      get: (key: string) => headersMap.get(key) ?? null,
+    },
+  } as unknown as Request;
 }
 
 const emptyRouteContext = { params: Promise.resolve({}) };
 
-describe('withTenantAuth', () => {
-  it('returns 401 when getSessionUserId returns null', async () => {
+// ========================================================
+// Open mode tests (existing — regression)
+// ========================================================
+
+describe('withTenantAuth — open mode, session path', () => {
+  it('returns 401 when no session and no x-auth-sub header', async () => {
     mockGetSessionUserId.mockResolvedValue(null);
 
     const handler = jest.fn();
@@ -60,7 +120,7 @@ describe('withTenantAuth', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it('calls inner handler with correct userId, tenantId, and params', async () => {
+  it('calls inner handler with correct context for session auth', async () => {
     mockGetSessionUserId.mockResolvedValue('user-1');
     mockGetTenantId.mockResolvedValue('org-1');
 
@@ -75,6 +135,7 @@ describe('withTenantAuth', () => {
       userId: 'user-1',
       tenantId: 'org-1',
       params: routeContext.params,
+      authMethod: 'session',
     });
   });
 
@@ -103,7 +164,383 @@ describe('withTenantAuth', () => {
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ ok: false, error: 'not found' });
   });
+
+  it('does not attempt service account resolution when session exists', async () => {
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockResolvedValue('org-1');
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+
+    // Even with x-auth-sub present, session path should take precedence
+    await wrapped(fakeRequest('GET', { 'x-auth-sub': 'ext-123' }), emptyRouteContext);
+
+    expect(mockResolveServiceAccountUser).not.toHaveBeenCalled();
+    expect(handler.mock.calls[0][1].authMethod).toBe('session');
+  });
 });
+
+describe('withTenantAuth — open mode, service account path', () => {
+  beforeEach(() => {
+    // No session for service account tests
+    mockGetSessionUserId.mockResolvedValue(null);
+  });
+
+  it('resolves user via x-auth-sub header when no session', async () => {
+    mockResolveServiceAccountUser.mockResolvedValue({ userId: 'sa-user-1', tenantId: 'sa-org-1' });
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+
+    const req = fakeRequest('GET', {
+      'x-auth-sub': 'ext-sub-123',
+      'x-auth-azp': 'my-client',
+      'x-auth-name': 'Test User',
+      'x-auth-email': 'test@example.com',
+    });
+
+    await wrapped(req, emptyRouteContext);
+
+    expect(mockResolveServiceAccountUser).toHaveBeenCalledWith({
+      sub: 'ext-sub-123',
+      name: 'Test User',
+      email: 'test@example.com',
+    });
+
+    expect(handler).toHaveBeenCalledWith(req, {
+      userId: 'sa-user-1',
+      tenantId: 'sa-org-1',
+      params: emptyRouteContext.params,
+      authMethod: 'service-account',
+      serviceAccountClientId: 'my-client',
+    });
+  });
+
+  it('returns 401 when resolveServiceAccountUser returns null', async () => {
+    mockResolveServiceAccountUser.mockResolvedValue(null);
+
+    const handler = jest.fn();
+    const wrapped = withTenantAuth(handler);
+
+    const req = fakeRequest('GET', { 'x-auth-sub': 'ext-sub-unknown' });
+    const res = await wrapped(req, emptyRouteContext);
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ ok: false, error: 'Unauthorized' });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('passes undefined for optional headers when not present', async () => {
+    mockResolveServiceAccountUser.mockResolvedValue({ userId: 'sa-user-1', tenantId: 'sa-org-1' });
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+
+    const req = fakeRequest('GET', { 'x-auth-sub': 'ext-sub-123' });
+    await wrapped(req, emptyRouteContext);
+
+    expect(mockResolveServiceAccountUser).toHaveBeenCalledWith({
+      sub: 'ext-sub-123',
+      name: undefined,
+      email: undefined,
+    });
+
+    const context = handler.mock.calls[0][1];
+    expect(context.authMethod).toBe('service-account');
+    expect(context.serviceAccountClientId).toBeUndefined();
+  });
+
+  it('catches handler errors in service account path', async () => {
+    mockResolveServiceAccountUser.mockResolvedValue({ userId: 'sa-user-1', tenantId: 'sa-org-1' });
+
+    const handler = jest.fn().mockRejectedValue(new NotFoundError('not found'));
+    const wrapped = withTenantAuth(handler);
+
+    const req = fakeRequest('GET', { 'x-auth-sub': 'ext-sub-123' });
+    const res = await wrapped(req, emptyRouteContext);
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ ok: false, error: 'not found' });
+  });
+});
+
+// ========================================================
+// Closed mode tests
+// ========================================================
+
+describe('withTenantAuth — closed mode, session path', () => {
+  beforeEach(() => {
+    mockTenantMode = 'closed';
+  });
+
+  it('resolves tenant by group claim from session', async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: 'user-1' },
+      group_claim: '/acme-corp',
+    });
+    mockPrismaTenant.findUnique.mockResolvedValue({ id: 'tenant-1' });
+    mockPrismaUser.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(mockPrismaTenant.findUnique).toHaveBeenCalledWith({
+      where: { externalIdpGroupId: '/acme-corp' },
+      select: { id: true },
+    });
+    expect(mockPrismaUser.update).not.toHaveBeenCalled();
+    expect(handler).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: 'user-1',
+        tenantId: 'tenant-1',
+        authMethod: 'session',
+      }),
+    );
+  });
+
+  it('re-links user when group changes to a different tenant', async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: 'user-1' },
+      group_claim: '/new-group',
+    });
+    mockPrismaTenant.findUnique.mockResolvedValue({ id: 'tenant-2' });
+    mockPrismaUser.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
+    mockPrismaUser.update.mockResolvedValue({});
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(mockPrismaUser.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { tenantId: 'tenant-2' },
+    });
+  });
+
+  it('skips user update when already linked to correct tenant', async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: 'user-1' },
+      group_claim: '/same-group',
+    });
+    mockPrismaTenant.findUnique.mockResolvedValue({ id: 'tenant-1' });
+    mockPrismaUser.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(mockPrismaUser.update).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when session has RefreshAccessTokenError', async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: 'user-1' },
+      group_claim: '/acme',
+      error: 'RefreshAccessTokenError',
+    });
+
+    const handler = jest.fn();
+    const wrapped = withTenantAuth(handler);
+    const res = await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: 'Session expired — please sign in again',
+      }),
+    );
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when session has no group claim', async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: 'user-1' },
+    });
+
+    const handler = jest.fn();
+    const wrapped = withTenantAuth(handler);
+    const res = await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: 'No group assignment found',
+      }),
+    );
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when no tenant matches the group claim', async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: 'user-1' },
+      group_claim: '/unknown-group',
+    });
+    mockPrismaTenant.findUnique.mockResolvedValue(null);
+
+    const handler = jest.fn();
+    const wrapped = withTenantAuth(handler);
+    const res = await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: 'No tenant found for group',
+      }),
+    );
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when no session and no bearer token', async () => {
+    mockAuth.mockResolvedValue(null);
+    mockExtractBearerToken.mockReturnValue(null);
+
+    const handler = jest.fn();
+    const wrapped = withTenantAuth(handler);
+    const res = await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ ok: false, error: 'Unauthorized' });
+  });
+});
+
+describe('withTenantAuth — closed mode, bearer path', () => {
+  beforeEach(() => {
+    mockTenantMode = 'closed';
+    mockAuth.mockResolvedValue(null); // No session
+  });
+
+  it('resolves tenant by group claim from bearer token', async () => {
+    mockExtractBearerToken.mockReturnValue('valid-token');
+    mockValidateServiceAccountToken.mockResolvedValue({
+      valid: true,
+      payload: { sub: 'ext-sub-1', groups: ['/acme'], azp: 'my-client' },
+    });
+    mockExtractGroupClaim.mockReturnValue('/acme');
+    mockResolveClosedModeTenant.mockResolvedValue({ userId: 'user-1', tenantId: 'tenant-1' });
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    const req = fakeRequest('GET', { authorization: 'Bearer valid-token' });
+    await wrapped(req, emptyRouteContext);
+
+    expect(mockResolveClosedModeTenant).toHaveBeenCalledWith('/acme', 'ext-sub-1', {
+      name: undefined,
+      email: undefined,
+    });
+    expect(handler).toHaveBeenCalledWith(
+      req,
+      expect.objectContaining({
+        userId: 'user-1',
+        tenantId: 'tenant-1',
+        authMethod: 'service-account',
+        serviceAccountClientId: 'my-client',
+      }),
+    );
+  });
+
+  it('returns 401 when bearer token is invalid', async () => {
+    mockExtractBearerToken.mockReturnValue('bad-token');
+    mockValidateServiceAccountToken.mockResolvedValue({
+      valid: false,
+      error: 'Token expired',
+    });
+
+    const handler = jest.fn();
+    const wrapped = withTenantAuth(handler);
+    const res = await wrapped(fakeRequest('GET', { authorization: 'Bearer bad-token' }), emptyRouteContext);
+
+    expect(res.status).toBe(401);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when bearer token has no sub claim', async () => {
+    mockExtractBearerToken.mockReturnValue('token-no-sub');
+    mockValidateServiceAccountToken.mockResolvedValue({
+      valid: true,
+      payload: { groups: ['/acme'] }, // no sub
+    });
+
+    const handler = jest.fn();
+    const wrapped = withTenantAuth(handler);
+    const res = await wrapped(fakeRequest('GET', { authorization: 'Bearer token-no-sub' }), emptyRouteContext);
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual(
+      expect.objectContaining({
+        error: 'Token missing required sub claim',
+      }),
+    );
+  });
+
+  it('returns 403 when bearer token has no group claim', async () => {
+    mockExtractBearerToken.mockReturnValue('token-no-group');
+    mockValidateServiceAccountToken.mockResolvedValue({
+      valid: true,
+      payload: { sub: 'ext-sub-1' },
+    });
+    mockExtractGroupClaim.mockReturnValue(null);
+
+    const handler = jest.fn();
+    const wrapped = withTenantAuth(handler);
+    const res = await wrapped(fakeRequest('GET', { authorization: 'Bearer token-no-group' }), emptyRouteContext);
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual(
+      expect.objectContaining({
+        error: 'No group assignment found in token',
+      }),
+    );
+  });
+
+  it('returns 500 when resolveClosedModeTenant fails', async () => {
+    mockExtractBearerToken.mockReturnValue('valid-token');
+    mockValidateServiceAccountToken.mockResolvedValue({
+      valid: true,
+      payload: { sub: 'ext-sub-1', groups: ['/acme'] },
+    });
+    mockExtractGroupClaim.mockReturnValue('/acme');
+    mockResolveClosedModeTenant.mockResolvedValue(null);
+
+    const handler = jest.fn();
+    const wrapped = withTenantAuth(handler);
+    const res = await wrapped(fakeRequest('GET', { authorization: 'Bearer valid-token' }), emptyRouteContext);
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual(
+      expect.objectContaining({
+        error: 'Failed to resolve tenant',
+      }),
+    );
+  });
+
+  it('passes name and email claims from bearer token', async () => {
+    mockExtractBearerToken.mockReturnValue('valid-token');
+    mockValidateServiceAccountToken.mockResolvedValue({
+      valid: true,
+      payload: { sub: 'ext-sub-1', groups: ['/acme'], name: 'Alice', email: 'alice@example.com' },
+    });
+    mockExtractGroupClaim.mockReturnValue('/acme');
+    mockResolveClosedModeTenant.mockResolvedValue({ userId: 'user-1', tenantId: 'tenant-1' });
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest('GET', { authorization: 'Bearer valid-token' }), emptyRouteContext);
+
+    expect(mockResolveClosedModeTenant).toHaveBeenCalledWith('/acme', 'ext-sub-1', {
+      name: 'Alice',
+      email: 'alice@example.com',
+    });
+  });
+});
+
+// ========================================================
+// handleRouteError tests (unchanged)
+// ========================================================
 
 describe('handleRouteError', () => {
   it('maps ValidationError to 400', async () => {
