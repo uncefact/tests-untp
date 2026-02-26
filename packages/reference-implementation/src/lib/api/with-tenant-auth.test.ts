@@ -38,7 +38,7 @@ jest.mock('@/auth', () => ({
 }));
 
 const mockPrismaTenant = { findUnique: jest.fn() };
-const mockPrismaUser = { update: jest.fn() };
+const mockPrismaUser = { findUnique: jest.fn(), update: jest.fn() };
 jest.mock('@/lib/prisma/prisma', () => ({
   prisma: {
     tenant: mockPrismaTenant,
@@ -279,7 +279,7 @@ describe('withTenantAuth — closed mode, session path', () => {
       group_claim: '/acme-corp',
     });
     mockPrismaTenant.findUnique.mockResolvedValue({ id: 'tenant-1' });
-    mockPrismaUser.update.mockResolvedValue({});
+    mockPrismaUser.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
 
     const handler = jest.fn().mockResolvedValue({ status: 200 });
     const wrapped = withTenantAuth(handler);
@@ -289,6 +289,7 @@ describe('withTenantAuth — closed mode, session path', () => {
       where: { externalIdpGroupId: '/acme-corp' },
       select: { id: true },
     });
+    expect(mockPrismaUser.update).not.toHaveBeenCalled();
     expect(handler).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -299,12 +300,13 @@ describe('withTenantAuth — closed mode, session path', () => {
     );
   });
 
-  it('re-links user to correct tenant on every session request', async () => {
+  it('re-links user when group changes to a different tenant', async () => {
     mockAuth.mockResolvedValue({
       user: { id: 'user-1' },
       group_claim: '/new-group',
     });
     mockPrismaTenant.findUnique.mockResolvedValue({ id: 'tenant-2' });
+    mockPrismaUser.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
     mockPrismaUser.update.mockResolvedValue({});
 
     const handler = jest.fn().mockResolvedValue({ status: 200 });
@@ -315,6 +317,21 @@ describe('withTenantAuth — closed mode, session path', () => {
       where: { id: 'user-1' },
       data: { tenantId: 'tenant-2' },
     });
+  });
+
+  it('skips user update when already linked to correct tenant', async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: 'user-1' },
+      group_claim: '/same-group',
+    });
+    mockPrismaTenant.findUnique.mockResolvedValue({ id: 'tenant-1' });
+    mockPrismaUser.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(mockPrismaUser.update).not.toHaveBeenCalled();
   });
 
   it('returns 401 when session has RefreshAccessTokenError', async () => {

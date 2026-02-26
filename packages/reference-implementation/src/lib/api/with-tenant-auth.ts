@@ -85,10 +85,17 @@ async function handleClosedMode(
     }
 
     // Ensure user is linked to the correct tenant (handles group changes)
-    await prisma.user.update({
+    const dbUser = await prisma.user.findUnique({
       where: { id: session.user.id },
-      data: { tenantId: tenant.id },
+      select: { tenantId: true },
     });
+
+    if (dbUser && dbUser.tenantId !== tenant.id) {
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data: { tenantId: tenant.id },
+      });
+    }
 
     return executeHandler(
       handler,

@@ -11,7 +11,6 @@
 describe('Closed mode — service account API', { testIsolation: false }, () => {
   const GROUP_CLAIM = '/e2e-org-alpha';
   let accessToken: string;
-  let tokenSub: string;
 
   before(() => {
     // Clean up any leftover closed mode data
@@ -20,12 +19,6 @@ describe('Closed mode — service account API', { testIsolation: false }, () => 
     // Fetch a service account token from Keycloak
     cy.task('getServiceAccountToken').then((result: any) => {
       accessToken = result.accessToken;
-
-      // Decode the JWT payload to extract the sub claim
-      const payload = JSON.parse(
-        Buffer.from(accessToken.split('.')[1], 'base64').toString(),
-      );
-      tokenSub = payload.sub;
     });
   });
 
