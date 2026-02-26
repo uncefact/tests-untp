@@ -8,6 +8,7 @@ jest.mock('@uncefact/untp-ri-services/logging', () => ({
   createLogger: () => ({ child: () => mockLogger }),
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockPrisma: any = {
   tenant: { findUnique: jest.fn(), create: jest.fn() },
   user: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
