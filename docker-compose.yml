@@ -116,7 +116,7 @@ services:
       RI_POSTGRES_HOST: ri-db
       RI_POSTGRES_PORT: 5432
       # Auth
-      AUTH_KEYCLOAK_ISSUER: http://keycloak:8080/realms/${KEYCLOAK_REALM}
+      AUTH_OIDC_ISSUER: http://keycloak:8080/realms/${KEYCLOAK_REALM}
       RI_APP_URL: http://localhost:3003
       # Verification URLs
       DEFAULT_HUMAN_VERIFICATION_URL: http://localhost:3003

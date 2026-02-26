@@ -18,10 +18,10 @@ This guide covers how to configure and use service account authentication for pr
 
 ## Prerequisites
 
-- Keycloak identity provider running and configured
-- A service account client configured in Keycloak (see [Keycloak Configuration](#keycloak-configuration))
+- An OIDC-compliant identity provider running and configured (e.g. Keycloak, Zitadel)
+- A service account client configured in your identity provider (see [Identity Provider Configuration](#identity-provider-configuration))
 
-## Keycloak Configuration
+## Identity Provider Configuration
 
 The default Keycloak realm includes a pre-configured service account client:
 
@@ -37,9 +37,9 @@ For production deployments, you should:
 2. Configure appropriate client scopes and role mappings
 :::
 
-### Creating a Custom Service Account Client
+### Creating a Custom Service Account Client (Keycloak)
 
-To create a new service account client in Keycloak:
+The steps below are Keycloak-specific. Consult your provider's documentation for other OIDC providers.
 
 1. Navigate to your Keycloak Admin Console
 2. Select your realm (e.g., `untp-reference-implementation`)
@@ -53,9 +53,9 @@ To create a new service account client in Keycloak:
 
 ## Obtaining an Access Token
 
-Use the OAuth2 client credentials grant to obtain an access token from Keycloak.
+Use the OAuth2 client credentials grant to obtain an access token from your OIDC provider's token endpoint.
 
-### Using cURL
+### Using cURL (Keycloak example)
 
 ```bash
 # Set your configuration
@@ -71,6 +71,10 @@ curl -X POST "${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token" \
   -d "client_id=${CLIENT_ID}" \
   -d "client_secret=${CLIENT_SECRET}"
 ```
+
+:::tip Other Providers
+The token endpoint URL varies by provider. The Reference Implementation discovers it automatically via OIDC Discovery (`.well-known/openid-configuration`). For manual token requests, consult your provider's documentation.
+:::
 
 ### Response
 
@@ -108,7 +112,8 @@ Configure the following environment variables for service account support:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `AUTH_KEYCLOAK_ISSUER` | Keycloak realm issuer URL | Required |
-| `AUTH_KEYCLOAK_SERVICE_ACCOUNT_CLIENT_ID` | Service account client ID | `ri-service-account` |
-| `AUTH_KEYCLOAK_SERVICE_ACCOUNT_CLIENT_SECRET` | Service account client secret | `service-account-secret` |
-| `AUTH_KEYCLOAK_SERVICE_ACCOUNT_AUDIENCE` | Expected token audience (optional) | - |
+| `AUTH_OIDC_ISSUER` | OIDC provider issuer URL | Required |
+| `AUTH_OIDC_PROVIDER` | Provider type (`keycloak` or `zitadel`) | `keycloak` |
+| `AUTH_OIDC_SERVICE_ACCOUNT_CLIENT_ID` | Service account client ID | `ri-service-account` |
+| `AUTH_OIDC_SERVICE_ACCOUNT_CLIENT_SECRET` | Service account client secret | `service-account-secret` |
+| `AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE` | Expected token audience (optional) | - |

@@ -174,11 +174,11 @@ services:
       - AUTH_SECRET=e2e-super-secret-key-for-testing
       - AUTH_TRUST_HOST=true
       - AUTH_URL=http://localhost:3003
-      - AUTH_KEYCLOAK_CLIENT_ID=ri-app-e2e
-      - AUTH_KEYCLOAK_CLIENT_SECRET=e2e-test-secret
-      - AUTH_KEYCLOAK_ISSUER=http://localhost:8081/realms/ri-e2e
-      - AUTH_KEYCLOAK_SERVICE_ACCOUNT_CLIENT_ID=ri-service-account-e2e
-      - AUTH_KEYCLOAK_SERVICE_ACCOUNT_CLIENT_SECRET=e2e-service-account-secret
+      - AUTH_OIDC_CLIENT_ID=ri-app-e2e
+      - AUTH_OIDC_CLIENT_SECRET=e2e-test-secret
+      - AUTH_OIDC_ISSUER=http://localhost:8081/realms/ri-e2e
+      - AUTH_OIDC_SERVICE_ACCOUNT_CLIENT_ID=ri-service-account-e2e
+      - AUTH_OIDC_SERVICE_ACCOUNT_CLIENT_SECRET=e2e-service-account-secret
       - UNCEFACT_STORAGE_URL=http://storage-service:3334/api/3.0.0/public
       - UNCEFACT_STORAGE_API_KEY=test123
       - PYX_IDR_API_URL=http://identity-resolver-service:3000
