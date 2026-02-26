@@ -12,7 +12,7 @@ const logger = createLogger().child({ module: 'adapter-wrapper' });
  * (resolveServiceAccountUser created a User with authProviderId set), this wrapper
  * finds and returns that existing user instead of creating a duplicate.
  *
- * The incoming profile.id is the Keycloak sub (external ID). PrismaAdapter would
+ * The incoming profile.id is the IdP sub (external ID). PrismaAdapter would
  * normally strip this and auto-generate a cuid. We intercept to check authProviderId first.
  */
 export function withPreProvisionedUserLookup(baseAdapter: Adapter, prisma: PrismaClient): Adapter {

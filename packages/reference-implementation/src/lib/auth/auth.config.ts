@@ -5,7 +5,7 @@
  * - src/auth.ts (server-side, with Prisma adapter)
  * - src/middleware.ts (edge runtime, no Prisma)
  *
- * In closed mode, the JWT callback performs token rotation via Keycloak
+ * In closed mode, the JWT callback performs token rotation via IdP
  * refresh tokens to keep the group claim fresh (~5 minute window).
  */
 
