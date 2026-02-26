@@ -43,6 +43,12 @@
         }
       ],
       "groups": ["/e2e-org-alpha"]
+    },
+    {
+      "username": "service-account-ri-service-account-e2e",
+      "enabled": true,
+      "serviceAccountClientId": "ri-service-account-e2e",
+      "groups": ["/e2e-org-alpha"]
     }
   ],
   "clients": [

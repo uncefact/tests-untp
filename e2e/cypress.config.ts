@@ -321,6 +321,60 @@ export default defineConfig({
             await client.end();
           }
         },
+        async getServiceAccountToken() {
+          const tokenUrl = 'http://localhost:8081/realms/ri-e2e/protocol/openid-connect/token';
+          const clientId = 'ri-service-account-e2e';
+          const clientSecret = 'e2e-service-account-secret';
+
+          const params = new URLSearchParams({
+            grant_type: 'client_credentials',
+            client_id: clientId,
+            client_secret: clientSecret,
+          });
+
+          const response = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString(),
+          });
+
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Failed to get service account token: ${response.status} ${text}`);
+          }
+
+          const data = await response.json();
+          return { accessToken: data.access_token };
+        },
+        async cleanupServiceAccountData({ sub }: { sub: string }) {
+          const client = getDbClient();
+          try {
+            await client.connect();
+
+            // Find user by authProviderId (Keycloak sub claim)
+            const userResult = await client.query(
+              `SELECT id, "tenantId" FROM "User" WHERE "authProviderId" = $1`,
+              [sub],
+            );
+
+            if (userResult.rowCount === 0) {
+              return null;
+            }
+
+            const { id: userId, tenantId } = userResult.rows[0];
+
+            if (tenantId) {
+              await deleteTenantData(client, tenantId);
+            }
+
+            // Delete the auto-provisioned user itself
+            await client.query(`DELETE FROM "User" WHERE id = $1`, [userId]);
+
+            return { userId, tenantId };
+          } finally {
+            await client.end();
+          }
+        },
       });
     },
   },
