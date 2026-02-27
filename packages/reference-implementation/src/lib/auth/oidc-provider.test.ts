@@ -97,13 +97,17 @@ describe('getOidcProvider', () => {
     expect(() => getOidcProvider()).toThrow("Unsupported IdP provider: 'okta'");
   });
 
-  it('throws when required env vars are missing', () => {
+  it('defaults to empty strings when env vars are missing (build-time safety)', () => {
     delete process.env.AUTH_OIDC_ISSUER;
     delete process.env.AUTH_OIDC_CLIENT_ID;
     delete process.env.AUTH_OIDC_CLIENT_SECRET;
 
-    expect(() => getOidcProvider()).toThrow(
-      'AUTH_OIDC_ISSUER, AUTH_OIDC_CLIENT_ID, and AUTH_OIDC_CLIENT_SECRET must all be set',
-    );
+    getOidcProvider();
+
+    expect(keycloakMock).toHaveBeenCalledWith({
+      issuer: '',
+      clientId: '',
+      clientSecret: '',
+    });
   });
 });
