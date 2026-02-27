@@ -17,12 +17,21 @@ export async function getLogoutUrl(): Promise<string | null> {
     return null;
   }
 
-  const { end_session_endpoint } = await getOidcEndpoints();
-  const postLogoutRedirectUri = process.env.RI_APP_URL!;
+  const postLogoutRedirectUri = process.env.RI_APP_URL;
+  if (!postLogoutRedirectUri) {
+    return null;
+  }
 
-  const logoutUrl = new URL(end_session_endpoint);
-  logoutUrl.searchParams.set('id_token_hint', session.id_token);
-  logoutUrl.searchParams.set('post_logout_redirect_uri', postLogoutRedirectUri);
+  try {
+    const { end_session_endpoint } = await getOidcEndpoints();
 
-  return logoutUrl.toString();
+    const logoutUrl = new URL(end_session_endpoint);
+    logoutUrl.searchParams.set('id_token_hint', session.id_token);
+    logoutUrl.searchParams.set('post_logout_redirect_uri', postLogoutRedirectUri);
+
+    return logoutUrl.toString();
+  } catch {
+    // If OIDC discovery fails, return null so the caller still performs local sign-out
+    return null;
+  }
 }

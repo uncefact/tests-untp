@@ -10,10 +10,13 @@
  */
 
 import { type NextAuthConfig } from 'next-auth';
+import { createLogger } from '@uncefact/untp-ri-services/logging';
 import { getTenantConfig } from '@/lib/auth/tenant-config';
 import { extractGroupClaim } from '@/lib/auth/group-claim';
 import { refreshOidcToken, decodeAccessToken } from '@/lib/auth/oidc-token';
 import { getOidcProvider } from '@/lib/auth/oidc-provider';
+
+const logger = createLogger().child({ module: 'auth-config' });
 
 const tenantConfig = getTenantConfig();
 
@@ -61,7 +64,11 @@ export const authConfig: NextAuthConfig = {
           token.group_claim = extractGroupClaim(payload, tenantConfig);
 
           delete token.error;
-        } catch {
+        } catch (error) {
+          logger.error(
+            { error: error instanceof Error ? error.message : String(error) },
+            'Token refresh failed — invalidating session',
+          );
           token.error = 'RefreshAccessTokenError';
           delete token.sub;
           delete token.group_claim;

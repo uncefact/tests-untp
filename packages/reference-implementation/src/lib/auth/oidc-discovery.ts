@@ -6,6 +6,8 @@ export interface OidcEndpoints {
 
 /**
  * Module-level cache is safe because Next.js standalone runs as a single process.
+ * The cache is never invalidated — a process restart is required if the OIDC
+ * provider's discovery document changes. clearOidcCache() is exposed for testing.
  */
 let cachedEndpoints: OidcEndpoints | null = null;
 
@@ -28,6 +30,14 @@ export async function getOidcEndpoints(): Promise<OidcEndpoints> {
   }
 
   const config = await response.json();
+
+  if (!config.jwks_uri || !config.token_endpoint) {
+    throw new Error(
+      'OIDC discovery response missing required fields: ' +
+        `jwks_uri=${config.jwks_uri ? 'present' : 'MISSING'}, ` +
+        `token_endpoint=${config.token_endpoint ? 'present' : 'MISSING'}`,
+    );
+  }
 
   cachedEndpoints = {
     jwks_uri: config.jwks_uri,

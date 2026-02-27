@@ -7,7 +7,7 @@
  * Validates:
  * - Token signature (using JWKS from OIDC discovery)
  * - Token issuer (must match configured issuer)
- * - Token audience (must include expected audience)
+ * - Token audience (must match AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE)
  * - Token expiry (must not be expired)
  */
 
@@ -53,17 +53,20 @@ export async function validateServiceAccountToken(
     };
   }
 
+  if (!audience) {
+    return {
+      valid: false,
+      error: 'Service account audience not configured (AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE)',
+    };
+  }
+
   try {
     const jwks = await getJWKS();
 
     const verifyOptions: jose.JWTVerifyOptions = {
       issuer,
+      audience,
     };
-
-    // Only validate audience if configured
-    if (audience) {
-      verifyOptions.audience = audience;
-    }
 
     const { payload } = await jose.jwtVerify(token, jwks, verifyOptions);
 

@@ -50,6 +50,24 @@ describe('getLogoutUrl', () => {
     expect(url).toBeNull();
   });
 
+  it('returns null when RI_APP_URL is not set', async () => {
+    mockAuth.mockResolvedValue({ id_token: 'test-id-token' });
+    delete process.env.RI_APP_URL;
+
+    const url = await getLogoutUrl();
+
+    expect(url).toBeNull();
+  });
+
+  it('returns null when getOidcEndpoints throws', async () => {
+    mockAuth.mockResolvedValue({ id_token: 'test-id-token' });
+    mockGetOidcEndpoints.mockRejectedValue(new Error('Discovery failed'));
+
+    const url = await getLogoutUrl();
+
+    expect(url).toBeNull();
+  });
+
   it('uses discovered end_session_endpoint', async () => {
     mockAuth.mockResolvedValue({ id_token: 'test-id-token' });
     mockGetOidcEndpoints.mockResolvedValue({

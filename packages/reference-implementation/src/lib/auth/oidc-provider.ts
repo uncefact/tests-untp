@@ -10,9 +10,13 @@ import Zitadel from 'next-auth/providers/zitadel';
  */
 export function getOidcProvider() {
   const provider = process.env.AUTH_OIDC_PROVIDER ?? 'keycloak';
-  const issuer = process.env.AUTH_OIDC_ISSUER!;
-  const clientId = process.env.AUTH_OIDC_CLIENT_ID!;
-  const clientSecret = process.env.AUTH_OIDC_CLIENT_SECRET!;
+  const issuer = process.env.AUTH_OIDC_ISSUER;
+  const clientId = process.env.AUTH_OIDC_CLIENT_ID;
+  const clientSecret = process.env.AUTH_OIDC_CLIENT_SECRET;
+
+  if (!issuer || !clientId || !clientSecret) {
+    throw new Error('AUTH_OIDC_ISSUER, AUTH_OIDC_CLIENT_ID, and AUTH_OIDC_CLIENT_SECRET must all be set');
+  }
 
   // When the OIDC issuer hostname is only reachable from within Docker,
   // allow overriding the browser-facing authorisation URL separately.

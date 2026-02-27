@@ -74,6 +74,16 @@ describe('getOidcEndpoints', () => {
     expect(global.fetch).toHaveBeenCalledWith('http://localhost:8080/realms/test/.well-known/openid-configuration');
   });
 
+  it('throws when discovery response is missing required fields', async () => {
+    process.env.AUTH_OIDC_ISSUER = 'https://issuer.example.com';
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ end_session_endpoint: 'https://issuer.example.com/logout' }),
+    });
+
+    await expect(getOidcEndpoints()).rejects.toThrow('OIDC discovery response missing required fields');
+  });
+
   it('resets cache when clearOidcCache is called', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,

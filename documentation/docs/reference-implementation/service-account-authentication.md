@@ -116,4 +116,4 @@ Configure the following environment variables for service account support:
 | `AUTH_OIDC_PROVIDER` | Provider type (`keycloak` or `zitadel`) | `keycloak` |
 | `AUTH_OIDC_SERVICE_ACCOUNT_CLIENT_ID` | Service account client ID | `ri-service-account` |
 | `AUTH_OIDC_SERVICE_ACCOUNT_CLIENT_SECRET` | Service account client secret | `service-account-secret` |
-| `AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE` | Expected token audience (optional) | - |
+| `AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE` | Expected token audience (must match IdP audience claim) | Required |
