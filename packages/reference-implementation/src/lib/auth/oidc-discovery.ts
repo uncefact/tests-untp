@@ -31,11 +31,12 @@ export async function getOidcEndpoints(): Promise<OidcEndpoints> {
 
   const config = await response.json();
 
-  if (!config.jwks_uri || !config.token_endpoint) {
+  if (!config.jwks_uri || !config.token_endpoint || !config.end_session_endpoint) {
     throw new Error(
       'OIDC discovery response missing required fields: ' +
         `jwks_uri=${config.jwks_uri ? 'present' : 'MISSING'}, ` +
-        `token_endpoint=${config.token_endpoint ? 'present' : 'MISSING'}`,
+        `token_endpoint=${config.token_endpoint ? 'present' : 'MISSING'}, ` +
+        `end_session_endpoint=${config.end_session_endpoint ? 'present' : 'MISSING'}`,
     );
   }
 

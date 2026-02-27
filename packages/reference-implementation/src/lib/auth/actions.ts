@@ -30,8 +30,8 @@ export async function getLogoutUrl(): Promise<string | null> {
     logoutUrl.searchParams.set('post_logout_redirect_uri', postLogoutRedirectUri);
 
     return logoutUrl.toString();
-  } catch {
-    // If OIDC discovery fails, return null so the caller still performs local sign-out
+  } catch (error) {
+    console.error('Failed to construct OIDC logout URL. Falling back to local-only logout.', error);
     return null;
   }
 }
