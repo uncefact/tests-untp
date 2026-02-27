@@ -14,19 +14,18 @@ export function getOidcProvider() {
   const clientId = process.env.AUTH_OIDC_CLIENT_ID!;
   const clientSecret = process.env.AUTH_OIDC_CLIENT_SECRET!;
 
+  // When the OIDC issuer hostname is only reachable from within Docker,
+  // allow overriding the browser-facing authorisation URL separately.
+  const authorizationOverride = process.env.AUTH_OIDC_AUTHORIZATION_URL
+    ? { authorization: { url: process.env.AUTH_OIDC_AUTHORIZATION_URL } }
+    : {};
+
   switch (provider) {
     case 'keycloak':
-      return Keycloak({
-        issuer,
-        clientId,
-        clientSecret,
-        ...(process.env.AUTH_OIDC_AUTHORIZATION_URL && {
-          authorization: { url: process.env.AUTH_OIDC_AUTHORIZATION_URL },
-        }),
-      });
+      return Keycloak({ issuer, clientId, clientSecret, ...authorizationOverride });
 
     case 'zitadel':
-      return Zitadel({ issuer, clientId, clientSecret });
+      return Zitadel({ issuer, clientId, clientSecret, ...authorizationOverride });
 
     default:
       throw new Error(`Unsupported IdP provider: '${provider}'`);

@@ -77,9 +77,9 @@ describe('getOidcProvider', () => {
     });
   });
 
-  it('does not pass authorization URL override for Zitadel', () => {
+  it('passes AUTH_OIDC_AUTHORIZATION_URL through for Zitadel', () => {
     process.env.AUTH_OIDC_PROVIDER = 'zitadel';
-    process.env.AUTH_OIDC_AUTHORIZATION_URL = 'http://external:8080/something';
+    process.env.AUTH_OIDC_AUTHORIZATION_URL = 'http://external:8080/authorize';
 
     getOidcProvider();
 
@@ -87,6 +87,7 @@ describe('getOidcProvider', () => {
       issuer: 'http://localhost:8080/realms/test',
       clientId: 'ri-app',
       clientSecret: 'changeme',
+      authorization: { url: 'http://external:8080/authorize' },
     });
   });
 
