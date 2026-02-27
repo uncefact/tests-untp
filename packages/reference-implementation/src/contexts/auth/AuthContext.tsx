@@ -3,7 +3,7 @@
 import { createContext, useContext, ReactNode } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { User } from '@reference-implementation/components';
-import { getIdpLogoutUrl } from '@/lib/auth/helpers';
+import { getLogoutUrl } from '@/lib/auth/actions';
 
 interface AuthContextType {
   user: User | null;
@@ -34,15 +34,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = async () => {
     try {
-      // Step 1: Get the IDP logout URL before clearing the session (we need id_token)
-      const idpLogoutUrl = getIdpLogoutUrl(session);
+      // Step 1: Get the OIDC logout URL before clearing the session (server action reads id_token)
+      const logoutUrl = await getLogoutUrl();
 
       // Step 2: Sign out from NextAuth (clear app session)
       await signOut({ redirect: false });
 
-      // Step 3: Redirect to IDP logout
-      if (idpLogoutUrl) {
-        window.location.href = idpLogoutUrl;
+      // Step 3: Redirect to OIDC provider logout
+      if (logoutUrl) {
+        window.location.href = logoutUrl;
       } else {
         // Fallback: just redirect to home
         window.location.href = '/';

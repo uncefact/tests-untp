@@ -19,6 +19,10 @@ function getDbClient() {
   });
 }
 
+// Cannot rely on Tenant cascade deletes — manual ordered deletes needed because:
+// - Credential has no FK to Tenant (legacy schema, tenantId is a plain column)
+// - Product self-reference is Restrict to prevent accidental orphaning of child products
+// - Identifier → IdentifierScheme is Restrict to prevent deleting schemes still in use
 async function deleteTenantData(client: any, tenantId: string) {
   // Delete in dependency order (children first)
 
@@ -130,7 +134,7 @@ export default defineConfig({
     baseUrl: 'http://localhost:3003', // Replace with your application's base URL
     supportFile: 'cypress/support/e2e.ts',
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
-    excludeSpecPattern: process.env.CYPRESS_INCLUDE_CLOSED_MODE === 'true' ? [] : ['cypress/e2e/closed_mode/**'],
+    excludeSpecPattern: process.env.CYPRESS_INCLUDE_CLOSED_MODE === 'true' ? [] : ['cypress/e2e/closed_mode/**'], // env var needed because excludeSpecPattern takes precedence over --spec CLI flag
     video: false, // Disable video recording (optional)
     chromeWebSecurity: false, // Helps bypass security restrictions (if needed)
     retries: {

@@ -1,6 +1,7 @@
 import { createLogger } from '@uncefact/untp-ri-services/logging';
+import { getOidcEndpoints } from '@/lib/auth/oidc-discovery';
 
-const logger = createLogger().child({ module: 'keycloak-token' });
+const logger = createLogger().child({ module: 'oidc-token' });
 
 const REFRESH_TIMEOUT_MS = 5000;
 
@@ -10,25 +11,28 @@ export interface RefreshedToken {
   expires_at: number;
 }
 
-export async function refreshKeycloakToken(refreshToken: string): Promise<RefreshedToken> {
-  const issuer = process.env.AUTH_KEYCLOAK_ISSUER;
-  const clientId = process.env.AUTH_KEYCLOAK_CLIENT_ID;
-  const clientSecret = process.env.AUTH_KEYCLOAK_CLIENT_SECRET;
+export async function refreshOidcToken(refreshToken: string): Promise<RefreshedToken> {
+  const clientId = process.env.AUTH_OIDC_CLIENT_ID;
+  const clientSecret = process.env.AUTH_OIDC_CLIENT_SECRET;
 
-  const tokenUrl = `${issuer}/protocol/openid-connect/token`;
+  if (!clientId || !clientSecret) {
+    throw new Error('AUTH_OIDC_CLIENT_ID and AUTH_OIDC_CLIENT_SECRET must be set for token refresh');
+  }
+
+  const { token_endpoint } = await getOidcEndpoints();
 
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
-    client_id: clientId!,
-    client_secret: clientSecret!,
+    client_id: clientId,
+    client_secret: clientSecret,
   });
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(tokenUrl, {
+    const response = await fetch(token_endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body,
@@ -56,11 +60,17 @@ export async function refreshKeycloakToken(refreshToken: string): Promise<Refres
 export function decodeAccessToken(token: string): Record<string, unknown> {
   try {
     const parts = token.split('.');
-    if (parts.length < 2) return {};
+    if (parts.length < 2) {
+      logger.warn({ tokenParts: parts.length }, 'Access token does not have a decodable payload');
+      return {};
+    }
     const payload = Buffer.from(parts[1], 'base64url').toString('utf-8');
     return JSON.parse(payload);
-  } catch {
-    logger.warn('Failed to decode access token payload');
+  } catch (error) {
+    logger.warn(
+      { error: error instanceof Error ? error.message : String(error) },
+      'Failed to decode access token payload',
+    );
     return {};
   }
 }

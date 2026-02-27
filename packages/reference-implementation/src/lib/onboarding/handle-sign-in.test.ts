@@ -12,7 +12,7 @@ jest.mock('@/lib/auth/tenant-config', () => ({
 }));
 
 const mockDecodeAccessToken = jest.fn();
-jest.mock('@/lib/auth/keycloak-token', () => ({
+jest.mock('@/lib/auth/oidc-token', () => ({
   decodeAccessToken: (token: string) => mockDecodeAccessToken(token),
 }));
 

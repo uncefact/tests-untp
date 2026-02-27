@@ -8,22 +8,32 @@ jest.mock('@uncefact/untp-ri-services/logging', () => ({
   createLogger: () => ({ child: () => mockLogger }),
 }));
 
-import { refreshKeycloakToken, decodeAccessToken } from './keycloak-token';
+const mockGetOidcEndpoints = jest.fn();
+jest.mock('@/lib/auth/oidc-discovery', () => ({
+  getOidcEndpoints: () => mockGetOidcEndpoints(),
+}));
+
+import { refreshOidcToken, decodeAccessToken } from './oidc-token';
 
 const originalFetch = global.fetch;
 
 beforeEach(() => {
   jest.resetAllMocks();
-  process.env.AUTH_KEYCLOAK_ISSUER = 'http://localhost:8080/realms/ri-local';
-  process.env.AUTH_KEYCLOAK_CLIENT_ID = 'ri-app';
-  process.env.AUTH_KEYCLOAK_CLIENT_SECRET = 'changeme';
+  process.env.AUTH_OIDC_CLIENT_ID = 'ri-app';
+  process.env.AUTH_OIDC_CLIENT_SECRET = 'changeme';
+
+  mockGetOidcEndpoints.mockResolvedValue({
+    token_endpoint: 'http://localhost:8080/realms/test/protocol/openid-connect/token',
+    jwks_uri: 'http://localhost:8080/realms/test/protocol/openid-connect/certs',
+    end_session_endpoint: 'http://localhost:8080/realms/test/protocol/openid-connect/logout',
+  });
 });
 
 afterAll(() => {
   global.fetch = originalFetch;
 });
 
-describe('refreshKeycloakToken', () => {
+describe('refreshOidcToken', () => {
   it('returns fresh tokens on successful refresh', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -34,7 +44,7 @@ describe('refreshKeycloakToken', () => {
       }),
     });
 
-    const result = await refreshKeycloakToken('old-refresh');
+    const result = await refreshOidcToken('old-refresh');
 
     expect(result.access_token).toBe('new-access');
     expect(result.refresh_token).toBe('new-refresh');
@@ -48,25 +58,25 @@ describe('refreshKeycloakToken', () => {
       text: async () => 'invalid_grant',
     });
 
-    await expect(refreshKeycloakToken('bad-refresh')).rejects.toThrow(/Token refresh failed/);
+    await expect(refreshOidcToken('bad-refresh')).rejects.toThrow(/Token refresh failed/);
   });
 
   it('throws on network error', async () => {
     global.fetch = jest.fn().mockRejectedValue(new Error('ECONNREFUSED'));
 
-    await expect(refreshKeycloakToken('some-refresh')).rejects.toThrow('ECONNREFUSED');
+    await expect(refreshOidcToken('some-refresh')).rejects.toThrow('ECONNREFUSED');
   });
 
-  it('sends correct form data to token endpoint', async () => {
+  it('uses discovered token_endpoint instead of hardcoded URL', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ access_token: 'x', expires_in: 300 }),
     });
 
-    await refreshKeycloakToken('the-refresh-token');
+    await refreshOidcToken('the-refresh-token');
 
     const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toBe('http://localhost:8080/realms/ri-local/protocol/openid-connect/token');
+    expect(url).toBe('http://localhost:8080/realms/test/protocol/openid-connect/token');
     expect(options.method).toBe('POST');
     const body = options.body as URLSearchParams;
     expect(body.get('grant_type')).toBe('refresh_token');
