@@ -9,10 +9,17 @@ import { resolveClosedModeTenant } from '@/lib/api/resolve-closed-mode-tenant';
 import { validateServiceAccountToken, extractBearerToken } from '@/lib/auth/token-validator';
 import { prisma } from '@/lib/prisma/prisma';
 import { auth } from '@/auth';
+import { runWithRequestContext, updateRequestContext } from '@uncefact/untp-ri-services/logging';
 
 // Re-export for backwards compatibility — consumers that import from
 // this module will continue to work during migration.
 export { handleRouteError } from '@/lib/api/handle-route-error';
+
+/** RI-specific request context extension. */
+type RiRequestContext = {
+  userId: string;
+  tenantId: string;
+};
 
 export interface TenantAuthContext {
   userId: string;
@@ -26,19 +33,23 @@ type RouteHandler = (req: Request, context: TenantAuthContext) => Promise<Respon
 
 export function withTenantAuth(handler: RouteHandler) {
   return async (req: Request, routeContext: { params: Promise<Record<string, string>> }) => {
-    const method = req.method;
-    const url = new URL(req.url);
-    const path = url.pathname;
-    const start = Date.now();
-    const tenantConfig = getTenantConfig();
+    const correlationId = req.headers.get('x-correlation-id') || crypto.randomUUID();
 
-    apiLogger.info({ method, path }, 'Request received');
+    return runWithRequestContext(correlationId, async () => {
+      const method = req.method;
+      const url = new URL(req.url);
+      const path = url.pathname;
+      const start = Date.now();
+      const tenantConfig = getTenantConfig();
 
-    if (tenantConfig.mode === 'closed') {
-      return handleClosedMode(handler, req, routeContext, method, path, start, tenantConfig);
-    }
+      apiLogger.info({ method, path }, 'Request received');
 
-    return handleOpenMode(handler, req, routeContext, method, path, start);
+      if (tenantConfig.mode === 'closed') {
+        return handleClosedMode(handler, req, routeContext, method, path, start, tenantConfig);
+      }
+
+      return handleOpenMode(handler, req, routeContext, method, path, start);
+    });
   };
 }
 
@@ -262,6 +273,8 @@ async function executeHandler(
   path: string,
   start: number,
 ): Promise<Response> {
+  updateRequestContext<RiRequestContext>({ userId: context.userId, tenantId: context.tenantId });
+
   try {
     const response = await handler(req, context);
 

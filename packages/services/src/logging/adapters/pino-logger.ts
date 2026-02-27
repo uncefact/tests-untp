@@ -1,17 +1,17 @@
 import pino from 'pino';
 import type { LoggerService, LogContext, LoggerConfig } from '../types.js';
 
-type CorrelationIdProvider = () => string | undefined;
-let _correlationIdProvider: CorrelationIdProvider | undefined;
+type RequestContextProvider = () => Record<string, unknown> | undefined;
+let _requestContextProvider: RequestContextProvider | undefined;
 
 /**
- * Register a function that provides the current correlation ID.
+ * Register a function that provides the current request context.
  * Called automatically when `@uncefact/untp-ri-services/logging` is imported.
  * The provider is invoked on every log call via pino's mixin, so loggers
- * created at module scope still pick up request-scoped correlation IDs.
+ * created at module scope still pick up request-scoped context fields.
  */
-export function registerCorrelationIdProvider(fn: CorrelationIdProvider): void {
-  _correlationIdProvider = fn;
+export function registerRequestContextProvider(fn: RequestContextProvider): void {
+  _requestContextProvider = fn;
 }
 
 export class PinoLoggerAdapter implements LoggerService {
@@ -25,9 +25,9 @@ export class PinoLoggerAdapter implements LoggerService {
       this.logger = pino({
         level: config.level || process.env.LOG_LEVEL || 'info',
         mixin() {
-          if (_correlationIdProvider) {
-            const correlationId = _correlationIdProvider();
-            return correlationId ? { correlationId } : {};
+          if (_requestContextProvider) {
+            const context = _requestContextProvider();
+            return context ? { ...context } : {};
           }
           return {};
         },

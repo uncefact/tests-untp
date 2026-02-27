@@ -1,6 +1,6 @@
 import pino from 'pino';
 import { Writable } from 'stream';
-import { PinoLoggerAdapter, registerCorrelationIdProvider } from './pino-logger.js';
+import { PinoLoggerAdapter, registerRequestContextProvider } from './pino-logger.js';
 
 describe('PinoLoggerAdapter', () => {
   describe('child method optimization', () => {
@@ -60,7 +60,7 @@ describe('PinoLoggerAdapter', () => {
     });
   });
 
-  describe('registerCorrelationIdProvider and mixin', () => {
+  describe('registerRequestContextProvider and mixin', () => {
     function createSink(): { sink: Writable; getLines: () => string[] } {
       const lines: string[] = [];
       const sink = new Writable({
@@ -74,12 +74,12 @@ describe('PinoLoggerAdapter', () => {
 
     afterEach(() => {
       // Reset the module-level provider to avoid leaking state between tests
-      registerCorrelationIdProvider(undefined as unknown as () => string | undefined);
+      registerRequestContextProvider(undefined as unknown as () => Record<string, unknown> | undefined);
     });
 
     it('should register a provider that gets called during logging', () => {
-      const provider = jest.fn().mockReturnValue('corr-abc');
-      registerCorrelationIdProvider(provider);
+      const provider = jest.fn().mockReturnValue({ correlationId: 'corr-abc' });
+      registerRequestContextProvider(provider);
 
       const adapter = new PinoLoggerAdapter({ level: 'info' });
       adapter.info('hello');
@@ -104,7 +104,7 @@ describe('PinoLoggerAdapter', () => {
         sink,
       );
 
-      loggerWithMixin.info('no correlation');
+      loggerWithMixin.info('no context');
 
       const lines = getLines();
       expect(lines.length).toBeGreaterThanOrEqual(1);
@@ -114,7 +114,7 @@ describe('PinoLoggerAdapter', () => {
 
     it('should return empty object from mixin when provider returns undefined', () => {
       const provider = jest.fn().mockReturnValue(undefined);
-      registerCorrelationIdProvider(provider);
+      registerRequestContextProvider(provider);
 
       const { sink, getLines } = createSink();
 
@@ -123,14 +123,14 @@ describe('PinoLoggerAdapter', () => {
         {
           level: 'info',
           mixin() {
-            const correlationId = provider();
-            return correlationId ? { correlationId } : {};
+            const context = provider();
+            return context ? { ...context } : {};
           },
         },
         sink,
       );
 
-      loggerWithMixin.info('no id');
+      loggerWithMixin.info('no context');
 
       const lines = getLines();
       expect(lines.length).toBeGreaterThanOrEqual(1);
@@ -139,9 +139,9 @@ describe('PinoLoggerAdapter', () => {
       expect(provider).toHaveBeenCalled();
     });
 
-    it('should inject correlationId when provider returns a value', () => {
-      const provider = jest.fn().mockReturnValue('req-123');
-      registerCorrelationIdProvider(provider);
+    it('should spread all context fields when provider returns a context object', () => {
+      const provider = jest.fn().mockReturnValue({ correlationId: 'req-123', userId: 'user-1', tenantId: 'tenant-1' });
+      registerRequestContextProvider(provider);
 
       const { sink, getLines } = createSink();
 
@@ -150,8 +150,8 @@ describe('PinoLoggerAdapter', () => {
         {
           level: 'info',
           mixin() {
-            const correlationId = provider();
-            return correlationId ? { correlationId } : {};
+            const context = provider();
+            return context ? { ...context } : {};
           },
         },
         sink,
@@ -163,11 +163,13 @@ describe('PinoLoggerAdapter', () => {
       expect(lines.length).toBeGreaterThanOrEqual(1);
       const parsed = JSON.parse(lines[lines.length - 1]);
       expect(parsed.correlationId).toBe('req-123');
+      expect(parsed.userId).toBe('user-1');
+      expect(parsed.tenantId).toBe('tenant-1');
     });
 
-    it('should inherit mixin behaviour in child loggers', () => {
-      const provider = jest.fn().mockReturnValue('req-child-456');
-      registerCorrelationIdProvider(provider);
+    it('should inject only correlationId when no extension fields are set', () => {
+      const provider = jest.fn().mockReturnValue({ correlationId: 'req-456' });
+      registerRequestContextProvider(provider);
 
       const { sink, getLines } = createSink();
 
@@ -175,8 +177,35 @@ describe('PinoLoggerAdapter', () => {
         {
           level: 'info',
           mixin() {
-            const correlationId = provider();
-            return correlationId ? { correlationId } : {};
+            const context = provider();
+            return context ? { ...context } : {};
+          },
+        },
+        sink,
+      );
+
+      loggerWithMixin.info('test message');
+
+      const lines = getLines();
+      expect(lines.length).toBeGreaterThanOrEqual(1);
+      const parsed = JSON.parse(lines[lines.length - 1]);
+      expect(parsed.correlationId).toBe('req-456');
+      expect(parsed).not.toHaveProperty('userId');
+      expect(parsed).not.toHaveProperty('tenantId');
+    });
+
+    it('should inherit mixin behaviour in child loggers', () => {
+      const provider = jest.fn().mockReturnValue({ correlationId: 'req-child-456', userId: 'child-user' });
+      registerRequestContextProvider(provider);
+
+      const { sink, getLines } = createSink();
+
+      const loggerWithMixin = pino(
+        {
+          level: 'info',
+          mixin() {
+            const context = provider();
+            return context ? { ...context } : {};
           },
         },
         sink,
@@ -189,6 +218,7 @@ describe('PinoLoggerAdapter', () => {
       expect(lines.length).toBeGreaterThanOrEqual(1);
       const parsed = JSON.parse(lines[lines.length - 1]);
       expect(parsed.correlationId).toBe('req-child-456');
+      expect(parsed.userId).toBe('child-user');
       expect(parsed.module).toBe('child-mod');
     });
   });
