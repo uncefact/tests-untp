@@ -179,6 +179,7 @@ services:
       - AUTH_OIDC_ISSUER=http://localhost:8081/realms/ri-e2e
       - AUTH_OIDC_SERVICE_ACCOUNT_CLIENT_ID=ri-service-account-e2e
       - AUTH_OIDC_SERVICE_ACCOUNT_CLIENT_SECRET=e2e-service-account-secret
+      - AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE=ri-api
       - UNCEFACT_STORAGE_URL=http://storage-service:3334/api/3.0.0/public
       - UNCEFACT_STORAGE_API_KEY=test123
       - PYX_IDR_API_URL=http://identity-resolver-service:3000
