@@ -5,12 +5,10 @@ export const vckitDidConfigSchema = z.object({
     .string()
     .url()
     .describe('API Endpoint||The base URL of your VCKit instance, e.g. https://vckit.example.com'),
-  authToken: z.string().min(1).describe('Auth Token||The Bearer token for authenticating with VCKit'),
-  keyType: z.literal('Ed25519').default('Ed25519').describe('Key Algorithm||The key algorithm used when creating DIDs'),
-  apiVersion: z.enum(['1.1.0']).default('1.1.0').describe('API Version||The VCKit API version to use'),
+  apiKey: z.string().min(1).describe('API Key||The API key for authenticating with VCKit'),
+  apiVersion: z.enum(['1.0.0']).default('1.0.0').describe('API Version||The VCKit API version'),
 });
 
-/** Fields whose values should be treated as sensitive (e.g. masked in UI, encrypted at rest). */
-export const vckitDidSensitiveFields: (keyof VCKitDidConfig)[] = ['authToken'];
-
 export type VCKitDidConfig = z.infer<typeof vckitDidConfigSchema>;
+
+export const vckitDidSensitiveFields: (keyof VCKitDidConfig)[] = ['apiKey'];

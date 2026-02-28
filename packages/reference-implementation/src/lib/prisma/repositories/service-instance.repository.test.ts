@@ -47,7 +47,7 @@ describe('service-instance.repository', () => {
   const INSTANCE_RECORD = {
     id: 'instance-1',
     tenantId: ORG_ID,
-    serviceType: 'DID',
+    serviceType: 'VC',
     adapterType: 'VCKIT',
     name: 'Test VCKit Instance',
     description: null,
@@ -68,7 +68,7 @@ describe('service-instance.repository', () => {
 
       const result = await createServiceInstance({
         tenantId: ORG_ID,
-        serviceType: 'DID',
+        serviceType: 'VC',
         adapterType: 'VCKIT',
         name: 'Test VCKit Instance',
         config: 'encrypted-config-blob',
@@ -78,7 +78,7 @@ describe('service-instance.repository', () => {
       expect(mockServiceInstance.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           tenantId: ORG_ID,
-          serviceType: 'DID',
+          serviceType: 'VC',
           adapterType: 'VCKIT',
           name: 'Test VCKit Instance',
           config: 'encrypted-config-blob',
@@ -94,7 +94,7 @@ describe('service-instance.repository', () => {
 
       await createServiceInstance({
         tenantId: ORG_ID,
-        serviceType: 'DID',
+        serviceType: 'VC',
         adapterType: 'VCKIT',
         name: 'Test',
         config: 'encrypted',
@@ -115,7 +115,7 @@ describe('service-instance.repository', () => {
 
       await createServiceInstance({
         tenantId: ORG_ID,
-        serviceType: 'DID',
+        serviceType: 'VC',
         adapterType: 'VCKIT',
         name: 'Primary Instance',
         config: 'encrypted',
@@ -126,7 +126,7 @@ describe('service-instance.repository', () => {
       expect(mockServiceInstance.updateMany).toHaveBeenCalledWith({
         where: {
           tenantId: ORG_ID,
-          serviceType: 'DID',
+          serviceType: 'VC',
           isPrimary: true,
         },
         data: { isPrimary: false },
@@ -191,11 +191,11 @@ describe('service-instance.repository', () => {
     it('applies serviceType filter', async () => {
       mockServiceInstance.findMany.mockResolvedValue([]);
 
-      await listServiceInstances(ORG_ID, { serviceType: 'DID' });
+      await listServiceInstances(ORG_ID, { serviceType: 'VC' });
 
       expect(mockServiceInstance.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
-          serviceType: 'DID',
+          serviceType: 'VC',
         }),
         take: 100,
         skip: undefined,
@@ -282,7 +282,7 @@ describe('service-instance.repository', () => {
       expect(mockServiceInstance.updateMany).toHaveBeenCalledWith({
         where: {
           tenantId: ORG_ID,
-          serviceType: 'DID',
+          serviceType: 'VC',
           isPrimary: true,
           NOT: { id: 'instance-1' },
         },
@@ -332,7 +332,7 @@ describe('service-instance.repository', () => {
     it('returns explicit instance by ID (own organisation)', async () => {
       mockServiceInstance.findFirst.mockResolvedValue(INSTANCE_RECORD);
 
-      const result = await getInstanceByResolution(ORG_ID, 'DID', 'instance-1');
+      const result = await getInstanceByResolution(ORG_ID, 'VC', 'instance-1');
 
       expect(mockServiceInstance.findFirst).toHaveBeenCalledWith({
         where: {
@@ -347,7 +347,7 @@ describe('service-instance.repository', () => {
       const systemRecord = { ...INSTANCE_RECORD, tenantId: 'system' };
       mockServiceInstance.findFirst.mockResolvedValue(systemRecord);
 
-      const result = await getInstanceByResolution(ORG_ID, 'DID', 'instance-1');
+      const result = await getInstanceByResolution(ORG_ID, 'VC', 'instance-1');
 
       expect(result).toEqual(systemRecord);
     });
@@ -355,7 +355,7 @@ describe('service-instance.repository', () => {
     it('returns null for explicit ID not accessible', async () => {
       mockServiceInstance.findFirst.mockResolvedValue(null);
 
-      const result = await getInstanceByResolution('other-org', 'DID', 'instance-1');
+      const result = await getInstanceByResolution('other-org', 'VC', 'instance-1');
 
       expect(result).toBeNull();
     });
@@ -364,12 +364,12 @@ describe('service-instance.repository', () => {
       const primaryRecord = { ...INSTANCE_RECORD, isPrimary: true };
       mockServiceInstance.findFirst.mockResolvedValue(primaryRecord);
 
-      const result = await getInstanceByResolution(ORG_ID, 'DID');
+      const result = await getInstanceByResolution(ORG_ID, 'VC');
 
       expect(mockServiceInstance.findFirst).toHaveBeenCalledWith({
         where: {
           tenantId: ORG_ID,
-          serviceType: 'DID',
+          serviceType: 'VC',
           isPrimary: true,
         },
       });
@@ -383,20 +383,20 @@ describe('service-instance.repository', () => {
       // Second call: system default lookup returns the system record
       mockServiceInstance.findFirst.mockResolvedValueOnce(systemRecord);
 
-      const result = await getInstanceByResolution(ORG_ID, 'DID');
+      const result = await getInstanceByResolution(ORG_ID, 'VC');
 
       expect(mockServiceInstance.findFirst).toHaveBeenCalledTimes(2);
       expect(mockServiceInstance.findFirst).toHaveBeenNthCalledWith(1, {
         where: {
           tenantId: ORG_ID,
-          serviceType: 'DID',
+          serviceType: 'VC',
           isPrimary: true,
         },
       });
       expect(mockServiceInstance.findFirst).toHaveBeenNthCalledWith(2, {
         where: {
           tenantId: 'system',
-          serviceType: 'DID',
+          serviceType: 'VC',
         },
       });
       expect(result).toEqual(systemRecord);
@@ -408,7 +408,7 @@ describe('service-instance.repository', () => {
       // Second call: system default lookup returns null
       mockServiceInstance.findFirst.mockResolvedValueOnce(null);
 
-      const result = await getInstanceByResolution(ORG_ID, 'DID');
+      const result = await getInstanceByResolution(ORG_ID, 'VC');
 
       expect(mockServiceInstance.findFirst).toHaveBeenCalledTimes(2);
       expect(result).toBeNull();

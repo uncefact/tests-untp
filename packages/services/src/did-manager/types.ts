@@ -7,9 +7,6 @@
  * - SELF_MANAGED: tenant-scoped, keys in VCKit, document self-hosted
  */
 
-/** Service type identifier for DID management. */
-export const DID_SERVICE_TYPE = 'DID' as const;
-
 // ── Enums ──────────────────────────────────────────────────────────────────
 
 export enum DidType {

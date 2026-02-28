@@ -52,6 +52,7 @@ export { createLogger } from './logging/factory.js';
 export { ServiceType, AdapterType } from './registry/types.js';
 export { BaseServiceAdapter } from './registry/base-adapter.js';
 export { adapterRegistry } from './registry/registry.js';
+export { didAdapterRegistry } from './registry/did-adapter-registry.js';
 export { getSensitiveFields } from './registry/common/get-sensitive-fields.js';
 export type { AdapterRegistryEntry, AdapterRegistry } from './registry/types.js';
 export { maskInstanceConfig } from './registry/common/mask-instance-config.js';

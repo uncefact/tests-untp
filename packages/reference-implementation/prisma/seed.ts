@@ -76,36 +76,6 @@ async function main() {
     },
   });
 
-  // Upsert the system default VCKit DID service instance
-  const { vckitApiUrl, vckitApiKey: vckitDidApiKey } = getDidConfig();
-  const didServiceConfig = JSON.stringify({
-    endpoint: new URL(vckitApiUrl).origin,
-    authToken: vckitDidApiKey,
-  });
-  const encryptedConfig = JSON.stringify(encryptionService.encrypt(didServiceConfig, EncryptionAlgorithm.AES_256_GCM));
-
-  const systemDidInstance = await prisma.serviceInstance.upsert({
-    where: { id: 'system-did-vckit' },
-    update: { config: encryptedConfig },
-    create: {
-      id: 'system-did-vckit',
-      tenantId: SYSTEM_TENANT_ID,
-      serviceType: PrismaServiceType.DID,
-      adapterType: PrismaAdapterType.VCKIT,
-      name: 'System Default VCKit (DID)',
-      description: 'System-wide default VCKit instance for DID management',
-      config: encryptedConfig,
-      apiVersion: '1.1.0',
-      isPrimary: false,
-    },
-  });
-
-  // Update the system default DID to reference the service instance
-  await prisma.did.updateMany({
-    where: { did: DEFAULT_DID },
-    data: { serviceInstanceId: systemDidInstance.id },
-  });
-
   // ── Seed system registrars ──────────────────────────────────────────────────
 
   const gs1Registrar = await prisma.registrar.upsert({
@@ -328,6 +298,7 @@ async function main() {
     const vcServiceConfig = JSON.stringify({
       endpoint: new URL(vckitApiUrl).origin,
       apiKey: vckitApiKey,
+      apiVersion: '1.0.0',
     });
     const encryptedVcConfig = JSON.stringify(
       encryptionService.encrypt(vcServiceConfig, EncryptionAlgorithm.AES_256_GCM),
@@ -341,14 +312,20 @@ async function main() {
         tenantId: SYSTEM_TENANT_ID,
         serviceType: PrismaServiceType.VC,
         adapterType: PrismaAdapterType.VCKIT,
-        name: 'System Default VCKit (VC)',
-        description: 'System-wide default VCKit instance for verifiable credential operations',
+        name: 'System Default VCKit',
+        description: 'System-wide default VCKit instance for DID management and verifiable credential operations',
         config: encryptedVcConfig,
         apiVersion: '1.0.0',
         isPrimary: true,
       },
     });
     vcSeeded = true;
+
+    // Link the system default DID to the VC service instance
+    await prisma.did.updateMany({
+      where: { did: DEFAULT_DID },
+      data: { serviceInstanceId: 'system-vc-vckit' },
+    });
   } catch (error) {
     logger.warn(
       { error: error instanceof Error ? error.message : error },

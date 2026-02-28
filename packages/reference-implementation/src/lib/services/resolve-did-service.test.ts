@@ -25,7 +25,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
 
 // Mock the services package (types only from main barrel)
 jest.mock('@uncefact/untp-ri-services', () => ({
-  ServiceType: { DID: 'DID' },
+  ServiceType: { VC: 'VC' },
   AdapterType: { VCKIT: 'VCKIT' },
   createLogger: () => ({
     child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }),
@@ -39,11 +39,17 @@ const mockConfigSchema = {
 };
 jest.mock('@uncefact/untp-ri-services/server', () => ({
   adapterRegistry: {
-    DID: {
+    VC: {
       VCKIT: {
         configSchema: mockConfigSchema,
         factory: (...args: unknown[]) => mockFactory(...args),
       },
+    },
+  },
+  didAdapterRegistry: {
+    VCKIT: {
+      configSchema: mockConfigSchema,
+      factory: (...args: unknown[]) => mockFactory(...args),
     },
   },
 }));
@@ -69,7 +75,7 @@ const MOCK_ENCRYPTED_ENVELOPE = {
 const MOCK_INSTANCE = {
   id: 'inst-1',
   tenantId: 'system',
-  serviceType: 'DID',
+  serviceType: 'VC',
   adapterType: 'VCKIT',
   name: 'System VCKit',
   config: JSON.stringify(MOCK_ENCRYPTED_ENVELOPE),
@@ -79,7 +85,7 @@ const MOCK_INSTANCE = {
   updatedAt: new Date(),
 };
 
-const VALID_CONFIG = { endpoint: 'https://vckit.example.com', authToken: 'tok' };
+const VALID_CONFIG = { endpoint: 'https://vckit.example.com', apiKey: 'tok' };
 const VALID_JSON = JSON.stringify(VALID_CONFIG);
 
 const MOCK_SERVICE = {
@@ -113,7 +119,7 @@ describe('resolveDidService', () => {
 
     const result = await resolveDidService('org-1');
 
-    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'DID', undefined);
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'VC', undefined);
     expect(mockEncryptionService.decrypt).toHaveBeenCalledWith(MOCK_ENCRYPTED_ENVELOPE);
     expect(mockConfigSchema.safeParse).toHaveBeenCalledWith(VALID_CONFIG);
     expect(mockFactory).toHaveBeenCalledWith(
@@ -133,7 +139,7 @@ describe('resolveDidService', () => {
 
     await resolveDidService('org-1', 'inst-42');
 
-    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'DID', 'inst-42');
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'VC', 'inst-42');
   });
 
   it('throws ServiceInstanceNotFoundError for explicit ID not found', async () => {
@@ -170,12 +176,12 @@ describe('resolveDidService', () => {
     mockConfigSchema.safeParse.mockReturnValue({
       success: false,
       error: {
-        issues: [{ message: 'endpoint is required' }, { message: 'authToken must be a string' }],
+        issues: [{ message: 'endpoint is required' }, { message: 'apiKey must be a string' }],
       },
     });
 
     await expect(resolveDidService('org-1')).rejects.toThrow(ConfigValidationError);
-    await expect(resolveDidService('org-1')).rejects.toThrow(/endpoint is required, authToken must be a string/);
+    await expect(resolveDidService('org-1')).rejects.toThrow(/endpoint is required, apiKey must be a string/);
   });
 
   it('returns the adapter and instance ID from the factory (end-to-end flow)', async () => {
