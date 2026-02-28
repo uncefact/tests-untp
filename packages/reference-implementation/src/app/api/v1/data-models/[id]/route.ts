@@ -14,7 +14,7 @@ const UPDATABLE_FIELDS = ['name', 'schemaUrl', 'contextUrl', 'websiteUrl'] as co
  * /data-models/{id}:
  *   get:
  *     summary: Get a data model by ID
- *     description: Retrieves a specific data model by its database ID. Returns system-provisioned (tenantId=null) or tenant-owned models.
+ *     description: Retrieves a specific data model by its database ID. Returns system-provisioned or tenant-owned models.
  *     tags:
  *       - Data Models
  *     parameters:

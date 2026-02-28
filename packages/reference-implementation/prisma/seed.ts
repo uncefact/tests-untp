@@ -17,6 +17,12 @@ import { getDidConfig } from '../src/lib/config/did.config';
 import { getIdrConfig } from '../src/lib/config/idr.config';
 import { getStorageConfig } from '../src/lib/config/storage.config';
 import { getVcConfig } from '../src/lib/config/vc.config';
+/**
+ * Must match the value in src/lib/prisma/constants.ts.
+ * Inlined here because seed.ts runs via tsx outside the Next.js build,
+ * so ../src/ path aliases are unavailable in the Docker container.
+ */
+const SYSTEM_TENANT_ID = 'system';
 
 const logger = createLogger().child({ module: 'prisma-seed' });
 
@@ -32,8 +38,6 @@ if (RI_POSTGRES_USER && RI_POSTGRES_PASSWORD && RI_POSTGRES_DB && RI_POSTGRES_HO
 
 const prisma = new PrismaClient();
 const { defaultDid: DEFAULT_DID } = getDidConfig();
-
-const SYSTEM_TENANT_ID = 'system';
 
 const ENCRYPTION_KEY = process.env.SERVICE_ENCRYPTION_KEY;
 if (!ENCRYPTION_KEY) {
