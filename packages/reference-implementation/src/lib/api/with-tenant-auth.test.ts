@@ -1,5 +1,6 @@
 // Polyfill crypto.randomUUID for the test environment
 if (!globalThis.crypto?.randomUUID) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { randomUUID } = require('crypto');
   Object.defineProperty(globalThis, 'crypto', {
     value: { ...globalThis.crypto, randomUUID },
