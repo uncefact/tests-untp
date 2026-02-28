@@ -20,7 +20,7 @@ import NextAuth from 'next-auth';
 import { authConfig } from '@/lib/auth/auth.config';
 import { NextResponse, type NextRequest } from 'next/server';
 import { validateServiceAccountToken, extractBearerToken } from '@/lib/auth/token-validator';
-import { runWithCorrelationId } from '@uncefact/untp-ri-services/logging';
+import { runWithRequestContext } from '@uncefact/untp-ri-services/logging';
 import type { JWTPayload } from 'jose';
 
 const { auth } = NextAuth(authConfig);
@@ -57,7 +57,7 @@ export default auth(async (req) => {
   const correlationId =
     req.headers.get('x-correlation-id') || req.headers.get('x-amzn-trace-id') || crypto.randomUUID();
 
-  return runWithCorrelationId(correlationId, async () => {
+  return runWithRequestContext(correlationId, async () => {
     const { pathname } = req.nextUrl;
     const isSessionAuthenticated = !!req.auth;
 

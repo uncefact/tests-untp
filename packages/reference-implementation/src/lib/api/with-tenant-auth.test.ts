@@ -1,3 +1,34 @@
+// Polyfill crypto.randomUUID for the test environment
+if (!globalThis.crypto?.randomUUID) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { randomUUID } = require('crypto');
+  Object.defineProperty(globalThis, 'crypto', {
+    value: { ...globalThis.crypto, randomUUID },
+  });
+}
+
+const mockRunWithRequestContext = jest.fn((_correlationId: string, callback: () => unknown) => callback());
+const mockUpdateRequestContext = jest.fn();
+
+const mockLogger = (): Record<string, jest.Mock> => {
+  const logger: Record<string, jest.Mock> = {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    child: jest.fn(),
+  };
+  logger.child.mockImplementation(() => mockLogger());
+  return logger;
+};
+
+jest.mock('@uncefact/untp-ri-services/logging', () => ({
+  runWithRequestContext: (correlationId: string, callback: () => unknown) =>
+    mockRunWithRequestContext(correlationId, callback),
+  updateRequestContext: (partial: Record<string, unknown>) => mockUpdateRequestContext(partial),
+  createLogger: () => mockLogger(),
+}));
+
 jest.mock('next/server', () => ({
   NextResponse: {
     json: (body: unknown, init?: { status?: number }) => ({
@@ -73,8 +104,12 @@ interface MockResponse {
 }
 
 beforeEach(() => {
-  jest.resetAllMocks();
+  jest.clearAllMocks();
   mockTenantMode = 'open';
+  // Restore the default implementation after clearing — resetAllMocks would
+  // remove the implementation, causing runWithRequestContext to return undefined
+  // instead of invoking the callback.
+  mockRunWithRequestContext.mockImplementation((_correlationId: string, callback: () => unknown) => callback());
 });
 
 function fakeRequest(method = 'GET', headers: Record<string, string> = {}): Request {
@@ -535,6 +570,155 @@ describe('withTenantAuth — closed mode, bearer path', () => {
       name: 'Alice',
       email: 'alice@example.com',
     });
+  });
+});
+
+// ========================================================
+// Request context propagation tests
+// ========================================================
+
+describe('withTenantAuth — request context propagation', () => {
+  it('establishes request context with correlationId from x-correlation-id header', async () => {
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockResolvedValue('org-1');
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest('GET', { 'x-correlation-id': 'test-corr-id' }), emptyRouteContext);
+
+    expect(mockRunWithRequestContext).toHaveBeenCalledWith('test-corr-id', expect.any(Function));
+  });
+
+  it('generates fallback correlationId when x-correlation-id header is missing', async () => {
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockResolvedValue('org-1');
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(mockRunWithRequestContext).toHaveBeenCalledTimes(1);
+    const correlationId = mockRunWithRequestContext.mock.calls[0][0];
+    expect(correlationId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('rejects oversized x-correlation-id and generates a fallback UUID', async () => {
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockResolvedValue('org-1');
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    const oversizedId = 'x'.repeat(200);
+    await wrapped(fakeRequest('GET', { 'x-correlation-id': oversizedId }), emptyRouteContext);
+
+    expect(mockRunWithRequestContext).toHaveBeenCalledTimes(1);
+    const correlationId = mockRunWithRequestContext.mock.calls[0][0];
+    expect(correlationId).not.toBe(oversizedId);
+    expect(correlationId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('sets userId and tenantId on request context for open mode session path', async () => {
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockResolvedValue('org-1');
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(mockUpdateRequestContext).toHaveBeenCalledWith({ userId: 'user-1', tenantId: 'org-1' });
+  });
+
+  it('sets userId and tenantId on request context for open mode service account path', async () => {
+    mockGetSessionUserId.mockResolvedValue(null);
+    mockResolveServiceAccountUser.mockResolvedValue({ userId: 'sa-user-1', tenantId: 'sa-org-1' });
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest('GET', { 'x-auth-sub': 'ext-sub-1' }), emptyRouteContext);
+
+    expect(mockUpdateRequestContext).toHaveBeenCalledWith({ userId: 'sa-user-1', tenantId: 'sa-org-1' });
+  });
+
+  it('sets userId and tenantId on request context for closed mode session path', async () => {
+    mockTenantMode = 'closed';
+    mockAuth.mockResolvedValue({
+      user: { id: 'user-1' },
+      group_claim: '/acme',
+    });
+    mockPrismaTenant.findUnique.mockResolvedValue({ id: 'tenant-1' });
+    mockPrismaUser.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(mockUpdateRequestContext).toHaveBeenCalledWith({ userId: 'user-1', tenantId: 'tenant-1' });
+  });
+
+  it('sets userId and tenantId on request context for closed mode bearer path', async () => {
+    mockTenantMode = 'closed';
+    mockAuth.mockResolvedValue(null);
+    mockExtractBearerToken.mockReturnValue('valid-token');
+    mockValidateServiceAccountToken.mockResolvedValue({
+      valid: true,
+      payload: { sub: 'ext-sub-1', groups: ['/acme'], azp: 'client-1' },
+    });
+    mockExtractGroupClaim.mockReturnValue('/acme');
+    mockResolveClosedModeTenant.mockResolvedValue({ userId: 'user-1', tenantId: 'tenant-1' });
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest('GET', { authorization: 'Bearer valid-token' }), emptyRouteContext);
+
+    expect(mockUpdateRequestContext).toHaveBeenCalledWith({ userId: 'user-1', tenantId: 'tenant-1' });
+  });
+
+  it('does not set userId or tenantId on open mode 401 path', async () => {
+    mockGetSessionUserId.mockResolvedValue(null);
+
+    const handler = jest.fn();
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(mockUpdateRequestContext).not.toHaveBeenCalled();
+  });
+
+  it('does not set userId or tenantId on open mode 403 path', async () => {
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockResolvedValue(null);
+
+    const handler = jest.fn();
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(mockUpdateRequestContext).not.toHaveBeenCalled();
+  });
+
+  it('does not set userId or tenantId on closed mode 401 path', async () => {
+    mockTenantMode = 'closed';
+    mockAuth.mockResolvedValue(null);
+    mockExtractBearerToken.mockReturnValue(null);
+
+    const handler = jest.fn();
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(mockUpdateRequestContext).not.toHaveBeenCalled();
+  });
+
+  it('does not set userId or tenantId on closed mode 403 path', async () => {
+    mockTenantMode = 'closed';
+    mockAuth.mockResolvedValue({
+      user: { id: 'user-1' },
+      group_claim: '/unknown',
+    });
+    mockPrismaTenant.findUnique.mockResolvedValue(null);
+
+    const handler = jest.fn();
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest(), emptyRouteContext);
+
+    expect(mockUpdateRequestContext).not.toHaveBeenCalled();
   });
 });
 

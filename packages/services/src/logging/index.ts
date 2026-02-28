@@ -1,11 +1,11 @@
 export type { LoggerService, LogContext, LoggerConfig, LogLevel } from './types.js';
 export { createLogger } from './factory.js';
-export { getCorrelationId, setCorrelationId, runWithCorrelationId } from './correlation-context.js';
-export { registerCorrelationIdProvider } from './adapters/pino-logger.js';
+export { getRequestContext, updateRequestContext, runWithRequestContext } from './request-context.js';
+export { registerRequestContextProvider } from './adapters/pino-logger.js';
 
-// Auto-register the correlation ID provider so that ALL loggers (even those
-// created at module scope via the main barrel) include the request-scoped
-// correlation ID in every log entry once this module is loaded.
-import { getCorrelationId } from './correlation-context.js';
-import { registerCorrelationIdProvider } from './adapters/pino-logger.js';
-registerCorrelationIdProvider(getCorrelationId);
+// Auto-register the request context provider so that ALL loggers include
+// request-scoped fields (correlationId, userId, tenantId, etc.) in every
+// log entry once this module is loaded.
+import { getRequestContext } from './request-context.js';
+import { registerRequestContextProvider } from './adapters/pino-logger.js';
+registerRequestContextProvider(getRequestContext);
