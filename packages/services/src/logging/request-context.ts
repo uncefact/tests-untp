@@ -4,7 +4,9 @@ const asyncLocalStorage = new AsyncLocalStorage<Record<string, unknown>>();
 
 /**
  * Returns the current request context, or undefined if called outside a context.
- * Generic type parameter provides type safety at the call site.
+ * The generic type parameter narrows the return type at the call site but performs
+ * no runtime validation — actual contents depend on what has been set via
+ * updateRequestContext().
  */
 export function getRequestContext<T extends Record<string, unknown> = Record<string, unknown>>():
   | (T & { correlationId: string })

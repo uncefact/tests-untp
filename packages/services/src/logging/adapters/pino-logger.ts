@@ -26,8 +26,12 @@ export class PinoLoggerAdapter implements LoggerService {
         level: config.level || process.env.LOG_LEVEL || 'info',
         mixin() {
           if (_requestContextProvider) {
-            const context = _requestContextProvider();
-            return context ? { ...context } : {};
+            try {
+              const context = _requestContextProvider();
+              return context ? { ...context } : {};
+            } catch {
+              return {};
+            }
           }
           return {};
         },

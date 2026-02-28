@@ -194,6 +194,17 @@ describe('PinoLoggerAdapter', () => {
       expect(parsed).not.toHaveProperty('tenantId');
     });
 
+    it('should return empty object from mixin when provider throws', () => {
+      const provider = jest.fn().mockImplementation(() => {
+        throw new Error('provider failure');
+      });
+      registerRequestContextProvider(provider);
+
+      const adapter = new PinoLoggerAdapter({ level: 'info' });
+      expect(() => adapter.info('should not crash')).not.toThrow();
+      expect(provider).toHaveBeenCalled();
+    });
+
     it('should inherit mixin behaviour in child loggers', () => {
       const provider = jest.fn().mockReturnValue({ correlationId: 'req-child-456', userId: 'child-user' });
       registerRequestContextProvider(provider);

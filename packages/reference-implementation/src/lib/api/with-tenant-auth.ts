@@ -15,11 +15,11 @@ import { runWithRequestContext, updateRequestContext } from '@uncefact/untp-ri-s
 // this module will continue to work during migration.
 export { handleRouteError } from '@/lib/api/handle-route-error';
 
-/** RI-specific request context extension. */
-type RiRequestContext = {
+/** Fields added to the request-scoped logging context by the RI layer. */
+interface RiRequestContext extends Record<string, unknown> {
   userId: string;
   tenantId: string;
-};
+}
 
 export interface TenantAuthContext {
   userId: string;
@@ -273,6 +273,7 @@ async function executeHandler(
   path: string,
   start: number,
 ): Promise<Response> {
+  // Enrich request context so all downstream log entries include userId and tenantId.
   updateRequestContext<RiRequestContext>({ userId: context.userId, tenantId: context.tenantId });
 
   try {
