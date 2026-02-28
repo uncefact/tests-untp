@@ -31,6 +31,7 @@ jest.mock('../prisma', () => ({
 
 // Import the mocked prisma after jest.mock
 import { prisma } from '../prisma';
+import { SYSTEM_TENANT_ID } from '../constants';
 
 const mockDataModel = prisma.dataModel as unknown as {
   create: jest.Mock;
@@ -45,7 +46,6 @@ const INCLUDE_SHAPE = {
 };
 
 describe('data-model.repository', () => {
-  const SYSTEM_TENANT_ID = 'system';
   const TENANT_ID = 'tenant-1';
   const CONFIG_RECORD = {
     id: 'config-1',
