@@ -190,9 +190,6 @@ export class VCKitDidAdapter implements IDidService {
   }
 }
 
-/** Adapter type identifier for VCKit DID provider. */
-export const VCKIT_DID_ADAPTER_TYPE = 'VCKIT' as const;
-
 /** Registry entry for the VCKit DID adapter. */
 export const vckitDidRegistryEntry = {
   configSchema: vckitDidConfigSchema,

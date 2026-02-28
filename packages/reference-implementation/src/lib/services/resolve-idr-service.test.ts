@@ -25,7 +25,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
 
 // Mock the services package (types only from main barrel)
 jest.mock('@uncefact/untp-ri-services', () => ({
-  ServiceType: { DID: 'DID', IDR: 'IDR' },
+  ServiceType: { IDR: 'IDR' },
   AdapterType: { VCKIT: 'VCKIT', PYX_IDR: 'PYX_IDR' },
 }));
 

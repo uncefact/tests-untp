@@ -110,12 +110,14 @@ tests-untp/
 
 ### Service Registry Pattern
 The services package uses a type-safe adapter registry for pluggable implementations:
-- `ServiceType` enum: DID (extensible)
+- `ServiceType` enum: IDR, STORAGE, VC
 - `AdapterType` enum: VCKIT (extensible)
 - `AdapterRegistry`: Type-safe mapping of services to adapters
 - `AdapterRegistryEntry`: Schema validation + factory function pattern
 
-Example: `registry[ServiceType.DID][AdapterType.VCKIT]` returns factory for VCKit DID adapter.
+Example: `registry[ServiceType.VC][AdapterType.VCKIT]` returns factory for VCKit VC adapter.
+
+DID adapters are resolved via the separate `didAdapterRegistry`, exported from `server.ts`.
 
 ### Adapter Pattern
 External integrations use interfaces + implementations:

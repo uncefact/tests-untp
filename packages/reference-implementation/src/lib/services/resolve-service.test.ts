@@ -25,7 +25,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
 
 // Mock the services package (types only from main barrel)
 jest.mock('@uncefact/untp-ri-services', () => ({
-  ServiceType: { DID: 'DID', IDR: 'IDR', STORAGE: 'STORAGE', VC: 'VC' },
+  ServiceType: { IDR: 'IDR', STORAGE: 'STORAGE', VC: 'VC' },
   AdapterType: { VCKIT: 'VCKIT', PYX_IDR: 'PYX_IDR', UNCEFACT_STORAGE: 'UNCEFACT_STORAGE' },
 }));
 
@@ -47,6 +47,7 @@ jest.mock('@uncefact/untp-ri-services/server', () => ({
 
 import { resolveService } from './resolve-service';
 import { ServiceType } from '@uncefact/untp-ri-services';
+import type { AdapterRegistryEntry } from '@uncefact/untp-ri-services';
 
 import {
   ServiceResolutionError,
@@ -203,5 +204,64 @@ describe('resolveService', () => {
     expect(mockConfigSchema.safeParse).toHaveBeenCalledTimes(1);
     expect(mockFactory).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ service: MOCK_SERVICE, instanceId: 'storage-inst-1' });
+  });
+
+  describe('adapterLookupOverride', () => {
+    it('uses override registry when provided', async () => {
+      // Instance has adapterType 'VCKIT' which is NOT in the standard adapterRegistry
+      // (the standard registry only has STORAGE.UNCEFACT_STORAGE)
+      const instanceWithVckit = {
+        ...MOCK_INSTANCE,
+        id: 'override-inst-1',
+        serviceType: 'VC',
+        adapterType: 'VCKIT',
+      };
+      mockGetInstanceByResolution.mockResolvedValue(instanceWithVckit);
+      mockEncryptionService.decrypt.mockReturnValue(VALID_JSON);
+
+      const overrideConfigSchema = {
+        safeParse: jest.fn().mockReturnValue({ success: true, data: VALID_CONFIG }),
+      };
+      const overrideFactory = jest.fn().mockReturnValue(MOCK_SERVICE);
+      const override = {
+        VCKIT: {
+          configSchema: overrideConfigSchema,
+          sensitiveFields: ['apiKey'] as const,
+          factory: overrideFactory,
+        },
+      } as unknown as Record<string, AdapterRegistryEntry>;
+
+      const result = await resolveService('org-1', ServiceType.VC, undefined, override);
+
+      expect(overrideConfigSchema.safeParse).toHaveBeenCalledWith(VALID_CONFIG);
+      expect(overrideFactory).toHaveBeenCalledWith(
+        VALID_CONFIG,
+        expect.objectContaining({
+          info: expect.any(Function),
+          warn: expect.any(Function),
+          error: expect.any(Function),
+          debug: expect.any(Function),
+        }),
+      );
+      // The standard registry factory should NOT have been called
+      expect(mockFactory).not.toHaveBeenCalled();
+      expect(result).toEqual({ service: MOCK_SERVICE, instanceId: 'override-inst-1' });
+    });
+
+    it('throws when override does not contain adapter type', async () => {
+      mockGetInstanceByResolution.mockResolvedValue(MOCK_INSTANCE);
+      mockEncryptionService.decrypt.mockReturnValue(VALID_JSON);
+
+      // Empty override — has no entry for 'UNCEFACT_STORAGE'
+      const emptyOverride = {} as Record<string, AdapterRegistryEntry>;
+
+      await expect(resolveService('org-1', ServiceType.STORAGE, undefined, emptyOverride)).rejects.toThrow(
+        ConfigValidationError,
+      );
+
+      await expect(resolveService('org-1', ServiceType.STORAGE, undefined, emptyOverride)).rejects.toThrow(
+        /not registered/,
+      );
+    });
   });
 });

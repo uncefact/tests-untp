@@ -261,10 +261,10 @@ describe('Service API', { testIsolation: false }, () => {
 
   describe('Filtering and pagination', () => {
     it('filters by serviceType', () => {
-      cy.request('/api/v1/services?serviceType=DID').then((response) => {
+      cy.request('/api/v1/services?serviceType=VC').then((response) => {
         expect(response.status).to.eq(200);
         response.body.services.forEach((s: ServiceInstance) => {
-          expect(s.serviceType).to.eq('DID');
+          expect(s.serviceType).to.eq('VC');
         });
       });
     });
@@ -279,11 +279,11 @@ describe('Service API', { testIsolation: false }, () => {
     });
 
     it('combines serviceType and adapterType filters', () => {
-      cy.request('/api/v1/services?serviceType=DID&adapterType=VCKIT').then(
+      cy.request('/api/v1/services?serviceType=VC&adapterType=VCKIT').then(
         (response) => {
           expect(response.status).to.eq(200);
           response.body.services.forEach((s: ServiceInstance) => {
-            expect(s.serviceType).to.eq('DID');
+            expect(s.serviceType).to.eq('VC');
             expect(s.adapterType).to.eq('VCKIT');
           });
         },
