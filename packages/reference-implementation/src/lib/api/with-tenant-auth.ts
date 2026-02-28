@@ -33,7 +33,8 @@ type RouteHandler = (req: Request, context: TenantAuthContext) => Promise<Respon
 
 export function withTenantAuth(handler: RouteHandler) {
   return async (req: Request, routeContext: { params: Promise<Record<string, string>> }) => {
-    const correlationId = req.headers.get('x-correlation-id') || crypto.randomUUID();
+    const raw = req.headers.get('x-correlation-id');
+    const correlationId = raw && raw.length <= 128 ? raw : crypto.randomUUID();
 
     return runWithRequestContext(correlationId, async () => {
       const method = req.method;

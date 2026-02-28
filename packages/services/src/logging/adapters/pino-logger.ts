@@ -29,7 +29,8 @@ export class PinoLoggerAdapter implements LoggerService {
             try {
               const context = _requestContextProvider();
               return context ? { ...context } : {};
-            } catch {
+            } catch (e) {
+              console.error('Failed to get request context for logging:', e);
               return {};
             }
           }

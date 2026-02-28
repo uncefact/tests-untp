@@ -602,6 +602,21 @@ describe('withTenantAuth — request context propagation', () => {
     expect(correlationId).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  it('rejects oversized x-correlation-id and generates a fallback UUID', async () => {
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockResolvedValue('org-1');
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    const oversizedId = 'x'.repeat(200);
+    await wrapped(fakeRequest('GET', { 'x-correlation-id': oversizedId }), emptyRouteContext);
+
+    expect(mockRunWithRequestContext).toHaveBeenCalledTimes(1);
+    const correlationId = mockRunWithRequestContext.mock.calls[0][0];
+    expect(correlationId).not.toBe(oversizedId);
+    expect(correlationId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
   it('sets userId and tenantId on request context for open mode session path', async () => {
     mockGetSessionUserId.mockResolvedValue('user-1');
     mockGetTenantId.mockResolvedValue('org-1');
