@@ -17,6 +17,7 @@ import { getDidConfig } from '../src/lib/config/did.config';
 import { getIdrConfig } from '../src/lib/config/idr.config';
 import { getStorageConfig } from '../src/lib/config/storage.config';
 import { getVcConfig } from '../src/lib/config/vc.config';
+import { SYSTEM_TENANT_ID } from '../src/lib/prisma/constants';
 
 const logger = createLogger().child({ module: 'prisma-seed' });
 
@@ -32,8 +33,6 @@ if (RI_POSTGRES_USER && RI_POSTGRES_PASSWORD && RI_POSTGRES_DB && RI_POSTGRES_HO
 
 const prisma = new PrismaClient();
 const { defaultDid: DEFAULT_DID } = getDidConfig();
-
-import { SYSTEM_TENANT_ID } from '../src/lib/prisma/constants';
 
 const ENCRYPTION_KEY = process.env.SERVICE_ENCRYPTION_KEY;
 if (!ENCRYPTION_KEY) {
