@@ -1,6 +1,5 @@
 import { AdapterType } from './types.js';
 import { vckitDidRegistryEntry } from '../did-manager/adapters/vckit/vckit-did.adapter.js';
-import type { AdapterRegistryEntry } from './types.js';
 
 /**
  * Internal adapter registry for DID management.
@@ -10,6 +9,6 @@ import type { AdapterRegistryEntry } from './types.js';
  * This registry provides the adapter entries needed to create DID adapters
  * from VC service instance configs.
  */
-export const didAdapterRegistry: Record<string, AdapterRegistryEntry> = {
-  [AdapterType.VCKIT]: vckitDidRegistryEntry as AdapterRegistryEntry,
+export const didAdapterRegistry = {
+  [AdapterType.VCKIT]: vckitDidRegistryEntry,
 };
