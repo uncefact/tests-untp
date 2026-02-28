@@ -33,7 +33,7 @@ if (RI_POSTGRES_USER && RI_POSTGRES_PASSWORD && RI_POSTGRES_DB && RI_POSTGRES_HO
 const prisma = new PrismaClient();
 const { defaultDid: DEFAULT_DID } = getDidConfig();
 
-const SYSTEM_TENANT_ID = 'system';
+import { SYSTEM_TENANT_ID } from '../src/lib/prisma/constants';
 
 const ENCRYPTION_KEY = process.env.SERVICE_ENCRYPTION_KEY;
 if (!ENCRYPTION_KEY) {

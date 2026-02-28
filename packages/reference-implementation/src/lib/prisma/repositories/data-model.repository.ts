@@ -1,5 +1,6 @@
 import { CredentialType, Prisma } from '../generated';
 import { prisma } from '../prisma';
+import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 
@@ -103,13 +104,13 @@ export async function createDataModel(tenantId: string, input: CreateDataModelIn
 
 /**
  * Retrieves a data model by ID.
- * Returns models visible to the tenant OR system-provisioned (tenantId=null).
+ * Returns models visible to the tenant OR system-provisioned.
  */
 export async function getDataModelById(id: string, tenantId: string): Promise<DataModelWithRelations | null> {
   return prisma.dataModel.findFirst({
     where: {
       id,
-      OR: [{ tenantId }, { tenantId: null }],
+      OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
     },
     include: DATA_MODEL_INCLUDE,
   });
@@ -126,7 +127,7 @@ export async function listDataModels(
   const { isExtension, credentialType, version, limit, offset } = options;
 
   const where: Prisma.DataModelWhereInput = {
-    OR: [{ tenantId }, { tenantId: null }],
+    OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
   };
 
   if (isExtension !== undefined) {

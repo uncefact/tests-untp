@@ -1,8 +1,7 @@
 import { Registrar, Prisma } from '../generated';
 import { prisma } from '../prisma';
+import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
-
-const SYSTEM_TENANT_ID = 'system';
 
 /**
  * Input for creating a new registrar

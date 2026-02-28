@@ -45,10 +45,11 @@ const INCLUDE_SHAPE = {
 };
 
 describe('data-model.repository', () => {
+  const SYSTEM_TENANT_ID = 'system';
   const TENANT_ID = 'tenant-1';
   const CONFIG_RECORD = {
     id: 'config-1',
-    tenantId: null,
+    tenantId: SYSTEM_TENANT_ID,
     name: 'Digital Product Passport v0.6.0',
     credentialType: 'DigitalProductPassport',
     version: '0.6.0',
@@ -207,7 +208,7 @@ describe('data-model.repository', () => {
       expect(mockDataModel.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'config-1',
-          OR: [{ tenantId: TENANT_ID }, { tenantId: null }],
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
         include: INCLUDE_SHAPE,
       });
@@ -230,7 +231,7 @@ describe('data-model.repository', () => {
 
       expect(mockDataModel.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [{ tenantId: TENANT_ID }, { tenantId: null }],
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
         include: INCLUDE_SHAPE,
         take: 100,
