@@ -3,7 +3,7 @@ import {
   UNCEFACT_STORAGE_ADAPTER_TYPE,
   uncefactStorageRegistryEntry,
 } from './uncefact-storage.adapter';
-import { StorageStoreError } from '../../errors';
+import { StoragePayloadError, StorageStoreError } from '../../errors';
 import type { UncefactStorageConfig } from './uncefact-storage.schema';
 import type { LoggerService } from '../../../logging/types';
 import type { EnvelopedVerifiableCredential } from '../../../verifiable-credential/types';
@@ -468,6 +468,89 @@ describe('UncefactStorageAdapter', () => {
 
         expect(result.uri).toBe('https://storage.example.com/documents/abc-123');
         expect(result.decryptionKey).toBeUndefined();
+      });
+
+      it('should throw StoragePayloadError on 400 response', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        try {
+          await adapter.store(mockCredential);
+          fail('Expected StoragePayloadError to be thrown');
+        } catch (error) {
+          expect(error).toBeInstanceOf(StoragePayloadError);
+          expect((error as StoragePayloadError).code).toBe('STORAGE_PAYLOAD_REJECTED');
+          expect((error as StoragePayloadError).statusCode).toBe(422);
+          expect((error as StoragePayloadError).context).toEqual(expect.objectContaining({ httpStatus: 400 }));
+        }
+      });
+
+      it('should throw StoragePayloadError on 422 response', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 422,
+          statusText: 'Unprocessable Entity',
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.store(mockCredential)).rejects.toThrow(StoragePayloadError);
+      });
+
+      it('should log "Storage API rejected payload" for 4xx responses', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.store(mockCredential)).rejects.toThrow();
+
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            httpStatus: 400,
+            detail: 'Bad Request',
+          }),
+          'Storage API rejected payload',
+        );
+      });
+
+      it('should throw StorageStoreError (not StoragePayloadError) on 500 response', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        try {
+          await adapter.store(mockCredential);
+          fail('Expected StorageStoreError to be thrown');
+        } catch (error) {
+          expect(error).toBeInstanceOf(StorageStoreError);
+          expect(error).not.toBeInstanceOf(StoragePayloadError);
+        }
+      });
+
+      it('should throw StorageStoreError on 503 response', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 503,
+          statusText: 'Service Unavailable',
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.store(mockCredential)).rejects.toThrow(StorageStoreError);
       });
 
       it('should set statusCode to 502 (Bad Gateway) on StorageStoreError', async () => {

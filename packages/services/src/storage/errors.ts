@@ -9,3 +9,12 @@ export class StorageStoreError extends StorageError {
     super(`Failed to store credential: HTTP ${httpStatus}: ${detail}`, 'STORAGE_STORE_FAILED', 502, { httpStatus });
   }
 }
+
+/** Upstream storage service rejected the payload. */
+export class StoragePayloadError extends StorageError {
+  constructor(httpStatus: number, detail: string) {
+    super(`Storage service rejected payload: HTTP ${httpStatus}: ${detail}`, 'STORAGE_PAYLOAD_REJECTED', 422, {
+      httpStatus,
+    });
+  }
+}

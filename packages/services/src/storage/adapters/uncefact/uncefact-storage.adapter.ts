@@ -3,7 +3,7 @@ import type { LoggerService } from '../../../logging/types.js';
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
 import type { IStorageService, StorageRecord } from '../../types.js';
 import type { EnvelopedVerifiableCredential } from '../../../verifiable-credential/types.js';
-import { StorageStoreError } from '../../errors.js';
+import { StoragePayloadError, StorageStoreError } from '../../errors.js';
 import type { UncefactStorageConfig } from './uncefact-storage.schema.js';
 import { uncefactStorageConfigSchema, uncefactStorageSensitiveFields } from './uncefact-storage.schema.js';
 
@@ -48,6 +48,10 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
 
     if (!response.ok) {
       const detail = response.statusText || 'Unknown error';
+      if (response.status >= 400 && response.status < 500) {
+        this.logger.error({ httpStatus: response.status, detail }, 'Storage API rejected payload');
+        throw new StoragePayloadError(response.status, detail);
+      }
       this.logger.error({ httpStatus: response.status, detail }, 'Storage API request failed');
       throw new StorageStoreError(response.status, detail);
     }

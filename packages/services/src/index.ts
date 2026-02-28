@@ -129,7 +129,7 @@ export { buildPublishLinks, publishCredential } from './identity-resolver/common
 // Storage service types and constants
 export { STORAGE_SERVICE_TYPE } from './storage/types.js';
 export type { IStorageService, StorageRecord } from './storage/types.js';
-export { StorageError, StorageStoreError } from './storage/errors.js';
+export { StorageError, StoragePayloadError, StorageStoreError } from './storage/errors.js';
 export { UNCEFACT_STORAGE_ADAPTER_TYPE } from './storage/adapters/uncefact/uncefact-storage.adapter.js';
 export type { UncefactStorageConfig } from './storage/adapters/uncefact/uncefact-storage.schema.js';
 export {
