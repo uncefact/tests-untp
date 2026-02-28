@@ -28,7 +28,6 @@ enum DidStatus {
 }
 
 enum ServiceType {
-  DID
   IDR
   STORAGE
   VC

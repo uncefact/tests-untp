@@ -26,3 +26,4 @@ export { VCKitVerifiableCredentialService } from './verifiable-credential/adapte
 
 // Registry (imports VCKit adapter which transitively pulls in jsonld)
 export { adapterRegistry } from './registry/registry.js';
+export { didAdapterRegistry } from './registry/did-adapter-registry.js';

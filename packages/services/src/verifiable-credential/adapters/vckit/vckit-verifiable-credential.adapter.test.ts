@@ -21,6 +21,7 @@ describe('VCKitVerifiableCredentialService', () => {
   const mockConfig: VCKitVerifiableCredentialConfig = {
     endpoint: 'https://vckit.example.com',
     apiKey: 'test-api-key',
+    apiVersion: '1.0.0',
   };
 
   const mockCredentialPayload: CredentialPayload = {

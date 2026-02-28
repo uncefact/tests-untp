@@ -6,11 +6,6 @@ jest.mock('jose', () => ({
 }));
 
 describe('getSensitiveFields', () => {
-  it('returns sensitiveFields for VCKit DID adapter (contains "authToken")', () => {
-    const fields = getSensitiveFields('DID', 'VCKIT');
-    expect(fields).toContain('authToken');
-  });
-
   it('returns sensitiveFields for VCKit VC adapter (contains "apiKey")', () => {
     const fields = getSensitiveFields('VC', 'VCKIT');
     expect(fields).toContain('apiKey');
@@ -38,7 +33,6 @@ describe('getSensitiveFields', () => {
 
   it('returns an array (not undefined or null) for every known combination', () => {
     const combos: [string, string][] = [
-      ['DID', 'VCKIT'],
       ['VC', 'VCKIT'],
       ['IDR', 'PYX_IDR'],
       ['STORAGE', 'UNCEFACT_STORAGE'],

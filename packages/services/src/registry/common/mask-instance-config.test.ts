@@ -126,14 +126,14 @@ describe('maskInstanceConfig', () => {
         adapterType: 'VCKIT',
         config: JSON.stringify({ encrypted: 'data' }),
         name: 'My Service',
-        serviceType: 'DID',
+        serviceType: 'VC',
       };
 
       const result = maskInstanceConfig(instance, mockEncryptionService, mockLogger);
 
       expect(result.id).toBe('inst-42');
       expect(result.name).toBe('My Service');
-      expect(result.serviceType).toBe('DID');
+      expect(result.serviceType).toBe('VC');
       expect(result.adapterType).toBe('VCKIT');
     });
   });

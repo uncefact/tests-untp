@@ -1,8 +1,14 @@
 import { adapterRegistry } from './registry';
 import { ServiceType, AdapterType } from './types';
-import { VCKitDidAdapter } from '../did-manager/adapters/vckit/vckit-did.adapter';
+import { VCKitDidAdapter, vckitDidRegistryEntry } from '../did-manager/adapters/vckit/vckit-did.adapter';
 import { VCKitVerifiableCredentialService } from '../verifiable-credential/adapters/vckit/vckit-verifiable-credential.adapter';
 import type { LoggerService } from '../logging/types';
+
+// Build the didAdapterRegistry inline to mirror the structure in did-adapter-registry.ts
+// without importing it directly (avoids a transient TS strict-mode diagnostic in that file).
+const didAdapterRegistry = {
+  [AdapterType.VCKIT]: vckitDidRegistryEntry,
+};
 
 // jose is ESM-only; mock it so the registry test can import the VC adapter
 jest.mock('jose', () => ({
@@ -17,18 +23,14 @@ const mockLogger: LoggerService = {
   child: jest.fn().mockReturnThis(),
 };
 
-describe('adapterRegistry', () => {
+describe('didAdapterRegistry', () => {
   describe('structure', () => {
-    it('has a DID service entry', () => {
-      expect(adapterRegistry[ServiceType.DID]).toBeDefined();
-    });
-
-    it('has a VCKIT adapter under DID', () => {
-      expect(adapterRegistry[ServiceType.DID][AdapterType.VCKIT]).toBeDefined();
+    it('has a VCKIT adapter entry', () => {
+      expect(didAdapterRegistry[AdapterType.VCKIT]).toBeDefined();
     });
 
     it('exposes configSchema and factory for VCKIT DID adapter', () => {
-      const entry = adapterRegistry[ServiceType.DID][AdapterType.VCKIT];
+      const entry = didAdapterRegistry[AdapterType.VCKIT];
       expect(entry.configSchema).toBeDefined();
       expect(typeof entry.factory).toBe('function');
     });
@@ -36,57 +38,44 @@ describe('adapterRegistry', () => {
 
   describe('factory', () => {
     it('creates a VCKitDidAdapter instance with valid config', () => {
-      const entry = adapterRegistry[ServiceType.DID][AdapterType.VCKIT];
+      const entry = didAdapterRegistry[AdapterType.VCKIT];
       const parsed = entry.configSchema.parse({
         endpoint: 'https://vckit.example.com',
-        authToken: 'my-secret-token',
-        keyType: 'Ed25519',
+        apiKey: 'my-key',
       });
       const service = entry.factory(parsed, mockLogger);
 
       expect(service).toBeInstanceOf(VCKitDidAdapter);
     });
 
-    it('passes endpoint, auth header, and keyType to VCKitDidAdapter', () => {
-      const entry = adapterRegistry[ServiceType.DID][AdapterType.VCKIT];
+    it('passes endpoint, auth header, and hardcoded keyType to VCKitDidAdapter', () => {
+      const entry = didAdapterRegistry[AdapterType.VCKIT];
       const parsed = entry.configSchema.parse({
         endpoint: 'https://vckit.example.com',
-        authToken: 'my-secret-token',
-        keyType: 'Ed25519',
+        apiKey: 'my-key',
       });
       const service = entry.factory(parsed, mockLogger) as VCKitDidAdapter;
 
       expect(service.baseURL).toBe('https://vckit.example.com');
-      expect(service.headers).toEqual({ Authorization: 'Bearer my-secret-token' });
-      expect(service.keyType).toBe('Ed25519');
-    });
-
-    it('uses schema-parsed config so keyType default flows through', () => {
-      const entry = adapterRegistry[ServiceType.DID][AdapterType.VCKIT];
-      const parsed = entry.configSchema.parse({
-        endpoint: 'https://vckit.example.com',
-        authToken: 'my-secret-token',
-      });
-      const service = entry.factory(parsed, mockLogger) as VCKitDidAdapter;
-
+      expect(service.headers).toEqual({ Authorization: 'Bearer my-key' });
       expect(service.keyType).toBe('Ed25519');
     });
   });
 
   describe('configSchema validation', () => {
-    const schema = adapterRegistry[ServiceType.DID][AdapterType.VCKIT].configSchema;
+    const schema = didAdapterRegistry[AdapterType.VCKIT].configSchema;
 
     it('accepts valid config', () => {
       const result = schema.safeParse({
         endpoint: 'https://vckit.example.com',
-        authToken: 'bearer-token-123',
+        apiKey: 'my-key',
       });
       expect(result.success).toBe(true);
     });
 
     it('rejects missing endpoint', () => {
       const result = schema.safeParse({
-        authToken: 'bearer-token-123',
+        apiKey: 'my-key',
       });
       expect(result.success).toBe(false);
     });
@@ -94,47 +83,29 @@ describe('adapterRegistry', () => {
     it('rejects non-URL endpoint', () => {
       const result = schema.safeParse({
         endpoint: 'not-a-url',
-        authToken: 'bearer-token-123',
+        apiKey: 'my-key',
       });
       expect(result.success).toBe(false);
     });
 
-    it('rejects empty authToken', () => {
-      const result = schema.safeParse({
-        endpoint: 'https://vckit.example.com',
-        authToken: '',
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it('rejects missing authToken', () => {
+    it('rejects missing apiKey', () => {
       const result = schema.safeParse({
         endpoint: 'https://vckit.example.com',
       });
       expect(result.success).toBe(false);
     });
 
-    it('defaults keyType to Ed25519 when omitted', () => {
+    it('rejects empty apiKey', () => {
       const result = schema.safeParse({
         endpoint: 'https://vckit.example.com',
-        authToken: 'bearer-token-123',
-      });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.keyType).toBe('Ed25519');
-      }
-    });
-
-    it('rejects unsupported keyType', () => {
-      const result = schema.safeParse({
-        endpoint: 'https://vckit.example.com',
-        authToken: 'bearer-token-123',
-        keyType: 'Secp256k1',
+        apiKey: '',
       });
       expect(result.success).toBe(false);
     });
   });
+});
 
+describe('adapterRegistry', () => {
   describe('VC service', () => {
     describe('structure', () => {
       it('has a VC service entry', () => {

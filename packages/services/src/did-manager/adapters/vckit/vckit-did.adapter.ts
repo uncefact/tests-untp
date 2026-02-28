@@ -190,13 +190,10 @@ export class VCKitDidAdapter implements IDidService {
   }
 }
 
-/** Adapter type identifier for VCKit DID provider. */
-export const VCKIT_DID_ADAPTER_TYPE = 'VCKIT' as const;
-
 /** Registry entry for the VCKit DID adapter. */
 export const vckitDidRegistryEntry = {
   configSchema: vckitDidConfigSchema,
   sensitiveFields: vckitDidSensitiveFields,
   factory: (config: VCKitDidConfig, logger: LoggerService): IDidService =>
-    new VCKitDidAdapter(config.endpoint, { Authorization: `Bearer ${config.authToken}` }, config.keyType, logger),
+    new VCKitDidAdapter(config.endpoint, { Authorization: `Bearer ${config.apiKey}` }, 'Ed25519', logger),
 } satisfies AdapterRegistryEntry<VCKitDidConfig, IDidService>;

@@ -33,6 +33,7 @@ export async function resolveService<TService>(
   tenantId: string,
   serviceType: ServiceType,
   explicitInstanceId?: string,
+  adapterLookupOverride?: Record<string, AdapterRegistryEntry>,
 ): Promise<ResolvedService<TService>> {
   const instance = await getInstanceByResolution(tenantId, serviceType, explicitInstanceId);
 
@@ -61,10 +62,15 @@ export async function resolveService<TService>(
     throw new ConfigValidationError(instance.id, 'Invalid JSON in decrypted config');
   }
 
-  const serviceEntry = (adapterRegistry as Record<string, Record<string, AdapterRegistryEntry> | undefined>)[
-    serviceType
-  ];
-  const adapterEntry = serviceEntry?.[instance.adapterType];
+  let adapterEntry: AdapterRegistryEntry | undefined;
+  if (adapterLookupOverride) {
+    adapterEntry = adapterLookupOverride[instance.adapterType];
+  } else {
+    const serviceEntry = (adapterRegistry as Record<string, Record<string, AdapterRegistryEntry> | undefined>)[
+      serviceType
+    ];
+    adapterEntry = serviceEntry?.[instance.adapterType];
+  }
   if (!adapterEntry) {
     throw new ConfigValidationError(
       instance.id,

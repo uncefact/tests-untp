@@ -308,12 +308,13 @@ describe('VCKitDidAdapter', () => {
   });
 
   describe('vckitDidConfigSchema', () => {
-    it('defaults apiVersion to 1.1.0', () => {
+    it('accepts valid config with endpoint and apiKey', () => {
       const result = vckitDidConfigSchema.parse({
         endpoint: 'https://vckit.example.com',
-        authToken: 'token',
+        apiKey: 'my-key',
       });
-      expect(result.apiVersion).toBe('1.1.0');
+      expect(result.endpoint).toBe('https://vckit.example.com');
+      expect(result.apiKey).toBe('my-key');
     });
   });
 
@@ -321,7 +322,7 @@ describe('VCKitDidAdapter', () => {
     it('factory creates an adapter using Logger', () => {
       const config = vckitDidConfigSchema.parse({
         endpoint: 'https://vckit.example.com',
-        authToken: 'my-token',
+        apiKey: 'my-key',
       });
       const adapter = vckitDidRegistryEntry.factory(config, mockLogger);
       expect(adapter).toBeInstanceOf(VCKitDidAdapter);
