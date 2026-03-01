@@ -37,33 +37,27 @@ export const PYX_IDR_ADAPTER_TYPE = 'PYX_IDR' as const;
  */
 export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements IIdentityResolverService {
   private readonly baseURL: string;
-  private readonly uriPrefix: string;
   private readonly headers: Record<string, string>;
   private readonly apiVersion: string;
-  private readonly ianaLanguage: string;
-  private readonly context: string;
   private readonly defaultLinkType: string;
   private readonly defaultMimeType: string;
   private readonly defaultIanaLanguage: string;
   private readonly defaultContext: string;
-  private readonly fwqs: boolean;
+  private readonly defaultFwqs: boolean;
 
   constructor(config: PyxIdrConfig, logger: LoggerService) {
     super(logger.child({ service: 'IDR - PyxIdentityResolver', apiVersion: config.apiVersion }));
     this.baseURL = config.baseUrl;
-    this.uriPrefix = config.uriPrefix;
     this.headers = {
       Authorization: `Bearer ${config.apiKey}`,
       'Content-Type': 'application/json',
     };
     this.apiVersion = config.apiVersion;
-    this.ianaLanguage = config.ianaLanguage;
-    this.context = config.context;
     this.defaultLinkType = config.defaultLinkType;
     this.defaultMimeType = config.defaultMimeType;
     this.defaultIanaLanguage = config.defaultIanaLanguage;
     this.defaultContext = config.defaultContext;
-    this.fwqs = config.fwqs;
+    this.defaultFwqs = config.defaultFwqs;
   }
 
   private get apiBasePath(): string {
@@ -78,13 +72,13 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
     options: PublishLinksOptions,
   ): Promise<LinkRegistration> {
     const namespace = options.namespace;
-    const ianaLanguage = options.ianaLanguage ?? this.ianaLanguage;
-    const context = options.context ?? this.context;
+    const ianaLanguage = options.ianaLanguage ?? this.defaultIanaLanguage;
+    const context = options.context ?? this.defaultContext;
     const defaultLinkType = options.defaultLinkType ?? this.defaultLinkType;
     const defaultMimeType = options.defaultMimeType ?? this.defaultMimeType;
     const defaultIanaLanguage = options.defaultIanaLanguage ?? this.defaultIanaLanguage;
     const defaultContext = options.defaultContext ?? this.defaultContext;
-    const fwqs = options.fwqs ?? this.fwqs;
+    const fwqs = options.fwqs ?? this.defaultFwqs;
 
     const payload = {
       namespace,
@@ -247,7 +241,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
 
   buildResolverUri(parts: ResolverUriParts): string {
     // Render IDR-specific prefix
-    const prefix = this.uriPrefix.replace('{namespace}', parts.namespace);
+    const prefix = `/${parts.namespace}`;
 
     // Render scheme link template
     let path = parts.linkTemplate.replace('{primaryKey}', parts.primaryKey).replace('{value}', parts.value);
