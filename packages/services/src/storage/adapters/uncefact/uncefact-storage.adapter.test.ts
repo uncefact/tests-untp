@@ -485,7 +485,7 @@ describe('UncefactStorageAdapter', () => {
         } catch (error) {
           expect(error).toBeInstanceOf(StoragePayloadError);
           expect((error as StoragePayloadError).code).toBe('STORAGE_PAYLOAD_REJECTED');
-          expect((error as StoragePayloadError).statusCode).toBe(422);
+          expect((error as StoragePayloadError).statusCode).toBe(400);
           expect((error as StoragePayloadError).context).toEqual(expect.objectContaining({ httpStatus: 400 }));
         }
       });
@@ -553,7 +553,7 @@ describe('UncefactStorageAdapter', () => {
         await expect(adapter.store(mockCredential)).rejects.toThrow(StorageStoreError);
       });
 
-      it('should set statusCode to 502 (Bad Gateway) on StorageStoreError', async () => {
+      it('should set statusCode to upstream HTTP status on StorageStoreError', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: false,
           status: 500,
@@ -567,7 +567,7 @@ describe('UncefactStorageAdapter', () => {
           fail('Expected StorageStoreError to be thrown');
         } catch (error) {
           expect(error).toBeInstanceOf(StorageStoreError);
-          expect((error as StorageStoreError).statusCode).toBe(502);
+          expect((error as StorageStoreError).statusCode).toBe(500);
           expect((error as StorageStoreError).code).toBe('STORAGE_STORE_FAILED');
         }
       });

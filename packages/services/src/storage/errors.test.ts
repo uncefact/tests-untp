@@ -16,7 +16,7 @@ describe('Storage errors', () => {
       const err = new StorageStoreError(503, 'service unavailable');
       expect(err.message).toBe('Failed to store credential: HTTP 503: service unavailable');
       expect(err.code).toBe('STORAGE_STORE_FAILED');
-      expect(err.statusCode).toBe(502);
+      expect(err.statusCode).toBe(503);
       expect(err.context).toEqual({ httpStatus: 503 });
       expect(err.name).toBe('StorageStoreError');
       expect(err).toBeInstanceOf(StorageError);
