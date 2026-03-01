@@ -205,8 +205,8 @@ describe('PyxIdentityResolverAdapter', () => {
         context: 'au',
         defaultLinkType: true, // 'untp:dpp' === config.defaultLinkType
         defaultMimeType: false, // 'application/json' !== config.defaultMimeType ('text/html')
-        defaultIanaLanguage: true, // defaultIanaLanguage === defaultIanaLanguage
-        defaultContext: true, // defaultContext === defaultContext
+        defaultIanaLanguage: true, // link language ('en') matches default language ('en')
+        defaultContext: true, // link context ('au') matches default context ('au')
         fwqs: false,
       });
     });
