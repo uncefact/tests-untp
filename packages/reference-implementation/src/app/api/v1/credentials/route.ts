@@ -1,16 +1,22 @@
 import { NextResponse } from 'next/server';
-import { ValidationError } from '@/lib/api/validation';
-import { UnprocessableError } from '@/lib/api/errors';
+import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
+import { resolveDataModel } from '@/lib/credentials/resolve-data-model';
+import { validateCredentialPayload } from '@/lib/credentials/validate-credential-payload';
+import { issueCredential } from '@/lib/credentials/issue-credential';
+import { updateCredentialPublished } from '@/lib/prisma/repositories';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
-import { createCredential, getDidByDid } from '@/lib/prisma/repositories';
-import { ISSUABLE_DID_STATUSES } from '@uncefact/untp-ri-services';
+import { buildPublishLinks } from '@uncefact/untp-ri-services';
+import { CredentialType } from '@/lib/prisma/generated';
 import type { CredentialPayload } from '@uncefact/untp-ri-services';
 
 const logger = apiLogger.child({ route: '/api/v1/credentials' });
+
+/** Valid credential type strings (must match Prisma CredentialType enum). */
+const VALID_CREDENTIAL_TYPES = Object.values(CredentialType) as string[];
 
 // ---------------------------------------------------------------------------
 // POST /api/v1/credentials
@@ -22,9 +28,10 @@ const logger = apiLogger.child({ route: '/api/v1/credentials' });
  *   post:
  *     summary: Issue a verifiable credential
  *     description: |
- *       Signs a credential payload, stores the enveloped credential (optionally
- *       encrypted), optionally publishes it to the Identity Resolver, and returns
- *       the credential ID.
+ *       Validates a credential payload via JSON Schema and JSON-LD expansion,
+ *       signs it, stores the enveloped credential (optionally encrypted),
+ *       optionally publishes it to the Identity Resolver, links it to its
+ *       primary entity, and returns the credential ID.
  *     tags:
  *       - Credentials
  *     requestBody:
@@ -35,72 +42,71 @@ const logger = apiLogger.child({ route: '/api/v1/credentials' });
  *             type: object
  *             required:
  *               - credentialPayload
+ *               - credentialType
+ *               - version
  *             properties:
  *               credentialPayload:
  *                 type: object
- *                 description: The credential payload to sign (must include issuer, credentialSubject, etc.)
- *               encrypt:
- *                 type: boolean
- *                 description: Whether to encrypt the credential in storage (default true)
- *               publish:
- *                 type: boolean
- *                 description: Whether to publish the credential to the Identity Resolver (default false)
- *               vcServiceInstanceId:
+ *                 description: The credential payload to sign
+ *               credentialType:
  *                 type: string
- *                 description: Optional VC service instance ID (falls back to tenant primary or system default)
- *               storageServiceInstanceId:
+ *                 enum: [DigitalProductPassport, DigitalConformityCredential, DigitalFacilityRecord, DigitalIdentityAnchor, DigitalTraceabilityEvent]
+ *               version:
  *                 type: string
- *                 description: Optional storage service instance ID (falls back to tenant primary or system default)
- *               idrServiceInstanceId:
- *                 type: string
- *                 description: Optional IDR service instance ID for publishing (falls back to tenant primary or system default)
+ *               signingOptions:
+ *                 type: object
+ *                 properties:
+ *                   serviceInstanceId:
+ *                     type: string
+ *               storageOptions:
+ *                 type: object
+ *                 properties:
+ *                   serviceInstanceId:
+ *                     type: string
+ *                   encrypt:
+ *                     type: boolean
+ *               publishingOptions:
+ *                 type: object
+ *                 properties:
+ *                   publish:
+ *                     type: boolean
+ *                   serviceInstanceId:
+ *                     type: string
+ *                   linkTitle:
+ *                     type: string
+ *                   machineVerificationUrl:
+ *                     type: string
+ *                   humanVerificationUrl:
+ *                     type: string
  *     responses:
  *       201:
- *         description: Credential issued, stored, and optionally published
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 credentialId:
- *                   type: string
- *                   description: Database record ID for the credential
+ *         description: Credential issued
  *       400:
  *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Unauthorised — missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       422:
- *         description: Issuer DID is not registered for this tenant or not in an issuable status (ACTIVE or VERIFIED)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         description: Unauthorised
  *       500:
- *         description: Server error during credential issuance
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         description: Server error
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
   let body: {
     credentialPayload?: CredentialPayload;
-    encrypt?: boolean;
-    publish?: boolean;
-    vcServiceInstanceId?: string;
-    storageServiceInstanceId?: string;
-    idrServiceInstanceId?: string;
+    credentialType?: string;
+    version?: string;
+    signingOptions?: {
+      serviceInstanceId?: string;
+    };
+    storageOptions?: {
+      serviceInstanceId?: string;
+      encrypt?: boolean;
+    };
+    publishingOptions?: {
+      publish?: boolean;
+      serviceInstanceId?: string;
+      linkTitle?: string;
+      machineVerificationUrl?: string;
+      humanVerificationUrl?: string;
+    };
   };
 
   try {
@@ -109,72 +115,85 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
+  // ── Step 1: Validate request ────────────────────────────────────────────
+
   if (!body.credentialPayload || typeof body.credentialPayload !== 'object') {
     throw new ValidationError('credentialPayload is required and must be an object');
   }
 
-  const issuerDid = body.credentialPayload.issuer?.id;
-  if (!issuerDid || typeof issuerDid !== 'string') {
-    throw new ValidationError('credentialPayload.issuer.id is required');
+  if (!isNonEmptyString(body.credentialType)) {
+    throw new ValidationError('credentialType is required');
   }
 
-  logger.info({ tenantId, issuerDid }, 'Verifying issuer DID is registered and issuable');
-  const didRecord = await getDidByDid(issuerDid, tenantId);
-  if (!didRecord) {
-    logger.warn({ tenantId, issuerDid }, 'Credential issuance rejected — issuer DID not registered');
-    throw new UnprocessableError('Issuer DID is not registered for this tenant');
-  }
-  if (!(ISSUABLE_DID_STATUSES as readonly string[]).includes(didRecord.status)) {
-    logger.warn(
-      { tenantId, issuerDid, didStatus: didRecord.status, didId: didRecord.id },
-      'Credential issuance rejected — issuer DID status not eligible',
-    );
-    throw new UnprocessableError(
-      `Issuer DID status (${
-        didRecord.status
-      }) is not eligible for credential issuance. DID must be ${ISSUABLE_DID_STATUSES.join(' or ')}.`,
-    );
+  if (!VALID_CREDENTIAL_TYPES.includes(body.credentialType)) {
+    throw new ValidationError(`credentialType must be one of: ${VALID_CREDENTIAL_TYPES.join(', ')}`);
   }
 
-  const shouldEncrypt = body.encrypt !== false;
-  const shouldPublish = body.publish === true;
+  if (!isNonEmptyString(body.version)) {
+    throw new ValidationError('version is required');
+  }
 
-  const { service: vcService, instanceId: vcInstanceId } = await resolveVcService(tenantId, body.vcServiceInstanceId);
-  logger.info({ tenantId, vcInstanceId }, 'Signing credential');
-  const signedCredential = await vcService.sign(body.credentialPayload);
+  const { credentialPayload, credentialType, version } = body;
+  const signingOptions = body.signingOptions ?? {};
+  const storageOptions = body.storageOptions ?? {};
+  const publishingOptions = body.publishingOptions ?? {};
 
-  const { service: storageService, instanceId: storageInstanceId } = await resolveStorageService(
+  // ── Step 2: Resolve data model ──────────────────────────────────────────
+
+  const { dataModel, mapper, schemaUrls } = await resolveDataModel(tenantId, credentialType, version);
+
+  // ── Step 3: Validate payload ────────────────────────────────────────────
+
+  await validateCredentialPayload(credentialPayload, schemaUrls);
+
+  // ── Step 4: Resolve services ────────────────────────────────────────────
+
+  const vcService = await resolveVcService(tenantId, signingOptions.serviceInstanceId);
+  const storageService = await resolveStorageService(tenantId, storageOptions.serviceInstanceId);
+
+  // ── Step 5: Issue credential ────────────────────────────────────────────
+
+  const { credentialId, storageResponse, primaryEntity } = await issueCredential({
     tenantId,
-    body.storageServiceInstanceId,
-  );
-  logger.info({ tenantId, storageInstanceId, shouldEncrypt }, 'Storing credential');
-  const storageResponse = await storageService.store(signedCredential, shouldEncrypt);
-
-  if (shouldPublish) {
-    const { service: _idrService, instanceId: idrInstanceId } = await resolveIdrService(
-      tenantId,
-      body.idrServiceInstanceId,
-    );
-    logger.info({ tenantId, idrInstanceId }, 'Publishing credential to IDR');
-    // TODO: Wire up publishCredential via credential type mapper service
-  }
-
-  // TODO: Derive credentialType from credential payload via credential type mapper service
-  const credentialType = 'VerifiableCredential';
-
-  const credentialRecord = await createCredential({
-    tenantId,
-    storageUri: storageResponse.uri,
-    hash: storageResponse.hash,
-    decryptionKey: storageResponse.decryptionKey,
+    credentialPayload,
     credentialType,
-    isPublished: false, // Always false until publishCredential is wired up
+    mapper,
+    vcService,
+    storageService,
+    storageOptions,
   });
 
-  logger.info(
-    { tenantId, credentialId: credentialRecord.id, published: shouldPublish },
-    'Credential issued and stored',
-  );
+  // ── Step 6: Publish to IDR ──────────────────────────────────────────────
 
-  return NextResponse.json({ ok: true, credentialId: credentialRecord.id }, { status: 201 });
+  if (publishingOptions.publish === true && primaryEntity.schemePrimaryKey && primaryEntity.schemeNamespace) {
+    const primaryIdentifier = mapper.extractEntityRefs(credentialPayload).primaryIdentifier;
+
+    if (primaryIdentifier) {
+      const idrService = await resolveIdrService(
+        tenantId,
+        primaryEntity.schemeIdrServiceInstanceId,
+        publishingOptions.serviceInstanceId,
+      );
+
+      const linkTitle = publishingOptions.linkTitle || dataModel.name;
+      const links = buildPublishLinks(storageResponse, linkTitle, {
+        machineVerificationUrl: publishingOptions.machineVerificationUrl,
+        humanVerificationUrl: publishingOptions.humanVerificationUrl,
+      });
+
+      logger.info(
+        { tenantId, idrInstanceId: idrService.instanceId, primaryIdentifier },
+        'Publishing credential to IDR',
+      );
+
+      await idrService.service.publishLinks(primaryEntity.schemePrimaryKey, primaryIdentifier, links, '/', {
+        namespace: primaryEntity.schemeNamespace,
+        itemDescription: linkTitle,
+      });
+
+      await updateCredentialPublished(credentialId, tenantId, true);
+    }
+  }
+
+  return NextResponse.json({ credentialId }, { status: 201 });
 });
