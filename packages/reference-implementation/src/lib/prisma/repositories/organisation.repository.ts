@@ -269,6 +269,23 @@ export async function updateOrganisation(
 }
 
 /**
+ * Retrieves an organisation entity by its primary identifier value, scoped to a tenant.
+ * Returns null if no organisation has a matching primary identifier.
+ */
+export async function getOrganisationByIdentifierValue(
+  value: string,
+  tenantId: string,
+): Promise<OrganisationEntityWithRelations | null> {
+  return prisma.organisationEntity.findFirst({
+    where: {
+      tenantId,
+      primaryIdentifier: { value },
+    },
+    include: ORGANISATION_INCLUDE,
+  });
+}
+
+/**
  * Deletes an organisation entity.
  * Join table rows (secondary identifiers) cascade automatically.
  */

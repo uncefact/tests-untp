@@ -11,6 +11,9 @@ export type CreateCredentialInput = {
   decryptionKey?: string;
   credentialType: string;
   isPublished?: boolean;
+  organisationId?: string;
+  facilityId?: string;
+  productId?: string;
 };
 
 /**
@@ -36,6 +39,9 @@ export async function createCredential(input: CreateCredentialInput): Promise<Cr
       decryptionKey: input.decryptionKey,
       credentialType: input.credentialType,
       isPublished: input.isPublished ?? false,
+      organisationId: input.organisationId,
+      facilityId: input.facilityId,
+      productId: input.productId,
     },
   });
 }
