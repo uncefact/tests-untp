@@ -314,6 +314,7 @@ describe('UncefactStorageAdapter', () => {
           ok: false,
           status: 500,
           statusText: 'Internal Server Error',
+          json: jest.fn().mockRejectedValue(new Error('no body')),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -337,6 +338,7 @@ describe('UncefactStorageAdapter', () => {
           ok: false,
           status: 500,
           statusText: 'Internal Server Error',
+          json: jest.fn().mockRejectedValue(new Error('no body')),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -349,6 +351,7 @@ describe('UncefactStorageAdapter', () => {
           ok: false,
           status: 503,
           statusText: 'Service Unavailable',
+          json: jest.fn().mockRejectedValue(new Error('no body')),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -361,11 +364,29 @@ describe('UncefactStorageAdapter', () => {
         );
       });
 
-      it('should include status text detail in the error message', async () => {
+      it('should use response body message as detail when available', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: false,
           status: 400,
           statusText: 'Bad Request',
+          json: jest.fn().mockResolvedValue({ message: 'data field is required' }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.store(mockCredential)).rejects.toThrow(
+          expect.objectContaining({
+            message: expect.stringContaining('data field is required'),
+          }),
+        );
+      });
+
+      it('should fall back to statusText when response body has no message', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          json: jest.fn().mockResolvedValue({ error: 'something' }),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -377,11 +398,29 @@ describe('UncefactStorageAdapter', () => {
         );
       });
 
-      it('should use "Unknown error" when statusText is empty', async () => {
+      it('should fall back to statusText when response body is not JSON', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          json: jest.fn().mockRejectedValue(new SyntaxError('Unexpected token')),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.store(mockCredential)).rejects.toThrow(
+          expect.objectContaining({
+            message: expect.stringContaining('Bad Request'),
+          }),
+        );
+      });
+
+      it('should use "Unknown error" when statusText is empty and body parsing fails', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: false,
           status: 502,
           statusText: '',
+          json: jest.fn().mockRejectedValue(new Error('no body')),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -475,6 +514,7 @@ describe('UncefactStorageAdapter', () => {
           ok: false,
           status: 400,
           statusText: 'Bad Request',
+          json: jest.fn().mockRejectedValue(new Error('no body')),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -495,6 +535,7 @@ describe('UncefactStorageAdapter', () => {
           ok: false,
           status: 422,
           statusText: 'Unprocessable Entity',
+          json: jest.fn().mockRejectedValue(new Error('no body')),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -507,6 +548,7 @@ describe('UncefactStorageAdapter', () => {
           ok: false,
           status: 400,
           statusText: 'Bad Request',
+          json: jest.fn().mockRejectedValue(new Error('no body')),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -528,6 +570,7 @@ describe('UncefactStorageAdapter', () => {
           ok: false,
           status: 500,
           statusText: 'Internal Server Error',
+          json: jest.fn().mockRejectedValue(new Error('no body')),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -546,6 +589,7 @@ describe('UncefactStorageAdapter', () => {
           ok: false,
           status: 503,
           statusText: 'Service Unavailable',
+          json: jest.fn().mockRejectedValue(new Error('no body')),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -558,6 +602,7 @@ describe('UncefactStorageAdapter', () => {
           ok: false,
           status: 500,
           statusText: 'Internal Server Error',
+          json: jest.fn().mockRejectedValue(new Error('no body')),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);

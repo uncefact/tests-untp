@@ -47,7 +47,17 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
     });
 
     if (!response.ok) {
-      const detail = response.statusText || 'Unknown error';
+      let detail = response.statusText;
+      try {
+        const errorBody = await response.json();
+        if (errorBody?.message && typeof errorBody.message === 'string') {
+          detail = errorBody.message;
+        }
+      } catch {
+        // Response body is not valid JSON or is empty; fall back to statusText.
+      }
+      detail = detail || 'Unknown error';
+
       if (response.status >= 400 && response.status < 500) {
         this.logger.error({ httpStatus: response.status, detail }, 'Storage API rejected payload');
         throw new StoragePayloadError(response.status, detail);
