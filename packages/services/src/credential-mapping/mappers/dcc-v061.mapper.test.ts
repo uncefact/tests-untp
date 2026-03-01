@@ -1,104 +1,64 @@
 import { DccV061Mapper } from './dcc-v061.mapper';
-import { getMapper } from '../mapper-registry';
-import { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
+import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
 
 // -- Mock data model configs --------------------------------------------------
 
-const mockCoreDataModel = {
-  id: 'dm-core-dcc',
-  tenantId: null,
-  name: 'Digital Conformity Credential v0.6.1',
-  credentialType: 'DigitalConformityCredential',
-  version: '0.6.1',
-  isExtension: false,
-  parentConfigId: null,
-  parentConfig: null,
-  extensions: [],
-  renderTemplates: [],
-  schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dcc/0.6.1/schema.json',
+const mockCoreDataModel: DataModelConfig['core'] = {
   contextUrl: 'https://test.uncefact.org/vocabulary/untp/dcc/0.6.1/',
-  websiteUrl: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-} as DataModelConfig['core'];
-
-const mockExtensionDataModel = {
-  id: 'dm-ext-dcc',
-  tenantId: 'tenant-1',
-  name: 'Custom Conformity Extension',
   credentialType: 'DigitalConformityCredential',
-  version: '0.6.1',
-  isExtension: true,
-  parentConfigId: 'dm-core-dcc',
-  parentConfig: mockCoreDataModel,
-  extensions: [],
-  renderTemplates: [],
-  schemaUrl: 'https://example.org/conformity-ext/v1/schema.json',
-  contextUrl: 'https://example.org/conformity-ext/v1/',
-  websiteUrl: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-} as DataModelConfig['extension'];
+};
 
-const mockExtensionDifferentType = {
-  ...mockExtensionDataModel!,
-  id: 'dm-ext-dcc-2',
-  name: 'Custom Product Extension',
-  credentialType: 'DigitalProductPassport',
+const mockExtensionDataModel: DataModelConfig['extension'] = {
+  contextUrl: 'https://example.org/conformity-ext/v1/',
+  credentialType: 'DigitalConformityCredential',
+};
+
+const mockExtensionDifferentType: DataModelConfig['extension'] = {
   contextUrl: 'https://example.org/product-ext/v1/',
-} as DataModelConfig['extension'];
+  credentialType: 'DigitalProductPassport',
+};
 
 // -- Mock entities ------------------------------------------------------------
 
-const mockOrganisation = {
+const mockOrganisation: ResolvedEntities['organisation'] = {
   id: 'org-1',
   name: 'Test Organisation',
   description: 'A test org',
-  tenantId: 'tenant-1',
   primaryIdentifier: {
-    id: 'id-1',
     value: '1234567890',
     scheme: {
       id: 'scheme-1',
-      primaryKey: 'gs1:gln',
       name: 'Global Location Number (GLN)',
-      linkTemplate: '/{primaryKey}/{value}',
     },
   },
-} as unknown as ResolvedEntities['organisation'];
+};
 
-const mockFacility = {
+const mockFacility: ResolvedEntities['facility'] = {
   id: 'facility-1',
   name: 'Test Facility',
   description: 'A test facility',
-  tenantId: 'tenant-1',
   location: null,
   primaryIdentifier: {
-    id: 'id-2',
     value: '9876543210',
     scheme: {
       id: 'scheme-2',
-      primaryKey: 'gs1:gln',
       name: 'Global Location Number (GLN)',
-      linkTemplate: '/{primaryKey}/{value}',
     },
   },
-} as unknown as ResolvedEntities['facility'];
+};
 
-const mockProduct = {
+const mockProduct: ResolvedEntities['product'] = {
   id: 'product-1',
   name: 'Test Product',
   description: 'A test product',
-  tenantId: 'tenant-1',
   level: 'MODEL',
   batchNumber: 'BATCH-001',
   serialNumber: 'SN-12345',
   primaryIdentifier: {
-    id: 'id-3',
     value: '01234567890123',
-    scheme: { id: 'scheme-3', primaryKey: 'gs1:gtin', name: 'GTIN', linkTemplate: '/{primaryKey}/{value}' },
+    scheme: { id: 'scheme-3', name: 'GTIN' },
   },
-} as unknown as ResolvedEntities['product'];
+};
 
 // -- Tests --------------------------------------------------------------------
 
@@ -199,9 +159,9 @@ describe('DccV061Mapper', () => {
     it('omits description on issuedToParty when organisation has none', async () => {
       const orgNoDescription: ResolvedEntities = {
         organisation: {
-          ...mockOrganisation!,
-          description: null,
-        } as unknown as ResolvedEntities['organisation'],
+          ...mockOrganisation,
+          description: undefined,
+        },
       };
 
       const result = await mapper.buildPayload(orgNoDescription, coreConfig);
@@ -214,9 +174,9 @@ describe('DccV061Mapper', () => {
     it('omits registeredId and idScheme on issuedToParty when organisation has no primaryIdentifier', async () => {
       const orgNoIdentifier: ResolvedEntities = {
         organisation: {
-          ...mockOrganisation!,
+          ...mockOrganisation,
           primaryIdentifier: null,
-        } as unknown as ResolvedEntities['organisation'],
+        },
       };
 
       const result = await mapper.buildPayload(orgNoIdentifier, coreConfig);
@@ -448,7 +408,7 @@ describe('DccV061Mapper', () => {
       expect(refs.facility).toEqual({ registeredId: '9876543210' });
     });
 
-    it('extracts all three entity refs from a full payload', () => {
+    it('extracts all three entity refs and sets primaryIdentifier to product registeredId', () => {
       const payload: MapperOutput = {
         '@context': stubContext,
         type: stubType,
@@ -479,10 +439,52 @@ describe('DccV061Mapper', () => {
       const refs = mapper.extractEntityRefs(payload);
 
       expect(refs).toEqual({
+        primaryIdentifier: '01234567890123',
         organisation: { registeredId: '1234567890' },
         product: { registeredId: '01234567890123' },
         facility: { registeredId: '9876543210' },
       });
+    });
+
+    it('sets primaryIdentifier to facility registeredId when no product', () => {
+      const payload: MapperOutput = {
+        '@context': stubContext,
+        type: stubType,
+        credentialSubject: {
+          type: ['ConformityAttestation'],
+          issuedToParty: { registeredId: '1234567890' },
+          assessment: [
+            {
+              type: ['ConformityAssessment', 'Declaration'],
+              assessedFacility: [
+                {
+                  type: ['FacilityVerification'],
+                  facility: { registeredId: '9876543210' },
+                },
+              ],
+            },
+          ],
+        },
+      };
+
+      const refs = mapper.extractEntityRefs(payload);
+
+      expect(refs.primaryIdentifier).toBe('9876543210');
+    });
+
+    it('sets primaryIdentifier to organisation registeredId when no product or facility', () => {
+      const payload: MapperOutput = {
+        '@context': stubContext,
+        type: stubType,
+        credentialSubject: {
+          type: ['ConformityAttestation'],
+          issuedToParty: { registeredId: '1234567890' },
+        },
+      };
+
+      const refs = mapper.extractEntityRefs(payload);
+
+      expect(refs.primaryIdentifier).toBe('1234567890');
     });
 
     it('falls back to assessedOrganisation when issuedToParty has no registeredId', () => {
@@ -516,16 +518,6 @@ describe('DccV061Mapper', () => {
       const refs = mapper.extractEntityRefs(payload);
 
       expect(refs).toEqual({});
-    });
-  });
-
-  // -- Self-registration ------------------------------------------------------
-
-  describe('self-registration', () => {
-    it('registers itself in the mapper registry as DigitalConformityCredential / 0.6.1', () => {
-      const registered = getMapper('DigitalConformityCredential', '0.6.1');
-      expect(registered).toBeDefined();
-      expect(registered).toBeInstanceOf(DccV061Mapper);
     });
   });
 });

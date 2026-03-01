@@ -1,63 +1,32 @@
 import { DiaV061Mapper } from './dia-v061.mapper';
-import { getMapper } from '../mapper-registry';
-import { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
+import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
 
 // -- Mock data model configs --------------------------------------------------
 
-const mockCoreDataModel = {
-  id: 'dm-core-dia',
-  tenantId: null,
-  name: 'Digital Identity Anchor v0.6.1',
-  credentialType: 'DigitalIdentityAnchor',
-  version: '0.6.1',
-  isExtension: false,
-  parentConfigId: null,
-  parentConfig: null,
-  extensions: [],
-  renderTemplates: [],
-  schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dia/0.6.1/schema.json',
+const mockCoreDataModel: DataModelConfig['core'] = {
   contextUrl: 'https://test.uncefact.org/vocabulary/untp/dia/0.6.1/',
-  websiteUrl: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-} as DataModelConfig['core'];
-
-const mockExtensionDataModel = {
-  id: 'dm-ext-dia',
-  tenantId: 'tenant-1',
-  name: 'Custom Identity Extension',
   credentialType: 'DigitalIdentityAnchor',
-  version: '0.6.1',
-  isExtension: true,
-  parentConfigId: 'dm-core-dia',
-  parentConfig: mockCoreDataModel,
-  extensions: [],
-  renderTemplates: [],
-  schemaUrl: 'https://example.org/identity-ext/v1/schema.json',
+};
+
+const mockExtensionDataModel: DataModelConfig['extension'] = {
   contextUrl: 'https://example.org/identity-ext/v1/',
-  websiteUrl: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-} as DataModelConfig['extension'];
+  credentialType: 'DigitalIdentityAnchor',
+};
 
 // -- Mock entities ------------------------------------------------------------
 
-const mockOrganisation = {
+const mockOrganisation: ResolvedEntities['organisation'] = {
   id: 'org-1',
   name: 'Test Organisation',
   description: 'A test org',
-  tenantId: 'tenant-1',
   primaryIdentifier: {
-    id: 'id-1',
     value: '1234567890',
     scheme: {
       id: 'scheme-1',
-      primaryKey: 'gs1:gln',
       name: 'Global Location Number (GLN)',
-      linkTemplate: '/{primaryKey}/{value}',
     },
   },
-} as unknown as ResolvedEntities['organisation'];
+};
 
 // -- Tests --------------------------------------------------------------------
 
@@ -137,9 +106,9 @@ describe('DiaV061Mapper', () => {
     it('omits registeredId and idScheme when organisation has no primaryIdentifier', async () => {
       const orgNoIdentifier: ResolvedEntities = {
         organisation: {
-          ...mockOrganisation!,
+          ...mockOrganisation,
           primaryIdentifier: null,
-        } as unknown as ResolvedEntities['organisation'],
+        },
       };
 
       const result = await mapper.buildPayload(orgNoIdentifier, coreConfig);
@@ -167,7 +136,7 @@ describe('DiaV061Mapper', () => {
     const stubContext = ['https://test.uncefact.org/vocabulary/untp/dia/0.6.1/'];
     const stubType = ['DigitalIdentityAnchor'];
 
-    it('extracts organisation registeredId from credentialSubject', () => {
+    it('extracts organisation registeredId and sets primaryIdentifier', () => {
       const payload: MapperOutput = {
         '@context': stubContext,
         type: stubType,
@@ -180,6 +149,7 @@ describe('DiaV061Mapper', () => {
       const refs = mapper.extractEntityRefs(payload);
 
       expect(refs).toEqual({
+        primaryIdentifier: '1234567890',
         organisation: { registeredId: '1234567890' },
       });
     });
@@ -197,16 +167,6 @@ describe('DiaV061Mapper', () => {
       const refs = mapper.extractEntityRefs(payload);
 
       expect(refs).toEqual({});
-    });
-  });
-
-  // -- Self-registration ------------------------------------------------------
-
-  describe('self-registration', () => {
-    it('registers itself in the mapper registry as DigitalIdentityAnchor / 0.6.1', () => {
-      const registered = getMapper('DigitalIdentityAnchor', '0.6.1');
-      expect(registered).toBeDefined();
-      expect(registered).toBeInstanceOf(DiaV061Mapper);
     });
   });
 });

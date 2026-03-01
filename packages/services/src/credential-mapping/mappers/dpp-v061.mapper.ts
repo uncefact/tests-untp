@@ -1,12 +1,14 @@
-import { ICredentialMapper, ResolvedEntities, ExtractedIdentifierRefs, DataModelConfig, MapperOutput } from '../types';
-import { registerMapper } from '../mapper-registry';
-import type { IdentifierScheme } from '@uncefact/untp-ri-services';
-import type { UntpLocation } from '@/lib/types';
+import type { IdentifierScheme } from '../../verifiable-credential/types.js';
+import type {
+  ICredentialMapper,
+  ResolvedEntities,
+  ExtractedIdentifierRefs,
+  DataModelConfig,
+  MapperOutput,
+  UntpLocation,
+} from '../types.js';
+import { buildIdentifierScheme, buildParty, buildContextAndTypes } from './shared-v061.js';
 
-/**
- * DPP v0.6.1 UNTP schema types.
- * These mirror the JSON schema definitions for the Digital Product Passport.
- */
 type DppProduct = {
   type: ['Product'];
   id: string | undefined;
@@ -16,16 +18,8 @@ type DppProduct = {
   idScheme?: IdentifierScheme;
   batchNumber?: string;
   serialNumber?: string;
-  producedByParty: DppParty;
+  producedByParty: ReturnType<typeof buildParty>;
   producedAtFacility: DppFacility;
-};
-
-type DppParty = {
-  id: string | undefined;
-  name: string | undefined;
-  description?: string;
-  registeredId?: string;
-  idScheme?: IdentifierScheme;
 };
 
 type DppLocation = {
@@ -54,30 +48,10 @@ type DppFacility = {
   address?: DppAddress;
 };
 
-/**
- * Mapper for Digital Product Passport v0.6.1.
- * Builds a UNTP DPP credential payload from product, facility, and organisation entities.
- *
- * Output structure follows the UNTP DPP JSON schema:
- *   - credentialSubject is a ProductPassport
- *   - product uses registeredId + idScheme (not an identifiers array)
- *   - product includes batchNumber, serialNumber when present
- *   - organisation maps to producedByParty with idScheme + description
- *   - facility maps to producedAtFacility with idScheme, description, location, address
- */
 export class DppV061Mapper implements ICredentialMapper {
   async buildPayload(entities: ResolvedEntities, config: DataModelConfig): Promise<MapperOutput> {
     const { organisation, facility, product } = entities;
-
-    const contexts: string[] = [config.core.contextUrl];
-    const types: string[] = [config.core.credentialType];
-
-    if (config.extension) {
-      contexts.push(config.extension.contextUrl);
-      if (config.extension.credentialType !== config.core.credentialType) {
-        types.push(config.extension.credentialType);
-      }
-    }
+    const { contexts, types } = buildContextAndTypes(config);
 
     return {
       '@context': contexts,
@@ -102,29 +76,17 @@ export class DppV061Mapper implements ICredentialMapper {
       ...(product?.description && { description: product.description }),
       ...(product?.primaryIdentifier && {
         registeredId: product.primaryIdentifier.value,
-        idScheme: this.buildIdentifierScheme(product.primaryIdentifier.scheme),
+        idScheme: buildIdentifierScheme(product.primaryIdentifier.scheme),
       }),
       ...(product?.batchNumber && { batchNumber: product.batchNumber }),
       ...(product?.serialNumber && { serialNumber: product.serialNumber }),
-      producedByParty: this.buildParty(organisation),
+      producedByParty: buildParty(organisation),
       producedAtFacility: this.buildFacility(facility),
     };
   }
 
-  private buildParty(org: ResolvedEntities['organisation']): DppParty {
-    return {
-      id: org?.id,
-      name: org?.name,
-      ...(org?.description && { description: org.description }),
-      ...(org?.primaryIdentifier && {
-        registeredId: org.primaryIdentifier.value,
-        idScheme: this.buildIdentifierScheme(org.primaryIdentifier.scheme),
-      }),
-    };
-  }
-
   private buildFacility(facility: ResolvedEntities['facility']): DppFacility {
-    const location = facility?.location as UntpLocation | null | undefined;
+    const location = facility?.location;
 
     return {
       id: facility?.id,
@@ -132,7 +94,7 @@ export class DppV061Mapper implements ICredentialMapper {
       ...(facility?.description && { description: facility.description }),
       ...(facility?.primaryIdentifier && {
         registeredId: facility.primaryIdentifier.value,
-        idScheme: this.buildIdentifierScheme(facility.primaryIdentifier.scheme),
+        idScheme: buildIdentifierScheme(facility.primaryIdentifier.scheme),
       }),
       ...(location?.geoLocation || location?.plusCode || location?.geoBoundary
         ? {
@@ -159,17 +121,6 @@ export class DppV061Mapper implements ICredentialMapper {
     };
   }
 
-  private buildIdentifierScheme(
-    scheme: { id?: string; name?: string } | null | undefined,
-  ): IdentifierScheme | undefined {
-    if (!scheme || !scheme.id || !scheme.name) return undefined;
-    return {
-      type: ['IdentifierScheme'],
-      id: scheme.id,
-      name: scheme.name,
-    };
-  }
-
   extractEntityRefs(payload: MapperOutput): ExtractedIdentifierRefs {
     const subject = payload.credentialSubject;
     if (!subject) return {};
@@ -180,6 +131,7 @@ export class DppV061Mapper implements ICredentialMapper {
     const refs: ExtractedIdentifierRefs = {};
 
     if (product.registeredId) {
+      refs.primaryIdentifier = product.registeredId;
       refs.product = {
         registeredId: product.registeredId,
         ...(product.batchNumber ? { batchNumber: product.batchNumber } : {}),
@@ -198,6 +150,3 @@ export class DppV061Mapper implements ICredentialMapper {
     return refs;
   }
 }
-
-// Self-register on import
-registerMapper('DigitalProductPassport', '0.6.1', new DppV061Mapper());
