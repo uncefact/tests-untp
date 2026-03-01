@@ -9,9 +9,8 @@ import { DteV061Mapper } from './mappers/dte-v061.mapper.js';
  * Registers all built-in credential type mappers.
  * Call during application startup before using the mapper registry.
  *
- * Idempotent -- safe to call multiple times.
- * Consumers can override a built-in mapper by calling
- * registerMapper() after this function.
+ * Safe to call multiple times; subsequent calls replace mapper
+ * instances with fresh ones.
  */
 export function initBuiltInMappers(): void {
   registerMapper('DigitalProductPassport', '0.6.1', new DppV061Mapper());

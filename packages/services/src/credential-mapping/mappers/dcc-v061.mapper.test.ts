@@ -519,5 +519,38 @@ describe('DccV061Mapper', () => {
 
       expect(refs).toEqual({});
     });
+
+    it('returns empty object when credentialSubject is missing', () => {
+      const payload = {
+        '@context': stubContext,
+        type: stubType,
+      } as MapperOutput;
+
+      const refs = mapper.extractEntityRefs(payload);
+
+      expect(refs).toEqual({});
+    });
+
+    it('sets primaryIdentifier to assessedOrganisation registeredId when no product or facility', () => {
+      const payload: MapperOutput = {
+        '@context': stubContext,
+        type: stubType,
+        credentialSubject: {
+          type: ['ConformityAttestation'],
+          issuedToParty: { name: 'Some org' },
+          assessment: [
+            {
+              type: ['ConformityAssessment', 'Declaration'],
+              assessedOrganisation: { registeredId: '5555555555' },
+            },
+          ],
+        },
+      };
+
+      const refs = mapper.extractEntityRefs(payload);
+
+      expect(refs.primaryIdentifier).toBe('5555555555');
+      expect(refs.organisation).toEqual({ registeredId: '5555555555' });
+    });
   });
 });
