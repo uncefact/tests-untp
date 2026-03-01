@@ -107,9 +107,13 @@ export {
   linkRegistrationSchema,
 } from './identity-resolver/schemas.js';
 
-// Schema cache
+// Schema cache and validation
 export { SchemaFetchError, fetchSchema, clearSchemaCache, getSchemaCache } from './schema/index.js';
+export { SchemaValidationError, validateAgainstSchemas } from './schema/index.js';
 export type { CachedSchema } from './schema/index.js';
+
+// JSON-LD validation
+export { JsonLdValidationError, validateJsonLd } from './jsonld-validation/index.js';
 
 // Shared API response schemas
 export { errorResponseSchema } from './schemas.js';
@@ -119,12 +123,8 @@ export type { VerificationWarning } from './identity-resolver/common/idr-verific
 export { verifyResolverDescription, verifyUntpLinkTypes } from './identity-resolver/common/idr-verification.js';
 
 // IDR publish utilities
-export type {
-  BuildPublishLinksOptions,
-  PublishCredentialOptions,
-  PublishCredentialResult,
-} from './identity-resolver/common/publish-credential.js';
-export { buildPublishLinks, publishCredential } from './identity-resolver/common/publish-credential.js';
+export type { BuildPublishLinksOptions } from './identity-resolver/common/publish-credential.js';
+export { buildPublishLinks } from './identity-resolver/common/publish-credential.js';
 
 // Storage service types and constants
 export { STORAGE_SERVICE_TYPE } from './storage/types.js';
@@ -168,4 +168,4 @@ export type {
   EntityIdentifier,
   UntpLocation,
 } from './credential-mapping/index.js';
-export { registerMapper, getMapper, listRegisteredMappers, initBuiltInMappers } from './credential-mapping/index.js';
+export { getMapper } from './credential-mapping/index.js';
