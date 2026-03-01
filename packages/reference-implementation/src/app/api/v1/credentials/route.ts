@@ -165,10 +165,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   // ── Step 6: Publish to IDR ──────────────────────────────────────────────
 
-  if (publishingOptions.publish === true && primaryEntity.schemePrimaryKey && primaryEntity.schemeNamespace) {
-    const primaryIdentifier = mapper.extractEntityRefs(credentialPayload).primaryIdentifier;
-
-    if (primaryIdentifier) {
+  if (publishingOptions.publish === true) {
+    if (!primaryEntity.schemePrimaryKey || !primaryEntity.schemeNamespace) {
+      logger.warn({ tenantId, credentialId }, 'Publishing requested but entity has no scheme configuration — skipping');
+    } else if (!primaryEntity.primaryIdentifier) {
+      logger.warn({ tenantId, credentialId }, 'Publishing requested but no primary identifier resolved — skipping');
+    } else {
       const idrService = await resolveIdrService(
         tenantId,
         primaryEntity.schemeIdrServiceInstanceId,
@@ -182,14 +184,20 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       });
 
       logger.info(
-        { tenantId, idrInstanceId: idrService.instanceId, primaryIdentifier },
+        { tenantId, idrInstanceId: idrService.instanceId, primaryIdentifier: primaryEntity.primaryIdentifier },
         'Publishing credential to IDR',
       );
 
-      await idrService.service.publishLinks(primaryEntity.schemePrimaryKey, primaryIdentifier, links, '/', {
-        namespace: primaryEntity.schemeNamespace,
-        itemDescription: linkTitle,
-      });
+      await idrService.service.publishLinks(
+        primaryEntity.schemePrimaryKey,
+        primaryEntity.primaryIdentifier,
+        links,
+        '/',
+        {
+          namespace: primaryEntity.schemeNamespace,
+          itemDescription: linkTitle,
+        },
+      );
 
       await updateCredentialPublished(credentialId, tenantId, true);
     }

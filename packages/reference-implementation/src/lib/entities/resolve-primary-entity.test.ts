@@ -62,6 +62,7 @@ describe('resolvePrimaryEntity', () => {
 
     expect(mockGetProductByIdentifierValue).toHaveBeenCalledWith('09506000134352', TENANT_ID);
     expect(result).toEqual<PrimaryEntityResult>({
+      primaryIdentifier: '09506000134352',
       productId: 'prod-1',
       schemeNamespace: 'gs1',
       schemePrimaryKey: 'gtin',
@@ -83,6 +84,7 @@ describe('resolvePrimaryEntity', () => {
 
     expect(mockGetFacilityByIdentifierValue).toHaveBeenCalledWith('9506000134', TENANT_ID);
     expect(result).toEqual<PrimaryEntityResult>({
+      primaryIdentifier: '9506000134',
       facilityId: 'fac-1',
       schemeNamespace: 'gs1',
       schemePrimaryKey: 'gtin',
@@ -104,6 +106,7 @@ describe('resolvePrimaryEntity', () => {
 
     expect(mockGetOrganisationByIdentifierValue).toHaveBeenCalledWith('9506000100', TENANT_ID);
     expect(result).toEqual<PrimaryEntityResult>({
+      primaryIdentifier: '9506000100',
       organisationId: 'org-1',
       schemeNamespace: 'gs1',
       schemePrimaryKey: 'gtin',

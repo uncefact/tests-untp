@@ -3,9 +3,25 @@ import { ValidationError } from '@/lib/api/validation';
 const mockValidateAgainstSchemas = jest.fn();
 const mockValidateJsonLd = jest.fn();
 
+class SchemaValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SchemaValidationError';
+  }
+}
+
+class JsonLdValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'JsonLdValidationError';
+  }
+}
+
 jest.mock('@uncefact/untp-ri-services', () => ({
   validateAgainstSchemas: (...args: unknown[]) => mockValidateAgainstSchemas(...args),
   validateJsonLd: (...args: unknown[]) => mockValidateJsonLd(...args),
+  SchemaValidationError,
+  JsonLdValidationError,
 }));
 
 import { validateCredentialPayload } from './validate-credential-payload';
@@ -42,7 +58,7 @@ describe('validateCredentialPayload', () => {
   });
 
   it('throws ValidationError when schema validation fails', async () => {
-    mockValidateAgainstSchemas.mockRejectedValue(new Error('Invalid against schema'));
+    mockValidateAgainstSchemas.mockRejectedValue(new SchemaValidationError('Invalid against schema'));
 
     await expect(validateCredentialPayload(payload, schemaUrls)).rejects.toThrow(ValidationError);
     await expect(validateCredentialPayload(payload, schemaUrls)).rejects.toThrow('Invalid against schema');
@@ -51,7 +67,7 @@ describe('validateCredentialPayload', () => {
 
   it('throws ValidationError when JSON-LD validation fails', async () => {
     mockValidateAgainstSchemas.mockResolvedValue(undefined);
-    mockValidateJsonLd.mockRejectedValue(new Error('Invalid JSON-LD context'));
+    mockValidateJsonLd.mockRejectedValue(new JsonLdValidationError('Invalid JSON-LD context'));
 
     await expect(validateCredentialPayload(payload, schemaUrls)).rejects.toThrow(ValidationError);
     await expect(validateCredentialPayload(payload, schemaUrls)).rejects.toThrow('Invalid JSON-LD context');
@@ -59,7 +75,7 @@ describe('validateCredentialPayload', () => {
 
   it('preserves original error message in ValidationError', async () => {
     const originalMessage = 'Property "id" does not match schema constraint';
-    mockValidateAgainstSchemas.mockRejectedValue(new Error(originalMessage));
+    mockValidateAgainstSchemas.mockRejectedValue(new SchemaValidationError(originalMessage));
 
     try {
       await validateCredentialPayload(payload, schemaUrls);
@@ -68,6 +84,33 @@ describe('validateCredentialPayload', () => {
       expect(error).toBeInstanceOf(ValidationError);
       expect((error as ValidationError).message).toBe(originalMessage);
       expect((error as ValidationError).name).toBe('ValidationError');
+    }
+  });
+
+  it('propagates non-SchemaValidationError from schema validation without wrapping', async () => {
+    mockValidateAgainstSchemas.mockRejectedValue(new Error('Network timeout'));
+
+    await expect(validateCredentialPayload(payload, schemaUrls)).rejects.toThrow('Network timeout');
+
+    try {
+      await validateCredentialPayload(payload, schemaUrls);
+    } catch (error) {
+      expect(error).not.toBeInstanceOf(ValidationError);
+      expect(error).toBeInstanceOf(Error);
+    }
+  });
+
+  it('propagates non-JsonLdValidationError from JSON-LD validation without wrapping', async () => {
+    mockValidateAgainstSchemas.mockResolvedValue(undefined);
+    mockValidateJsonLd.mockRejectedValue(new Error('Module not found'));
+
+    await expect(validateCredentialPayload(payload, schemaUrls)).rejects.toThrow('Module not found');
+
+    try {
+      await validateCredentialPayload(payload, schemaUrls);
+    } catch (error) {
+      expect(error).not.toBeInstanceOf(ValidationError);
+      expect(error).toBeInstanceOf(Error);
     }
   });
 });

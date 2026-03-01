@@ -406,6 +406,7 @@ describe('POST /api/v1/credentials', () => {
 
     function setupPublishingHappyPath(overrides: Record<string, unknown> = {}) {
       const defaults = {
+        primaryIdentifier: '09506000134352',
         schemePrimaryKey: 'gtin',
         schemeNamespace: 'gs1',
         schemeIdrServiceInstanceId: 'idr-scheme-1',
