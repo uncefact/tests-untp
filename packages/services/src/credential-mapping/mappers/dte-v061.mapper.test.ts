@@ -1,78 +1,30 @@
 import { DteV061Mapper } from './dte-v061.mapper';
-import { getMapper } from '../mapper-registry';
-import { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
+import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
 
 // -- Mock data model configs --------------------------------------------------
 
-const mockCoreDataModel = {
-  id: 'dm-core-dte',
-  tenantId: null,
-  name: 'Digital Traceability Event v0.6.1',
-  credentialType: 'DigitalTraceabilityEvent',
-  version: '0.6.1',
-  isExtension: false,
-  parentConfigId: null,
-  parentConfig: null,
-  extensions: [],
-  renderTemplates: [],
-  schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dte/0.6.1/schema.json',
+const mockCoreDataModel: DataModelConfig['core'] = {
   contextUrl: 'https://test.uncefact.org/vocabulary/untp/dte/0.6.1/',
-  websiteUrl: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-} as DataModelConfig['core'];
-
-const mockExtensionDataModel = {
-  id: 'dm-ext-dte',
-  tenantId: 'tenant-1',
-  name: 'Custom Traceability Extension',
   credentialType: 'DigitalTraceabilityEvent',
-  version: '0.6.1',
-  isExtension: true,
-  parentConfigId: 'dm-core-dte',
-  parentConfig: mockCoreDataModel,
-  extensions: [],
-  renderTemplates: [],
-  schemaUrl: 'https://example.org/traceability-ext/v1/schema.json',
+};
+
+const mockExtensionDataModel: DataModelConfig['extension'] = {
   contextUrl: 'https://example.org/traceability-ext/v1/',
-  websiteUrl: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-} as DataModelConfig['extension'];
+  credentialType: 'DigitalTraceabilityEvent',
+};
 
 // -- Mock entities ------------------------------------------------------------
 
-const mockOrganisation = {
-  id: 'org-1',
-  name: 'Test Organisation',
-  description: 'A test org',
-  tenantId: 'tenant-1',
-  primaryIdentifier: {
-    id: 'id-1',
-    value: '1234567890',
-    scheme: {
-      id: 'scheme-1',
-      primaryKey: 'gs1:gln',
-      name: 'Global Location Number (GLN)',
-      linkTemplate: '/{primaryKey}/{value}',
-    },
-  },
-} as unknown as ResolvedEntities['organisation'];
-
-const mockProduct = {
+const mockProduct: ResolvedEntities['product'] = {
   id: 'product-1',
   name: 'Test Product',
   description: 'A test product',
-  tenantId: 'tenant-1',
   level: 'MODEL',
-  batchNumber: null,
-  serialNumber: null,
   primaryIdentifier: {
-    id: 'id-3',
     value: '01234567890123',
-    scheme: { id: 'scheme-3', primaryKey: 'gs1:gtin', name: 'GTIN', linkTemplate: '/{primaryKey}/{value}' },
+    scheme: { id: 'scheme-3', name: 'GTIN' },
   },
-} as unknown as ResolvedEntities['product'];
+};
 
 // -- Tests --------------------------------------------------------------------
 
@@ -81,7 +33,6 @@ describe('DteV061Mapper', () => {
   const coreConfig: DataModelConfig = { core: mockCoreDataModel };
 
   const fullEntities: ResolvedEntities = {
-    organisation: mockOrganisation,
     product: mockProduct,
   };
 
@@ -150,9 +101,7 @@ describe('DteV061Mapper', () => {
     });
 
     it('omits epcList when product is undefined', async () => {
-      const entitiesNoProduct: ResolvedEntities = {
-        organisation: mockOrganisation,
-      };
+      const entitiesNoProduct: ResolvedEntities = {};
 
       const result = await mapper.buildPayload(entitiesNoProduct, coreConfig);
       const subject = result.credentialSubject as Record<string, unknown>;
@@ -167,7 +116,7 @@ describe('DteV061Mapper', () => {
     const stubContext = ['https://test.uncefact.org/vocabulary/untp/dte/0.6.1/'];
     const stubType = ['DigitalTraceabilityEvent'];
 
-    it('extracts product id from the first item in epcList', () => {
+    it('extracts product id from the first item in epcList and sets primaryIdentifier', () => {
       const payload: MapperOutput = {
         '@context': stubContext,
         type: stubType,
@@ -180,6 +129,7 @@ describe('DteV061Mapper', () => {
       const refs = mapper.extractEntityRefs(payload);
 
       expect(refs).toEqual({
+        primaryIdentifier: 'product-1',
         product: { registeredId: 'product-1' },
       });
     });
@@ -209,16 +159,6 @@ describe('DteV061Mapper', () => {
       const refs = mapper.extractEntityRefs(payload);
 
       expect(refs).toEqual({});
-    });
-  });
-
-  // -- Self-registration ------------------------------------------------------
-
-  describe('self-registration', () => {
-    it('registers itself in the mapper registry as DigitalTraceabilityEvent / 0.6.1', () => {
-      const registered = getMapper('DigitalTraceabilityEvent', '0.6.1');
-      expect(registered).toBeDefined();
-      expect(registered).toBeInstanceOf(DteV061Mapper);
     });
   });
 });

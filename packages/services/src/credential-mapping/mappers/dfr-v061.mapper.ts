@@ -1,24 +1,15 @@
-import { ICredentialMapper, ResolvedEntities, ExtractedIdentifierRefs, DataModelConfig, MapperOutput } from '../types';
-import { registerMapper } from '../mapper-registry';
-import type { IdentifierScheme } from '@uncefact/untp-ri-services';
-import type { UntpLocation } from '@/lib/types';
+import type { IdentifierScheme } from '../../verifiable-credential/types.js';
+import type {
+  ICredentialMapper,
+  ResolvedEntities,
+  ExtractedIdentifierRefs,
+  DataModelConfig,
+  MapperOutput,
+  UntpLocation,
+} from '../types.js';
+import { buildIdentifierScheme, buildParty, buildContextAndTypes } from './shared-v061.js';
 
-// TODO: Consolidate shared types and helpers across v0.6.1 mappers into a
-// common module (e.g. ./shared-v061.ts). Candidates:
-//   - Party type (DccParty, DfrParty) and buildParty helper
-//   - IdentifierScheme type import and buildIdentifierScheme helper (identical in DCC, DFR, DIA)
-//   - Context/type array construction logic (identical in all four mappers)
-
-/**
- * DFR v0.6.1 UNTP schema types.
- * These mirror the JSON schema definitions for the Digital Facility Record.
- */
-type DfrParty = {
-  id: string | undefined;
-  name: string | undefined;
-  registeredId?: string;
-  idScheme?: IdentifierScheme;
-};
+type DfrParty = ReturnType<typeof buildParty>;
 
 type DfrLocation = {
   type: ['Location'];
@@ -48,28 +39,10 @@ type DfrFacility = {
   address?: DfrAddress;
 };
 
-/**
- * Mapper for Digital Facility Record v0.6.1.
- * Builds a UNTP DFR credential payload from facility and organisation entities.
- *
- * Output structure follows the UNTP DFR JSON schema:
- *   - credentialSubject is a FacilityRecord
- *   - facility maps to credentialSubject.facility with location, address
- *   - organisation maps to facility.operatedByParty with idScheme
- */
 export class DfrV061Mapper implements ICredentialMapper {
   async buildPayload(entities: ResolvedEntities, config: DataModelConfig): Promise<MapperOutput> {
     const { organisation, facility } = entities;
-
-    const contexts: string[] = [config.core.contextUrl];
-    const types: string[] = [config.core.credentialType];
-
-    if (config.extension) {
-      contexts.push(config.extension.contextUrl);
-      if (config.extension.credentialType !== config.core.credentialType) {
-        types.push(config.extension.credentialType);
-      }
-    }
+    const { contexts, types } = buildContextAndTypes(config);
 
     return {
       '@context': contexts,
@@ -85,7 +58,7 @@ export class DfrV061Mapper implements ICredentialMapper {
     facility: ResolvedEntities['facility'],
     organisation: ResolvedEntities['organisation'],
   ): DfrFacility {
-    const location = facility?.location as UntpLocation | null | undefined;
+    const location = facility?.location;
 
     return {
       type: ['Facility'],
@@ -94,9 +67,9 @@ export class DfrV061Mapper implements ICredentialMapper {
       ...(facility?.description && { description: facility.description }),
       ...(facility?.primaryIdentifier && {
         registeredId: facility.primaryIdentifier.value,
-        idScheme: this.buildIdentifierScheme(facility.primaryIdentifier.scheme),
+        idScheme: buildIdentifierScheme(facility.primaryIdentifier.scheme),
       }),
-      operatedByParty: this.buildParty(organisation),
+      operatedByParty: buildParty(organisation),
       ...(location?.geoLocation || location?.plusCode || location?.geoBoundary
         ? {
             locationInformation: {
@@ -122,28 +95,6 @@ export class DfrV061Mapper implements ICredentialMapper {
     };
   }
 
-  private buildParty(org: ResolvedEntities['organisation']): DfrParty {
-    return {
-      id: org?.id,
-      name: org?.name,
-      ...(org?.primaryIdentifier && {
-        registeredId: org.primaryIdentifier.value,
-        idScheme: this.buildIdentifierScheme(org.primaryIdentifier.scheme),
-      }),
-    };
-  }
-
-  private buildIdentifierScheme(
-    scheme: { id?: string; name?: string } | null | undefined,
-  ): IdentifierScheme | undefined {
-    if (!scheme || !scheme.id || !scheme.name) return undefined;
-    return {
-      type: ['IdentifierScheme'],
-      id: scheme.id,
-      name: scheme.name,
-    };
-  }
-
   extractEntityRefs(payload: MapperOutput): ExtractedIdentifierRefs {
     const subject = payload.credentialSubject;
     if (!subject) return {};
@@ -154,6 +105,7 @@ export class DfrV061Mapper implements ICredentialMapper {
     const refs: ExtractedIdentifierRefs = {};
 
     if (facility.registeredId) {
+      refs.primaryIdentifier = facility.registeredId;
       refs.facility = { registeredId: facility.registeredId };
     }
 
@@ -164,6 +116,3 @@ export class DfrV061Mapper implements ICredentialMapper {
     return refs;
   }
 }
-
-// Self-register on import
-registerMapper('DigitalFacilityRecord', '0.6.1', new DfrV061Mapper());

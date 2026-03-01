@@ -1,69 +1,37 @@
 import { DfrV061Mapper } from './dfr-v061.mapper';
-import { getMapper } from '../mapper-registry';
-import { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
+import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
 
 // -- Mock data model configs --------------------------------------------------
 
-const mockCoreDataModel = {
-  id: 'dm-core-dfr',
-  tenantId: null,
-  name: 'Digital Facility Record v0.6.1',
-  credentialType: 'DigitalFacilityRecord',
-  version: '0.6.1',
-  isExtension: false,
-  parentConfigId: null,
-  parentConfig: null,
-  extensions: [],
-  renderTemplates: [],
-  schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dfr/0.6.1/schema.json',
+const mockCoreDataModel: DataModelConfig['core'] = {
   contextUrl: 'https://test.uncefact.org/vocabulary/untp/dfr/0.6.1/',
-  websiteUrl: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-} as DataModelConfig['core'];
-
-const mockExtensionDataModel = {
-  id: 'dm-ext-dfr',
-  tenantId: 'tenant-1',
-  name: 'Custom Facility Extension',
   credentialType: 'DigitalFacilityRecord',
-  version: '0.6.1',
-  isExtension: true,
-  parentConfigId: 'dm-core-dfr',
-  parentConfig: mockCoreDataModel,
-  extensions: [],
-  renderTemplates: [],
-  schemaUrl: 'https://example.org/facility-ext/v1/schema.json',
+};
+
+const mockExtensionDataModel: DataModelConfig['extension'] = {
   contextUrl: 'https://example.org/facility-ext/v1/',
-  websiteUrl: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-} as DataModelConfig['extension'];
+  credentialType: 'DigitalFacilityRecord',
+};
 
 // -- Mock entities ------------------------------------------------------------
 
-const mockOrganisation = {
+const mockOrganisation: ResolvedEntities['organisation'] = {
   id: 'org-1',
   name: 'Test Organisation',
   description: 'A test org',
-  tenantId: 'tenant-1',
   primaryIdentifier: {
-    id: 'id-1',
     value: '1234567890',
     scheme: {
       id: 'scheme-1',
-      primaryKey: 'gs1:gln',
       name: 'Global Location Number (GLN)',
-      linkTemplate: '/{primaryKey}/{value}',
     },
   },
-} as unknown as ResolvedEntities['organisation'];
+};
 
-const mockFacility = {
+const mockFacility: ResolvedEntities['facility'] = {
   id: 'facility-1',
   name: 'Test Facility',
   description: 'A test facility',
-  tenantId: 'tenant-1',
   location: {
     address: {
       streetAddress: '123 Factory Lane',
@@ -76,16 +44,13 @@ const mockFacility = {
     geoLocation: { type: 'Point', coordinates: [144.9631, -37.8136] },
   },
   primaryIdentifier: {
-    id: 'id-2',
     value: '9876543210',
     scheme: {
       id: 'scheme-2',
-      primaryKey: 'gs1:gln',
       name: 'Global Location Number (GLN)',
-      linkTemplate: '/{primaryKey}/{value}',
     },
   },
-} as unknown as ResolvedEntities['facility'];
+};
 
 // -- Tests --------------------------------------------------------------------
 
@@ -179,9 +144,9 @@ describe('DfrV061Mapper', () => {
       const facilityNoId: ResolvedEntities = {
         ...fullEntities,
         facility: {
-          ...mockFacility!,
+          ...mockFacility,
           primaryIdentifier: null,
-        } as unknown as ResolvedEntities['facility'],
+        },
       };
 
       const result = await mapper.buildPayload(facilityNoId, coreConfig);
@@ -203,6 +168,7 @@ describe('DfrV061Mapper', () => {
       expect(party).toEqual({
         id: 'org-1',
         name: 'Test Organisation',
+        description: 'A test org',
         registeredId: '1234567890',
         idScheme: {
           type: ['IdentifierScheme'],
@@ -245,11 +211,11 @@ describe('DfrV061Mapper', () => {
       const facilityNoGeo: ResolvedEntities = {
         ...fullEntities,
         facility: {
-          ...mockFacility!,
+          ...mockFacility,
           location: {
             address: { streetAddress: '123 Factory Lane' },
           },
-        } as unknown as ResolvedEntities['facility'],
+        },
       };
 
       const result = await mapper.buildPayload(facilityNoGeo, coreConfig);
@@ -267,9 +233,9 @@ describe('DfrV061Mapper', () => {
       const facilityNoLocation: ResolvedEntities = {
         ...fullEntities,
         facility: {
-          ...mockFacility!,
+          ...mockFacility,
           location: null,
-        } as unknown as ResolvedEntities['facility'],
+        },
       };
 
       const result = await mapper.buildPayload(facilityNoLocation, coreConfig);
@@ -287,7 +253,7 @@ describe('DfrV061Mapper', () => {
     const stubContext = ['https://test.uncefact.org/vocabulary/untp/dfr/0.6.1/'];
     const stubType = ['DigitalFacilityRecord'];
 
-    it('extracts facility and organisation registeredIds', () => {
+    it('extracts facility and organisation registeredIds and sets primaryIdentifier to facility registeredId', () => {
       const payload: MapperOutput = {
         '@context': stubContext,
         type: stubType,
@@ -303,6 +269,7 @@ describe('DfrV061Mapper', () => {
       const refs = mapper.extractEntityRefs(payload);
 
       expect(refs).toEqual({
+        primaryIdentifier: '9876543210',
         facility: { registeredId: '9876543210' },
         organisation: { registeredId: '1234567890' },
       });
@@ -336,16 +303,6 @@ describe('DfrV061Mapper', () => {
       const refs = mapper.extractEntityRefs(payload);
 
       expect(refs).toEqual({});
-    });
-  });
-
-  // -- Self-registration ------------------------------------------------------
-
-  describe('self-registration', () => {
-    it('registers itself in the mapper registry as DigitalFacilityRecord / 0.6.1', () => {
-      const registered = getMapper('DigitalFacilityRecord', '0.6.1');
-      expect(registered).toBeDefined();
-      expect(registered).toBeInstanceOf(DfrV061Mapper);
     });
   });
 });

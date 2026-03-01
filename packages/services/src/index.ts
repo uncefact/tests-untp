@@ -153,3 +153,19 @@ export {
   vckitVerifiableCredentialSensitiveFields,
 } from './verifiable-credential/adapters/vckit/vckit-verifiable-credential.schema.js';
 export { decodeCredential } from './verifiable-credential/common/decode-credential.js';
+
+// Credential mapping
+export type {
+  ICredentialMapper,
+  MapperOutput,
+  ExtractedIdentifierRefs,
+  DataModelConfig,
+  ResolvedEntities,
+  OrganisationEntity,
+  FacilityEntity,
+  ProductEntity,
+  ProductLevel,
+  EntityIdentifier,
+  UntpLocation,
+} from './credential-mapping/index.js';
+export { registerMapper, getMapper, listRegisteredMappers, initBuiltInMappers } from './credential-mapping/index.js';
