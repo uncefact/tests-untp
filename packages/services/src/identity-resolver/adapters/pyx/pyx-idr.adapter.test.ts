@@ -28,16 +28,13 @@ describe('PyxIdentityResolverAdapter', () => {
 
   const mockConfig: PyxIdrConfig = {
     baseUrl: 'https://resolver.example.com',
-    uriPrefix: '/{namespace}',
     apiKey: 'test-api-key',
     apiVersion: '2.0.0',
-    ianaLanguage: 'en',
-    context: 'au',
     defaultLinkType: 'untp:dpp',
     defaultMimeType: 'text/html',
     defaultIanaLanguage: 'en',
     defaultContext: 'au',
-    fwqs: false,
+    defaultFwqs: false,
   };
 
   const mockOptions = {
@@ -208,8 +205,8 @@ describe('PyxIdentityResolverAdapter', () => {
         context: 'au',
         defaultLinkType: true, // 'untp:dpp' === config.defaultLinkType
         defaultMimeType: false, // 'application/json' !== config.defaultMimeType ('text/html')
-        defaultIanaLanguage: true, // config.ianaLanguage === config.defaultIanaLanguage
-        defaultContext: true, // config.context === config.defaultContext
+        defaultIanaLanguage: true, // link language ('en') matches default language ('en')
+        defaultContext: true, // link context ('au') matches default context ('au')
         fwqs: false,
       });
     });
@@ -219,7 +216,7 @@ describe('PyxIdentityResolverAdapter', () => {
         ...mockOptions,
         ianaLanguage: 'de',
         context: 'us',
-        defaultLinkType: 'untp:dcc',
+        defaultLinkType: 'untp:dcc' as const,
         defaultMimeType: 'application/json',
         defaultIanaLanguage: 'de',
         defaultContext: 'us',
@@ -289,7 +286,7 @@ describe('PyxIdentityResolverAdapter', () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
       const result = await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
-      // buildResolverUri uses uriPrefix (/{namespace}) + fallback linkTemplate (/abn/51824753556)
+      // buildResolverUri uses /{namespace} prefix + fallback linkTemplate (/abn/51824753556)
       expect(result.resolverUri).toBe('https://resolver.example.com/ato/abn/51824753556');
     });
 
@@ -741,32 +738,6 @@ describe('PyxIdentityResolverAdapter', () => {
 
       expect(result).toBe('https://resolver.example.com/ato/abn/51824753556');
     });
-
-    it('uses custom uriPrefix from config', () => {
-      const customConfig = { ...mockConfig, uriPrefix: '/custom-prefix/{namespace}' };
-      const adapter = new PyxIdentityResolverAdapter(customConfig, mockLogger);
-      const result = adapter.buildResolverUri({
-        linkTemplate: '/{primaryKey}/{value}',
-        primaryKey: 'abn',
-        value: '51824753556',
-        namespace: 'ato',
-      });
-
-      expect(result).toBe('https://resolver.example.com/custom-prefix/ato/abn/51824753556');
-    });
-
-    it('handles empty uriPrefix', () => {
-      const customConfig = { ...mockConfig, uriPrefix: '' };
-      const adapter = new PyxIdentityResolverAdapter(customConfig, mockLogger);
-      const result = adapter.buildResolverUri({
-        linkTemplate: '/{primaryKey}/{value}',
-        primaryKey: '01',
-        value: '09520123456788',
-        namespace: 'gs1',
-      });
-
-      expect(result).toBe('https://resolver.example.com/01/09520123456788');
-    });
   });
 
   describe('registerSchemes', () => {
@@ -862,8 +833,6 @@ describe('PyxIdentityResolverAdapter', () => {
       const validConfig = {
         baseUrl: 'https://resolver.example.com',
         apiKey: 'test-key',
-        ianaLanguage: 'en',
-        context: 'au',
         defaultLinkType: 'untp:dpp',
         defaultMimeType: 'text/html',
         defaultIanaLanguage: 'en',
@@ -879,12 +848,22 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(() => pyxIdrRegistryEntry.configSchema.parse({ baseUrl: 'not-a-url', apiKey: '' })).toThrow();
     });
 
-    it('should default apiVersion, fwqs, and uriPrefix when not provided', () => {
+    it('should reject non-enum defaultLinkType values', () => {
       const config = {
         baseUrl: 'https://resolver.example.com',
         apiKey: 'test-key',
-        ianaLanguage: 'en',
-        context: 'au',
+        defaultLinkType: 'custom:link',
+        defaultMimeType: 'text/html',
+        defaultIanaLanguage: 'en',
+        defaultContext: 'au',
+      };
+      expect(() => pyxIdrRegistryEntry.configSchema.parse(config)).toThrow();
+    });
+
+    it('should default apiVersion and defaultFwqs when not provided', () => {
+      const config = {
+        baseUrl: 'https://resolver.example.com',
+        apiKey: 'test-key',
         defaultLinkType: 'untp:dpp',
         defaultMimeType: 'text/html',
         defaultIanaLanguage: 'en',
@@ -892,8 +871,7 @@ describe('PyxIdentityResolverAdapter', () => {
       };
       const result = pyxIdrRegistryEntry.configSchema.parse(config);
       expect(result.apiVersion).toBe('2.0.0');
-      expect(result.fwqs).toBe(false);
-      expect(result.uriPrefix).toBe('/{namespace}');
+      expect(result.defaultFwqs).toBe(false);
     });
 
     it('should reject an unsupported apiVersion', () => {
@@ -901,8 +879,6 @@ describe('PyxIdentityResolverAdapter', () => {
         baseUrl: 'https://resolver.example.com',
         apiKey: 'test-key',
         apiVersion: '1.0.0',
-        ianaLanguage: 'en',
-        context: 'au',
         defaultLinkType: 'untp:dpp',
         defaultMimeType: 'text/html',
         defaultIanaLanguage: 'en',
@@ -915,8 +891,6 @@ describe('PyxIdentityResolverAdapter', () => {
       const config = {
         baseUrl: 'https://resolver.example.com',
         apiKey: 'test-key',
-        ianaLanguage: 'en',
-        context: 'au',
         defaultLinkType: 'untp:dpp',
         defaultMimeType: 'text/html',
         defaultIanaLanguage: 'en',
