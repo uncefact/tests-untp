@@ -1,4 +1,12 @@
-import { createDid, getDidById, listDids, updateDid, updateDidStatus, getDefaultDid } from './did.repository';
+import {
+  createDid,
+  getDidById,
+  getDidByDid,
+  listDids,
+  updateDid,
+  updateDidStatus,
+  getDefaultDid,
+} from './did.repository';
 import type { DidStatus } from '../generated';
 
 // Transaction mock — functions called via $transaction callback
@@ -168,6 +176,44 @@ describe('did.repository', () => {
       mockDid.findFirst.mockResolvedValue(null);
 
       const result = await getDidById('did-record-1', 'other-org');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getDidByDid', () => {
+    it('returns the DID when found by DID string and tenantId', async () => {
+      mockDid.findFirst.mockResolvedValue(DID_RECORD);
+
+      const result = await getDidByDid('did:web:example.com:org:123', ORG_ID);
+
+      expect(mockDid.findFirst).toHaveBeenCalledWith({
+        where: {
+          did: 'did:web:example.com:org:123',
+          OR: [{ tenantId: ORG_ID }, { isDefault: true }],
+        },
+      });
+      expect(result).toEqual(DID_RECORD);
+    });
+
+    it('returns the system default DID even for a different tenant', async () => {
+      const defaultDid = { ...DID_RECORD, isDefault: true, tenantId: 'system' };
+      mockDid.findFirst.mockResolvedValue(defaultDid);
+
+      const result = await getDidByDid('did:web:example.com:org:123', 'other-org');
+
+      expect(mockDid.findFirst).toHaveBeenCalledWith({
+        where: {
+          did: 'did:web:example.com:org:123',
+          OR: [{ tenantId: 'other-org' }, { isDefault: true }],
+        },
+      });
+      expect(result).toEqual(defaultDid);
+    });
+
+    it('returns null when the DID does not exist', async () => {
+      mockDid.findFirst.mockResolvedValue(null);
+
+      const result = await getDidByDid('did:web:nonexistent', ORG_ID);
       expect(result).toBeNull();
     });
   });

@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "DidStatus" ADD VALUE 'VERIFICATION_FAILED';

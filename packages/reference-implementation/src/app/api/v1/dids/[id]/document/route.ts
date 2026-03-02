@@ -69,5 +69,6 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   logger.info({ tenantId, didId: id, did: did.did }, 'Fetching DID document from provider');
   const document = await didService.getDocument(did.did);
 
+  logger.info({ tenantId, didId: id }, 'DID document retrieved');
   return NextResponse.json({ ok: true, document });
 });

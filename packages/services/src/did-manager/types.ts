@@ -40,10 +40,15 @@ export enum DidStatus {
   VERIFIED = 'VERIFIED',
   /** Self-managed DID created but not yet verified (initial state for SELF_MANAGED) */
   UNVERIFIED = 'UNVERIFIED',
+  /** Self-managed DID verification was attempted and failed */
+  VERIFICATION_FAILED = 'VERIFICATION_FAILED',
 }
 
 /** DID types that can be created via the API (excludes DEFAULT, which is system-managed). */
 export const CREATABLE_DID_TYPES = [DidType.MANAGED, DidType.SELF_MANAGED] as const;
+
+/** DID statuses that are eligible for credential issuance. */
+export const ISSUABLE_DID_STATUSES = [DidStatus.ACTIVE, DidStatus.VERIFIED] as const;
 
 // ── Input / option types ───────────────────────────────────────────────────
 

@@ -14,7 +14,7 @@ export type CreateDidInput = {
   name?: string;
   description?: string;
   isDefault?: boolean;
-  status?: 'ACTIVE' | 'INACTIVE' | 'VERIFIED' | 'UNVERIFIED';
+  status?: 'ACTIVE' | 'INACTIVE' | 'VERIFIED' | 'UNVERIFIED' | 'VERIFICATION_FAILED';
   serviceInstanceId?: string;
 };
 
@@ -31,7 +31,7 @@ export type UpdateDidInput = {
  */
 export type ListDidsOptions = {
   type?: 'DEFAULT' | 'MANAGED' | 'SELF_MANAGED';
-  status?: 'ACTIVE' | 'INACTIVE' | 'VERIFIED' | 'UNVERIFIED';
+  status?: 'ACTIVE' | 'INACTIVE' | 'VERIFIED' | 'UNVERIFIED' | 'VERIFICATION_FAILED';
   serviceInstanceId?: string;
   limit?: number;
   offset?: number;
@@ -65,6 +65,20 @@ export async function getDidById(id: string, tenantId: string): Promise<Did | nu
   return prisma.did.findFirst({
     where: {
       id,
+      OR: [{ tenantId }, { isDefault: true }],
+    },
+  });
+}
+
+/**
+ * Retrieves a DID by its DID string (e.g. "did:web:example.com"), scoped to an organisation.
+ * Also returns system default DIDs regardless of tenant. Returns null if the DID
+ * does not exist or belongs to a different non-default organisation.
+ */
+export async function getDidByDid(did: string, tenantId: string): Promise<Did | null> {
+  return prisma.did.findFirst({
+    where: {
+      did,
       OR: [{ tenantId }, { isDefault: true }],
     },
   });

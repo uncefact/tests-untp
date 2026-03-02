@@ -9,6 +9,7 @@ jest.mock('next/server', () => ({
 
 import {
   NotFoundError,
+  UnprocessableError,
   ServiceRegistryError,
   ServiceInstanceNotFoundError,
   ServiceResolutionError,
@@ -46,6 +47,14 @@ describe('handleRouteError', () => {
     expect(res.status).toBe(404);
     const body = await (res as unknown as MockResponse).json();
     expect(body).toEqual({ ok: false, error: 'missing' });
+  });
+
+  it('maps UnprocessableError to 422', async () => {
+    const res = handleRouteError(new UnprocessableError('cannot process'));
+
+    expect(res.status).toBe(422);
+    const body = await (res as unknown as MockResponse).json();
+    expect(body).toEqual({ ok: false, error: 'cannot process' });
   });
 
   // --- ServiceRegistryError sub-types ---

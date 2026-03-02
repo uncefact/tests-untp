@@ -56,11 +56,14 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]' });
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
+
   logger.info({ tenantId, didId: id }, 'Looking up DID');
   const did = await getDidById(id, tenantId);
   if (!did) {
     throw new NotFoundError('DID not found');
   }
+
+  logger.info({ tenantId, didId: id, did: did.did }, 'DID retrieved');
   return NextResponse.json({ ok: true, did });
 });
 
@@ -134,6 +137,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PUT = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
+  logger.info({ tenantId, didId: id }, 'Parsing request body');
   let body: { name?: string; description?: string };
   try {
     body = await req.json();
@@ -141,6 +145,7 @@ export const PUT = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId, didId: id }, 'Validating update fields');
   const hasName = isNonEmptyString(body.name);
   const hasDescription = isNonEmptyString(body.description);
 
@@ -148,7 +153,7 @@ export const PUT = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('At least one of name or description is required');
   }
 
-  logger.info({ tenantId, didId: id, fields: { hasName, hasDescription } }, 'Updating DID');
+  logger.info({ tenantId, didId: id, fields: { hasName, hasDescription } }, 'Updating DID record');
   const updated = await updateDid(id, tenantId, {
     ...(hasName && { name: body.name }),
     ...(hasDescription && { description: body.description }),

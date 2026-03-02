@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { ValidationError } from '@/lib/api/validation';
+import { UnprocessableError } from '@/lib/api/errors';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
-import { createCredential } from '@/lib/prisma/repositories';
+import { createCredential, getDidByDid } from '@/lib/prisma/repositories';
+import { ISSUABLE_DID_STATUSES } from '@uncefact/untp-ri-services';
 import type { CredentialPayload } from '@uncefact/untp-ri-services';
 
 const logger = apiLogger.child({ route: '/api/v1/credentials' });
@@ -60,6 +62,9 @@ const logger = apiLogger.child({ route: '/api/v1/credentials' });
  *             schema:
  *               type: object
  *               properties:
+ *                 ok:
+ *                   type: boolean
+ *                   example: true
  *                 credentialId:
  *                   type: string
  *                   description: Database record ID for the credential
@@ -71,6 +76,12 @@ const logger = apiLogger.child({ route: '/api/v1/credentials' });
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised — missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       422:
+ *         description: Issuer DID is not registered for this tenant or not in an issuable status (ACTIVE or VERIFIED)
  *         content:
  *           application/json:
  *             schema:
@@ -100,6 +111,29 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   if (!body.credentialPayload || typeof body.credentialPayload !== 'object') {
     throw new ValidationError('credentialPayload is required and must be an object');
+  }
+
+  const issuerDid = body.credentialPayload.issuer?.id;
+  if (!issuerDid || typeof issuerDid !== 'string') {
+    throw new ValidationError('credentialPayload.issuer.id is required');
+  }
+
+  logger.info({ tenantId, issuerDid }, 'Verifying issuer DID is registered and issuable');
+  const didRecord = await getDidByDid(issuerDid, tenantId);
+  if (!didRecord) {
+    logger.warn({ tenantId, issuerDid }, 'Credential issuance rejected — issuer DID not registered');
+    throw new UnprocessableError('Issuer DID is not registered for this tenant');
+  }
+  if (!(ISSUABLE_DID_STATUSES as readonly string[]).includes(didRecord.status)) {
+    logger.warn(
+      { tenantId, issuerDid, didStatus: didRecord.status, didId: didRecord.id },
+      'Credential issuance rejected — issuer DID status not eligible',
+    );
+    throw new UnprocessableError(
+      `Issuer DID status (${
+        didRecord.status
+      }) is not eligible for credential issuance. DID must be ${ISSUABLE_DID_STATUSES.join(' or ')}.`,
+    );
   }
 
   const shouldEncrypt = body.encrypt !== false;
@@ -142,5 +176,5 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     'Credential issued and stored',
   );
 
-  return NextResponse.json({ credentialId: credentialRecord.id }, { status: 201 });
+  return NextResponse.json({ ok: true, credentialId: credentialRecord.id }, { status: 201 });
 });

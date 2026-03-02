@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
-import { resolveDidService } from '@/lib/services/resolve-did-service';
 import { NotFoundError } from '@/lib/api/errors';
-import { DidStatus } from '@uncefact/untp-ri-services';
+import { apiLogger } from '@/lib/api/logger';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDidById, updateDidStatus } from '@/lib/prisma/repositories';
-import { apiLogger } from '@/lib/api/logger';
+import { resolveDidService } from '@/lib/services/resolve-did-service';
+import { DidStatus } from '@uncefact/untp-ri-services';
+import { NextResponse } from 'next/server';
 
 const logger = apiLogger.child({ route: '/api/v1/dids/[id]/verify' });
 
@@ -16,7 +16,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/verify' });
  *     description: |
  *       Verifies ownership of a DID and updates its status accordingly.
  *       If verification succeeds, the DID status is set to VERIFIED.
- *       If verification fails, the status remains UNVERIFIED.
+ *       If verification fails, the DID status is set to VERIFICATION_FAILED.
  *     tags:
  *       - DIDs
  *     parameters:
@@ -75,7 +75,7 @@ export const POST = withTenantAuth(async (_req, { tenantId, params }) => {
   logger.info({ tenantId, didId: id, did: did.did }, 'Verifying DID ownership');
   const verification = await didService.verify(did.did);
 
-  const newStatus = verification.verified ? DidStatus.VERIFIED : DidStatus.UNVERIFIED;
+  const newStatus = verification.verified ? DidStatus.VERIFIED : DidStatus.VERIFICATION_FAILED;
   logger.info({ tenantId, didId: id, verified: verification.verified, newStatus }, 'Updating DID status');
   const updatedDid = await updateDidStatus(id, tenantId, newStatus);
 

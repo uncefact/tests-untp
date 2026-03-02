@@ -80,12 +80,14 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     serviceInstanceId?: string;
   };
 
+  logger.info({ tenantId }, 'Parsing request body');
   try {
     body = await req.json();
   } catch {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId, did: body.did, method: body.method }, 'Validating import parameters');
   if (!isNonEmptyString(body.did)) {
     throw new ValidationError('did is required');
   }
@@ -98,7 +100,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('method is required');
   }
 
-  logger.info({ tenantId, did: body.did, method }, 'Importing external DID');
+  logger.info({ tenantId, did: body.did, method }, 'Saving imported DID record');
   const record = await createDid({
     tenantId,
     did: body.did,

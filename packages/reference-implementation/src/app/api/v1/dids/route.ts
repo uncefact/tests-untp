@@ -96,12 +96,14 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     serviceInstanceId?: string;
   };
 
+  logger.info({ tenantId }, 'Parsing request body');
   try {
     body = await req.json();
   } catch {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId, type: body.type, method: body.method, alias: body.alias }, 'Validating input parameters');
   const type = validateEnum(body.type, CREATABLE_DID_TYPES, 'type');
   if (!type) throw new ValidationError('type is required');
 
@@ -118,9 +120,11 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     body.serviceInstanceId,
   );
 
+  logger.info({ tenantId, serviceInstanceId }, 'Validating parameters against service capabilities');
   validateEnum(type, didService.getSupportedTypes(), 'type');
   validateEnum(method, didService.getSupportedMethods(), 'method');
 
+  logger.info({ tenantId, alias: body.alias, method }, 'Normalising alias');
   let normalisedAlias: string;
   try {
     normalisedAlias = didService.normaliseAlias(body.alias, method);
@@ -175,7 +179,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         name: status
  *         schema:
  *           type: string
- *           enum: [ACTIVE, UNVERIFIED, VERIFIED, REVOKED]
+ *           enum: [ACTIVE, INACTIVE, UNVERIFIED, VERIFIED, VERIFICATION_FAILED]
  *         description: Filter by DID status
  *       - in: query
  *         name: serviceInstanceId
@@ -231,13 +235,14 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   const url = new URL(req.url);
 
+  logger.info({ tenantId }, 'Parsing and validating query filters');
   const type = validateEnum(url.searchParams.get('type') ?? undefined, Object.values(DidType), 'type');
   const status = validateEnum(url.searchParams.get('status') ?? undefined, Object.values(DidStatus), 'status');
   const serviceInstanceId = url.searchParams.get('serviceInstanceId') ?? undefined;
   const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  logger.info({ tenantId, filters: { type, status, serviceInstanceId, limit, offset } }, 'Listing DIDs');
+  logger.info({ tenantId, filters: { type, status, serviceInstanceId, limit, offset } }, 'Querying DIDs from database');
   const dids = await listDids(tenantId, {
     type,
     status,
