@@ -41,6 +41,13 @@ describe('validateJsonLd', () => {
     }
   });
 
+  it('throws JsonLdValidationError when document is not an object', async () => {
+    await expect(validateJsonLd('not-an-object')).rejects.toThrow(JsonLdValidationError);
+    await expect(validateJsonLd('not-an-object')).rejects.toThrow('JSON-LD document must be an object');
+    await expect(validateJsonLd(null)).rejects.toThrow('JSON-LD document must be an object');
+    expect(toRDF).not.toHaveBeenCalled();
+  });
+
   it('handles non-Error thrown values', async () => {
     toRDF.mockRejectedValue('string error');
 

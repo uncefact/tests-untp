@@ -1,11 +1,11 @@
 import type { DidDocument, DidVerificationResult, DidVerificationCheck, MethodVerificationResult } from '../types.js';
 import { DidVerificationCheckName } from '../types.js';
-import type { JsonLdDocument } from 'jsonld';
 import { parseDidMethod } from './utils.js';
 import { didDocumentSchema } from '../schemas.js';
 import { verifyDidWeb } from './verify-did-web.js';
 import { verifyDidWebVh } from './verify-did-webvh.js';
 import { DidInputError } from '../errors.js';
+import { validateJsonLd } from '../../jsonld-validation/validate-jsonld.js';
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -109,15 +109,9 @@ export async function verifyDid(did: string, options: VerifyDidOptions): Promise
   }
 
   // Shared check: JSON-LD validity — expand and convert to RDF.
-  // toRDF with {safe: true} is stricter than expand alone.
-  // @see https://opensource.unicc.org/un/unece/uncefact/spec-untp/-/issues/369#issuecomment-2878856840
-  // Dynamic import avoids pulling jsonld (and its Node-only deps) into the
-  // module graph at parse time, which breaks test environments that lack
-  // TextDecoder.
   if (document) {
     try {
-      const jsonld = await import('jsonld');
-      await jsonld.toRDF(document as JsonLdDocument, { safe: true } as Parameters<typeof jsonld.toRDF>[1]);
+      await validateJsonLd(document);
       checks.push({ name: C.JSONLD_VALIDITY, passed: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'JSON-LD validation failed';
