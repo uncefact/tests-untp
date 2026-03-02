@@ -8,16 +8,9 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withTenantAuth to mirror handleRouteError behaviour
+// Mock withTenantAuth — delegates error handling to the real handleRouteError
 jest.mock('@/lib/api/with-tenant-auth', () => {
-  const { NotFoundError, UnprocessableError, errorMessage, ServiceRegistryError } =
-    jest.requireActual('@/lib/api/errors');
-  const { ValidationError } = jest.requireActual('@/lib/api/validation');
-  const { ServiceError } = jest.requireActual('@uncefact/untp-ri-services');
-
-  function jsonResponse(body: unknown, init?: { status?: number }) {
-    return { status: init?.status ?? 200, json: async () => body };
-  }
+  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
 
   return {
     withTenantAuth:
@@ -25,26 +18,7 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
         try {
           return await handler(req, ctx);
         } catch (e: unknown) {
-          if (e instanceof ValidationError) {
-            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 400 });
-          }
-          if (e instanceof NotFoundError) {
-            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 404 });
-          }
-          if (e instanceof UnprocessableError) {
-            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 422 });
-          }
-          if (e instanceof ServiceRegistryError) {
-            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 500 });
-          }
-          if (e instanceof ServiceError) {
-            const serviceErr = e as Error & { code?: string; statusCode?: number };
-            return jsonResponse(
-              { ok: false, error: serviceErr.message, code: serviceErr.code },
-              { status: serviceErr.statusCode },
-            );
-          }
-          return jsonResponse({ ok: false, error: errorMessage(e) }, { status: 500 });
+          return handleRouteError(e);
         }
       },
   };

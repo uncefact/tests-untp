@@ -130,7 +130,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       'Credential issuance rejected — issuer DID status not eligible',
     );
     throw new UnprocessableError(
-      `Issuer DID status (${didRecord.status}) is not eligible for credential issuance. DID must be ACTIVE or VERIFIED.`,
+      `Issuer DID status (${
+        didRecord.status
+      }) is not eligible for credential issuance. DID must be ${ISSUABLE_DID_STATUSES.join(' or ')}.`,
     );
   }
 

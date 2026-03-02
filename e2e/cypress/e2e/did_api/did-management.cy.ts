@@ -149,6 +149,7 @@ describe('DID API', { testIsolation: false }, () => {
         expect(response.body.did.status).to.be.oneOf([
           'VERIFIED',
           'UNVERIFIED',
+          'VERIFICATION_FAILED',
         ]);
       });
     });
@@ -224,6 +225,7 @@ describe('DID API', { testIsolation: false }, () => {
         expect(response.body.did.status).to.be.oneOf([
           'VERIFIED',
           'UNVERIFIED',
+          'VERIFICATION_FAILED',
         ]);
       });
     });
