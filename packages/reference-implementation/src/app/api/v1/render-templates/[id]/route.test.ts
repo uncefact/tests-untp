@@ -91,7 +91,6 @@ describe('GET /api/v1/render-templates/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(404);
-    expect(json.ok).toBe(false);
     expect(json.error).toContain('Render template not found');
   });
 
@@ -162,7 +161,6 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.ok).toBe(false);
     expect(json.error).toContain('At least one updatable field must be provided');
   });
 

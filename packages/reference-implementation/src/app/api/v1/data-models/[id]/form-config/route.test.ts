@@ -192,7 +192,6 @@ describe('GET /api/v1/data-models/:id/form-config', () => {
     const json = await res.json();
 
     expect(res.status).toBe(404);
-    expect(json.ok).toBe(false);
     expect(json.error).toContain('Data model not found');
   });
 

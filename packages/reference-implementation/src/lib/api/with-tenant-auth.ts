@@ -71,7 +71,7 @@ async function handleClosedMode(
         { method, path, userId: session.user.id, durationMs: Date.now() - start },
         'Unauthorised — session token refresh failed',
       );
-      return NextResponse.json({ ok: false, error: 'Session expired — please sign in again' }, { status: 401 });
+      return NextResponse.json({ error: 'Session expired — please sign in again' }, { status: 401 });
     }
 
     if (!session.group_claim) {
@@ -79,7 +79,7 @@ async function handleClosedMode(
         { method, path, userId: session.user.id, durationMs: Date.now() - start },
         'Forbidden — no group claim in session',
       );
-      return NextResponse.json({ ok: false, error: 'No group assignment found' }, { status: 403 });
+      return NextResponse.json({ error: 'No group assignment found' }, { status: 403 });
     }
 
     // Look up tenant by group claim
@@ -93,7 +93,7 @@ async function handleClosedMode(
         { method, path, groupClaim: session.group_claim, durationMs: Date.now() - start },
         'Forbidden — no tenant for group claim',
       );
-      return NextResponse.json({ ok: false, error: 'No tenant found for group' }, { status: 403 });
+      return NextResponse.json({ error: 'No tenant found for group' }, { status: 403 });
     }
 
     // Ensure user is linked to the correct tenant (handles group changes)
@@ -136,12 +136,12 @@ async function handleClosedMode(
         { method, path, error: validationResult.error, durationMs: Date.now() - start },
         'Unauthorised — invalid bearer token',
       );
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const payload = validationResult.payload;
     if (!payload.sub) {
-      return NextResponse.json({ ok: false, error: 'Token missing required sub claim' }, { status: 401 });
+      return NextResponse.json({ error: 'Token missing required sub claim' }, { status: 401 });
     }
 
     const groupClaim = extractGroupClaim(payload as Record<string, unknown>, tenantConfig);
@@ -151,7 +151,7 @@ async function handleClosedMode(
         { method, path, sub: payload.sub, durationMs: Date.now() - start },
         'Forbidden — no group claim in bearer token',
       );
-      return NextResponse.json({ ok: false, error: 'No group assignment found in token' }, { status: 403 });
+      return NextResponse.json({ error: 'No group assignment found in token' }, { status: 403 });
     }
 
     const resolved = await resolveClosedModeTenant(groupClaim, payload.sub, {
@@ -164,7 +164,7 @@ async function handleClosedMode(
         { method, path, sub: payload.sub, durationMs: Date.now() - start },
         'Failed to resolve closed mode tenant for bearer token',
       );
-      return NextResponse.json({ ok: false, error: 'Failed to resolve tenant' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to resolve tenant' }, { status: 500 });
     }
 
     const azp = payload.azp;
@@ -185,7 +185,7 @@ async function handleClosedMode(
   }
 
   apiLogger.warn({ method, path, durationMs: Date.now() - start }, 'Unauthorised — no session or bearer token');
-  return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
 async function handleOpenMode(
@@ -202,7 +202,7 @@ async function handleOpenMode(
     const tenantId = await getTenantId(sessionUserId);
     if (!tenantId) {
       apiLogger.warn({ method, path, userId: sessionUserId, durationMs: Date.now() - start }, 'Forbidden — no tenant');
-      return NextResponse.json({ ok: false, error: 'No tenant found for user' }, { status: 403 });
+      return NextResponse.json({ error: 'No tenant found for user' }, { status: 403 });
     }
 
     return executeHandler(
@@ -235,7 +235,7 @@ async function handleOpenMode(
         { method, path, sub, error, durationMs: Date.now() - start },
         'Service account user resolution failed unexpectedly',
       );
-      return NextResponse.json({ ok: false, error: 'Internal server error' }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     if (!resolved) {
@@ -243,7 +243,7 @@ async function handleOpenMode(
         { method, path, sub, durationMs: Date.now() - start },
         'Unauthorised — service account user resolution failed',
       );
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     return executeHandler(
@@ -263,7 +263,7 @@ async function handleOpenMode(
   }
 
   apiLogger.warn({ method, path, durationMs: Date.now() - start }, 'Unauthorised — no session or service account');
-  return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
 async function executeHandler(
