@@ -31,8 +31,8 @@ const CORE_DATA_MODEL = {
   name: 'Digital Product Passport',
   credentialType: 'DigitalProductPassport',
   version: '0.6.1',
-  schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/schema.json',
-  contextUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/context.jsonld',
+  schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.1.json',
+  contextUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/context/',
   isExtension: false,
   parentConfig: null,
 };
@@ -49,7 +49,7 @@ const EXTENSION_DATA_MODEL = {
     id: 'dm-1',
     credentialType: 'DigitalProductPassport',
     version: '0.6.1',
-    schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/schema.json',
+    schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.1.json',
   },
 };
 
@@ -79,7 +79,7 @@ describe('resolveDataModel', () => {
     expect(result).toEqual({
       dataModel: CORE_DATA_MODEL,
       mapper: MOCK_MAPPER,
-      schemaUrls: ['https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/schema.json'],
+      schemaUrls: ['https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.1.json'],
     });
   });
 
@@ -100,7 +100,7 @@ describe('resolveDataModel', () => {
     const result = await resolveDataModel('tenant-1', 'DigitalProductPassport', '0.6.1');
 
     expect(result.schemaUrls).toEqual([
-      'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/schema.json',
+      'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.1.json',
       'https://example.com/ext-dpp/0.6.1/schema.json',
     ]);
   });

@@ -172,7 +172,7 @@ const DATA_MODEL = {
   name: 'Digital Product Passport',
   credentialType: 'DigitalProductPassport',
   version: '0.6.1',
-  schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/schema.json',
+  schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.1.json',
 };
 
 /** Builds a valid request body with sensible defaults. */
