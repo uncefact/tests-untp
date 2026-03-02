@@ -4,6 +4,7 @@ import { errorMessage } from '@/lib/api/errors';
 import { ValidationError, validateEnum, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createDid, listDids } from '@/lib/prisma/repositories';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
 
@@ -54,13 +55,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids' });
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 did:
- *                   $ref: '#/components/schemas/Did'
+ *               $ref: '#/components/schemas/Did'
  *       400:
  *         description: Validation error
  *         content:
@@ -157,7 +152,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   });
 
   logger.info({ tenantId, didId: record.id, did: record.did }, 'DID created');
-  return NextResponse.json({ ok: true, did: record }, { status: 201 });
+  return NextResponse.json(record, { status: 201 });
 });
 
 /**
@@ -206,13 +201,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *             schema:
  *               type: object
  *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 dids:
+ *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Did'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Validation error
  *         content:
@@ -243,7 +237,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   logger.info({ tenantId, filters: { type, status, serviceInstanceId, limit, offset } }, 'Querying DIDs from database');
-  const dids = await listDids(tenantId, {
+  const { data, total } = await listDids(tenantId, {
     type,
     status,
     serviceInstanceId,
@@ -251,6 +245,6 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
     offset,
   });
 
-  logger.info({ tenantId, count: dids.length }, 'DIDs listed');
-  return NextResponse.json({ ok: true, dids });
+  logger.info({ tenantId, count: data.length }, 'DIDs listed');
+  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

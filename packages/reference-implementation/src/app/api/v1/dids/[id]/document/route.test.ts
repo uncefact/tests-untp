@@ -25,22 +25,22 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
           return await handler(req, ctx);
         } catch (e: unknown) {
           if (e instanceof ValidationError) {
-            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 400 });
+            return jsonResponse({ error: (e as Error).message }, { status: 400 });
           }
           if (e instanceof NotFoundError) {
-            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 404 });
+            return jsonResponse({ error: (e as Error).message }, { status: 404 });
           }
           if (e instanceof ServiceRegistryError) {
-            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 500 });
+            return jsonResponse({ error: (e as Error).message }, { status: 500 });
           }
           if (e instanceof ServiceError) {
             const serviceErr = e as Error & { code?: string; statusCode?: number };
             return jsonResponse(
-              { ok: false, error: serviceErr.message, code: serviceErr.code },
+              { error: serviceErr.message, code: serviceErr.code },
               { status: serviceErr.statusCode },
             );
           }
-          return jsonResponse({ ok: false, error: errorMessage(e) }, { status: 500 });
+          return jsonResponse({ error: errorMessage(e) }, { status: 500 });
         }
       },
   };
@@ -93,8 +93,7 @@ describe('GET /api/v1/dids/:id/document', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.document).toEqual(document);
+    expect(json).toEqual(document);
   });
 
   it('returns 404 when DID not found', async () => {
@@ -122,7 +121,6 @@ describe('GET /api/v1/dids/:id/document', () => {
 
     expect(res.status).toBe(500);
     const json = await res.json();
-    expect(json.ok).toBe(false);
     expect(json.error).toContain('No service instance available');
   });
 
