@@ -62,6 +62,9 @@ const logger = apiLogger.child({ route: '/api/v1/credentials' });
  *             schema:
  *               type: object
  *               properties:
+ *                 ok:
+ *                   type: boolean
+ *                   example: true
  *                 credentialId:
  *                   type: string
  *                   description: Database record ID for the credential
@@ -118,9 +121,14 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   logger.info({ tenantId, issuerDid }, 'Verifying issuer DID is registered and issuable');
   const didRecord = await getDidByDid(issuerDid, tenantId);
   if (!didRecord) {
+    logger.warn({ tenantId, issuerDid }, 'Credential issuance rejected — issuer DID not registered');
     throw new UnprocessableError('Issuer DID is not registered for this tenant');
   }
-  if (!ISSUABLE_DID_STATUSES.includes(didRecord.status as (typeof ISSUABLE_DID_STATUSES)[number])) {
+  if (!(ISSUABLE_DID_STATUSES as readonly string[]).includes(didRecord.status)) {
+    logger.warn(
+      { tenantId, issuerDid, didStatus: didRecord.status, didId: didRecord.id },
+      'Credential issuance rejected — issuer DID status not eligible',
+    );
     throw new UnprocessableError(
       `Issuer DID status (${didRecord.status}) is not eligible for credential issuance. DID must be ACTIVE or VERIFIED.`,
     );
@@ -166,5 +174,5 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     'Credential issued and stored',
   );
 
-  return NextResponse.json({ credentialId: credentialRecord.id }, { status: 201 });
+  return NextResponse.json({ ok: true, credentialId: credentialRecord.id }, { status: 201 });
 });

@@ -72,7 +72,8 @@ export async function getDidById(id: string, tenantId: string): Promise<Did | nu
 
 /**
  * Retrieves a DID by its DID string (e.g. "did:web:example.com"), scoped to an organisation.
- * Returns null if the DID does not exist or belongs to a different organisation.
+ * Also returns system default DIDs regardless of tenant. Returns null if the DID
+ * does not exist or belongs to a different non-default organisation.
  */
 export async function getDidByDid(did: string, tenantId: string): Promise<Did | null> {
   return prisma.did.findFirst({

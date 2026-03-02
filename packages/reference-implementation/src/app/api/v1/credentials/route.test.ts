@@ -121,6 +121,35 @@ describe('POST /api/v1/credentials', () => {
     mockCreateCredential.mockResolvedValue({ id: 'cred-1' });
   });
 
+  // ── Validation: body parsing ─────────────────────────────────────────────
+
+  it('returns 400 when body is not valid JSON', async () => {
+    const req = {
+      method: 'POST',
+      url: 'http://localhost/api/v1/credentials',
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      json: async () => {
+        throw new Error('Unexpected end of JSON input');
+      },
+    } as unknown as Request;
+
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.ok).toBe(false);
+    expect(json.error).toBe('Invalid JSON body');
+  });
+
+  it('returns 400 when credentialPayload is missing', async () => {
+    const res = await POST(fakeRequest({}), AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.ok).toBe(false);
+    expect(json.error).toBe('credentialPayload is required and must be an object');
+  });
+
   // ── Validation: missing issuer.id ────────────────────────────────────────
 
   it('returns 400 when credentialPayload.issuer.id is missing', async () => {
@@ -217,6 +246,7 @@ describe('POST /api/v1/credentials', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
+    expect(json.ok).toBe(true);
     expect(json.credentialId).toBe('cred-1');
 
     // Verify the full happy path was executed
@@ -244,6 +274,7 @@ describe('POST /api/v1/credentials', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
+    expect(json.ok).toBe(true);
     expect(json.credentialId).toBe('cred-1');
 
     // Verify the full happy path was executed

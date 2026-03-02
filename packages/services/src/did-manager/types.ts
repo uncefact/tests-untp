@@ -48,7 +48,7 @@ export enum DidStatus {
 export const CREATABLE_DID_TYPES = [DidType.MANAGED, DidType.SELF_MANAGED] as const;
 
 /** DID statuses that are eligible for credential issuance. */
-export const ISSUABLE_DID_STATUSES: readonly DidStatus[] = [DidStatus.ACTIVE, DidStatus.VERIFIED];
+export const ISSUABLE_DID_STATUSES = [DidStatus.ACTIVE, DidStatus.VERIFIED] as const;
 
 // ── Input / option types ───────────────────────────────────────────────────
 
