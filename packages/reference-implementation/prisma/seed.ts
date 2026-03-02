@@ -37,15 +37,6 @@ if (RI_POSTGRES_USER && RI_POSTGRES_PASSWORD && RI_POSTGRES_DB && RI_POSTGRES_HO
 }
 
 const prisma = new PrismaClient();
-const { defaultDid: DEFAULT_DID } = getDidConfig();
-
-const ENCRYPTION_KEY = process.env.SERVICE_ENCRYPTION_KEY;
-if (!ENCRYPTION_KEY) {
-  throw new Error(
-    'Missing required SERVICE_ENCRYPTION_KEY environment variable. ' + 'Set this in your .env file or environment.',
-  );
-}
-const encryptionService = new AesGcmEncryptionAdapter(ENCRYPTION_KEY, logger);
 
 async function main() {
   // Upsert the system tenant (used for system-wide defaults)
@@ -58,27 +49,40 @@ async function main() {
     },
   });
 
-  // Upsert the system default DID
-  await prisma.did.upsert({
-    where: { did: DEFAULT_DID },
-    update: {
-      name: 'System Default DID',
-      description: 'System-wide default DID for the UNTP reference implementation',
-      status: DidStatus.ACTIVE,
-      isDefault: true,
-    },
-    create: {
-      tenantId: SYSTEM_TENANT_ID,
-      did: DEFAULT_DID,
-      type: DidType.DEFAULT,
-      method: DidMethod.DID_WEB,
-      name: 'System Default DID',
-      description: 'System-wide default DID for the UNTP reference implementation',
-      keyId: '',
-      status: DidStatus.ACTIVE,
-      isDefault: true,
-    },
-  });
+  // Upsert the system default DID (requires DID config env vars)
+  let defaultDid: string | null = null;
+  try {
+    const didConfig = getDidConfig();
+    defaultDid = didConfig.defaultDid;
+  } catch (error) {
+    logger.warn(
+      { error: error instanceof Error ? error.message : error },
+      'DID configuration not available; skipping default DID seed',
+    );
+  }
+
+  if (defaultDid) {
+    await prisma.did.upsert({
+      where: { did: defaultDid },
+      update: {
+        name: 'System Default DID',
+        description: 'System-wide default DID for the UNTP reference implementation',
+        status: DidStatus.ACTIVE,
+        isDefault: true,
+      },
+      create: {
+        tenantId: SYSTEM_TENANT_ID,
+        did: defaultDid,
+        type: DidType.DEFAULT,
+        method: DidMethod.DID_WEB,
+        name: 'System Default DID',
+        description: 'System-wide default DID for the UNTP reference implementation',
+        keyId: '',
+        status: DidStatus.ACTIVE,
+        isDefault: true,
+      },
+    });
+  }
 
   // ── Seed system registrars ──────────────────────────────────────────────────
 
@@ -211,131 +215,149 @@ async function main() {
     },
   });
 
+  // ── Seed service instances (requires SERVICE_ENCRYPTION_KEY) ────────────────
+
+  const ENCRYPTION_KEY = process.env.SERVICE_ENCRYPTION_KEY;
+  let encryptionService: AesGcmEncryptionAdapter | null = null;
+  if (ENCRYPTION_KEY) {
+    encryptionService = new AesGcmEncryptionAdapter(ENCRYPTION_KEY, logger);
+  } else {
+    logger.warn(
+      'SERVICE_ENCRYPTION_KEY not set; skipping service instance seeds (IDR, storage, VC). ' +
+        'These can be configured later via the application UI.',
+    );
+  }
+
   // ── Seed system Pyx IDR service instance ────────────────────────────────────
 
   let idrSeeded = false;
-  try {
-    const { pyxIdrApiUrl, pyxIdrApiKey } = getIdrConfig();
-    const idrServiceConfig = JSON.stringify({
-      baseUrl: new URL(pyxIdrApiUrl).origin,
-      apiKey: pyxIdrApiKey,
-      apiVersion: '2.0.0',
-      ianaLanguage: 'en',
-      context: 'au',
-      defaultLinkType: 'untp:dpp',
-      defaultMimeType: 'text/html',
-      defaultIanaLanguage: 'en',
-      defaultContext: 'au',
-      fwqs: false,
-    });
-    const encryptedIdrConfig = JSON.stringify(
-      encryptionService.encrypt(idrServiceConfig, EncryptionAlgorithm.AES_256_GCM),
-    );
-
-    await prisma.serviceInstance.upsert({
-      where: { id: 'system-idr-pyx' },
-      update: { config: encryptedIdrConfig },
-      create: {
-        id: 'system-idr-pyx',
-        tenantId: SYSTEM_TENANT_ID,
-        serviceType: PrismaServiceType.IDR,
-        adapterType: PrismaAdapterType.PYX_IDR,
-        name: 'System Default Pyx IDR',
-        description: 'System-wide default Pyx Identity Resolver instance',
-        config: encryptedIdrConfig,
+  if (encryptionService)
+    try {
+      const { pyxIdrApiUrl, pyxIdrApiKey } = getIdrConfig();
+      const idrServiceConfig = JSON.stringify({
+        baseUrl: new URL(pyxIdrApiUrl).origin,
+        apiKey: pyxIdrApiKey,
         apiVersion: '2.0.0',
-        isPrimary: true,
-      },
-    });
-    idrSeeded = true;
-  } catch (error) {
-    logger.warn(
-      { error: error instanceof Error ? error.message : error },
-      'Skipping IDR service instance seed: IDR configuration not available',
-    );
-  }
+        ianaLanguage: 'en',
+        context: 'au',
+        defaultLinkType: 'untp:dpp',
+        defaultMimeType: 'text/html',
+        defaultIanaLanguage: 'en',
+        defaultContext: 'au',
+        fwqs: false,
+      });
+      const encryptedIdrConfig = JSON.stringify(
+        encryptionService.encrypt(idrServiceConfig, EncryptionAlgorithm.AES_256_GCM),
+      );
+
+      await prisma.serviceInstance.upsert({
+        where: { id: 'system-idr-pyx' },
+        update: { config: encryptedIdrConfig },
+        create: {
+          id: 'system-idr-pyx',
+          tenantId: SYSTEM_TENANT_ID,
+          serviceType: PrismaServiceType.IDR,
+          adapterType: PrismaAdapterType.PYX_IDR,
+          name: 'System Default Pyx IDR',
+          description: 'System-wide default Pyx Identity Resolver instance',
+          config: encryptedIdrConfig,
+          apiVersion: '2.0.0',
+          isPrimary: true,
+        },
+      });
+      idrSeeded = true;
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : error },
+        'Skipping IDR service instance seed: IDR configuration not available',
+      );
+    }
 
   // ── Seed system UNCEFACT storage service instance ───────────────────────────
 
   let storageSeeded = false;
-  try {
-    const { storageServiceUrl } = getStorageConfig();
-    const storageApiKey = process.env.UNCEFACT_STORAGE_API_KEY;
-    const storageServiceConfig = JSON.stringify({
-      baseUrl: new URL(storageServiceUrl).origin,
-      ...(storageApiKey && { apiKey: storageApiKey }),
-      apiVersion: '3.0.0',
-      publicBucket: 'verifiable-credentials',
-      privateBucket: 'private-verifiable-credentials',
-    });
-    const encryptedStorageConfig = JSON.stringify(
-      encryptionService.encrypt(storageServiceConfig, EncryptionAlgorithm.AES_256_GCM),
-    );
-
-    await prisma.serviceInstance.upsert({
-      where: { id: 'system-storage-uncefact' },
-      update: { config: encryptedStorageConfig },
-      create: {
-        id: 'system-storage-uncefact',
-        tenantId: SYSTEM_TENANT_ID,
-        serviceType: PrismaServiceType.STORAGE,
-        adapterType: PrismaAdapterType.UNCEFACT_STORAGE,
-        name: 'System Default UNCEFACT Storage',
-        description: 'System-wide default UNCEFACT storage instance for credential persistence',
-        config: encryptedStorageConfig,
+  if (encryptionService)
+    try {
+      const { storageServiceUrl } = getStorageConfig();
+      const storageApiKey = process.env.UNCEFACT_STORAGE_API_KEY;
+      const storageServiceConfig = JSON.stringify({
+        baseUrl: new URL(storageServiceUrl).origin,
+        ...(storageApiKey && { apiKey: storageApiKey }),
         apiVersion: '3.0.0',
-        isPrimary: true,
-      },
-    });
-    storageSeeded = true;
-  } catch (error) {
-    logger.warn(
-      { error: error instanceof Error ? error.message : error },
-      'Skipping storage service instance seed: storage configuration not available',
-    );
-  }
+        publicBucket: 'verifiable-credentials',
+        privateBucket: 'private-verifiable-credentials',
+      });
+      const encryptedStorageConfig = JSON.stringify(
+        encryptionService.encrypt(storageServiceConfig, EncryptionAlgorithm.AES_256_GCM),
+      );
+
+      await prisma.serviceInstance.upsert({
+        where: { id: 'system-storage-uncefact' },
+        update: { config: encryptedStorageConfig },
+        create: {
+          id: 'system-storage-uncefact',
+          tenantId: SYSTEM_TENANT_ID,
+          serviceType: PrismaServiceType.STORAGE,
+          adapterType: PrismaAdapterType.UNCEFACT_STORAGE,
+          name: 'System Default UNCEFACT Storage',
+          description: 'System-wide default UNCEFACT storage instance for credential persistence',
+          config: encryptedStorageConfig,
+          apiVersion: '3.0.0',
+          isPrimary: true,
+        },
+      });
+      storageSeeded = true;
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : error },
+        'Skipping storage service instance seed: storage configuration not available',
+      );
+    }
 
   // ── Seed system VCKit VC service instance ─────────────────────────────────
   let vcSeeded = false;
-  try {
-    const { vckitApiUrl, vckitApiKey } = getVcConfig();
-    const vcServiceConfig = JSON.stringify({
-      endpoint: new URL(vckitApiUrl).origin,
-      apiKey: vckitApiKey,
-      apiVersion: '1.0.0',
-    });
-    const encryptedVcConfig = JSON.stringify(
-      encryptionService.encrypt(vcServiceConfig, EncryptionAlgorithm.AES_256_GCM),
-    );
-
-    await prisma.serviceInstance.upsert({
-      where: { id: 'system-vc-vckit' },
-      update: { config: encryptedVcConfig },
-      create: {
-        id: 'system-vc-vckit',
-        tenantId: SYSTEM_TENANT_ID,
-        serviceType: PrismaServiceType.VC,
-        adapterType: PrismaAdapterType.VCKIT,
-        name: 'System Default VCKit',
-        description: 'System-wide default VCKit instance for DID management and verifiable credential operations',
-        config: encryptedVcConfig,
+  if (encryptionService)
+    try {
+      const { vckitApiUrl, vckitApiKey } = getVcConfig();
+      const vcServiceConfig = JSON.stringify({
+        endpoint: new URL(vckitApiUrl).origin,
+        apiKey: vckitApiKey,
         apiVersion: '1.0.0',
-        isPrimary: true,
-      },
-    });
-    vcSeeded = true;
+      });
+      const encryptedVcConfig = JSON.stringify(
+        encryptionService.encrypt(vcServiceConfig, EncryptionAlgorithm.AES_256_GCM),
+      );
 
-    // Link the system default DID to the VC service instance
-    await prisma.did.updateMany({
-      where: { did: DEFAULT_DID },
-      data: { serviceInstanceId: 'system-vc-vckit' },
-    });
-  } catch (error) {
-    logger.warn(
-      { error: error instanceof Error ? error.message : error },
-      'Skipping VC service instance seed: VC configuration not available',
-    );
-  }
+      await prisma.serviceInstance.upsert({
+        where: { id: 'system-vc-vckit' },
+        update: { config: encryptedVcConfig },
+        create: {
+          id: 'system-vc-vckit',
+          tenantId: SYSTEM_TENANT_ID,
+          serviceType: PrismaServiceType.VC,
+          adapterType: PrismaAdapterType.VCKIT,
+          name: 'System Default VCKit',
+          description: 'System-wide default VCKit instance for DID management and verifiable credential operations',
+          config: encryptedVcConfig,
+          apiVersion: '1.0.0',
+          isPrimary: true,
+        },
+      });
+      vcSeeded = true;
+
+      // Link the system default DID to the VC service instance
+      if (defaultDid) {
+        await prisma.did.updateMany({
+          where: { did: defaultDid },
+          data: { serviceInstanceId: 'system-vc-vckit' },
+        });
+      }
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : error },
+        'Skipping VC service instance seed: VC configuration not available',
+      );
+    }
 
   // ── Seed core data model configs ────────────────────────────────────────────
   // Static UUIDs ensure idempotent seeding — if the record already exists, skip.
@@ -508,8 +530,9 @@ async function main() {
   }
 
   logger.info(
-    'Seed complete: system tenant, default DID, DID service instance, ' +
-      'registrars, schemes, qualifiers, data models' +
+    'Seed complete: system tenant' +
+      (defaultDid ? ', default DID' : '') +
+      ', registrars, schemes, qualifiers, data models' +
       (templatesSeeded ? ', render templates' : '') +
       (idrSeeded ? ', IDR service instance' : '') +
       (storageSeeded ? ', storage service instance' : '') +

@@ -27,7 +27,7 @@ fi
 if [ "${SKIP_SEED:-false}" = "false" ]; then
     echo "Running database seed..."
     cd /app/prisma
-    npx tsx seed.ts
+    node /app/node_modules/.bin/tsx seed.ts
     echo "Database seed completed"
 else
     echo "Skipping database seed (SKIP_SEED is set)"
