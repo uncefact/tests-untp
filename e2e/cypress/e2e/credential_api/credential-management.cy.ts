@@ -7,22 +7,24 @@ describe('Credential API', { testIsolation: false }, () => {
   let publishedCredentialId: string;
 
   /**
-   * Builds a minimal valid CredentialPayload for the given issuer DID.
-   * Uses the W3C VC v2 context and a simple Product subject.
+   * Builds a minimal valid CredentialPayload conforming to the DPP v0.6.1 schema.
    */
   function buildCredentialPayload(issuerDid: string) {
     return {
-      '@context': ['https://www.w3.org/ns/credentials/v2'],
-      type: ['VerifiableCredential'],
+      '@context': [
+        'https://www.w3.org/ns/credentials/v2',
+        'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/',
+      ],
+      id: `urn:uuid:e2e-${RUN_ID}`,
+      type: ['DigitalProductPassport', 'VerifiableCredential'],
       issuer: {
         type: ['CredentialIssuer'],
         id: issuerDid,
         name: `E2E Test Issuer ${RUN_ID}`,
       },
       credentialSubject: {
-        type: ['Product'],
+        type: ['ProductPassport'],
         id: `https://example.com/products/e2e-${RUN_ID}`,
-        name: `E2E Test Product ${RUN_ID}`,
       },
     };
   }
