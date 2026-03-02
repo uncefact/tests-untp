@@ -25,6 +25,7 @@ enum DidStatus {
   INACTIVE
   VERIFIED
   UNVERIFIED
+  VERIFICATION_FAILED
 }
 
 enum ServiceType {

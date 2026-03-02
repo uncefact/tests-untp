@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError, errorMessage, ServiceRegistryError } from '@/lib/api/errors';
+import { NotFoundError, UnprocessableError, errorMessage, ServiceRegistryError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { ServiceError } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
@@ -25,6 +25,10 @@ export function handleRouteError(e: unknown): Response {
   if (e instanceof NotFoundError) {
     logger.warn({ err: e }, 'Not found');
     return NextResponse.json({ ok: false, error: e.message }, { status: 404 });
+  }
+  if (e instanceof UnprocessableError) {
+    logger.warn({ err: e }, 'Unprocessable entity');
+    return NextResponse.json({ ok: false, error: e.message }, { status: 422 });
   }
   if (e instanceof ServiceRegistryError) {
     const status = e.name === 'ServiceInstanceNotFoundError' ? 404 : 500;

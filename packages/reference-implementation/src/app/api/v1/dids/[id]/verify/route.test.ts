@@ -57,6 +57,7 @@ jest.mock('@uncefact/untp-ri-services', () => ({
     INACTIVE: 'INACTIVE',
     VERIFIED: 'VERIFIED',
     UNVERIFIED: 'UNVERIFIED',
+    VERIFICATION_FAILED: 'VERIFICATION_FAILED',
   },
 }));
 
@@ -113,7 +114,7 @@ describe('POST /api/v1/dids/:id/verify', () => {
     expect(mockUpdateDidStatus).toHaveBeenCalledWith('did-1', 'org-1', 'VERIFIED');
   });
 
-  it('updates status to UNVERIFIED when verification fails', async () => {
+  it('updates status to VERIFICATION_FAILED when verification fails', async () => {
     mockGetDidById.mockResolvedValue({ id: 'did-1', did: 'did:web:example.com' });
     const verification = {
       verified: false,
@@ -121,13 +122,13 @@ describe('POST /api/v1/dids/:id/verify', () => {
       errors: [{ check: 'resolve', message: 'Resolution failed' }],
     };
     mockDidService.verify.mockResolvedValue(verification);
-    mockUpdateDidStatus.mockResolvedValue({ id: 'did-1', status: 'UNVERIFIED' });
+    mockUpdateDidStatus.mockResolvedValue({ id: 'did-1', status: 'VERIFICATION_FAILED' });
 
     const res = await POST(createFakeRequest(), createContext('did-1') as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
     expect(json.verification.verified).toBe(false);
-    expect(mockUpdateDidStatus).toHaveBeenCalledWith('did-1', 'org-1', 'UNVERIFIED');
+    expect(mockUpdateDidStatus).toHaveBeenCalledWith('did-1', 'org-1', 'VERIFICATION_FAILED');
   });
 
   it('returns 404 when DID not found', async () => {

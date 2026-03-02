@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { ValidationError } from '@/lib/api/validation';
+import { UnprocessableError } from '@/lib/api/errors';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
-import { createCredential } from '@/lib/prisma/repositories';
+import { createCredential, getDidByDid } from '@/lib/prisma/repositories';
+import { ISSUABLE_DID_STATUSES } from '@uncefact/untp-ri-services';
 import type { CredentialPayload } from '@uncefact/untp-ri-services';
 
 const logger = apiLogger.child({ route: '/api/v1/credentials' });
@@ -75,6 +77,12 @@ const logger = apiLogger.child({ route: '/api/v1/credentials' });
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       422:
+ *         description: Issuer DID is not registered for this tenant or not in an issuable status (ACTIVE or VERIFIED)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error during credential issuance
  *         content:
@@ -100,6 +108,22 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   if (!body.credentialPayload || typeof body.credentialPayload !== 'object') {
     throw new ValidationError('credentialPayload is required and must be an object');
+  }
+
+  const issuerDid = body.credentialPayload.issuer?.id;
+  if (!issuerDid || typeof issuerDid !== 'string') {
+    throw new ValidationError('credentialPayload.issuer.id is required');
+  }
+
+  logger.info({ tenantId, issuerDid }, 'Verifying issuer DID is registered and issuable');
+  const didRecord = await getDidByDid(issuerDid, tenantId);
+  if (!didRecord) {
+    throw new UnprocessableError('Issuer DID is not registered for this tenant');
+  }
+  if (!ISSUABLE_DID_STATUSES.includes(didRecord.status as (typeof ISSUABLE_DID_STATUSES)[number])) {
+    throw new UnprocessableError(
+      `Issuer DID status (${didRecord.status}) is not eligible for credential issuance. DID must be ACTIVE or VERIFIED.`,
+    );
   }
 
   const shouldEncrypt = body.encrypt !== false;
