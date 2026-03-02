@@ -8,6 +8,7 @@ import {
   DidMethodNotSupportedError,
   DidInputError,
   DidCreateError,
+  DidDeleteError,
   DidDocumentFetchError,
 } from '../../errors';
 
@@ -180,6 +181,40 @@ describe('VCKitDidAdapter', () => {
 
       const payload = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
       expect(payload.alias).toBe('my-org');
+    });
+  });
+
+  // delete() tests
+  describe('delete', () => {
+    it('calls didManagerDelete endpoint and returns void', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(createMockResponse(true));
+
+      await expect(service.delete('did:web:example.com:org:123')).resolves.toBeUndefined();
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${BASE_URL}/agent/didManagerDelete`,
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
+          body: JSON.stringify({ did: 'did:web:example.com:org:123' }),
+        }),
+      );
+    });
+
+    it('throws DidInputError if DID string is empty', async () => {
+      await expect(service.delete('')).rejects.toThrow(DidInputError);
+    });
+
+    it('throws DidDeleteError on HTTP error', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(createMockResponse({}, false, 500));
+
+      await expect(service.delete('did:web:example.com:org:123')).rejects.toThrow(DidDeleteError);
+    });
+
+    it('throws DidDeleteError on network failure', async () => {
+      (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+
+      await expect(service.delete('did:web:example.com:org:123')).rejects.toThrow(DidDeleteError);
     });
   });
 

@@ -12,6 +12,7 @@ import {
   DidMethodNotSupportedError,
   DidInputError,
   DidCreateError,
+  DidDeleteError,
   DidDocumentFetchError,
 } from '../../errors.js';
 import { ServiceError } from '../../../errors.js';
@@ -103,6 +104,37 @@ export class VCKitDidAdapter implements IDidService {
       this.logger.error({ error }, 'Failed to create DID');
       const detail = error instanceof Error ? error.message : 'Unknown error';
       throw new DidCreateError(detail);
+    }
+  }
+
+  async delete(did: string): Promise<void> {
+    if (!did) {
+      throw new DidInputError('DID string is required');
+    }
+
+    this.logger.debug({ did }, 'Deleting DID');
+
+    try {
+      const response = await fetch(`${this.baseURL}/agent/didManagerDelete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.headers,
+        },
+        body: JSON.stringify({ did }),
+      });
+
+      if (!response.ok) {
+        this.logger.error({ status: response.status, statusText: response.statusText, did }, 'Failed to delete DID');
+        throw new DidDeleteError(`HTTP ${response.status}: ${response.statusText}`, response.status);
+      }
+
+      this.logger.info({ did }, 'DID deleted successfully');
+    } catch (error) {
+      if (error instanceof ServiceError) throw error;
+      this.logger.error({ error, did }, 'Failed to delete DID');
+      const detail = error instanceof Error ? error.message : 'Unknown error';
+      throw new DidDeleteError(detail);
     }
   }
 

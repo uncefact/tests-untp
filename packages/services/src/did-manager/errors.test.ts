@@ -5,6 +5,7 @@ import {
   DidMethodNotSupportedError,
   DidInputError,
   DidCreateError,
+  DidDeleteError,
   DidDocumentFetchError,
   DidParseError,
 } from './errors.js';
@@ -79,6 +80,25 @@ describe('DID errors', () => {
     it('handles missing httpStatus', () => {
       const err = new DidCreateError('network failure');
       expect(err.message).toBe('Failed to create DID: network failure');
+      expect(err.context).toEqual({ httpStatus: undefined });
+    });
+  });
+
+  describe('DidDeleteError', () => {
+    it('constructs message from detail and httpStatus', () => {
+      const err = new DidDeleteError('upstream timeout', 504);
+      expect(err.message).toBe('Failed to delete DID: upstream timeout');
+      expect(err.code).toBe('DID_DELETE_FAILED');
+      expect(err.statusCode).toBe(502);
+      expect(err.context).toEqual({ httpStatus: 504 });
+      expect(err.name).toBe('DidDeleteError');
+      expect(err).toBeInstanceOf(DidError);
+      expect(err).toBeInstanceOf(ServiceError);
+    });
+
+    it('handles missing httpStatus', () => {
+      const err = new DidDeleteError('network failure');
+      expect(err.message).toBe('Failed to delete DID: network failure');
       expect(err.context).toEqual({ httpStatus: undefined });
     });
   });

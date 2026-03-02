@@ -134,6 +134,8 @@ export interface IDidService {
   getSupportedTypes(): DidType[];
   /** DID methods this adapter supports */
   getSupportedMethods(): DidMethod[];
+  /** Delete a DID from the provider */
+  delete(did: string): Promise<void>;
   /** Key algorithms this adapter supports */
   getSupportedKeyTypes(): string[];
 }
