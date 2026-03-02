@@ -155,11 +155,25 @@ describe('render-template.repository', () => {
       expect(mockRenderTemplate.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'template-1',
-          tenantId: TENANT_ID,
+          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
         },
         include: INCLUDE_SHAPE,
       });
       expect(result).toEqual(TEMPLATE_RECORD);
+    });
+
+    it('returns system-provisioned template for any tenant', async () => {
+      const SYSTEM_TEMPLATE_RECORD = {
+        ...TEMPLATE_RECORD,
+        id: 'system-template-1',
+        tenantId: 'system',
+        name: 'DPP System Default Template',
+      };
+      mockRenderTemplate.findFirst.mockResolvedValue(SYSTEM_TEMPLATE_RECORD);
+
+      const result = await getRenderTemplateById('system-template-1', TENANT_ID);
+
+      expect(result).toEqual(SYSTEM_TEMPLATE_RECORD);
     });
 
     it('returns null when template is not found', async () => {
@@ -178,7 +192,7 @@ describe('render-template.repository', () => {
 
       expect(mockRenderTemplate.findMany).toHaveBeenCalledWith({
         where: {
-          tenantId: TENANT_ID,
+          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
         },
         include: INCLUDE_SHAPE,
         take: 100,
@@ -195,7 +209,7 @@ describe('render-template.repository', () => {
 
       expect(mockRenderTemplate.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
-          tenantId: TENANT_ID,
+          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
           dataModelId: CONFIG_ID,
         }),
         include: INCLUDE_SHAPE,
@@ -203,6 +217,21 @@ describe('render-template.repository', () => {
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
+    });
+
+    it('includes system-provisioned templates in results', async () => {
+      const SYSTEM_TEMPLATE_RECORD = {
+        ...TEMPLATE_RECORD,
+        id: 'system-template-1',
+        tenantId: 'system',
+        name: 'DPP System Default Template',
+      };
+      mockRenderTemplate.findMany.mockResolvedValue([TEMPLATE_RECORD, SYSTEM_TEMPLATE_RECORD]);
+
+      const result = await listRenderTemplates(TENANT_ID);
+
+      expect(result).toHaveLength(2);
+      expect(result).toEqual([TEMPLATE_RECORD, SYSTEM_TEMPLATE_RECORD]);
     });
 
     it('applies pagination', async () => {
@@ -333,7 +362,7 @@ describe('render-template.repository', () => {
 
       expect(mockRenderTemplate.findFirst).toHaveBeenCalledWith({
         where: {
-          tenantId: TENANT_ID,
+          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
           dataModelId: CONFIG_ID,
           isPrimary: true,
         },

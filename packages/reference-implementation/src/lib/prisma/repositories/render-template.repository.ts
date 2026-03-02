@@ -1,5 +1,6 @@
 import { Prisma } from '../generated';
 import { prisma } from '../prisma';
+import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
 
 /**
@@ -84,21 +85,21 @@ export async function createRenderTemplate(
 }
 
 /**
- * Retrieves a render template by ID, scoped to a tenant.
- * Templates are always tenant-scoped (no system defaults).
+ * Retrieves a render template by ID.
+ * Returns templates visible to the tenant OR system-provisioned.
  */
 export async function getRenderTemplateById(id: string, tenantId: string): Promise<RenderTemplateWithRelations | null> {
   return prisma.renderTemplate.findFirst({
     where: {
       id,
-      tenantId,
+      OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
     },
     include: RENDER_TEMPLATE_INCLUDE,
   });
 }
 
 /**
- * Lists render templates for a tenant.
+ * Lists render templates for a tenant, including system-provisioned templates.
  * Supports filtering by dataModelId and pagination.
  */
 export async function listRenderTemplates(
@@ -108,7 +109,7 @@ export async function listRenderTemplates(
   const { dataModelId, limit, offset } = options;
 
   const where: Prisma.RenderTemplateWhereInput = {
-    tenantId,
+    OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
   };
 
   if (dataModelId !== undefined) {
@@ -190,7 +191,8 @@ export async function deleteRenderTemplate(id: string, tenantId: string): Promis
 
 /**
  * Returns the primary render template for a tenant + dataModelId
- * combination, or null if none is set.
+ * combination, including system-provisioned templates.
+ * Returns null if none is set.
  */
 export async function getPrimaryRenderTemplate(
   tenantId: string,
@@ -198,7 +200,7 @@ export async function getPrimaryRenderTemplate(
 ): Promise<RenderTemplateWithRelations | null> {
   return prisma.renderTemplate.findFirst({
     where: {
-      tenantId,
+      OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
       dataModelId,
       isPrimary: true,
     },
