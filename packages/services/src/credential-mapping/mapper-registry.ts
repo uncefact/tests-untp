@@ -1,34 +1,18 @@
 import type { ICredentialMapper } from './types.js';
+import { DppV061Mapper } from './mappers/dpp-v061.mapper.js';
+import { DccV061Mapper } from './mappers/dcc-v061.mapper.js';
+import { DfrV061Mapper } from './mappers/dfr-v061.mapper.js';
+import { DiaV061Mapper } from './mappers/dia-v061.mapper.js';
+import { DteV061Mapper } from './mappers/dte-v061.mapper.js';
 
-const registry: Record<string, Record<string, ICredentialMapper>> = {};
-
-export function registerMapper(credentialType: string, version: string, mapper: ICredentialMapper): void {
-  if (!registry[credentialType]) {
-    registry[credentialType] = {};
-  }
-  registry[credentialType][version] = mapper;
-}
+const mappers: Record<string, Record<string, ICredentialMapper>> = {
+  DigitalProductPassport: { '0.6.1': new DppV061Mapper() },
+  DigitalConformityCredential: { '0.6.1': new DccV061Mapper() },
+  DigitalFacilityRecord: { '0.6.1': new DfrV061Mapper() },
+  DigitalIdentityAnchor: { '0.6.1': new DiaV061Mapper() },
+  DigitalTraceabilityEvent: { '0.6.1': new DteV061Mapper() },
+};
 
 export function getMapper(credentialType: string, version: string): ICredentialMapper | undefined {
-  return registry[credentialType]?.[version];
-}
-
-export function listRegisteredMappers(): Array<{
-  credentialType: string;
-  version: string;
-}> {
-  const result: Array<{ credentialType: string; version: string }> = [];
-  for (const [credentialType, versions] of Object.entries(registry)) {
-    for (const version of Object.keys(versions)) {
-      result.push({ credentialType, version });
-    }
-  }
-  return result;
-}
-
-/** @internal -- for testing only */
-export function clearRegistry(): void {
-  for (const key of Object.keys(registry)) {
-    delete registry[key];
-  }
+  return mappers[credentialType]?.[version];
 }

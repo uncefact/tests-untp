@@ -14,7 +14,4 @@ export type {
 } from './types.js';
 
 // Registry
-export { registerMapper, getMapper, listRegisteredMappers } from './mapper-registry.js';
-
-// Initialisation
-export { initBuiltInMappers } from './init.js';
+export { getMapper } from './mapper-registry.js';

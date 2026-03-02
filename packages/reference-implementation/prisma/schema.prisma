@@ -111,8 +111,9 @@ model Tenant {
   organisations      OrganisationEntity[]
   facilities         Facility[]
   products             Product[]
+  credentials            Credential[]
   dataModels             DataModel[]
-  renderTemplates      RenderTemplate[]
+  renderTemplates        RenderTemplate[]
 
   @@map("Tenant")
 }
@@ -121,15 +122,25 @@ model Tenant {
  * Stores issued verifiable credentials metadata
  */
 model Credential {
-  id             String   @id @default(cuid())
-  tenantId       String
-  storageUri     String
-  hash           String
-  decryptionKey  String?
-  credentialType String
-  isPublished    Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(cuid())
+  tenantId        String
+  storageUri      String
+  hash            String
+  decryptionKey   String?
+  credentialType  String
+  isPublished     Boolean  @default(false)
+  organisationId  String?
+  facilityId      String?
+  productId       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organisation    OrganisationEntity? @relation(fields: [organisationId], references: [id], onDelete: SetNull)
+  facility        Facility?           @relation(fields: [facilityId], references: [id], onDelete: SetNull)
+  product         Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
 }
 
 /**
@@ -320,6 +331,7 @@ model OrganisationEntity {
   primaryIdentifier     Identifier? @relation("OrganisationPrimaryIdentifier", fields: [primaryIdentifierId], references: [id], onDelete: SetNull)
 
   secondaryIdentifiers  OrganisationSecondaryIdentifier[]
+  credentials           Credential[]
   facilities            Facility[]
   products              Product[]
 
@@ -345,6 +357,7 @@ model Facility {
   primaryIdentifier         Identifier?         @relation("FacilityPrimaryIdentifier", fields: [primaryIdentifierId], references: [id], onDelete: SetNull)
 
   secondaryIdentifiers      FacilitySecondaryIdentifier[]
+  credentials               Credential[]
   products                  Product[]
 
   @@index([tenantId])
@@ -376,6 +389,7 @@ model Product {
   primaryIdentifier         Identifier?         @relation("ProductPrimaryIdentifier", fields: [primaryIdentifierId], references: [id], onDelete: SetNull)
 
   secondaryIdentifiers      ProductSecondaryIdentifier[]
+  credentials               Credential[]
 
   @@index([tenantId])
   @@index([parentId])

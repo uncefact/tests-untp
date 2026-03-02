@@ -280,6 +280,23 @@ export async function updateFacility(
 }
 
 /**
+ * Retrieves a facility by its primary identifier value, scoped to a tenant.
+ * Returns null if no facility has a matching primary identifier.
+ */
+export async function getFacilityByIdentifierValue(
+  value: string,
+  tenantId: string,
+): Promise<FacilityWithRelations | null> {
+  return prisma.facility.findFirst({
+    where: {
+      tenantId,
+      primaryIdentifier: { value },
+    },
+    include: FACILITY_INCLUDE,
+  });
+}
+
+/**
  * Deletes a facility. Validates tenant ownership before deletion.
  */
 export async function deleteFacility(id: string, tenantId: string): Promise<Facility> {

@@ -1,4 +1,4 @@
-// Mock next/server before importing route handlers
+// Mock next/server before importing route handlers (jsdom lacks Request/Response)
 jest.mock('next/server', () => ({
   NextResponse: {
     json: (body: unknown, init?: { status?: number }) => ({
@@ -8,9 +8,16 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withTenantAuth — delegates error handling to the real handleRouteError
+// Mock withTenantAuth — mirrors handleRouteError behaviour inline to avoid
+// import issues with mocked @uncefact/untp-ri-services
 jest.mock('@/lib/api/with-tenant-auth', () => {
-  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
+  const { NotFoundError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
+  const { ValidationError } = jest.requireActual('@/lib/api/validation');
+  const { ServiceError } = jest.requireActual('@uncefact/untp-ri-services');
+
+  function jsonResponse(body: unknown, init?: { status?: number }) {
+    return { status: init?.status ?? 200, json: async () => body };
+  }
 
   return {
     withTenantAuth:
@@ -18,251 +25,562 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
         try {
           return await handler(req, ctx);
         } catch (e: unknown) {
-          return handleRouteError(e);
+          if (e instanceof ValidationError) {
+            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 400 });
+          }
+          if (e instanceof NotFoundError) {
+            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 404 });
+          }
+          if (e instanceof ServiceRegistryError) {
+            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 500 });
+          }
+          if (e instanceof ServiceError) {
+            const serviceErr = e as Error & { code?: string; statusCode?: number };
+            return jsonResponse(
+              { ok: false, error: serviceErr.message, code: serviceErr.code },
+              { status: serviceErr.statusCode },
+            );
+          }
+          return jsonResponse({ ok: false, error: errorMessage(e) }, { status: 500 });
         }
       },
   };
 });
 
-const mockGetDidByDid = jest.fn();
-const mockCreateCredential = jest.fn();
+// Suppress logger output in tests
+jest.mock('@/lib/api/logger', () => ({
+  apiLogger: {
+    child: () => ({
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    }),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
+}));
+
+// Mock the Prisma generated enum so the route can validate credentialType
+jest.mock('@/lib/prisma/generated', () => ({
+  CredentialType: {
+    DigitalProductPassport: 'DigitalProductPassport',
+    DigitalConformityCredential: 'DigitalConformityCredential',
+    DigitalFacilityRecord: 'DigitalFacilityRecord',
+    DigitalIdentityAnchor: 'DigitalIdentityAnchor',
+    DigitalTraceabilityEvent: 'DigitalTraceabilityEvent',
+  },
+}));
+
+// Mock the new lib modules
+const mockResolveDataModel = jest.fn();
+jest.mock('@/lib/credentials/resolve-data-model', () => ({
+  resolveDataModel: (...args: unknown[]) => mockResolveDataModel(...args),
+}));
+
+const mockValidateCredentialPayload = jest.fn();
+jest.mock('@/lib/credentials/validate-credential-payload', () => ({
+  validateCredentialPayload: (...args: unknown[]) => mockValidateCredentialPayload(...args),
+}));
+
+const mockIssueCredential = jest.fn();
+jest.mock('@/lib/credentials/issue-credential', () => ({
+  issueCredential: (...args: unknown[]) => mockIssueCredential(...args),
+}));
+
+// Service resolver mocks
 const mockResolveVcService = jest.fn();
 const mockResolveStorageService = jest.fn();
 const mockResolveIdrService = jest.fn();
 
-jest.mock('@/lib/prisma/repositories', () => ({
-  getDidByDid: (did: string, tenantId: string) => mockGetDidByDid(did, tenantId),
-  createCredential: (input: unknown) => mockCreateCredential(input),
-}));
-
 jest.mock('@/lib/services/resolve-vc-service', () => ({
   resolveVcService: (...args: unknown[]) => mockResolveVcService(...args),
 }));
-
 jest.mock('@/lib/services/resolve-storage-service', () => ({
   resolveStorageService: (...args: unknown[]) => mockResolveStorageService(...args),
 }));
-
 jest.mock('@/lib/services/resolve-idr-service', () => ({
   resolveIdrService: (...args: unknown[]) => mockResolveIdrService(...args),
 }));
 
+// Services package mocks
+const mockBuildPublishLinks = jest.fn();
+jest.mock('@uncefact/untp-ri-services', () => ({
+  buildPublishLinks: (...args: unknown[]) => mockBuildPublishLinks(...args),
+}));
+
+// Repository mocks
+const mockUpdateCredentialPublished = jest.fn();
+jest.mock('@/lib/prisma/repositories', () => ({
+  updateCredentialPublished: (...args: unknown[]) => mockUpdateCredentialPublished(...args),
+}));
+
 import { POST } from './route';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-function fakeRequest(body: unknown): Request {
+function createFakeRequest(body?: unknown): Request {
+  const bodyString = body !== undefined ? JSON.stringify(body) : undefined;
   return {
     method: 'POST',
     url: 'http://localhost/api/v1/credentials',
     headers: new Headers({ 'Content-Type': 'application/json' }),
-    json: async () => body,
+    json:
+      bodyString !== undefined
+        ? async () => JSON.parse(bodyString)
+        : async () => {
+            throw new SyntaxError('Unexpected token');
+          },
   } as unknown as Request;
 }
 
-const AUTH_CONTEXT = { tenantId: 'org-1', params: Promise.resolve({}) };
+function createBadJsonRequest(): Request {
+  return {
+    method: 'POST',
+    url: 'http://localhost/api/v1/credentials',
+    headers: new Headers({ 'Content-Type': 'application/json' }),
+    json: async () => {
+      throw new SyntaxError('Unexpected token n in JSON at position 0');
+    },
+  } as unknown as Request;
+}
 
-const validPayload = {
+const AUTH_CONTEXT = { tenantId: 'tenant-1', params: Promise.resolve({}) };
+
+/** Minimal credential payload for a valid request. */
+const VALID_PAYLOAD = {
   '@context': ['https://www.w3.org/ns/credentials/v2'],
-  type: ['VerifiableCredential'],
-  issuer: { type: ['Organization'], id: 'did:web:example.com', name: 'Test' },
-  credentialSubject: { id: 'subject-1' },
+  type: ['VerifiableCredential', 'DigitalProductPassport'],
+  credentialSubject: { id: 'urn:example:product:123' },
 };
 
-const signedCredential = { ...validPayload, proof: { type: 'Ed25519Signature2020' } };
-
-const storageResponse = {
-  uri: 'https://storage.example.com/creds/abc123',
-  hash: 'sha256-abc123',
-  decryptionKey: 'dec-key-1',
+const STORAGE_RESPONSE = {
+  uri: 'https://storage.example.com/cred/abc123',
+  hash: 'sha256-abc',
+  decryptionKey: 'key-xyz',
 };
 
-// ── Tests ────────────────────────────────────────────────────────────────────
+const stubMapper = {
+  extractEntityRefs: jest.fn().mockReturnValue({ primaryIdentifier: '09506000134352' }),
+  buildPayload: jest.fn(),
+};
+
+const DATA_MODEL = {
+  id: 'dm-1',
+  name: 'Digital Product Passport',
+  credentialType: 'DigitalProductPassport',
+  version: '0.6.1',
+  schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.1.json',
+};
+
+/** Builds a valid request body with sensible defaults. */
+function validBody(overrides: Record<string, unknown> = {}) {
+  return {
+    credentialPayload: VALID_PAYLOAD,
+    credentialType: 'DigitalProductPassport',
+    version: '0.6.1',
+    ...overrides,
+  };
+}
+
+function setupHappyPath() {
+  mockResolveDataModel.mockResolvedValue({
+    dataModel: DATA_MODEL,
+    mapper: stubMapper,
+    schemaUrls: [DATA_MODEL.schemaUrl],
+  });
+  mockValidateCredentialPayload.mockResolvedValue(undefined);
+  mockResolveVcService.mockResolvedValue({ service: {}, instanceId: 'vc-1' });
+  mockResolveStorageService.mockResolvedValue({ service: {}, instanceId: 'storage-1' });
+  mockIssueCredential.mockResolvedValue({
+    credentialId: 'cred-1',
+    storageResponse: STORAGE_RESPONSE,
+    primaryEntity: {},
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 describe('POST /api/v1/credentials', () => {
-  const mockVcService = { sign: jest.fn() };
-  const mockStorageService = { store: jest.fn() };
-
   beforeEach(() => {
     jest.clearAllMocks();
-
-    mockResolveVcService.mockResolvedValue({ service: mockVcService, instanceId: 'vc-inst-1' });
-    mockResolveStorageService.mockResolvedValue({ service: mockStorageService, instanceId: 'storage-inst-1' });
-    mockResolveIdrService.mockResolvedValue({ service: {}, instanceId: 'idr-inst-1' });
-
-    mockVcService.sign.mockResolvedValue(signedCredential);
-    mockStorageService.store.mockResolvedValue(storageResponse);
-    mockCreateCredential.mockResolvedValue({ id: 'cred-1' });
+    setupHappyPath();
   });
 
-  // ── Validation: body parsing ─────────────────────────────────────────────
+  // ── Validation ────────────────────────────────────────────────────────
 
-  it('returns 400 when body is not valid JSON', async () => {
-    const req = {
-      method: 'POST',
-      url: 'http://localhost/api/v1/credentials',
-      headers: new Headers({ 'Content-Type': 'application/json' }),
-      json: async () => {
-        throw new Error('Unexpected end of JSON input');
-      },
-    } as unknown as Request;
+  describe('validation', () => {
+    it('returns 400 for invalid JSON body', async () => {
+      const req = createBadJsonRequest();
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
 
-    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-    const json = await res.json();
+      expect(res.status).toBe(400);
+      expect(json.ok).toBe(false);
+      expect(json.error).toBe('Invalid JSON body');
+    });
 
-    expect(res.status).toBe(400);
-    expect(json.ok).toBe(false);
-    expect(json.error).toBe('Invalid JSON body');
+    it('returns 400 when credentialPayload is missing', async () => {
+      const req = createFakeRequest(validBody({ credentialPayload: undefined }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.ok).toBe(false);
+      expect(json.error).toContain('credentialPayload is required');
+    });
+
+    it('returns 400 when credentialPayload is not an object', async () => {
+      const req = createFakeRequest(validBody({ credentialPayload: 'not-an-object' }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('credentialPayload is required');
+    });
+
+    it('returns 400 when credentialType is missing', async () => {
+      const req = createFakeRequest(validBody({ credentialType: undefined }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('credentialType is required');
+    });
+
+    it('returns 400 when credentialType is not a valid enum value', async () => {
+      const req = createFakeRequest(validBody({ credentialType: 'InvalidType' }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('credentialType must be one of');
+    });
+
+    it('returns 400 when version is missing', async () => {
+      const req = createFakeRequest(validBody({ version: undefined }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('version is required');
+    });
   });
 
-  it('returns 400 when credentialPayload is missing', async () => {
-    const res = await POST(fakeRequest({}), AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-    const json = await res.json();
+  // ── Data model resolution ────────────────────────────────────────────
 
-    expect(res.status).toBe(400);
-    expect(json.ok).toBe(false);
-    expect(json.error).toBe('credentialPayload is required and must be an object');
+  describe('data model resolution', () => {
+    it('calls resolveDataModel with correct args', async () => {
+      const req = createFakeRequest(validBody());
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockResolveDataModel).toHaveBeenCalledWith('tenant-1', 'DigitalProductPassport', '0.6.1');
+    });
+
+    it('returns 400 when resolveDataModel throws ValidationError', async () => {
+      const { ValidationError: VE } = jest.requireActual('@/lib/api/validation');
+      mockResolveDataModel.mockRejectedValue(new VE('No data model found for Foo v1.0'));
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('No data model found');
+    });
   });
 
-  // ── Validation: missing issuer.id ────────────────────────────────────────
+  // ── Payload validation ──────────────────────────────────────────────
 
-  it('returns 400 when credentialPayload.issuer.id is missing', async () => {
-    const body = {
-      credentialPayload: {
-        '@context': ['https://www.w3.org/ns/credentials/v2'],
-        type: ['VerifiableCredential'],
-        issuer: { type: ['Organization'], name: 'No ID Issuer' },
-        credentialSubject: { id: 'subject-1' },
-      },
-    };
+  describe('payload validation', () => {
+    it('calls validateCredentialPayload with correct args', async () => {
+      const req = createFakeRequest(validBody());
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
-    const res = await POST(fakeRequest(body), AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-    const json = await res.json();
+      expect(mockValidateCredentialPayload).toHaveBeenCalledWith(VALID_PAYLOAD, [DATA_MODEL.schemaUrl]);
+    });
 
-    expect(res.status).toBe(400);
-    expect(json.ok).toBe(false);
-    expect(json.error).toBe('credentialPayload.issuer.id is required');
+    it('returns 400 when validateCredentialPayload throws ValidationError', async () => {
+      const { ValidationError: VE } = jest.requireActual('@/lib/api/validation');
+      mockValidateCredentialPayload.mockRejectedValue(new VE('Schema validation failed'));
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('Schema validation failed');
+    });
   });
 
-  // ── DID not registered ───────────────────────────────────────────────────
+  // ── Service resolution ──────────────────────────────────────────────
 
-  it('returns 422 when issuer DID is not registered for the tenant', async () => {
-    mockGetDidByDid.mockResolvedValue(null);
+  describe('service resolution', () => {
+    it('passes signingOptions.serviceInstanceId to resolveVcService', async () => {
+      const req = createFakeRequest(validBody({ signingOptions: { serviceInstanceId: 'custom-vc' } }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
-    const res = await POST(
-      fakeRequest({ credentialPayload: validPayload }),
-      AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
-    );
-    const json = await res.json();
+      expect(mockResolveVcService).toHaveBeenCalledWith('tenant-1', 'custom-vc');
+    });
 
-    expect(res.status).toBe(422);
-    expect(json.ok).toBe(false);
-    expect(json.error).toBe('Issuer DID is not registered for this tenant');
-    expect(mockGetDidByDid).toHaveBeenCalledWith('did:web:example.com', 'org-1');
+    it('passes storageOptions.serviceInstanceId to resolveStorageService', async () => {
+      const req = createFakeRequest(validBody({ storageOptions: { serviceInstanceId: 'custom-storage' } }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockResolveStorageService).toHaveBeenCalledWith('tenant-1', 'custom-storage');
+    });
+
+    it('passes undefined when no signingOptions provided', async () => {
+      const req = createFakeRequest(validBody());
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockResolveVcService).toHaveBeenCalledWith('tenant-1', undefined);
+    });
+
+    it('passes undefined when no storageOptions provided', async () => {
+      const req = createFakeRequest(validBody());
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockResolveStorageService).toHaveBeenCalledWith('tenant-1', undefined);
+    });
   });
 
-  // ── Non-issuable DID statuses ────────────────────────────────────────────
+  // ── Credential issuance ─────────────────────────────────────────────
 
-  it('returns 422 when issuer DID status is VERIFICATION_FAILED', async () => {
-    mockGetDidByDid.mockResolvedValue({ id: 'did-1', did: 'did:web:example.com', status: 'VERIFICATION_FAILED' });
+  describe('credential issuance', () => {
+    it('calls issueCredential with correct input shape', async () => {
+      const vcService = { service: {}, instanceId: 'vc-1' };
+      const storageService = { service: {}, instanceId: 'storage-1' };
+      mockResolveVcService.mockResolvedValue(vcService);
+      mockResolveStorageService.mockResolvedValue(storageService);
 
-    const res = await POST(
-      fakeRequest({ credentialPayload: validPayload }),
-      AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
-    );
-    const json = await res.json();
+      const req = createFakeRequest(validBody());
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
-    expect(res.status).toBe(422);
-    expect(json.ok).toBe(false);
-    expect(json.error).toContain('VERIFICATION_FAILED');
-    expect(json.error).toContain('not eligible for credential issuance');
+      expect(mockIssueCredential).toHaveBeenCalledWith({
+        tenantId: 'tenant-1',
+        credentialPayload: VALID_PAYLOAD,
+        credentialType: 'DigitalProductPassport',
+        mapper: stubMapper,
+        vcService,
+        storageService,
+        storageOptions: {},
+      });
+    });
+
+    it('passes storageOptions through to issueCredential', async () => {
+      const req = createFakeRequest(validBody({ storageOptions: { serviceInstanceId: 'store-1', encrypt: false } }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockIssueCredential).toHaveBeenCalledWith(
+        expect.objectContaining({
+          storageOptions: { serviceInstanceId: 'store-1', encrypt: false },
+        }),
+      );
+    });
+
+    it('returns 201 with credentialId from issueCredential result', async () => {
+      mockIssueCredential.mockResolvedValue({
+        credentialId: 'cred-42',
+        storageResponse: STORAGE_RESPONSE,
+        primaryEntity: {},
+      });
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.credentialId).toBe('cred-42');
+    });
   });
 
-  it('returns 422 when issuer DID status is UNVERIFIED', async () => {
-    mockGetDidByDid.mockResolvedValue({ id: 'did-2', did: 'did:web:example.com', status: 'UNVERIFIED' });
+  // ── Publishing ──────────────────────────────────────────────────────
 
-    const res = await POST(
-      fakeRequest({ credentialPayload: validPayload }),
-      AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
-    );
-    const json = await res.json();
+  describe('publishing', () => {
+    const mockPublishLinks = jest.fn();
 
-    expect(res.status).toBe(422);
-    expect(json.ok).toBe(false);
-    expect(json.error).toContain('UNVERIFIED');
-    expect(json.error).toContain('not eligible for credential issuance');
+    function setupPublishingHappyPath(overrides: Record<string, unknown> = {}) {
+      const defaults = {
+        primaryIdentifier: '09506000134352',
+        schemePrimaryKey: 'gtin',
+        schemeNamespace: 'gs1',
+        schemeIdrServiceInstanceId: 'idr-scheme-1',
+      };
+      const primaryEntity = { ...defaults, ...overrides };
+
+      mockIssueCredential.mockResolvedValue({
+        credentialId: 'cred-1',
+        storageResponse: STORAGE_RESPONSE,
+        primaryEntity,
+      });
+
+      mockResolveIdrService.mockResolvedValue({
+        service: { publishLinks: mockPublishLinks },
+        instanceId: 'idr-1',
+      });
+
+      mockBuildPublishLinks.mockReturnValue([
+        {
+          href: STORAGE_RESPONSE.uri,
+          rel: 'gs1:sustainabilityInfo',
+          type: 'application/json',
+          title: 'Digital Product Passport',
+        },
+      ]);
+
+      mockUpdateCredentialPublished.mockResolvedValue({});
+    }
+
+    it('publishes to IDR when publish=true and entity has scheme config', async () => {
+      setupPublishingHappyPath();
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      // resolveIdrService called with scheme and publishing service instance IDs
+      expect(mockResolveIdrService).toHaveBeenCalledWith('tenant-1', 'idr-scheme-1', undefined);
+
+      // buildPublishLinks called with storage response, link title, and options
+      expect(mockBuildPublishLinks).toHaveBeenCalledWith(STORAGE_RESPONSE, 'Digital Product Passport', {
+        machineVerificationUrl: undefined,
+        humanVerificationUrl: undefined,
+      });
+
+      // idrService.publishLinks called
+      expect(mockPublishLinks).toHaveBeenCalledWith('gtin', '09506000134352', expect.any(Array), '/', {
+        namespace: 'gs1',
+        itemDescription: 'Digital Product Passport',
+      });
+
+      // updateCredentialPublished called
+      expect(mockUpdateCredentialPublished).toHaveBeenCalledWith('cred-1', 'tenant-1', true);
+    });
+
+    it('passes publishingOptions.serviceInstanceId to resolveIdrService', async () => {
+      setupPublishingHappyPath();
+
+      const req = createFakeRequest(
+        validBody({ publishingOptions: { publish: true, serviceInstanceId: 'explicit-idr' } }),
+      );
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockResolveIdrService).toHaveBeenCalledWith('tenant-1', 'idr-scheme-1', 'explicit-idr');
+    });
+
+    it('uses publishingOptions.linkTitle override when provided', async () => {
+      setupPublishingHappyPath();
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true, linkTitle: 'Custom Title' } }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockBuildPublishLinks).toHaveBeenCalledWith(STORAGE_RESPONSE, 'Custom Title', expect.any(Object));
+
+      expect(mockPublishLinks).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        expect.any(Array),
+        '/',
+        expect.objectContaining({ itemDescription: 'Custom Title' }),
+      );
+    });
+
+    it('falls back to dataModel.name for linkTitle when not provided', async () => {
+      setupPublishingHappyPath();
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockBuildPublishLinks).toHaveBeenCalledWith(
+        STORAGE_RESPONSE,
+        'Digital Product Passport',
+        expect.any(Object),
+      );
+    });
+
+    it('passes machineVerificationUrl and humanVerificationUrl to buildPublishLinks', async () => {
+      setupPublishingHappyPath();
+
+      const req = createFakeRequest(
+        validBody({
+          publishingOptions: {
+            publish: true,
+            machineVerificationUrl: 'https://verify.example.com/api',
+            humanVerificationUrl: 'https://verify.example.com/ui',
+          },
+        }),
+      );
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockBuildPublishLinks).toHaveBeenCalledWith(STORAGE_RESPONSE, 'Digital Product Passport', {
+        machineVerificationUrl: 'https://verify.example.com/api',
+        humanVerificationUrl: 'https://verify.example.com/ui',
+      });
+    });
+
+    it('skips publishing when publish not requested', async () => {
+      setupPublishingHappyPath();
+
+      const req = createFakeRequest(validBody());
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockResolveIdrService).not.toHaveBeenCalled();
+      expect(mockPublishLinks).not.toHaveBeenCalled();
+      expect(mockUpdateCredentialPublished).not.toHaveBeenCalled();
+    });
+
+    it('skips publishing when primaryEntity has no schemePrimaryKey', async () => {
+      setupPublishingHappyPath({ schemePrimaryKey: undefined });
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockResolveIdrService).not.toHaveBeenCalled();
+      expect(mockUpdateCredentialPublished).not.toHaveBeenCalled();
+    });
+
+    it('skips publishing when primaryEntity has no schemeNamespace', async () => {
+      setupPublishingHappyPath({ schemeNamespace: undefined });
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockResolveIdrService).not.toHaveBeenCalled();
+      expect(mockUpdateCredentialPublished).not.toHaveBeenCalled();
+    });
+
+    it('skips publishing when primaryEntity is empty (no scheme info)', async () => {
+      // primaryEntity returned from issueCredential has no scheme fields
+      mockIssueCredential.mockResolvedValue({
+        credentialId: 'cred-1',
+        storageResponse: STORAGE_RESPONSE,
+        primaryEntity: {},
+      });
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockResolveIdrService).not.toHaveBeenCalled();
+      expect(mockUpdateCredentialPublished).not.toHaveBeenCalled();
+    });
   });
 
-  it('returns 422 when issuer DID status is INACTIVE', async () => {
-    mockGetDidByDid.mockResolvedValue({ id: 'did-3', did: 'did:web:example.com', status: 'INACTIVE' });
+  // ── Error propagation ─────────────────────────────────────────────────
 
-    const res = await POST(
-      fakeRequest({ credentialPayload: validPayload }),
-      AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
-    );
-    const json = await res.json();
+  describe('error propagation', () => {
+    it('returns 500 when issueCredential throws', async () => {
+      mockIssueCredential.mockRejectedValue(new Error('Signing service unavailable'));
 
-    expect(res.status).toBe(422);
-    expect(json.ok).toBe(false);
-    expect(json.error).toContain('INACTIVE');
-    expect(json.error).toContain('not eligible for credential issuance');
-  });
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
 
-  // ── Issuable DID statuses (happy paths) ──────────────────────────────────
-
-  it('returns 201 when issuer DID status is ACTIVE', async () => {
-    mockGetDidByDid.mockResolvedValue({ id: 'did-4', did: 'did:web:example.com', status: 'ACTIVE' });
-
-    const res = await POST(
-      fakeRequest({ credentialPayload: validPayload }),
-      AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
-    );
-    const json = await res.json();
-
-    expect(res.status).toBe(201);
-    expect(json.ok).toBe(true);
-    expect(json.credentialId).toBe('cred-1');
-
-    // Verify the full happy path was executed
-    expect(mockVcService.sign).toHaveBeenCalledWith(validPayload);
-    expect(mockStorageService.store).toHaveBeenCalledWith(signedCredential, true);
-    expect(mockCreateCredential).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tenantId: 'org-1',
-        storageUri: storageResponse.uri,
-        hash: storageResponse.hash,
-        decryptionKey: storageResponse.decryptionKey,
-        credentialType: 'VerifiableCredential',
-        isPublished: false,
-      }),
-    );
-  });
-
-  it('returns 201 when issuer DID status is VERIFIED', async () => {
-    mockGetDidByDid.mockResolvedValue({ id: 'did-5', did: 'did:web:example.com', status: 'VERIFIED' });
-
-    const res = await POST(
-      fakeRequest({ credentialPayload: validPayload }),
-      AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
-    );
-    const json = await res.json();
-
-    expect(res.status).toBe(201);
-    expect(json.ok).toBe(true);
-    expect(json.credentialId).toBe('cred-1');
-
-    // Verify the full happy path was executed
-    expect(mockVcService.sign).toHaveBeenCalledWith(validPayload);
-    expect(mockStorageService.store).toHaveBeenCalledWith(signedCredential, true);
-    expect(mockCreateCredential).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tenantId: 'org-1',
-        storageUri: storageResponse.uri,
-        hash: storageResponse.hash,
-        decryptionKey: storageResponse.decryptionKey,
-        credentialType: 'VerifiableCredential',
-        isPublished: false,
-      }),
-    );
+      expect(res.status).toBe(500);
+      expect(json.error).toContain('Signing service unavailable');
+    });
   });
 });

@@ -412,6 +412,23 @@ export async function updateProduct(
 }
 
 /**
+ * Retrieves a product by its primary identifier value, scoped to a tenant.
+ * Returns null if no product has a matching primary identifier.
+ */
+export async function getProductByIdentifierValue(
+  value: string,
+  tenantId: string,
+): Promise<ProductWithRelations | null> {
+  return prisma.product.findFirst({
+    where: {
+      tenantId,
+      primaryIdentifier: { value },
+    },
+    include: PRODUCT_INCLUDE,
+  });
+}
+
+/**
  * Deletes a product.
  * Blocks deletion if BATCH children depend on this MODEL.
  * Detaches ITEM children (sets parentId to null) before deleting.

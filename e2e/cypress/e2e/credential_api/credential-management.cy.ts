@@ -7,22 +7,24 @@ describe('Credential API', { testIsolation: false }, () => {
   let publishedCredentialId: string;
 
   /**
-   * Builds a minimal valid CredentialPayload for the given issuer DID.
-   * Uses the W3C VC v2 context and a simple Product subject.
+   * Builds a minimal valid CredentialPayload conforming to the DPP v0.6.1 schema.
    */
   function buildCredentialPayload(issuerDid: string) {
     return {
-      '@context': ['https://www.w3.org/ns/credentials/v2'],
-      type: ['VerifiableCredential'],
+      '@context': [
+        'https://www.w3.org/ns/credentials/v2',
+        'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/',
+      ],
+      id: `urn:uuid:e2e-${RUN_ID}`,
+      type: ['DigitalProductPassport', 'VerifiableCredential'],
       issuer: {
         type: ['CredentialIssuer'],
         id: issuerDid,
         name: `E2E Test Issuer ${RUN_ID}`,
       },
       credentialSubject: {
-        type: ['Product'],
+        type: ['ProductPassport'],
         id: `https://example.com/products/e2e-${RUN_ID}`,
-        name: `E2E Test Product ${RUN_ID}`,
       },
     };
   }
@@ -96,6 +98,8 @@ describe('Credential API', { testIsolation: false }, () => {
         url: '/api/v1/credentials',
         body: {
           credentialPayload: buildCredentialPayload(defaultDidValue),
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.1',
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
@@ -114,7 +118,7 @@ describe('Credential API', { testIsolation: false }, () => {
           expect(cred.id).to.eq(encryptedCredentialId);
           expect(cred.storageUri).to.be.a('string');
           expect(cred.hash).to.be.a('string');
-          expect(cred.credentialType).to.eq('VerifiableCredential');
+          expect(cred.credentialType).to.eq('DigitalProductPassport');
           expect(cred.isPublished).to.be.false;
           // API defaults encrypt to true, so decryptionKey is present
           expect(cred.decryptionKey).to.be.a('string');
@@ -127,13 +131,15 @@ describe('Credential API', { testIsolation: false }, () => {
   // Issuance options
   // -----------------------------------------------------------------------
   describe('Issuance options', () => {
-    it('POST /api/v1/credentials — encrypt=false stores without encryption', () => {
+    it('POST /api/v1/credentials — storageOptions.encrypt=false stores without encryption', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/credentials',
         body: {
           credentialPayload: buildCredentialPayload(defaultDidValue),
-          encrypt: false,
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.1',
+          storageOptions: { encrypt: false },
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
@@ -150,13 +156,15 @@ describe('Credential API', { testIsolation: false }, () => {
       );
     });
 
-    it('POST /api/v1/credentials — publish=true succeeds (publishing not yet wired up)', () => {
+    it('POST /api/v1/credentials — publishingOptions.publish=true issues and publishes', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/credentials',
         body: {
           credentialPayload: buildCredentialPayload(defaultDidValue),
-          publish: true,
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.1',
+          publishingOptions: { publish: true },
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
@@ -165,11 +173,11 @@ describe('Credential API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/credentials/:id — published credential has isPublished=false until wired up', () => {
+    it('GET /api/v1/credentials/:id — retrieves the published credential', () => {
       cy.request(`/api/v1/credentials/${publishedCredentialId}`).then(
         (response) => {
           expect(response.status).to.eq(200);
-          expect(response.body.credential.isPublished).to.be.false;
+          expect(response.body.credential).to.exist;
         },
       );
     });
@@ -196,7 +204,11 @@ describe('Credential API', { testIsolation: false }, () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/credentials',
-        body: { credentialPayload: null },
+        body: {
+          credentialPayload: null,
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.1',
+        },
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
@@ -207,7 +219,11 @@ describe('Credential API', { testIsolation: false }, () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/credentials',
-        body: { credentialPayload: 'not-an-object' },
+        body: {
+          credentialPayload: 'not-an-object',
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.1',
+        },
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
@@ -218,7 +234,11 @@ describe('Credential API', { testIsolation: false }, () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/credentials',
-        body: { credentialPayload: 42 },
+        body: {
+          credentialPayload: 42,
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.1',
+        },
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);

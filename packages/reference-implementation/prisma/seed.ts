@@ -349,7 +349,7 @@ async function main() {
       credentialType: CredentialType.DigitalProductPassport,
       version: '0.6.1',
       name: 'Digital Product Passport v0.6.1',
-      slug: 'dpp/0.6.1',
+      shortCode: 'dpp',
       templateDir: 'digital_product_passport',
     },
     {
@@ -358,7 +358,7 @@ async function main() {
       credentialType: CredentialType.DigitalConformityCredential,
       version: '0.6.1',
       name: 'Digital Conformity Credential v0.6.1',
-      slug: 'dcc/0.6.1',
+      shortCode: 'dcc',
       templateDir: 'digital_conformity_credential',
     },
     {
@@ -367,7 +367,7 @@ async function main() {
       credentialType: CredentialType.DigitalFacilityRecord,
       version: '0.6.1',
       name: 'Digital Facility Record v0.6.1',
-      slug: 'dfr/0.6.1',
+      shortCode: 'dfr',
       templateDir: 'digital_facility_record',
     },
     {
@@ -376,7 +376,7 @@ async function main() {
       credentialType: CredentialType.DigitalIdentityAnchor,
       version: '0.6.1',
       name: 'Digital Identity Anchor v0.6.1',
-      slug: 'dia/0.6.1',
+      shortCode: 'dia',
       templateDir: 'digital_identity_anchor',
     },
     {
@@ -385,7 +385,7 @@ async function main() {
       credentialType: CredentialType.DigitalTraceabilityEvent,
       version: '0.6.1',
       name: 'Digital Traceability Event v0.6.1',
-      slug: 'dte/0.6.1',
+      shortCode: 'dte',
       templateDir: 'digital_traceability_event',
     },
   ];
@@ -405,8 +405,8 @@ async function main() {
         credentialType: dm.credentialType,
         version: dm.version,
         isExtension: false,
-        schemaUrl: `${UNTP_BASE}/${dm.slug}/schema.json`,
-        contextUrl: `${UNTP_BASE}/${dm.slug}/`,
+        schemaUrl: `${UNTP_BASE}/${dm.shortCode}/untp-${dm.shortCode}-schema-${dm.version}.json`,
+        contextUrl: `${UNTP_BASE}/${dm.shortCode}/${dm.version}/context/`,
       },
     });
 
