@@ -14,7 +14,7 @@ const UPDATABLE_FIELDS = ['name', 'storageUrl', 'hash', 'isPrimary'] as const;
  * /render-templates/{id}:
  *   get:
  *     summary: Get a render template by ID
- *     description: Retrieves a specific render template by its database ID. Only templates owned by the authenticated tenant are returned.
+ *     description: Retrieves a specific render template by its database ID. Returns templates owned by the authenticated tenant or system-provisioned templates.
  *     tags:
  *       - Render Templates
  *     parameters:

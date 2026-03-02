@@ -11,7 +11,7 @@ const logger = apiLogger.child({ route: '/api/v1/render-templates' });
  * /render-templates:
  *   get:
  *     summary: List render templates
- *     description: Retrieves render templates belonging to the authenticated tenant, with optional filtering by data model
+ *     description: Retrieves render templates belonging to the authenticated tenant and system-provisioned templates, with optional filtering by data model
  *     tags:
  *       - Render Templates
  *     parameters:
