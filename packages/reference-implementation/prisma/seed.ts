@@ -231,7 +231,7 @@ async function main() {
   // ── Seed system Pyx IDR service instance ────────────────────────────────────
 
   let idrSeeded = false;
-  if (encryptionService)
+  if (encryptionService) {
     try {
       const { pyxIdrApiUrl, pyxIdrApiKey } = getIdrConfig();
       const idrServiceConfig = JSON.stringify({
@@ -272,11 +272,12 @@ async function main() {
         'Skipping IDR service instance seed: IDR configuration not available',
       );
     }
+  }
 
   // ── Seed system UNCEFACT storage service instance ───────────────────────────
 
   let storageSeeded = false;
-  if (encryptionService)
+  if (encryptionService) {
     try {
       const { storageServiceUrl } = getStorageConfig();
       const storageApiKey = process.env.UNCEFACT_STORAGE_API_KEY;
@@ -313,10 +314,11 @@ async function main() {
         'Skipping storage service instance seed: storage configuration not available',
       );
     }
+  }
 
   // ── Seed system VCKit VC service instance ─────────────────────────────────
   let vcSeeded = false;
-  if (encryptionService)
+  if (encryptionService) {
     try {
       const { vckitApiUrl, vckitApiKey } = getVcConfig();
       const vcServiceConfig = JSON.stringify({
@@ -358,6 +360,7 @@ async function main() {
         'Skipping VC service instance seed: VC configuration not available',
       );
     }
+  }
 
   // ── Seed core data model configs ────────────────────────────────────────────
   // Static UUIDs ensure idempotent seeding — if the record already exists, skip.
