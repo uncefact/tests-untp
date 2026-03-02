@@ -86,8 +86,12 @@ export async function getDidByDid(did: string, tenantId: string): Promise<Did | 
 
 /**
  * Lists DIDs for an organisation, including system defaults.
+ * Returns the matching records along with the total count for pagination.
  */
-export async function listDids(tenantId: string, options: ListDidsOptions = {}): Promise<Did[]> {
+export async function listDids(
+  tenantId: string,
+  options: ListDidsOptions = {},
+): Promise<{ data: Did[]; total: number }> {
   const { type, status, serviceInstanceId, limit, offset } = options;
 
   const where: Prisma.DidWhereInput = {
@@ -106,12 +110,17 @@ export async function listDids(tenantId: string, options: ListDidsOptions = {}):
     where.serviceInstanceId = serviceInstanceId;
   }
 
-  return prisma.did.findMany({
-    where,
-    take: limit ?? 100,
-    skip: offset,
-    orderBy: { createdAt: 'desc' },
-  });
+  const [data, total] = await Promise.all([
+    prisma.did.findMany({
+      where,
+      take: limit ?? 20,
+      skip: offset,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.did.count({ where }),
+  ]);
+
+  return { data, total };
 }
 
 /**
@@ -155,6 +164,26 @@ export async function updateDidStatus(id: string, tenantId: string, status: DidS
     return tx.did.update({
       where: { id },
       data: { status },
+    });
+  });
+}
+
+/**
+ * Deletes a DID.
+ * Validates that the DID exists and belongs to the specified organisation.
+ */
+export async function deleteDid(id: string, tenantId: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.did.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('DID not found or access denied');
+    }
+
+    await tx.did.delete({
+      where: { id },
     });
   });
 }
