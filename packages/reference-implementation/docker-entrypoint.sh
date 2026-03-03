@@ -23,7 +23,15 @@ else
     echo "Skipping database migrations (SKIP_MIGRATIONS is set)"
 fi
 
-# Execute the CMD (defaults to "node server.js" in production,
-# overridden by docker-compose for E2E to include seeding)
+# Run database seed (all operations are idempotent upserts)
+if [ "${SKIP_SEED:-false}" = "false" ]; then
+    echo "Running database seed..."
+    cd /app/prisma
+    node /app/node_modules/.bin/tsx seed.ts
+    echo "Database seed completed"
+else
+    echo "Skipping database seed (SKIP_SEED is set)"
+fi
+
 cd /app
 exec "$@"

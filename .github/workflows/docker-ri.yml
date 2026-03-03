@@ -11,7 +11,7 @@ on:
       - 'digitallink_toolkit_server/**'
       - 'yarn.lock'
       - 'package.json'
-      - 'Dockerfile'
+      - 'packages/reference-implementation/Dockerfile'
       - '.github/workflows/docker-ri.yml'
   workflow_dispatch:
 
@@ -57,7 +57,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          file: ./packages/reference-implementation/Dockerfile
           target: build
           platforms: linux/amd64,linux/arm64
           push: true

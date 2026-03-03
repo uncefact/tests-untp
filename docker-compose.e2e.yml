@@ -151,7 +151,7 @@ services:
     image: app:e2e
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: packages/reference-implementation/Dockerfile
       target: development
       args:
         CONFIG_FILE: ./e2e/cypress/fixtures/app-config.json
