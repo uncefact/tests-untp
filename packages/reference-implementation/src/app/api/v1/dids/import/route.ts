@@ -30,7 +30,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *                 description: The DID identifier to import (e.g., did:web:example.com)
  *               method:
  *                 type: string
- *                 enum: [DID_WEB, DID_WEB_VH]
+ *                 enum: [DID_WEB]
  *                 description: DID method
  *               keyId:
  *                 type: string
@@ -53,6 +53,12 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *               $ref: '#/components/schemas/Did'
  *       400:
  *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorised - missing or invalid authentication
  *         content:
  *           application/json:
  *             schema:

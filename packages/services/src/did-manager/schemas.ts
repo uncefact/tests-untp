@@ -28,7 +28,9 @@ export const didResponseSchema = z.object({
   method: z.enum(['DID_WEB', 'DID_WEB_VH']).describe('DID method'),
   name: z.string().describe('Human-readable name'),
   description: z.string().nullable().describe('Description of the DID'),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'VERIFIED', 'UNVERIFIED']).describe('Current status of the DID'),
+  status: z
+    .enum(['ACTIVE', 'INACTIVE', 'VERIFIED', 'UNVERIFIED', 'VERIFICATION_FAILED'])
+    .describe('Current status of the DID'),
   keyId: z.string().describe('Key identifier associated with the DID'),
   tenantId: z.string().describe('ID of the owning tenant'),
   serviceInstanceId: z.string().nullable().describe('ID of the service instance used to manage this DID'),
@@ -37,12 +39,33 @@ export const didResponseSchema = z.object({
   updatedAt: z.string().datetime().describe('Timestamp when the DID was last updated'),
 });
 
+const VERIFICATION_CHECK_NAMES = [
+  'resolve',
+  'structure',
+  'identity_match',
+  'https',
+  'key_material',
+  'jsonld_validity',
+] as const;
+
+export const verificationCheckSchema = z.object({
+  name: z.enum(VERIFICATION_CHECK_NAMES),
+  passed: z.boolean(),
+  message: z.string().optional(),
+});
+
+export const verificationErrorSchema = z.object({
+  check: z.enum(VERIFICATION_CHECK_NAMES),
+  message: z.string(),
+});
+
 /**
  * Verification result as returned by the REST API.
  */
 export const verificationResultResponseSchema = z.object({
   verified: z.boolean().describe('Whether the DID was successfully verified'),
-  message: z.string().describe('Verification result message'),
+  checks: z.array(verificationCheckSchema).describe('Individual verification checks performed'),
+  errors: z.array(verificationErrorSchema).optional().describe('Errors encountered during verification'),
 });
 
 /**

@@ -168,7 +168,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         name: type
  *         schema:
  *           type: string
- *           enum: [MANAGED, SELF_MANAGED]
+ *           enum: [DEFAULT, MANAGED, SELF_MANAGED]
  *         description: Filter by DID type
  *       - in: query
  *         name: status

@@ -10,6 +10,8 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import {
   // DID schemas
   didResponseSchema,
+  verificationCheckSchema,
+  verificationErrorSchema,
   verificationResultResponseSchema,
   didDocumentResponseSchema,
   // IDR schemas
@@ -21,6 +23,7 @@ import {
   // Shared schemas
   errorResponseSchema,
 } from '@uncefact/untp-ri-services';
+import { paginationMetaSchema } from '@/lib/api/pagination';
 
 // ============================================================================
 // Credential Schemas (remain local — no credential service directory yet)
@@ -68,6 +71,8 @@ export const credentialIssueRequestSchema = z.object({
 
 export {
   didResponseSchema,
+  verificationCheckSchema,
+  verificationErrorSchema,
   verificationResultResponseSchema,
   didDocumentResponseSchema,
   registrarSchema,
@@ -76,6 +81,7 @@ export {
   identifierSchema,
   linkRegistrationSchema,
   errorResponseSchema,
+  paginationMetaSchema,
 };
 
 // ============================================================================
@@ -97,6 +103,9 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     Did: didResponseSchema,
     ErrorResponse: errorResponseSchema,
     VerificationResult: verificationResultResponseSchema,
+    PaginationMeta: paginationMetaSchema,
+    VerificationCheck: verificationCheckSchema,
+    VerificationError: verificationErrorSchema,
     DidDocument: didDocumentResponseSchema,
     CredentialStorageResponse: credentialStorageResponseSchema,
     CredentialPublishResponse: credentialPublishResponseSchema,
