@@ -39,14 +39,23 @@ export const didResponseSchema = z.object({
   updatedAt: z.string().datetime().describe('Timestamp when the DID was last updated'),
 });
 
+const VERIFICATION_CHECK_NAMES = [
+  'resolve',
+  'structure',
+  'identity_match',
+  'https',
+  'key_material',
+  'jsonld_validity',
+] as const;
+
 export const verificationCheckSchema = z.object({
-  name: z.enum(['resolve', 'structure', 'identity_match', 'https', 'key_material', 'jsonld_validity']),
+  name: z.enum(VERIFICATION_CHECK_NAMES),
   passed: z.boolean(),
   message: z.string().optional(),
 });
 
 export const verificationErrorSchema = z.object({
-  check: z.enum(['resolve', 'structure', 'identity_match', 'https', 'key_material', 'jsonld_validity']),
+  check: z.enum(VERIFICATION_CHECK_NAMES),
   message: z.string(),
 });
 
