@@ -39,22 +39,21 @@ describe('Closed mode — DID CRUD', { testIsolation: false }, () => {
       },
     }).then((response) => {
       expect(response.status).to.eq(201);
-      expect(response.body.ok).to.be.true;
-      expect(response.body.did.did).to.match(/^did:web:/);
-      expect(response.body.did.type).to.eq('MANAGED');
-      expect(response.body.did.status).to.eq('ACTIVE');
+      expect(response.body.did).to.match(/^did:web:/);
+      expect(response.body.type).to.eq('MANAGED');
+      expect(response.body.status).to.eq('ACTIVE');
 
-      createdDidId = response.body.did.id;
+      createdDidId = response.body.id;
     });
   });
 
   it('GET /api/v1/dids — lists DIDs including the one just created', () => {
     cy.request('/api/v1/dids').then((response) => {
       expect(response.status).to.eq(200);
-      expect(response.body.ok).to.be.true;
-      expect(response.body.dids).to.be.an('array');
+      expect(response.body.data).to.be.an('array');
+      expect(response.body.pagination).to.exist;
 
-      const found = response.body.dids.find((d: any) => d.id === createdDidId);
+      const found = response.body.data.find((d: any) => d.id === createdDidId);
       expect(found).to.exist;
     });
   });
@@ -62,9 +61,8 @@ describe('Closed mode — DID CRUD', { testIsolation: false }, () => {
   it('GET /api/v1/dids/:id — retrieves the specific DID', () => {
     cy.request(`/api/v1/dids/${createdDidId}`).then((response) => {
       expect(response.status).to.eq(200);
-      expect(response.body.ok).to.be.true;
-      expect(response.body.did.id).to.eq(createdDidId);
-      expect(response.body.did.name).to.eq(`Closed Mode DID ${RUN_ID}`);
+      expect(response.body.id).to.eq(createdDidId);
+      expect(response.body.name).to.eq(`Closed Mode DID ${RUN_ID}`);
     });
   });
 });

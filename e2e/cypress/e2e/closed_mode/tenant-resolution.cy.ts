@@ -30,7 +30,7 @@ describe('Closed mode — tenant resolution', { testIsolation: false }, () => {
       // group claim.  Verify the session works by hitting a protected endpoint.
       cy.request('/api/v1/dids').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
+        expect(response.body.data).to.be.an('array');
       });
     });
 
@@ -54,7 +54,7 @@ describe('Closed mode — tenant resolution', { testIsolation: false }, () => {
 
       cy.request('/api/v1/dids').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
+        expect(response.body.data).to.be.an('array');
       });
     });
 

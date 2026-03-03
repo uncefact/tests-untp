@@ -39,8 +39,8 @@ describe('Open mode — service account API', { testIsolation: false }, () => {
       headers: { Authorization: `Bearer ${accessToken}` },
     }).then((response) => {
       expect(response.status).to.eq(200);
-      expect(response.body.ok).to.be.true;
-      expect(response.body.dids).to.be.an('array');
+      expect(response.body.data).to.be.an('array');
+      expect(response.body.pagination).to.exist;
     });
   });
 
@@ -60,8 +60,7 @@ describe('Open mode — service account API', { testIsolation: false }, () => {
       },
     }).then((response) => {
       expect(response.status).to.eq(201);
-      expect(response.body.ok).to.be.true;
-      expect(response.body.did.did).to.match(/^did:web:/);
+      expect(response.body.did).to.match(/^did:web:/);
     });
   });
 

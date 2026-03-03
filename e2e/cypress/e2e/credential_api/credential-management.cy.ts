@@ -84,7 +84,7 @@ describe('Credential API', { testIsolation: false }, () => {
     it('looks up the system default DID to use as issuer', () => {
       cy.request('/api/v1/dids').then((response) => {
         expect(response.status).to.eq(200);
-        const defaultDid = response.body.dids.find(
+        const defaultDid = response.body.data.find(
           (d: any) => d.isDefault === true,
         );
         expect(defaultDid).to.exist;
@@ -195,7 +195,6 @@ describe('Credential API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
-        expect(response.body.ok).to.be.false;
         expect(response.body.error).to.be.a('string').and.not.be.empty;
       });
     });

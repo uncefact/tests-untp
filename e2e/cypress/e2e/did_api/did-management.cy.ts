@@ -2,6 +2,7 @@ describe('DID API', { testIsolation: false }, () => {
   const TEST_ORG_ID = 'e2e-test-org';
   const RUN_ID = Date.now();
   let createdDidId: string;
+  let createdDid: string;
   let defaultDidId: string;
 
   before(() => {
@@ -30,22 +31,38 @@ describe('DID API', { testIsolation: false }, () => {
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.did.did).to.match(/^did:web:/);
-        expect(response.body.did.type).to.eq('MANAGED');
-        expect(response.body.did.status).to.eq('ACTIVE');
+        expect(response.body).to.not.have.property('ok');
+        expect(response.body.did).to.match(/^did:web:/);
+        expect(response.body.type).to.eq('MANAGED');
+        expect(response.body.status).to.eq('ACTIVE');
+        expect(response.body.id).to.be.a('string');
+        expect(response.body.name).to.eq(`E2E Test DID ${RUN_ID}`);
+        expect(response.body.description).to.eq('Created by Cypress E2E test');
+        expect(response.body.method).to.eq('DID_WEB');
+        expect(response.body.serviceInstanceId).to.be.a('string');
 
-        createdDidId = response.body.did.id;
+        createdDidId = response.body.id;
+        createdDid = response.body.did;
       });
     });
 
-    it('GET /api/v1/dids — lists DIDs including system default', () => {
+    it('GET /api/v1/dids — lists DIDs with pagination metadata', () => {
       cy.request('/api/v1/dids').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.dids).to.be.an('array');
+        expect(response.body).to.not.have.property('ok');
 
-        const defaultDid = response.body.dids.find(
+        // Paginated response shape
+        expect(response.body.data).to.be.an('array');
+        expect(response.body.pagination).to.exist;
+        expect(response.body.pagination.total).to.be.a('number');
+        expect(response.body.pagination.limit).to.be.a('number');
+        expect(response.body.pagination.offset).to.eq(0);
+        expect(response.body.pagination).to.have.property('hasMore');
+
+        // Should contain at least the created DID and the system default
+        expect(response.body.data.length).to.be.at.least(2);
+
+        const defaultDid = response.body.data.find(
           (d: any) => d.isDefault === true,
         );
         expect(defaultDid).to.exist;
@@ -57,21 +74,43 @@ describe('DID API', { testIsolation: false }, () => {
     it('GET /api/v1/dids/:id — retrieves a specific DID', () => {
       cy.request(`/api/v1/dids/${createdDidId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.did.id).to.eq(createdDidId);
-        expect(response.body.did.name).to.eq(`E2E Test DID ${RUN_ID}`);
+        expect(response.body).to.not.have.property('ok');
+        expect(response.body.id).to.eq(createdDidId);
+        expect(response.body.name).to.eq(`E2E Test DID ${RUN_ID}`);
+        expect(response.body.did).to.eq(createdDid);
+        expect(response.body.type).to.eq('MANAGED');
       });
     });
 
-    it('PUT /api/v1/dids/:id — updates DID name', () => {
+    it('PATCH /api/v1/dids/:id — updates DID name', () => {
       cy.request({
-        method: 'PUT',
+        method: 'PATCH',
         url: `/api/v1/dids/${createdDidId}`,
         body: { name: `Updated E2E DID ${RUN_ID}` },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.did.name).to.eq(`Updated E2E DID ${RUN_ID}`);
+        expect(response.body).to.not.have.property('ok');
+        expect(response.body.name).to.eq(`Updated E2E DID ${RUN_ID}`);
+        expect(response.body.id).to.eq(createdDidId);
+      });
+    });
+
+    it('PATCH /api/v1/dids/:id — updates DID description', () => {
+      cy.request({
+        method: 'PATCH',
+        url: `/api/v1/dids/${createdDidId}`,
+        body: { description: `Updated description ${RUN_ID}` },
+      }).then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.description).to.eq(`Updated description ${RUN_ID}`);
+      });
+    });
+
+    it('GET /api/v1/dids/:id — confirms updates persisted', () => {
+      cy.request(`/api/v1/dids/${createdDidId}`).then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.name).to.eq(`Updated E2E DID ${RUN_ID}`);
+        expect(response.body.description).to.eq(`Updated description ${RUN_ID}`);
       });
     });
 
@@ -81,21 +120,43 @@ describe('DID API', { testIsolation: false }, () => {
       // cannot be resolved over HTTPS.
       cy.request(`/api/v1/dids/${defaultDidId}/document`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.document).to.exist;
-        expect(response.body.document.id).to.match(/^did:web:/);
+        expect(response.body).to.not.have.property('ok');
+        expect(response.body.id).to.match(/^did:web:/);
+        expect(response.body).to.have.property('verificationMethod');
       });
     });
 
-    it('POST /api/v1/dids/:id/verify — verifies DID document', () => {
+    it('POST /api/v1/dids/:id/verify — verifies DID', () => {
       cy.request({
         method: 'POST',
         url: `/api/v1/dids/${createdDidId}/verify`,
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
+        expect(response.body).to.not.have.property('ok');
         expect(response.body.verification).to.exist;
         expect(response.body.verification.checks).to.be.an('array');
+        expect(response.body.did).to.exist;
+        expect(response.body.did.id).to.eq(createdDidId);
+      });
+    });
+
+    it('DELETE /api/v1/dids/:id — deletes a managed DID', () => {
+      cy.request({
+        method: 'DELETE',
+        url: `/api/v1/dids/${createdDidId}`,
+      }).then((response) => {
+        expect(response.status).to.eq(204);
+        expect(response.body).to.be.empty;
+      });
+    });
+
+    it('GET /api/v1/dids/:id — returns 404 after deletion', () => {
+      cy.request({
+        method: 'GET',
+        url: `/api/v1/dids/${createdDidId}`,
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
       });
     });
   });
@@ -104,16 +165,63 @@ describe('DID API', { testIsolation: false }, () => {
     it('filters DIDs by type', () => {
       cy.request('/api/v1/dids?type=MANAGED').then((response) => {
         expect(response.status).to.eq(200);
-        response.body.dids.forEach((did: any) => {
+        expect(response.body.data).to.be.an('array');
+        response.body.data.forEach((did: any) => {
           expect(did.type).to.eq('MANAGED');
         });
       });
     });
 
-    it('supports pagination', () => {
+    it('filters DIDs by status', () => {
+      cy.request('/api/v1/dids?status=ACTIVE').then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.data).to.be.an('array');
+        response.body.data.forEach((did: any) => {
+          expect(did.status).to.eq('ACTIVE');
+        });
+      });
+    });
+
+    it('supports limit and offset', () => {
       cy.request('/api/v1/dids?limit=1&offset=0').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.dids.length).to.be.at.most(1);
+        expect(response.body.data.length).to.be.at.most(1);
+        expect(response.body.pagination.limit).to.eq(1);
+        expect(response.body.pagination.offset).to.eq(0);
+      });
+    });
+
+    it('returns correct pagination metadata', () => {
+      // First get total count
+      cy.request('/api/v1/dids').then((allResponse) => {
+        const total = allResponse.body.pagination.total;
+
+        // Request with limit smaller than total
+        cy.request(`/api/v1/dids?limit=1&offset=0`).then((response) => {
+          expect(response.body.pagination.total).to.eq(total);
+          expect(response.body.pagination.hasMore).to.eq(total > 1);
+        });
+      });
+    });
+
+    it('returns 400 for invalid type filter', () => {
+      cy.request({
+        method: 'GET',
+        url: '/api/v1/dids?type=INVALID',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('returns 400 for invalid limit', () => {
+      cy.request({
+        method: 'GET',
+        url: '/api/v1/dids?limit=-1',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
       });
     });
   });
@@ -133,10 +241,10 @@ describe('DID API', { testIsolation: false }, () => {
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.did.type).to.eq('SELF_MANAGED');
-        expect(response.body.did.status).to.eq('UNVERIFIED');
+        expect(response.body.type).to.eq('SELF_MANAGED');
+        expect(response.body.status).to.eq('UNVERIFIED');
 
-        selfManagedDidId = response.body.did.id;
+        selfManagedDidId = response.body.id;
       });
     });
 
@@ -146,6 +254,7 @@ describe('DID API', { testIsolation: false }, () => {
         url: `/api/v1/dids/${selfManagedDidId}/verify`,
       }).then((response) => {
         expect(response.status).to.eq(200);
+        expect(response.body.verification).to.exist;
         expect(response.body.did.status).to.be.oneOf([
           'VERIFIED',
           'UNVERIFIED',
@@ -153,27 +262,23 @@ describe('DID API', { testIsolation: false }, () => {
         ]);
       });
     });
-  });
 
-  describe('Error handling', () => {
-    it('returns 404 for nonexistent DID', () => {
+    it('DELETE — deletes a self-managed DID', () => {
       cy.request({
-        method: 'GET',
-        url: '/api/v1/dids/nonexistent-id',
-        failOnStatusCode: false,
+        method: 'DELETE',
+        url: `/api/v1/dids/${selfManagedDidId}`,
       }).then((response) => {
-        expect(response.status).to.eq(404);
+        expect(response.status).to.eq(204);
       });
     });
 
-    it('returns 400 for invalid type', () => {
+    it('GET — returns 404 after self-managed DID deletion', () => {
       cy.request({
-        method: 'POST',
-        url: '/api/v1/dids',
-        body: { type: 'INVALID' },
+        method: 'GET',
+        url: `/api/v1/dids/${selfManagedDidId}`,
         failOnStatusCode: false,
       }).then((response) => {
-        expect(response.status).to.eq(400);
+        expect(response.status).to.eq(404);
       });
     });
   });
@@ -195,22 +300,22 @@ describe('DID API', { testIsolation: false }, () => {
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.did.type).to.eq('SELF_MANAGED');
-        expect(response.body.did.status).to.eq('UNVERIFIED');
-        expect(response.body.did.did).to.eq(importedDidString);
+        expect(response.body).to.not.have.property('ok');
+        expect(response.body.type).to.eq('SELF_MANAGED');
+        expect(response.body.status).to.eq('UNVERIFIED');
+        expect(response.body.did).to.eq(importedDidString);
+        expect(response.body.name).to.eq(`E2E Imported DID ${RUN_ID}`);
 
-        importedDidId = response.body.did.id;
+        importedDidId = response.body.id;
       });
     });
 
     it('GET /api/v1/dids/:id — retrieves the imported DID', () => {
       cy.request(`/api/v1/dids/${importedDidId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.did.name).to.eq(`E2E Imported DID ${RUN_ID}`);
-        expect(response.body.did.type).to.eq('SELF_MANAGED');
-        expect(response.body.did.status).to.eq('UNVERIFIED');
+        expect(response.body.name).to.eq(`E2E Imported DID ${RUN_ID}`);
+        expect(response.body.type).to.eq('SELF_MANAGED');
+        expect(response.body.status).to.eq('UNVERIFIED');
       });
     });
 
@@ -220,7 +325,6 @@ describe('DID API', { testIsolation: false }, () => {
         url: `/api/v1/dids/${importedDidId}/verify`,
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
         expect(response.body.verification).to.exist;
         expect(response.body.did.status).to.be.oneOf([
           'VERIFIED',
@@ -238,6 +342,37 @@ describe('DID API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('POST /api/v1/dids/import — returns 400 for missing method', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids/import',
+        body: {
+          did: `did:web:missing-method-${RUN_ID}.example.com`,
+          keyId: 'some-key',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('POST /api/v1/dids/import — returns 400 for missing keyId', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids/import',
+        body: {
+          did: `did:web:missing-key-${RUN_ID}.example.com`,
+          method: 'DID_WEB',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -255,6 +390,136 @@ describe('DID API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.not.eq(201);
+      });
+    });
+  });
+
+  describe('Error handling', () => {
+    it('GET — returns 404 for non-existent DID', () => {
+      cy.request({
+        method: 'GET',
+        url: '/api/v1/dids/nonexistent-id',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('PATCH — returns 404 for non-existent DID', () => {
+      cy.request({
+        method: 'PATCH',
+        url: '/api/v1/dids/nonexistent-id',
+        body: { name: 'Should not work' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('DELETE — returns 404 for non-existent DID', () => {
+      cy.request({
+        method: 'DELETE',
+        url: '/api/v1/dids/nonexistent-id',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('DELETE — returns 400 when deleting the default DID', () => {
+      cy.request({
+        method: 'DELETE',
+        url: `/api/v1/dids/${defaultDidId}`,
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.include('default');
+      });
+    });
+
+    it('POST — returns 400 for invalid type', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids',
+        body: { type: 'INVALID', method: 'DID_WEB', alias: 'test' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('POST — returns 400 for missing method', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids',
+        body: { type: 'MANAGED', alias: 'test' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('POST — returns 400 for missing alias', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids',
+        body: { type: 'MANAGED', method: 'DID_WEB' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('POST — returns 400 for invalid method', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids',
+        body: { type: 'MANAGED', method: 'INVALID', alias: 'test' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('PATCH — returns 400 for empty body', () => {
+      // Need a valid DID to test — use the default
+      cy.request({
+        method: 'PATCH',
+        url: `/api/v1/dids/${defaultDidId}`,
+        body: {},
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('GET /document — returns 404 for non-existent DID', () => {
+      cy.request({
+        method: 'GET',
+        url: '/api/v1/dids/nonexistent-id/document',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('POST /verify — returns 404 for non-existent DID', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids/nonexistent-id/verify',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
       });
     });
   });
