@@ -170,6 +170,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *     responses:
  *       204:
  *         description: DID deleted successfully
+ *       400:
+ *         description: Cannot delete the system default DID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - missing or invalid authentication
  *         content:
