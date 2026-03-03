@@ -5,6 +5,7 @@ import {
   listDids,
   updateDid,
   updateDidStatus,
+  deleteDid,
   getDefaultDid,
 } from './did.repository';
 import type { DidStatus } from '../generated';
@@ -14,6 +15,7 @@ const mockTx = {
   did: {
     findFirst: jest.fn(),
     update: jest.fn(),
+    delete: jest.fn(),
   },
 };
 
@@ -24,6 +26,7 @@ jest.mock('../prisma', () => ({
       create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
     },
     $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   },
@@ -36,6 +39,7 @@ const mockDid = prisma.did as unknown as {
   create: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
+  count: jest.Mock;
 };
 
 describe('did.repository', () => {
@@ -221,6 +225,7 @@ describe('did.repository', () => {
   describe('listDids', () => {
     it('lists DIDs for the organisation including defaults', async () => {
       mockDid.findMany.mockResolvedValue([DID_RECORD]);
+      mockDid.count.mockResolvedValue(1);
 
       const result = await listDids(ORG_ID);
 
@@ -228,15 +233,21 @@ describe('did.repository', () => {
         where: {
           OR: [{ tenantId: ORG_ID }, { isDefault: true }],
         },
-        take: 100,
+        take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
-      expect(result).toEqual([DID_RECORD]);
+      expect(mockDid.count).toHaveBeenCalledWith({
+        where: {
+          OR: [{ tenantId: ORG_ID }, { isDefault: true }],
+        },
+      });
+      expect(result).toEqual({ data: [DID_RECORD], total: 1 });
     });
 
     it('applies type and status filters', async () => {
       mockDid.findMany.mockResolvedValue([]);
+      mockDid.count.mockResolvedValue(0);
 
       await listDids(ORG_ID, { type: 'MANAGED', status: 'ACTIVE' });
 
@@ -245,7 +256,7 @@ describe('did.repository', () => {
           type: 'MANAGED',
           status: 'ACTIVE',
         }),
-        take: 100,
+        take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
@@ -253,6 +264,7 @@ describe('did.repository', () => {
 
     it('applies serviceInstanceId filter', async () => {
       mockDid.findMany.mockResolvedValue([]);
+      mockDid.count.mockResolvedValue(0);
 
       await listDids(ORG_ID, { serviceInstanceId: 'inst-1' });
 
@@ -260,7 +272,7 @@ describe('did.repository', () => {
         where: expect.objectContaining({
           serviceInstanceId: 'inst-1',
         }),
-        take: 100,
+        take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
@@ -268,6 +280,7 @@ describe('did.repository', () => {
 
     it('applies pagination', async () => {
       mockDid.findMany.mockResolvedValue([]);
+      mockDid.count.mockResolvedValue(0);
 
       await listDids(ORG_ID, { limit: 10, offset: 20 });
 
@@ -326,6 +339,36 @@ describe('did.repository', () => {
       await expect(updateDidStatus('did-record-1', 'other-org', 'VERIFIED' as DidStatus)).rejects.toThrow(
         'DID not found or access denied',
       );
+    });
+  });
+
+  describe('deleteDid', () => {
+    it('deletes the DID when it belongs to the organisation', async () => {
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      mockTx.did.delete.mockResolvedValue(DID_RECORD);
+
+      await deleteDid('did-record-1', ORG_ID);
+
+      expect(mockTx.did.findFirst).toHaveBeenCalledWith({
+        where: { id: 'did-record-1', tenantId: ORG_ID },
+      });
+      expect(mockTx.did.delete).toHaveBeenCalledWith({
+        where: { id: 'did-record-1' },
+      });
+    });
+
+    it('throws NotFoundError when DID does not exist', async () => {
+      mockTx.did.findFirst.mockResolvedValue(null);
+
+      await expect(deleteDid('nonexistent', ORG_ID)).rejects.toThrow('DID not found or access denied');
+      expect(mockTx.did.delete).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundError when DID belongs to a different organisation', async () => {
+      mockTx.did.findFirst.mockResolvedValue(null);
+
+      await expect(deleteDid('did-record-1', 'other-org')).rejects.toThrow('DID not found or access denied');
+      expect(mockTx.did.delete).not.toHaveBeenCalled();
     });
   });
 

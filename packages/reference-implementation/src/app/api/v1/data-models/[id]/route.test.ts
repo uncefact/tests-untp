@@ -88,7 +88,6 @@ describe('GET /api/v1/data-models/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(404);
-    expect(json.ok).toBe(false);
     expect(json.error).toContain('Data model not found');
   });
 
@@ -150,7 +149,6 @@ describe('PATCH /api/v1/data-models/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.ok).toBe(false);
     expect(json.error).toContain('At least one updatable field must be provided');
   });
 

@@ -34,9 +34,6 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/verify' });
  *             schema:
  *               type: object
  *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
  *                 verification:
  *                   $ref: '#/components/schemas/VerificationResult'
  *                 did:
@@ -80,5 +77,5 @@ export const POST = withTenantAuth(async (_req, { tenantId, params }) => {
   const updatedDid = await updateDidStatus(id, tenantId, newStatus);
 
   logger.info({ tenantId, didId: id, verified: verification.verified }, 'DID verification complete');
-  return NextResponse.json({ ok: true, verification, did: updatedDid });
+  return NextResponse.json({ verification, did: updatedDid });
 });

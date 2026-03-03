@@ -28,13 +28,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/document' });
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 document:
- *                   $ref: '#/components/schemas/DidDocument'
+ *               $ref: '#/components/schemas/DidDocument'
  *       401:
  *         description: Unauthorized - missing or invalid authentication
  *         content:
@@ -70,5 +64,5 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const document = await didService.getDocument(did.did);
 
   logger.info({ tenantId, didId: id }, 'DID document retrieved');
-  return NextResponse.json({ ok: true, document });
+  return NextResponse.json(document);
 });

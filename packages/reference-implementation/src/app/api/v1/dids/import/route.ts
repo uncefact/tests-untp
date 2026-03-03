@@ -50,13 +50,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 did:
- *                   $ref: '#/components/schemas/Did'
+ *               $ref: '#/components/schemas/Did'
  *       400:
  *         description: Validation error
  *         content:
@@ -114,5 +108,5 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   });
 
   logger.info({ tenantId, didId: record.id, did: record.did }, 'DID imported');
-  return NextResponse.json({ ok: true, did: record }, { status: 201 });
+  return NextResponse.json(record, { status: 201 });
 });

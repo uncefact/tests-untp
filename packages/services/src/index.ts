@@ -68,6 +68,7 @@ export {
   DidMethodNotSupportedError,
   DidInputError,
   DidCreateError,
+  DidDeleteError,
   DidDocumentFetchError,
   DidParseError,
 } from './did-manager/errors.js';

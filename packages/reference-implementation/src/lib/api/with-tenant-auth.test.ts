@@ -100,7 +100,7 @@ import { ServiceError } from '@uncefact/untp-ri-services';
 import { withTenantAuth, handleRouteError } from './with-tenant-auth';
 
 interface MockResponse {
-  json: () => Promise<{ ok: boolean; error: string; code?: string }>;
+  json: () => Promise<{ error: string; code?: string }>;
 }
 
 beforeEach(() => {
@@ -138,7 +138,7 @@ describe('withTenantAuth — open mode, session path', () => {
     const res = await wrapped(fakeRequest(), emptyRouteContext);
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ ok: false, error: 'Unauthorized' });
+    expect(await res.json()).toEqual({ error: 'Unauthorized' });
     expect(handler).not.toHaveBeenCalled();
   });
 
@@ -151,7 +151,7 @@ describe('withTenantAuth — open mode, session path', () => {
     const res = await wrapped(fakeRequest(), emptyRouteContext);
 
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ ok: false, error: 'No tenant found for user' });
+    expect(await res.json()).toEqual({ error: 'No tenant found for user' });
     expect(handler).not.toHaveBeenCalled();
   });
 
@@ -197,7 +197,7 @@ describe('withTenantAuth — open mode, session path', () => {
     const res = await wrapped(fakeRequest(), emptyRouteContext);
 
     expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ ok: false, error: 'not found' });
+    expect(await res.json()).toEqual({ error: 'not found' });
   });
 
   it('does not attempt service account resolution when session exists', async () => {
@@ -261,7 +261,7 @@ describe('withTenantAuth — open mode, service account path', () => {
     const res = await wrapped(req, emptyRouteContext);
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ ok: false, error: 'Unauthorized' });
+    expect(await res.json()).toEqual({ error: 'Unauthorized' });
     expect(handler).not.toHaveBeenCalled();
   });
 
@@ -295,7 +295,7 @@ describe('withTenantAuth — open mode, service account path', () => {
     const res = await wrapped(req, emptyRouteContext);
 
     expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ ok: false, error: 'not found' });
+    expect(await res.json()).toEqual({ error: 'not found' });
   });
 });
 
@@ -383,7 +383,6 @@ describe('withTenantAuth — closed mode, session path', () => {
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual(
       expect.objectContaining({
-        ok: false,
         error: 'Session expired — please sign in again',
       }),
     );
@@ -402,7 +401,6 @@ describe('withTenantAuth — closed mode, session path', () => {
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual(
       expect.objectContaining({
-        ok: false,
         error: 'No group assignment found',
       }),
     );
@@ -423,7 +421,6 @@ describe('withTenantAuth — closed mode, session path', () => {
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual(
       expect.objectContaining({
-        ok: false,
         error: 'No tenant found for group',
       }),
     );
@@ -439,7 +436,7 @@ describe('withTenantAuth — closed mode, session path', () => {
     const res = await wrapped(fakeRequest(), emptyRouteContext);
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ ok: false, error: 'Unauthorized' });
+    expect(await res.json()).toEqual({ error: 'Unauthorized' });
   });
 });
 
@@ -731,7 +728,6 @@ describe('handleRouteError', () => {
     const res = handleRouteError(new ValidationError('bad input'));
     expect(res.status).toBe(400);
     const body = await (res as unknown as MockResponse).json();
-    expect(body.ok).toBe(false);
     expect(body.error).toBe('bad input');
   });
 
@@ -739,7 +735,6 @@ describe('handleRouteError', () => {
     const res = handleRouteError(new NotFoundError('missing'));
     expect(res.status).toBe(404);
     const body = await (res as unknown as MockResponse).json();
-    expect(body.ok).toBe(false);
     expect(body.error).toBe('missing');
   });
 
@@ -747,7 +742,6 @@ describe('handleRouteError', () => {
     const res = handleRouteError(new ServiceRegistryError('config bad'));
     expect(res.status).toBe(500);
     const body = await (res as unknown as MockResponse).json();
-    expect(body.ok).toBe(false);
     expect(body.error).toBe('config bad');
   });
 
@@ -755,7 +749,6 @@ describe('handleRouteError', () => {
     const res = handleRouteError(new ServiceError('upstream fail', 'TEST_ERR', 502));
     expect(res.status).toBe(502);
     const body = await (res as unknown as MockResponse).json();
-    expect(body.ok).toBe(false);
     expect(body.error).toBe('upstream fail');
     expect(body.code).toBe('TEST_ERR');
   });
@@ -764,7 +757,6 @@ describe('handleRouteError', () => {
     const res = handleRouteError(new Error('kaboom'));
     expect(res.status).toBe(500);
     const body = await (res as unknown as MockResponse).json();
-    expect(body.ok).toBe(false);
     expect(body.error).toBe('kaboom');
   });
 });

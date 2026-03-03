@@ -137,7 +137,6 @@ describe('GET /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.ok).toBe(false);
     expect(json.error).toContain('isExtension must be "true" or "false"');
   });
 
@@ -168,7 +167,6 @@ describe('GET /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.ok).toBe(false);
     expect(json.error).toContain('credentialType must be one of');
   });
 

@@ -22,15 +22,15 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
           return await handler(req, ctx);
         } catch (e: unknown) {
           if (e instanceof ValidationError) {
-            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 400 });
+            return jsonResponse({ error: (e as Error).message }, { status: 400 });
           }
           if (e instanceof NotFoundError) {
-            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 404 });
+            return jsonResponse({ error: (e as Error).message }, { status: 404 });
           }
           if (e instanceof ServiceRegistryError) {
-            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 500 });
+            return jsonResponse({ error: (e as Error).message }, { status: 500 });
           }
-          return jsonResponse({ ok: false, error: errorMessage(e) }, { status: 500 });
+          return jsonResponse({ error: errorMessage(e) }, { status: 500 });
         }
       },
   };
@@ -98,8 +98,7 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(201);
-    expect(body.ok).toBe(true);
-    expect(body.did).toEqual(MOCK_DID_RECORD);
+    expect(body).toEqual(MOCK_DID_RECORD);
 
     // Verify createDid was called with correct params -- NOT calling adapter
     expect(mockCreateDid).toHaveBeenCalledWith({
@@ -187,7 +186,6 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.ok).toBe(false);
     expect(body.error).toContain('did is required');
   });
 
@@ -198,7 +196,6 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.ok).toBe(false);
     expect(body.error).toContain('keyId is required');
   });
 
@@ -209,7 +206,6 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.ok).toBe(false);
     expect(body.error).toContain('method is required');
   });
 
@@ -220,7 +216,6 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.ok).toBe(false);
     expect(body.error).toContain('method must be one of');
   });
 
@@ -268,7 +263,6 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(500);
-    expect(body.ok).toBe(false);
     expect(body.error).toBeDefined();
   });
 
@@ -285,7 +279,6 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(500);
-    expect(body.ok).toBe(false);
     expect(body.error).toBeDefined();
   });
 
@@ -296,7 +289,6 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.ok).toBe(false);
     expect(body.error).toContain('did is required');
   });
 
@@ -307,7 +299,6 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.ok).toBe(false);
     expect(body.error).toContain('keyId is required');
   });
 
@@ -318,7 +309,6 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.ok).toBe(false);
     expect(body.error).toContain('method');
   });
 
@@ -331,10 +321,8 @@ describe('POST /api/v1/dids/import', () => {
     });
 
     const res = await POST(req, createContext());
-    const body = await res.json();
 
     expect(res.status).toBe(201);
-    expect(body.ok).toBe(true);
 
     expect(mockCreateDid).toHaveBeenCalledWith(
       expect.objectContaining({

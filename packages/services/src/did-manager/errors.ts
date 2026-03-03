@@ -36,6 +36,13 @@ export class DidCreateError extends DidError {
   }
 }
 
+/** Failed to delete a DID via the upstream provider. */
+export class DidDeleteError extends DidError {
+  constructor(detail: string, httpStatus?: number) {
+    super(`Failed to delete DID: ${detail}`, 'DID_DELETE_FAILED', 502, { httpStatus });
+  }
+}
+
 /** Failed to fetch a DID document from the upstream provider. */
 export class DidDocumentFetchError extends DidError {
   constructor(did: string, detail: string, httpStatus?: number) {

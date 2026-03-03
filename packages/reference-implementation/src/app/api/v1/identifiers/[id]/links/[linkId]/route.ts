@@ -163,7 +163,6 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
       logger.warn({ tenantId, identifierId, linkId }, 'Link desync — cannot update, missing from upstream IDR');
       return NextResponse.json(
         {
-          ok: false,
           error: `Link "${linkId}" no longer exists on the upstream IDR. It may have been removed out-of-band. Delete the local record to resolve this desynchronisation.`,
           desync: true,
         },

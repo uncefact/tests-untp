@@ -25,22 +25,22 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
           return await handler(req, ctx);
         } catch (e: unknown) {
           if (e instanceof ValidationError) {
-            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 400 });
+            return jsonResponse({ error: (e as Error).message }, { status: 400 });
           }
           if (e instanceof NotFoundError) {
-            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 404 });
+            return jsonResponse({ error: (e as Error).message }, { status: 404 });
           }
           if (e instanceof ServiceRegistryError) {
-            return jsonResponse({ ok: false, error: (e as Error).message }, { status: 500 });
+            return jsonResponse({ error: (e as Error).message }, { status: 500 });
           }
           if (e instanceof ServiceError) {
             const serviceErr = e as Error & { code?: string; statusCode?: number };
             return jsonResponse(
-              { ok: false, error: serviceErr.message, code: serviceErr.code },
+              { error: serviceErr.message, code: serviceErr.code },
               { status: serviceErr.statusCode },
             );
           }
-          return jsonResponse({ ok: false, error: errorMessage(e) }, { status: 500 });
+          return jsonResponse({ error: errorMessage(e) }, { status: 500 });
         }
       },
   };
@@ -125,8 +125,7 @@ describe('POST /api/v1/dids', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(json.ok).toBe(true);
-    expect(json.did.did).toBe('did:web:example.com:org:123');
+    expect(json.did).toBe('did:web:example.com:org:123');
   });
 
   it('creates a self-managed DID with UNVERIFIED status and serviceInstanceId', async () => {
@@ -249,7 +248,6 @@ describe('POST /api/v1/dids', () => {
 
     expect(res.status).toBe(500);
     const json = await res.json();
-    expect(json.ok).toBe(false);
     expect(json.error).toContain('No service instance available');
   });
 
@@ -334,21 +332,26 @@ describe('GET /api/v1/dids', () => {
     jest.clearAllMocks();
   });
 
-  it('lists DIDs for the organisation', async () => {
+  it('lists DIDs for the organisation with pagination', async () => {
     const dids = [{ id: '1', did: 'did:web:example.com' }];
-    mockListDids.mockResolvedValue(dids);
+    mockListDids.mockResolvedValue({ data: dids, total: 1 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/dids' });
     const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.dids).toEqual(dids);
+    expect(json.data).toEqual(dids);
+    expect(json.pagination).toEqual({
+      total: 1,
+      limit: 20,
+      offset: 0,
+      hasMore: false,
+    });
   });
 
   it('passes query parameters to listDids', async () => {
-    mockListDids.mockResolvedValue([]);
+    mockListDids.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -366,7 +369,7 @@ describe('GET /api/v1/dids', () => {
   });
 
   it('handles no query parameters', async () => {
-    mockListDids.mockResolvedValue([]);
+    mockListDids.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/dids' });
     await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
@@ -377,6 +380,25 @@ describe('GET /api/v1/dids', () => {
       serviceInstanceId: undefined,
       limit: undefined,
       offset: undefined,
+    });
+  });
+
+  it('returns hasMore: true when more results exist', async () => {
+    const dids = [{ id: '1' }, { id: '2' }];
+    mockListDids.mockResolvedValue({ data: dids, total: 5 });
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/dids?limit=2&offset=0',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(json.pagination).toEqual({
+      total: 5,
+      limit: 2,
+      offset: 0,
+      hasMore: true,
     });
   });
 

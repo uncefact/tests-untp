@@ -21,7 +21,7 @@ import { ServiceError } from '@uncefact/untp-ri-services';
 import { handleRouteError } from './handle-route-error';
 
 interface MockResponse {
-  json: () => Promise<{ ok: boolean; error: string; code?: string }>;
+  json: () => Promise<{ error: string; code?: string }>;
 }
 
 beforeEach(() => {
@@ -38,7 +38,7 @@ describe('handleRouteError', () => {
 
     expect(res.status).toBe(400);
     const body = await (res as unknown as MockResponse).json();
-    expect(body).toEqual({ ok: false, error: 'bad input' });
+    expect(body).toEqual({ error: 'bad input' });
   });
 
   it('maps NotFoundError to 404', async () => {
@@ -46,7 +46,7 @@ describe('handleRouteError', () => {
 
     expect(res.status).toBe(404);
     const body = await (res as unknown as MockResponse).json();
-    expect(body).toEqual({ ok: false, error: 'missing' });
+    expect(body).toEqual({ error: 'missing' });
   });
 
   it('maps UnprocessableError to 422', async () => {
@@ -54,7 +54,7 @@ describe('handleRouteError', () => {
 
     expect(res.status).toBe(422);
     const body = await (res as unknown as MockResponse).json();
-    expect(body).toEqual({ ok: false, error: 'cannot process' });
+    expect(body).toEqual({ error: 'cannot process' });
   });
 
   // --- ServiceRegistryError sub-types ---
@@ -64,7 +64,7 @@ describe('handleRouteError', () => {
 
     expect(res.status).toBe(404);
     const body = await (res as unknown as MockResponse).json();
-    expect(body).toEqual({ ok: false, error: 'Service instance not found: inst-42' });
+    expect(body).toEqual({ error: 'Service instance not found: inst-42' });
   });
 
   it('maps ServiceResolutionError to 500', async () => {
@@ -72,7 +72,6 @@ describe('handleRouteError', () => {
 
     expect(res.status).toBe(500);
     const body = await (res as unknown as MockResponse).json();
-    expect(body.ok).toBe(false);
     expect(body.error).toContain('No service instance available');
   });
 
@@ -81,7 +80,6 @@ describe('handleRouteError', () => {
 
     expect(res.status).toBe(500);
     const body = await (res as unknown as MockResponse).json();
-    expect(body.ok).toBe(false);
     expect(body.error).toContain('Failed to decrypt');
   });
 
@@ -90,7 +88,6 @@ describe('handleRouteError', () => {
 
     expect(res.status).toBe(500);
     const body = await (res as unknown as MockResponse).json();
-    expect(body.ok).toBe(false);
     expect(body.error).toContain('Configuration validation failed');
   });
 
@@ -99,7 +96,7 @@ describe('handleRouteError', () => {
 
     expect(res.status).toBe(500);
     const body = await (res as unknown as MockResponse).json();
-    expect(body).toEqual({ ok: false, error: 'config bad' });
+    expect(body).toEqual({ error: 'config bad' });
   });
 
   // --- ServiceError ---
@@ -109,7 +106,7 @@ describe('handleRouteError', () => {
 
     expect(res.status).toBe(502);
     const body = await (res as unknown as MockResponse).json();
-    expect(body).toEqual({ ok: false, error: 'upstream fail', code: 'TEST_ERR' });
+    expect(body).toEqual({ error: 'upstream fail', code: 'TEST_ERR' });
   });
 
   // --- Generic / unknown errors ---
@@ -119,7 +116,7 @@ describe('handleRouteError', () => {
 
     expect(res.status).toBe(500);
     const body = await (res as unknown as MockResponse).json();
-    expect(body).toEqual({ ok: false, error: 'kaboom' });
+    expect(body).toEqual({ error: 'kaboom' });
   });
 
   it('maps a non-Error value to 500 with fallback message', async () => {
@@ -127,6 +124,6 @@ describe('handleRouteError', () => {
 
     expect(res.status).toBe(500);
     const body = await (res as unknown as MockResponse).json();
-    expect(body).toEqual({ ok: false, error: 'An unexpected error has occurred.' });
+    expect(body).toEqual({ error: 'An unexpected error has occurred.' });
   });
 });

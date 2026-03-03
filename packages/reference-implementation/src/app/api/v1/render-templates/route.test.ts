@@ -126,7 +126,6 @@ describe('GET /api/v1/render-templates', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.ok).toBe(false);
     expect(json.error).toContain('limit must be a positive integer');
   });
 
@@ -139,7 +138,6 @@ describe('GET /api/v1/render-templates', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.ok).toBe(false);
     expect(json.error).toContain('offset must be a non-negative integer');
   });
 
