@@ -198,17 +198,28 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
     throw new NotFoundError('DID not found');
   }
 
-  if (did.serviceInstanceId) {
-    logger.info(
-      { tenantId, didId: id, did: did.did, serviceInstanceId: did.serviceInstanceId },
-      'Removing DID from upstream provider',
-    );
-    const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId);
-    await didService.delete(did.did);
+  if (did.isDefault) {
+    throw new ValidationError('Cannot delete system default DID');
   }
 
   logger.info({ tenantId, didId: id }, 'Deleting DID from database');
   await deleteDid(id, tenantId);
+
+  if (did.serviceInstanceId) {
+    try {
+      logger.info(
+        { tenantId, didId: id, did: did.did, serviceInstanceId: did.serviceInstanceId },
+        'Removing DID from upstream provider',
+      );
+      const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId);
+      await didService.delete(did.did);
+    } catch (err) {
+      logger.error(
+        { tenantId, didId: id, did: did.did, error: err },
+        'Best-effort upstream DID deletion failed; orphaned upstream DID is harmless',
+      );
+    }
+  }
 
   logger.info({ tenantId, didId: id }, 'DID deleted');
   return new Response(null, { status: 204 });

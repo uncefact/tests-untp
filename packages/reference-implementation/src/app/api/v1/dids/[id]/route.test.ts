@@ -221,4 +221,57 @@ describe('DELETE /api/v1/dids/:id', () => {
     expect(mockDidService.delete).not.toHaveBeenCalled();
     expect(mockDeleteDid).toHaveBeenCalledWith('did-1', 'org-1');
   });
+
+  it('returns 400 when trying to delete a default DID', async () => {
+    mockGetDidById.mockResolvedValue({
+      id: 'did-1',
+      did: 'did:web:example.com',
+      serviceInstanceId: 'inst-1',
+      isDefault: true,
+    });
+
+    const req = createFakeRequest({ method: 'DELETE' });
+    const res = await DELETE(req, createContext('did-1') as unknown as Parameters<typeof DELETE>[1]);
+    const json = await (res as { status: number; json: () => Promise<{ error: string }> }).json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('Cannot delete system default DID');
+    expect(mockDeleteDid).not.toHaveBeenCalled();
+    expect(mockDidService.delete).not.toHaveBeenCalled();
+  });
+
+  it('returns 204 even when upstream service.delete() throws', async () => {
+    mockGetDidById.mockResolvedValue({
+      id: 'did-1',
+      did: 'did:web:example.com',
+      serviceInstanceId: 'inst-1',
+    });
+    mockDeleteDid.mockResolvedValue(undefined);
+    mockDidService.delete.mockRejectedValue(new Error('Upstream provider unreachable'));
+
+    const req = createFakeRequest({ method: 'DELETE' });
+    const res = await DELETE(req, createContext('did-1') as unknown as Parameters<typeof DELETE>[1]);
+
+    expect(res.status).toBe(204);
+    expect(mockDeleteDid).toHaveBeenCalledWith('did-1', 'org-1');
+    expect(mockDidService.delete).toHaveBeenCalledWith('did:web:example.com');
+  });
+
+  it('returns 204 even when resolveDidService throws', async () => {
+    mockGetDidById.mockResolvedValue({
+      id: 'did-1',
+      did: 'did:web:example.com',
+      serviceInstanceId: 'inst-1',
+    });
+    mockDeleteDid.mockResolvedValue(undefined);
+    mockResolveDidService.mockRejectedValue(new Error('Service registry unavailable'));
+
+    const req = createFakeRequest({ method: 'DELETE' });
+    const res = await DELETE(req, createContext('did-1') as unknown as Parameters<typeof DELETE>[1]);
+
+    expect(res.status).toBe(204);
+    expect(mockDeleteDid).toHaveBeenCalledWith('did-1', 'org-1');
+    expect(mockResolveDidService).toHaveBeenCalledWith('org-1', 'inst-1');
+    expect(mockDidService.delete).not.toHaveBeenCalled();
+  });
 });
