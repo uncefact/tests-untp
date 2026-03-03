@@ -1,4 +1,4 @@
-import { buildPaginatedResponse } from './pagination';
+import { buildPaginatedResponse, paginationMetaSchema } from './pagination';
 
 describe('buildPaginatedResponse', () => {
   it('returns correct pagination metadata with explicit limit and offset', () => {
@@ -71,5 +71,31 @@ describe('buildPaginatedResponse', () => {
         hasMore: false,
       },
     });
+  });
+});
+
+describe('paginationMetaSchema', () => {
+  it('parses valid pagination metadata', () => {
+    const result = paginationMetaSchema.parse({
+      total: 100,
+      limit: 20,
+      offset: 0,
+      hasMore: true,
+    });
+
+    expect(result).toEqual({
+      total: 100,
+      limit: 20,
+      offset: 0,
+      hasMore: true,
+    });
+  });
+
+  it('rejects non-integer total', () => {
+    expect(() => paginationMetaSchema.parse({ total: 1.5, limit: 20, offset: 0, hasMore: false })).toThrow();
+  });
+
+  it('rejects missing fields', () => {
+    expect(() => paginationMetaSchema.parse({ total: 10 })).toThrow();
   });
 });

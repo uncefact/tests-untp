@@ -1,9 +1,13 @@
-export interface PaginationMeta {
-  total: number;
-  limit: number;
-  offset: number;
-  hasMore: boolean;
-}
+import { z } from 'zod';
+
+export const paginationMetaSchema = z.object({
+  total: z.number().int().describe('Total number of records matching the query'),
+  limit: z.number().int().describe('Maximum records per page'),
+  offset: z.number().int().describe('Number of records skipped'),
+  hasMore: z.boolean().describe('Whether more records exist beyond this page'),
+});
+
+export type PaginationMeta = z.infer<typeof paginationMetaSchema>;
 
 export interface PaginatedResponse<T> {
   data: T[];
