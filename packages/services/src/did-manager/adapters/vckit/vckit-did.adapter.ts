@@ -1,5 +1,5 @@
 import type { IDidService, CreateDidOptions, DidRecord, DidDocument, DidVerificationResult } from '../../types.js';
-import { DidMethod, DidType } from '../../types.js';
+import { DidMethod, DidType, DidVerificationCheckName } from '../../types.js';
 import { verifyDid } from '../../common/verify.js';
 import { normaliseDidWebAlias } from '../../common/utils.js';
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
@@ -187,6 +187,7 @@ export class VCKitDidAdapter implements IDidService {
     this.logger.debug({ did }, 'Verifying DID');
 
     let providerKeys: Array<{ kid: string }> = [];
+    let keyFetchFailed = false;
     try {
       const response = await fetch(`${this.baseURL}/agent/didManagerGet`, {
         method: 'POST',
@@ -197,14 +198,26 @@ export class VCKitDidAdapter implements IDidService {
         const vckitDid = await response.json();
         providerKeys = vckitDid.keys ?? [];
         this.logger.debug({ did, keyCount: providerKeys.length }, 'Fetched provider keys');
+      } else {
+        keyFetchFailed = true;
+        this.logger.warn({ did, status: response.status }, 'Provider key fetch returned non-OK status');
       }
     } catch (error) {
       // If we can't fetch keys, the key_material check will still run with empty keys
-
+      keyFetchFailed = true;
       this.logger.warn({ error, did }, 'Failed to fetch provider keys, continuing with empty keys');
     }
 
     const result = await verifyDid(did, { providerKeys });
+
+    if (keyFetchFailed) {
+      if (!result.errors) result.errors = [];
+      result.errors.push({
+        check: DidVerificationCheckName.KEY_MATERIAL,
+        message: 'Provider key material could not be fetched — key_material check may be incomplete',
+      });
+    }
+
     this.logger.info({ did, verified: result.verified }, 'DID verification completed');
     return result;
   }

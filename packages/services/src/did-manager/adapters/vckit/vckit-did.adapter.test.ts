@@ -1,6 +1,6 @@
 import { VCKitDidAdapter, vckitDidRegistryEntry } from './vckit-did.adapter';
 import { vckitDidConfigSchema } from './vckit-did.schema';
-import { DidMethod, DidType } from '../../types';
+import { DidMethod, DidType, DidVerificationCheckName } from '../../types';
 import { verifyDid } from '../../common/verify';
 import type { LoggerService } from '../../../logging/types';
 import {
@@ -297,15 +297,57 @@ describe('VCKitDidAdapter', () => {
       await expect(service.verify('')).rejects.toThrow(DidInputError);
     });
 
-    it('passes empty providerKeys when VCKit key fetch fails', async () => {
+    it('passes empty providerKeys and adds KEY_MATERIAL error when key fetch throws', async () => {
       const mockResult = { verified: true, checks: [], errors: undefined };
       (verifyDid as jest.Mock).mockResolvedValue(mockResult);
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
-      await service.verify('did:web:example.com');
+      const result = await service.verify('did:web:example.com');
 
       expect(verifyDid).toHaveBeenCalledWith('did:web:example.com', {
         providerKeys: [],
+      });
+
+      expect(result.errors).toEqual([
+        {
+          check: DidVerificationCheckName.KEY_MATERIAL,
+          message: 'Provider key material could not be fetched — key_material check may be incomplete',
+        },
+      ]);
+    });
+
+    it('adds KEY_MATERIAL error when key fetch returns non-OK status', async () => {
+      const mockResult = { verified: true, checks: [], errors: undefined };
+      (verifyDid as jest.Mock).mockResolvedValue(mockResult);
+      (global.fetch as jest.Mock).mockResolvedValueOnce(createMockResponse({}, false, 500));
+
+      const result = await service.verify('did:web:example.com');
+
+      expect(verifyDid).toHaveBeenCalledWith('did:web:example.com', {
+        providerKeys: [],
+      });
+
+      expect(result.errors).toEqual([
+        {
+          check: DidVerificationCheckName.KEY_MATERIAL,
+          message: 'Provider key material could not be fetched — key_material check may be incomplete',
+        },
+      ]);
+    });
+
+    it('appends KEY_MATERIAL error to existing errors when key fetch fails', async () => {
+      const existingError = { check: DidVerificationCheckName.RESOLVE, message: 'Could not resolve' };
+      const mockResult = { verified: false, checks: [], errors: [existingError] };
+      (verifyDid as jest.Mock).mockResolvedValue(mockResult);
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+
+      const result = await service.verify('did:web:example.com');
+
+      expect(result.errors).toHaveLength(2);
+      expect(result.errors![0]).toEqual(existingError);
+      expect(result.errors![1]).toEqual({
+        check: DidVerificationCheckName.KEY_MATERIAL,
+        message: 'Provider key material could not be fetched — key_material check may be incomplete',
       });
     });
   });
