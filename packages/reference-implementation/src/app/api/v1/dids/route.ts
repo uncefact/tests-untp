@@ -35,7 +35,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids' });
  *                 description: Type of DID to create
  *               method:
  *                 type: string
- *                 enum: [did:web, did:key]
+ *                 enum: [DID_WEB, DID_WEB_VH]
  *                 description: DID method to use
  *               alias:
  *                 type: string
