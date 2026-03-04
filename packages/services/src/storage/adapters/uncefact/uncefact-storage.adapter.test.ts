@@ -156,7 +156,7 @@ describe('UncefactStorageAdapter', () => {
       expect(mockFetch).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ method: 'POST' }));
     });
 
-    it('should return StorageRecord with uri and hash', async () => {
+    it('should return StorageRecord with uri, hash, and bucket', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: jest.fn().mockResolvedValue({
@@ -172,6 +172,7 @@ describe('UncefactStorageAdapter', () => {
         uri: 'https://storage.example.com/documents/abc-123',
         hash: 'sha256-abc123def456',
         decryptionKey: undefined,
+        bucket: undefined,
       });
     });
 
@@ -192,7 +193,23 @@ describe('UncefactStorageAdapter', () => {
         uri: 'https://storage.example.com/credentials/xyz-789',
         hash: 'sha256-xyz789',
         decryptionKey: 'decryption-key-abc',
+        bucket: undefined,
       });
+    });
+
+    it('should include configured bucket in the response', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          uri: 'https://storage.example.com/documents/abc-123',
+          hash: 'sha256-abc123def456',
+        }),
+      });
+
+      const adapter = new UncefactStorageAdapter({ ...mockConfig, publicBucket: 'pub-bucket' }, mockLogger);
+      const result = await adapter.store(mockCredential);
+
+      expect(result.bucket).toBe('pub-bucket');
     });
 
     it('should return undefined decryptionKey when key is not in response', async () => {
@@ -616,6 +633,337 @@ describe('UncefactStorageAdapter', () => {
           expect((error as StorageStoreError).code).toBe('STORAGE_STORE_FAILED');
         }
       });
+    });
+  });
+
+  describe('storeBinary', () => {
+    it('should use /public endpoint for unencrypted upload', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          uri: 'https://storage.example.com/documents/binary-123',
+          hash: 'sha256-binary123',
+        }),
+      });
+
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+      await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
+
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.0.0/public', expect.any(Object));
+    });
+
+    it('should use /private endpoint for encrypted upload', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          uri: 'https://storage.example.com/documents/binary-456',
+          hash: 'sha256-binary456',
+          decryptionKey: 'key-abc',
+        }),
+      });
+
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+      await adapter.storeBinary('<html>Secret</html>', 'template.html', 'text/html', true);
+
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.0.0/private', expect.any(Object));
+    });
+
+    it('should send FormData body with file field', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          uri: 'https://storage.example.com/documents/binary-123',
+          hash: 'sha256-binary123',
+        }),
+      });
+
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+      await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
+
+      const callArgs = mockFetch.mock.calls[0];
+      const body = callArgs[1].body;
+      expect(body).toBeInstanceOf(FormData);
+      expect(body.has('file')).toBe(true);
+    });
+
+    it('should include bucket in FormData when configured', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          uri: 'https://storage.example.com/documents/binary-123',
+          hash: 'sha256-binary123',
+        }),
+      });
+
+      const adapter = new UncefactStorageAdapter({ ...mockConfig, publicBucket: 'pub-bucket' }, mockLogger);
+      await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
+
+      const callArgs = mockFetch.mock.calls[0];
+      const body = callArgs[1].body as FormData;
+      expect(body.get('bucket')).toBe('pub-bucket');
+    });
+
+    it('should not include bucket in FormData when no bucket is configured', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          uri: 'https://storage.example.com/documents/binary-123',
+          hash: 'sha256-binary123',
+        }),
+      });
+
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+      await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
+
+      const callArgs = mockFetch.mock.calls[0];
+      const body = callArgs[1].body as FormData;
+      expect(body.has('bucket')).toBe(false);
+    });
+
+    it('should not include Content-Type header (let runtime set multipart boundary)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          uri: 'https://storage.example.com/documents/binary-123',
+          hash: 'sha256-binary123',
+        }),
+      });
+
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+      await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
+
+      const callArgs = mockFetch.mock.calls[0];
+      const headers = callArgs[1].headers;
+      expect(headers['Content-Type']).toBeUndefined();
+    });
+
+    it('should include X-API-Key header when configured', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          uri: 'https://storage.example.com/documents/binary-123',
+          hash: 'sha256-binary123',
+        }),
+      });
+
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+      await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
+
+      const callArgs = mockFetch.mock.calls[0];
+      const headers = callArgs[1].headers;
+      expect(headers['X-API-Key']).toBe('test-api-key');
+    });
+
+    it('should not include X-API-Key header when apiKey is omitted', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          uri: 'https://storage.example.com/documents/binary-123',
+          hash: 'sha256-binary123',
+        }),
+      });
+
+      const configWithoutKey: UncefactStorageConfig = {
+        baseUrl: 'https://storage.example.com',
+        apiVersion: '3.0.0',
+      };
+      const adapter = new UncefactStorageAdapter(configWithoutKey, mockLogger);
+      await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
+
+      const callArgs = mockFetch.mock.calls[0];
+      const headers = callArgs[1].headers;
+      expect(headers['X-API-Key']).toBeUndefined();
+    });
+
+    it('should return StorageRecord with uri, hash, and bucket', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          uri: 'https://storage.example.com/documents/binary-123',
+          hash: 'sha256-binary123',
+        }),
+      });
+
+      const adapter = new UncefactStorageAdapter({ ...mockConfig, publicBucket: 'pub-bucket' }, mockLogger);
+      const result = await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
+
+      expect(result).toEqual({
+        uri: 'https://storage.example.com/documents/binary-123',
+        hash: 'sha256-binary123',
+        decryptionKey: undefined,
+        bucket: 'pub-bucket',
+      });
+    });
+
+    it('should return decryptionKey when encrypt is true', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          uri: 'https://storage.example.com/documents/binary-456',
+          hash: 'sha256-binary456',
+          decryptionKey: 'decrypt-key-xyz',
+        }),
+      });
+
+      const adapter = new UncefactStorageAdapter({ ...mockConfig, privateBucket: 'priv-bucket' }, mockLogger);
+      const result = await adapter.storeBinary('<html>Secret</html>', 'secret.html', 'text/html', true);
+
+      expect(result).toEqual({
+        uri: 'https://storage.example.com/documents/binary-456',
+        hash: 'sha256-binary456',
+        decryptionKey: 'decrypt-key-xyz',
+        bucket: 'priv-bucket',
+      });
+    });
+
+    it('should use POST method', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          uri: 'https://storage.example.com/documents/binary-123',
+          hash: 'sha256-binary123',
+        }),
+      });
+
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+      await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
+
+      expect(mockFetch).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ method: 'POST' }));
+    });
+
+    describe('error handling', () => {
+      it('should throw StoragePayloadError on 4xx response', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          json: jest.fn().mockRejectedValue(new Error('no body')),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(StoragePayloadError);
+      });
+
+      it('should throw StorageStoreError on 5xx response', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+          json: jest.fn().mockRejectedValue(new Error('no body')),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(StorageStoreError);
+      });
+
+      it('should throw StorageStoreError when response is missing "uri"', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({ hash: 'sha256-abc123' }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(StorageStoreError);
+      });
+
+      it('should throw StorageStoreError when response is missing "hash"', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({ uri: 'https://storage.example.com/documents/abc-123' }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(StorageStoreError);
+      });
+
+      it('should throw StorageStoreError when response is not valid JSON', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockRejectedValue(new SyntaxError('Unexpected token')),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(
+          expect.objectContaining({
+            message: expect.stringContaining('invalid JSON'),
+          }),
+        );
+      });
+
+      it('should throw StorageStoreError when encrypt is true and response is missing "decryptionKey"', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/documents/binary-123',
+            hash: 'sha256-binary123',
+          }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html', true)).rejects.toThrow(
+          StorageStoreError,
+        );
+      });
+    });
+  });
+
+  describe('delete', () => {
+    it('should log a warning and not throw', async () => {
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+      await expect(adapter.delete('https://storage.example.com/documents/abc-123')).resolves.toBeUndefined();
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          uri: 'https://storage.example.com/documents/abc-123',
+        }),
+        expect.stringContaining('Storage deletion not yet implemented'),
+      );
+    });
+
+    it('should include bucket in log context when provided', async () => {
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+      await adapter.delete('https://storage.example.com/documents/abc-123', 'my-bucket');
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          uri: 'https://storage.example.com/documents/abc-123',
+          bucket: 'my-bucket',
+        }),
+        expect.stringContaining('Storage deletion not yet implemented'),
+      );
+    });
+
+    it('should not call fetch', async () => {
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+      await adapter.delete('https://storage.example.com/documents/abc-123');
+
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 

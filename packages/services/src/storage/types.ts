@@ -12,6 +12,8 @@ export type StorageRecord = {
   hash: string;
   /** Decryption key if the credential was stored encrypted */
   decryptionKey?: string;
+  /** Storage bucket the content was written to */
+  bucket?: string;
 };
 
 /**
@@ -25,4 +27,21 @@ export interface IStorageService {
    *                  and a decryption key will be returned. Defaults to false.
    */
   store(credential: EnvelopedVerifiableCredential, encrypt?: boolean): Promise<StorageRecord>;
+
+  /**
+   * Stores binary or text content via multipart upload.
+   * @param content - The content to store (as a string)
+   * @param filename - The filename to use in the multipart upload
+   * @param contentType - The MIME type of the content (e.g. 'text/html')
+   * @param encrypt - If true, the content will be encrypted by the storage service
+   *                  and a decryption key will be returned. Defaults to false.
+   */
+  storeBinary(content: string, filename: string, contentType: string, encrypt?: boolean): Promise<StorageRecord>;
+
+  /**
+   * Deletes content at the given URI.
+   * @param uri - The URI of the content to delete
+   * @param bucket - Optional bucket the content resides in
+   */
+  delete(uri: string, bucket?: string): Promise<void>;
 }
