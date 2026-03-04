@@ -12,8 +12,12 @@ export type StorageRecord = {
   hash: string;
   /** Decryption key if the credential was stored encrypted */
   decryptionKey?: string;
-  /** Storage bucket the content was written to */
+  /** Storage resource identifier */
+  externalId: string;
+  /** The bucket where content was stored */
   bucket?: string;
+  /** The content type used when storing */
+  mimeType: string;
 };
 
 /**
@@ -39,9 +43,9 @@ export interface IStorageService {
   storeBinary(content: string, filename: string, contentType: string, encrypt?: boolean): Promise<StorageRecord>;
 
   /**
-   * Deletes content at the given URI.
-   * @param uri - The URI of the content to delete
+   * Deletes content by its storage resource identifier.
+   * @param externalId - The storage resource identifier of the content to delete
    * @param bucket - Optional bucket the content resides in
    */
-  delete(uri: string, bucket?: string): Promise<void>;
+  delete(externalId: string, bucket?: string): Promise<void>;
 }

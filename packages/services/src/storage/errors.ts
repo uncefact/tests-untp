@@ -20,3 +20,12 @@ export class StoragePayloadError extends StorageError {
     });
   }
 }
+
+/** Failed to delete content from the upstream storage service. */
+export class StorageDeleteError extends StorageError {
+  constructor(httpStatus: number, detail: string) {
+    super(`Failed to delete stored content: HTTP ${httpStatus}: ${detail}`, 'STORAGE_DELETE_FAILED', httpStatus, {
+      httpStatus,
+    });
+  }
+}
