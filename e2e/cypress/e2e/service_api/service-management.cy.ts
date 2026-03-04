@@ -168,7 +168,7 @@ describe('Service API', { testIsolation: false }, () => {
           url: '/api/v1/dids',
           body: {
             type: 'MANAGED',
-            method: 'did:web',
+            method: 'DID_WEB',
             alias: `ref-test-${RUN_ID}`,
             serviceInstanceId: refServiceId,
           },
