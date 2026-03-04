@@ -174,7 +174,7 @@ describe('PATCH /api/v1/dids/:id', () => {
 
     const req = createFakeRequest({ method: 'PATCH', body: { isDefault: true } });
     const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
-    const json = await (res as { status: number; json: () => Promise<{ error: string }> }).json();
+    const json = await res.json();
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('Cannot modify default status of system DIDs');
@@ -270,7 +270,7 @@ describe('DELETE /api/v1/dids/:id', () => {
 
     const req = createFakeRequest({ method: 'DELETE' });
     const res = await DELETE(req, createContext('did-1') as unknown as Parameters<typeof DELETE>[1]);
-    const json = await (res as { status: number; json: () => Promise<{ error: string }> }).json();
+    const json = await res.json();
 
     expect(res.status).toBe(400);
     expect(json.error).toBe('Cannot delete system default DID');
