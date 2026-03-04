@@ -26,6 +26,28 @@ function getDbClient() {
 async function deleteTenantData(client: any, tenantId: string) {
   // Delete in dependency order (children first)
 
+  // CVC tables (join table → profiles → schemes → catalogues → orphan criteria)
+  await client.query(
+    `DELETE FROM "ProfileCriterion" WHERE "profileId" IN (SELECT id FROM "ConformityProfile" WHERE "tenantId" = $1)`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "ConformityProfile" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "ConformityScheme" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "CvcCatalogue" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+  await client.query(
+    `DELETE FROM "Criterion" WHERE "tenantId" = $1`,
+    [tenantId],
+  );
+
   // Master data secondary identifier join tables
   await client.query(
     `DELETE FROM "ProductSecondaryIdentifier" WHERE "productId" IN (SELECT id FROM "Product" WHERE "tenantId" = $1)`,
