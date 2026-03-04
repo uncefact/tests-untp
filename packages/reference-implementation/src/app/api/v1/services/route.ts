@@ -102,7 +102,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     isPrimary?: boolean;
   };
 
-  logger.info({ tenantId }, 'Parsing request body');
+  logger.info('Parsing request body');
   try {
     body = await req.json();
   } catch {
@@ -112,7 +112,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // --- Field validation ---------------------------------------------------
 
   logger.info(
-    { tenantId, serviceType: body.serviceType, adapterType: body.adapterType, name: body.name },
+    { serviceType: body.serviceType, adapterType: body.adapterType, name: body.name },
     'Validating input parameters',
   );
 
@@ -132,7 +132,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   // --- Registry look-up & config schema validation ------------------------
 
-  logger.info({ tenantId, serviceType, adapterType }, 'Looking up adapter in registry');
+  logger.info({ serviceType, adapterType }, 'Looking up adapter in registry');
 
   const registryForService = (adapterRegistry as Record<string, Record<string, AdapterRegistryEntry> | undefined>)[
     serviceType
@@ -144,7 +144,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError(`Unknown adapter type '${adapterType}' for service type '${serviceType}'`);
   }
 
-  logger.info({ tenantId, serviceType, adapterType }, 'Validating config against adapter schema');
+  logger.info({ serviceType, adapterType }, 'Validating config against adapter schema');
 
   const parseResult = registryEntry.configSchema.safeParse(body.config);
   if (!parseResult.success) {
@@ -154,7 +154,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   // --- Encrypt & persist --------------------------------------------------
 
-  logger.info({ tenantId, serviceType, adapterType, name: body.name }, 'Encrypting and persisting service instance');
+  logger.info({ serviceType, adapterType, name: body.name }, 'Encrypting and persisting service instance');
 
   const encryptedConfig = JSON.stringify(
     getEncryptionService().encrypt(JSON.stringify(body.config), EncryptionAlgorithm.AES_256_GCM),
@@ -172,7 +172,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   const masked = maskInstanceConfig(record, getEncryptionService(), logger);
 
-  logger.info({ tenantId, serviceInstanceId: record.id }, 'Service instance created');
+  logger.info({ serviceInstanceId: record.id }, 'Service instance created');
   return NextResponse.json(masked, { status: 201 });
 });
 
@@ -249,7 +249,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   const url = new URL(req.url);
 
-  logger.info({ tenantId }, 'Parsing and validating query filters');
+  logger.info('Parsing and validating query filters');
 
   const serviceType = validateEnum(
     url.searchParams.get('serviceType') ?? undefined,
@@ -264,7 +264,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  logger.info({ tenantId, filters: { serviceType, adapterType, limit, offset } }, 'Querying service instances');
+  logger.info({ filters: { serviceType, adapterType, limit, offset } }, 'Querying service instances');
 
   const { data, total } = await listServiceInstances(tenantId, {
     serviceType,
@@ -273,9 +273,9 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
     offset,
   });
 
-  logger.info({ tenantId }, 'Masking service instance configurations');
+  logger.info('Masking service instance configurations');
   const masked = data.map((i) => maskInstanceConfig(i, getEncryptionService(), logger));
 
-  logger.info({ tenantId, count: masked.length }, 'Service instances listed');
+  logger.info({ count: masked.length }, 'Service instances listed');
   return NextResponse.json(buildPaginatedResponse(masked, total, limit, offset));
 });

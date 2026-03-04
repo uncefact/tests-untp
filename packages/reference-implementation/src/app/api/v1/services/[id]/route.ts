@@ -63,13 +63,13 @@ const logger = apiLogger.child({ route: '/api/v1/services/[id]' });
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, serviceInstanceId: id }, 'Looking up service instance');
+  logger.info({ serviceInstanceId: id }, 'Looking up service instance');
   const instance = await getServiceInstanceById(id, tenantId);
   if (!instance) {
     throw new NotFoundError('Service instance not found');
   }
 
-  logger.info({ tenantId, serviceInstanceId: id }, 'Service instance retrieved');
+  logger.info({ serviceInstanceId: id }, 'Service instance retrieved');
   return NextResponse.json(maskInstanceConfig(instance, getEncryptionService(), logger));
 });
 
@@ -147,7 +147,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, serviceInstanceId: id }, 'Parsing request body');
+  logger.info({ serviceInstanceId: id }, 'Parsing request body');
   let body: { name?: string; description?: string; config?: Record<string, unknown>; isPrimary?: boolean };
   try {
     body = await req.json();
@@ -157,7 +157,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 
   const { name, description, config, isPrimary } = body;
 
-  logger.info({ tenantId, serviceInstanceId: id }, 'Validating fields');
+  logger.info({ serviceInstanceId: id }, 'Validating fields');
   const hasName = name !== undefined;
   const hasDescription = description !== undefined;
   const hasConfig = config !== undefined;
@@ -175,7 +175,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('config must be an object');
   }
 
-  logger.info({ tenantId, serviceInstanceId: id }, 'Looking up existing service instance');
+  logger.info({ serviceInstanceId: id }, 'Looking up existing service instance');
   const existing = await getServiceInstanceById(id, tenantId);
   if (!existing) {
     throw new NotFoundError('Service instance not found');
@@ -184,7 +184,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   let encryptedConfig: string | undefined;
 
   if (hasConfig) {
-    logger.info({ tenantId, serviceInstanceId: id }, 'Decrypting existing config');
+    logger.info({ serviceInstanceId: id }, 'Decrypting existing config');
     let existingConfig: Record<string, unknown>;
     try {
       existingConfig = JSON.parse(getEncryptionService().decrypt(JSON.parse(existing.config)));
@@ -193,10 +193,10 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
       throw new ValidationError('Cannot update configuration: existing config could not be decrypted.');
     }
 
-    logger.info({ tenantId, serviceInstanceId: id }, 'Merging config');
+    logger.info({ serviceInstanceId: id }, 'Merging config');
     const mergedConfig = { ...existingConfig, ...config };
 
-    logger.info({ tenantId, serviceInstanceId: id }, 'Validating merged config against adapter schema');
+    logger.info({ serviceInstanceId: id }, 'Validating merged config against adapter schema');
     const { serviceType, adapterType } = existing;
     const serviceAdapters = (adapterRegistry as Record<string, Record<string, AdapterRegistryEntry> | undefined>)[
       serviceType
@@ -214,14 +214,14 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
       throw new ValidationError(`Invalid configuration: ${result.error.message}`);
     }
 
-    logger.info({ tenantId, serviceInstanceId: id }, 'Encrypting config');
+    logger.info({ serviceInstanceId: id }, 'Encrypting config');
     encryptedConfig = JSON.stringify(
       getEncryptionService().encrypt(JSON.stringify(mergedConfig), EncryptionAlgorithm.AES_256_GCM),
     );
   }
 
   logger.info(
-    { tenantId, serviceInstanceId: id, fields: { hasName, hasDescription, hasConfig, hasIsPrimary } },
+    { serviceInstanceId: id, fields: { hasName, hasDescription, hasConfig, hasIsPrimary } },
     'Updating service instance',
   );
 
@@ -232,7 +232,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     ...(hasIsPrimary && { isPrimary }),
   });
 
-  logger.info({ tenantId, serviceInstanceId: id }, 'Service instance updated successfully');
+  logger.info({ serviceInstanceId: id }, 'Service instance updated successfully');
   return NextResponse.json(maskInstanceConfig(updated, getEncryptionService(), logger));
 });
 
@@ -297,14 +297,14 @@ export const DELETE = withTenantAuth(async (req, { tenantId, params }) => {
   const url = new URL(req.url);
   const force = url.searchParams.get('force') === 'true';
 
-  logger.info({ tenantId, serviceInstanceId: id }, 'Looking up service instance for deletion');
+  logger.info({ serviceInstanceId: id }, 'Looking up service instance for deletion');
   const existing = await getServiceInstanceById(id, tenantId);
   if (!existing) {
     throw new NotFoundError('Service instance not found');
   }
 
   if (!force) {
-    logger.info({ tenantId, serviceInstanceId: id }, 'Checking for referencing records');
+    logger.info({ serviceInstanceId: id }, 'Checking for referencing records');
     const refs = await countServiceInstanceReferences(id);
     const total = refs.dids + refs.registrars + refs.schemes;
 
@@ -321,9 +321,9 @@ export const DELETE = withTenantAuth(async (req, { tenantId, params }) => {
     }
   }
 
-  logger.info({ tenantId, serviceInstanceId: id, force }, 'Deleting service instance');
+  logger.info({ serviceInstanceId: id, force }, 'Deleting service instance');
   await deleteServiceInstance(id, tenantId);
 
-  logger.info({ tenantId, serviceInstanceId: id }, 'Service instance deleted');
+  logger.info({ serviceInstanceId: id }, 'Service instance deleted');
   return new Response(null, { status: 204 });
 });
