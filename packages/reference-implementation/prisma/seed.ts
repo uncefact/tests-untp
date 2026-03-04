@@ -449,10 +449,7 @@ async function main() {
       const { storageServiceUrl } = getStorageConfig();
       const storageApiKey = process.env.UNCEFACT_STORAGE_API_KEY;
       const storageBaseUrl = new URL(storageServiceUrl).origin;
-      const storageHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (storageApiKey) {
-        storageHeaders['X-API-Key'] = storageApiKey;
-      }
+      const storageBucket = 'verifiable-credentials';
 
       const TEMPLATES_DIR = path.resolve(__dirname, '../src/templates/v0.6.0');
 
@@ -473,14 +470,28 @@ async function main() {
         }
 
         const templateContent = fs.readFileSync(templatePath, 'utf-8');
-        const hash = crypto.createHash('sha256').update(templateContent).digest('hex');
 
-        // Upload to the storage service public bucket
+        // Upload to the storage service public bucket using multipart FormData
+        // (matches the adapter pattern in uncefact-storage.adapter.ts)
+        const externalId = crypto.randomUUID();
+        const formData = new FormData();
+        const blob = new Blob([templateContent], { type: 'text/html' });
+        formData.append('file', blob, `${dm.shortCode}-template.hbs`);
+        formData.append('id', externalId);
+        formData.append('bucket', storageBucket);
+
+        // Build headers without Content-Type — the runtime must set
+        // multipart/form-data with the correct boundary automatically.
+        const uploadHeaders: Record<string, string> = {};
+        if (storageApiKey) {
+          uploadHeaders['X-API-Key'] = storageApiKey;
+        }
+
         const uploadUrl = `${storageBaseUrl}/api/3.0.0/public`;
         const response = await fetch(uploadUrl, {
           method: 'POST',
-          headers: storageHeaders,
-          body: JSON.stringify({ data: templateContent, bucket: 'render-templates' }),
+          headers: uploadHeaders,
+          body: formData,
         });
 
         if (!response.ok) {
@@ -503,7 +514,7 @@ async function main() {
           );
           continue;
         }
-        const { uri } = result as { uri: string };
+        const { uri, hash } = result as { uri: string; hash?: string };
 
         await prisma.renderTemplate.create({
           data: {
@@ -512,11 +523,15 @@ async function main() {
             dataModelId: dm.id,
             name: `${dm.name} Default Template`,
             storageUrl: uri,
-            hash,
+            hash: hash ?? crypto.createHash('sha256').update(templateContent).digest('hex'),
             isPrimary: true,
             renderMethodType: RenderMethodType.RenderTemplate2024,
             inline: false,
             mediaType: 'text/html',
+            storageExternalId: externalId,
+            storageBucket: storageBucket,
+            storageContentType: 'text/html',
+            storageServiceInstanceId: 'system-storage-uncefact',
           },
         });
 
