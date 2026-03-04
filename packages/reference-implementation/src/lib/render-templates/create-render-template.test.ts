@@ -14,6 +14,11 @@ jest.mock('./validate-render-method-fields', () => ({
   validateRenderMethodFields: (...args: unknown[]) => mockValidateRenderMethodFields(...args),
 }));
 
+const mockSanitiseTemplate = jest.fn((html: string) => html);
+jest.mock('./sanitise-template', () => ({
+  sanitiseTemplate: (html: string) => mockSanitiseTemplate(html),
+}));
+
 jest.mock('@uncefact/untp-ri-services', () => ({}));
 jest.mock('@/lib/services/resolve-service', () => ({}));
 
@@ -151,6 +156,12 @@ describe('createRenderTemplate', () => {
     await createRenderTemplate(buildInput({ isPrimary: true }));
 
     expect(mockCreateRenderTemplateRepo).toHaveBeenCalledWith(TENANT_ID, expect.objectContaining({ isPrimary: true }));
+  });
+
+  it('sanitises template content before upload', async () => {
+    const input = buildInput({ template: '<p>content</p>' });
+    await createRenderTemplate(input);
+    expect(mockSanitiseTemplate).toHaveBeenCalledWith('<p>content</p>');
   });
 
   it('applies defaults from validation module', async () => {

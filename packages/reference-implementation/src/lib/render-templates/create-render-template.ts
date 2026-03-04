@@ -6,6 +6,7 @@ import { getDataModelById, createRenderTemplate as createRenderTemplateRepo } fr
 import type { RenderTemplateWithRelations } from '@/lib/prisma/repositories/render-template.repository';
 import { validateRenderMethodFields } from './validate-render-method-fields';
 import type { RenderMethodFields } from './validate-render-method-fields';
+import { sanitiseTemplate } from './sanitise-template';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ module: 'create-render-template' });
@@ -36,9 +37,12 @@ export async function createRenderTemplate(input: CreateRenderTemplateInput): Pr
     mediaQuery: input.mediaQuery,
   });
 
+  logger.info('Sanitising template content');
+  const sanitisedTemplate = sanitiseTemplate(template);
+
   // All render templates are stored as HTML; update contentType if non-HTML types are supported in future.
   logger.info({ storageInstanceId: storageService.instanceId }, 'Uploading template to storage');
-  const storageResult = await storageService.service.storeBinary(template, name, 'text/html', false);
+  const storageResult = await storageService.service.storeBinary(sanitisedTemplate, name, 'text/html', false);
 
   logger.info({ uri: storageResult.uri }, 'Creating render template record');
   return createRenderTemplateRepo(tenantId, {

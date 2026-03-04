@@ -14,6 +14,11 @@ jest.mock('./validate-render-method-fields', () => ({
   validateRenderMethodFields: (...args: unknown[]) => mockValidateRenderMethodFields(...args),
 }));
 
+const mockSanitiseTemplate = jest.fn((html: string) => html);
+jest.mock('./sanitise-template', () => ({
+  sanitiseTemplate: (html: string) => mockSanitiseTemplate(html),
+}));
+
 jest.mock('@uncefact/untp-ri-services', () => ({}));
 jest.mock('@/lib/services/resolve-service', () => ({}));
 
@@ -195,6 +200,17 @@ describe('updateRenderTemplate', () => {
     const result = await updateRenderTemplate(buildInput({ name: 'Updated' }));
 
     expect(result).toEqual(updatedRecord);
+  });
+
+  it('sanitises template content before upload', async () => {
+    await updateRenderTemplate(
+      buildInput({
+        template: '<p>new content</p>',
+        storageService: mockStorageService as unknown as UpdateRenderTemplateInput['storageService'],
+      }),
+    );
+
+    expect(mockSanitiseTemplate).toHaveBeenCalledWith('<p>new content</p>');
   });
 
   it('skips old content deletion when storageExternalId is null', async () => {

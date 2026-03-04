@@ -5,6 +5,7 @@ import { getRenderTemplateById, updateRenderTemplate as updateRenderTemplateRepo
 import type { RenderTemplateWithRelations } from '@/lib/prisma/repositories/render-template.repository';
 import { validateRenderMethodFields } from './validate-render-method-fields';
 import type { RenderMethodFields } from './validate-render-method-fields';
+import { sanitiseTemplate } from './sanitise-template';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ module: 'update-render-template' });
@@ -44,9 +45,17 @@ export async function updateRenderTemplate(input: UpdateRenderTemplateInput): Pr
   } = {};
 
   if (template && storageService) {
+    logger.info('Sanitising template content');
+    const sanitisedTemplate = sanitiseTemplate(template);
+
     // All render templates are stored as HTML; update contentType if non-HTML types are supported in future.
     logger.info({ storageInstanceId: storageService.instanceId }, 'Re-uploading template to storage');
-    const storageResult = await storageService.service.storeBinary(template, existing.name, 'text/html', false);
+    const storageResult = await storageService.service.storeBinary(
+      sanitisedTemplate,
+      existing.name,
+      'text/html',
+      false,
+    );
     storageUpdates = {
       storageUrl: storageResult.uri,
       hash: storageResult.hash,
