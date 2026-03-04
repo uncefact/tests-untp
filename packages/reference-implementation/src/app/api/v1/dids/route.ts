@@ -91,14 +91,14 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     serviceInstanceId?: string;
   };
 
-  logger.info({ tenantId }, 'Parsing request body');
+  logger.info('Parsing request body');
   try {
     body = await req.json();
   } catch {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId, type: body.type, method: body.method, alias: body.alias }, 'Validating input parameters');
+  logger.info({ type: body.type, method: body.method, alias: body.alias }, 'Validating input parameters');
   const type = validateEnum(body.type, CREATABLE_DID_TYPES, 'type');
   if (!type) throw new ValidationError('type is required');
 
@@ -109,17 +109,17 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('alias is required');
   }
 
-  logger.info({ tenantId, type, method, alias: body.alias }, 'Resolving DID service');
+  logger.info({ type, method, alias: body.alias }, 'Resolving DID service');
   const { service: didService, instanceId: serviceInstanceId } = await resolveDidService(
     tenantId,
     body.serviceInstanceId,
   );
 
-  logger.info({ tenantId, serviceInstanceId }, 'Validating parameters against service capabilities');
+  logger.info({ serviceInstanceId }, 'Validating parameters against service capabilities');
   validateEnum(type, didService.getSupportedTypes(), 'type');
   validateEnum(method, didService.getSupportedMethods(), 'method');
 
-  logger.info({ tenantId, alias: body.alias, method }, 'Normalising alias');
+  logger.info({ alias: body.alias, method }, 'Normalising alias');
   let normalisedAlias: string;
   try {
     normalisedAlias = didService.normaliseAlias(body.alias, method);
@@ -127,7 +127,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError(errorMessage(aliasErr, 'Invalid alias'));
   }
 
-  logger.info({ tenantId, type, method, alias: normalisedAlias, serviceInstanceId }, 'Creating DID via provider');
+  logger.info({ type, method, alias: normalisedAlias, serviceInstanceId }, 'Creating DID via provider');
   const providerResult = await didService.create({
     type,
     method,
@@ -138,7 +138,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   const status = type === DidType.SELF_MANAGED ? DidStatus.UNVERIFIED : DidStatus.ACTIVE;
 
-  logger.info({ tenantId, did: providerResult.did, status }, 'Saving DID record');
+  logger.info({ did: providerResult.did, status }, 'Saving DID record');
   const record = await createDid({
     tenantId,
     did: providerResult.did,
@@ -151,7 +151,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     serviceInstanceId,
   });
 
-  logger.info({ tenantId, didId: record.id, did: record.did }, 'DID created');
+  logger.info({ didId: record.id, did: record.did }, 'DID created');
   return NextResponse.json(record, { status: 201 });
 });
 
@@ -229,14 +229,14 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   const url = new URL(req.url);
 
-  logger.info({ tenantId }, 'Parsing and validating query filters');
+  logger.info('Parsing query filters');
   const type = validateEnum(url.searchParams.get('type') ?? undefined, Object.values(DidType), 'type');
   const status = validateEnum(url.searchParams.get('status') ?? undefined, Object.values(DidStatus), 'status');
   const serviceInstanceId = url.searchParams.get('serviceInstanceId') ?? undefined;
   const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  logger.info({ tenantId, filters: { type, status, serviceInstanceId, limit, offset } }, 'Querying DIDs from database');
+  logger.info({ filters: { type, status, serviceInstanceId, limit, offset } }, 'Querying DIDs from database');
   const { data, total } = await listDids(tenantId, {
     type,
     status,
@@ -245,6 +245,6 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
     offset,
   });
 
-  logger.info({ tenantId, count: data.length }, 'DIDs listed');
+  logger.info({ count: data.length }, 'DIDs listed');
   return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

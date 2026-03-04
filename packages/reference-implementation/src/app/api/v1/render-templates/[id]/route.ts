@@ -2,12 +2,16 @@ import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { getRenderTemplateById, updateRenderTemplate, deleteRenderTemplate } from '@/lib/prisma/repositories';
+import { getRenderTemplateById, deleteRenderTemplate } from '@/lib/prisma/repositories';
+import { updateRenderTemplate } from '@/lib/render-templates/update-render-template';
+import { resolveStorageService } from '@/lib/services/resolve-storage-service';
+import type { ResolvedStorageService } from '@/lib/services/resolve-storage-service';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/render-templates/[id]' });
 
-const UPDATABLE_FIELDS = ['name', 'storageUrl', 'hash', 'isPrimary'] as const;
+const REJECTED_FIELDS = ['storageUrl', 'hash', 'renderMethodType'] as const;
+const PATCHABLE_FIELDS = ['name', 'template', 'isPrimary', 'inline', 'mediaType', 'mediaQuery'] as const;
 
 /**
  * @swagger
@@ -30,13 +34,7 @@ const UPDATABLE_FIELDS = ['name', 'storageUrl', 'hash', 'isPrimary'] as const;
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 renderTemplate:
- *                   $ref: '#/components/schemas/RenderTemplate'
+ *               $ref: '#/components/schemas/RenderTemplate'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -58,12 +56,13 @@ const UPDATABLE_FIELDS = ['name', 'storageUrl', 'hash', 'isPrimary'] as const;
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ tenantId, renderTemplateId: id }, 'Looking up render template');
+  logger.info({ renderTemplateId: id }, 'Looking up render template');
   const renderTemplate = await getRenderTemplateById(id, tenantId);
   if (!renderTemplate) {
     throw new NotFoundError('Render template not found');
   }
-  return NextResponse.json({ ok: true, renderTemplate });
+  logger.info({ renderTemplateId: id }, 'Render template retrieved');
+  return NextResponse.json(renderTemplate);
 });
 
 /**
@@ -71,7 +70,11 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  * /render-templates/{id}:
  *   patch:
  *     summary: Update a render template
- *     description: Updates one or more fields of a tenant-owned render template. When setting isPrimary to true, any existing primary template for the same data model will be unset.
+ *     description: >
+ *       Updates one or more fields of a tenant-owned render template.
+ *       The fields storageUrl, hash, and renderMethodType cannot be set directly — they are managed by the server.
+ *       When template content is provided, the server re-uploads it to storage and updates storageUrl/hash automatically.
+ *       When setting isPrimary to true, any existing primary template for the same data model will be unset.
  *     tags:
  *       - Render Templates
  *     parameters:
@@ -91,15 +94,27 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *               name:
  *                 type: string
  *                 description: Updated human-readable name for the render template
- *               storageUrl:
+ *               template:
  *                 type: string
- *                 description: Updated URL where the template file is stored
- *               hash:
- *                 type: string
- *                 description: Updated content hash of the template file
+ *                 description: HTML content to replace the existing template
  *               isPrimary:
  *                 type: boolean
  *                 description: Whether this is the primary template for its data model
+ *               inline:
+ *                 type: boolean
+ *                 description: Whether to inline the template (RenderTemplate2024 only)
+ *               mediaType:
+ *                 type: string
+ *                 description: Media type of the template (RenderTemplate2024 only)
+ *               mediaQuery:
+ *                 type: string
+ *                 description: CSS media query (RenderTemplate2024 only)
+ *               storageOptions:
+ *                 type: object
+ *                 properties:
+ *                   serviceInstanceId:
+ *                     type: string
+ *                     description: Explicit storage service instance ID to use for upload
  *             minProperties: 1
  *     responses:
  *       200:
@@ -107,13 +122,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 renderTemplate:
- *                   $ref: '#/components/schemas/RenderTemplate'
+ *               $ref: '#/components/schemas/RenderTemplate'
  *       400:
  *         description: Validation error
  *         content:
@@ -143,41 +152,60 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
   let body: Record<string, unknown>;
-
+  logger.info('Parsing request body');
   try {
     body = await req.json();
   } catch {
     throw new ValidationError('Invalid JSON body');
   }
 
-  const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
-  if (!hasUpdatableField) {
-    throw new ValidationError(`At least one updatable field must be provided: ${UPDATABLE_FIELDS.join(', ')}`);
+  // Reject server-managed and immutable fields
+  for (const field of REJECTED_FIELDS) {
+    if (body[field] !== undefined) {
+      throw new ValidationError(`${field} cannot be set directly`);
+    }
   }
 
+  logger.info({ renderTemplateId: id }, 'Validating update fields');
+  const hasPatchableField = PATCHABLE_FIELDS.some((f) => f in body);
+  if (!hasPatchableField) {
+    throw new ValidationError(`At least one updatable field must be provided: ${PATCHABLE_FIELDS.join(', ')}`);
+  }
+
+  // Resolve storage service if template content is being replaced
+  let storageService: ResolvedStorageService | undefined;
+  if (isNonEmptyString(body.template)) {
+    const storageOptions = (body.storageOptions as { serviceInstanceId?: string } | undefined) ?? {};
+    logger.info('Resolving storage service for template re-upload');
+    storageService = await resolveStorageService(tenantId, storageOptions.serviceInstanceId);
+  }
+
+  // Validate optional field types
   if (body.name !== undefined && !isNonEmptyString(body.name)) {
     throw new ValidationError('name must be a non-empty string');
-  }
-  if (body.storageUrl !== undefined && !isNonEmptyString(body.storageUrl)) {
-    throw new ValidationError('storageUrl must be a non-empty string');
-  }
-  if (body.hash !== undefined && !isNonEmptyString(body.hash)) {
-    throw new ValidationError('hash must be a non-empty string');
   }
   if (body.isPrimary !== undefined && typeof body.isPrimary !== 'boolean') {
     throw new ValidationError('isPrimary must be a boolean');
   }
+  if (body.inline !== undefined && typeof body.inline !== 'boolean') {
+    throw new ValidationError('inline must be a boolean');
+  }
 
-  logger.info({ tenantId, renderTemplateId: id }, 'Updating render template');
-  const renderTemplate = await updateRenderTemplate(id, tenantId, {
-    ...(body.name !== undefined && { name: body.name as string }),
-    ...(body.storageUrl !== undefined && { storageUrl: body.storageUrl as string }),
-    ...(body.hash !== undefined && { hash: body.hash as string }),
-    ...(body.isPrimary !== undefined && { isPrimary: body.isPrimary as boolean }),
+  logger.info({ renderTemplateId: id }, 'Updating render template');
+  const renderTemplate = await updateRenderTemplate({
+    id,
+    tenantId,
+    name: body.name as string | undefined,
+    template: body.template as string | undefined,
+    storageService,
+    isPrimary: body.isPrimary,
+    inline: body.inline,
+    mediaType: body.mediaType as string | undefined,
+    mediaQuery: body.mediaQuery as string | undefined,
   });
 
-  logger.info({ tenantId, renderTemplateId: id }, 'Render template updated');
-  return NextResponse.json({ ok: true, renderTemplate });
+  logger.info({ renderTemplateId: id }, 'Render template updated');
+  return NextResponse.json(renderTemplate);
 });
 
 /**
@@ -196,18 +224,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *           type: string
  *         description: The database ID of the render template
  *     responses:
- *       200:
+ *       204:
  *         description: Render template deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 renderTemplate:
- *                   $ref: '#/components/schemas/RenderTemplate'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -230,9 +248,31 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, renderTemplateId: id }, 'Deleting render template');
-  const renderTemplate = await deleteRenderTemplate(id, tenantId);
+  logger.info({ renderTemplateId: id }, 'Deleting render template');
+  const deleted = await deleteRenderTemplate(id, tenantId);
 
-  logger.info({ tenantId, renderTemplateId: id }, 'Render template deleted');
-  return NextResponse.json({ ok: true, renderTemplate });
+  // Best-effort storage deletion using resource ID and bucket
+  if (deleted.storageExternalId) {
+    try {
+      const storageService = await resolveStorageService(tenantId, deleted.storageServiceInstanceId ?? undefined);
+      await storageService.service.delete(deleted.storageExternalId, deleted.storageBucket ?? undefined);
+      logger.info(
+        { renderTemplateId: id, storageExternalId: deleted.storageExternalId },
+        'Template content deleted from storage',
+      );
+    } catch (e) {
+      logger.warn(
+        {
+          renderTemplateId: id,
+          storageExternalId: deleted.storageExternalId,
+          storageServiceInstanceId: deleted.storageServiceInstanceId,
+          error: e,
+        },
+        'Failed to delete template content from storage',
+      );
+    }
+  }
+
+  logger.info({ renderTemplateId: id }, 'Render template deleted');
+  return new Response(null, { status: 204 });
 });

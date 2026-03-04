@@ -18,6 +18,8 @@ function makeStorage(overrides: Partial<StorageRecord> = {}): StorageRecord {
   return {
     uri: 'https://storage.example.com/cred-123.json',
     hash: 'abc123hash',
+    externalId: 'test-external-id',
+    mimeType: 'application/json',
     ...overrides,
   };
 }

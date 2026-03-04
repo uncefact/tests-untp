@@ -44,10 +44,11 @@ services:
       - PROTOCOL=http
       - DOMAIN=localhost
       - PORT=3334
-      - AVAILABLE_BUCKETS=verifiable-credentials,private-verifiable-credentials,epcis-events
-      - DEFAULT_BUCKET=verifiable-credentials
+      - AVAILABLE_BUCKETS=public-data,private-data
+      - DEFAULT_BUCKET=public-data
       - STORAGE_TYPE=local
       - API_KEY=${UNCEFACT_STORAGE_API_KEY:-test123}
+      - ALLOWED_UPLOAD_TYPES=image/png,image/jpeg,image/webp,application/pdf,text/html
 
   identity-resolver-service:
     image: ghcr.io/pyx-industries/pyx-identity-resolver:2.0.2

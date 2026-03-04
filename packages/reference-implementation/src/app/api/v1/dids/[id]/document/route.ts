@@ -51,18 +51,18 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/document' });
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, didId: id }, 'Looking up DID for document retrieval');
+  logger.info({ didId: id }, 'Looking up DID for document retrieval');
   const did = await getDidById(id, tenantId);
   if (!did) {
     throw new NotFoundError('DID not found');
   }
 
-  logger.info({ tenantId, didId: id, did: did.did }, 'Resolving DID service');
+  logger.info({ didId: id, did: did.did }, 'Resolving DID service');
   const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId ?? undefined);
 
-  logger.info({ tenantId, didId: id, did: did.did }, 'Fetching DID document from provider');
+  logger.info({ didId: id, did: did.did }, 'Fetching DID document from provider');
   const document = await didService.getDocument(did.did);
 
-  logger.info({ tenantId, didId: id }, 'DID document retrieved');
+  logger.info({ didId: id }, 'DID document retrieved');
   return NextResponse.json(document);
 });

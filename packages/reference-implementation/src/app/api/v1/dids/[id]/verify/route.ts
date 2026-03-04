@@ -60,22 +60,22 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/verify' });
 export const POST = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, didId: id }, 'Looking up DID for verification');
+  logger.info({ didId: id }, 'Looking up DID for verification');
   const did = await getDidById(id, tenantId);
   if (!did) {
     throw new NotFoundError('DID not found');
   }
 
-  logger.info({ tenantId, didId: id, did: did.did }, 'Resolving DID service for verification');
+  logger.info({ didId: id, did: did.did }, 'Resolving DID service for verification');
   const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId ?? undefined);
 
-  logger.info({ tenantId, didId: id, did: did.did }, 'Verifying DID ownership');
+  logger.info({ didId: id, did: did.did }, 'Verifying DID ownership');
   const verification = await didService.verify(did.did);
 
   const newStatus = verification.verified ? DidStatus.VERIFIED : DidStatus.VERIFICATION_FAILED;
-  logger.info({ tenantId, didId: id, verified: verification.verified, newStatus }, 'Updating DID status');
+  logger.info({ didId: id, verified: verification.verified, newStatus }, 'Updating DID status');
   const updatedDid = await updateDidStatus(id, tenantId, newStatus);
 
-  logger.info({ tenantId, didId: id, verified: verification.verified }, 'DID verification complete');
+  logger.info({ didId: id, verified: verification.verified }, 'DID verification complete');
   return NextResponse.json({ verification, did: updatedDid });
 });
