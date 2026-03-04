@@ -555,7 +555,7 @@ describe('Service API', { testIsolation: false }, () => {
           // Clean up
           cy.request({
             method: 'DELETE',
-            url: `/api/v1/services/${tempId}`,
+            url: `/api/v1/services/${tempId}?force=true`,
           });
         });
       });
@@ -588,7 +588,7 @@ describe('Service API', { testIsolation: false }, () => {
           // Clean up
           cy.request({
             method: 'DELETE',
-            url: `/api/v1/services/${tempId}`,
+            url: `/api/v1/services/${tempId}?force=true`,
           });
         });
       });
