@@ -1,5 +1,6 @@
 import { NotFoundError } from '@/lib/api/errors';
 import { apiLogger } from '@/lib/api/logger';
+import { ValidationError } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDidById, updateDidStatus } from '@/lib/prisma/repositories';
 import { resolveDidService } from '@/lib/services/resolve-did-service';
@@ -64,6 +65,10 @@ export const POST = withTenantAuth(async (_req, { tenantId, params }) => {
   const did = await getDidById(id, tenantId);
   if (!did) {
     throw new NotFoundError('DID not found');
+  }
+
+  if (did.type === 'DEFAULT') {
+    throw new ValidationError('System default DIDs cannot be verified through this endpoint');
   }
 
   logger.info({ didId: id, did: did.did }, 'Resolving DID service for verification');
