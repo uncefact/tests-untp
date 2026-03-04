@@ -170,6 +170,17 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
+    it('PATCH /api/v1/dids/:id — unsets isDefault before deletion', () => {
+      cy.request({
+        method: 'PATCH',
+        url: `/api/v1/dids/${createdDidId}`,
+        body: { isDefault: false },
+      }).then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.isDefault).to.eq(false);
+      });
+    });
+
     it('DELETE /api/v1/dids/:id — deletes a managed DID', () => {
       cy.request({
         method: 'DELETE',
