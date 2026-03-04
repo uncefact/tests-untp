@@ -32,7 +32,7 @@ describe('DID API', { testIsolation: false }, () => {
       }).then((response) => {
         expect(response.status).to.eq(201);
         expect(response.body).to.not.have.property('ok');
-        expect(response.body.did).to.match(/^did:web:/);
+        expect(response.body.did).to.match(/^did:web:.+:.+/);
         expect(response.body.type).to.eq('MANAGED');
         expect(response.body.status).to.eq('ACTIVE');
         expect(response.body.id).to.be.a('string');
@@ -68,6 +68,7 @@ describe('DID API', { testIsolation: false }, () => {
         expect(defaultDid).to.exist;
 
         defaultDidId = defaultDid.id;
+        expect(defaultDid.keyId).to.be.a('string').and.not.be.empty;
       });
     });
 
@@ -106,6 +107,24 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
+    it('PATCH /api/v1/dids/:id — sets isDefault on a managed DID', () => {
+      cy.request({
+        method: 'PATCH',
+        url: `/api/v1/dids/${createdDidId}`,
+        body: { isDefault: true },
+      }).then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.isDefault).to.eq(true);
+      });
+    });
+
+    it('GET /api/v1/dids/:id — confirms isDefault persisted', () => {
+      cy.request(`/api/v1/dids/${createdDidId}`).then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.isDefault).to.eq(true);
+      });
+    });
+
     it('GET /api/v1/dids/:id — confirms updates persisted', () => {
       cy.request(`/api/v1/dids/${createdDidId}`).then((response) => {
         expect(response.status).to.eq(200);
@@ -137,6 +156,17 @@ describe('DID API', { testIsolation: false }, () => {
         expect(response.body.verification.checks).to.be.an('array');
         expect(response.body.did).to.exist;
         expect(response.body.did.id).to.eq(createdDidId);
+      });
+    });
+
+    it('POST /api/v1/dids/:id/verify — returns 400 for system default DID', () => {
+      cy.request({
+        method: 'POST',
+        url: `/api/v1/dids/${defaultDidId}/verify`,
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.include('System default DIDs cannot be verified');
       });
     });
 
@@ -437,6 +467,18 @@ describe('DID API', { testIsolation: false }, () => {
       }).then((response) => {
         expect(response.status).to.eq(400);
         expect(response.body.error).to.include('default');
+      });
+    });
+
+    it('PATCH — returns 400 when setting isDefault on system default DID', () => {
+      cy.request({
+        method: 'PATCH',
+        url: `/api/v1/dids/${defaultDidId}`,
+        body: { isDefault: true },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
