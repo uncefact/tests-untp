@@ -180,6 +180,14 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     storageService = await resolveStorageService(tenantId, storageOptions.serviceInstanceId);
   }
 
+  // Validate optional field types
+  if (body.isPrimary !== undefined && typeof body.isPrimary !== 'boolean') {
+    throw new ValidationError('isPrimary must be a boolean');
+  }
+  if (body.inline !== undefined && typeof body.inline !== 'boolean') {
+    throw new ValidationError('inline must be a boolean');
+  }
+
   logger.info({ renderTemplateId: id }, 'Updating render template');
   const renderTemplate = await updateRenderTemplate({
     id,
@@ -187,8 +195,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     name: body.name as string | undefined,
     template: body.template as string | undefined,
     storageService,
-    isPrimary: body.isPrimary as boolean | undefined,
-    inline: body.inline as boolean | undefined,
+    isPrimary: body.isPrimary,
+    inline: body.inline,
     mediaType: body.mediaType as string | undefined,
     mediaQuery: body.mediaQuery as string | undefined,
   });
@@ -251,7 +259,12 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
       );
     } catch (e) {
       logger.warn(
-        { renderTemplateId: id, storageExternalId: deleted.storageExternalId, error: e },
+        {
+          renderTemplateId: id,
+          storageExternalId: deleted.storageExternalId,
+          storageServiceInstanceId: deleted.storageServiceInstanceId,
+          error: e,
+        },
         'Failed to delete template content from storage',
       );
     }

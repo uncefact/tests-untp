@@ -20,7 +20,7 @@ export function validateRenderMethodFields(
   fields: RenderMethodFields,
 ): ValidatedRenderMethodFields {
   if (renderMethodType === RenderMethodType.WebRenderingTemplate2022) {
-    const inapplicable = RT2024_FIELDS.filter((f) => fields[f] !== undefined);
+    const inapplicable = RT2024_FIELDS.filter((f) => fields[f] != null);
     if (inapplicable.length > 0) {
       throw new ValidationError(`Fields not applicable to WebRenderingTemplate2022: ${inapplicable.join(', ')}`);
     }

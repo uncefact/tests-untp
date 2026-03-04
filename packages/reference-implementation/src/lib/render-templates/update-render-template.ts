@@ -44,6 +44,7 @@ export async function updateRenderTemplate(input: UpdateRenderTemplateInput): Pr
   } = {};
 
   if (template && storageService) {
+    // All render templates are stored as HTML; update contentType if non-HTML types are supported in future.
     logger.info({ storageInstanceId: storageService.instanceId }, 'Re-uploading template to storage');
     const storageResult = await storageService.service.storeBinary(template, existing.name, 'text/html', false);
     storageUpdates = {

@@ -36,6 +36,7 @@ export async function createRenderTemplate(input: CreateRenderTemplateInput): Pr
     mediaQuery: input.mediaQuery,
   });
 
+  // All render templates are stored as HTML; update contentType if non-HTML types are supported in future.
   logger.info({ storageInstanceId: storageService.instanceId }, 'Uploading template to storage');
   const storageResult = await storageService.service.storeBinary(template, name, 'text/html', false);
 

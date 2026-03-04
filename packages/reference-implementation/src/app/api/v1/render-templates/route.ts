@@ -197,6 +197,14 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   if (!isNonEmptyString(body.renderMethodType)) throw new ValidationError('renderMethodType is required');
   if (!isNonEmptyString(body.template)) throw new ValidationError('template is required');
 
+  // Validate optional field types
+  if (body.isPrimary !== undefined && typeof body.isPrimary !== 'boolean') {
+    throw new ValidationError('isPrimary must be a boolean');
+  }
+  if (body.inline !== undefined && typeof body.inline !== 'boolean') {
+    throw new ValidationError('inline must be a boolean');
+  }
+
   logger.info({ renderMethodType: body.renderMethodType }, 'Validating render method type');
   const renderMethodType = validateEnum(
     body.renderMethodType as string,
@@ -217,8 +225,8 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     renderMethodType,
     template: body.template as string,
     storageService,
-    isPrimary: body.isPrimary as boolean | undefined,
-    inline: body.inline as boolean | undefined,
+    isPrimary: body.isPrimary,
+    inline: body.inline,
     mediaType: body.mediaType as string | undefined,
     mediaQuery: body.mediaQuery as string | undefined,
   });
