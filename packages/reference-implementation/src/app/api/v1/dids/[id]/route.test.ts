@@ -73,6 +73,7 @@ jest.mock('@/lib/services/resolve-did-service', () => ({
 }));
 
 import { NotFoundError } from '@/lib/api/errors';
+import { ValidationError } from '@/lib/api/validation';
 import { GET, PATCH, DELETE } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -156,7 +157,6 @@ describe('PATCH /api/v1/dids/:id', () => {
   });
 
   it('sets isDefault on a managed DID', async () => {
-    mockGetDidById.mockResolvedValue({ id: 'did-1', type: 'MANAGED', tenantId: 'org-1' });
     const updated = { id: 'did-1', type: 'MANAGED', isDefault: true };
     mockUpdateDid.mockResolvedValue(updated);
 
@@ -170,7 +170,7 @@ describe('PATCH /api/v1/dids/:id', () => {
   });
 
   it('returns 400 when setting isDefault on a DEFAULT type DID', async () => {
-    mockGetDidById.mockResolvedValue({ id: 'did-1', type: 'DEFAULT', tenantId: 'system', isDefault: true });
+    mockUpdateDid.mockRejectedValue(new ValidationError('Cannot modify default status of system DIDs'));
 
     const req = createFakeRequest({ method: 'PATCH', body: { isDefault: true } });
     const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
@@ -178,11 +178,9 @@ describe('PATCH /api/v1/dids/:id', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('Cannot modify default status of system DIDs');
-    expect(mockUpdateDid).not.toHaveBeenCalled();
   });
 
   it('accepts isDefault with name together', async () => {
-    mockGetDidById.mockResolvedValue({ id: 'did-1', type: 'MANAGED', tenantId: 'org-1' });
     const updated = { id: 'did-1', type: 'MANAGED', name: 'My DID', isDefault: true };
     mockUpdateDid.mockResolvedValue(updated);
 

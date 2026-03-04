@@ -1,6 +1,7 @@
 import { Did, DidStatus, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
+import { ValidationError } from '@/lib/api/validation';
 
 /**
  * Input for creating a new DID record
@@ -138,6 +139,10 @@ export async function updateDid(id: string, tenantId: string, input: UpdateDidIn
 
     if (!existing) {
       throw new NotFoundError('DID not found or access denied');
+    }
+
+    if (input.isDefault !== undefined && existing.type === 'DEFAULT') {
+      throw new ValidationError('Cannot modify default status of system DIDs');
     }
 
     if (input.isDefault) {

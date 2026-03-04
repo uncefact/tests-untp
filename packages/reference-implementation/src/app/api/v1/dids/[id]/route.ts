@@ -67,7 +67,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  * /dids/{id}:
  *   patch:
  *     summary: Update a DID
- *     description: Updates the name and/or description of a specific DID
+ *     description: Updates the name, description, and/or default status of a specific DID
  *     tags:
  *       - DIDs
  *     parameters:
@@ -144,16 +144,6 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 
   if (!hasName && !hasDescription && !hasIsDefault) {
     throw new ValidationError('At least one of name, description, or isDefault is required');
-  }
-
-  if (hasIsDefault) {
-    const existing = await getDidById(id, tenantId);
-    if (!existing) {
-      throw new NotFoundError('DID not found');
-    }
-    if (existing.type === 'DEFAULT') {
-      throw new ValidationError('Cannot modify default status of system DIDs');
-    }
   }
 
   logger.info({ didId: id, fields: { hasName, hasDescription, hasIsDefault } }, 'Updating DID record');

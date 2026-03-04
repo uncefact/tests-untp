@@ -111,7 +111,7 @@ export async function verifyDid(did: string, options: VerifyDidOptions): Promise
   // Shared check: JSON-LD validity — expand and convert to RDF.
   if (document) {
     try {
-      // @todo Revisit whether safe: false is the correct default for DID document validation.
+      // @todo Revisit whether safe: false is the correct choice for DID document validation.
       // See https://opensource.unicc.org/un/unece/uncefact/spec-untp/-/issues/369#issuecomment-2878856840
       await validateJsonLd(document, { safe: false });
       checks.push({ name: C.JSONLD_VALIDITY, passed: true });

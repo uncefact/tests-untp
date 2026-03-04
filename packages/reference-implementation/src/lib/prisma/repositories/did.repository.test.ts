@@ -348,6 +348,16 @@ describe('did.repository', () => {
       expect(result.isDefault).toBe(false);
     });
 
+    it('throws ValidationError when setting isDefault on a DEFAULT type DID', async () => {
+      mockTx.did.findFirst.mockResolvedValue({ ...DID_RECORD, type: 'DEFAULT' });
+
+      await expect(updateDid('did-record-1', ORG_ID, { isDefault: true })).rejects.toThrow(
+        'Cannot modify default status of system DIDs',
+      );
+      expect(mockTx.did.updateMany).not.toHaveBeenCalled();
+      expect(mockTx.did.update).not.toHaveBeenCalled();
+    });
+
     it('throws if DID does not belong to the organisation', async () => {
       mockTx.did.findFirst.mockResolvedValue(null);
 
