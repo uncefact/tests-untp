@@ -412,3 +412,21 @@ export async function findCriteriaByCanonicalIds(tenantId: string, canonicalIds:
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// findProfileWithCriteriaByCanonicalId
+// ---------------------------------------------------------------------------
+
+export async function findProfileWithCriteriaByCanonicalId(tenantId: string, canonicalId: string) {
+  return prisma.conformityProfile.findFirst({
+    where: {
+      canonicalId,
+      OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
+    },
+    include: {
+      criteria: {
+        include: { criterion: true },
+      },
+    },
+  });
+}

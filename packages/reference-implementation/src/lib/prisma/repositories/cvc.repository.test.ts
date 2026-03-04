@@ -10,6 +10,7 @@ import {
   listCriteria,
   getCriterionById,
   findCriteriaByCanonicalIds,
+  findProfileWithCriteriaByCanonicalId,
 } from './cvc.repository';
 import { NotFoundError } from '@/lib/api/errors';
 
@@ -753,6 +754,50 @@ describe('cvc.repository', () => {
 
       const result = await findCriteriaByCanonicalIds(TENANT_ID, ['https://example.com/criterion/nonexistent']);
       expect(result).toEqual([]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // findProfileWithCriteriaByCanonicalId
+  // -------------------------------------------------------------------------
+
+  describe('findProfileWithCriteriaByCanonicalId', () => {
+    it('returns profile with nested criteria when found', async () => {
+      const profileWithCriteria = {
+        ...PROFILE_RECORD,
+        criteria: [
+          {
+            id: 'pc-1',
+            profileId: 'profile-1',
+            criterionId: 'crit-1',
+            criterion: CRITERION_RECORD,
+          },
+        ],
+      };
+      mockProfile.findFirst.mockResolvedValue(profileWithCriteria);
+
+      const result = await findProfileWithCriteriaByCanonicalId(TENANT_ID, 'https://example.com/profile/1');
+
+      expect(mockProfile.findFirst).toHaveBeenCalledWith({
+        where: {
+          canonicalId: 'https://example.com/profile/1',
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT }],
+        },
+        include: {
+          criteria: {
+            include: { criterion: true },
+          },
+        },
+      });
+      expect(result).toEqual(profileWithCriteria);
+    });
+
+    it('returns null when no matching profile exists', async () => {
+      mockProfile.findFirst.mockResolvedValue(null);
+
+      const result = await findProfileWithCriteriaByCanonicalId(TENANT_ID, 'https://example.com/profile/nonexistent');
+
+      expect(result).toBeNull();
     });
   });
 });
