@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { apiLogger } from '@/lib/api/logger';
 import { ValidationError } from '@/lib/api/validation';
-import { UnprocessableError } from '@/lib/api/errors';
 import { withPublicRoute } from '@/lib/api/with-public-route';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
@@ -204,7 +203,10 @@ export const POST = withPublicRoute(async (req) => {
   try {
     fetchedData = JSON.parse(responseText);
   } catch {
-    throw new UnprocessableError('Response from storage URI is not valid JSON');
+    return NextResponse.json(
+      { error: 'Response from storage URI is not valid JSON', code: 'INVALID_RESPONSE' },
+      { status: 422 },
+    );
   }
 
   // ── Step 3: Detect and handle encryption ───────────────────────────
