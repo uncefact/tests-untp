@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
-import { ValidationError, validateEnum, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import {
+  ValidationError,
+  validateEnum,
+  isNonEmptyString,
+  parsePositiveInt,
+  parseNonNegativeInt,
+} from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { createServiceInstance, listServiceInstances } from '@/lib/prisma/repositories';
 import { getEncryptionService } from '@/lib/encryption/encryption';
 import {
@@ -38,11 +45,10 @@ const logger = apiLogger.child({ route: '/api/v1/services' });
  *               - adapterType
  *               - name
  *               - config
- *               - apiVersion
  *             properties:
  *               serviceType:
  *                 type: string
- *                 enum: [DID, IDR, STORAGE, VC]
+ *                 enum: [IDR, STORAGE, VC]
  *                 description: The service category
  *               adapterType:
  *                 type: string
@@ -57,9 +63,6 @@ const logger = apiLogger.child({ route: '/api/v1/services' });
  *               config:
  *                 type: object
  *                 description: Adapter-specific configuration (validated against the adapter schema)
- *               apiVersion:
- *                 type: string
- *                 description: Semver API version (e.g. "1.1.0")
  *               isPrimary:
  *                 type: boolean
  *                 description: Whether this instance is the primary for its service type
@@ -69,11 +72,7 @@ const logger = apiLogger.child({ route: '/api/v1/services' });
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 serviceInstanceId:
- *                   type: string
- *                   description: Database record ID for the new service instance
+ *               $ref: '#/components/schemas/ServiceInstance'
  *       400:
  *         description: Validation error
  *         content:
@@ -100,10 +99,10 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     name?: string;
     description?: string;
     config?: unknown;
-    apiVersion?: string;
     isPrimary?: boolean;
   };
 
+  logger.info({ tenantId }, 'Parsing request body');
   try {
     body = await req.json();
   } catch {
@@ -112,13 +111,18 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   // --- Field validation ---------------------------------------------------
 
+  logger.info(
+    { tenantId, serviceType: body.serviceType, adapterType: body.adapterType, name: body.name },
+    'Validating input parameters',
+  );
+
   const serviceType = validateEnum(body.serviceType, Object.values(ServiceType), 'serviceType');
   if (!serviceType) throw new ValidationError('serviceType is required');
 
   const adapterType = validateEnum(body.adapterType, Object.values(AdapterType), 'adapterType');
   if (!adapterType) throw new ValidationError('adapterType is required');
 
-  if (!body.name || typeof body.name !== 'string') {
+  if (!isNonEmptyString(body.name)) {
     throw new ValidationError('name is required');
   }
 
@@ -126,11 +130,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('config must be an object');
   }
 
-  if (!body.apiVersion || typeof body.apiVersion !== 'string') {
-    throw new ValidationError('apiVersion is required');
-  }
-
   // --- Registry look-up & config schema validation ------------------------
+
+  logger.info({ tenantId, serviceType, adapterType }, 'Looking up adapter in registry');
 
   const registryForService = (adapterRegistry as Record<string, Record<string, AdapterRegistryEntry> | undefined>)[
     serviceType
@@ -142,6 +144,8 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError(`Unknown adapter type '${adapterType}' for service type '${serviceType}'`);
   }
 
+  logger.info({ tenantId, serviceType, adapterType }, 'Validating config against adapter schema');
+
   const parseResult = registryEntry.configSchema.safeParse(body.config);
   if (!parseResult.success) {
     const messages = parseResult.error.issues.map((i) => i.message).join('; ');
@@ -150,11 +154,11 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   // --- Encrypt & persist --------------------------------------------------
 
+  logger.info({ tenantId, serviceType, adapterType, name: body.name }, 'Encrypting and persisting service instance');
+
   const encryptedConfig = JSON.stringify(
     getEncryptionService().encrypt(JSON.stringify(body.config), EncryptionAlgorithm.AES_256_GCM),
   );
-
-  logger.info({ tenantId, serviceType, adapterType, name: body.name }, 'Creating service instance');
 
   const record = await createServiceInstance({
     tenantId,
@@ -163,13 +167,13 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     name: body.name,
     description: body.description,
     config: encryptedConfig,
-    apiVersion: body.apiVersion,
     isPrimary: body.isPrimary,
   });
 
-  logger.info({ tenantId, serviceId: record.id }, 'Service instance created');
+  const masked = maskInstanceConfig(record, getEncryptionService(), logger);
 
-  return NextResponse.json({ serviceInstanceId: record.id }, { status: 201 });
+  logger.info({ tenantId, serviceInstanceId: record.id }, 'Service instance created');
+  return NextResponse.json(masked, { status: 201 });
 });
 
 // ---------------------------------------------------------------------------
@@ -189,7 +193,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         name: serviceType
  *         schema:
  *           type: string
- *           enum: [DID, IDR, STORAGE, VC]
+ *           enum: [IDR, STORAGE, VC]
  *         description: Filter by service type
  *       - in: query
  *         name: adapterType
@@ -217,10 +221,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *             schema:
  *               type: object
  *               properties:
- *                 services:
+ *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/ServiceInstance'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Validation error
  *         content:
@@ -243,6 +249,8 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   const url = new URL(req.url);
 
+  logger.info({ tenantId }, 'Parsing and validating query filters');
+
   const serviceType = validateEnum(
     url.searchParams.get('serviceType') ?? undefined,
     Object.values(ServiceType),
@@ -256,17 +264,18 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  logger.info({ tenantId, filters: { serviceType, adapterType, limit, offset } }, 'Listing service instances');
+  logger.info({ tenantId, filters: { serviceType, adapterType, limit, offset } }, 'Querying service instances');
 
-  const instances = await listServiceInstances(tenantId, {
+  const { data, total } = await listServiceInstances(tenantId, {
     serviceType,
     adapterType,
     limit,
     offset,
   });
 
-  const services = instances.map((i) => maskInstanceConfig(i, getEncryptionService(), logger));
+  logger.info({ tenantId }, 'Masking service instance configurations');
+  const masked = data.map((i) => maskInstanceConfig(i, getEncryptionService(), logger));
 
-  logger.info({ tenantId, count: services.length }, 'Service instances listed');
-  return NextResponse.json({ services });
+  logger.info({ tenantId, count: masked.length }, 'Service instances listed');
+  return NextResponse.json(buildPaginatedResponse(masked, total, limit, offset));
 });

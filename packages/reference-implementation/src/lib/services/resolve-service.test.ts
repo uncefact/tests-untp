@@ -72,7 +72,6 @@ const MOCK_INSTANCE = {
   adapterType: 'UNCEFACT_STORAGE',
   name: 'System UNCEFACT Storage',
   config: JSON.stringify(MOCK_ENCRYPTED_ENVELOPE),
-  apiVersion: '1.0.0',
   isPrimary: true,
   createdAt: new Date(),
   updatedAt: new Date(),

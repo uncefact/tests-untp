@@ -5,7 +5,6 @@ interface ServiceInstance {
   name: string;
   description?: string;
   config: Record<string, unknown>;
-  apiVersion: string;
   isPrimary: boolean;
 }
 
@@ -36,22 +35,27 @@ describe('Service API', { testIsolation: false }, () => {
             endpoint: 'https://vckit-e2e.example.com',
             apiKey: 'e2e-test-key-123',
           },
-          apiVersion: '1.0.0',
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.serviceInstanceId).to.be.a('string');
+        expect(response.body.id).to.be.a('string');
+        expect(response.body.serviceType).to.eq('VC');
+        expect(response.body.adapterType).to.eq('VCKIT');
+        expect(response.body.name).to.eq(`E2E Test VC Service ${RUN_ID}`);
 
-        createdServiceId = response.body.serviceInstanceId;
+        createdServiceId = response.body.id;
       });
     });
 
     it('GET /api/v1/services — lists service instances including the created one', () => {
       cy.request('/api/v1/services').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.services).to.be.an('array');
+        expect(response.body.data).to.be.an('array');
+        expect(response.body.pagination).to.exist;
+        expect(response.body.pagination.total).to.be.a('number');
+        expect(response.body.pagination.hasMore).to.be.a('boolean');
 
-        const created = response.body.services.find(
+        const created = response.body.data.find(
           (s: ServiceInstance) => s.id === createdServiceId,
         );
         expect(created).to.exist;
@@ -62,18 +66,17 @@ describe('Service API', { testIsolation: false }, () => {
     it('GET /api/v1/services/:id — retrieves a specific service instance', () => {
       cy.request(`/api/v1/services/${createdServiceId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.service).to.exist;
-        expect(response.body.service.id).to.eq(createdServiceId);
-        expect(response.body.service.serviceType).to.eq('VC');
-        expect(response.body.service.adapterType).to.eq('VCKIT');
-        expect(response.body.service.name).to.eq(`E2E Test VC Service ${RUN_ID}`);
-        expect(response.body.service.description).to.eq('Created by Cypress E2E test');
+        expect(response.body.id).to.eq(createdServiceId);
+        expect(response.body.serviceType).to.eq('VC');
+        expect(response.body.adapterType).to.eq('VCKIT');
+        expect(response.body.name).to.eq(`E2E Test VC Service ${RUN_ID}`);
+        expect(response.body.description).to.eq('Created by Cypress E2E test');
       });
     });
 
     it('GET /api/v1/services/:id — masks sensitive config fields', () => {
       cy.request(`/api/v1/services/${createdServiceId}`).then((response) => {
-        const config = response.body.service.config;
+        const config = response.body.config;
         expect(config).to.be.an('object');
         expect(config.endpoint).to.eq('https://vckit-e2e.example.com');
         expect(config.apiKey).to.eq('***');
@@ -87,7 +90,7 @@ describe('Service API', { testIsolation: false }, () => {
         body: { name: `Updated E2E VC Service ${RUN_ID}` },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.service.name).to.eq(`Updated E2E VC Service ${RUN_ID}`);
+        expect(response.body.name).to.eq(`Updated E2E VC Service ${RUN_ID}`);
       });
     });
 
@@ -98,7 +101,7 @@ describe('Service API', { testIsolation: false }, () => {
         body: { description: 'Updated description' },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.service.description).to.eq('Updated description');
+        expect(response.body.description).to.eq('Updated description');
       });
     });
 
@@ -114,50 +117,91 @@ describe('Service API', { testIsolation: false }, () => {
       }).then((response) => {
         expect(response.status).to.eq(200);
         // Updated field reflected
-        expect(response.body.service.config.endpoint).to.eq(
+        expect(response.body.config.endpoint).to.eq(
           'https://vckit-e2e-updated.example.com',
         );
         // apiKey preserved from original config (merged) and masked
-        expect(response.body.service.config.apiKey).to.eq('***');
+        expect(response.body.config.apiKey).to.eq('***');
       });
     });
 
     it('GET /api/v1/services/:id — confirms all updates persisted', () => {
       cy.request(`/api/v1/services/${createdServiceId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.service.name).to.eq(`Updated E2E VC Service ${RUN_ID}`);
-        expect(response.body.service.description).to.eq('Updated description');
-        expect(response.body.service.config.endpoint).to.eq(
+        expect(response.body.name).to.eq(`Updated E2E VC Service ${RUN_ID}`);
+        expect(response.body.description).to.eq('Updated description');
+        expect(response.body.config.endpoint).to.eq(
           'https://vckit-e2e-updated.example.com',
         );
       });
     });
 
-    it('DELETE /api/v1/services/:id — warns without force flag', () => {
+    it('DELETE /api/v1/services/:id — deletes the service instance', () => {
       cy.request({
         method: 'DELETE',
         url: `/api/v1/services/${createdServiceId}`,
       }).then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body.deleted).to.be.false;
-        expect(response.body.warning).to.exist;
+        expect(response.status).to.eq(204);
       });
     });
 
-    it('GET /api/v1/services/:id — still exists after delete without force', () => {
-      cy.request(`/api/v1/services/${createdServiceId}`).then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body.service.id).to.eq(createdServiceId);
-      });
-    });
-
-    it('DELETE /api/v1/services/:id?force=true — deletes the service instance', () => {
+    it('DELETE /api/v1/services/:id — returns 409 when instance has references', () => {
+      // Create a service instance that will be referenced by a DID
       cy.request({
-        method: 'DELETE',
-        url: `/api/v1/services/${createdServiceId}?force=true`,
-      }).then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body.deleted).to.be.true;
+        method: 'POST',
+        url: '/api/v1/services',
+        body: {
+          serviceType: 'VC',
+          adapterType: 'VCKIT',
+          name: `E2E Ref Check ${RUN_ID}`,
+          config: {
+            endpoint: 'https://ref-check.example.com',
+            apiKey: 'ref-key',
+          },
+        },
+      }).then((createRes) => {
+        const refServiceId = createRes.body.id;
+
+        // Create a DID that references this service instance
+        cy.request({
+          method: 'POST',
+          url: '/api/v1/dids',
+          body: {
+            type: 'MANAGED',
+            method: 'did:web',
+            alias: `ref-test-${RUN_ID}`,
+            serviceInstanceId: refServiceId,
+          },
+        }).then((didRes) => {
+          const didId = didRes.body.id;
+
+          // Attempt to delete without force — should get 409
+          cy.request({
+            method: 'DELETE',
+            url: `/api/v1/services/${refServiceId}`,
+            failOnStatusCode: false,
+          }).then((deleteRes) => {
+            expect(deleteRes.status).to.eq(409);
+            expect(deleteRes.body.error).to.include('Cannot delete');
+            expect(deleteRes.body.error).to.include('DID(s)');
+          });
+
+          // Delete with force=true — should succeed
+          cy.request({
+            method: 'DELETE',
+            url: `/api/v1/services/${refServiceId}?force=true`,
+          }).then((forceRes) => {
+            expect(forceRes.status).to.eq(204);
+          });
+
+          // Clean up DID (it still exists, serviceInstanceId is now null)
+          cy.request({
+            method: 'GET',
+            url: `/api/v1/dids/${didId}`,
+          }).then((didGetRes) => {
+            expect(didGetRes.body.serviceInstanceId).to.be.null;
+          });
+        });
       });
     });
 
@@ -188,18 +232,17 @@ describe('Service API', { testIsolation: false }, () => {
             endpoint: 'https://primary.example.com',
             apiKey: 'primary-key',
           },
-          apiVersion: '1.0.0',
           isPrimary: true,
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
-        primaryServiceId = response.body.serviceInstanceId;
+        primaryServiceId = response.body.id;
       });
     });
 
     it('verifies the first instance is primary', () => {
       cy.request(`/api/v1/services/${primaryServiceId}`).then((response) => {
-        expect(response.body.service.isPrimary).to.be.true;
+        expect(response.body.isPrimary).to.be.true;
       });
     });
 
@@ -215,18 +258,17 @@ describe('Service API', { testIsolation: false }, () => {
             endpoint: 'https://second.example.com',
             apiKey: 'second-key',
           },
-          apiVersion: '1.0.0',
           isPrimary: true,
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
-        secondServiceId = response.body.serviceInstanceId;
+        secondServiceId = response.body.id;
       });
     });
 
     it('second instance is primary, first is demoted', () => {
       cy.request('/api/v1/services').then((response) => {
-        const services = response.body.services;
+        const services = response.body.data;
         const second = services.find((s: ServiceInstance) => s.id === secondServiceId);
         const first = services.find((s: ServiceInstance) => s.id === primaryServiceId);
 
@@ -242,7 +284,7 @@ describe('Service API', { testIsolation: false }, () => {
         body: { isPrimary: true },
       }).then(() => {
         cy.request('/api/v1/services').then((response) => {
-          const services = response.body.services;
+          const services = response.body.data;
           const first = services.find((s: ServiceInstance) => s.id === primaryServiceId);
           const second = services.find((s: ServiceInstance) => s.id === secondServiceId);
 
@@ -253,7 +295,7 @@ describe('Service API', { testIsolation: false }, () => {
     });
 
     after(() => {
-      // Clean up both instances (ignore 404 if already deleted or never created)
+      // Clean up both instances (force to bypass referential integrity checks)
       cy.request({ method: 'DELETE', url: `/api/v1/services/${primaryServiceId}?force=true`, failOnStatusCode: false });
       cy.request({ method: 'DELETE', url: `/api/v1/services/${secondServiceId}?force=true`, failOnStatusCode: false });
     });
@@ -263,7 +305,7 @@ describe('Service API', { testIsolation: false }, () => {
     it('filters by serviceType', () => {
       cy.request('/api/v1/services?serviceType=VC').then((response) => {
         expect(response.status).to.eq(200);
-        response.body.services.forEach((s: ServiceInstance) => {
+        response.body.data.forEach((s: ServiceInstance) => {
           expect(s.serviceType).to.eq('VC');
         });
       });
@@ -272,7 +314,7 @@ describe('Service API', { testIsolation: false }, () => {
     it('filters by adapterType', () => {
       cy.request('/api/v1/services?adapterType=VCKIT').then((response) => {
         expect(response.status).to.eq(200);
-        response.body.services.forEach((s: ServiceInstance) => {
+        response.body.data.forEach((s: ServiceInstance) => {
           expect(s.adapterType).to.eq('VCKIT');
         });
       });
@@ -282,7 +324,7 @@ describe('Service API', { testIsolation: false }, () => {
       cy.request('/api/v1/services?serviceType=VC&adapterType=VCKIT').then(
         (response) => {
           expect(response.status).to.eq(200);
-          response.body.services.forEach((s: ServiceInstance) => {
+          response.body.data.forEach((s: ServiceInstance) => {
             expect(s.serviceType).to.eq('VC');
             expect(s.adapterType).to.eq('VCKIT');
           });
@@ -293,22 +335,26 @@ describe('Service API', { testIsolation: false }, () => {
     it('supports pagination with limit', () => {
       cy.request('/api/v1/services?limit=1').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.services.length).to.be.at.most(1);
+        expect(response.body.data.length).to.be.at.most(1);
+        expect(response.body.pagination).to.exist;
+        expect(response.body.pagination.limit).to.eq(1);
       });
     });
 
     it('supports pagination with limit and offset', () => {
       cy.request('/api/v1/services?limit=1&offset=0').then((firstPage) => {
         expect(firstPage.status).to.eq(200);
-        expect(firstPage.body.services.length).to.be.at.most(1);
+        expect(firstPage.body.data.length).to.be.at.most(1);
+        expect(firstPage.body.pagination.offset).to.eq(0);
 
-        if (firstPage.body.services.length === 1) {
-          const firstId = firstPage.body.services[0].id;
+        if (firstPage.body.data.length === 1) {
+          const firstId = firstPage.body.data[0].id;
 
           cy.request('/api/v1/services?limit=1&offset=1').then((secondPage) => {
             expect(secondPage.status).to.eq(200);
-            if (secondPage.body.services.length === 1) {
-              expect(secondPage.body.services[0].id).to.not.eq(firstId);
+            expect(secondPage.body.pagination.offset).to.eq(1);
+            if (secondPage.body.data.length === 1) {
+              expect(secondPage.body.data[0].id).to.not.eq(firstId);
             }
           });
         }
@@ -319,7 +365,8 @@ describe('Service API', { testIsolation: false }, () => {
       cy.request('/api/v1/services').then((response) => {
         expect(response.status).to.eq(200);
         // System defaults are seeded at startup — at least one should exist
-        expect(response.body.services.length).to.be.greaterThan(0);
+        expect(response.body.data.length).to.be.greaterThan(0);
+        expect(response.body.pagination.total).to.be.greaterThan(0);
       });
     });
   });
@@ -333,7 +380,6 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'VCKIT',
           name: 'Test',
           config: { endpoint: 'https://example.com', apiKey: 'key' },
-          apiVersion: '1.0.0',
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -349,7 +395,6 @@ describe('Service API', { testIsolation: false }, () => {
           serviceType: 'VC',
           name: 'Test',
           config: { endpoint: 'https://example.com', apiKey: 'key' },
-          apiVersion: '1.0.0',
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -365,7 +410,6 @@ describe('Service API', { testIsolation: false }, () => {
           serviceType: 'VC',
           adapterType: 'VCKIT',
           config: { endpoint: 'https://example.com', apiKey: 'key' },
-          apiVersion: '1.0.0',
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -381,23 +425,6 @@ describe('Service API', { testIsolation: false }, () => {
           serviceType: 'VC',
           adapterType: 'VCKIT',
           name: 'Test',
-          apiVersion: '1.0.0',
-        },
-        failOnStatusCode: false,
-      }).then((response) => {
-        expect(response.status).to.eq(400);
-      });
-    });
-
-    it('returns 400 when apiVersion is missing', () => {
-      cy.request({
-        method: 'POST',
-        url: '/api/v1/services',
-        body: {
-          serviceType: 'VC',
-          adapterType: 'VCKIT',
-          name: 'Test',
-          config: { endpoint: 'https://example.com', apiKey: 'key' },
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -414,7 +441,6 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'VCKIT',
           name: 'Test',
           config: { endpoint: 'https://example.com', apiKey: 'key' },
-          apiVersion: '1.0.0',
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -431,7 +457,6 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'PYX_IDR',
           name: 'Test',
           config: {},
-          apiVersion: '1.0.0',
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -448,7 +473,6 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'VCKIT',
           name: 'Test',
           config: null,
-          apiVersion: '1.0.0',
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -465,7 +489,6 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'VCKIT',
           name: 'Test',
           config: [],
-          apiVersion: '1.0.0',
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -482,7 +505,6 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'VCKIT',
           name: 'Test',
           config: 'not an object',
-          apiVersion: '1.0.0',
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -499,7 +521,6 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'VCKIT',
           name: 'Test',
           config: { endpoint: 'not-a-url' },
-          apiVersion: '1.0.0',
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -519,10 +540,9 @@ describe('Service API', { testIsolation: false }, () => {
             endpoint: 'https://temp.example.com',
             apiKey: 'temp-key',
           },
-          apiVersion: '1.0.0',
         },
       }).then((createResponse) => {
-        const tempId = createResponse.body.serviceInstanceId;
+        const tempId = createResponse.body.id;
 
         cy.request({
           method: 'PATCH',
@@ -535,7 +555,7 @@ describe('Service API', { testIsolation: false }, () => {
           // Clean up
           cy.request({
             method: 'DELETE',
-            url: `/api/v1/services/${tempId}?force=true`,
+            url: `/api/v1/services/${tempId}`,
           });
         });
       });
@@ -553,10 +573,9 @@ describe('Service API', { testIsolation: false }, () => {
             endpoint: 'https://temp.example.com',
             apiKey: 'temp-key',
           },
-          apiVersion: '1.0.0',
         },
       }).then((createResponse) => {
-        const tempId = createResponse.body.serviceInstanceId;
+        const tempId = createResponse.body.id;
 
         cy.request({
           method: 'PATCH',
@@ -569,7 +588,7 @@ describe('Service API', { testIsolation: false }, () => {
           // Clean up
           cy.request({
             method: 'DELETE',
-            url: `/api/v1/services/${tempId}?force=true`,
+            url: `/api/v1/services/${tempId}`,
           });
         });
       });
@@ -588,7 +607,7 @@ describe('Service API', { testIsolation: false }, () => {
     it('returns 404 when deleting nonexistent service instance', () => {
       cy.request({
         method: 'DELETE',
-        url: '/api/v1/services/nonexistent-id?force=true',
+        url: '/api/v1/services/nonexistent-id',
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(404);

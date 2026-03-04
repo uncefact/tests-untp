@@ -261,7 +261,6 @@ async function main() {
           name: 'System Default Pyx IDR',
           description: 'System-wide default Pyx Identity Resolver instance',
           config: encryptedIdrConfig,
-          apiVersion: '2.0.0',
           isPrimary: true,
         },
       });
@@ -303,7 +302,6 @@ async function main() {
           name: 'System Default UNCEFACT Storage',
           description: 'System-wide default UNCEFACT storage instance for credential persistence',
           config: encryptedStorageConfig,
-          apiVersion: '3.0.0',
           isPrimary: true,
         },
       });
@@ -341,7 +339,6 @@ async function main() {
           name: 'System Default VCKit',
           description: 'System-wide default VCKit instance for DID management and verifiable credential operations',
           config: encryptedVcConfig,
-          apiVersion: '1.0.0',
           isPrimary: true,
         },
       });

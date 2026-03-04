@@ -20,6 +20,8 @@ import {
   identifierSchemeSchema,
   identifierSchema,
   linkRegistrationSchema,
+  // Service instance schemas
+  serviceInstanceResponseSchema,
   // Shared schemas
   errorResponseSchema,
 } from '@uncefact/untp-ri-services';
@@ -80,6 +82,7 @@ export {
   identifierSchemeSchema,
   identifierSchema,
   linkRegistrationSchema,
+  serviceInstanceResponseSchema,
   errorResponseSchema,
   paginationMetaSchema,
 };
@@ -116,6 +119,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     IdentifierScheme: identifierSchemeSchema,
     Identifier: identifierSchema,
     LinkRegistration: linkRegistrationSchema,
+    ServiceInstance: serviceInstanceResponseSchema,
   };
 
   const openAPISchemas: Record<string, OpenAPISchema> = {};

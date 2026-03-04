@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError } from '@/lib/api/validation';
+import { NotFoundError, ConflictError } from '@/lib/api/errors';
+import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
-import { getServiceInstanceById, updateServiceInstance, deleteServiceInstance } from '@/lib/prisma/repositories';
+import {
+  getServiceInstanceById,
+  updateServiceInstance,
+  deleteServiceInstance,
+  countServiceInstanceReferences,
+} from '@/lib/prisma/repositories';
 import { getEncryptionService } from '@/lib/encryption/encryption';
 import { EncryptionAlgorithm, adapterRegistry, maskInstanceConfig } from '@uncefact/untp-ri-services';
 import type { AdapterRegistryEntry } from '@uncefact/untp-ri-services';
@@ -35,10 +40,7 @@ const logger = apiLogger.child({ route: '/api/v1/services/[id]' });
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 service:
- *                   $ref: '#/components/schemas/ServiceInstance'
+ *               $ref: '#/components/schemas/ServiceInstance'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -60,14 +62,15 @@ const logger = apiLogger.child({ route: '/api/v1/services/[id]' });
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ tenantId, serviceInstanceId: id }, 'Looking up service instance');
 
+  logger.info({ tenantId, serviceInstanceId: id }, 'Looking up service instance');
   const instance = await getServiceInstanceById(id, tenantId);
   if (!instance) {
     throw new NotFoundError('Service instance not found');
   }
 
-  return NextResponse.json({ service: maskInstanceConfig(instance, getEncryptionService(), logger) });
+  logger.info({ tenantId, serviceInstanceId: id }, 'Service instance retrieved');
+  return NextResponse.json(maskInstanceConfig(instance, getEncryptionService(), logger));
 });
 
 // ---------------------------------------------------------------------------
@@ -115,10 +118,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 service:
- *                   $ref: '#/components/schemas/ServiceInstance'
+ *               $ref: '#/components/schemas/ServiceInstance'
  *       400:
  *         description: Validation error - invalid body or configuration
  *         content:
@@ -147,6 +147,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
+  logger.info({ tenantId, serviceInstanceId: id }, 'Parsing request body');
   let body: { name?: string; description?: string; config?: Record<string, unknown>; isPrimary?: boolean };
   try {
     body = await req.json();
@@ -156,6 +157,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 
   const { name, description, config, isPrimary } = body;
 
+  logger.info({ tenantId, serviceInstanceId: id }, 'Validating fields');
   const hasName = name !== undefined;
   const hasDescription = description !== undefined;
   const hasConfig = config !== undefined;
@@ -165,10 +167,15 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('At least one of name, description, config, or isPrimary is required');
   }
 
+  if (hasName && !isNonEmptyString(name)) {
+    throw new ValidationError('name must be a non-empty string');
+  }
+
   if (hasConfig && (typeof config !== 'object' || Array.isArray(config) || config === null)) {
     throw new ValidationError('config must be an object');
   }
 
+  logger.info({ tenantId, serviceInstanceId: id }, 'Looking up existing service instance');
   const existing = await getServiceInstanceById(id, tenantId);
   if (!existing) {
     throw new NotFoundError('Service instance not found');
@@ -177,7 +184,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   let encryptedConfig: string | undefined;
 
   if (hasConfig) {
-    // Decrypt existing config and merge with user-supplied fields
+    logger.info({ tenantId, serviceInstanceId: id }, 'Decrypting existing config');
     let existingConfig: Record<string, unknown>;
     try {
       existingConfig = JSON.parse(getEncryptionService().decrypt(JSON.parse(existing.config)));
@@ -185,9 +192,11 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
       logger.error({ error, serviceInstanceId: id }, 'Failed to decrypt existing config for merge');
       throw new ValidationError('Cannot update configuration: existing config could not be decrypted.');
     }
+
+    logger.info({ tenantId, serviceInstanceId: id }, 'Merging config');
     const mergedConfig = { ...existingConfig, ...config };
 
-    // Validate the merged config against the adapter schema
+    logger.info({ tenantId, serviceInstanceId: id }, 'Validating merged config against adapter schema');
     const { serviceType, adapterType } = existing;
     const serviceAdapters = (adapterRegistry as Record<string, Record<string, AdapterRegistryEntry> | undefined>)[
       serviceType
@@ -205,6 +214,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
       throw new ValidationError(`Invalid configuration: ${result.error.message}`);
     }
 
+    logger.info({ tenantId, serviceInstanceId: id }, 'Encrypting config');
     encryptedConfig = JSON.stringify(
       getEncryptionService().encrypt(JSON.stringify(mergedConfig), EncryptionAlgorithm.AES_256_GCM),
     );
@@ -222,8 +232,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     ...(hasIsPrimary && { isPrimary }),
   });
 
-  logger.info({ tenantId, serviceInstanceId: id }, 'Service instance updated');
-  return NextResponse.json({ service: maskInstanceConfig(updated, getEncryptionService(), logger) });
+  logger.info({ tenantId, serviceInstanceId: id }, 'Service instance updated successfully');
+  return NextResponse.json(maskInstanceConfig(updated, getEncryptionService(), logger));
 });
 
 // ---------------------------------------------------------------------------
@@ -235,7 +245,11 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  * /services/{id}:
  *   delete:
  *     summary: Delete a service instance
- *     description: "Deletes a service instance. Requires the `force` query parameter set to `true` to confirm deletion."
+ *     description: >
+ *       Permanently deletes a service instance. If the instance is referenced by
+ *       DIDs, registrars, or identifier schemes, returns 409 Conflict unless the
+ *       `force` query parameter is set to `true`. When forced, Prisma's `onDelete: SetNull`
+ *       behaviour nullifies the foreign keys on related records.
  *     tags:
  *       - Services
  *     parameters:
@@ -247,25 +261,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *         description: The database ID of the service instance
  *       - in: query
  *         name: force
- *         required: false
  *         schema:
- *           type: string
- *           enum:
- *             - 'true'
- *         description: Set to "true" to confirm deletion
+ *           type: boolean
+ *         description: Set to true to delete even when other records reference this instance
  *     responses:
- *       200:
- *         description: Service instance deleted successfully (or warning if force not set)
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 deleted:
- *                   type: boolean
- *                 warning:
- *                   type: string
- *                   description: Present when force is not set to true
+ *       204:
+ *         description: Service instance deleted successfully
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -274,6 +275,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Service instance not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: Conflict - service instance is referenced by other records
  *         content:
  *           application/json:
  *             schema:
@@ -287,25 +294,36 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  */
 export const DELETE = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
+  const url = new URL(req.url);
+  const force = url.searchParams.get('force') === 'true';
 
+  logger.info({ tenantId, serviceInstanceId: id }, 'Looking up service instance for deletion');
   const existing = await getServiceInstanceById(id, tenantId);
   if (!existing) {
     throw new NotFoundError('Service instance not found');
   }
 
-  const url = new URL(req.url);
-  const force = url.searchParams.get('force') === 'true';
-
   if (!force) {
-    logger.warn({ tenantId, serviceInstanceId: id }, 'Delete requested without force flag');
-    return NextResponse.json({
-      deleted: false,
-      warning: 'Use ?force=true to confirm deletion.',
-    });
+    logger.info({ tenantId, serviceInstanceId: id }, 'Checking for referencing records');
+    const refs = await countServiceInstanceReferences(id);
+    const total = refs.dids + refs.registrars + refs.schemes;
+
+    if (total > 0) {
+      const parts: string[] = [];
+      if (refs.dids > 0) parts.push(`${refs.dids} DID(s)`);
+      if (refs.registrars > 0) parts.push(`${refs.registrars} registrar(s)`);
+      if (refs.schemes > 0) parts.push(`${refs.schemes} identifier scheme(s)`);
+
+      throw new ConflictError(
+        `Cannot delete: service instance is referenced by ${parts.join(', ')}. ` +
+          'Use ?force=true to delete anyway (references will be set to null).',
+      );
+    }
   }
 
-  logger.info({ tenantId, serviceInstanceId: id }, 'Deleting service instance');
+  logger.info({ tenantId, serviceInstanceId: id, force }, 'Deleting service instance');
   await deleteServiceInstance(id, tenantId);
 
-  return NextResponse.json({ deleted: true });
+  logger.info({ tenantId, serviceInstanceId: id }, 'Service instance deleted');
+  return new Response(null, { status: 204 });
 });
