@@ -1,5 +1,6 @@
 import { DccV061Mapper } from './dcc-v061.mapper';
 import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
+import type { CredentialPayload } from '../../verifiable-credential/types';
 
 // -- Mock data model configs --------------------------------------------------
 
@@ -551,6 +552,142 @@ describe('DccV061Mapper', () => {
 
       expect(refs.primaryIdentifier).toBe('5555555555');
       expect(refs.organisation).toEqual({ registeredId: '5555555555' });
+    });
+  });
+
+  // -- extractCvcRefs ---------------------------------------------------------
+
+  describe('extractCvcRefs', () => {
+    it('extracts scopeUrl from credentialSubject.scope.id', () => {
+      const result = mapper.extractCvcRefs({
+        credentialSubject: {
+          type: ['ConformityAttestation'],
+          scope: { id: 'https://vocab.example.com/scheme/vap' },
+        },
+      } as unknown as CredentialPayload);
+
+      expect(result.scopeUrl).toBe('https://vocab.example.com/scheme/vap');
+    });
+
+    it('extracts criteriaUrls from assessment[].assessmentCriteria[].id', () => {
+      const result = mapper.extractCvcRefs({
+        credentialSubject: {
+          type: ['ConformityAttestation'],
+          assessment: [
+            {
+              type: ['ConformityAssessment'],
+              assessmentCriteria: [
+                { id: 'https://vocab.example.com/criterion/c1' },
+                { id: 'https://vocab.example.com/criterion/c2' },
+              ],
+            },
+          ],
+        },
+      } as unknown as CredentialPayload);
+
+      expect(result.criteriaUrls).toEqual([
+        'https://vocab.example.com/criterion/c1',
+        'https://vocab.example.com/criterion/c2',
+      ]);
+    });
+
+    it('flattens criteria across multiple assessments', () => {
+      const result = mapper.extractCvcRefs({
+        credentialSubject: {
+          type: ['ConformityAttestation'],
+          assessment: [
+            {
+              type: ['ConformityAssessment'],
+              assessmentCriteria: [{ id: 'https://vocab.example.com/criterion/c1' }],
+            },
+            {
+              type: ['ConformityAssessment'],
+              assessmentCriteria: [{ id: 'https://vocab.example.com/criterion/c3' }],
+            },
+          ],
+        },
+      } as unknown as CredentialPayload);
+
+      expect(result.criteriaUrls).toEqual([
+        'https://vocab.example.com/criterion/c1',
+        'https://vocab.example.com/criterion/c3',
+      ]);
+    });
+
+    it('deduplicates criteria URLs', () => {
+      const result = mapper.extractCvcRefs({
+        credentialSubject: {
+          type: ['ConformityAttestation'],
+          assessment: [
+            {
+              type: ['ConformityAssessment'],
+              assessmentCriteria: [
+                { id: 'https://vocab.example.com/criterion/c1' },
+                { id: 'https://vocab.example.com/criterion/c1' },
+              ],
+            },
+          ],
+        },
+      } as unknown as CredentialPayload);
+
+      expect(result.criteriaUrls).toEqual(['https://vocab.example.com/criterion/c1']);
+    });
+
+    it('returns empty criteriaUrls when no assessment', () => {
+      const result = mapper.extractCvcRefs({
+        credentialSubject: {
+          type: ['ConformityAttestation'],
+          scope: { id: 'https://vocab.example.com/scheme/vap' },
+        },
+      } as unknown as CredentialPayload);
+
+      expect(result.criteriaUrls).toEqual([]);
+      expect(result.scopeUrl).toBe('https://vocab.example.com/scheme/vap');
+    });
+
+    it('omits scopeUrl when scope is absent', () => {
+      const result = mapper.extractCvcRefs({
+        credentialSubject: {
+          type: ['ConformityAttestation'],
+          assessment: [
+            {
+              type: ['ConformityAssessment'],
+              assessmentCriteria: [{ id: 'https://vocab.example.com/criterion/c1' }],
+            },
+          ],
+        },
+      } as unknown as CredentialPayload);
+
+      expect(result.scopeUrl).toBeUndefined();
+    });
+
+    it('returns empty results when credentialSubject is missing', () => {
+      const result = mapper.extractCvcRefs({} as unknown as CredentialPayload);
+
+      expect(result).toEqual({ criteriaUrls: [] });
+    });
+
+    it('skips criteria entries without id', () => {
+      const result = mapper.extractCvcRefs({
+        credentialSubject: {
+          type: ['ConformityAttestation'],
+          assessment: [
+            {
+              type: ['ConformityAssessment'],
+              assessmentCriteria: [
+                { id: 'https://vocab.example.com/criterion/c1' },
+                { name: 'no-id-criterion' },
+                { id: 'https://vocab.example.com/criterion/c2' },
+              ],
+            },
+          ],
+        },
+      } as unknown as CredentialPayload);
+
+      expect(result.criteriaUrls).toEqual([
+        'https://vocab.example.com/criterion/c1',
+        'https://vocab.example.com/criterion/c2',
+      ]);
     });
   });
 });

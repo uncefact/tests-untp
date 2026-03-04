@@ -159,11 +159,24 @@ export {
 } from './verifiable-credential/adapters/vckit/vckit-verifiable-credential.schema.js';
 export { decodeCredential } from './verifiable-credential/common/decode-credential.js';
 
+// CVC parsing
+export type {
+  ICvcParser,
+  ParsedCvcCatalogue,
+  ParsedCvcScheme,
+  ParsedCvcProfile,
+  ParsedCvcCriterion,
+} from './cvc-parsing/index.js';
+export { getCvcParser, SUPPORTED_CVC_VERSIONS } from './cvc-parsing/index.js';
+export { CvcV070Parser } from './cvc-parsing/index.js';
+
 // Credential mapping
 export type {
   ICredentialMapper,
+  ICvcAwareMapper,
   MapperOutput,
   ExtractedIdentifierRefs,
+  ExtractedCvcRefs,
   DataModelConfig,
   ResolvedEntities,
   OrganisationEntity,
@@ -174,3 +187,4 @@ export type {
   UntpLocation,
 } from './credential-mapping/index.js';
 export { getMapper } from './credential-mapping/index.js';
+export { DccV061Mapper } from './credential-mapping/mappers/dcc-v061.mapper.js';
