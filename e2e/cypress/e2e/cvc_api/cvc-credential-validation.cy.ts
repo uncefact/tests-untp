@@ -64,7 +64,7 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
                 name: 'E2E Test Conformity Scheme',
                 description: 'A conformity scheme used for E2E CVC validation tests.',
                 version: '1.0.0',
-                validFrom: '2025-01-01T00:00:00Z',
+                validFrom: '2025-01-01',
                 owner: {
                   type: ['Entity'],
                   id: 'https://example.com/e2e-cvc/scheme-owner',
@@ -271,29 +271,9 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
       });
     });
 
-    it('returns CVC_NO_SCOPE when credential has no scope', () => {
-      const payload = buildDccPayload(defaultDidValue, {
-        criteriaIds: [CRITERION_1_CANONICAL_ID],
-      });
-
-      cy.request({
-        method: 'POST',
-        url: '/api/v1/credentials',
-        body: {
-          credentialPayload: payload,
-          credentialType: 'DigitalConformityCredential',
-          version: '0.6.1',
-        },
-      }).then((response) => {
-        expect(response.status).to.eq(201);
-        expect(response.body.warnings).to.be.an('array');
-
-        const noScopeWarnings = response.body.warnings.filter(
-          (w: any) => w.code === 'CVC_NO_SCOPE',
-        );
-        expect(noScopeWarnings).to.have.length(1);
-      });
-    });
+    // CVC_NO_SCOPE cannot be tested E2E because a valid DCC always requires
+    // scope with an id per the JSON Schema. The warning code is covered by
+    // unit tests in cvc-validation.service.test.ts.
 
     it('returns CVC_NO_CRITERIA when credential has scope but no assessment criteria', () => {
       const payload = buildDccPayload(defaultDidValue, {
