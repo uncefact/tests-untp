@@ -215,6 +215,15 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     expect(mockResolveStorageService).toHaveBeenCalledWith('tenant-1', 'si-1');
   });
 
+  it('returns 400 when name is empty string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { name: '' } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('name must be a non-empty string');
+  });
+
   it('rejects storageUrl in body', async () => {
     const req = createFakeRequest({ method: 'PATCH', body: { storageUrl: 'https://evil.com' } });
     const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);

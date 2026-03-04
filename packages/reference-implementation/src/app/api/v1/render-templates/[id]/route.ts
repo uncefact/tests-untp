@@ -181,6 +181,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   }
 
   // Validate optional field types
+  if (body.name !== undefined && !isNonEmptyString(body.name)) {
+    throw new ValidationError('name must be a non-empty string');
+  }
   if (body.isPrimary !== undefined && typeof body.isPrimary !== 'boolean') {
     throw new ValidationError('isPrimary must be a boolean');
   }
