@@ -286,8 +286,8 @@ async function main() {
         baseUrl: new URL(storageServiceUrl).origin,
         ...(storageApiKey && { apiKey: storageApiKey }),
         apiVersion: '3.0.0',
-        publicBucket: 'verifiable-credentials',
-        privateBucket: 'private-verifiable-credentials',
+        publicBucket: 'public-data',
+        privateBucket: 'private-data',
       });
       const encryptedStorageConfig = JSON.stringify(
         encryptionService.encrypt(storageServiceConfig, EncryptionAlgorithm.AES_256_GCM),
@@ -449,7 +449,7 @@ async function main() {
       const { storageServiceUrl } = getStorageConfig();
       const storageApiKey = process.env.UNCEFACT_STORAGE_API_KEY;
       const storageBaseUrl = new URL(storageServiceUrl).origin;
-      const storageBucket = 'verifiable-credentials';
+      const storageBucket = 'public-data';
 
       const TEMPLATES_DIR = path.resolve(__dirname, '../src/templates/v0.6.0');
 
