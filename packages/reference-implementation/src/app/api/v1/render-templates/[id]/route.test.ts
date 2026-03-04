@@ -36,13 +36,21 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 });
 
 const mockGetRenderTemplateById = jest.fn();
-const mockUpdateRenderTemplate = jest.fn();
 const mockDeleteRenderTemplate = jest.fn();
 
 jest.mock('@/lib/prisma/repositories', () => ({
   getRenderTemplateById: (id: string, tenantId: string) => mockGetRenderTemplateById(id, tenantId),
-  updateRenderTemplate: (id: string, tenantId: string, input: unknown) => mockUpdateRenderTemplate(id, tenantId, input),
   deleteRenderTemplate: (id: string, tenantId: string) => mockDeleteRenderTemplate(id, tenantId),
+}));
+
+const mockUpdateRenderTemplate = jest.fn();
+jest.mock('@/lib/render-templates/update-render-template', () => ({
+  updateRenderTemplate: (...args: unknown[]) => mockUpdateRenderTemplate(...args),
+}));
+
+const mockResolveStorageService = jest.fn();
+jest.mock('@/lib/services/resolve-storage-service', () => ({
+  resolveStorageService: (...args: unknown[]) => mockResolveStorageService(...args),
 }));
 
 import { NotFoundError } from '@/lib/api/errors';
@@ -121,12 +129,12 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     jest.clearAllMocks();
   });
 
-  it('updates the render template metadata', async () => {
+  it('updates metadata fields via orchestrator', async () => {
     const updated = {
       id: 'rt-1',
       name: 'Updated Template',
-      storageUrl: 'https://storage.example.com/templates/dpp-v2.html',
-      hash: 'def456',
+      storageUrl: 'https://storage.example.com/templates/dpp.html',
+      hash: 'abc123',
       isPrimary: false,
       dataModel: { id: 'dm-1', name: 'DPP v0.6.0' },
     };
@@ -138,32 +146,103 @@ describe('PATCH /api/v1/render-templates/:id', () => {
 
     expect(res.status).toBe(200);
     expect(json).toEqual(updated);
-    expect(mockUpdateRenderTemplate).toHaveBeenCalledWith('rt-1', 'tenant-1', {
+    expect(mockUpdateRenderTemplate).toHaveBeenCalledWith({
+      id: 'rt-1',
+      tenantId: 'tenant-1',
       name: 'Updated Template',
+      template: undefined,
+      storageService: undefined,
+      isPrimary: undefined,
+      inline: undefined,
+      mediaType: undefined,
+      mediaQuery: undefined,
     });
+    expect(mockResolveStorageService).not.toHaveBeenCalled();
   });
 
-  it('updates isPrimary', async () => {
+  it('re-uploads template when template field is provided', async () => {
+    const mockStorageService = {
+      service: { storeBinary: jest.fn(), delete: jest.fn() },
+      instanceId: 'storage-instance-1',
+    };
+    mockResolveStorageService.mockResolvedValue(mockStorageService);
+
     const updated = {
       id: 'rt-1',
-      name: 'DPP Default Template',
-      isPrimary: true,
+      name: 'DPP Template',
+      storageUrl: 'https://storage.example.com/templates/new.html',
+      hash: 'newhash',
+      isPrimary: false,
       dataModel: { id: 'dm-1', name: 'DPP v0.6.0' },
     };
     mockUpdateRenderTemplate.mockResolvedValue(updated);
 
-    const req = createFakeRequest({ method: 'PATCH', body: { isPrimary: true } });
+    const req = createFakeRequest({ method: 'PATCH', body: { template: '<div>new</div>' } });
     const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(200);
     expect(json).toEqual(updated);
-    expect(mockUpdateRenderTemplate).toHaveBeenCalledWith('rt-1', 'tenant-1', {
-      isPrimary: true,
+    expect(mockResolveStorageService).toHaveBeenCalledWith('tenant-1', undefined);
+    expect(mockUpdateRenderTemplate).toHaveBeenCalledWith({
+      id: 'rt-1',
+      tenantId: 'tenant-1',
+      name: undefined,
+      template: '<div>new</div>',
+      storageService: mockStorageService,
+      isPrimary: undefined,
+      inline: undefined,
+      mediaType: undefined,
+      mediaQuery: undefined,
     });
   });
 
-  it('returns 400 for empty body (no updatable fields)', async () => {
+  it('passes storageOptions.serviceInstanceId when resolving storage service', async () => {
+    const mockStorageService = {
+      service: { storeBinary: jest.fn(), delete: jest.fn() },
+      instanceId: 'si-1',
+    };
+    mockResolveStorageService.mockResolvedValue(mockStorageService);
+    mockUpdateRenderTemplate.mockResolvedValue({ id: 'rt-1' });
+
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: { template: '<div>updated</div>', storageOptions: { serviceInstanceId: 'si-1' } },
+    });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockResolveStorageService).toHaveBeenCalledWith('tenant-1', 'si-1');
+  });
+
+  it('rejects storageUrl in body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { storageUrl: 'https://evil.com' } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('storageUrl cannot be set directly');
+  });
+
+  it('rejects hash in body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { hash: 'abc123' } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('hash cannot be set directly');
+  });
+
+  it('rejects renderMethodType in body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { renderMethodType: 'WebRenderingTemplate2022' } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('renderMethodType cannot be set directly');
+  });
+
+  it('returns 400 when no patchable field provided', async () => {
     const req = createFakeRequest({ method: 'PATCH', body: {} });
     const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
     const json = await res.json();
@@ -188,44 +267,8 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     expect(json.error).toBe('Invalid JSON body');
   });
 
-  it('returns 400 when name is empty string', async () => {
-    const req = createFakeRequest({ method: 'PATCH', body: { name: '' } });
-    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
-    const json = await res.json();
-
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('name must be a non-empty string');
-  });
-
-  it('returns 400 when storageUrl is empty string', async () => {
-    const req = createFakeRequest({ method: 'PATCH', body: { storageUrl: '' } });
-    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
-    const json = await res.json();
-
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('storageUrl must be a non-empty string');
-  });
-
-  it('returns 400 when hash is empty string', async () => {
-    const req = createFakeRequest({ method: 'PATCH', body: { hash: '' } });
-    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
-    const json = await res.json();
-
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('hash must be a non-empty string');
-  });
-
-  it('returns 400 when isPrimary is not a boolean', async () => {
-    const req = createFakeRequest({ method: 'PATCH', body: { isPrimary: 'yes' } });
-    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
-    const json = await res.json();
-
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('isPrimary must be a boolean');
-  });
-
-  it('returns 404 when repository throws NotFoundError', async () => {
-    mockUpdateRenderTemplate.mockRejectedValue(new NotFoundError('Render template not found or access denied'));
+  it('returns 404 when orchestrator throws NotFoundError', async () => {
+    mockUpdateRenderTemplate.mockRejectedValue(new NotFoundError('Render template not found'));
 
     const req = createFakeRequest({ method: 'PATCH', body: { name: 'Updated' } });
     const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
@@ -252,14 +295,62 @@ describe('DELETE /api/v1/render-templates/:id', () => {
     jest.clearAllMocks();
   });
 
-  it('deletes the render template and returns 204', async () => {
-    mockDeleteRenderTemplate.mockResolvedValue({ id: 'rt-1' });
+  it('deletes template and attempts storage deletion', async () => {
+    const mockStorageDelete = jest.fn().mockResolvedValue(undefined);
+    mockResolveStorageService.mockResolvedValue({
+      service: { delete: mockStorageDelete },
+      instanceId: 'storage-instance-1',
+    });
+    mockDeleteRenderTemplate.mockResolvedValue({
+      id: 'rt-1',
+      storageExternalId: 'ext-1',
+      storageBucket: 'public',
+      storageServiceInstanceId: 'si-1',
+    });
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('rt-1') as unknown as Parameters<typeof DELETE>[1]);
 
     expect(res.status).toBe(204);
     expect(mockDeleteRenderTemplate).toHaveBeenCalledWith('rt-1', 'tenant-1');
+    expect(mockResolveStorageService).toHaveBeenCalledWith('tenant-1', 'si-1');
+    expect(mockStorageDelete).toHaveBeenCalledWith('ext-1', 'public');
+  });
+
+  it('skips storage deletion when storageExternalId is null', async () => {
+    mockDeleteRenderTemplate.mockResolvedValue({
+      id: 'rt-1',
+      storageExternalId: null,
+      storageBucket: null,
+      storageServiceInstanceId: null,
+    });
+
+    const req = createFakeRequest({});
+    const res = await DELETE(req, createContext('rt-1') as unknown as Parameters<typeof DELETE>[1]);
+
+    expect(res.status).toBe(204);
+    expect(mockDeleteRenderTemplate).toHaveBeenCalledWith('rt-1', 'tenant-1');
+    expect(mockResolveStorageService).not.toHaveBeenCalled();
+  });
+
+  it('returns 204 even when storage deletion fails', async () => {
+    const mockStorageDelete = jest.fn().mockRejectedValue(new Error('Storage unavailable'));
+    mockResolveStorageService.mockResolvedValue({
+      service: { delete: mockStorageDelete },
+      instanceId: 'storage-instance-1',
+    });
+    mockDeleteRenderTemplate.mockResolvedValue({
+      id: 'rt-1',
+      storageExternalId: 'ext-1',
+      storageBucket: 'public',
+      storageServiceInstanceId: 'si-1',
+    });
+
+    const req = createFakeRequest({});
+    const res = await DELETE(req, createContext('rt-1') as unknown as Parameters<typeof DELETE>[1]);
+
+    expect(res.status).toBe(204);
+    expect(mockStorageDelete).toHaveBeenCalledWith('ext-1', 'public');
   });
 
   it('returns 404 when repository throws NotFoundError', async () => {
