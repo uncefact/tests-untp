@@ -155,8 +155,8 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'VCKIT',
           name: `E2E Ref Check ${RUN_ID}`,
           config: {
-            endpoint: 'https://ref-check.example.com',
-            apiKey: 'ref-key',
+            endpoint: 'http://vckit-api:3332',
+            apiKey: 'test123',
           },
         },
       }).then((createRes) => {
