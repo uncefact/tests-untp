@@ -1,4 +1,4 @@
-import { Prisma } from '../generated';
+import { Prisma, RenderMethodType } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
@@ -25,9 +25,17 @@ export type RenderTemplateWithRelations = Prisma.RenderTemplateGetPayload<{
 export type CreateRenderTemplateInput = {
   name: string;
   dataModelId: string;
+  renderMethodType: RenderMethodType;
   storageUrl: string;
   hash: string;
   isPrimary?: boolean;
+  storageServiceInstanceId?: string;
+  storageExternalId?: string;
+  storageBucket?: string;
+  storageContentType?: string;
+  inline?: boolean | null;
+  mediaType?: string | null;
+  mediaQuery?: string | null;
 };
 
 /**
@@ -38,6 +46,13 @@ export type UpdateRenderTemplateInput = {
   storageUrl?: string;
   hash?: string;
   isPrimary?: boolean;
+  storageServiceInstanceId?: string;
+  storageExternalId?: string;
+  storageBucket?: string;
+  storageContentType?: string;
+  inline?: boolean | null;
+  mediaType?: string | null;
+  mediaQuery?: string | null;
 };
 
 /**
@@ -75,9 +90,17 @@ export async function createRenderTemplate(
         tenantId,
         name: input.name,
         dataModelId: input.dataModelId,
+        renderMethodType: input.renderMethodType,
         storageUrl: input.storageUrl,
         hash: input.hash,
         isPrimary: input.isPrimary ?? false,
+        storageServiceInstanceId: input.storageServiceInstanceId,
+        storageExternalId: input.storageExternalId,
+        storageBucket: input.storageBucket,
+        storageContentType: input.storageContentType,
+        inline: input.inline,
+        mediaType: input.mediaType,
+        mediaQuery: input.mediaQuery,
       },
       include: RENDER_TEMPLATE_INCLUDE,
     });
@@ -168,6 +191,15 @@ export async function updateRenderTemplate(
         ...(input.storageUrl !== undefined && { storageUrl: input.storageUrl }),
         ...(input.hash !== undefined && { hash: input.hash }),
         ...(input.isPrimary !== undefined && { isPrimary: input.isPrimary }),
+        ...(input.storageServiceInstanceId !== undefined && {
+          storageServiceInstanceId: input.storageServiceInstanceId,
+        }),
+        ...(input.storageExternalId !== undefined && { storageExternalId: input.storageExternalId }),
+        ...(input.storageBucket !== undefined && { storageBucket: input.storageBucket }),
+        ...(input.storageContentType !== undefined && { storageContentType: input.storageContentType }),
+        ...(input.inline !== undefined && { inline: input.inline }),
+        ...(input.mediaType !== undefined && { mediaType: input.mediaType }),
+        ...(input.mediaQuery !== undefined && { mediaQuery: input.mediaQuery }),
       },
       include: RENDER_TEMPLATE_INCLUDE,
     });

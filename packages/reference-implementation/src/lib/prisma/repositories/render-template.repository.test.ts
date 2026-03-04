@@ -60,9 +60,17 @@ describe('render-template.repository', () => {
     tenantId: TENANT_ID,
     dataModelId: CONFIG_ID,
     name: 'DPP Default Template',
+    renderMethodType: 'RenderTemplate2024',
     storageUrl: 'https://storage.example.com/templates/dpp-default.html',
     hash: 'sha256-abc123',
     isPrimary: false,
+    storageServiceInstanceId: null,
+    storageExternalId: null,
+    storageBucket: null,
+    storageContentType: null,
+    inline: false,
+    mediaType: 'text/html',
+    mediaQuery: null,
     dataModel: {
       id: CONFIG_ID,
       name: 'Digital Product Passport v0.6.0',
@@ -82,6 +90,7 @@ describe('render-template.repository', () => {
       const result = await createRenderTemplate(TENANT_ID, {
         name: 'DPP Default Template',
         dataModelId: CONFIG_ID,
+        renderMethodType: 'RenderTemplate2024',
         storageUrl: 'https://storage.example.com/templates/dpp-default.html',
         hash: 'sha256-abc123',
       });
@@ -91,9 +100,17 @@ describe('render-template.repository', () => {
           tenantId: TENANT_ID,
           name: 'DPP Default Template',
           dataModelId: CONFIG_ID,
+          renderMethodType: 'RenderTemplate2024',
           storageUrl: 'https://storage.example.com/templates/dpp-default.html',
           hash: 'sha256-abc123',
           isPrimary: false,
+          storageServiceInstanceId: undefined,
+          storageExternalId: undefined,
+          storageBucket: undefined,
+          storageContentType: undefined,
+          inline: undefined,
+          mediaType: undefined,
+          mediaQuery: undefined,
         },
         include: INCLUDE_SHAPE,
       });
@@ -106,6 +123,7 @@ describe('render-template.repository', () => {
       await createRenderTemplate(TENANT_ID, {
         name: 'DPP Default Template',
         dataModelId: CONFIG_ID,
+        renderMethodType: 'RenderTemplate2024',
         storageUrl: 'https://storage.example.com/templates/dpp-default.html',
         hash: 'sha256-abc123',
       });
@@ -126,6 +144,7 @@ describe('render-template.repository', () => {
       await createRenderTemplate(TENANT_ID, {
         name: 'DPP Primary Template',
         dataModelId: CONFIG_ID,
+        renderMethodType: 'RenderTemplate2024',
         storageUrl: 'https://storage.example.com/templates/dpp-primary.html',
         hash: 'sha256-def456',
         isPrimary: true,
@@ -336,6 +355,44 @@ describe('render-template.repository', () => {
         data: {
           storageUrl: 'https://storage.example.com/templates/updated.html',
           hash: 'sha256-new789',
+        },
+        include: INCLUDE_SHAPE,
+      });
+    });
+
+    it('includes new optional fields in the update when provided', async () => {
+      mockTx.renderTemplate.findFirst.mockResolvedValue(TEMPLATE_RECORD);
+      mockTx.renderTemplate.update.mockResolvedValue({
+        ...TEMPLATE_RECORD,
+        storageServiceInstanceId: 'svc-1',
+        storageExternalId: 'ext-1',
+        storageBucket: 'templates',
+        storageContentType: 'text/html',
+        inline: true,
+        mediaType: 'text/html',
+        mediaQuery: 'screen',
+      });
+
+      await updateRenderTemplate('template-1', TENANT_ID, {
+        storageServiceInstanceId: 'svc-1',
+        storageExternalId: 'ext-1',
+        storageBucket: 'templates',
+        storageContentType: 'text/html',
+        inline: true,
+        mediaType: 'text/html',
+        mediaQuery: 'screen',
+      });
+
+      expect(mockTx.renderTemplate.update).toHaveBeenCalledWith({
+        where: { id: 'template-1' },
+        data: {
+          storageServiceInstanceId: 'svc-1',
+          storageExternalId: 'ext-1',
+          storageBucket: 'templates',
+          storageContentType: 'text/html',
+          inline: true,
+          mediaType: 'text/html',
+          mediaQuery: 'screen',
         },
         include: INCLUDE_SHAPE,
       });
