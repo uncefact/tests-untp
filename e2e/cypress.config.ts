@@ -404,8 +404,9 @@ export default defineConfig({
         },
         async seedCvcCatalogue({ tenantId }: { tenantId: string }) {
           const client = getDbClient();
+          await client.connect();
           try {
-            await client.connect();
+            await client.query('BEGIN');
 
             const now = new Date().toISOString();
 
@@ -459,7 +460,11 @@ export default defineConfig({
               [profileId, criterionId1, criterionId2],
             );
 
+            await client.query('COMMIT');
             return { catalogueId, schemeId, profileId, criterionIds: [criterionId1, criterionId2] };
+          } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
           } finally {
             await client.end();
           }

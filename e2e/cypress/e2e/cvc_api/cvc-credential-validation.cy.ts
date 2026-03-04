@@ -17,22 +17,28 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
   let defaultDidValue: string;
 
   /**
-   * Builds a minimal DCC credential payload.
+   * Builds a schema-valid DCC v0.6.1 credential payload.
+   *
+   * All required fields from the JSON Schema at
+   * https://test.uncefact.org/vocabulary/untp/dcc/untp-dcc-schema-0.6.1.json
+   * are populated with reasonable defaults.
+   *
    * The scope.id references the seeded profile, and assessmentCriteria
-   * can be customised per test.
+   * can be customised per test via opts.scopeId and opts.criteriaIds.
    */
   function buildDccPayload(
     issuerDid: string,
     opts: { scopeId?: string; criteriaIds?: string[] } = {},
   ) {
     const { scopeId, criteriaIds = [] } = opts;
+    const uniqueSuffix = `${RUN_ID}-${Math.random().toString(36).slice(2, 8)}`;
 
     return {
       '@context': [
         'https://www.w3.org/ns/credentials/v2',
         'https://test.uncefact.org/vocabulary/untp/dcc/0.6.1/',
       ],
-      id: `urn:uuid:e2e-cvc-${RUN_ID}-${Math.random().toString(36).slice(2, 8)}`,
+      id: `urn:uuid:e2e-cvc-${uniqueSuffix}`,
       type: ['DigitalConformityCredential', 'VerifiableCredential'],
       issuer: {
         type: ['CredentialIssuer'],
@@ -40,16 +46,52 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
         name: `E2E CVC Test Issuer ${RUN_ID}`,
       },
       credentialSubject: {
-        type: ['ConformityAttestation'],
-        ...(scopeId ? { scope: { id: scopeId } } : {}),
-        assessment: criteriaIds.length > 0
-          ? [
-              {
-                type: ['ConformityAssessment'],
-                assessmentCriteria: criteriaIds.map((id) => ({ id })),
+        type: ['ConformityAttestation', 'Attestation'],
+        id: `https://example.com/e2e-cvc/attestation/${uniqueSuffix}`,
+        assessorLevel: 'Self',
+        assessmentLevel: 'Unspecified',
+        attestationType: 'certification',
+        issuedToParty: {
+          type: ['Entity'],
+          id: `https://example.com/e2e-cvc/party/${uniqueSuffix}`,
+          name: `E2E Test Party ${RUN_ID}`,
+        },
+        ...(scopeId
+          ? {
+              scope: {
+                type: ['ConformityScheme'],
+                id: scopeId,
+                name: 'E2E Test Conformity Scheme',
+                description: 'A conformity scheme used for E2E CVC validation tests.',
+                version: '1.0.0',
+                validFrom: '2025-01-01T00:00:00Z',
+                owner: {
+                  type: ['Entity'],
+                  id: 'https://example.com/e2e-cvc/scheme-owner',
+                  name: 'E2E Scheme Owner',
+                },
               },
-            ]
-          : [],
+            }
+          : {}),
+        assessment:
+          criteriaIds.length > 0
+            ? [
+                {
+                  type: ['ConformityAssessment', 'Declaration'],
+                  id: `https://example.com/e2e-cvc/assessment/${uniqueSuffix}`,
+                  conformance: true,
+                  conformityTopic: 'governance.compliance',
+                  assessmentCriteria: criteriaIds.map((criterionId, index) => ({
+                    type: ['Criterion'],
+                    id: criterionId,
+                    name: `E2E Criterion ${index + 1}`,
+                    description: `Criterion ${index + 1} for E2E CVC validation tests.`,
+                    conformityTopic: 'governance.compliance',
+                    status: 'active',
+                  })),
+                },
+              ]
+            : [],
       },
     };
   }
