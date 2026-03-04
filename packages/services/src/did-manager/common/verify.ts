@@ -5,7 +5,7 @@ import { didDocumentSchema } from '../schemas.js';
 import { verifyDidWeb } from './verify-did-web.js';
 import { verifyDidWebVh } from './verify-did-webvh.js';
 import { DidInputError } from '../errors.js';
-import { validateJsonLd } from '../../jsonld-validation/validate-jsonld.js';
+// import { validateJsonLd } from '../../jsonld-validation/validate-jsonld.js';
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -108,20 +108,24 @@ export async function verifyDid(did: string, options: VerifyDidOptions): Promise
     checks.push({ name: C.KEY_MATERIAL, passed: false, message: 'No document to validate' });
   }
 
+  // @todo Re-enable JSON-LD expansion once a safe document loader with an
+  // allow-listed set of trusted contexts is in place. Disabled to avoid SSRF
+  // via attacker-controlled @context URLs in untrusted DID documents.
+  // See https://opensource.unicc.org/un/unece/uncefact/spec-untp/-/issues/369#issuecomment-2878856840
+  //
   // Shared check: JSON-LD validity — expand and convert to RDF.
-  if (document) {
-    try {
-      // @todo Revisit whether safe: false is the correct choice for DID document validation.
-      // See https://opensource.unicc.org/un/unece/uncefact/spec-untp/-/issues/369#issuecomment-2878856840
-      await validateJsonLd(document, { safe: false });
-      checks.push({ name: C.JSONLD_VALIDITY, passed: true });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'JSON-LD validation failed';
-      checks.push({ name: C.JSONLD_VALIDITY, passed: false, message });
-    }
-  } else {
-    checks.push({ name: C.JSONLD_VALIDITY, passed: false, message: 'No document to validate' });
-  }
+  // if (document) {
+  //   try {
+  //     await validateJsonLd(document, { safe: false });
+  //     checks.push({ name: C.JSONLD_VALIDITY, passed: true });
+  //   } catch (error) {
+  //     const message = error instanceof Error ? error.message : 'JSON-LD validation failed';
+  //     checks.push({ name: C.JSONLD_VALIDITY, passed: false, message });
+  //   }
+  // } else {
+  //   checks.push({ name: C.JSONLD_VALIDITY, passed: false, message: 'No document to validate' });
+  // }
+  checks.push({ name: C.JSONLD_VALIDITY, passed: true, message: 'Skipped — JSON-LD expansion disabled' });
 
   const verified = checks.every((c) => c.passed);
   const errors = checks.filter((c) => !c.passed).map((c) => ({ check: c.name, message: c.message ?? 'Check failed' }));

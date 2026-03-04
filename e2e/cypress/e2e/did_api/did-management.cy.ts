@@ -470,14 +470,14 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH — returns 400 when setting isDefault on system default DID', () => {
+    it('PATCH — returns 404 when attempting to set isDefault on system default DID', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/dids/${defaultDidId}`,
         body: { isDefault: true },
         failOnStatusCode: false,
       }).then((response) => {
-        expect(response.status).to.eq(400);
+        expect(response.status).to.eq(404);
         expect(response.body.error).to.be.a('string');
       });
     });
