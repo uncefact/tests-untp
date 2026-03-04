@@ -58,9 +58,6 @@ const ENTITY_REQUIREMENTS: Record<
  *             schema:
  *               type: object
  *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
  *                 formConfig:
  *                   type: object
  *                   properties:
@@ -121,7 +118,6 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   );
 
   return NextResponse.json({
-    ok: true,
     formConfig: {
       dataModelId: dataModel.id,
       credentialType: dataModel.credentialType,

@@ -74,15 +74,15 @@ describe('GET /api/v1/data-models', () => {
       { id: 'cfg-1', name: 'DPP v0.6.0', credentialType: 'DigitalProductPassport' },
       { id: 'cfg-2', name: 'DCC v0.6.0', credentialType: 'DigitalConformityCredential' },
     ];
-    mockListDataModels.mockResolvedValue(dataModels);
+    mockListDataModels.mockResolvedValue({ data: dataModels, total: 2 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/data-models' });
     const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.dataModels).toEqual(dataModels);
+    expect(json.data).toEqual(dataModels);
+    expect(json.pagination).toEqual({ total: 2, limit: 20, offset: 0, hasMore: false });
     expect(mockListDataModels).toHaveBeenCalledWith('tenant-1', {
       isExtension: undefined,
       credentialType: undefined,
@@ -93,7 +93,7 @@ describe('GET /api/v1/data-models', () => {
   });
 
   it('passes isExtension=true filter correctly', async () => {
-    mockListDataModels.mockResolvedValue([]);
+    mockListDataModels.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -111,7 +111,7 @@ describe('GET /api/v1/data-models', () => {
   });
 
   it('passes isExtension=false filter correctly', async () => {
-    mockListDataModels.mockResolvedValue([]);
+    mockListDataModels.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -141,7 +141,7 @@ describe('GET /api/v1/data-models', () => {
   });
 
   it('passes credentialType filter correctly', async () => {
-    mockListDataModels.mockResolvedValue([]);
+    mockListDataModels.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -171,7 +171,7 @@ describe('GET /api/v1/data-models', () => {
   });
 
   it('passes version filter correctly', async () => {
-    mockListDataModels.mockResolvedValue([]);
+    mockListDataModels.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -189,7 +189,7 @@ describe('GET /api/v1/data-models', () => {
   });
 
   it('passes pagination parameters correctly', async () => {
-    mockListDataModels.mockResolvedValue([]);
+    mockListDataModels.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -207,7 +207,7 @@ describe('GET /api/v1/data-models', () => {
   });
 
   it('passes all filters together', async () => {
-    mockListDataModels.mockResolvedValue([]);
+    mockListDataModels.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -292,8 +292,7 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(json.ok).toBe(true);
-    expect(json.dataModel).toEqual(created);
+    expect(json).toEqual(created);
   });
 
   it('passes isExtension=true and all fields to the repository', async () => {

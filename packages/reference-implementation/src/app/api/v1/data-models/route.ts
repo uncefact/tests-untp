@@ -6,6 +6,7 @@ import {
   parsePositiveInt,
   parseNonNegativeInt,
 } from '@/lib/api/validation';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { listDataModels, createDataModel } from '@/lib/prisma/repositories';
 import { CredentialType } from '@/lib/prisma/generated';
@@ -71,13 +72,12 @@ function parseBooleanParam(raw: string | null | undefined, paramName: string): b
  *             schema:
  *               type: object
  *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 dataModels:
+ *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/DataModel'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Validation error
  *         content:
@@ -100,6 +100,7 @@ function parseBooleanParam(raw: string | null | undefined, paramName: string): b
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   const url = new URL(req.url);
 
+  logger.info({ tenantId }, 'Parsing query filters');
   const isExtension = parseBooleanParam(url.searchParams.get('isExtension'), 'isExtension');
   const credentialType = validateEnum(
     url.searchParams.get('credentialType') ?? undefined,
@@ -110,8 +111,11 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  logger.info({ tenantId, filters: { isExtension, credentialType, version, limit, offset } }, 'Listing data models');
-  const dataModels = await listDataModels(tenantId, {
+  logger.info(
+    { tenantId, filters: { isExtension, credentialType, version, limit, offset } },
+    'Querying data models from database',
+  );
+  const { data, total } = await listDataModels(tenantId, {
     isExtension,
     credentialType,
     version,
@@ -119,8 +123,8 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
     offset,
   });
 
-  logger.info({ tenantId, count: dataModels.length }, 'Data models listed');
-  return NextResponse.json({ ok: true, dataModels });
+  logger.info({ tenantId, count: data.length, total }, 'Data models listed');
+  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });
 
 /**
@@ -173,13 +177,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 dataModel:
- *                   $ref: '#/components/schemas/DataModel'
+ *               $ref: '#/components/schemas/DataModel'
  *       400:
  *         description: Validation error
  *         content:
@@ -206,6 +204,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
+  logger.info({ tenantId }, 'Parsing request body');
   let body: {
     name?: string;
     credentialType?: string;
@@ -222,6 +221,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId }, 'Validating input parameters');
   if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
 
   const credentialType = validateEnum(body.credentialType, Object.values(CredentialType), 'credentialType');
@@ -247,5 +247,5 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   });
 
   logger.info({ tenantId, dataModelId: dataModel.id }, 'Data model extension created');
-  return NextResponse.json({ ok: true, dataModel }, { status: 201 });
+  return NextResponse.json(dataModel, { status: 201 });
 });

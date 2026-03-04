@@ -64,7 +64,6 @@ describe('GET /api/v1/data-models/:id/form-config', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
     expect(json.formConfig).toEqual({
       dataModelId: 'dm-1',
       credentialType: 'DigitalProductPassport',
@@ -94,7 +93,6 @@ describe('GET /api/v1/data-models/:id/form-config', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
     expect(json.formConfig.sections).toHaveLength(1);
     expect(json.formConfig.sections).toEqual([
       { entityType: 'organisation', label: 'Organisation', endpoint: '/api/v1/organisations', required: true },

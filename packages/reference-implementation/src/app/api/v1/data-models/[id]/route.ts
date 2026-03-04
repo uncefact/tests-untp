@@ -30,13 +30,7 @@ const UPDATABLE_FIELDS = ['name', 'schemaUrl', 'contextUrl', 'websiteUrl'] as co
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 dataModel:
- *                   $ref: '#/components/schemas/DataModel'
+ *               $ref: '#/components/schemas/DataModel'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -63,7 +57,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   if (!dataModel) {
     throw new NotFoundError('Data model not found');
   }
-  return NextResponse.json({ ok: true, dataModel });
+  return NextResponse.json(dataModel);
 });
 
 /**
@@ -107,13 +101,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 dataModel:
- *                   $ref: '#/components/schemas/DataModel'
+ *               $ref: '#/components/schemas/DataModel'
  *       400:
  *         description: Validation error
  *         content:
@@ -142,6 +130,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
+  logger.info({ tenantId, dataModelId: id }, 'Parsing request body');
   let body: Record<string, unknown>;
 
   try {
@@ -150,6 +139,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId, dataModelId: id }, 'Validating input parameters');
   const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
   if (!hasUpdatableField) {
     throw new ValidationError(`At least one updatable field must be provided: ${UPDATABLE_FIELDS.join(', ')}`);
@@ -164,6 +154,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   if (body.contextUrl !== undefined && !isNonEmptyString(body.contextUrl)) {
     throw new ValidationError('contextUrl must be a non-empty string');
   }
+  if (body.websiteUrl !== undefined && !isNonEmptyString(body.websiteUrl)) {
+    throw new ValidationError('websiteUrl must be a non-empty string');
+  }
 
   logger.info({ tenantId, dataModelId: id }, 'Updating data model');
   const dataModel = await updateDataModel(id, tenantId, {
@@ -174,7 +167,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   });
 
   logger.info({ tenantId, dataModelId: id }, 'Data model updated');
-  return NextResponse.json({ ok: true, dataModel });
+  return NextResponse.json(dataModel);
 });
 
 /**
@@ -193,18 +186,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *           type: string
  *         description: The database ID of the data model
  *     responses:
- *       200:
+ *       204:
  *         description: Data model deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 dataModel:
- *                   $ref: '#/components/schemas/DataModel'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -228,8 +211,8 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
   logger.info({ tenantId, dataModelId: id }, 'Deleting data model');
-  const dataModel = await deleteDataModel(id, tenantId);
+  await deleteDataModel(id, tenantId);
 
   logger.info({ tenantId, dataModelId: id }, 'Data model deleted');
-  return NextResponse.json({ ok: true, dataModel });
+  return new Response(null, { status: 204 });
 });
