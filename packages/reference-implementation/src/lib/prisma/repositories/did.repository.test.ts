@@ -15,6 +15,7 @@ const mockTx = {
   did: {
     findFirst: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
     delete: jest.fn(),
   },
 };
@@ -308,6 +309,43 @@ describe('did.repository', () => {
         data: { name: 'New Name', description: 'New desc' },
       });
       expect(result.name).toBe('New Name');
+    });
+
+    it('sets isDefault to true and clears previous default in same tenant', async () => {
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      mockTx.did.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.did.update.mockResolvedValue({ ...DID_RECORD, isDefault: true });
+
+      const result = await updateDid('did-record-1', ORG_ID, { isDefault: true });
+
+      expect(mockTx.did.updateMany).toHaveBeenCalledWith({
+        where: {
+          tenantId: ORG_ID,
+          isDefault: true,
+          id: { not: 'did-record-1' },
+          type: { not: 'DEFAULT' },
+        },
+        data: { isDefault: false },
+      });
+      expect(mockTx.did.update).toHaveBeenCalledWith({
+        where: { id: 'did-record-1' },
+        data: { isDefault: true },
+      });
+      expect(result.isDefault).toBe(true);
+    });
+
+    it('passes isDefault: false without clearing other defaults', async () => {
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      mockTx.did.update.mockResolvedValue({ ...DID_RECORD, isDefault: false });
+
+      const result = await updateDid('did-record-1', ORG_ID, { isDefault: false });
+
+      expect(mockTx.did.updateMany).not.toHaveBeenCalled();
+      expect(mockTx.did.update).toHaveBeenCalledWith({
+        where: { id: 'did-record-1' },
+        data: { isDefault: false },
+      });
+      expect(result.isDefault).toBe(false);
     });
 
     it('throws if DID does not belong to the organisation', async () => {

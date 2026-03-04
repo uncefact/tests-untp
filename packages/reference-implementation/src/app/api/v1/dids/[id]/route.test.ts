@@ -154,6 +154,46 @@ describe('PATCH /api/v1/dids/:id', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('sets isDefault on a managed DID', async () => {
+    mockGetDidById.mockResolvedValue({ id: 'did-1', type: 'MANAGED', tenantId: 'org-1' });
+    const updated = { id: 'did-1', type: 'MANAGED', isDefault: true };
+    mockUpdateDid.mockResolvedValue(updated);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { isDefault: true } });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json).toEqual(updated);
+    expect(mockUpdateDid).toHaveBeenCalledWith('did-1', 'org-1', { isDefault: true });
+  });
+
+  it('returns 400 when setting isDefault on a DEFAULT type DID', async () => {
+    mockGetDidById.mockResolvedValue({ id: 'did-1', type: 'DEFAULT', tenantId: 'system', isDefault: true });
+
+    const req = createFakeRequest({ method: 'PATCH', body: { isDefault: true } });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await (res as { status: number; json: () => Promise<{ error: string }> }).json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('Cannot modify default status of system DIDs');
+    expect(mockUpdateDid).not.toHaveBeenCalled();
+  });
+
+  it('accepts isDefault with name together', async () => {
+    mockGetDidById.mockResolvedValue({ id: 'did-1', type: 'MANAGED', tenantId: 'org-1' });
+    const updated = { id: 'did-1', type: 'MANAGED', name: 'My DID', isDefault: true };
+    mockUpdateDid.mockResolvedValue(updated);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { name: 'My DID', isDefault: true } });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json).toEqual(updated);
+    expect(mockUpdateDid).toHaveBeenCalledWith('did-1', 'org-1', { name: 'My DID', isDefault: true });
+  });
 });
 
 describe('DELETE /api/v1/dids/:id', () => {

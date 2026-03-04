@@ -24,6 +24,7 @@ export type CreateDidInput = {
 export type UpdateDidInput = {
   name?: string;
   description?: string;
+  isDefault?: boolean;
 };
 
 /**
@@ -124,8 +125,10 @@ export async function listDids(
 }
 
 /**
- * Updates a DID's name and/or description.
+ * Updates a DID's name, description, and/or default status.
  * Validates that the DID belongs to the specified organisation.
+ * When setting isDefault to true, clears any existing tenant default
+ * (excluding system DEFAULT type DIDs) within the same transaction.
  */
 export async function updateDid(id: string, tenantId: string, input: UpdateDidInput): Promise<Did> {
   return prisma.$transaction(async (tx) => {
@@ -137,11 +140,24 @@ export async function updateDid(id: string, tenantId: string, input: UpdateDidIn
       throw new NotFoundError('DID not found or access denied');
     }
 
+    if (input.isDefault) {
+      await tx.did.updateMany({
+        where: {
+          tenantId: existing.tenantId,
+          isDefault: true,
+          id: { not: id },
+          type: { not: 'DEFAULT' },
+        },
+        data: { isDefault: false },
+      });
+    }
+
     return tx.did.update({
       where: { id },
       data: {
         ...(input.name !== undefined && { name: input.name }),
         ...(input.description !== undefined && { description: input.description }),
+        ...(input.isDefault !== undefined && { isDefault: input.isDefault }),
       },
     });
   });
