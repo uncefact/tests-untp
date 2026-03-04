@@ -14,28 +14,20 @@ describe('CVC API', { testIsolation: false }, () => {
   });
 
   // -----------------------------------------------------------------------
-  // Import & Browse
+  // Seed & Browse
   // -----------------------------------------------------------------------
-  describe('Import & Browse', () => {
-    it('POST /api/v1/cvc/catalogues — imports a catalogue from a remote URL', () => {
-      cy.request({
-        method: 'POST',
-        url: '/api/v1/cvc/catalogues',
-        body: {
-          url: 'https://vocab.deploy2cloud.com.au',
-          version: 'v0.6.1',
-        },
-        timeout: 30000,
-      }).then((response) => {
-        expect(response.status).to.eq(201);
-        expect(response.body.catalogue).to.exist;
-        expect(response.body.catalogue.name).to.exist;
-        expect(response.body.summary).to.exist;
-        expect(response.body.summary.schemes).to.be.at.least(1);
-        expect(response.body.summary.profiles).to.be.at.least(1);
-        expect(response.body.summary.criteria).to.be.at.least(1);
+  describe('Seed & Browse', () => {
+    it('seeds a CVC catalogue via task', () => {
+      cy.task('seedCvcCatalogue', { tenantId: 'e2e-test-org' }).then((result: any) => {
+        expect(result.catalogueId).to.be.a('string');
+        expect(result.schemeId).to.be.a('string');
+        expect(result.profileId).to.be.a('string');
+        expect(result.criterionIds).to.be.an('array').with.length(2);
 
-        catalogueId = response.body.catalogue.id;
+        catalogueId = result.catalogueId;
+        schemeId = result.schemeId;
+        profileId = result.profileId;
+        criterionId = result.criterionIds[0];
       });
     });
 
@@ -45,19 +37,19 @@ describe('CVC API', { testIsolation: false }, () => {
         expect(response.body.data).to.be.an('array');
         expect(response.body.data.length).to.be.at.least(1);
 
-        const imported = response.body.data.find(
+        const seeded = response.body.data.find(
           (c: any) => c.id === catalogueId,
         );
-        expect(imported).to.exist;
+        expect(seeded).to.exist;
       });
     });
 
-    it('GET /api/v1/cvc/catalogues/:id — retrieves the imported catalogue', () => {
+    it('GET /api/v1/cvc/catalogues/:id — retrieves the catalogue', () => {
       cy.request(`/api/v1/cvc/catalogues/${catalogueId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.id).to.eq(catalogueId);
-        expect(response.body.name).to.exist;
-        expect(response.body.sourceUrl).to.eq('https://vocab.deploy2cloud.com.au');
+        expect(response.body.name).to.eq('E2E Test Catalogue');
+        expect(response.body.sourceUrl).to.eq('https://example.com/e2e-cvc');
       });
     });
 
@@ -74,9 +66,8 @@ describe('CVC API', { testIsolation: false }, () => {
       cy.request(`/api/v1/cvc/schemes?catalogueId=${catalogueId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data).to.be.an('array');
-        expect(response.body.data.length).to.be.at.least(1);
-
-        schemeId = response.body.data[0].id;
+        expect(response.body.data.length).to.eq(1);
+        expect(response.body.data[0].id).to.eq(schemeId);
       });
     });
 
@@ -84,7 +75,7 @@ describe('CVC API', { testIsolation: false }, () => {
       cy.request(`/api/v1/cvc/schemes/${schemeId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.id).to.eq(schemeId);
-        expect(response.body.profiles).to.be.an('array');
+        expect(response.body.profiles).to.be.an('array').with.length(1);
       });
     });
 
@@ -101,17 +92,16 @@ describe('CVC API', { testIsolation: false }, () => {
       cy.request(`/api/v1/cvc/profiles?schemeId=${schemeId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data).to.be.an('array');
-        expect(response.body.data.length).to.be.at.least(1);
-
-        profileId = response.body.data[0].id;
+        expect(response.body.data.length).to.eq(1);
+        expect(response.body.data[0].id).to.eq(profileId);
       });
     });
 
-    it('GET /api/v1/cvc/profiles/:id — retrieves the profile detail', () => {
+    it('GET /api/v1/cvc/profiles/:id — retrieves the profile detail with criteria', () => {
       cy.request(`/api/v1/cvc/profiles/${profileId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.id).to.eq(profileId);
-        expect(response.body.criteria).to.be.an('array');
+        expect(response.body.criteria).to.be.an('array').with.length(2);
       });
     });
 
@@ -119,7 +109,7 @@ describe('CVC API', { testIsolation: false }, () => {
       cy.request('/api/v1/cvc/criteria').then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data).to.be.an('array');
-        expect(response.body.data.length).to.be.at.least(1);
+        expect(response.body.data.length).to.be.at.least(2);
         expect(response.body.pagination).to.exist;
       });
     });
@@ -128,7 +118,7 @@ describe('CVC API', { testIsolation: false }, () => {
       cy.request(`/api/v1/cvc/criteria?profileId=${profileId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data).to.be.an('array');
-        expect(response.body.data.length).to.be.at.least(1);
+        expect(response.body.data.length).to.eq(2);
 
         criterionId = response.body.data[0].id;
       });
@@ -139,31 +129,6 @@ describe('CVC API', { testIsolation: false }, () => {
         expect(response.status).to.eq(200);
         expect(response.body.id).to.eq(criterionId);
         expect(response.body.name).to.exist;
-      });
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // Re-import
-  // -----------------------------------------------------------------------
-  describe('Re-import', () => {
-    it('POST /api/v1/cvc/catalogues — re-importing the same URL/version replaces the catalogue', () => {
-      cy.request({
-        method: 'POST',
-        url: '/api/v1/cvc/catalogues',
-        body: {
-          url: 'https://vocab.deploy2cloud.com.au',
-          version: 'v0.6.1',
-        },
-        timeout: 30000,
-      }).then((response) => {
-        expect(response.status).to.eq(201);
-        expect(response.body.catalogue).to.exist;
-        expect(response.body.summary).to.exist;
-        expect(response.body.summary.schemes).to.be.at.least(1);
-
-        // Update catalogueId in case it changed on re-import
-        catalogueId = response.body.catalogue.id;
       });
     });
   });
@@ -220,7 +185,7 @@ describe('CVC API', { testIsolation: false }, () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/cvc/catalogues',
-        body: { version: 'v0.6.1' },
+        body: { version: '0.7.0' },
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
@@ -231,7 +196,7 @@ describe('CVC API', { testIsolation: false }, () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/cvc/catalogues',
-        body: { url: 'https://vocab.deploy2cloud.com.au' },
+        body: { url: 'https://example.com/some-cvc' },
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
@@ -242,7 +207,7 @@ describe('CVC API', { testIsolation: false }, () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/cvc/catalogues',
-        body: { url: 'not-a-valid-url', version: 'v0.6.1' },
+        body: { url: 'not-a-valid-url', version: '0.7.0' },
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
@@ -253,7 +218,7 @@ describe('CVC API', { testIsolation: false }, () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/cvc/catalogues',
-        body: { url: 'https://vocab.deploy2cloud.com.au', version: 'v99.0.0' },
+        body: { url: 'https://example.com/some-cvc', version: 'v99.0.0' },
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
@@ -276,7 +241,7 @@ describe('CVC API', { testIsolation: false }, () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/cvc/catalogues',
-        body: { url: 'https://this-domain-does-not-exist-12345.example.com', version: 'v0.6.1' },
+        body: { url: 'https://this-domain-does-not-exist-12345.example.com', version: '0.7.0' },
         failOnStatusCode: false,
         timeout: 30000,
       }).then((response) => {
@@ -389,6 +354,13 @@ describe('CVC API', { testIsolation: false }, () => {
   // Pagination
   // -----------------------------------------------------------------------
   describe('Pagination', () => {
+    before(() => {
+      // Re-seed so pagination tests have data (previous section deleted it)
+      cy.task('seedCvcCatalogue', { tenantId: 'e2e-test-org' }).then((result: any) => {
+        catalogueId = result.catalogueId;
+      });
+    });
+
     it('GET /api/v1/cvc/catalogues — supports limit and offset parameters', () => {
       cy.request('/api/v1/cvc/catalogues?limit=1&offset=0').then((response) => {
         expect(response.status).to.eq(200);
