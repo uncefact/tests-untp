@@ -70,7 +70,6 @@ const MOCK_INSTANCE = {
   adapterType: 'VCKIT_VC',
   name: 'System VCKit VC',
   config: JSON.stringify(MOCK_ENCRYPTED_ENVELOPE),
-  apiVersion: '1.0.0',
   isPrimary: true,
   createdAt: new Date(),
   updatedAt: new Date(),

@@ -4,6 +4,7 @@ import {
   listServiceInstances,
   updateServiceInstance,
   deleteServiceInstance,
+  countServiceInstanceReferences,
   getInstanceByResolution,
 } from './service-instance.repository';
 
@@ -12,6 +13,7 @@ const mockServiceInstance = {
   create: jest.fn(),
   findFirst: jest.fn(),
   findMany: jest.fn(),
+  count: jest.fn(),
   update: jest.fn(),
   updateMany: jest.fn(),
   delete: jest.fn(),
@@ -23,10 +25,14 @@ jest.mock('../prisma', () => ({
       create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
       delete: jest.fn(),
     },
+    did: { count: jest.fn() },
+    registrar: { count: jest.fn() },
+    identifierScheme: { count: jest.fn() },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     $transaction: jest.fn((fn: any) => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -52,7 +58,6 @@ describe('service-instance.repository', () => {
     name: 'Test VCKit Instance',
     description: null,
     config: 'encrypted-config-blob',
-    apiVersion: '1.1.0',
     isPrimary: false,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
@@ -72,7 +77,6 @@ describe('service-instance.repository', () => {
         adapterType: 'VCKIT',
         name: 'Test VCKit Instance',
         config: 'encrypted-config-blob',
-        apiVersion: '1.1.0',
       });
 
       expect(mockServiceInstance.create).toHaveBeenCalledWith({
@@ -82,7 +86,6 @@ describe('service-instance.repository', () => {
           adapterType: 'VCKIT',
           name: 'Test VCKit Instance',
           config: 'encrypted-config-blob',
-          apiVersion: '1.1.0',
           isPrimary: false,
         }),
       });
@@ -98,7 +101,6 @@ describe('service-instance.repository', () => {
         adapterType: 'VCKIT',
         name: 'Test',
         config: 'encrypted',
-        apiVersion: '1.1.0',
       });
 
       expect(mockServiceInstance.create).toHaveBeenCalledWith({
@@ -119,7 +121,6 @@ describe('service-instance.repository', () => {
         adapterType: 'VCKIT',
         name: 'Primary Instance',
         config: 'encrypted',
-        apiVersion: '1.1.0',
         isPrimary: true,
       });
 
@@ -174,6 +175,7 @@ describe('service-instance.repository', () => {
   describe('listServiceInstances', () => {
     it('lists for organisation including system defaults', async () => {
       mockServiceInstance.findMany.mockResolvedValue([INSTANCE_RECORD]);
+      mockServiceInstance.count.mockResolvedValue(1);
 
       const result = await listServiceInstances(ORG_ID);
 
@@ -181,47 +183,60 @@ describe('service-instance.repository', () => {
         where: {
           OR: [{ tenantId: ORG_ID }, { tenantId: 'system' }],
         },
-        take: 100,
+        take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
-      expect(result).toEqual([INSTANCE_RECORD]);
+      expect(mockServiceInstance.count).toHaveBeenCalledWith({
+        where: {
+          OR: [{ tenantId: ORG_ID }, { tenantId: 'system' }],
+        },
+      });
+      expect(result.data).toEqual([INSTANCE_RECORD]);
+      expect(result.total).toBe(1);
     });
 
     it('applies serviceType filter', async () => {
       mockServiceInstance.findMany.mockResolvedValue([]);
+      mockServiceInstance.count.mockResolvedValue(0);
 
-      await listServiceInstances(ORG_ID, { serviceType: 'VC' });
+      const result = await listServiceInstances(ORG_ID, { serviceType: 'VC' });
 
       expect(mockServiceInstance.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
           serviceType: 'VC',
         }),
-        take: 100,
+        take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
+      expect(result.data).toEqual([]);
+      expect(result.total).toBe(0);
     });
 
     it('applies adapterType filter', async () => {
       mockServiceInstance.findMany.mockResolvedValue([]);
+      mockServiceInstance.count.mockResolvedValue(0);
 
-      await listServiceInstances(ORG_ID, { adapterType: 'VCKIT' });
+      const result = await listServiceInstances(ORG_ID, { adapterType: 'VCKIT' });
 
       expect(mockServiceInstance.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
           adapterType: 'VCKIT',
         }),
-        take: 100,
+        take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
+      expect(result.data).toEqual([]);
+      expect(result.total).toBe(0);
     });
 
     it('applies pagination', async () => {
       mockServiceInstance.findMany.mockResolvedValue([]);
+      mockServiceInstance.count.mockResolvedValue(0);
 
-      await listServiceInstances(ORG_ID, { limit: 10, offset: 20 });
+      const result = await listServiceInstances(ORG_ID, { limit: 10, offset: 20 });
 
       expect(mockServiceInstance.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -229,6 +244,8 @@ describe('service-instance.repository', () => {
           skip: 20,
         }),
       );
+      expect(result.data).toEqual([]);
+      expect(result.total).toBe(0);
     });
   });
 
@@ -325,6 +342,31 @@ describe('service-instance.repository', () => {
       await expect(deleteServiceInstance('instance-1', 'other-org')).rejects.toThrow(
         'Service instance not found or access denied',
       );
+    });
+  });
+
+  describe('countServiceInstanceReferences', () => {
+    it('counts references across all related models', async () => {
+      (prisma.did.count as jest.Mock).mockResolvedValue(3);
+      (prisma.registrar.count as jest.Mock).mockResolvedValue(1);
+      (prisma.identifierScheme.count as jest.Mock).mockResolvedValue(2);
+
+      const result = await countServiceInstanceReferences('instance-1');
+
+      expect(prisma.did.count).toHaveBeenCalledWith({ where: { serviceInstanceId: 'instance-1' } });
+      expect(prisma.registrar.count).toHaveBeenCalledWith({ where: { idrServiceInstanceId: 'instance-1' } });
+      expect(prisma.identifierScheme.count).toHaveBeenCalledWith({ where: { idrServiceInstanceId: 'instance-1' } });
+      expect(result).toEqual({ dids: 3, registrars: 1, schemes: 2 });
+    });
+
+    it('returns zeros when no references exist', async () => {
+      (prisma.did.count as jest.Mock).mockResolvedValue(0);
+      (prisma.registrar.count as jest.Mock).mockResolvedValue(0);
+      (prisma.identifierScheme.count as jest.Mock).mockResolvedValue(0);
+
+      const result = await countServiceInstanceReferences('instance-1');
+
+      expect(result).toEqual({ dids: 0, registrars: 0, schemes: 0 });
     });
   });
 

@@ -57,6 +57,7 @@ export { adapterRegistry } from './registry/registry.js';
 export { getSensitiveFields } from './registry/common/get-sensitive-fields.js';
 export type { AdapterRegistryEntry, AdapterRegistry } from './registry/types.js';
 export { maskInstanceConfig } from './registry/common/mask-instance-config.js';
+export { serviceInstanceResponseSchema } from './registry/schemas.js';
 
 // Config schemas
 export { vckitDidConfigSchema, vckitDidSensitiveFields } from './did-manager/adapters/vckit/vckit-did.schema.js';

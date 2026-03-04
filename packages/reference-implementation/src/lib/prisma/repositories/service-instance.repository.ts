@@ -10,7 +10,6 @@ export type CreateServiceInstanceInput = {
   name: string;
   description?: string;
   config: string; // Already encrypted by the caller
-  apiVersion: string; // Semver without v prefix, e.g. "1.1.0"
   isPrimary?: boolean;
 };
 
@@ -53,7 +52,6 @@ export async function createServiceInstance(input: CreateServiceInstanceInput): 
         name: input.name,
         description: input.description,
         config: input.config,
-        apiVersion: input.apiVersion,
         isPrimary: input.isPrimary ?? false,
       },
     });
@@ -79,7 +77,7 @@ export async function getServiceInstanceById(id: string, tenantId: string): Prom
 export async function listServiceInstances(
   tenantId: string,
   options: ListServiceInstancesOptions = {},
-): Promise<ServiceInstance[]> {
+): Promise<{ data: ServiceInstance[]; total: number }> {
   const { serviceType, adapterType, limit, offset } = options;
 
   const where: Prisma.ServiceInstanceWhereInput = {
@@ -94,12 +92,17 @@ export async function listServiceInstances(
     where.adapterType = adapterType as AdapterType;
   }
 
-  return prisma.serviceInstance.findMany({
-    where,
-    take: limit ?? 100,
-    skip: offset,
-    orderBy: { createdAt: 'desc' },
-  });
+  const [data, total] = await Promise.all([
+    prisma.serviceInstance.findMany({
+      where,
+      take: limit ?? 20,
+      skip: offset,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.serviceInstance.count({ where }),
+  ]);
+
+  return { data, total };
 }
 
 /**
@@ -161,6 +164,22 @@ export async function deleteServiceInstance(id: string, tenantId: string): Promi
       where: { id },
     });
   });
+}
+
+/**
+ * Counts records that reference a given service instance.
+ * Used for pre-delete referential integrity checks.
+ */
+export async function countServiceInstanceReferences(
+  id: string,
+): Promise<{ dids: number; registrars: number; schemes: number }> {
+  const [dids, registrars, schemes] = await Promise.all([
+    prisma.did.count({ where: { serviceInstanceId: id } }),
+    prisma.registrar.count({ where: { idrServiceInstanceId: id } }),
+    prisma.identifierScheme.count({ where: { idrServiceInstanceId: id } }),
+  ]);
+
+  return { dids, registrars, schemes };
 }
 
 /**
