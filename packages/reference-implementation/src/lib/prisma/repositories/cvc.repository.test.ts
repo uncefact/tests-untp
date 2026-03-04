@@ -17,6 +17,7 @@ import { NotFoundError } from '@/lib/api/errors';
 const mockTx = {
   cvcCatalogue: {
     deleteMany: jest.fn(),
+    delete: jest.fn(),
     create: jest.fn(),
   },
   criterion: {
@@ -389,18 +390,19 @@ describe('cvc.repository', () => {
   // -------------------------------------------------------------------------
 
   describe('deleteCatalogue', () => {
-    it('deletes the catalogue and cleans orphan criteria', async () => {
+    it('deletes the catalogue and cleans orphan criteria in a transaction', async () => {
       mockCatalogue.findFirst.mockResolvedValue(CATALOGUE_RECORD);
-      mockCatalogue.delete.mockResolvedValue(CATALOGUE_RECORD);
-      mockCriterion.deleteMany.mockResolvedValue({ count: 0 });
+      mockTx.cvcCatalogue.delete.mockResolvedValue(CATALOGUE_RECORD);
+      mockTx.criterion.deleteMany.mockResolvedValue({ count: 0 });
 
       await deleteCatalogue('cat-1', TENANT_ID);
 
       expect(mockCatalogue.findFirst).toHaveBeenCalledWith({
         where: { id: 'cat-1', tenantId: TENANT_ID },
       });
-      expect(mockCatalogue.delete).toHaveBeenCalledWith({ where: { id: 'cat-1' } });
-      expect(mockCriterion.deleteMany).toHaveBeenCalledWith({
+      expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
+      expect(mockTx.cvcCatalogue.delete).toHaveBeenCalledWith({ where: { id: 'cat-1' } });
+      expect(mockTx.criterion.deleteMany).toHaveBeenCalledWith({
         where: { tenantId: TENANT_ID, profiles: { none: {} } },
       });
     });

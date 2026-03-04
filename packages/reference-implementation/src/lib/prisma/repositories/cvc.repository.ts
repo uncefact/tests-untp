@@ -210,11 +210,13 @@ export async function deleteCatalogue(id: string, tenantId: string): Promise<voi
     throw new NotFoundError('Catalogue not found or access denied');
   }
 
-  await prisma.cvcCatalogue.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.cvcCatalogue.delete({ where: { id } });
 
-  // Clean orphan criteria for this tenant
-  await prisma.criterion.deleteMany({
-    where: { tenantId, profiles: { none: {} } },
+    // Clean orphan criteria for this tenant
+    await tx.criterion.deleteMany({
+      where: { tenantId, profiles: { none: {} } },
+    });
   });
 }
 

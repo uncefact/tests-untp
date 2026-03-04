@@ -70,7 +70,7 @@ export const credentialIssueRequestSchema = z.object({
 export const cvcValidationWarningSchema = z.object({
   code: z.string().describe('Warning code (e.g. CVC_UNKNOWN_CRITERION)'),
   message: z.string().describe('Human-readable warning message'),
-  details: z.record(z.unknown()).optional().describe('Additional context'),
+  detail: z.string().optional().describe('Additional context (e.g. the unrecognised criterion URL)'),
 });
 
 /** Successful credential issue response from POST /credentials. */
