@@ -25,11 +25,19 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 });
 
 const mockListRenderTemplates = jest.fn();
-const mockCreateRenderTemplate = jest.fn();
 
 jest.mock('@/lib/prisma/repositories', () => ({
   listRenderTemplates: (tenantId: string, opts: unknown) => mockListRenderTemplates(tenantId, opts),
-  createRenderTemplate: (tenantId: string, input: unknown) => mockCreateRenderTemplate(tenantId, input),
+}));
+
+const mockCreateRenderTemplate = jest.fn();
+jest.mock('@/lib/render-templates/create-render-template', () => ({
+  createRenderTemplate: (...args: unknown[]) => mockCreateRenderTemplate(...args),
+}));
+
+const mockResolveStorageService = jest.fn();
+jest.mock('@/lib/services/resolve-storage-service', () => ({
+  resolveStorageService: (...args: unknown[]) => mockResolveStorageService(...args),
 }));
 
 import { GET, POST } from './route';
@@ -182,15 +190,19 @@ describe('GET /api/v1/render-templates', () => {
 });
 
 describe('POST /api/v1/render-templates', () => {
+  const defaultStorageService = { service: {}, instanceId: 'storage-instance-1' };
+
   beforeEach(() => {
     jest.clearAllMocks();
+    mockResolveStorageService.mockResolvedValue(defaultStorageService);
   });
 
-  it('creates a render template and returns 201', async () => {
+  it('creates render template via orchestrator and returns 201', async () => {
     const created = {
       id: 'rt-new',
       name: 'My Template',
       dataModelId: 'dm-1',
+      renderMethodType: 'RenderTemplate2024',
       storageUrl: 'https://example.com/template.html',
       hash: 'sha256-abc123',
       isPrimary: false,
@@ -201,8 +213,8 @@ describe('POST /api/v1/render-templates', () => {
       body: {
         name: 'My Template',
         dataModelId: 'dm-1',
-        storageUrl: 'https://example.com/template.html',
-        hash: 'sha256-abc123',
+        renderMethodType: 'RenderTemplate2024',
+        template: '<div>Hello</div>',
       },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
@@ -210,54 +222,106 @@ describe('POST /api/v1/render-templates', () => {
 
     expect(res.status).toBe(201);
     expect(json).toEqual(created);
-  });
-
-  it('passes isPrimary to the repository when provided', async () => {
-    mockCreateRenderTemplate.mockResolvedValue({ id: 'rt-new' });
-
-    const req = createFakeRequest({
-      body: {
-        name: 'Primary Template',
-        dataModelId: 'dm-1',
-        storageUrl: 'https://example.com/template.html',
-        hash: 'sha256-abc123',
-        isPrimary: true,
-      },
-    });
-    await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-
-    expect(mockCreateRenderTemplate).toHaveBeenCalledWith('tenant-1', {
-      name: 'Primary Template',
+    expect(mockCreateRenderTemplate).toHaveBeenCalledWith({
+      tenantId: 'tenant-1',
+      name: 'My Template',
       dataModelId: 'dm-1',
-      storageUrl: 'https://example.com/template.html',
-      hash: 'sha256-abc123',
-      isPrimary: true,
+      renderMethodType: 'RenderTemplate2024',
+      template: '<div>Hello</div>',
+      storageService: defaultStorageService,
+      isPrimary: undefined,
+      inline: undefined,
+      mediaType: undefined,
+      mediaQuery: undefined,
     });
   });
 
-  it('omits isPrimary when not provided', async () => {
-    mockCreateRenderTemplate.mockResolvedValue({ id: 'rt-new' });
-
+  it('rejects when storageUrl is provided', async () => {
     const req = createFakeRequest({
       body: {
         name: 'Template',
         dataModelId: 'dm-1',
-        storageUrl: 'https://example.com/template.html',
-        hash: 'sha256-abc123',
+        renderMethodType: 'RenderTemplate2024',
+        template: '<div>Hello</div>',
+        storageUrl: 'https://example.com/sneaky.html',
       },
     });
-    await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
 
-    const callArgs = mockCreateRenderTemplate.mock.calls[0][1];
-    expect(callArgs).not.toHaveProperty('isPrimary');
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('storageUrl cannot be set directly');
+  });
+
+  it('rejects when hash is provided', async () => {
+    const req = createFakeRequest({
+      body: {
+        name: 'Template',
+        dataModelId: 'dm-1',
+        renderMethodType: 'RenderTemplate2024',
+        template: '<div>Hello</div>',
+        hash: 'sha256-sneaky',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('hash cannot be set directly');
+  });
+
+  it('rejects when renderMethodType is missing', async () => {
+    const req = createFakeRequest({
+      body: {
+        name: 'Template',
+        dataModelId: 'dm-1',
+        template: '<div>Hello</div>',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('renderMethodType is required');
+  });
+
+  it('rejects when renderMethodType is invalid', async () => {
+    const req = createFakeRequest({
+      body: {
+        name: 'Template',
+        dataModelId: 'dm-1',
+        renderMethodType: 'InvalidType',
+        template: '<div>Hello</div>',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('renderMethodType must be one of:');
+  });
+
+  it('rejects when template is missing', async () => {
+    const req = createFakeRequest({
+      body: {
+        name: 'Template',
+        dataModelId: 'dm-1',
+        renderMethodType: 'RenderTemplate2024',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('template is required');
   });
 
   it('returns 400 when name is missing', async () => {
     const req = createFakeRequest({
       body: {
         dataModelId: 'dm-1',
-        storageUrl: 'https://example.com/template.html',
-        hash: 'sha256-abc123',
+        renderMethodType: 'RenderTemplate2024',
+        template: '<div>Hello</div>',
       },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
@@ -271,8 +335,8 @@ describe('POST /api/v1/render-templates', () => {
     const req = createFakeRequest({
       body: {
         name: 'Template',
-        storageUrl: 'https://example.com/template.html',
-        hash: 'sha256-abc123',
+        renderMethodType: 'RenderTemplate2024',
+        template: '<div>Hello</div>',
       },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
@@ -282,34 +346,21 @@ describe('POST /api/v1/render-templates', () => {
     expect(json.error).toContain('dataModelId is required');
   });
 
-  it('returns 400 when storageUrl is missing', async () => {
+  it('passes storageOptions.serviceInstanceId to resolveStorageService', async () => {
+    mockCreateRenderTemplate.mockResolvedValue({ id: 'rt-new' });
+
     const req = createFakeRequest({
       body: {
         name: 'Template',
         dataModelId: 'dm-1',
-        hash: 'sha256-abc123',
+        renderMethodType: 'RenderTemplate2024',
+        template: '<div>Hello</div>',
+        storageOptions: { serviceInstanceId: 'custom-storage-1' },
       },
     });
-    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-    const json = await res.json();
+    await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('storageUrl is required');
-  });
-
-  it('returns 400 when hash is missing', async () => {
-    const req = createFakeRequest({
-      body: {
-        name: 'Template',
-        dataModelId: 'dm-1',
-        storageUrl: 'https://example.com/template.html',
-      },
-    });
-    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-    const json = await res.json();
-
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('hash is required');
+    expect(mockResolveStorageService).toHaveBeenCalledWith('tenant-1', 'custom-storage-1');
   });
 
   it('returns 400 for invalid JSON body', async () => {
@@ -321,6 +372,25 @@ describe('POST /api/v1/render-templates', () => {
     expect(json.error).toBe('Invalid JSON body');
   });
 
+  it('returns 404 when orchestrator throws NotFoundError', async () => {
+    const { NotFoundError } = jest.requireActual('@/lib/api/errors') as { NotFoundError: new (msg: string) => Error };
+    mockCreateRenderTemplate.mockRejectedValue(new NotFoundError('Data model not found'));
+
+    const req = createFakeRequest({
+      body: {
+        name: 'Template',
+        dataModelId: 'dm-missing',
+        renderMethodType: 'RenderTemplate2024',
+        template: '<div>Hello</div>',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(json.error).toContain('Data model not found');
+  });
+
   it('returns 500 on unexpected error', async () => {
     mockCreateRenderTemplate.mockRejectedValue(new Error('Database error'));
 
@@ -328,8 +398,8 @@ describe('POST /api/v1/render-templates', () => {
       body: {
         name: 'Template',
         dataModelId: 'dm-1',
-        storageUrl: 'https://example.com/template.html',
-        hash: 'sha256-abc123',
+        renderMethodType: 'RenderTemplate2024',
+        template: '<div>Hello</div>',
       },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
