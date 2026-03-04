@@ -1,0 +1,123 @@
+{
+  "@context": [
+    "https://jargon.sh/user/unece/ConformityVocabulary/v/working/artefacts/jsonldContexts/ConformityVocabulary.jsonld?class=ConformityVocabulary"
+  ],
+  "type": [
+    "ConformityVocabularyCatalog"
+  ],
+  "id": "https://example.com/cvc/sample-catalogue",
+  "name": "Sample Conformity Vocabulary Catalogue",
+  "conformityScheme": [
+    {
+      "type": [
+        "ConformityScheme"
+      ],
+      "id": "https://example.com/cvc/sample-scheme",
+      "name": "Sample Sustainability Scheme",
+      "description": "A sample conformity assessment scheme for testing and demonstration purposes.",
+      "includedProfile": [
+        {
+          "type": [
+            "ConformityProfile"
+          ],
+          "id": "https://example.com/cvc/sample-scheme/sample-full/1.0.0",
+          "name": "Sample Full Assessment",
+          "version": "1.0.0",
+          "status": "active",
+          "description": "Full assessment profile covering all sample criteria.",
+          "criterion": [
+            {
+              "type": [
+                "ConformityCriterion"
+              ],
+              "id": "https://example.com/cvc/criteria/env-emissions",
+              "name": "Greenhouse Gas Emissions",
+              "version": "1.0.0",
+              "status": "active",
+              "description": "Assessment of greenhouse gas emission levels and reduction targets.",
+              "conformityTopic": "environment.emissions"
+            },
+            {
+              "type": [
+                "ConformityCriterion"
+              ],
+              "id": "https://example.com/cvc/criteria/env-waste",
+              "name": "Waste Management",
+              "version": "1.0.0",
+              "status": "active",
+              "description": "Assessment of waste reduction, recycling, and disposal practices.",
+              "conformityTopic": "environment.waste"
+            },
+            {
+              "type": [
+                "ConformityCriterion"
+              ],
+              "id": "https://example.com/cvc/criteria/social-labour",
+              "name": "Labour Practices",
+              "version": "1.0.0",
+              "status": "active",
+              "description": "Assessment of fair labour practices including working hours, wages, and conditions.",
+              "conformityTopic": "social.labour"
+            },
+            {
+              "type": [
+                "ConformityCriterion"
+              ],
+              "id": "https://example.com/cvc/criteria/social-safety",
+              "name": "Health and Safety",
+              "version": "1.0.0",
+              "status": "active",
+              "description": "Assessment of workplace health and safety management systems.",
+              "conformityTopic": "social.safety"
+            },
+            {
+              "type": [
+                "ConformityCriterion"
+              ],
+              "id": "https://example.com/cvc/criteria/gov-ethics",
+              "name": "Business Ethics",
+              "version": "1.0.0",
+              "status": "active",
+              "description": "Assessment of ethical business practices including anti-corruption and transparency.",
+              "conformityTopic": "governance.ethics"
+            }
+          ]
+        },
+        {
+          "type": [
+            "ConformityProfile"
+          ],
+          "id": "https://example.com/cvc/sample-scheme/sample-env/1.0.0",
+          "name": "Sample Environmental Assessment",
+          "version": "1.0.0",
+          "status": "active",
+          "description": "Focused assessment covering only environmental criteria.",
+          "criterion": [
+            {
+              "type": [
+                "ConformityCriterion"
+              ],
+              "id": "https://example.com/cvc/criteria/env-emissions",
+              "name": "Greenhouse Gas Emissions",
+              "version": "1.0.0",
+              "status": "active",
+              "description": "Assessment of greenhouse gas emission levels and reduction targets.",
+              "conformityTopic": "environment.emissions"
+            },
+            {
+              "type": [
+                "ConformityCriterion"
+              ],
+              "id": "https://example.com/cvc/criteria/env-waste",
+              "name": "Waste Management",
+              "version": "1.0.0",
+              "status": "active",
+              "description": "Assessment of waste reduction, recycling, and disposal practices.",
+              "conformityTopic": "environment.waste"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
