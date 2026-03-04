@@ -16,16 +16,41 @@ export async function importCvc(tenantId: string, url: string, version: string) 
     throw new ValidationError(`Unsupported CVC version: ${version}. Supported: ${SUPPORTED_CVC_VERSIONS.join(', ')}`);
   }
 
-  const response = await fetch(url, {
-    headers: { Accept: 'application/ld+json' },
-  });
+  const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(15_000) : undefined;
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch CVC data from ${url}: ${response.status} ${response.statusText}`);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { Accept: 'application/ld+json' },
+      signal,
+    });
+  } catch (err) {
+    throw new ValidationError(
+      `Unable to reach the CVC catalogue at ${url}. Check the URL is accessible and try again.`,
+    );
   }
 
-  const data = await response.json();
-  const parsed = parser.parse(data, url);
+  if (!response.ok) {
+    throw new ValidationError(
+      `The remote server at ${url} responded with status ${response.status} ${response.statusText}.`,
+    );
+  }
+
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    throw new ValidationError(`The URL ${url} did not return valid JSON.`);
+  }
+
+  let parsed: ReturnType<typeof parser.parse>;
+  try {
+    parsed = parser.parse(data, url);
+  } catch (err) {
+    throw new ValidationError(
+      `Failed to parse CVC catalogue from ${url}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 
   return importCatalogue({ ...parsed, tenantId, specVersion: version });
 }
@@ -44,7 +69,14 @@ export async function importCvcFromData(tenantId: string, data: unknown, sourceU
     throw new ValidationError(`Unsupported CVC version: ${version}. Supported: ${SUPPORTED_CVC_VERSIONS.join(', ')}`);
   }
 
-  const parsed = parser.parse(data, sourceUrl);
+  let parsed: ReturnType<typeof parser.parse>;
+  try {
+    parsed = parser.parse(data, sourceUrl);
+  } catch (err) {
+    throw new ValidationError(
+      `Failed to parse CVC catalogue from ${sourceUrl}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 
   return importCatalogue({ ...parsed, tenantId, specVersion: version });
 }

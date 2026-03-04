@@ -1,9 +1,17 @@
 const mockImportCatalogue = jest.fn();
+const mockParserParse = jest.fn();
+const mockGetCvcParser = jest.fn();
 
 jest.mock('@/lib/prisma/repositories', () => ({
   importCatalogue: (...args: unknown[]) => mockImportCatalogue(...args),
 }));
 
+jest.mock('@uncefact/untp-ri-services', () => ({
+  getCvcParser: (...args: unknown[]) => mockGetCvcParser(...args),
+  SUPPORTED_CVC_VERSIONS: ['0.7.0'],
+}));
+
+import { ValidationError } from '@/lib/api/validation';
 import { importCvc, importCvcFromData } from './cvc-import.service';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -61,6 +69,42 @@ const MOCK_JSON_LD = {
   conformityScheme: [MOCK_SCHEME],
 };
 
+const MOCK_PARSED_CATALOGUE = {
+  canonicalId: 'https://example.com/cvc/sample-catalogue',
+  name: 'Sample Sustainability Scheme',
+  sourceUrl: SOURCE_URL,
+  schemes: [
+    {
+      canonicalId: 'https://example.com/cvc/sample-scheme',
+      name: 'Sample Sustainability Scheme',
+      slug: 'sample-sustainability-scheme',
+      profiles: [
+        {
+          canonicalId: 'https://example.com/cvc/sample-scheme/full-assessment/1.0.0',
+          name: 'Full Sustainability Assessment',
+          slug: 'full-sustainability-assessment',
+          version: '1.0.0',
+          status: 'active',
+          criteria: [
+            {
+              canonicalId: 'https://example.com/cvc/criteria/emissions/1.1.0',
+              name: 'Greenhouse Gas Emissions',
+              version: '1.1.0',
+              status: 'current',
+            },
+            {
+              canonicalId: 'https://example.com/cvc/criteria/waste/1.0.0',
+              name: 'Waste Management',
+              version: '1.0.0',
+              status: 'current',
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 const MOCK_CATALOGUE_RESULT = {
   catalogue: { id: 'cat-1' },
   summary: { schemes: 1, profiles: 1, criteria: 2 },
@@ -74,6 +118,8 @@ describe('importCvc', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     global.fetch = mockFetch;
+    mockGetCvcParser.mockReturnValue({ parse: mockParserParse });
+    mockParserParse.mockReturnValue(MOCK_PARSED_CATALOGUE);
   });
 
   afterEach(() => {
@@ -90,9 +136,12 @@ describe('importCvc', () => {
 
     await importCvc(TENANT_ID, SOURCE_URL, VERSION);
 
-    expect(mockFetch).toHaveBeenCalledWith(SOURCE_URL, {
-      headers: { Accept: 'application/ld+json' },
-    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      SOURCE_URL,
+      expect.objectContaining({
+        headers: { Accept: 'application/ld+json' },
+      }),
+    );
   });
 
   it('parses the response and calls importCatalogue with tenantId and specVersion', async () => {
@@ -115,23 +164,61 @@ describe('importCvc', () => {
   });
 
   it('throws ValidationError for unsupported CVC version', async () => {
+    mockGetCvcParser.mockReturnValue(null);
+
     await expect(importCvc(TENANT_ID, SOURCE_URL, '99.0.0')).rejects.toThrow(/Unsupported CVC version: 99\.0\.0/);
   });
 
-  it('throws when fetch returns a non-OK response', async () => {
+  it('throws ValidationError when fetch returns a non-OK response', async () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 404,
       statusText: 'Not Found',
     });
 
-    await expect(importCvc(TENANT_ID, SOURCE_URL, VERSION)).rejects.toThrow(/Failed to fetch CVC data.*404 Not Found/);
+    const err = await importCvc(TENANT_ID, SOURCE_URL, VERSION).catch((e) => e);
+
+    expect(err).toBeInstanceOf(ValidationError);
+    expect(err.message).toMatch(/responded with status 404 Not Found/);
   });
 
-  it('propagates fetch errors', async () => {
+  it('throws ValidationError wrapping network errors', async () => {
     mockFetch.mockRejectedValue(new Error('Network failure'));
 
-    await expect(importCvc(TENANT_ID, SOURCE_URL, VERSION)).rejects.toThrow('Network failure');
+    const err = await importCvc(TENANT_ID, SOURCE_URL, VERSION).catch((e) => e);
+
+    expect(err).toBeInstanceOf(ValidationError);
+    expect(err.message).toMatch(/Unable to reach the CVC catalogue at/);
+    expect(err.message).toMatch(SOURCE_URL);
+  });
+
+  it('throws ValidationError when the response body is not valid JSON', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockRejectedValue(new SyntaxError('Unexpected token')),
+    });
+
+    const err = await importCvc(TENANT_ID, SOURCE_URL, VERSION).catch((e) => e);
+
+    expect(err).toBeInstanceOf(ValidationError);
+    expect(err.message).toMatch(/did not return valid JSON/);
+    expect(err.message).toMatch(SOURCE_URL);
+  });
+
+  it('throws ValidationError when parser.parse throws', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => MOCK_JSON_LD,
+    });
+    mockParserParse.mockImplementation(() => {
+      throw new Error('Invalid catalogue structure');
+    });
+
+    const err = await importCvc(TENANT_ID, SOURCE_URL, VERSION).catch((e) => e);
+
+    expect(err).toBeInstanceOf(ValidationError);
+    expect(err.message).toMatch(/Failed to parse CVC catalogue from/);
+    expect(err.message).toMatch(/Invalid catalogue structure/);
   });
 });
 
@@ -140,6 +227,8 @@ describe('importCvc', () => {
 describe('importCvcFromData', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetCvcParser.mockReturnValue({ parse: mockParserParse });
+    mockParserParse.mockReturnValue(MOCK_PARSED_CATALOGUE);
   });
 
   it('parses data and calls importCatalogue with tenantId and specVersion', async () => {
@@ -158,8 +247,22 @@ describe('importCvcFromData', () => {
   });
 
   it('throws ValidationError for unsupported CVC version', async () => {
+    mockGetCvcParser.mockReturnValue(null);
+
     await expect(importCvcFromData(TENANT_ID, MOCK_JSON_LD, SOURCE_URL, '99.0.0')).rejects.toThrow(
       /Unsupported CVC version: 99\.0\.0/,
     );
+  });
+
+  it('throws ValidationError when parser.parse throws', async () => {
+    mockParserParse.mockImplementation(() => {
+      throw new Error('Malformed data');
+    });
+
+    const err = await importCvcFromData(TENANT_ID, MOCK_JSON_LD, SOURCE_URL, VERSION).catch((e) => e);
+
+    expect(err).toBeInstanceOf(ValidationError);
+    expect(err.message).toMatch(/Failed to parse CVC catalogue from/);
+    expect(err.message).toMatch(/Malformed data/);
   });
 });

@@ -405,7 +405,12 @@ describe('POST /api/v1/credentials', () => {
 
       expect(res.status).toBe(201);
       expect(json.credentialId).toBe('cred-1');
-      expect(json).not.toHaveProperty('warnings');
+      expect(json.warnings).toEqual([
+        {
+          code: 'CVC_VALIDATION_ERROR',
+          message: 'CVC validation could not be performed — credential was issued without CVC checks',
+        },
+      ]);
     });
 
     it('runs CVC validation for DCC extension credential types', async () => {

@@ -85,11 +85,11 @@ type JsonLdCriterion = {
  */
 export class CvcV070Parser implements ICvcParser {
   parse(data: unknown, sourceUrl: string): ParsedCvcCatalogue {
-    const root = data as JsonLdRoot;
-
-    if (!root || typeof root !== 'object') {
+    if (!data || typeof data !== 'object') {
       throw new Error('CVC JSON-LD data must be a non-null object');
     }
+
+    const root = data as JsonLdRoot;
 
     if (!root.id) {
       throw new Error('CVC JSON-LD missing root id');

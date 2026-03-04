@@ -137,7 +137,13 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
         const result = await validateCvcCompliance(tenantId, cvcRefs);
         cvcWarnings = result.warnings;
       } catch (error) {
-        logger.warn({ error }, 'CVC validation failed — continuing');
+        logger.warn({ error }, 'CVC validation failed — continuing without CVC checks');
+        cvcWarnings = [
+          {
+            code: 'CVC_VALIDATION_ERROR',
+            message: 'CVC validation could not be performed — credential was issued without CVC checks',
+          },
+        ];
       }
     } else {
       logger.warn(

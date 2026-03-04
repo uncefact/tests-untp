@@ -202,16 +202,16 @@ export async function importCatalogue(input: ImportCatalogueInput): Promise<Impo
 // ---------------------------------------------------------------------------
 
 export async function deleteCatalogue(id: string, tenantId: string): Promise<void> {
-  const existing = await prisma.cvcCatalogue.findFirst({
-    where: { id, tenantId },
-  });
-
-  if (!existing) {
-    throw new NotFoundError('Catalogue not found or access denied');
-  }
-
   await prisma.$transaction(async (tx) => {
-    await tx.cvcCatalogue.delete({ where: { id } });
+    const existing = await tx.cvcCatalogue.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Catalogue not found or access denied');
+    }
+
+    await tx.cvcCatalogue.delete({ where: { id, tenantId } });
 
     // Clean orphan criteria for this tenant
     await tx.criterion.deleteMany({

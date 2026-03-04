@@ -9,7 +9,8 @@ export type CvcValidationWarningCode =
   | 'CVC_NO_SCOPE'
   | 'CVC_SCOPE_NOT_FOUND'
   | 'CVC_UNKNOWN_CRITERION'
-  | 'CVC_NO_CRITERIA';
+  | 'CVC_NO_CRITERIA'
+  | 'CVC_VALIDATION_ERROR';
 
 export type CvcValidationWarning = {
   code: CvcValidationWarningCode;
