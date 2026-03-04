@@ -171,6 +171,7 @@ services:
       - VCKIT_API_URL=http://vckit-api:3332/v2
       - VCKIT_API_KEY=test123
       - DEFAULT_ISSUER_DID=did:web:uncefact.github.io:project-vckit:test-and-development
+      - DEFAULT_ISSUER_KEY_ID=7af136a8efa11a4df2e9010b972bdb92a0013724b50e5efa45407a2ddea184e6
       - SERVICE_ENCRYPTION_KEY=dd1b7430915155b51c503806031f31f901e85563035f65421d707f042c75f44b
       - AUTH_SECRET=e2e-super-secret-key-for-testing
       - AUTH_TRUST_HOST=true

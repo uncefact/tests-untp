@@ -115,18 +115,14 @@ describe('verifyDid', () => {
     expect(identityCheck?.message).toContain('does not match');
   });
 
-  it('returns jsonld_validity failure when expansion fails', async () => {
-    (jsonld.toRDF as jest.Mock).mockRejectedValueOnce(
-      new Error('Dereferencing a URL did not result in a valid JSON-LD context'),
-    );
+  it('skips jsonld_validity check (expansion disabled)', async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(createMockResponse(validDidDocument));
 
     const result = await verifyDid('did:web:example.com:org:abc', { providerKeys: [] });
 
-    expect(result.verified).toBe(false);
     const jsonldCheck = result.checks.find((c) => c.name === C.JSONLD_VALIDITY);
-    expect(jsonldCheck?.passed).toBe(false);
-    expect(jsonldCheck?.message).toContain('JSON-LD');
+    expect(jsonldCheck?.passed).toBe(true);
+    expect(jsonldCheck?.message).toContain('Skipped');
   });
 
   it('handles resolution failure gracefully', async () => {

@@ -1,6 +1,7 @@
 import { Did, DidStatus, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
+import { ValidationError } from '@/lib/api/validation';
 
 /**
  * Input for creating a new DID record
@@ -24,6 +25,7 @@ export type CreateDidInput = {
 export type UpdateDidInput = {
   name?: string;
   description?: string;
+  isDefault?: boolean;
 };
 
 /**
@@ -65,7 +67,7 @@ export async function getDidById(id: string, tenantId: string): Promise<Did | nu
   return prisma.did.findFirst({
     where: {
       id,
-      OR: [{ tenantId }, { isDefault: true }],
+      OR: [{ tenantId }, { isDefault: true, type: 'DEFAULT' }],
     },
   });
 }
@@ -79,7 +81,7 @@ export async function getDidByDid(did: string, tenantId: string): Promise<Did | 
   return prisma.did.findFirst({
     where: {
       did,
-      OR: [{ tenantId }, { isDefault: true }],
+      OR: [{ tenantId }, { isDefault: true, type: 'DEFAULT' }],
     },
   });
 }
@@ -95,7 +97,7 @@ export async function listDids(
   const { type, status, serviceInstanceId, limit, offset } = options;
 
   const where: Prisma.DidWhereInput = {
-    OR: [{ tenantId }, { isDefault: true }],
+    OR: [{ tenantId }, { isDefault: true, type: 'DEFAULT' }],
   };
 
   if (type !== undefined) {
@@ -124,8 +126,10 @@ export async function listDids(
 }
 
 /**
- * Updates a DID's name and/or description.
+ * Updates a DID's name, description, and/or default status.
  * Validates that the DID belongs to the specified organisation.
+ * When setting isDefault to true, clears any existing tenant default
+ * (excluding system DEFAULT type DIDs) within the same transaction.
  */
 export async function updateDid(id: string, tenantId: string, input: UpdateDidInput): Promise<Did> {
   return prisma.$transaction(async (tx) => {
@@ -137,11 +141,28 @@ export async function updateDid(id: string, tenantId: string, input: UpdateDidIn
       throw new NotFoundError('DID not found or access denied');
     }
 
+    if (input.isDefault !== undefined && existing.type === 'DEFAULT') {
+      throw new ValidationError('Cannot modify default status of system DIDs');
+    }
+
+    if (input.isDefault) {
+      await tx.did.updateMany({
+        where: {
+          tenantId: existing.tenantId,
+          isDefault: true,
+          id: { not: id },
+          type: { not: 'DEFAULT' },
+        },
+        data: { isDefault: false },
+      });
+    }
+
     return tx.did.update({
       where: { id },
       data: {
         ...(input.name !== undefined && { name: input.name }),
         ...(input.description !== undefined && { description: input.description }),
+        ...(input.isDefault !== undefined && { isDefault: input.isDefault }),
       },
     });
   });

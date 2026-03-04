@@ -67,7 +67,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  * /dids/{id}:
  *   patch:
  *     summary: Update a DID
- *     description: Updates the name and/or description of a specific DID
+ *     description: Updates the name, description, and/or default status of a specific DID
  *     tags:
  *       - DIDs
  *     parameters:
@@ -90,6 +90,9 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *               description:
  *                 type: string
  *                 description: New description for the DID
+ *               isDefault:
+ *                 type: boolean
+ *                 description: Whether to set this DID as the tenant default
  *             minProperties: 1
  *     responses:
  *       200:
@@ -126,8 +129,8 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  let body: { name?: string; description?: string };
-  logger.info('Parsing request body');
+  logger.info({ didId: id }, 'Parsing request body');
+  let body: { name?: string; description?: string; isDefault?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -137,15 +140,17 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   logger.info({ didId: id }, 'Validating update fields');
   const hasName = isNonEmptyString(body.name);
   const hasDescription = isNonEmptyString(body.description);
+  const hasIsDefault = typeof body.isDefault === 'boolean';
 
-  if (!hasName && !hasDescription) {
-    throw new ValidationError('At least one of name or description is required');
+  if (!hasName && !hasDescription && !hasIsDefault) {
+    throw new ValidationError('At least one of name, description, or isDefault is required');
   }
 
-  logger.info({ didId: id, fields: { hasName, hasDescription } }, 'Updating DID record');
+  logger.info({ didId: id, fields: { hasName, hasDescription, hasIsDefault } }, 'Updating DID record');
   const updated = await updateDid(id, tenantId, {
     ...(hasName && { name: body.name }),
     ...(hasDescription && { description: body.description }),
+    ...(hasIsDefault && { isDefault: body.isDefault }),
   });
 
   logger.info({ didId: id }, 'DID updated');

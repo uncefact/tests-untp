@@ -52,9 +52,11 @@ async function main() {
 
   // Upsert the system default DID (requires DID config env vars)
   let defaultDid: string | null = null;
+  let defaultKeyId = '';
   try {
     const didConfig = getDidConfig();
     defaultDid = didConfig.defaultDid;
+    defaultKeyId = didConfig.defaultKeyId;
   } catch (error) {
     logger.warn(
       { error: error instanceof Error ? error.message : error },
@@ -68,6 +70,7 @@ async function main() {
       update: {
         name: 'System Default DID',
         description: 'System-wide default DID for the UNTP reference implementation',
+        keyId: defaultKeyId,
         status: DidStatus.ACTIVE,
         isDefault: true,
       },
@@ -78,7 +81,7 @@ async function main() {
         method: DidMethod.DID_WEB,
         name: 'System Default DID',
         description: 'System-wide default DID for the UNTP reference implementation',
-        keyId: '',
+        keyId: defaultKeyId,
         status: DidStatus.ACTIVE,
         isDefault: true,
       },

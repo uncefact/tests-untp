@@ -15,6 +15,7 @@ const mockTx = {
   did: {
     findFirst: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
     delete: jest.fn(),
   },
 };
@@ -170,7 +171,7 @@ describe('did.repository', () => {
       expect(mockDid.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'did-record-1',
-          OR: [{ tenantId: ORG_ID }, { isDefault: true }],
+          OR: [{ tenantId: ORG_ID }, { isDefault: true, type: 'DEFAULT' }],
         },
       });
       expect(result).toEqual(DID_RECORD);
@@ -193,7 +194,7 @@ describe('did.repository', () => {
       expect(mockDid.findFirst).toHaveBeenCalledWith({
         where: {
           did: 'did:web:example.com:org:123',
-          OR: [{ tenantId: ORG_ID }, { isDefault: true }],
+          OR: [{ tenantId: ORG_ID }, { isDefault: true, type: 'DEFAULT' }],
         },
       });
       expect(result).toEqual(DID_RECORD);
@@ -208,7 +209,7 @@ describe('did.repository', () => {
       expect(mockDid.findFirst).toHaveBeenCalledWith({
         where: {
           did: 'did:web:example.com:org:123',
-          OR: [{ tenantId: 'other-org' }, { isDefault: true }],
+          OR: [{ tenantId: 'other-org' }, { isDefault: true, type: 'DEFAULT' }],
         },
       });
       expect(result).toEqual(defaultDid);
@@ -231,7 +232,7 @@ describe('did.repository', () => {
 
       expect(mockDid.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [{ tenantId: ORG_ID }, { isDefault: true }],
+          OR: [{ tenantId: ORG_ID }, { isDefault: true, type: 'DEFAULT' }],
         },
         take: 20,
         skip: undefined,
@@ -239,7 +240,7 @@ describe('did.repository', () => {
       });
       expect(mockDid.count).toHaveBeenCalledWith({
         where: {
-          OR: [{ tenantId: ORG_ID }, { isDefault: true }],
+          OR: [{ tenantId: ORG_ID }, { isDefault: true, type: 'DEFAULT' }],
         },
       });
       expect(result).toEqual({ data: [DID_RECORD], total: 1 });
@@ -308,6 +309,53 @@ describe('did.repository', () => {
         data: { name: 'New Name', description: 'New desc' },
       });
       expect(result.name).toBe('New Name');
+    });
+
+    it('sets isDefault to true and clears previous default in same tenant', async () => {
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      mockTx.did.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.did.update.mockResolvedValue({ ...DID_RECORD, isDefault: true });
+
+      const result = await updateDid('did-record-1', ORG_ID, { isDefault: true });
+
+      expect(mockTx.did.updateMany).toHaveBeenCalledWith({
+        where: {
+          tenantId: ORG_ID,
+          isDefault: true,
+          id: { not: 'did-record-1' },
+          type: { not: 'DEFAULT' },
+        },
+        data: { isDefault: false },
+      });
+      expect(mockTx.did.update).toHaveBeenCalledWith({
+        where: { id: 'did-record-1' },
+        data: { isDefault: true },
+      });
+      expect(result.isDefault).toBe(true);
+    });
+
+    it('passes isDefault: false without clearing other defaults', async () => {
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      mockTx.did.update.mockResolvedValue({ ...DID_RECORD, isDefault: false });
+
+      const result = await updateDid('did-record-1', ORG_ID, { isDefault: false });
+
+      expect(mockTx.did.updateMany).not.toHaveBeenCalled();
+      expect(mockTx.did.update).toHaveBeenCalledWith({
+        where: { id: 'did-record-1' },
+        data: { isDefault: false },
+      });
+      expect(result.isDefault).toBe(false);
+    });
+
+    it('throws ValidationError when setting isDefault on a DEFAULT type DID', async () => {
+      mockTx.did.findFirst.mockResolvedValue({ ...DID_RECORD, type: 'DEFAULT' });
+
+      await expect(updateDid('did-record-1', ORG_ID, { isDefault: true })).rejects.toThrow(
+        'Cannot modify default status of system DIDs',
+      );
+      expect(mockTx.did.updateMany).not.toHaveBeenCalled();
+      expect(mockTx.did.update).not.toHaveBeenCalled();
     });
 
     it('throws if DID does not belong to the organisation', async () => {

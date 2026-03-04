@@ -17,6 +17,7 @@ describe('did.config', () => {
     VCKIT_API_URL: 'https://vckit.example.com',
     VCKIT_API_KEY: 'test-token-123',
     DEFAULT_ISSUER_DID: 'did:web:example.com:org:123',
+    DEFAULT_ISSUER_KEY_ID: '7af136a8efa11a4df2e9010b972bdb92a0013724b50e5efa45407a2ddea184e6',
   };
 
   it('returns valid config when all env vars are set', () => {
@@ -28,6 +29,7 @@ describe('did.config', () => {
       vckitApiUrl: validEnv.VCKIT_API_URL,
       vckitApiKey: validEnv.VCKIT_API_KEY,
       defaultDid: validEnv.DEFAULT_ISSUER_DID,
+      defaultKeyId: validEnv.DEFAULT_ISSUER_KEY_ID,
     });
   });
 
@@ -35,6 +37,7 @@ describe('did.config', () => {
     delete process.env.VCKIT_API_URL;
     delete process.env.VCKIT_API_KEY;
     delete process.env.DEFAULT_ISSUER_DID;
+    delete process.env.DEFAULT_ISSUER_KEY_ID;
 
     expect(() => getDidConfig()).toThrow('Missing required DID configuration');
 
@@ -45,6 +48,7 @@ describe('did.config', () => {
       expect(message).toContain('VCKIT_API_URL');
       expect(message).toContain('VCKIT_API_KEY');
       expect(message).toContain('DEFAULT_ISSUER_DID');
+      expect(message).toContain('DEFAULT_ISSUER_KEY_ID');
     }
   });
 
@@ -105,5 +109,12 @@ describe('did.config', () => {
     delete process.env.DEFAULT_ISSUER_DID;
 
     expect(() => getDidConfig()).toThrow('DEFAULT_ISSUER_DID');
+  });
+
+  it('throws when DEFAULT_ISSUER_KEY_ID is missing', () => {
+    Object.assign(process.env, validEnv);
+    delete process.env.DEFAULT_ISSUER_KEY_ID;
+
+    expect(() => getDidConfig()).toThrow('DEFAULT_ISSUER_KEY_ID');
   });
 });

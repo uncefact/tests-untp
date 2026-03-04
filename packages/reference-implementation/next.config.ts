@@ -22,6 +22,7 @@ const nextConfig = (phase: string): NextConfig => {
     VCKIT_API_URL,
     VCKIT_API_KEY,
     DEFAULT_ISSUER_DID,
+    DEFAULT_ISSUER_KEY_ID,
     SERVICE_ENCRYPTION_KEY,
   } = process.env;
 
@@ -40,6 +41,7 @@ const nextConfig = (phase: string): NextConfig => {
       VCKIT_API_URL,
       VCKIT_API_KEY,
       DEFAULT_ISSUER_DID,
+      DEFAULT_ISSUER_KEY_ID,
       SERVICE_ENCRYPTION_KEY,
     };
 

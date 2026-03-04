@@ -2,6 +2,7 @@ export interface DidConfig {
   vckitApiUrl: string;
   vckitApiKey: string;
   defaultDid: string;
+  defaultKeyId: string;
 }
 
 let cached: DidConfig | null = null;
@@ -9,9 +10,9 @@ let cached: DidConfig | null = null;
 export function getDidConfig(): DidConfig {
   if (cached) return cached;
 
-  const { VCKIT_API_URL, VCKIT_API_KEY, DEFAULT_ISSUER_DID } = process.env;
+  const { VCKIT_API_URL, VCKIT_API_KEY, DEFAULT_ISSUER_DID, DEFAULT_ISSUER_KEY_ID } = process.env;
 
-  const required = { VCKIT_API_URL, VCKIT_API_KEY, DEFAULT_ISSUER_DID };
+  const required = { VCKIT_API_URL, VCKIT_API_KEY, DEFAULT_ISSUER_DID, DEFAULT_ISSUER_KEY_ID };
   const missing = Object.entries(required)
     .filter(([, value]) => !value)
     .map(([key]) => key);
@@ -26,6 +27,7 @@ export function getDidConfig(): DidConfig {
     vckitApiUrl: VCKIT_API_URL!,
     vckitApiKey: VCKIT_API_KEY!,
     defaultDid: DEFAULT_ISSUER_DID!,
+    defaultKeyId: DEFAULT_ISSUER_KEY_ID!,
   };
   return cached;
 }

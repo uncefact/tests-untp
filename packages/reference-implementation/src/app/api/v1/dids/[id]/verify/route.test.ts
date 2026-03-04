@@ -167,6 +167,24 @@ describe('POST /api/v1/dids/:id/verify', () => {
     expect(mockResolveDidService).toHaveBeenCalledWith('org-1', 'inst-99');
   });
 
+  it('returns 400 when attempting to verify a system default DID', async () => {
+    mockGetDidById.mockResolvedValue({
+      id: 'did-1',
+      did: 'did:web:example.com',
+      type: 'DEFAULT',
+      isDefault: true,
+    });
+
+    const res = await POST(createFakeRequest(), createContext('did-1') as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('System default DIDs cannot be verified through this endpoint');
+    expect(mockResolveDidService).not.toHaveBeenCalled();
+    expect(mockDidService.verify).not.toHaveBeenCalled();
+    expect(mockUpdateDidStatus).not.toHaveBeenCalled();
+  });
+
   it('returns 500 when service resolution fails', async () => {
     mockGetDidById.mockResolvedValue({ id: 'did-1', did: 'did:web:example.com' });
     mockResolveDidService.mockRejectedValue(new ServiceResolutionError('DID', 'org-1'));

@@ -73,6 +73,7 @@ jest.mock('@/lib/services/resolve-did-service', () => ({
 }));
 
 import { NotFoundError } from '@/lib/api/errors';
+import { ValidationError } from '@/lib/api/validation';
 import { GET, PATCH, DELETE } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -154,6 +155,43 @@ describe('PATCH /api/v1/dids/:id', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('sets isDefault on a managed DID', async () => {
+    const updated = { id: 'did-1', type: 'MANAGED', isDefault: true };
+    mockUpdateDid.mockResolvedValue(updated);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { isDefault: true } });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json).toEqual(updated);
+    expect(mockUpdateDid).toHaveBeenCalledWith('did-1', 'org-1', { isDefault: true });
+  });
+
+  it('returns 400 when setting isDefault on a DEFAULT type DID', async () => {
+    mockUpdateDid.mockRejectedValue(new ValidationError('Cannot modify default status of system DIDs'));
+
+    const req = createFakeRequest({ method: 'PATCH', body: { isDefault: true } });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('Cannot modify default status of system DIDs');
+  });
+
+  it('accepts isDefault with name together', async () => {
+    const updated = { id: 'did-1', type: 'MANAGED', name: 'My DID', isDefault: true };
+    mockUpdateDid.mockResolvedValue(updated);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { name: 'My DID', isDefault: true } });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json).toEqual(updated);
+    expect(mockUpdateDid).toHaveBeenCalledWith('did-1', 'org-1', { name: 'My DID', isDefault: true });
+  });
 });
 
 describe('DELETE /api/v1/dids/:id', () => {
@@ -232,7 +270,7 @@ describe('DELETE /api/v1/dids/:id', () => {
 
     const req = createFakeRequest({ method: 'DELETE' });
     const res = await DELETE(req, createContext('did-1') as unknown as Parameters<typeof DELETE>[1]);
-    const json = await (res as { status: number; json: () => Promise<{ error: string }> }).json();
+    const json = await res.json();
 
     expect(res.status).toBe(400);
     expect(json.error).toBe('Cannot delete system default DID');
