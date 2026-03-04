@@ -105,7 +105,7 @@ export async function getRenderTemplateById(id: string, tenantId: string): Promi
 export async function listRenderTemplates(
   tenantId: string,
   options: ListRenderTemplatesOptions = {},
-): Promise<RenderTemplateWithRelations[]> {
+): Promise<{ data: RenderTemplateWithRelations[]; total: number }> {
   const { dataModelId, limit, offset } = options;
 
   const where: Prisma.RenderTemplateWhereInput = {
@@ -116,13 +116,18 @@ export async function listRenderTemplates(
     where.dataModelId = dataModelId;
   }
 
-  return prisma.renderTemplate.findMany({
-    where,
-    include: RENDER_TEMPLATE_INCLUDE,
-    take: limit ?? 100,
-    skip: offset,
-    orderBy: { createdAt: 'desc' },
-  });
+  const [data, total] = await Promise.all([
+    prisma.renderTemplate.findMany({
+      where,
+      include: RENDER_TEMPLATE_INCLUDE,
+      take: limit ?? 20,
+      skip: offset,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.renderTemplate.count({ where }),
+  ]);
+
+  return { data, total };
 }
 
 /**

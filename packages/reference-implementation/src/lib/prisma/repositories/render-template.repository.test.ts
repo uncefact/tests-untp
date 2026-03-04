@@ -26,6 +26,7 @@ jest.mock('../prisma', () => ({
       create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
       delete: jest.fn(),
@@ -41,6 +42,7 @@ const mockRenderTemplate = prisma.renderTemplate as unknown as {
   create: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
+  count: jest.Mock;
   update: jest.Mock;
   updateMany: jest.Mock;
   delete: jest.Mock;
@@ -185,8 +187,9 @@ describe('render-template.repository', () => {
   });
 
   describe('listRenderTemplates', () => {
-    it('lists templates for tenant', async () => {
+    it('lists templates for tenant with total count', async () => {
       mockRenderTemplate.findMany.mockResolvedValue([TEMPLATE_RECORD]);
+      mockRenderTemplate.count.mockResolvedValue(1);
 
       const result = await listRenderTemplates(TENANT_ID);
 
@@ -195,27 +198,37 @@ describe('render-template.repository', () => {
           OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
         },
         include: INCLUDE_SHAPE,
-        take: 100,
+        take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
-      expect(result).toEqual([TEMPLATE_RECORD]);
+      expect(mockRenderTemplate.count).toHaveBeenCalledWith({
+        where: {
+          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+        },
+      });
+      expect(result).toEqual({ data: [TEMPLATE_RECORD], total: 1 });
     });
 
     it('filters by dataModelId', async () => {
       mockRenderTemplate.findMany.mockResolvedValue([TEMPLATE_RECORD]);
+      mockRenderTemplate.count.mockResolvedValue(1);
 
       await listRenderTemplates(TENANT_ID, { dataModelId: CONFIG_ID });
 
+      const expectedWhere = expect.objectContaining({
+        OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+        dataModelId: CONFIG_ID,
+      });
       expect(mockRenderTemplate.findMany).toHaveBeenCalledWith({
-        where: expect.objectContaining({
-          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
-          dataModelId: CONFIG_ID,
-        }),
+        where: expectedWhere,
         include: INCLUDE_SHAPE,
-        take: 100,
+        take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
+      });
+      expect(mockRenderTemplate.count).toHaveBeenCalledWith({
+        where: expectedWhere,
       });
     });
 
@@ -227,15 +240,17 @@ describe('render-template.repository', () => {
         name: 'DPP System Default Template',
       };
       mockRenderTemplate.findMany.mockResolvedValue([TEMPLATE_RECORD, SYSTEM_TEMPLATE_RECORD]);
+      mockRenderTemplate.count.mockResolvedValue(2);
 
       const result = await listRenderTemplates(TENANT_ID);
 
-      expect(result).toHaveLength(2);
-      expect(result).toEqual([TEMPLATE_RECORD, SYSTEM_TEMPLATE_RECORD]);
+      expect(result.data).toHaveLength(2);
+      expect(result).toEqual({ data: [TEMPLATE_RECORD, SYSTEM_TEMPLATE_RECORD], total: 2 });
     });
 
     it('applies pagination', async () => {
       mockRenderTemplate.findMany.mockResolvedValue([]);
+      mockRenderTemplate.count.mockResolvedValue(0);
 
       await listRenderTemplates(TENANT_ID, { limit: 10, offset: 20 });
 

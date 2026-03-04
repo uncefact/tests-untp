@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { listRenderTemplates, createRenderTemplate } from '@/lib/prisma/repositories';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/render-templates' });
@@ -40,13 +41,12 @@ const logger = apiLogger.child({ route: '/api/v1/render-templates' });
  *             schema:
  *               type: object
  *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 renderTemplates:
+ *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/RenderTemplate'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Validation error
  *         content:
@@ -69,19 +69,20 @@ const logger = apiLogger.child({ route: '/api/v1/render-templates' });
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   const url = new URL(req.url);
 
+  logger.info('Parsing query filters');
   const dataModelId = url.searchParams.get('dataModelId') ?? undefined;
   const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  logger.info({ tenantId, filters: { dataModelId, limit, offset } }, 'Listing render templates');
-  const renderTemplates = await listRenderTemplates(tenantId, {
+  logger.info({ filters: { dataModelId, limit, offset } }, 'Querying render templates');
+  const { data, total } = await listRenderTemplates(tenantId, {
     dataModelId,
     limit,
     offset,
   });
 
-  logger.info({ tenantId, count: renderTemplates.length }, 'Render templates listed');
-  return NextResponse.json({ ok: true, renderTemplates });
+  logger.info({ count: data.length }, 'Render templates listed');
+  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });
 
 /**
@@ -125,13 +126,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 renderTemplate:
- *                   $ref: '#/components/schemas/RenderTemplate'
+ *               $ref: '#/components/schemas/RenderTemplate'
  *       400:
  *         description: Validation error
  *         content:
@@ -160,6 +155,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     isPrimary?: boolean;
   };
 
+  logger.info('Parsing request body');
   try {
     body = await req.json();
   } catch {
@@ -171,7 +167,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   if (!isNonEmptyString(body.storageUrl)) throw new ValidationError('storageUrl is required');
   if (!isNonEmptyString(body.hash)) throw new ValidationError('hash is required');
 
-  logger.info({ tenantId, dataModelId: body.dataModelId, name: body.name }, 'Creating render template');
+  logger.info({ dataModelId: body.dataModelId, name: body.name }, 'Creating render template');
   const renderTemplate = await createRenderTemplate(tenantId, {
     name: body.name,
     dataModelId: body.dataModelId,
@@ -180,6 +176,6 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     ...(body.isPrimary !== undefined && { isPrimary: body.isPrimary }),
   });
 
-  logger.info({ tenantId, renderTemplateId: renderTemplate.id }, 'Render template created');
-  return NextResponse.json({ ok: true, renderTemplate }, { status: 201 });
+  logger.info({ renderTemplateId: renderTemplate.id }, 'Render template created');
+  return NextResponse.json(renderTemplate, { status: 201 });
 });

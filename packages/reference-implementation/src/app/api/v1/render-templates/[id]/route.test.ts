@@ -1,3 +1,14 @@
+// Provide a minimal Response constructor for the DELETE handler
+// (jsdom does not expose the Fetch API's Response)
+global.Response = class Response {
+  status: number;
+  body: unknown;
+  constructor(body: unknown, init?: { status?: number }) {
+    this.body = body;
+    this.status = init?.status ?? 200;
+  }
+} as unknown as typeof globalThis.Response;
+
 // Mock next/server before importing route handlers
 jest.mock('next/server', () => ({
   NextResponse: {
@@ -78,8 +89,7 @@ describe('GET /api/v1/render-templates/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.renderTemplate).toEqual(renderTemplate);
+    expect(json).toEqual(renderTemplate);
     expect(mockGetRenderTemplateById).toHaveBeenCalledWith('rt-1', 'tenant-1');
   });
 
@@ -127,8 +137,7 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.renderTemplate).toEqual(updated);
+    expect(json).toEqual(updated);
     expect(mockUpdateRenderTemplate).toHaveBeenCalledWith('rt-1', 'tenant-1', {
       name: 'Updated Template',
     });
@@ -148,8 +157,7 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.renderTemplate).toEqual(updated);
+    expect(json).toEqual(updated);
     expect(mockUpdateRenderTemplate).toHaveBeenCalledWith('rt-1', 'tenant-1', {
       isPrimary: true,
     });
@@ -244,17 +252,13 @@ describe('DELETE /api/v1/render-templates/:id', () => {
     jest.clearAllMocks();
   });
 
-  it('deletes the render template and returns it', async () => {
-    const deleted = { id: 'rt-1', name: 'Deleted Template' };
-    mockDeleteRenderTemplate.mockResolvedValue(deleted);
+  it('deletes the render template and returns 204', async () => {
+    mockDeleteRenderTemplate.mockResolvedValue({ id: 'rt-1' });
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('rt-1') as unknown as Parameters<typeof DELETE>[1]);
-    const json = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.renderTemplate).toEqual(deleted);
+    expect(res.status).toBe(204);
     expect(mockDeleteRenderTemplate).toHaveBeenCalledWith('rt-1', 'tenant-1');
   });
 

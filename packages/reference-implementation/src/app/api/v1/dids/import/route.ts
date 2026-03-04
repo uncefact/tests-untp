@@ -80,14 +80,14 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     serviceInstanceId?: string;
   };
 
-  logger.info({ tenantId }, 'Parsing request body');
+  logger.info('Parsing request body');
   try {
     body = await req.json();
   } catch {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId, did: body.did, method: body.method }, 'Validating import parameters');
+  logger.info({ did: body.did, method: body.method }, 'Validating import parameters');
   if (!isNonEmptyString(body.did)) {
     throw new ValidationError('did is required');
   }
@@ -100,7 +100,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('method is required');
   }
 
-  logger.info({ tenantId, did: body.did, method }, 'Saving imported DID record');
+  logger.info({ did: body.did, method }, 'Saving imported DID record');
   const record = await createDid({
     tenantId,
     did: body.did,
@@ -113,6 +113,6 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     serviceInstanceId: body.serviceInstanceId,
   });
 
-  logger.info({ tenantId, didId: record.id, did: record.did }, 'DID imported');
+  logger.info({ didId: record.id, did: record.did }, 'DID imported');
   return NextResponse.json(record, { status: 201 });
 });

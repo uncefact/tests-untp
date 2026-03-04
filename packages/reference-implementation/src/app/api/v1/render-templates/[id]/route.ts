@@ -30,13 +30,7 @@ const UPDATABLE_FIELDS = ['name', 'storageUrl', 'hash', 'isPrimary'] as const;
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 renderTemplate:
- *                   $ref: '#/components/schemas/RenderTemplate'
+ *               $ref: '#/components/schemas/RenderTemplate'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -58,12 +52,13 @@ const UPDATABLE_FIELDS = ['name', 'storageUrl', 'hash', 'isPrimary'] as const;
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ tenantId, renderTemplateId: id }, 'Looking up render template');
+  logger.info({ renderTemplateId: id }, 'Looking up render template');
   const renderTemplate = await getRenderTemplateById(id, tenantId);
   if (!renderTemplate) {
     throw new NotFoundError('Render template not found');
   }
-  return NextResponse.json({ ok: true, renderTemplate });
+  logger.info({ renderTemplateId: id }, 'Render template retrieved');
+  return NextResponse.json(renderTemplate);
 });
 
 /**
@@ -107,13 +102,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 renderTemplate:
- *                   $ref: '#/components/schemas/RenderTemplate'
+ *               $ref: '#/components/schemas/RenderTemplate'
  *       400:
  *         description: Validation error
  *         content:
@@ -144,12 +133,14 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 
   let body: Record<string, unknown>;
 
+  logger.info('Parsing request body');
   try {
     body = await req.json();
   } catch {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ renderTemplateId: id }, 'Validating update fields');
   const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
   if (!hasUpdatableField) {
     throw new ValidationError(`At least one updatable field must be provided: ${UPDATABLE_FIELDS.join(', ')}`);
@@ -168,7 +159,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('isPrimary must be a boolean');
   }
 
-  logger.info({ tenantId, renderTemplateId: id }, 'Updating render template');
+  logger.info({ renderTemplateId: id }, 'Updating render template');
   const renderTemplate = await updateRenderTemplate(id, tenantId, {
     ...(body.name !== undefined && { name: body.name as string }),
     ...(body.storageUrl !== undefined && { storageUrl: body.storageUrl as string }),
@@ -176,8 +167,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     ...(body.isPrimary !== undefined && { isPrimary: body.isPrimary as boolean }),
   });
 
-  logger.info({ tenantId, renderTemplateId: id }, 'Render template updated');
-  return NextResponse.json({ ok: true, renderTemplate });
+  logger.info({ renderTemplateId: id }, 'Render template updated');
+  return NextResponse.json(renderTemplate);
 });
 
 /**
@@ -196,18 +187,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *           type: string
  *         description: The database ID of the render template
  *     responses:
- *       200:
+ *       204:
  *         description: Render template deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 renderTemplate:
- *                   $ref: '#/components/schemas/RenderTemplate'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -230,9 +211,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, renderTemplateId: id }, 'Deleting render template');
-  const renderTemplate = await deleteRenderTemplate(id, tenantId);
+  logger.info({ renderTemplateId: id }, 'Deleting render template');
+  await deleteRenderTemplate(id, tenantId);
 
-  logger.info({ tenantId, renderTemplateId: id }, 'Render template deleted');
-  return NextResponse.json({ ok: true, renderTemplate });
+  logger.info({ renderTemplateId: id }, 'Render template deleted');
+  return new Response(null, { status: 204 });
 });

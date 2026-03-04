@@ -68,7 +68,7 @@ describe('GET /api/v1/render-templates', () => {
     jest.clearAllMocks();
   });
 
-  it('lists render templates for the tenant with no filters', async () => {
+  it('lists render templates with paginated response', async () => {
     const renderTemplates = [
       {
         id: 'rt-1',
@@ -85,15 +85,21 @@ describe('GET /api/v1/render-templates', () => {
         hash: 'def456',
       },
     ];
-    mockListRenderTemplates.mockResolvedValue(renderTemplates);
+    mockListRenderTemplates.mockResolvedValue({ data: renderTemplates, total: 2 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/render-templates' });
     const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.renderTemplates).toEqual(renderTemplates);
+    expect(json.data).toEqual(renderTemplates);
+    expect(json.pagination).toEqual({
+      total: 2,
+      limit: 20,
+      offset: 0,
+      hasMore: false,
+    });
+    expect(json).not.toHaveProperty('ok');
     expect(mockListRenderTemplates).toHaveBeenCalledWith('tenant-1', {
       dataModelId: undefined,
       limit: undefined,
@@ -102,18 +108,25 @@ describe('GET /api/v1/render-templates', () => {
   });
 
   it('passes dataModelId, limit, and offset query params to the repository', async () => {
-    mockListRenderTemplates.mockResolvedValue([]);
+    mockListRenderTemplates.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
       url: 'http://localhost/api/v1/render-templates?dataModelId=dm-1&limit=10&offset=20',
     });
-    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
 
     expect(mockListRenderTemplates).toHaveBeenCalledWith('tenant-1', {
       dataModelId: 'dm-1',
       limit: 10,
       offset: 20,
+    });
+    expect(json.pagination).toEqual({
+      total: 0,
+      limit: 10,
+      offset: 20,
+      hasMore: false,
     });
   });
 
@@ -139,6 +152,21 @@ describe('GET /api/v1/render-templates', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('offset must be a non-negative integer');
+  });
+
+  it('returns paginated response with hasMore when more records exist', async () => {
+    const templates = [{ id: 'rt-1' }];
+    mockListRenderTemplates.mockResolvedValue({ data: templates, total: 25 });
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/render-templates?limit=10&offset=0',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(json.pagination.hasMore).toBe(true);
+    expect(json.pagination.total).toBe(25);
   });
 
   it('returns 500 when listRenderTemplates throws', async () => {
@@ -181,8 +209,7 @@ describe('POST /api/v1/render-templates', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(json.ok).toBe(true);
-    expect(json.renderTemplate).toEqual(created);
+    expect(json).toEqual(created);
   });
 
   it('passes isPrimary to the repository when provided', async () => {

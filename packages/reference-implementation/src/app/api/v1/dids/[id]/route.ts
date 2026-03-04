@@ -52,13 +52,13 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]' });
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, didId: id }, 'Looking up DID');
+  logger.info({ didId: id }, 'Looking up DID');
   const did = await getDidById(id, tenantId);
   if (!did) {
     throw new NotFoundError('DID not found');
   }
 
-  logger.info({ tenantId, didId: id, did: did.did }, 'DID retrieved');
+  logger.info({ didId: id, did: did.did }, 'DID retrieved');
   return NextResponse.json(did);
 });
 
@@ -126,15 +126,15 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, didId: id }, 'Parsing request body');
   let body: { name?: string; description?: string };
+  logger.info('Parsing request body');
   try {
     body = await req.json();
   } catch {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId, didId: id }, 'Validating update fields');
+  logger.info({ didId: id }, 'Validating update fields');
   const hasName = isNonEmptyString(body.name);
   const hasDescription = isNonEmptyString(body.description);
 
@@ -142,13 +142,13 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('At least one of name or description is required');
   }
 
-  logger.info({ tenantId, didId: id, fields: { hasName, hasDescription } }, 'Updating DID record');
+  logger.info({ didId: id, fields: { hasName, hasDescription } }, 'Updating DID record');
   const updated = await updateDid(id, tenantId, {
     ...(hasName && { name: body.name }),
     ...(hasDescription && { description: body.description }),
   });
 
-  logger.info({ tenantId, didId: id }, 'DID updated');
+  logger.info({ didId: id }, 'DID updated');
   return NextResponse.json(updated);
 });
 
@@ -198,7 +198,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, didId: id }, 'Looking up DID for deletion');
+  logger.info({ didId: id }, 'Looking up DID for deletion');
   const did = await getDidById(id, tenantId);
   if (!did) {
     throw new NotFoundError('DID not found');
@@ -208,25 +208,25 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
     throw new ValidationError('Cannot delete system default DID');
   }
 
-  logger.info({ tenantId, didId: id }, 'Deleting DID from database');
+  logger.info({ didId: id }, 'Deleting DID from database');
   await deleteDid(id, tenantId);
 
   if (did.serviceInstanceId) {
     try {
       logger.info(
-        { tenantId, didId: id, did: did.did, serviceInstanceId: did.serviceInstanceId },
+        { didId: id, did: did.did, serviceInstanceId: did.serviceInstanceId },
         'Removing DID from upstream provider',
       );
       const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId);
       await didService.delete(did.did);
     } catch (err) {
       logger.error(
-        { tenantId, didId: id, did: did.did, error: err },
+        { didId: id, did: did.did, error: err },
         'Best-effort upstream DID deletion failed; orphaned upstream DID is harmless',
       );
     }
   }
 
-  logger.info({ tenantId, didId: id }, 'DID deleted');
+  logger.info({ didId: id }, 'DID deleted');
   return new Response(null, { status: 204 });
 });
