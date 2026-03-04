@@ -235,6 +235,22 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.code).toBe('UPSTREAM_ERROR');
   });
 
+  it('returns 502 when response.text() throws', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => {
+        throw new Error('stream error');
+      },
+    });
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(502);
+    const json = await res.json();
+    expect(json.error).toBe('Failed to read credential response');
+    expect(json.code).toBe('UPSTREAM_ERROR');
+  });
+
   // ── Credential Processing (422) ───────────────────────────────────
 
   it('returns 422 when response is not valid JSON', async () => {
