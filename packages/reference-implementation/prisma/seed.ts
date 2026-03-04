@@ -8,6 +8,7 @@ import {
   DidStatus,
   DidType,
   PrismaClient,
+  RenderMethodType,
   ServiceType as PrismaServiceType,
   AdapterType as PrismaAdapterType,
 } from '../src/lib/prisma/generated';
@@ -513,6 +514,9 @@ async function main() {
             storageUrl: uri,
             hash,
             isPrimary: true,
+            renderMethodType: RenderMethodType.RenderTemplate2024,
+            inline: false,
+            mediaType: 'text/html',
           },
         });
 

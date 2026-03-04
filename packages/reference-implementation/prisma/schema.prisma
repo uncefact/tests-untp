@@ -54,6 +54,11 @@ enum CredentialType {
   DigitalTraceabilityEvent
 }
 
+enum RenderMethodType {
+  RenderTemplate2024
+  WebRenderingTemplate2022
+}
+
 /**
  * Auth.js + Prisma adapter tables for OAuth + JWT sessions
  */
@@ -472,6 +477,14 @@ model RenderTemplate {
   storageUrl               String
   hash                     String
   isPrimary                Boolean   @default(false)
+  renderMethodType          RenderMethodType
+  storageServiceInstanceId  String?
+  storageExternalId         String?
+  storageBucket             String?
+  storageContentType        String?
+  inline                    Boolean?
+  mediaType                 String?
+  mediaQuery                String?
 
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
