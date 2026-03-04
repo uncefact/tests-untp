@@ -156,9 +156,9 @@ describe('VCKitDidAdapter', () => {
       ).rejects.toThrow(DidCreateError);
     });
 
-    it('passes the alias through to the payload as-is', async () => {
+    it('prepends the baseURL host to the alias in the payload', async () => {
       (global.fetch as jest.Mock)
-        .mockResolvedValueOnce(createMockResponse({ did: 'did:web:example.com:my-org', controllerKeyId: 'key-1' }))
+        .mockResolvedValueOnce(createMockResponse({ did: 'did:web:localhost%3A3332:my-org', controllerKeyId: 'key-1' }))
         .mockResolvedValueOnce(
           createMockResponse({
             didDocument: {
@@ -167,7 +167,7 @@ describe('VCKitDidAdapter', () => {
                 'https://w3id.org/security/suites/ed25519-2020/v1',
                 'https://w3id.org/security/suites/jws-2020/v1',
               ],
-              id: 'did:web:example.com:my-org',
+              id: 'did:web:localhost%3A3332:my-org',
               verificationMethod: [],
             },
           }),
@@ -180,7 +180,51 @@ describe('VCKitDidAdapter', () => {
       });
 
       const payload = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
-      expect(payload.alias).toBe('my-org');
+      expect(payload.alias).toBe('localhost%3A3332:my-org');
+    });
+
+    it('prepends host with port-encoded alias when baseURL has non-standard port', async () => {
+      const serviceWithPort = new VCKitDidAdapter('https://vckit.dev3.pyx.io:8080', HEADERS);
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce(
+          createMockResponse({ did: 'did:web:vckit.dev3.pyx.io%3A8080:my-org', controllerKeyId: 'key-1' }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            didDocument: {
+              '@context': ['https://www.w3.org/ns/did/v1'],
+              id: 'did:web:vckit.dev3.pyx.io%3A8080:my-org',
+              verificationMethod: [],
+            },
+          }),
+        );
+
+      await serviceWithPort.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'my-org' });
+
+      const payload = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+      expect(payload.alias).toBe('vckit.dev3.pyx.io%3A8080:my-org');
+    });
+
+    it('prepends host without port for standard HTTPS', async () => {
+      const serviceHttps = new VCKitDidAdapter('https://vckit.dev3.pyx.io', HEADERS);
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce(
+          createMockResponse({ did: 'did:web:vckit.dev3.pyx.io:acme-corp', controllerKeyId: 'key-1' }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            didDocument: {
+              '@context': ['https://www.w3.org/ns/did/v1'],
+              id: 'did:web:vckit.dev3.pyx.io:acme-corp',
+              verificationMethod: [],
+            },
+          }),
+        );
+
+      await serviceHttps.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'acme-corp' });
+
+      const payload = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+      expect(payload.alias).toBe('vckit.dev3.pyx.io:acme-corp');
     });
   });
 
