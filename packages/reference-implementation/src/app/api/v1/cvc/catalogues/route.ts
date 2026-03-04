@@ -140,8 +140,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   }
 
   try {
-    new URL(body.url);
-  } catch {
+    const parsed = new URL(body.url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new ValidationError('url must use http or https protocol');
+    }
+  } catch (err) {
+    if (err instanceof ValidationError) throw err;
     throw new ValidationError('url must be a valid URL');
   }
 

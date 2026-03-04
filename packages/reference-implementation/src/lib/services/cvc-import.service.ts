@@ -16,7 +16,7 @@ export async function importCvc(tenantId: string, url: string, version: string) 
     throw new ValidationError(`Unsupported CVC version: ${version}. Supported: ${SUPPORTED_CVC_VERSIONS.join(', ')}`);
   }
 
-  const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(15_000) : undefined;
+  const signal = AbortSignal.timeout(15_000);
 
   let response: Response;
   try {
@@ -39,8 +39,10 @@ export async function importCvc(tenantId: string, url: string, version: string) 
   let data: unknown;
   try {
     data = await response.json();
-  } catch {
-    throw new ValidationError(`The URL ${url} did not return valid JSON.`);
+  } catch (err) {
+    throw new ValidationError(
+      `The URL ${url} did not return valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 
   let parsed: ReturnType<typeof parser.parse>;

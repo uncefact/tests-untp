@@ -237,7 +237,7 @@ describe('CVC API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/cvc/catalogues — returns 500 for unreachable URL', () => {
+    it('POST /api/v1/cvc/catalogues — returns 400 for unreachable URL', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/cvc/catalogues',
@@ -245,7 +245,7 @@ describe('CVC API', { testIsolation: false }, () => {
         failOnStatusCode: false,
         timeout: 30000,
       }).then((response) => {
-        expect(response.status).to.eq(500);
+        expect(response.status).to.eq(400);
       });
     });
 

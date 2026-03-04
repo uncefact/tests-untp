@@ -11,11 +11,15 @@ import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { buildPublishLinks } from '@uncefact/untp-ri-services';
 import { CredentialType } from '@/lib/prisma/generated';
-import type { CredentialPayload, ICvcAwareMapper } from '@uncefact/untp-ri-services';
+import type { CredentialPayload, ICvcAwareMapper, ExtractedCvcRefs } from '@uncefact/untp-ri-services';
 import { validateCvcCompliance } from '@/lib/services/cvc-validation.service';
 import type { CvcValidationWarning } from '@/lib/services/cvc-validation.service';
 
 const logger = apiLogger.child({ route: '/api/v1/credentials' });
+
+function isCvcAwareMapper(mapper: unknown): mapper is ICvcAwareMapper {
+  return typeof (mapper as ICvcAwareMapper).extractCvcRefs === 'function';
+}
 
 /** Valid credential type strings (must match Prisma CredentialType enum). */
 const VALID_CREDENTIAL_TYPES = Object.values(CredentialType) as string[];
@@ -131,19 +135,33 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   let cvcWarnings: CvcValidationWarning[] = [];
 
   if (isDccDataModel(dataModel)) {
-    if ('extractCvcRefs' in mapper) {
+    if (isCvcAwareMapper(mapper)) {
+      let cvcRefs: ExtractedCvcRefs | undefined;
       try {
-        const cvcRefs = (mapper as ICvcAwareMapper).extractCvcRefs(credentialPayload);
-        const result = await validateCvcCompliance(tenantId, cvcRefs);
-        cvcWarnings = result.warnings;
+        cvcRefs = (mapper as ICvcAwareMapper).extractCvcRefs(credentialPayload);
       } catch (error) {
-        logger.warn({ error }, 'CVC validation failed — continuing without CVC checks');
+        logger.error({ err: error, tenantId, credentialType }, 'CVC reference extraction failed');
         cvcWarnings = [
           {
-            code: 'CVC_VALIDATION_ERROR',
-            message: 'CVC validation could not be performed — credential was issued without CVC checks',
+            code: 'CVC_VALIDATION_ERROR' as const,
+            message: 'Failed to extract CVC references from credential payload',
           },
         ];
+      }
+
+      if (cvcRefs) {
+        try {
+          const result = await validateCvcCompliance(tenantId, cvcRefs);
+          cvcWarnings = result.warnings;
+        } catch (error) {
+          logger.error({ err: error, tenantId, credentialType }, 'CVC compliance validation failed');
+          cvcWarnings = [
+            {
+              code: 'CVC_VALIDATION_ERROR' as const,
+              message: 'CVC validation could not be performed — credential was issued without CVC checks',
+            },
+          ];
+        }
       }
     } else {
       logger.warn(

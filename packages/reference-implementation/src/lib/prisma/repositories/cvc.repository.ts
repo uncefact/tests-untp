@@ -2,6 +2,7 @@ import { CvcCatalogue, ConformityScheme, ConformityProfile, Criterion, Prisma } 
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
+import type { ParsedCvcCatalogue } from '@uncefact/untp-ri-services';
 
 // ---------------------------------------------------------------------------
 // Input / option / result types
@@ -9,40 +10,10 @@ import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 
 export type ListResult<T> = { data: T[]; total: number };
 
-export type ImportCatalogueInput = {
+export type ImportCatalogueInput = ParsedCvcCatalogue & {
   tenantId: string;
-  canonicalId: string;
-  name: string;
-  sourceUrl: string;
   specVersion: string;
   metadata?: Record<string, unknown>;
-  schemes: {
-    canonicalId: string;
-    name: string;
-    slug: string;
-    description?: string;
-    metadata?: Record<string, unknown>;
-    profiles: {
-      canonicalId: string;
-      name: string;
-      slug: string;
-      version: string;
-      status: string;
-      description?: string;
-      metadata?: Record<string, unknown>;
-      criteria: {
-        canonicalId: string;
-        name: string;
-        version: string;
-        status: string;
-        description?: string;
-        conformityTopic?: string;
-        passThreshold?: Record<string, unknown>;
-        documentation?: string;
-        metadata?: Record<string, unknown>;
-      }[];
-    }[];
-  }[];
 };
 
 export type ImportCatalogueResult = {
@@ -169,15 +140,28 @@ export async function importCatalogue(input: ImportCatalogueInput): Promise<Impo
       // Create ProfileCriterion join rows
       for (const scheme of catalogue.schemes) {
         for (const profile of scheme.profiles) {
-          const inputScheme = schemes.find((s) => s.canonicalId === scheme.canonicalId)!;
-          const inputProfile = inputScheme.profiles.find((p) => p.canonicalId === profile.canonicalId)!;
+          const inputScheme = schemes.find((s) => s.canonicalId === scheme.canonicalId);
+          if (!inputScheme) {
+            throw new Error(`Import consistency error: no input scheme for canonicalId "${scheme.canonicalId}"`);
+          }
+
+          const inputProfile = inputScheme.profiles.find((p) => p.canonicalId === profile.canonicalId);
+          if (!inputProfile) {
+            throw new Error(`Import consistency error: no input profile for canonicalId "${profile.canonicalId}"`);
+          }
 
           if (inputProfile.criteria.length > 0) {
             await tx.profileCriterion.createMany({
-              data: inputProfile.criteria.map((c) => ({
-                profileId: profile.id,
-                criterionId: criterionIdMap.get(c.canonicalId)!,
-              })),
+              data: inputProfile.criteria.map((c) => {
+                const criterionId = criterionIdMap.get(c.canonicalId);
+                if (criterionId === undefined) {
+                  throw new Error(`Import consistency error: no criterion ID for canonicalId "${c.canonicalId}"`);
+                }
+                return {
+                  profileId: profile.id,
+                  criterionId,
+                };
+              }),
               skipDuplicates: true,
             });
           }
