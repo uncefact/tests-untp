@@ -48,6 +48,22 @@ describe('validateJsonLd', () => {
     expect(toRDF).not.toHaveBeenCalled();
   });
 
+  it('passes safe: false to toRDF when options.safe is false', async () => {
+    toRDF.mockResolvedValue([]);
+
+    await expect(validateJsonLd({ '@context': 'https://example.com' }, { safe: false })).resolves.toBeUndefined();
+
+    expect(toRDF).toHaveBeenCalledWith({ '@context': 'https://example.com' }, { safe: false });
+  });
+
+  it('defaults safe to true when no options provided', async () => {
+    toRDF.mockResolvedValue([]);
+
+    await validateJsonLd({ '@context': 'https://example.com' });
+
+    expect(toRDF).toHaveBeenCalledWith({ '@context': 'https://example.com' }, { safe: true });
+  });
+
   it('handles non-Error thrown values', async () => {
     toRDF.mockRejectedValue('string error');
 

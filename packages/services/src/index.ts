@@ -116,7 +116,7 @@ export { SchemaValidationError, validateAgainstSchemas } from './schema/index.js
 export type { CachedSchema } from './schema/index.js';
 
 // JSON-LD validation
-export { JsonLdValidationError, validateJsonLd } from './jsonld-validation/index.js';
+export { JsonLdValidationError, validateJsonLd, type ValidateJsonLdOptions } from './jsonld-validation/index.js';
 
 // Shared API response schemas
 export { errorResponseSchema } from './schemas.js';
