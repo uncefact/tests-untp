@@ -124,6 +124,8 @@ services:
       ISSUER_API_URL: http://vckit-api:3332/v2
       ISSUER_AUTH_TOKEN: ${ISSUER_AUTH_TOKEN}
       UNCEFACT_STORAGE_URL: http://storage-service:3334/api/3.0.0/public
+      UNCEFACT_STORAGE_PUBLIC_BUCKET: ${UNCEFACT_STORAGE_PUBLIC_BUCKET:-public-data}
+      UNCEFACT_STORAGE_PRIVATE_BUCKET: ${UNCEFACT_STORAGE_PRIVATE_BUCKET:-private-data}
       IDR_API_URL: http://identity-resolver-service:3000/api/2.0.0
       IDR_API_KEY: ${IDR_API_KEY}
     healthcheck:
@@ -158,8 +160,8 @@ services:
       - PROTOCOL=http
       - DOMAIN=localhost
       - PORT=3334
-      - AVAILABLE_BUCKETS=public-data,private-data
-      - DEFAULT_BUCKET=public-data
+      - AVAILABLE_BUCKETS=${UNCEFACT_STORAGE_PUBLIC_BUCKET:-public-data},${UNCEFACT_STORAGE_PRIVATE_BUCKET:-private-data}
+      - DEFAULT_BUCKET=${UNCEFACT_STORAGE_PUBLIC_BUCKET:-public-data}
       - STORAGE_TYPE=local
       - API_KEY=${UNCEFACT_STORAGE_API_KEY:-test123}
       - ALLOWED_UPLOAD_TYPES=image/png,image/jpeg,image/webp,application/pdf,text/html
