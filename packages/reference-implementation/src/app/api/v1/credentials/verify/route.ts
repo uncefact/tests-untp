@@ -24,7 +24,7 @@ function getMaxCredentialSize(): number {
 
 /**
  * @swagger
- * /api/v1/credentials/verify:
+ * /credentials/verify:
  *   post:
  *     summary: Verify a credential
  *     description: |
