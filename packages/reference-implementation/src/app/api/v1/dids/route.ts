@@ -126,7 +126,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   logger.info({ alias: body.alias, method }, 'Normalising alias');
   let normalisedAlias: string;
   try {
-    normalisedAlias = didService.normaliseAlias(body.alias, method);
+    normalisedAlias = didService.normaliseAlias(body.alias, method, type);
   } catch (aliasErr) {
     throw new ValidationError(errorMessage(aliasErr, 'Invalid alias'));
   }

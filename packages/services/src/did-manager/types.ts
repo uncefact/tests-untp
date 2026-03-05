@@ -122,8 +122,8 @@ export type MethodVerificationResult = {
 // ── Service interface ──────────────────────────────────────────────────────
 
 export interface IDidService {
-  /** Normalise and validate an alias for the given DID method. Throws if invalid. */
-  normaliseAlias(alias: string, method: DidMethod): string;
+  /** Normalise and validate an alias for the given DID method and type. Throws if invalid. */
+  normaliseAlias(alias: string, method: DidMethod, type?: DidType): string;
   /** Create a new DID in the provider */
   create(options: CreateDidOptions): Promise<DidRecord>;
   /** Get the full DID Document */

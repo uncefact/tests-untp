@@ -1,7 +1,7 @@
 import type { IDidService, CreateDidOptions, DidRecord, DidDocument, DidVerificationResult } from '../../types.js';
 import { DidMethod, DidType, DidVerificationCheckName } from '../../types.js';
 import { verifyDid } from '../../common/verify.js';
-import { normaliseDidWebAlias } from '../../common/utils.js';
+import { normaliseDidWebAlias, normaliseSelfManagedAlias } from '../../common/utils.js';
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
 import { vckitDidConfigSchema, vckitDidSensitiveFields } from './vckit-did.schema.js';
 import type { VCKitDidConfig } from './vckit-did.schema.js';
@@ -60,10 +60,10 @@ export class VCKitDidAdapter implements IDidService {
     return url.port && url.port !== '443' && url.port !== '80' ? `${url.hostname}%3A${url.port}` : url.hostname;
   }
 
-  normaliseAlias(alias: string, method: DidMethod): string {
+  normaliseAlias(alias: string, method: DidMethod, type?: DidType): string {
     switch (method) {
       case DidMethod.DID_WEB:
-        return normaliseDidWebAlias(alias);
+        return type === DidType.SELF_MANAGED ? normaliseSelfManagedAlias(alias) : normaliseDidWebAlias(alias);
       case DidMethod.DID_WEB_VH:
         throw new DidMethodNotSupportedError('did:webvh');
       default:

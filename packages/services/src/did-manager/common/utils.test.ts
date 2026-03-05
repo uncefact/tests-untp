@@ -1,4 +1,4 @@
-import { didWebToUrl, parseDidMethod, normaliseDidWebAlias } from './utils';
+import { didWebToUrl, parseDidMethod, normaliseDidWebAlias, normaliseSelfManagedAlias } from './utils';
 import { DidParseError, DidMethodNotSupportedError, DidInputError } from '../errors';
 
 describe('didWebToUrl', () => {
@@ -96,5 +96,35 @@ describe('normaliseDidWebAlias', () => {
 
   it('preserves already-valid aliases', () => {
     expect(normaliseDidWebAlias('my-org-123')).toBe('my-org-123');
+  });
+});
+
+describe('normaliseSelfManagedAlias', () => {
+  it('preserves dots and colons in domain aliases', () => {
+    expect(normaliseSelfManagedAlias('vckit.dev3.pyx.io:my-org')).toBe('vckit.dev3.pyx.io:my-org');
+  });
+
+  it('lowercases the input', () => {
+    expect(normaliseSelfManagedAlias('Example.COM:My-Org')).toBe('example.com:my-org');
+  });
+
+  it('trims whitespace', () => {
+    expect(normaliseSelfManagedAlias('  example.com:org  ')).toBe('example.com:org');
+  });
+
+  it('strips invalid characters', () => {
+    expect(normaliseSelfManagedAlias('example.com:my_org@123!')).toBe('example.com:myorg123');
+  });
+
+  it('preserves hyphens', () => {
+    expect(normaliseSelfManagedAlias('my-domain.io:my-org')).toBe('my-domain.io:my-org');
+  });
+
+  it('throws DidInputError for input that normalises to empty', () => {
+    expect(() => normaliseSelfManagedAlias('!!!')).toThrow(DidInputError);
+  });
+
+  it('throws DidInputError for empty string', () => {
+    expect(() => normaliseSelfManagedAlias('')).toThrow(DidInputError);
   });
 });
