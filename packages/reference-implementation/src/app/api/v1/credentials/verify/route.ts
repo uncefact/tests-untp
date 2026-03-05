@@ -4,13 +4,14 @@ import { ValidationError } from '@/lib/api/validation';
 import { withPublicRoute } from '@/lib/api/with-public-route';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
-import { computeHash, decryptCredential, isEncryptedEnvelope } from '@uncefact/untp-ri-services';
-import type { EncryptionAlgorithm, EnvelopedVerifiableCredential } from '@uncefact/untp-ri-services';
+import { computeHash, decryptCredential, isEncryptedEnvelope, VcVerifyError } from '@uncefact/untp-ri-services';
+import type { EnvelopedVerifiableCredential, VerifyResult } from '@uncefact/untp-ri-services';
 import { decodeJwt } from 'jose';
 
 const logger = apiLogger.child({ route: '/api/v1/credentials/verify' });
 
 const HEX_64 = /^[a-f0-9]{64}$/i;
+const JWT_PREFIX = 'data:application/vc+jwt,';
 const DEFAULT_MAX_CREDENTIAL_SIZE = 10_485_760; // 10 MB
 
 function getMaxCredentialSize(): number {
@@ -110,7 +111,7 @@ function getMaxCredentialSize(): number {
  *                     - HASH_MISMATCH
  *                     - UNSUPPORTED_CREDENTIAL_TYPE
  *       502:
- *         description: Upstream storage error
+ *         description: Upstream service error
  *         content:
  *           application/json:
  *             schema:
@@ -120,7 +121,7 @@ function getMaxCredentialSize(): number {
  *                   type: string
  *                 code:
  *                   type: string
- *                   enum: [UPSTREAM_ERROR]
+ *                   enum: [UPSTREAM_ERROR, VC_SERVICE_ERROR]
  *       500:
  *         description: Server error (e.g. system VC service not configured)
  *         content:
@@ -220,11 +221,10 @@ export const POST = withPublicRoute(async (req) => {
 
   // ── Step 3: Detect and handle encryption ───────────────────────────
   logger.info('Detecting credential encryption');
-  const isEncrypted = isEncryptedEnvelope(fetchedData);
 
   let credential: Record<string, unknown>;
 
-  if (isEncrypted) {
+  if (isEncryptedEnvelope(fetchedData)) {
     if (!body.decryptionKey) {
       logger.info('Encrypted credential but no decryption key provided');
       return NextResponse.json(
@@ -234,14 +234,13 @@ export const POST = withPublicRoute(async (req) => {
     }
 
     logger.info('Decrypting credential');
-    const encrypted = fetchedData as { cipherText: string; iv: string; tag: string; type: string };
     try {
       const decryptedString = decryptCredential({
-        cipherText: encrypted.cipherText,
+        cipherText: fetchedData.cipherText,
         key: body.decryptionKey,
-        iv: encrypted.iv,
-        tag: encrypted.tag,
-        type: encrypted.type as EncryptionAlgorithm,
+        iv: fetchedData.iv,
+        tag: fetchedData.tag,
+        type: fetchedData.type,
       });
       credential = JSON.parse(decryptedString);
     } catch (e: unknown) {
@@ -282,7 +281,19 @@ export const POST = withPublicRoute(async (req) => {
   const { service: vcService } = await resolveVcService(SYSTEM_TENANT_ID);
 
   logger.info('Verifying credential');
-  const result = await vcService.verify(credential as unknown as EnvelopedVerifiableCredential);
+  let result: VerifyResult;
+  try {
+    result = await vcService.verify(credential as unknown as EnvelopedVerifiableCredential);
+  } catch (e: unknown) {
+    if (e instanceof VcVerifyError) {
+      logger.error({ err: e }, 'VC service verification failed');
+      return NextResponse.json(
+        { error: 'Credential verification service failed', code: 'VC_SERVICE_ERROR' },
+        { status: 502 },
+      );
+    }
+    throw e;
+  }
 
   // ── Step 7: Decode JWT from enveloped credential ───────────────────
   const warnings: string[] = [];
@@ -293,12 +304,12 @@ export const POST = withPublicRoute(async (req) => {
   if (typeof credentialId !== 'string') {
     logger.warn({ credentialIdType: typeof credentialId }, 'Credential id is not a string');
     warnings.push('Credential id is not a string; unable to decode JWT');
-  } else if (!credentialId.startsWith('data:application/vc+jwt,')) {
+  } else if (!credentialId.startsWith(JWT_PREFIX)) {
     logger.warn('Credential id does not use the expected data:application/vc+jwt media type');
     warnings.push('Credential id does not use the expected data:application/vc+jwt media type');
   } else {
     try {
-      const jwt = credentialId.replace('data:application/vc+jwt,', '');
+      const jwt = credentialId.substring(JWT_PREFIX.length);
       decodedCredential = decodeJwt(jwt) as unknown as Record<string, unknown>;
     } catch (e: unknown) {
       logger.warn({ err: e }, 'Failed to decode JWT from enveloped credential');

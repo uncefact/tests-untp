@@ -258,9 +258,9 @@ describe('VCKitVerifiableCredentialService', () => {
 
       expect(result).toEqual({ verified: true });
 
-      // Verify the correct request was made
+      // Verify the correct request was made (agent endpoint, not v2 API)
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://vckit.example.com/credentials/verify',
+        'https://vckit.example.com/agent/routeVerificationCredential',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({

@@ -50,11 +50,15 @@ jest.mock('@/lib/services/resolve-vc-service', () => ({
   resolveVcService: (...args: unknown[]) => mockResolveVcService(...args),
 }));
 
-jest.mock('@uncefact/untp-ri-services', () => ({
-  computeHash: (...args: unknown[]) => mockComputeHash(...args),
-  decryptCredential: (...args: unknown[]) => mockDecryptCredential(...args),
-  isEncryptedEnvelope: (...args: unknown[]) => mockIsEncryptedEnvelope(...args),
-}));
+jest.mock('@uncefact/untp-ri-services', () => {
+  const actual = jest.requireActual('@uncefact/untp-ri-services');
+  return {
+    computeHash: (...args: unknown[]) => mockComputeHash(...args),
+    decryptCredential: (...args: unknown[]) => mockDecryptCredential(...args),
+    isEncryptedEnvelope: (...args: unknown[]) => mockIsEncryptedEnvelope(...args),
+    VcVerifyError: actual.VcVerifyError,
+  };
+});
 
 jest.mock('jose', () => ({
   decodeJwt: (...args: unknown[]) => mockDecodeJwt(...args),
@@ -463,6 +467,18 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(res.status).toBe(500);
     const json = await res.json();
     expect(json.error).toContain('No service instance available');
+  });
+
+  it('returns 502 when VC service returns an error during verification', async () => {
+    const { VcVerifyError } = jest.requireActual('@uncefact/untp-ri-services');
+    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockVcService.verify.mockRejectedValue(new VcVerifyError('HTTP 404: Not Found', 404));
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(502);
+    const json = await res.json();
+    expect(json.error).toBe('Credential verification service failed');
+    expect(json.code).toBe('VC_SERVICE_ERROR');
   });
 
   it('returns 500 when vcService.verify() throws unexpectedly', async () => {
