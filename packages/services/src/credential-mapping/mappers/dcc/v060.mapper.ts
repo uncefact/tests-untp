@@ -1,15 +1,12 @@
-import type { IdentifierScheme } from '../../verifiable-credential/types.js';
+import type { IdentifierScheme } from '../../../verifiable-credential/types.js';
 import type {
   ICredentialMapper,
-  ICvcAwareMapper,
   ResolvedEntities,
   ExtractedIdentifierRefs,
-  ExtractedCvcRefs,
   DataModelConfig,
   MapperOutput,
-} from '../types.js';
-import type { CredentialPayload } from '../../verifiable-credential/types.js';
-import { buildIdentifierScheme, buildParty, buildContextAndTypes } from './shared-v061.js';
+} from '../../types.js';
+import { buildIdentifierScheme, buildParty, buildContextAndTypes } from '../shared/v060.js';
 
 type DccParty = ReturnType<typeof buildParty>;
 
@@ -46,7 +43,7 @@ type DccAssessment = {
   assessedOrganisation?: DccParty;
 };
 
-export class DccV061Mapper implements ICredentialMapper, ICvcAwareMapper {
+export class DccV060Mapper implements ICredentialMapper {
   async buildPayload(entities: ResolvedEntities, config: DataModelConfig): Promise<MapperOutput> {
     const { organisation, facility, product } = entities;
     const { contexts, types } = buildContextAndTypes(config);
@@ -163,36 +160,5 @@ export class DccV061Mapper implements ICredentialMapper, ICvcAwareMapper {
       refs.product?.registeredId ?? refs.facility?.registeredId ?? refs.organisation?.registeredId;
 
     return refs;
-  }
-
-  extractCvcRefs(credentialPayload: CredentialPayload): ExtractedCvcRefs {
-    const subject = Array.isArray(credentialPayload.credentialSubject)
-      ? credentialPayload.credentialSubject[0]
-      : credentialPayload.credentialSubject;
-    if (!subject) return { criteriaUrls: [] };
-
-    // scope.id → scopeUrl
-    const scope = subject.scope as { id?: string } | undefined;
-    const scopeUrl = scope?.id;
-
-    // assessment[].assessmentCriteria[].id → criteriaUrls (flattened, deduplicated)
-    const criteriaUrls: string[] = [];
-    const seen = new Set<string>();
-    const assessments = subject.assessment as Array<Record<string, unknown>> | undefined;
-    if (Array.isArray(assessments)) {
-      for (const assessment of assessments) {
-        const criteria = assessment.assessmentCriteria as Array<{ id?: string }> | undefined;
-        if (Array.isArray(criteria)) {
-          for (const criterion of criteria) {
-            if (criterion.id && !seen.has(criterion.id)) {
-              seen.add(criterion.id);
-              criteriaUrls.push(criterion.id);
-            }
-          }
-        }
-      }
-    }
-
-    return { ...(scopeUrl ? { scopeUrl } : {}), criteriaUrls };
   }
 }

@@ -1,4 +1,4 @@
-import type { IdentifierScheme } from '../../verifiable-credential/types.js';
+import type { IdentifierScheme } from '../../../verifiable-credential/types.js';
 import type {
   ICredentialMapper,
   ResolvedEntities,
@@ -6,19 +6,30 @@ import type {
   DataModelConfig,
   MapperOutput,
   UntpLocation,
-} from '../types.js';
-import { buildIdentifierScheme, buildParty, buildContextAndTypes } from './shared-v061.js';
+} from '../../types.js';
+import { buildIdentifierScheme, buildParty, buildContextAndTypes } from '../shared/v061.js';
 
-type DfrParty = ReturnType<typeof buildParty>;
+type DppProduct = {
+  type: ['Product'];
+  id: string | undefined;
+  name: string | undefined;
+  description?: string;
+  registeredId?: string;
+  idScheme?: IdentifierScheme;
+  batchNumber?: string;
+  serialNumber?: string;
+  producedByParty: ReturnType<typeof buildParty>;
+  producedAtFacility: DppFacility;
+};
 
-type DfrLocation = {
+type DppLocation = {
   type: ['Location'];
   plusCode?: string;
   geoLocation?: unknown;
   geoBoundary?: unknown;
 };
 
-type DfrAddress = {
+type DppAddress = {
   type: ['Address'];
   streetAddress?: string;
   postalCode?: string;
@@ -27,41 +38,57 @@ type DfrAddress = {
   addressCountry?: string;
 };
 
-type DfrFacility = {
-  type: ['Facility'];
+type DppFacility = {
   id: string | undefined;
   name: string | undefined;
   description?: string;
   registeredId?: string;
   idScheme?: IdentifierScheme;
-  operatedByParty: DfrParty;
-  locationInformation?: DfrLocation;
-  address?: DfrAddress;
+  locationInformation?: DppLocation;
+  address?: DppAddress;
 };
 
-export class DfrV061Mapper implements ICredentialMapper {
+export class DppV061Mapper implements ICredentialMapper {
   async buildPayload(entities: ResolvedEntities, config: DataModelConfig): Promise<MapperOutput> {
-    const { organisation, facility } = entities;
+    const { organisation, facility, product } = entities;
     const { contexts, types } = buildContextAndTypes(config);
 
     return {
       '@context': contexts,
       type: types,
       credentialSubject: {
-        type: ['FacilityRecord'],
-        facility: this.buildFacility(facility, organisation),
+        type: ['ProductPassport'],
+        product: this.buildProduct(product, organisation, facility),
+        ...(product?.level && { granularityLevel: product.level.toLowerCase() }),
       },
     };
   }
 
-  private buildFacility(
-    facility: ResolvedEntities['facility'],
+  private buildProduct(
+    product: ResolvedEntities['product'],
     organisation: ResolvedEntities['organisation'],
-  ): DfrFacility {
+    facility: ResolvedEntities['facility'],
+  ): DppProduct {
+    return {
+      type: ['Product'],
+      id: product?.id,
+      name: product?.name,
+      ...(product?.description && { description: product.description }),
+      ...(product?.primaryIdentifier && {
+        registeredId: product.primaryIdentifier.value,
+        idScheme: buildIdentifierScheme(product.primaryIdentifier.scheme),
+      }),
+      ...(product?.batchNumber && { batchNumber: product.batchNumber }),
+      ...(product?.serialNumber && { serialNumber: product.serialNumber }),
+      producedByParty: buildParty(organisation),
+      producedAtFacility: this.buildFacility(facility),
+    };
+  }
+
+  private buildFacility(facility: ResolvedEntities['facility']): DppFacility {
     const location = facility?.location;
 
     return {
-      type: ['Facility'],
       id: facility?.id,
       name: facility?.name,
       ...(facility?.description && { description: facility.description }),
@@ -69,7 +96,6 @@ export class DfrV061Mapper implements ICredentialMapper {
         registeredId: facility.primaryIdentifier.value,
         idScheme: buildIdentifierScheme(facility.primaryIdentifier.scheme),
       }),
-      operatedByParty: buildParty(organisation),
       ...(location?.geoLocation || location?.plusCode || location?.geoBoundary
         ? {
             locationInformation: {
@@ -99,18 +125,26 @@ export class DfrV061Mapper implements ICredentialMapper {
     const subject = payload.credentialSubject;
     if (!subject) return {};
 
-    const facility = subject.facility as DfrFacility | undefined;
-    if (!facility) return {};
+    const product = subject.product as DppProduct | undefined;
+    if (!product) return {};
 
     const refs: ExtractedIdentifierRefs = {};
 
-    if (facility.registeredId) {
-      refs.primaryIdentifier = facility.registeredId;
-      refs.facility = { registeredId: facility.registeredId };
+    if (product.registeredId) {
+      refs.primaryIdentifier = product.registeredId;
+      refs.product = {
+        registeredId: product.registeredId,
+        ...(product.batchNumber ? { batchNumber: product.batchNumber } : {}),
+        ...(product.serialNumber ? { serialNumber: product.serialNumber } : {}),
+      };
     }
 
-    if (facility.operatedByParty?.registeredId) {
-      refs.organisation = { registeredId: facility.operatedByParty.registeredId };
+    if (product.producedByParty?.registeredId) {
+      refs.organisation = { registeredId: product.producedByParty.registeredId };
+    }
+
+    if (product.producedAtFacility?.registeredId) {
+      refs.facility = { registeredId: product.producedAtFacility.registeredId };
     }
 
     return refs;

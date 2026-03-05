@@ -4,8 +4,8 @@ import type {
   ExtractedIdentifierRefs,
   DataModelConfig,
   MapperOutput,
-} from '../types.js';
-import { buildContextAndTypes } from './shared-v061.js';
+} from '../../types.js';
+import { buildContextAndTypes } from '../shared/v061.js';
 
 type DteItem = {
   type: ['Item'];

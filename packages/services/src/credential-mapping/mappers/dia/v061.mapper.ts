@@ -4,8 +4,8 @@ import type {
   ExtractedIdentifierRefs,
   DataModelConfig,
   MapperOutput,
-} from '../types.js';
-import { buildIdentifierScheme, buildContextAndTypes } from './shared-v061.js';
+} from '../../types.js';
+import { buildIdentifierScheme, buildContextAndTypes } from '../shared/v061.js';
 
 export class DiaV061Mapper implements ICredentialMapper {
   async buildPayload(entities: ResolvedEntities, config: DataModelConfig): Promise<MapperOutput> {

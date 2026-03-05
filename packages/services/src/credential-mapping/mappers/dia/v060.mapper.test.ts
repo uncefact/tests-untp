@@ -1,5 +1,5 @@
-import { DiaV061Mapper } from './dia-v061.mapper';
-import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
+import { DiaV060Mapper } from './v060.mapper';
+import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../../types';
 
 // -- Mock data model configs --------------------------------------------------
 
@@ -30,8 +30,8 @@ const mockOrganisation: ResolvedEntities['organisation'] = {
 
 // -- Tests --------------------------------------------------------------------
 
-describe('DiaV061Mapper', () => {
-  const mapper = new DiaV061Mapper();
+describe('DiaV060Mapper', () => {
+  const mapper = new DiaV060Mapper();
   const coreConfig: DataModelConfig = { core: mockCoreDataModel };
 
   const fullEntities: ResolvedEntities = {

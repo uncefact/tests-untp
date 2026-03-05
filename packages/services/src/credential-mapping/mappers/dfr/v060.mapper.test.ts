@@ -1,5 +1,5 @@
-import { DfrV061Mapper } from './dfr-v061.mapper';
-import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
+import { DfrV060Mapper } from './v060.mapper';
+import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../../types';
 
 // -- Mock data model configs --------------------------------------------------
 
@@ -54,8 +54,8 @@ const mockFacility: ResolvedEntities['facility'] = {
 
 // -- Tests --------------------------------------------------------------------
 
-describe('DfrV061Mapper', () => {
-  const mapper = new DfrV061Mapper();
+describe('DfrV060Mapper', () => {
+  const mapper = new DfrV060Mapper();
   const coreConfig: DataModelConfig = { core: mockCoreDataModel };
 
   const fullEntities: ResolvedEntities = {

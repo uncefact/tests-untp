@@ -1,5 +1,5 @@
-import { DppV061Mapper } from './dpp-v061.mapper';
-import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
+import { DppV060Mapper } from './v060.mapper';
+import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../../types';
 
 // -- Mock data model configs --------------------------------------------------
 
@@ -70,8 +70,8 @@ const mockProduct: ResolvedEntities['product'] = {
 
 // -- Tests --------------------------------------------------------------------
 
-describe('DppV061Mapper', () => {
-  const mapper = new DppV061Mapper();
+describe('DppV060Mapper', () => {
+  const mapper = new DppV060Mapper();
   const coreConfig: DataModelConfig = { core: mockCoreDataModel };
 
   const fullEntities: ResolvedEntities = {

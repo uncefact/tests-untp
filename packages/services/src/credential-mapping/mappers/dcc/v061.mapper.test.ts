@@ -1,6 +1,6 @@
-import { DccV061Mapper } from './dcc-v061.mapper';
-import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
-import type { CredentialPayload } from '../../verifiable-credential/types';
+import { DccV061Mapper } from './v061.mapper';
+import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../../types';
+import type { CredentialPayload } from '../../../verifiable-credential/types';
 
 // -- Mock data model configs --------------------------------------------------
 

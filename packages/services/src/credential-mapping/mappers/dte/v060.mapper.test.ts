@@ -1,5 +1,5 @@
-import { DteV061Mapper } from './dte-v061.mapper';
-import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
+import { DteV060Mapper } from './v060.mapper';
+import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../../types';
 
 // -- Mock data model configs --------------------------------------------------
 
@@ -28,8 +28,8 @@ const mockProduct: ResolvedEntities['product'] = {
 
 // -- Tests --------------------------------------------------------------------
 
-describe('DteV061Mapper', () => {
-  const mapper = new DteV061Mapper();
+describe('DteV060Mapper', () => {
+  const mapper = new DteV060Mapper();
   const coreConfig: DataModelConfig = { core: mockCoreDataModel };
 
   const fullEntities: ResolvedEntities = {
