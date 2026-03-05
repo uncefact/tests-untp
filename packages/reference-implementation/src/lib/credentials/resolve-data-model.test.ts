@@ -66,7 +66,7 @@ describe('resolveDataModel', () => {
   });
 
   it('resolves core data model, mapper, and schema URLs', async () => {
-    mockListDataModels.mockResolvedValue([CORE_DATA_MODEL]);
+    mockListDataModels.mockResolvedValue({ data: [CORE_DATA_MODEL], total: 1 });
     mockGetMapper.mockReturnValue(MOCK_MAPPER);
 
     const result = await resolveDataModel('tenant-1', 'DigitalProductPassport', '0.6.1');
@@ -84,7 +84,7 @@ describe('resolveDataModel', () => {
   });
 
   it('infers mapper from parent config for extension data models', async () => {
-    mockListDataModels.mockResolvedValue([EXTENSION_DATA_MODEL]);
+    mockListDataModels.mockResolvedValue({ data: [EXTENSION_DATA_MODEL], total: 1 });
     mockGetMapper.mockReturnValue(MOCK_MAPPER);
 
     const result = await resolveDataModel('tenant-1', 'DigitalProductPassport', '0.6.1');
@@ -94,7 +94,7 @@ describe('resolveDataModel', () => {
   });
 
   it('returns core + extension schema URLs for extension data models', async () => {
-    mockListDataModels.mockResolvedValue([EXTENSION_DATA_MODEL]);
+    mockListDataModels.mockResolvedValue({ data: [EXTENSION_DATA_MODEL], total: 1 });
     mockGetMapper.mockReturnValue(MOCK_MAPPER);
 
     const result = await resolveDataModel('tenant-1', 'DigitalProductPassport', '0.6.1');
@@ -106,7 +106,7 @@ describe('resolveDataModel', () => {
   });
 
   it('throws ValidationError when no data model found', async () => {
-    mockListDataModels.mockResolvedValue([]);
+    mockListDataModels.mockResolvedValue({ data: [], total: 0 });
 
     await expect(resolveDataModel('tenant-1', 'DigitalProductPassport', '0.6.1')).rejects.toThrow(ValidationError);
 
@@ -116,7 +116,7 @@ describe('resolveDataModel', () => {
   });
 
   it('throws ValidationError when no mapper found', async () => {
-    mockListDataModels.mockResolvedValue([CORE_DATA_MODEL]);
+    mockListDataModels.mockResolvedValue({ data: [CORE_DATA_MODEL], total: 1 });
     mockGetMapper.mockReturnValue(undefined);
 
     await expect(resolveDataModel('tenant-1', 'DigitalProductPassport', '0.6.1')).rejects.toThrow(ValidationError);

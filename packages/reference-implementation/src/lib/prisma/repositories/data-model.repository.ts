@@ -123,7 +123,7 @@ export async function getDataModelById(id: string, tenantId: string): Promise<Da
 export async function listDataModels(
   tenantId: string,
   options: ListDataModelOptions = {},
-): Promise<DataModelWithRelations[]> {
+): Promise<{ data: DataModelWithRelations[]; total: number }> {
   const { isExtension, credentialType, version, limit, offset } = options;
 
   const where: Prisma.DataModelWhereInput = {
@@ -142,13 +142,18 @@ export async function listDataModels(
     where.version = version;
   }
 
-  return prisma.dataModel.findMany({
-    where,
-    include: DATA_MODEL_INCLUDE,
-    take: limit ?? 100,
-    skip: offset,
-    orderBy: { createdAt: 'desc' },
-  });
+  const [data, total] = await prisma.$transaction([
+    prisma.dataModel.findMany({
+      where,
+      include: DATA_MODEL_INCLUDE,
+      take: limit ?? 20,
+      skip: offset,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.dataModel.count({ where }),
+  ]);
+
+  return { data, total };
 }
 
 /**
@@ -188,8 +193,8 @@ export async function updateDataModel(
  * Only tenant-owned extension configs can be deleted.
  * System-provisioned and core configs cannot be removed by tenants.
  */
-export async function deleteDataModel(id: string, tenantId: string): Promise<DataModelWithRelations> {
-  return prisma.$transaction(async (tx) => {
+export async function deleteDataModel(id: string, tenantId: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
     const existing = await tx.dataModel.findFirst({
       where: { id, tenantId, isExtension: true },
     });
@@ -198,9 +203,6 @@ export async function deleteDataModel(id: string, tenantId: string): Promise<Dat
       throw new NotFoundError('Data model not found or access denied');
     }
 
-    return tx.dataModel.delete({
-      where: { id },
-      include: DATA_MODEL_INCLUDE,
-    });
+    await tx.dataModel.delete({ where: { id } });
   });
 }

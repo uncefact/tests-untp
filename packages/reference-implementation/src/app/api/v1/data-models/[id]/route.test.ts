@@ -1,3 +1,17 @@
+// Provide a minimal Response constructor for the DELETE handler
+// (jsdom does not expose the Fetch API's Response)
+global.Response = class Response {
+  status: number;
+  body: unknown;
+  constructor(body: unknown, init?: { status?: number }) {
+    this.body = body;
+    this.status = init?.status ?? 200;
+  }
+  json(): never {
+    throw new Error('Response has no body (e.g. 204 No Content)');
+  }
+} as unknown as typeof globalThis.Response;
+
 // Mock next/server before importing route handlers
 jest.mock('next/server', () => ({
   NextResponse: {
@@ -75,8 +89,7 @@ describe('GET /api/v1/data-models/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.dataModel).toEqual(dataModel);
+    expect(json).toEqual(dataModel);
     expect(mockGetDataModelById).toHaveBeenCalledWith('dm-1', 'tenant-1');
   });
 
@@ -121,8 +134,7 @@ describe('PATCH /api/v1/data-models/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.dataModel).toEqual(updated);
+    expect(json).toEqual(updated);
     expect(mockUpdateDataModel).toHaveBeenCalledWith('dm-1', 'tenant-1', {
       name: 'Updated Extension',
     });
@@ -179,6 +191,15 @@ describe('PATCH /api/v1/data-models/:id', () => {
     expect(json.error).toContain('contextUrl must be a non-empty string');
   });
 
+  it('returns 400 when websiteUrl is empty string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { websiteUrl: '' } });
+    const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('websiteUrl must be a non-empty string');
+  });
+
   it('returns 400 for invalid JSON body', async () => {
     const req = {
       method: 'PATCH',
@@ -223,17 +244,13 @@ describe('DELETE /api/v1/data-models/:id', () => {
     jest.clearAllMocks();
   });
 
-  it('deletes the data model and returns it', async () => {
-    const deleted = { id: 'dm-1', name: 'Deleted Extension' };
-    mockDeleteDataModel.mockResolvedValue(deleted);
+  it('deletes the data model and returns 204', async () => {
+    mockDeleteDataModel.mockResolvedValue(undefined);
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('dm-1') as unknown as Parameters<typeof DELETE>[1]);
-    const json = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.dataModel).toEqual(deleted);
+    expect(res.status).toBe(204);
     expect(mockDeleteDataModel).toHaveBeenCalledWith('dm-1', 'tenant-1');
   });
 

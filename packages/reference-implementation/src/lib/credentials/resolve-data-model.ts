@@ -16,7 +16,7 @@ export async function resolveDataModel(
   credentialType: string,
   version: string,
 ): Promise<ResolvedDataModel> {
-  const dataModels = await listDataModels(tenantId, {
+  const { data: dataModels } = await listDataModels(tenantId, {
     credentialType: credentialType as CredentialType,
     version,
   });

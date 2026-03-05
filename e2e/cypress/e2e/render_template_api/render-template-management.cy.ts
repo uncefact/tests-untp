@@ -10,9 +10,7 @@ describe('Render Template API', { testIsolation: false }, () => {
 
     // Find a data model to associate templates with
     cy.request('/api/v1/data-models').then((response) => {
-      const dm = response.body.dataModels.find(
-        (d: any) => !d.isExtension,
-      );
+      const dm = response.body.data.find((d: any) => !d.isExtension);
       if (dm) {
         dataModelId = dm.id;
       }

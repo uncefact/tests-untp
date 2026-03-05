@@ -24,8 +24,14 @@ jest.mock('../prisma', () => ({
       create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
     },
-    $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
+    $transaction: jest.fn((arg: unknown) => {
+      // Batch form: $transaction([promise1, promise2])
+      if (Array.isArray(arg)) return Promise.all(arg);
+      // Interactive form: $transaction(async (tx) => { ... })
+      return (arg as (tx: typeof mockTx) => Promise<unknown>)(mockTx);
+    }),
   },
 }));
 
@@ -37,6 +43,7 @@ const mockDataModel = prisma.dataModel as unknown as {
   create: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
+  count: jest.Mock;
 };
 
 const INCLUDE_SHAPE = {
@@ -226,73 +233,81 @@ describe('data-model.repository', () => {
   describe('listDataModels', () => {
     it('returns system and tenant configs', async () => {
       mockDataModel.findMany.mockResolvedValue([CONFIG_RECORD, EXTENSION_RECORD]);
+      mockDataModel.count.mockResolvedValue(2);
 
       const result = await listDataModels(TENANT_ID);
 
+      const expectedWhere = {
+        OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
+      };
       expect(mockDataModel.findMany).toHaveBeenCalledWith({
-        where: {
-          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
-        },
+        where: expectedWhere,
         include: INCLUDE_SHAPE,
-        take: 100,
+        take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
-      expect(result).toHaveLength(2);
+      expect(mockDataModel.count).toHaveBeenCalledWith({ where: expectedWhere });
+      expect(result.data).toHaveLength(2);
+      expect(result.total).toBe(2);
     });
 
     it('applies isExtension filter', async () => {
       mockDataModel.findMany.mockResolvedValue([CONFIG_RECORD]);
+      mockDataModel.count.mockResolvedValue(1);
 
       await listDataModels(TENANT_ID, { isExtension: false });
 
+      const expectedWhere = expect.objectContaining({ isExtension: false });
       expect(mockDataModel.findMany).toHaveBeenCalledWith({
-        where: expect.objectContaining({
-          isExtension: false,
-        }),
+        where: expectedWhere,
         include: INCLUDE_SHAPE,
-        take: 100,
+        take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
+      expect(mockDataModel.count).toHaveBeenCalledWith({ where: expectedWhere });
     });
 
     it('applies credentialType filter', async () => {
       mockDataModel.findMany.mockResolvedValue([]);
+      mockDataModel.count.mockResolvedValue(0);
 
       await listDataModels(TENANT_ID, {
         credentialType: 'DigitalProductPassport' as never,
       });
 
+      const expectedWhere = expect.objectContaining({ credentialType: 'DigitalProductPassport' });
       expect(mockDataModel.findMany).toHaveBeenCalledWith({
-        where: expect.objectContaining({
-          credentialType: 'DigitalProductPassport',
-        }),
+        where: expectedWhere,
         include: INCLUDE_SHAPE,
-        take: 100,
+        take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
+      expect(mockDataModel.count).toHaveBeenCalledWith({ where: expectedWhere });
     });
 
     it('applies version filter', async () => {
       mockDataModel.findMany.mockResolvedValue([]);
+      mockDataModel.count.mockResolvedValue(0);
 
       await listDataModels(TENANT_ID, { version: '0.6.0' });
 
+      const expectedWhere = expect.objectContaining({ version: '0.6.0' });
       expect(mockDataModel.findMany).toHaveBeenCalledWith({
-        where: expect.objectContaining({
-          version: '0.6.0',
-        }),
+        where: expectedWhere,
         include: INCLUDE_SHAPE,
-        take: 100,
+        take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
+      expect(mockDataModel.count).toHaveBeenCalledWith({ where: expectedWhere });
     });
 
     it('applies pagination', async () => {
       mockDataModel.findMany.mockResolvedValue([]);
+      mockDataModel.count.mockResolvedValue(0);
 
       await listDataModels(TENANT_ID, { limit: 10, offset: 20 });
 
@@ -364,18 +379,16 @@ describe('data-model.repository', () => {
   describe('deleteDataModel', () => {
     it('deletes a tenant-owned extension config', async () => {
       mockTx.dataModel.findFirst.mockResolvedValue(EXTENSION_RECORD);
-      mockTx.dataModel.delete.mockResolvedValue(EXTENSION_RECORD);
+      mockTx.dataModel.delete.mockResolvedValue(undefined);
 
-      const result = await deleteDataModel('config-ext-1', TENANT_ID);
+      await deleteDataModel('config-ext-1', TENANT_ID);
 
       expect(mockTx.dataModel.findFirst).toHaveBeenCalledWith({
         where: { id: 'config-ext-1', tenantId: TENANT_ID, isExtension: true },
       });
       expect(mockTx.dataModel.delete).toHaveBeenCalledWith({
         where: { id: 'config-ext-1' },
-        include: INCLUDE_SHAPE,
       });
-      expect(result).toEqual(EXTENSION_RECORD);
     });
 
     it('throws when config is not tenant-owned', async () => {
