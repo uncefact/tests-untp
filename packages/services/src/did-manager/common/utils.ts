@@ -99,11 +99,13 @@ export function normaliseDidWebAlias(alias: string): string {
  * - Throws if the result is empty
  */
 export function normaliseSelfManagedAlias(alias: string): string {
-  const normalised = alias
-    .toLowerCase()
-    .trim()
-    .replace(/\s+(?=[:.-])/g, '')
-    .replace(/(?<=[:.-])\s+/g, '')
+  // Split on structural characters, trim each segment, then rejoin.
+  // This avoids polynomial regex when stripping whitespace around delimiters.
+  const trimmed = alias.toLowerCase().trim();
+  const tokens = trimmed.split(/([:.-])/);
+  const rejoined = tokens.map((t) => t.trim()).join('');
+
+  const normalised = rejoined
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9.:-]/g, '')
     .replace(/-{2,}/g, '-')
