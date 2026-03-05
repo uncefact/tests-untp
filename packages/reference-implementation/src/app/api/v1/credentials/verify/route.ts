@@ -5,6 +5,7 @@ import { withPublicRoute } from '@/lib/api/with-public-route';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { computeHash, decryptCredential, isEncryptedEnvelope, VcVerifyError } from '@uncefact/untp-ri-services';
+import { validatePublicUrl } from '@uncefact/untp-ri-services/server';
 import type { EnvelopedVerifiableCredential, VerifyResult } from '@uncefact/untp-ri-services';
 import { decodeJwt } from 'jose';
 
@@ -32,6 +33,10 @@ function getMaxCredentialSize(): number {
  *       signature via the system VC service.
  *
  *       This is an unauthenticated endpoint — no bearer token is required.
+ *
+ *       SSRF protection: the URI hostname is resolved via DNS and the
+ *       resolved IP is checked against private/reserved ranges. Set
+ *       `VERIFY_ALLOW_PRIVATE_URLS=true` to bypass (development only).
  *     tags:
  *       - Credentials
  *     security: []
@@ -169,6 +174,17 @@ export const POST = withPublicRoute(async (req) => {
     (typeof body.decryptionKey !== 'string' || !HEX_64.test(body.decryptionKey))
   ) {
     throw new ValidationError('decryptionKey must be a 64-character hex string');
+  }
+
+  // ── SSRF protection: block private/reserved network addresses ──────
+  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+    try {
+      await validatePublicUrl(parsedUri);
+    } catch (e) {
+      throw new ValidationError(
+        e instanceof Error ? e.message : 'uri must not point to a private or reserved network address',
+      );
+    }
   }
 
   // ── Step 2: Fetch credential from storage URI ──────────────────────

@@ -221,12 +221,8 @@ describe('Verify Page', { testIsolation: false }, () => {
 
       cy.contains('Invalid verification link').should('not.exist');
 
-      // The page should display a network/upstream error message
-      cy.get('body', { timeout: 30000 }).then(($body) => {
-        // Ensure loading is finished and an error is shown (not the credential tabs)
-        expect($body.text()).to.not.contain('Verifying the credential');
-        expect($body.text()).to.not.contain('JSON');
-      });
+      // The API returns 502 UPSTREAM_ERROR; the page displays the thrown error
+      cy.contains('UPSTREAM_ERROR', { timeout: 30000 }).should('be.visible');
     });
 
     it('shows error when encrypted credential has no decryptionKey', () => {

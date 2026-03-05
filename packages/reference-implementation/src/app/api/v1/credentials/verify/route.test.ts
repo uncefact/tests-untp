@@ -64,6 +64,11 @@ jest.mock('jose', () => ({
   decodeJwt: (...args: unknown[]) => mockDecodeJwt(...args),
 }));
 
+const mockValidatePublicUrl = jest.fn();
+jest.mock('@uncefact/untp-ri-services/server', () => ({
+  validatePublicUrl: (...args: unknown[]) => mockValidatePublicUrl(...args),
+}));
+
 jest.mock('@/lib/api/logger', () => ({
   apiLogger: { child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }) },
 }));
@@ -142,6 +147,8 @@ describe('POST /api/v1/credentials/verify', () => {
     mockDecodeJwt.mockReturnValue(DECODED_JWT);
     mockComputeHash.mockReturnValue(VALID_HASH);
     mockIsEncryptedEnvelope.mockReturnValue(false);
+    mockValidatePublicUrl.mockResolvedValue(undefined);
+    delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
   });
 
   // ── Input Validation (400s) ───────────────────────────────────────
@@ -193,6 +200,39 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.error).toBe('decryptionKey must be a 64-character hex string');
+  });
+
+  // ── SSRF Protection (400) ────────────────────────────────────────
+
+  it('returns 400 when validatePublicUrl rejects the URI', async () => {
+    mockValidatePublicUrl.mockRejectedValue(new Error('uri must not point to a private or reserved network address'));
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe('uri must not point to a private or reserved network address');
+  });
+
+  it('calls validatePublicUrl with parsed URL', async () => {
+    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockVcService.verify.mockResolvedValue({ verified: true });
+
+    await POST(createFakeRequest({ uri: VALID_URI }));
+
+    expect(mockValidatePublicUrl).toHaveBeenCalledTimes(1);
+    const calledUrl = mockValidatePublicUrl.mock.calls[0][0];
+    expect(calledUrl).toBeInstanceOf(URL);
+    expect(calledUrl.href).toBe(VALID_URI);
+  });
+
+  it('skips validatePublicUrl when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockVcService.verify.mockResolvedValue({ verified: true });
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(200);
+    expect(mockValidatePublicUrl).not.toHaveBeenCalled();
   });
 
   // ── Upstream Errors (502) ─────────────────────────────────────────
