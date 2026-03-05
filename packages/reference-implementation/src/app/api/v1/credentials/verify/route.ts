@@ -4,7 +4,7 @@ import { ValidationError } from '@/lib/api/validation';
 import { withPublicRoute } from '@/lib/api/with-public-route';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
-import { computeHash, decryptCredential } from '@uncefact/untp-ri-services';
+import { computeHash, decryptCredential, isEncryptedEnvelope } from '@uncefact/untp-ri-services';
 import type { EncryptionAlgorithm, EnvelopedVerifiableCredential } from '@uncefact/untp-ri-services';
 import { decodeJwt } from 'jose';
 
@@ -72,6 +72,11 @@ function getMaxCredentialSize(): number {
  *                 decodedCredential:
  *                   type: object
  *                   description: Decoded JWT payload (omitted if decoding fails)
+ *                 warnings:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   description: Non-fatal issues (e.g. JWT decode failure)
  *                 error:
  *                   type: object
  *                   description: Present only when verified is false
@@ -129,12 +134,15 @@ export const POST = withPublicRoute(async (req) => {
   // is fragile across serverless instances.
 
   // ── Step 1: Parse and validate input ────────────────────────────────
+  logger.info('Parsing request body');
   let body: { uri?: string; hash?: string; decryptionKey?: string };
   try {
     body = await req.json();
   } catch {
     throw new ValidationError('Invalid JSON body');
   }
+
+  logger.info({ uri: body.uri }, 'Validating input parameters');
 
   if (!body.uri || typeof body.uri !== 'string') {
     throw new ValidationError('uri is required');
@@ -163,8 +171,6 @@ export const POST = withPublicRoute(async (req) => {
   }
 
   // ── Step 2: Fetch credential from storage URI ──────────────────────
-  // NOTE: Production deployments should consider SSRF protection (e.g., blocking private IP
-  // ranges at the infrastructure/reverse-proxy level).
   logger.info({ uri: body.uri }, 'Fetching credential from storage');
 
   let fetchResponse: Response;
@@ -204,7 +210,7 @@ export const POST = withPublicRoute(async (req) => {
   let fetchedData: unknown;
   try {
     fetchedData = JSON.parse(responseText);
-  } catch (e: unknown) {
+  } catch {
     logger.warn({ uri: body.uri }, 'Storage URI returned non-JSON response');
     return NextResponse.json(
       { error: 'Response from storage URI is not valid JSON', code: 'INVALID_RESPONSE' },
@@ -213,13 +219,8 @@ export const POST = withPublicRoute(async (req) => {
   }
 
   // ── Step 3: Detect and handle encryption ───────────────────────────
-  const isEncrypted =
-    typeof fetchedData === 'object' &&
-    fetchedData !== null &&
-    'cipherText' in fetchedData &&
-    'iv' in fetchedData &&
-    'tag' in fetchedData &&
-    'type' in fetchedData;
+  logger.info('Detecting credential encryption');
+  const isEncrypted = isEncryptedEnvelope(fetchedData);
 
   let credential: Record<string, unknown>;
 
@@ -266,6 +267,7 @@ export const POST = withPublicRoute(async (req) => {
   }
 
   // ── Step 5: Validate credential type ───────────────────────────────
+  logger.info({ credentialType: credential.type }, 'Validating credential type');
   const types = Array.isArray(credential.type) ? credential.type : [credential.type];
   if (!types.includes('EnvelopedVerifiableCredential')) {
     logger.warn({ uri: body.uri, credentialType: credential.type }, 'Unsupported credential type');
@@ -283,29 +285,40 @@ export const POST = withPublicRoute(async (req) => {
   const result = await vcService.verify(credential as unknown as EnvelopedVerifiableCredential);
 
   // ── Step 7: Decode JWT from enveloped credential ───────────────────
+  const warnings: string[] = [];
   let decodedCredential: Record<string, unknown> | undefined;
-  try {
-    const jwt = (credential.id as string).replace('data:application/vc+jwt,', '');
-    decodedCredential = decodeJwt(jwt) as unknown as Record<string, unknown>;
-  } catch (e: unknown) {
-    logger.warn({ err: e }, 'Failed to decode JWT from enveloped credential');
+
+  logger.info('Decoding JWT from enveloped credential');
+  const credentialId = credential.id;
+  if (typeof credentialId !== 'string') {
+    logger.warn({ credentialIdType: typeof credentialId }, 'Credential id is not a string');
+    warnings.push('Credential id is not a string; unable to decode JWT');
+  } else if (!credentialId.startsWith('data:application/vc+jwt,')) {
+    logger.warn('Credential id does not use the expected data:application/vc+jwt media type');
+    warnings.push('Credential id does not use the expected data:application/vc+jwt media type');
+  } else {
+    try {
+      const jwt = credentialId.replace('data:application/vc+jwt,', '');
+      decodedCredential = decodeJwt(jwt) as unknown as Record<string, unknown>;
+    } catch (e: unknown) {
+      logger.warn({ err: e }, 'Failed to decode JWT from enveloped credential');
+      warnings.push('Failed to decode JWT from enveloped credential');
+    }
   }
 
   // ── Step 8: Return result ──────────────────────────────────────────
-  if (result.verified) {
-    logger.info('Credential verification passed');
-    return NextResponse.json({
-      verified: true,
-      credential,
-      ...(decodedCredential && { decodedCredential }),
-    });
-  }
+  logger.info({ verified: result.verified }, 'Credential verification complete');
 
-  logger.info({ errorType: result.error?.type }, 'Credential verification failed');
-  return NextResponse.json({
-    verified: false,
-    error: result.error,
+  const responseBody: Record<string, unknown> = {
+    verified: result.verified,
     credential,
     ...(decodedCredential && { decodedCredential }),
-  });
+    ...(warnings.length > 0 && { warnings }),
+  };
+
+  if (!result.verified) {
+    responseBody.error = result.error;
+  }
+
+  return NextResponse.json(responseBody, { status: 200 });
 });

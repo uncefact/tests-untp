@@ -42,6 +42,7 @@ export type { EncryptedEnvelope, IEncryptionService } from './encryption/encrypt
 export { computeHash, HashAlgorithm } from './encryption/compute-hash.js';
 export { decryptCredential } from './encryption/decrypt-credential.js';
 export type { DecryptionParams } from './encryption/decrypt-credential.js';
+export { isEncryptedEnvelope } from './encryption/is-encrypted-envelope.js';
 export type { IKeyGenerator, IKeyStore } from './key-provider/key-provider.interface.js';
 export { LocalKeyGenerator } from './key-provider/adapters/local/local.adapter.js';
 

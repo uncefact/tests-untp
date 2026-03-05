@@ -43,6 +43,7 @@ jest.mock('@/lib/api/with-public-route', () => {
 const mockResolveVcService = jest.fn();
 const mockComputeHash = jest.fn();
 const mockDecryptCredential = jest.fn();
+const mockIsEncryptedEnvelope = jest.fn();
 const mockDecodeJwt = jest.fn();
 
 jest.mock('@/lib/services/resolve-vc-service', () => ({
@@ -52,6 +53,7 @@ jest.mock('@/lib/services/resolve-vc-service', () => ({
 jest.mock('@uncefact/untp-ri-services', () => ({
   computeHash: (...args: unknown[]) => mockComputeHash(...args),
   decryptCredential: (...args: unknown[]) => mockDecryptCredential(...args),
+  isEncryptedEnvelope: (...args: unknown[]) => mockIsEncryptedEnvelope(...args),
 }));
 
 jest.mock('jose', () => ({
@@ -135,6 +137,7 @@ describe('POST /api/v1/credentials/verify', () => {
     mockResolveVcService.mockResolvedValue({ service: mockVcService, instanceId: 'inst-1' });
     mockDecodeJwt.mockReturnValue(DECODED_JWT);
     mockComputeHash.mockReturnValue(VALID_HASH);
+    mockIsEncryptedEnvelope.mockReturnValue(false);
   });
 
   // ── Input Validation (400s) ───────────────────────────────────────
@@ -270,6 +273,7 @@ describe('POST /api/v1/credentials/verify', () => {
 
   it('returns 422 when credential is encrypted but no decryption key provided', async () => {
     mockFetch.mockResolvedValue(createFetchResponse(ENCRYPTED_DATA));
+    mockIsEncryptedEnvelope.mockReturnValue(true);
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(422);
@@ -280,6 +284,7 @@ describe('POST /api/v1/credentials/verify', () => {
 
   it('returns 422 when decryption fails', async () => {
     mockFetch.mockResolvedValue(createFetchResponse(ENCRYPTED_DATA));
+    mockIsEncryptedEnvelope.mockReturnValue(true);
     mockDecryptCredential.mockImplementation(() => {
       throw new Error('decryption failure');
     });
@@ -293,6 +298,7 @@ describe('POST /api/v1/credentials/verify', () => {
 
   it('returns 422 when decrypted output is not valid JSON', async () => {
     mockFetch.mockResolvedValue(createFetchResponse(ENCRYPTED_DATA));
+    mockIsEncryptedEnvelope.mockReturnValue(true);
     mockDecryptCredential.mockReturnValue('not-valid-json{{{');
 
     const res = await POST(createFakeRequest({ uri: VALID_URI, decryptionKey: VALID_KEY }));
@@ -336,6 +342,7 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.credential).toEqual(ENVELOPED_CREDENTIAL);
     expect(json.decodedCredential).toEqual(DECODED_JWT);
     expect(json.error).toBeUndefined();
+    expect(json.warnings).toBeUndefined();
   });
 
   it('returns verified: false with error details when verification fails', async () => {
@@ -372,7 +379,7 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(mockComputeHash).not.toHaveBeenCalled();
   });
 
-  it('omits decodedCredential when JWT decode fails', async () => {
+  it('omits decodedCredential and adds warning when JWT decode fails', async () => {
     mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
     mockVcService.verify.mockResolvedValue({ verified: true });
     mockDecodeJwt.mockImplementation(() => {
@@ -383,6 +390,31 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.verified).toBe(true);
+    expect(json.decodedCredential).toBeUndefined();
+    expect(json.warnings).toEqual(['Failed to decode JWT from enveloped credential']);
+  });
+
+  it('adds warning when credential.id is not a string', async () => {
+    const credNoId = { ...ENVELOPED_CREDENTIAL, id: 42 };
+    mockFetch.mockResolvedValue(createFetchResponse(credNoId));
+    mockVcService.verify.mockResolvedValue({ verified: true });
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.warnings).toEqual(['Credential id is not a string; unable to decode JWT']);
+    expect(json.decodedCredential).toBeUndefined();
+  });
+
+  it('adds warning when credential.id does not start with data:application/vc+jwt,', async () => {
+    const credBadId = { ...ENVELOPED_CREDENTIAL, id: 'urn:uuid:123' };
+    mockFetch.mockResolvedValue(createFetchResponse(credBadId));
+    mockVcService.verify.mockResolvedValue({ verified: true });
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.warnings).toEqual(['Credential id does not use the expected data:application/vc+jwt media type']);
     expect(json.decodedCredential).toBeUndefined();
   });
 
