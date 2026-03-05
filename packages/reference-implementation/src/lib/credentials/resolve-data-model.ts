@@ -10,7 +10,7 @@ export type ResolvedDataModel = {
   schemaUrls: string[];
 };
 
-export function isDccDataModel(dataModel: DataModelWithRelations): boolean {
+export function isDccDataModel(dataModel: DataModelListItem): boolean {
   return (
     dataModel.credentialType === 'DigitalConformityCredential' ||
     (dataModel.isExtension === true && dataModel.parentConfig?.credentialType === 'DigitalConformityCredential')
