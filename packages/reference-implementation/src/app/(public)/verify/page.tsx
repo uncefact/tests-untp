@@ -37,8 +37,8 @@ const Verify = () => {
             uri = parsed?.payload?.uri;
             hash = parsed?.payload?.hash;
             decryptionKey = parsed?.payload?.key;
-          } catch {
-            // Malformed JSON in q param
+          } catch (e) {
+            console.error('Failed to parse legacy ?q= parameter:', e);
           }
         }
       }

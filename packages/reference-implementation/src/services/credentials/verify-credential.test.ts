@@ -64,10 +64,12 @@ describe('verifyCredential', () => {
     const result = await verifyCredential({ uri: 'https://example.com/cred' });
 
     expect(result.verified).toBe(false);
-    expect(result.error).toEqual({
-      type: 'INVALID_SIGNATURE',
-      message: 'Signature verification failed',
-    });
+    if (!result.verified) {
+      expect(result.error).toEqual({
+        type: 'INVALID_SIGNATURE',
+        message: 'Signature verification failed',
+      });
+    }
   });
 
   it('throws on 400 validation error', async () => {
@@ -77,7 +79,7 @@ describe('verifyCredential', () => {
       json: async () => ({ error: 'uri is required' }),
     });
 
-    await expect(verifyCredential({ uri: '' })).rejects.toThrow('uri is required');
+    await expect(verifyCredential({ uri: 'https://example.com/cred' })).rejects.toThrow('uri is required');
   });
 
   it('throws on 422 processing error with code', async () => {
@@ -139,6 +141,25 @@ describe('verifyCredential', () => {
 
     await expect(verifyCredential({ uri: 'https://example.com/cred' })).rejects.toThrow(
       'Verification request failed with status 502',
+    );
+  });
+
+  it('throws when uri is empty', async () => {
+    await expect(verifyCredential({ uri: '' })).rejects.toThrow('uri is required');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('throws when success response is not valid JSON', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new SyntaxError('Unexpected token');
+      },
+    });
+
+    await expect(verifyCredential({ uri: 'https://example.com/cred' })).rejects.toThrow(
+      'Received an invalid response from the verification service',
     );
   });
 
