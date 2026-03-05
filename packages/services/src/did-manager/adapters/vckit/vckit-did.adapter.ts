@@ -69,13 +69,20 @@ export class VCKitDidAdapter implements IDidService {
   async create(options: CreateDidOptions): Promise<DidRecord> {
     const provider = toProviderString(options.method);
 
-    // Extract host from baseURL for did:web alias prefixing
-    const url = new URL(this.baseURL);
-    const host = url.port && url.port !== '443' && url.port !== '80' ? `${url.hostname}%3A${url.port}` : url.hostname;
-    const prefixedAlias = `${host}:${options.alias}`;
+    // For MANAGED DIDs, prefix the alias with the VCKit host (VCKit hosts the
+    // DID document). For SELF_MANAGED DIDs, use the alias as-is because the
+    // user hosts their own DID document at their own domain.
+    let resolvedAlias: string;
+    if (options.type === DidType.SELF_MANAGED) {
+      resolvedAlias = options.alias;
+    } else {
+      const url = new URL(this.baseURL);
+      const host = url.port && url.port !== '443' && url.port !== '80' ? `${url.hostname}%3A${url.port}` : url.hostname;
+      resolvedAlias = `${host}:${options.alias}`;
+    }
 
     const payload = {
-      alias: prefixedAlias,
+      alias: resolvedAlias,
       provider,
       kms: 'local',
       options: { keyType: this.keyType },
