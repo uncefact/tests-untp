@@ -59,16 +59,41 @@ export async function createServiceInstance(input: CreateServiceInstanceInput): 
 }
 
 /**
+ * When a system default service instance has isPrimary true but the tenant
+ * has set their own primary for the same serviceType, the system instance's
+ * isPrimary should appear as false for that tenant.
+ */
+async function applyTenantPrimaryOverride(
+  instance: ServiceInstance | null,
+  tenantId: string,
+): Promise<ServiceInstance | null> {
+  if (!instance || instance.tenantId !== SYSTEM_TENANT_ID || !instance.isPrimary) return instance;
+
+  const tenantPrimary = await prisma.serviceInstance.findFirst({
+    where: {
+      tenantId,
+      serviceType: instance.serviceType,
+      isPrimary: true,
+    },
+  });
+
+  return tenantPrimary ? { ...instance, isPrimary: false } : instance;
+}
+
+/**
  * Gets a service instance by ID. Returns it if owned by the specified
  * org or if it's a system default.
+ * If the fetched instance is a system default, applies tenant primary override.
  */
 export async function getServiceInstanceById(id: string, tenantId: string): Promise<ServiceInstance | null> {
-  return prisma.serviceInstance.findFirst({
+  const instance = await prisma.serviceInstance.findFirst({
     where: {
       id,
       OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
     },
   });
+
+  return applyTenantPrimaryOverride(instance, tenantId);
 }
 
 /**
@@ -92,7 +117,7 @@ export async function listServiceInstances(
     where.adapterType = adapterType as AdapterType;
   }
 
-  const [data, total] = await Promise.all([
+  const [data, total, tenantPrimaries] = await Promise.all([
     prisma.serviceInstance.findMany({
       where,
       take: limit ?? 20,
@@ -100,7 +125,24 @@ export async function listServiceInstances(
       orderBy: { createdAt: 'desc' },
     }),
     prisma.serviceInstance.count({ where }),
+    prisma.serviceInstance.findMany({
+      where: { tenantId, isPrimary: true },
+      select: { serviceType: true },
+    }),
   ]);
+
+  const tenantPrimaryTypes = new Set(tenantPrimaries.map((p) => p.serviceType));
+
+  if (tenantPrimaryTypes.size > 0) {
+    return {
+      data: data.map((i) =>
+        i.tenantId === SYSTEM_TENANT_ID && i.isPrimary && tenantPrimaryTypes.has(i.serviceType)
+          ? { ...i, isPrimary: false }
+          : i,
+      ),
+      total,
+    };
+  }
 
   return { data, total };
 }
