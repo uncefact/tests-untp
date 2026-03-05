@@ -94,7 +94,8 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
     };
 
     this.logger.debug('Verifying credential');
-    const response = await fetch(`${this.baseURL}/credentials/verify`, {
+    const host = new URL(this.baseURL).origin;
+    const response = await fetch(`${host}/agent/routeVerificationCredential`, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify(verifyParams),

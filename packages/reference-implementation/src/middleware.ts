@@ -25,6 +25,9 @@ import type { JWTPayload } from 'jose';
 
 const { auth } = NextAuth(authConfig);
 
+/** Routes under /api/v1/ that do not require authentication. */
+const PUBLIC_API_ROUTES = new Set(['/api/v1/credentials/verify']);
+
 /**
  * Strips all x-auth-* headers from the incoming request to prevent spoofing.
  */
@@ -63,6 +66,14 @@ export default auth(async (req) => {
 
     // For API routes, check authentication
     if (pathname.startsWith('/api/v1/')) {
+      // Allow public API routes through without authentication
+      if (PUBLIC_API_ROUTES.has(pathname)) {
+        const requestHeaders = stripAuthHeaders(req.headers);
+        const response = NextResponse.next({ request: { headers: requestHeaders } });
+        response.headers.set('x-correlation-id', correlationId);
+        return response;
+      }
+
       // Strip x-auth-* headers from incoming request to prevent spoofing
       const requestHeaders = stripAuthHeaders(req.headers);
 
