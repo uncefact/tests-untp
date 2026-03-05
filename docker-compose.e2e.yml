@@ -4,9 +4,6 @@ services:
     build:
       context: .
       dockerfile: packages/untp-playground/Dockerfile
-      args:
-        NEXT_PUBLIC_VERIFICATION_SERVICE_URL: http://localhost:3332/agent/routeVerificationCredential
-        NEXT_PUBLIC_VERIFICATION_SERVICE_TOKEN: test123
     ports:
       - '4000:3000'
     volumes:
@@ -14,6 +11,8 @@ services:
       - /untp-playground/node_modules
     environment:
       - NODE_ENV=development
+      - VERIFICATION_SERVICE_URL=http://vckit-api:3332/agent/routeVerificationCredential
+      - VERIFICATION_SERVICE_TOKEN=test123
 
   vckit-api:
     image: ghcr.io/uncefact/project-vckit:sha-325b7e3@sha256:3623cd45cdb971ba16c6016a1e3ba153fe6920c2053275cd430e76ab75d5a563
