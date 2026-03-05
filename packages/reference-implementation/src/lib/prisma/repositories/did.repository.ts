@@ -166,15 +166,11 @@ export async function listDids(
 
   // If the tenant has set their own default, override the system DID's isDefault
   const tenantHasDefault = data.some((d) => d.isDefault && d.type !== 'DEFAULT');
-  if (tenantHasDefault) {
-    for (const d of data) {
-      if (d.type === 'DEFAULT' && d.isDefault) {
-        d.isDefault = false;
-      }
-    }
-  }
+  const adjusted = tenantHasDefault
+    ? data.map((d) => (d.type === 'DEFAULT' && d.isDefault ? { ...d, isDefault: false } : d))
+    : data;
 
-  return { data, total };
+  return { data: adjusted, total };
 }
 
 /**
