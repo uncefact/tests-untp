@@ -301,6 +301,132 @@ describe('Service API', { testIsolation: false }, () => {
     });
   });
 
+  describe('System default override', () => {
+    let tenantPrimaryId: string;
+
+    it('system defaults show isPrimary when tenant has no primary', () => {
+      cy.request('/api/v1/services?serviceType=VC').then((response) => {
+        expect(response.status).to.eq(200);
+        const systemVc = response.body.data.find(
+          (s: ServiceInstance) => s.id === 'system-vc-vckit',
+        );
+        // No tenant primary exists yet — system default should be primary
+        expect(systemVc).to.exist;
+        expect(systemVc.isPrimary).to.be.true;
+      });
+    });
+
+    it('creates a tenant primary VC service', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/services',
+        body: {
+          serviceType: 'VC',
+          adapterType: 'VCKIT',
+          name: `E2E Override Test ${RUN_ID}`,
+          config: {
+            endpoint: 'https://override-test.example.com',
+            apiKey: 'override-key',
+          },
+          isPrimary: true,
+        },
+      }).then((response) => {
+        expect(response.status).to.eq(201);
+        tenantPrimaryId = response.body.id;
+      });
+    });
+
+    it('system VC default shows isPrimary false when tenant has own primary', () => {
+      cy.request('/api/v1/services?serviceType=VC').then((response) => {
+        expect(response.status).to.eq(200);
+        const systemVc = response.body.data.find(
+          (s: ServiceInstance) => s.id === 'system-vc-vckit',
+        );
+        const tenantVc = response.body.data.find(
+          (s: ServiceInstance) => s.id === tenantPrimaryId,
+        );
+        expect(systemVc).to.exist;
+        expect(systemVc.isPrimary).to.be.false;
+        expect(tenantVc).to.exist;
+        expect(tenantVc.isPrimary).to.be.true;
+      });
+    });
+
+    it('system default for other serviceType is unaffected', () => {
+      cy.request('/api/v1/services?serviceType=STORAGE').then((response) => {
+        expect(response.status).to.eq(200);
+        const systemStorage = response.body.data.find(
+          (s: ServiceInstance) => s.id === 'system-storage-uncefact',
+        );
+        // Tenant has no STORAGE primary — system default stays primary
+        expect(systemStorage).to.exist;
+        expect(systemStorage.isPrimary).to.be.true;
+      });
+    });
+
+    it('GET by ID also applies override for system VC default', () => {
+      cy.request('/api/v1/services/system-vc-vckit').then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.isPrimary).to.be.false;
+      });
+    });
+
+    it('system default restores isPrimary when tenant un-sets their primary via PATCH', () => {
+      cy.request({
+        method: 'PATCH',
+        url: `/api/v1/services/${tenantPrimaryId}`,
+        body: { isPrimary: false },
+      }).then((patchRes) => {
+        expect(patchRes.status).to.eq(200);
+        expect(patchRes.body.isPrimary).to.be.false;
+      });
+
+      cy.request('/api/v1/services?serviceType=VC').then((response) => {
+        const systemVc = response.body.data.find(
+          (s: ServiceInstance) => s.id === 'system-vc-vckit',
+        );
+        expect(systemVc).to.exist;
+        expect(systemVc.isPrimary).to.be.true;
+      });
+    });
+
+    it('system default overrides again when tenant re-sets primary via PATCH', () => {
+      cy.request({
+        method: 'PATCH',
+        url: `/api/v1/services/${tenantPrimaryId}`,
+        body: { isPrimary: true },
+      }).then((patchRes) => {
+        expect(patchRes.status).to.eq(200);
+        expect(patchRes.body.isPrimary).to.be.true;
+      });
+
+      cy.request('/api/v1/services?serviceType=VC').then((response) => {
+        const systemVc = response.body.data.find(
+          (s: ServiceInstance) => s.id === 'system-vc-vckit',
+        );
+        expect(systemVc).to.exist;
+        expect(systemVc.isPrimary).to.be.false;
+      });
+    });
+
+    it('system default restores isPrimary after tenant primary is deleted', () => {
+      cy.request({
+        method: 'DELETE',
+        url: `/api/v1/services/${tenantPrimaryId}?force=true`,
+      }).then((deleteRes) => {
+        expect(deleteRes.status).to.eq(204);
+      });
+
+      cy.request('/api/v1/services?serviceType=VC').then((response) => {
+        const systemVc = response.body.data.find(
+          (s: ServiceInstance) => s.id === 'system-vc-vckit',
+        );
+        expect(systemVc).to.exist;
+        expect(systemVc.isPrimary).to.be.true;
+      });
+    });
+  });
+
   describe('Filtering and pagination', () => {
     it('filters by serviceType', () => {
       cy.request('/api/v1/services?serviceType=VC').then((response) => {

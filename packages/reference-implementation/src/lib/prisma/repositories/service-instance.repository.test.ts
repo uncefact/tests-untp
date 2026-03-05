@@ -170,11 +170,38 @@ describe('service-instance.repository', () => {
       const result = await getServiceInstanceById('instance-1', 'other-org');
       expect(result).toBeNull();
     });
+
+    it('overrides system default isPrimary when tenant has own primary for same serviceType', async () => {
+      const systemRecord = { ...INSTANCE_RECORD, tenantId: 'system', isPrimary: true, serviceType: 'VC' };
+      const tenantPrimary = { ...INSTANCE_RECORD, id: 'tenant-vc', tenantId: ORG_ID, isPrimary: true };
+      // First call: getServiceInstanceById lookup
+      mockServiceInstance.findFirst.mockResolvedValueOnce(systemRecord);
+      // Second call: applyTenantPrimaryOverride lookup
+      mockServiceInstance.findFirst.mockResolvedValueOnce(tenantPrimary);
+
+      const result = await getServiceInstanceById('instance-1', ORG_ID);
+
+      expect(result).toEqual({ ...systemRecord, isPrimary: false });
+    });
+
+    it('keeps system default isPrimary when tenant has no primary for same serviceType', async () => {
+      const systemRecord = { ...INSTANCE_RECORD, tenantId: 'system', isPrimary: true, serviceType: 'VC' };
+      // First call: getServiceInstanceById lookup
+      mockServiceInstance.findFirst.mockResolvedValueOnce(systemRecord);
+      // Second call: applyTenantPrimaryOverride lookup — no tenant primary
+      mockServiceInstance.findFirst.mockResolvedValueOnce(null);
+
+      const result = await getServiceInstanceById('instance-1', ORG_ID);
+
+      expect(result).toEqual(systemRecord);
+    });
   });
 
   describe('listServiceInstances', () => {
     it('lists for organisation including system defaults', async () => {
-      mockServiceInstance.findMany.mockResolvedValue([INSTANCE_RECORD]);
+      // First findMany: data query; second findMany: tenant primaries query
+      mockServiceInstance.findMany.mockResolvedValueOnce([INSTANCE_RECORD]);
+      mockServiceInstance.findMany.mockResolvedValueOnce([]);
       mockServiceInstance.count.mockResolvedValue(1);
 
       const result = await listServiceInstances(ORG_ID);
@@ -197,7 +224,8 @@ describe('service-instance.repository', () => {
     });
 
     it('applies serviceType filter', async () => {
-      mockServiceInstance.findMany.mockResolvedValue([]);
+      mockServiceInstance.findMany.mockResolvedValueOnce([]);
+      mockServiceInstance.findMany.mockResolvedValueOnce([]);
       mockServiceInstance.count.mockResolvedValue(0);
 
       const result = await listServiceInstances(ORG_ID, { serviceType: 'VC' });
@@ -215,7 +243,8 @@ describe('service-instance.repository', () => {
     });
 
     it('applies adapterType filter', async () => {
-      mockServiceInstance.findMany.mockResolvedValue([]);
+      mockServiceInstance.findMany.mockResolvedValueOnce([]);
+      mockServiceInstance.findMany.mockResolvedValueOnce([]);
       mockServiceInstance.count.mockResolvedValue(0);
 
       const result = await listServiceInstances(ORG_ID, { adapterType: 'VCKIT' });
@@ -233,7 +262,8 @@ describe('service-instance.repository', () => {
     });
 
     it('applies pagination', async () => {
-      mockServiceInstance.findMany.mockResolvedValue([]);
+      mockServiceInstance.findMany.mockResolvedValueOnce([]);
+      mockServiceInstance.findMany.mockResolvedValueOnce([]);
       mockServiceInstance.count.mockResolvedValue(0);
 
       const result = await listServiceInstances(ORG_ID, { limit: 10, offset: 20 });
@@ -246,6 +276,50 @@ describe('service-instance.repository', () => {
       );
       expect(result.data).toEqual([]);
       expect(result.total).toBe(0);
+    });
+
+    it('overrides system default isPrimary when tenant has own primary for same serviceType', async () => {
+      const systemVc = { ...INSTANCE_RECORD, id: 'sys-vc', tenantId: 'system', serviceType: 'VC', isPrimary: true };
+      const systemIdr = { ...INSTANCE_RECORD, id: 'sys-idr', tenantId: 'system', serviceType: 'IDR', isPrimary: true };
+      const tenantVc = { ...INSTANCE_RECORD, id: 'tenant-vc', tenantId: ORG_ID, serviceType: 'VC', isPrimary: true };
+
+      // First findMany: data query; second findMany: tenant primaries query
+      mockServiceInstance.findMany.mockResolvedValueOnce([tenantVc, systemVc, systemIdr]);
+      mockServiceInstance.findMany.mockResolvedValueOnce([{ serviceType: 'VC' }]);
+      mockServiceInstance.count.mockResolvedValue(3);
+
+      const result = await listServiceInstances(ORG_ID);
+
+      // System VC should be overridden (tenant has VC primary), system IDR should stay primary
+      expect(result.data[0]).toEqual(tenantVc);
+      expect(result.data[1]).toEqual({ ...systemVc, isPrimary: false });
+      expect(result.data[2]).toEqual(systemIdr);
+    });
+
+    it('overrides correctly even when tenant primary is on a different page', async () => {
+      const systemVc = { ...INSTANCE_RECORD, id: 'sys-vc', tenantId: 'system', serviceType: 'VC', isPrimary: true };
+
+      // Data query returns only system default (tenant primary on another page)
+      mockServiceInstance.findMany.mockResolvedValueOnce([systemVc]);
+      // Tenant primaries query finds the primary across all pages
+      mockServiceInstance.findMany.mockResolvedValueOnce([{ serviceType: 'VC' }]);
+      mockServiceInstance.count.mockResolvedValue(2);
+
+      const result = await listServiceInstances(ORG_ID, { limit: 1, offset: 0 });
+
+      expect(result.data[0]).toEqual({ ...systemVc, isPrimary: false });
+    });
+
+    it('keeps system default isPrimary when tenant has no primary', async () => {
+      const systemVc = { ...INSTANCE_RECORD, id: 'sys-vc', tenantId: 'system', serviceType: 'VC', isPrimary: true };
+
+      mockServiceInstance.findMany.mockResolvedValueOnce([systemVc]);
+      mockServiceInstance.findMany.mockResolvedValueOnce([]);
+      mockServiceInstance.count.mockResolvedValue(1);
+
+      const result = await listServiceInstances(ORG_ID);
+
+      expect(result.data[0]).toEqual(systemVc);
     });
   });
 
