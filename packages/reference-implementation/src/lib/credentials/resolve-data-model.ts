@@ -11,6 +11,13 @@ export type ResolvedDataModel = {
   schemaUrls: string[];
 };
 
+export function isDccDataModel(dataModel: DataModelWithRelations): boolean {
+  return (
+    dataModel.credentialType === 'DigitalConformityCredential' ||
+    (dataModel.isExtension === true && dataModel.parentConfig?.credentialType === 'DigitalConformityCredential')
+  );
+}
+
 export async function resolveDataModel(
   tenantId: string,
   credentialType: string,

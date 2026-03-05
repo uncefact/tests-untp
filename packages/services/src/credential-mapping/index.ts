@@ -1,8 +1,10 @@
 // Types
 export type {
   ICredentialMapper,
+  ICvcAwareMapper,
   MapperOutput,
   ExtractedIdentifierRefs,
+  ExtractedCvcRefs,
   DataModelConfig,
   ResolvedEntities,
   OrganisationEntity,

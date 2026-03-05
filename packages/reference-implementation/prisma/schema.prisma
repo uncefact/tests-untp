@@ -119,6 +119,7 @@ model Tenant {
   credentials            Credential[]
   dataModels             DataModel[]
   renderTemplates        RenderTemplate[]
+  cvcCatalogues          CvcCatalogue[]
 
   @@map("Tenant")
 }
@@ -489,4 +490,113 @@ model RenderTemplate {
   updatedAt                DateTime  @updatedAt
 
   @@index([tenantId, dataModelId])
+}
+
+// ── CVC (Conformity Vocabulary Catalogue) models ────────────────────────────
+
+/**
+ * Root CVC document imported from a remote JSON-LD endpoint.
+ * Each catalogue contains one or more conformity schemes.
+ */
+model CvcCatalogue {
+  id          String   @id @default(cuid())
+  canonicalId String
+  name        String
+  sourceUrl   String
+  specVersion String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  schemes     ConformityScheme[]
+
+  @@unique([canonicalId, tenantId])
+  @@index([tenantId])
+}
+
+/**
+ * Top-level assessment programme within a CVC (e.g. a sustainability assessment programme).
+ * Carries denormalised tenantId for query convenience.
+ */
+model ConformityScheme {
+  id          String   @id @default(cuid())
+  canonicalId String
+  name        String
+  slug        String
+  description String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenantId    String
+  catalogueId String
+  catalogue   CvcCatalogue @relation(fields: [catalogueId], references: [id], onDelete: Cascade)
+  profiles    ConformityProfile[]
+
+  @@unique([canonicalId, tenantId])
+  @@index([catalogueId])
+}
+
+/**
+ * A versioned assessment profile within a conformity scheme.
+ * Each profile references a set of criteria via the join table.
+ */
+model ConformityProfile {
+  id          String   @id @default(cuid())
+  canonicalId String
+  name        String
+  slug        String
+  version     String
+  status      String
+  description String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenantId    String
+  schemeId    String
+  scheme      ConformityScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  criteria    ProfileCriterion[]
+
+  @@unique([canonicalId, tenantId])
+  @@index([schemeId])
+}
+
+/**
+ * An individually versioned conformity requirement.
+ * Shared across profiles via the ProfileCriterion join table.
+ */
+model Criterion {
+  id              String   @id @default(cuid())
+  canonicalId     String
+  name            String
+  version         String
+  status          String
+  description     String?
+  conformityTopic String?
+  passThreshold   Json?
+  documentation   String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  tenantId        String
+  profiles        ProfileCriterion[]
+
+  @@unique([canonicalId, tenantId])
+  @@index([tenantId])
+}
+
+/**
+ * Join table linking profiles to criteria.
+ * Cascade on profile delete; restrict on criterion delete to prevent
+ * accidental removal of shared criteria.
+ */
+model ProfileCriterion {
+  id          String   @id @default(cuid())
+  profileId   String
+  criterionId String
+  profile     ConformityProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  criterion   Criterion         @relation(fields: [criterionId], references: [id], onDelete: Restrict)
+
+  @@unique([profileId, criterionId])
+  @@index([criterionId])
 }

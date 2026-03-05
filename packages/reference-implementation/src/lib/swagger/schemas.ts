@@ -31,40 +31,125 @@ import { paginationMetaSchema } from '@/lib/api/pagination';
 // Credential Schemas (remain local — no credential service directory yet)
 // ============================================================================
 
-/**
- * Storage response after storing a credential.
- */
-export const credentialStorageResponseSchema = z.object({
-  uri: z.string().describe('URI where the credential is stored'),
-  hash: z.string().describe('Hash of the stored credential'),
-  decryptionKey: z.string().describe('Key to decrypt the credential'),
+const signingOptionsSchema = z.object({
+  serviceInstanceId: z.string().optional().describe('Signing service instance ID'),
 });
 
-/**
- * Publish response when publishing a credential.
- */
-export const credentialPublishResponseSchema = z.object({
-  enabled: z.boolean().describe('Whether publishing was enabled'),
-  raw: z.record(z.unknown()).optional().describe('Raw response from the DLR service'),
+const storageOptionsSchema = z.object({
+  serviceInstanceId: z.string().optional().describe('Storage service instance ID'),
+  encrypt: z.boolean().optional().describe('Whether to encrypt the stored credential'),
 });
 
-/**
- * Successful credential issue response.
- */
-export const credentialIssueResponseSchema = z.object({
-  ok: z.literal(true),
-  storageResponse: credentialStorageResponseSchema.describe('Storage details for the credential'),
-  publishResponse: credentialPublishResponseSchema.describe('Publish status and details'),
-  credential: z.record(z.unknown()).describe('The decoded verifiable credential'),
-  credentialId: z.string().describe('Database ID of the stored credential record'),
+const publishingOptionsSchema = z.object({
+  publish: z.boolean().optional().describe('Whether to publish the credential to the Identity Resolver'),
+  serviceInstanceId: z.string().optional().describe('IDR service instance ID'),
+  linkTitle: z.string().optional().describe('Title for the published link'),
+  machineVerificationUrl: z.string().optional().describe('Machine verification URL'),
+  humanVerificationUrl: z.string().optional().describe('Human verification URL'),
 });
 
-/**
- * Request body for issuing a credential.
- */
+/** Request body for POST /credentials. */
 export const credentialIssueRequestSchema = z.object({
-  formData: z.record(z.unknown()).describe('The credential payload'),
-  publish: z.boolean().optional().default(false).describe('Whether to publish the credential to the Identity Resolver'),
+  credentialPayload: z.record(z.unknown()).describe('The full credential payload to sign'),
+  credentialType: z
+    .enum([
+      'DigitalProductPassport',
+      'DigitalConformityCredential',
+      'DigitalFacilityRecord',
+      'DigitalIdentityAnchor',
+      'DigitalTraceabilityEvent',
+    ])
+    .describe('Type of credential to issue'),
+  version: z.string().describe('Data model version'),
+  signingOptions: signingOptionsSchema.optional().describe('Signing service options'),
+  storageOptions: storageOptionsSchema.optional().describe('Storage service options'),
+  publishingOptions: publishingOptionsSchema.optional().describe('IDR publishing options'),
+});
+
+/** CVC validation warning returned when advisory checks find issues. */
+export const cvcValidationWarningSchema = z.object({
+  code: z.string().describe('Warning code (e.g. CVC_UNKNOWN_CRITERION)'),
+  message: z.string().describe('Human-readable warning message'),
+  detail: z.string().optional().describe('Additional context (e.g. the unrecognised criterion URL)'),
+});
+
+/** Successful credential issue response from POST /credentials. */
+export const credentialIssueResponseSchema = z.object({
+  credentialId: z.string().describe('Database ID of the stored credential record'),
+  warnings: z.array(cvcValidationWarningSchema).optional().describe('CVC compliance warnings (advisory only)'),
+});
+
+// ============================================================================
+// CVC Schemas (local — CVC is a reference-implementation concern)
+// ============================================================================
+
+/** CVC catalogue as returned by the API. */
+export const cvcCatalogueSchema = z.object({
+  id: z.string().describe('Database ID'),
+  canonicalId: z.string().describe('JSON-LD @id from the source document'),
+  name: z.string().describe('Catalogue display name'),
+  sourceUrl: z.string().describe('URL the catalogue was imported from'),
+  specVersion: z.string().describe('CVC spec version used to parse this catalogue (e.g. "0.7.0")'),
+  metadata: z.record(z.unknown()).nullable().optional().describe('Extra JSON-LD properties'),
+  createdAt: z.string().datetime().describe('Creation timestamp'),
+  updatedAt: z.string().datetime().describe('Last update timestamp'),
+});
+
+/** Import request body for POST /cvc/catalogues. */
+export const cvcImportRequestSchema = z.object({
+  url: z.string().url().describe('URL of the CVC JSON-LD document to import'),
+  version: z.string().describe('CVC spec version to use for parsing (e.g. "0.7.0")'),
+});
+
+/** Import summary returned alongside the catalogue after import. */
+export const cvcImportSummarySchema = z.object({
+  schemes: z.number().int().describe('Number of schemes imported'),
+  profiles: z.number().int().describe('Number of profiles imported'),
+  criteria: z.number().int().describe('Number of criteria imported'),
+});
+
+/** Conformity scheme as returned by the API. */
+export const conformitySchemeSchema = z.object({
+  id: z.string().describe('Database ID'),
+  canonicalId: z.string().describe('JSON-LD @id from the source document'),
+  name: z.string().describe('Scheme display name'),
+  slug: z.string().describe('URL-friendly identifier derived from the canonical ID'),
+  description: z.string().nullable().optional().describe('Scheme description'),
+  metadata: z.record(z.unknown()).nullable().optional().describe('Extra JSON-LD properties'),
+  createdAt: z.string().datetime().describe('Creation timestamp'),
+  updatedAt: z.string().datetime().describe('Last update timestamp'),
+  catalogueId: z.string().describe('Parent catalogue ID'),
+});
+
+/** Conformity profile as returned by the API. */
+export const conformityProfileSchema = z.object({
+  id: z.string().describe('Database ID'),
+  canonicalId: z.string().describe('JSON-LD @id from the source document'),
+  name: z.string().describe('Profile display name'),
+  slug: z.string().describe('URL-friendly identifier derived from the canonical ID'),
+  version: z.string().describe('Profile version'),
+  status: z.string().describe('Profile status (e.g. Active, Draft)'),
+  description: z.string().nullable().optional().describe('Profile description'),
+  metadata: z.record(z.unknown()).nullable().optional().describe('Extra JSON-LD properties'),
+  createdAt: z.string().datetime().describe('Creation timestamp'),
+  updatedAt: z.string().datetime().describe('Last update timestamp'),
+  schemeId: z.string().describe('Parent scheme ID'),
+});
+
+/** Criterion as returned by the API. */
+export const criterionSchema = z.object({
+  id: z.string().describe('Database ID'),
+  canonicalId: z.string().describe('JSON-LD @id from the source document'),
+  name: z.string().describe('Criterion display name'),
+  version: z.string().describe('Criterion version'),
+  status: z.string().describe('Criterion status (e.g. Active, Draft)'),
+  description: z.string().nullable().optional().describe('Criterion description'),
+  conformityTopic: z.string().nullable().optional().describe('Conformity topic classification'),
+  passThreshold: z.record(z.unknown()).nullable().optional().describe('Pass/fail threshold definition'),
+  documentation: z.string().nullable().optional().describe('Documentation URL'),
+  metadata: z.record(z.unknown()).nullable().optional().describe('Extra JSON-LD properties'),
+  createdAt: z.string().datetime().describe('Creation timestamp'),
+  updatedAt: z.string().datetime().describe('Last update timestamp'),
 });
 
 // ============================================================================
@@ -110,16 +195,21 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     VerificationCheck: verificationCheckSchema,
     VerificationError: verificationErrorSchema,
     DidDocument: didDocumentResponseSchema,
-    CredentialStorageResponse: credentialStorageResponseSchema,
-    CredentialPublishResponse: credentialPublishResponseSchema,
-    CredentialIssueResponse: credentialIssueResponseSchema,
     CredentialIssueRequest: credentialIssueRequestSchema,
+    CredentialIssueResponse: credentialIssueResponseSchema,
+    CvcValidationWarning: cvcValidationWarningSchema,
     Registrar: registrarSchema,
     SchemeQualifier: schemeQualifierSchema,
     IdentifierScheme: identifierSchemeSchema,
     Identifier: identifierSchema,
     LinkRegistration: linkRegistrationSchema,
     ServiceInstance: serviceInstanceResponseSchema,
+    CvcCatalogue: cvcCatalogueSchema,
+    CvcImportRequest: cvcImportRequestSchema,
+    CvcImportSummary: cvcImportSummarySchema,
+    ConformityScheme: conformitySchemeSchema,
+    ConformityProfile: conformityProfileSchema,
+    Criterion: criterionSchema,
   };
 
   const openAPISchemas: Record<string, OpenAPISchema> = {};

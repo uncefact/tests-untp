@@ -39,6 +39,7 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
         { name: 'Schemes', description: 'Identifier scheme management' },
         { name: 'Identifiers', description: 'Identifier instance management' },
         { name: 'Links', description: 'IDR link management' },
+        { name: 'CVC', description: 'Conformity Vocabulary Catalogue management' },
       ],
     },
   });

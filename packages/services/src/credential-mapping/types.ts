@@ -1,4 +1,4 @@
-import type { CredentialSubject } from '../verifiable-credential/types.js';
+import type { CredentialPayload, CredentialSubject } from '../verifiable-credential/types.js';
 
 // ── Entity types (minimal projections) ──────────────────────────────────────
 
@@ -79,9 +79,20 @@ export type ExtractedIdentifierRefs = {
   facility?: { registeredId: string };
 };
 
+// ── Extracted CVC refs ──────────────────────────────────────────────────────
+
+export type ExtractedCvcRefs = {
+  scopeUrl?: string;
+  criteriaUrls: string[];
+};
+
 // ── Mapper interface ────────────────────────────────────────────────────────
 
 export interface ICredentialMapper {
   buildPayload(entities: ResolvedEntities, config: DataModelConfig): Promise<MapperOutput>;
   extractEntityRefs(payload: MapperOutput): ExtractedIdentifierRefs;
+}
+
+export interface ICvcAwareMapper {
+  extractCvcRefs(credentialPayload: CredentialPayload): ExtractedCvcRefs;
 }

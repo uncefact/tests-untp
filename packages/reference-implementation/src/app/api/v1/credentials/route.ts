@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
-import { resolveDataModel } from '@/lib/credentials/resolve-data-model';
+import { resolveDataModel, isDccDataModel } from '@/lib/credentials/resolve-data-model';
 import { validateCredentialPayload } from '@/lib/credentials/validate-credential-payload';
 import { issueCredential } from '@/lib/credentials/issue-credential';
 import { updateCredentialPublished } from '@/lib/prisma/repositories';
@@ -11,9 +11,15 @@ import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { buildPublishLinks } from '@uncefact/untp-ri-services';
 import { CredentialType } from '@/lib/prisma/generated';
-import type { CredentialPayload } from '@uncefact/untp-ri-services';
+import type { CredentialPayload, ICvcAwareMapper, ExtractedCvcRefs } from '@uncefact/untp-ri-services';
+import { validateCvcCompliance } from '@/lib/services/cvc-validation.service';
+import type { CvcValidationWarning } from '@/lib/services/cvc-validation.service';
 
 const logger = apiLogger.child({ route: '/api/v1/credentials' });
+
+function isCvcAwareMapper(mapper: unknown): mapper is ICvcAwareMapper {
+  return typeof (mapper as ICvcAwareMapper).extractCvcRefs === 'function';
+}
 
 /** Valid credential type strings (must match Prisma CredentialType enum). */
 const VALID_CREDENTIAL_TYPES = Object.values(CredentialType) as string[];
@@ -39,54 +45,32 @@ const VALID_CREDENTIAL_TYPES = Object.values(CredentialType) as string[];
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - credentialPayload
- *               - credentialType
- *               - version
- *             properties:
- *               credentialPayload:
- *                 type: object
- *                 description: The credential payload to sign
- *               credentialType:
- *                 type: string
- *                 enum: [DigitalProductPassport, DigitalConformityCredential, DigitalFacilityRecord, DigitalIdentityAnchor, DigitalTraceabilityEvent]
- *               version:
- *                 type: string
- *               signingOptions:
- *                 type: object
- *                 properties:
- *                   serviceInstanceId:
- *                     type: string
- *               storageOptions:
- *                 type: object
- *                 properties:
- *                   serviceInstanceId:
- *                     type: string
- *                   encrypt:
- *                     type: boolean
- *               publishingOptions:
- *                 type: object
- *                 properties:
- *                   publish:
- *                     type: boolean
- *                   serviceInstanceId:
- *                     type: string
- *                   linkTitle:
- *                     type: string
- *                   machineVerificationUrl:
- *                     type: string
- *                   humanVerificationUrl:
- *                     type: string
+ *             $ref: '#/components/schemas/CredentialIssueRequest'
  *     responses:
  *       201:
  *         description: Credential issued
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CredentialIssueResponse'
  *       400:
  *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
   let body: {
@@ -146,6 +130,47 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   await validateCredentialPayload(credentialPayload, schemaUrls);
 
+  // ── Step 3.5: CVC validation (advisory) ─────────────────────────────
+
+  let cvcWarnings: CvcValidationWarning[] = [];
+
+  if (isDccDataModel(dataModel)) {
+    if (isCvcAwareMapper(mapper)) {
+      let cvcRefs: ExtractedCvcRefs | undefined;
+      try {
+        cvcRefs = (mapper as ICvcAwareMapper).extractCvcRefs(credentialPayload);
+      } catch (error) {
+        logger.error({ err: error, tenantId, credentialType }, 'CVC reference extraction failed');
+        cvcWarnings = [
+          {
+            code: 'CVC_VALIDATION_ERROR' as const,
+            message: 'Failed to extract CVC references from credential payload',
+          },
+        ];
+      }
+
+      if (cvcRefs) {
+        try {
+          const result = await validateCvcCompliance(tenantId, cvcRefs);
+          cvcWarnings = result.warnings;
+        } catch (error) {
+          logger.error({ err: error, tenantId, credentialType }, 'CVC compliance validation failed');
+          cvcWarnings = [
+            {
+              code: 'CVC_VALIDATION_ERROR' as const,
+              message: 'CVC validation could not be performed — credential was issued without CVC checks',
+            },
+          ];
+        }
+      }
+    } else {
+      logger.warn(
+        { tenantId, credentialType, version },
+        'DCC mapper does not implement extractCvcRefs — skipping CVC validation',
+      );
+    }
+  }
+
   // ── Step 4: Resolve services ────────────────────────────────────────────
 
   const vcService = await resolveVcService(tenantId, signingOptions.serviceInstanceId);
@@ -203,5 +228,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     }
   }
 
-  return NextResponse.json({ credentialId }, { status: 201 });
+  const response: Record<string, unknown> = { credentialId };
+  if (cvcWarnings.length > 0) response.warnings = cvcWarnings;
+  return NextResponse.json(response, { status: 201 });
 });

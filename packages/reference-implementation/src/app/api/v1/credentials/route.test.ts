@@ -76,6 +76,7 @@ jest.mock('@/lib/prisma/generated', () => ({
 const mockResolveDataModel = jest.fn();
 jest.mock('@/lib/credentials/resolve-data-model', () => ({
   resolveDataModel: (...args: unknown[]) => mockResolveDataModel(...args),
+  isDccDataModel: jest.requireActual('@/lib/credentials/resolve-data-model').isDccDataModel,
 }));
 
 const mockValidateCredentialPayload = jest.fn();
@@ -113,6 +114,11 @@ jest.mock('@uncefact/untp-ri-services', () => ({
 const mockUpdateCredentialPublished = jest.fn();
 jest.mock('@/lib/prisma/repositories', () => ({
   updateCredentialPublished: (...args: unknown[]) => mockUpdateCredentialPublished(...args),
+}));
+
+const mockValidateCvcCompliance = jest.fn();
+jest.mock('@/lib/services/cvc-validation.service', () => ({
+  validateCvcCompliance: (...args: unknown[]) => mockValidateCvcCompliance(...args),
 }));
 
 import { POST } from './route';
@@ -165,6 +171,7 @@ const STORAGE_RESPONSE = {
 const stubMapper = {
   extractEntityRefs: jest.fn().mockReturnValue({ primaryIdentifier: '09506000134352' }),
   buildPayload: jest.fn(),
+  extractCvcRefs: jest.fn().mockReturnValue({ scopeUrl: undefined, criteriaUrls: [] }),
 };
 
 const DATA_MODEL = {
@@ -192,6 +199,7 @@ function setupHappyPath() {
     schemaUrls: [DATA_MODEL.schemaUrl],
   });
   mockValidateCredentialPayload.mockResolvedValue(undefined);
+  mockValidateCvcCompliance.mockResolvedValue({ warnings: [] });
   mockResolveVcService.mockResolvedValue({ service: {}, instanceId: 'vc-1' });
   mockResolveStorageService.mockResolvedValue({ service: {}, instanceId: 'storage-1' });
   mockIssueCredential.mockResolvedValue({
@@ -312,6 +320,120 @@ describe('POST /api/v1/credentials', () => {
 
       expect(res.status).toBe(400);
       expect(json.error).toContain('Schema validation failed');
+    });
+  });
+
+  // ── CVC validation ──────────────────────────────────────────────────
+
+  describe('CVC validation', () => {
+    it('skips CVC validation for non-DCC credential types', async () => {
+      const req = createFakeRequest(validBody());
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockValidateCvcCompliance).not.toHaveBeenCalled();
+    });
+
+    it('runs CVC validation for DCC credential type', async () => {
+      mockResolveDataModel.mockResolvedValue({
+        dataModel: {
+          ...DATA_MODEL,
+          credentialType: 'DigitalConformityCredential',
+          name: 'Digital Conformity Credential',
+        },
+        mapper: stubMapper,
+        schemaUrls: [DATA_MODEL.schemaUrl],
+      });
+      mockValidateCvcCompliance.mockResolvedValue({ warnings: [] });
+
+      const req = createFakeRequest(validBody({ credentialType: 'DigitalConformityCredential' }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(stubMapper.extractCvcRefs).toHaveBeenCalled();
+      expect(mockValidateCvcCompliance).toHaveBeenCalledWith('tenant-1', {
+        scopeUrl: undefined,
+        criteriaUrls: [],
+      });
+    });
+
+    it('includes CVC warnings in response when present', async () => {
+      mockResolveDataModel.mockResolvedValue({
+        dataModel: {
+          ...DATA_MODEL,
+          credentialType: 'DigitalConformityCredential',
+          name: 'Digital Conformity Credential',
+        },
+        mapper: stubMapper,
+        schemaUrls: [DATA_MODEL.schemaUrl],
+      });
+      const warnings = [{ code: 'CVC_NO_SCOPE', message: 'No conformity scope found in credential payload' }];
+      mockValidateCvcCompliance.mockResolvedValue({ warnings });
+
+      const req = createFakeRequest(validBody({ credentialType: 'DigitalConformityCredential' }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.credentialId).toBe('cred-1');
+      expect(json.warnings).toEqual(warnings);
+    });
+
+    it('does not include warnings key when no CVC warnings', async () => {
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.credentialId).toBe('cred-1');
+      expect(json).not.toHaveProperty('warnings');
+    });
+
+    it('continues issuing credential even when CVC validation throws', async () => {
+      mockResolveDataModel.mockResolvedValue({
+        dataModel: {
+          ...DATA_MODEL,
+          credentialType: 'DigitalConformityCredential',
+          name: 'Digital Conformity Credential',
+        },
+        mapper: stubMapper,
+        schemaUrls: [DATA_MODEL.schemaUrl],
+      });
+      mockValidateCvcCompliance.mockRejectedValue(new Error('DB connection lost'));
+
+      const req = createFakeRequest(validBody({ credentialType: 'DigitalConformityCredential' }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.credentialId).toBe('cred-1');
+      expect(json.warnings).toEqual([
+        {
+          code: 'CVC_VALIDATION_ERROR',
+          message: 'CVC validation could not be performed — credential was issued without CVC checks',
+        },
+      ]);
+    });
+
+    it('runs CVC validation for DCC extension credential types', async () => {
+      mockResolveDataModel.mockResolvedValue({
+        dataModel: {
+          ...DATA_MODEL,
+          credentialType: 'DigitalConformityCredential',
+          isExtension: true,
+          parentConfig: {
+            credentialType: 'DigitalConformityCredential',
+            version: '0.6.1',
+            schemaUrl: 'https://example.com/schema.json',
+          },
+        },
+        mapper: stubMapper,
+        schemaUrls: [DATA_MODEL.schemaUrl],
+      });
+      mockValidateCvcCompliance.mockResolvedValue({ warnings: [] });
+
+      const req = createFakeRequest(validBody({ credentialType: 'DigitalConformityCredential' }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockValidateCvcCompliance).toHaveBeenCalled();
     });
   });
 
