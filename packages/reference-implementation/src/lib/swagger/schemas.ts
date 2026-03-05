@@ -80,18 +80,6 @@ export const credentialIssueResponseSchema = z.object({
 });
 
 // ============================================================================
-// Pagination Schema
-// ============================================================================
-
-/** Pagination metadata for list endpoints. */
-export const paginationMetaSchema = z.object({
-  total: z.number().int().describe('Total number of records matching the query'),
-  limit: z.number().int().describe('Maximum records per page'),
-  offset: z.number().int().describe('Number of records skipped'),
-  hasMore: z.boolean().describe('Whether more records exist beyond the current page'),
-});
-
-// ============================================================================
 // CVC Schemas (local — CVC is a reference-implementation concern)
 // ============================================================================
 
@@ -216,7 +204,6 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     Identifier: identifierSchema,
     LinkRegistration: linkRegistrationSchema,
     ServiceInstance: serviceInstanceResponseSchema,
-    PaginationMeta: paginationMetaSchema,
     CvcCatalogue: cvcCatalogueSchema,
     CvcImportRequest: cvcImportRequestSchema,
     CvcImportSummary: cvcImportSummarySchema,
