@@ -1,20 +1,11 @@
-import { verificationServiceUrl, verificationServiceToken } from '../../config';
-
 export async function verifyCredential(credential: any) {
   try {
-    const response = await fetch(verificationServiceUrl, {
+    const response = await fetch('/api/verify', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${verificationServiceToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        credential,
-        fetchRemoteContexts: true,
-        policies: {
-          credentialStatus: false,
-        },
-      }),
+      body: JSON.stringify({ credential }),
     });
 
     if (!response.ok) {
