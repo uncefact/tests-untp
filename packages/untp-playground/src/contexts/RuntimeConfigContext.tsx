@@ -4,14 +4,10 @@ import { createContext, useContext } from 'react';
 
 export interface RuntimeConfig {
   headerTitle: string;
-  verificationServiceUrl: string;
-  verificationServiceToken: string;
 }
 
 const defaultConfig: RuntimeConfig = {
   headerTitle: 'UNTP Playground',
-  verificationServiceUrl: 'https://vckit.untp.showthething.com/agent/routeVerificationCredential',
-  verificationServiceToken: 'test123',
 };
 
 const RuntimeConfigContext = createContext<RuntimeConfig>(defaultConfig);

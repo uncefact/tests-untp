@@ -1,27 +1,11 @@
-import { verificationServiceUrl as defaultUrl, verificationServiceToken as defaultToken } from '../../config';
-
-export async function verifyCredential(
-  credential: any,
-  serviceUrl?: string,
-  serviceToken?: string,
-) {
-  const url = serviceUrl || defaultUrl;
-  const token = serviceToken || defaultToken;
-
+export async function verifyCredential(credential: any) {
   try {
-    const response = await fetch(url, {
+    const response = await fetch('/api/verify', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        credential,
-        fetchRemoteContexts: true,
-        policies: {
-          credentialStatus: false,
-        },
-      }),
+      body: JSON.stringify({ credential }),
     });
 
     if (!response.ok) {

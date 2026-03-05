@@ -32,10 +32,6 @@ export async function generateMetadata(): Promise<Metadata> {
 function getRuntimeConfig(): RuntimeConfig {
   return {
     headerTitle: process.env.HEADER_TITLE || 'UNTP Playground',
-    verificationServiceUrl:
-      process.env.VERIFICATION_SERVICE_URL ||
-      'https://vckit.untp.showthething.com/agent/routeVerificationCredential',
-    verificationServiceToken: process.env.VERIFICATION_SERVICE_TOKEN || 'test123',
   };
 }
 
