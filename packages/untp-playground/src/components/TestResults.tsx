@@ -10,6 +10,7 @@ import { detectExtension, validateCredentialSchema, validateExtension } from '@/
 import { detectVcdmVersion } from '@/lib/utils';
 import { validateVcdmRules } from '@/lib/vcdm-validation';
 import { verifyCredential } from '@/lib/verificationService';
+import { useRuntimeConfig } from '@/contexts/RuntimeConfigContext';
 import { Credential, PermittedCredentialType, TestStep } from '@/types';
 import confetti from 'canvas-confetti';
 import { AlertCircle, Check, ChevronDown, ChevronRight, Loader2, X } from 'lucide-react';
@@ -241,6 +242,7 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
     Partial<Record<PermittedCredentialType, { original: any; decoded: Credential }>>
   >({});
   const { canDownloadReport, downloadReport } = useTestReport();
+  const { verificationServiceUrl, verificationServiceToken } = useRuntimeConfig();
 
   const initializeTestSteps = (credential?: { original: any; decoded: Credential }) => {
     if (!credential) {
@@ -377,7 +379,7 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
           }));
 
           // Verification
-          const verificationResult = await verifyCredential(credential.original);
+          const verificationResult = await verifyCredential(credential.original, verificationServiceUrl, verificationServiceToken);
           setTestResults((prev) => ({
             ...prev,
             [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>

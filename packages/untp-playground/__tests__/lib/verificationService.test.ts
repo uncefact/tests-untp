@@ -41,6 +41,63 @@ describe('verificationService', () => {
     });
   });
 
+  test('uses custom URL and token when provided', async () => {
+    const mockResponse = { verified: true, results: [] };
+    const mockCredential = { id: '456', type: ['VerifiableCredential'] };
+    const customUrl = 'https://custom.example.com/verify';
+    const customToken = 'custom-token-123';
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
+    const result = await verifyCredential(mockCredential, customUrl, customToken);
+
+    expect(result).toEqual(mockResponse);
+    expect(global.fetch).toHaveBeenCalledWith(customUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${customToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        credential: mockCredential,
+        fetchRemoteContexts: true,
+        policies: {
+          credentialStatus: false,
+        },
+      }),
+    });
+  });
+
+  test('falls back to defaults when custom params are undefined', async () => {
+    const mockResponse = { verified: true, results: [] };
+    const mockCredential = { id: '789', type: ['VerifiableCredential'] };
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
+    await verifyCredential(mockCredential, undefined, undefined);
+
+    expect(global.fetch).toHaveBeenCalledWith('https://vckit.untp.showthething.com/agent/routeVerificationCredential', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer test123',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        credential: mockCredential,
+        fetchRemoteContexts: true,
+        policies: {
+          credentialStatus: false,
+        },
+      }),
+    });
+  });
+
   test('handles non-ok response from API', async () => {
     const mockCredential = { id: '123', type: ['VerifiableCredential'] };
 
