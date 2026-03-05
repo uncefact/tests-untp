@@ -127,6 +127,12 @@ services:
       UNCEFACT_STORAGE_URL: http://storage-service:3334/api/3.0.0/public
       IDR_API_URL: http://identity-resolver-service:3000/api/2.0.0
       IDR_API_KEY: ${IDR_API_KEY}
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:3003/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     depends_on:
       keycloak:
         condition: service_started
