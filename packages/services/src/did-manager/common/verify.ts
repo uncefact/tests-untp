@@ -128,7 +128,7 @@ export async function verifyDid(did: string, options: VerifyDidOptions): Promise
   checks.push({ name: C.JSONLD_VALIDITY, passed: true, message: 'Skipped — JSON-LD expansion disabled' });
 
   const verified = checks.every((c) => c.passed);
-  const errors = checks.filter((c) => !c.passed).map((c) => ({ check: c.name, message: c.message ?? 'Check failed' }));
+  const errors = checks.filter((c) => !c.passed).map((c) => ({ name: c.name, message: c.message ?? 'Check failed' }));
 
   return {
     verified,

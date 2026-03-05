@@ -226,6 +226,29 @@ describe('VCKitDidAdapter', () => {
       const payload = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
       expect(payload.alias).toBe('vckit.dev3.pyx.io:acme-corp');
     });
+
+    it('does NOT prepend host prefix for SELF_MANAGED type', async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce(createMockResponse({ did: 'did:web:my-domain.com:my-org', controllerKeyId: 'key-1' }))
+        .mockResolvedValueOnce(
+          createMockResponse({
+            didDocument: {
+              '@context': ['https://www.w3.org/ns/did/v1'],
+              id: 'did:web:my-domain.com:my-org',
+              verificationMethod: [],
+            },
+          }),
+        );
+
+      await service.create({
+        type: DidType.SELF_MANAGED,
+        method: DidMethod.DID_WEB,
+        alias: 'my-domain.com:my-org',
+      });
+
+      const payload = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+      expect(payload.alias).toBe('my-domain.com:my-org');
+    });
   });
 
   // delete() tests
@@ -354,7 +377,7 @@ describe('VCKitDidAdapter', () => {
 
       expect(result.errors).toEqual([
         {
-          check: DidVerificationCheckName.KEY_MATERIAL,
+          name: DidVerificationCheckName.KEY_MATERIAL,
           message: 'Provider key material could not be fetched — key_material check may be incomplete',
         },
       ]);
@@ -373,14 +396,14 @@ describe('VCKitDidAdapter', () => {
 
       expect(result.errors).toEqual([
         {
-          check: DidVerificationCheckName.KEY_MATERIAL,
+          name: DidVerificationCheckName.KEY_MATERIAL,
           message: 'Provider key material could not be fetched — key_material check may be incomplete',
         },
       ]);
     });
 
     it('appends KEY_MATERIAL error to existing errors when key fetch fails', async () => {
-      const existingError = { check: DidVerificationCheckName.RESOLVE, message: 'Could not resolve' };
+      const existingError = { name: DidVerificationCheckName.RESOLVE, message: 'Could not resolve' };
       const mockResult = { verified: false, checks: [], errors: [existingError] };
       (verifyDid as jest.Mock).mockResolvedValue(mockResult);
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
@@ -390,7 +413,7 @@ describe('VCKitDidAdapter', () => {
       expect(result.errors).toHaveLength(2);
       expect(result.errors![0]).toEqual(existingError);
       expect(result.errors![1]).toEqual({
-        check: DidVerificationCheckName.KEY_MATERIAL,
+        name: DidVerificationCheckName.KEY_MATERIAL,
         message: 'Provider key material could not be fetched — key_material check may be incomplete',
       });
     });

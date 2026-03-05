@@ -55,7 +55,7 @@ export const verificationCheckSchema = z.object({
 });
 
 export const verificationErrorSchema = z.object({
-  check: z.enum(VERIFICATION_CHECK_NAMES),
+  name: z.enum(VERIFICATION_CHECK_NAMES),
   message: z.string(),
 });
 

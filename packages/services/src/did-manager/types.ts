@@ -103,7 +103,7 @@ export type DidVerificationCheck = {
 };
 
 export type DidVerificationError = {
-  check: DidVerificationCheckName;
+  name: DidVerificationCheckName;
   message: string;
 };
 
