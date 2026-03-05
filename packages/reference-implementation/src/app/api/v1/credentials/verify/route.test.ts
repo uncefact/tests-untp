@@ -1,5 +1,6 @@
 // Polyfill AbortSignal.timeout for jsdom (not available in jsdom)
 if (typeof AbortSignal.timeout !== 'function') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (AbortSignal as any).timeout = (ms: number) => {
     const controller = new AbortController();
     setTimeout(() => controller.abort(), ms);

@@ -5,6 +5,7 @@ import { withPublicRoute } from '@/lib/api/with-public-route';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { computeHash, decryptCredential } from '@uncefact/untp-ri-services';
+import type { EncryptionAlgorithm, EnvelopedVerifiableCredential } from '@uncefact/untp-ri-services';
 import { decodeJwt } from 'jose';
 
 const logger = apiLogger.child({ route: '/api/v1/credentials/verify' });
@@ -237,7 +238,7 @@ export const POST = withPublicRoute(async (req) => {
         key: body.decryptionKey,
         iv: encrypted.iv,
         tag: encrypted.tag,
-        type: encrypted.type as any,
+        type: encrypted.type as EncryptionAlgorithm,
       });
       credential = JSON.parse(decryptedString);
     } catch {
@@ -275,7 +276,7 @@ export const POST = withPublicRoute(async (req) => {
   const { service: vcService } = await resolveVcService(SYSTEM_TENANT_ID);
 
   logger.info('Verifying credential');
-  const result = await vcService.verify(credential as any);
+  const result = await vcService.verify(credential as unknown as EnvelopedVerifiableCredential);
 
   // ── Step 7: Decode JWT from enveloped credential ───────────────────
   let decodedCredential: Record<string, unknown> | undefined;
