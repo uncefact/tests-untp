@@ -26,6 +26,7 @@ const jestConfig = {
     '^@uncefact/untp-ri-services/encryption$': '<rootDir>/../services/build/encryption/index.js',
     '^@uncefact/untp-ri-services/key-provider$': '<rootDir>/../services/build/key-provider/index.js',
     '^@uncefact/untp-ri-services$': '<rootDir>/../services/build/index.js',
+    '^@reference-implementation/components$': '<rootDir>/../../node_modules/@reference-implementation/components/src/index.ts',
   },
   transform: {
     '^.+\\.m?[tj]sx?$': [

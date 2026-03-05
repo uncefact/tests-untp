@@ -183,6 +183,7 @@ services:
       - UNCEFACT_STORAGE_API_KEY=test123
       - PYX_IDR_API_URL=http://identity-resolver-service:3000
       - PYX_IDR_API_KEY=test123
+      - VERIFY_ALLOW_PRIVATE_URLS=true
     extra_hosts:
       - 'localhost:host-gateway'
     depends_on:
