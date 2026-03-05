@@ -91,7 +91,7 @@ export function normaliseDidWebAlias(alias: string): string {
  *
  * - Lowercases the input
  * - Trims whitespace
- * - Collapses whitespace around structural characters (dots, colons, hyphens)
+ * - Strips whitespace adjacent to structural characters (dots, colons, hyphens)
  * - Replaces remaining whitespace with hyphens
  * - Keeps alphanumeric characters, dots, colons, and hyphens
  * - Collapses consecutive hyphens
@@ -102,7 +102,8 @@ export function normaliseSelfManagedAlias(alias: string): string {
   const normalised = alias
     .toLowerCase()
     .trim()
-    .replace(/\s*([:.-])\s*/g, '$1')
+    .replace(/\s+(?=[:.-])/g, '')
+    .replace(/(?<=[:.-])\s+/g, '')
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9.:-]/g, '')
     .replace(/-{2,}/g, '-')
