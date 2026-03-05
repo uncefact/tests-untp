@@ -4,10 +4,14 @@ import { createContext, useContext } from 'react';
 
 export interface RuntimeConfig {
   headerTitle: string;
+  specUrl: string;
+  testSuiteUrl: string;
 }
 
 const defaultConfig: RuntimeConfig = {
   headerTitle: 'UNTP Playground',
+  specUrl: 'https://untp.unece.org',
+  testSuiteUrl: 'https://github.com/uncefact/tests-untp',
 };
 
 const RuntimeConfigContext = createContext<RuntimeConfig>(defaultConfig);
