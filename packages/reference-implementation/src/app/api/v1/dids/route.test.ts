@@ -150,6 +150,31 @@ describe('POST /api/v1/dids', () => {
     );
   });
 
+  it('passes isDefault to createDid when provided', async () => {
+    mockDidService.create.mockResolvedValue({
+      did: 'did:web:example.com:org:789',
+      keyId: 'key-3',
+      document: { '@context': 'https://www.w3.org/ns/did/v1', id: 'did:web:example.com:org:789' },
+    });
+    mockCreateDid.mockResolvedValue({
+      id: 'record-3',
+      did: 'did:web:example.com:org:789',
+      type: DidType.MANAGED,
+      status: DidStatus.ACTIVE,
+      isDefault: true,
+    });
+
+    const req = createFakeRequest({
+      body: { type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'default-did', isDefault: true },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(mockCreateDid).toHaveBeenCalledWith(expect.objectContaining({ isDefault: true }));
+    expect(json.isDefault).toBe(true);
+  });
+
   it('returns 400 for invalid type', async () => {
     const req = createFakeRequest({
       body: { type: 'INVALID', method: DidMethod.DID_WEB },

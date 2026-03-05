@@ -46,6 +46,9 @@ const logger = apiLogger.child({ route: '/api/v1/dids' });
  *               description:
  *                 type: string
  *                 description: Description of the DID's purpose
+ *               isDefault:
+ *                 type: boolean
+ *                 description: Whether this DID should be the tenant's default
  *               serviceInstanceId:
  *                 type: string
  *                 description: Optional service instance ID to use for DID creation
@@ -88,6 +91,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     alias?: string;
     name?: string;
     description?: string;
+    isDefault?: boolean;
     serviceInstanceId?: string;
   };
 
@@ -147,6 +151,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     keyId: providerResult.keyId,
     name: body.name ?? providerResult.did,
     description: body.description,
+    isDefault: body.isDefault,
     status,
     serviceInstanceId,
   });

@@ -14,6 +14,7 @@ import type { DidStatus } from '../generated';
 const mockTx = {
   did: {
     findFirst: jest.fn(),
+    create: jest.fn(),
     update: jest.fn(),
     updateMany: jest.fn(),
     delete: jest.fn(),
@@ -144,6 +145,36 @@ describe('did.repository', () => {
       });
     });
 
+    it('clears existing tenant defaults when isDefault is true', async () => {
+      const createdRecord = { ...DID_RECORD, isDefault: true };
+      mockTx.did.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.did.create.mockResolvedValue(createdRecord);
+
+      const result = await createDid({
+        tenantId: ORG_ID,
+        did: 'did:web:example.com:org:123',
+        type: 'MANAGED',
+        keyId: 'key-1',
+        isDefault: true,
+      });
+
+      expect(mockTx.did.updateMany).toHaveBeenCalledWith({
+        where: {
+          tenantId: ORG_ID,
+          isDefault: true,
+          type: { not: 'DEFAULT' },
+        },
+        data: { isDefault: false },
+      });
+      expect(mockTx.did.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          tenantId: ORG_ID,
+          isDefault: true,
+        }),
+      });
+      expect(result).toEqual(createdRecord);
+    });
+
     it('passes undefined serviceInstanceId when not provided', async () => {
       mockDid.create.mockResolvedValue(DID_RECORD);
 
@@ -183,6 +214,29 @@ describe('did.repository', () => {
       const result = await getDidById('did-record-1', 'other-org');
       expect(result).toBeNull();
     });
+
+    it('returns system DEFAULT DID with isDefault false when tenant has own default', async () => {
+      const systemDid = { ...DID_RECORD, id: 'sys-did', type: 'DEFAULT', isDefault: true, tenantId: 'system' };
+      const tenantDid = { ...DID_RECORD, id: 'tenant-did', isDefault: true };
+
+      // First call returns the system DID, second call finds tenant default
+      mockDid.findFirst.mockResolvedValueOnce(systemDid).mockResolvedValueOnce(tenantDid);
+
+      const result = await getDidById('sys-did', ORG_ID);
+
+      expect(result).toEqual({ ...systemDid, isDefault: false });
+    });
+
+    it('returns system DEFAULT DID with isDefault true when tenant has no default', async () => {
+      const systemDid = { ...DID_RECORD, id: 'sys-did', type: 'DEFAULT', isDefault: true, tenantId: 'system' };
+
+      // First call returns the system DID, second call finds no tenant default
+      mockDid.findFirst.mockResolvedValueOnce(systemDid).mockResolvedValueOnce(null);
+
+      const result = await getDidById('sys-did', ORG_ID);
+
+      expect(result).toEqual(systemDid);
+    });
   });
 
   describe('getDidByDid', () => {
@@ -220,6 +274,17 @@ describe('did.repository', () => {
 
       const result = await getDidByDid('did:web:nonexistent', ORG_ID);
       expect(result).toBeNull();
+    });
+
+    it('returns system DEFAULT DID with isDefault false when tenant has own default', async () => {
+      const systemDid = { ...DID_RECORD, type: 'DEFAULT', isDefault: true, tenantId: 'system' };
+      const tenantDid = { ...DID_RECORD, id: 'tenant-did', isDefault: true };
+
+      mockDid.findFirst.mockResolvedValueOnce(systemDid).mockResolvedValueOnce(tenantDid);
+
+      const result = await getDidByDid('did:web:example.com:org:123', ORG_ID);
+
+      expect(result).toEqual({ ...systemDid, isDefault: false });
     });
   });
 
@@ -291,6 +356,31 @@ describe('did.repository', () => {
           skip: 20,
         }),
       );
+    });
+
+    it('returns system DEFAULT DID with isDefault false when tenant has own default', async () => {
+      const systemDid = { ...DID_RECORD, id: 'sys-did', type: 'DEFAULT', isDefault: true, tenantId: 'system' };
+      const tenantDid = { ...DID_RECORD, id: 'tenant-did', type: 'MANAGED', isDefault: true };
+
+      mockDid.findMany.mockResolvedValue([systemDid, tenantDid]);
+      mockDid.count.mockResolvedValue(2);
+
+      const result = await listDids(ORG_ID);
+
+      expect(result.data[0]).toEqual(expect.objectContaining({ id: 'sys-did', isDefault: false }));
+      expect(result.data[1]).toEqual(expect.objectContaining({ id: 'tenant-did', isDefault: true }));
+    });
+
+    it('keeps system DEFAULT DID with isDefault true when tenant has no default', async () => {
+      const systemDid = { ...DID_RECORD, id: 'sys-did', type: 'DEFAULT', isDefault: true, tenantId: 'system' };
+      const tenantDid = { ...DID_RECORD, id: 'tenant-did', type: 'MANAGED', isDefault: false };
+
+      mockDid.findMany.mockResolvedValue([systemDid, tenantDid]);
+      mockDid.count.mockResolvedValue(2);
+
+      const result = await listDids(ORG_ID);
+
+      expect(result.data[0]).toEqual(expect.objectContaining({ id: 'sys-did', isDefault: true }));
     });
   });
 
@@ -421,14 +511,14 @@ describe('did.repository', () => {
   });
 
   describe('getDefaultDid', () => {
-    it('returns the default DID', async () => {
+    it('returns the system default DID when no tenantId is provided', async () => {
       const defaultDid = { ...DID_RECORD, isDefault: true, type: 'DEFAULT' };
       mockDid.findFirst.mockResolvedValue(defaultDid);
 
       const result = await getDefaultDid();
 
       expect(mockDid.findFirst).toHaveBeenCalledWith({
-        where: { isDefault: true },
+        where: { isDefault: true, type: 'DEFAULT' },
       });
       expect(result).toEqual(defaultDid);
     });
@@ -438,6 +528,34 @@ describe('did.repository', () => {
 
       const result = await getDefaultDid();
       expect(result).toBeNull();
+    });
+
+    it('returns tenant default DID when tenant has one set', async () => {
+      const tenantDid = { ...DID_RECORD, isDefault: true, type: 'MANAGED' };
+      mockDid.findFirst.mockResolvedValueOnce(tenantDid);
+
+      const result = await getDefaultDid(ORG_ID);
+
+      expect(mockDid.findFirst).toHaveBeenCalledWith({
+        where: { tenantId: ORG_ID, isDefault: true, type: { not: 'DEFAULT' } },
+      });
+      expect(result).toEqual(tenantDid);
+    });
+
+    it('falls back to system default when tenant has no default', async () => {
+      const systemDid = { ...DID_RECORD, isDefault: true, type: 'DEFAULT' };
+      mockDid.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(systemDid);
+
+      const result = await getDefaultDid(ORG_ID);
+
+      expect(mockDid.findFirst).toHaveBeenCalledTimes(2);
+      expect(mockDid.findFirst).toHaveBeenNthCalledWith(1, {
+        where: { tenantId: ORG_ID, isDefault: true, type: { not: 'DEFAULT' } },
+      });
+      expect(mockDid.findFirst).toHaveBeenNthCalledWith(2, {
+        where: { isDefault: true, type: 'DEFAULT' },
+      });
+      expect(result).toEqual(systemDid);
     });
   });
 });
