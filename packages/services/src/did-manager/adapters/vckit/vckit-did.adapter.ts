@@ -55,6 +55,11 @@ export class VCKitDidAdapter implements IDidService {
     this.logger = logger || createLogger().child({ service: 'DID - VCKitDid' });
   }
 
+  private getHostPrefix(): string {
+    const url = new URL(this.baseURL);
+    return url.port && url.port !== '443' && url.port !== '80' ? `${url.hostname}%3A${url.port}` : url.hostname;
+  }
+
   normaliseAlias(alias: string, method: DidMethod): string {
     switch (method) {
       case DidMethod.DID_WEB:
@@ -69,17 +74,10 @@ export class VCKitDidAdapter implements IDidService {
   async create(options: CreateDidOptions): Promise<DidRecord> {
     const provider = toProviderString(options.method);
 
-    // For MANAGED DIDs, prefix the alias with the VCKit host (VCKit hosts the
-    // DID document). For SELF_MANAGED DIDs, use the alias as-is because the
-    // user hosts their own DID document at their own domain.
-    let resolvedAlias: string;
-    if (options.type === DidType.SELF_MANAGED) {
-      resolvedAlias = options.alias;
-    } else {
-      const url = new URL(this.baseURL);
-      const host = url.port && url.port !== '443' && url.port !== '80' ? `${url.hostname}%3A${url.port}` : url.hostname;
-      resolvedAlias = `${host}:${options.alias}`;
-    }
+    // MANAGED DIDs are hosted by VCKit, so prefix the alias with the VCKit host.
+    // SELF_MANAGED DIDs are hosted at the user's own domain — use the alias as-is.
+    const resolvedAlias =
+      options.type === DidType.SELF_MANAGED ? options.alias : `${this.getHostPrefix()}:${options.alias}`;
 
     const payload = {
       alias: resolvedAlias,
