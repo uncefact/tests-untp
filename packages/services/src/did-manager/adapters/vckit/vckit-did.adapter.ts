@@ -219,7 +219,7 @@ export class VCKitDidAdapter implements IDidService {
     if (keyFetchFailed) {
       if (!result.errors) result.errors = [];
       result.errors.push({
-        check: DidVerificationCheckName.KEY_MATERIAL,
+        name: DidVerificationCheckName.KEY_MATERIAL,
         message: 'Provider key material could not be fetched — key_material check may be incomplete',
       });
     }
