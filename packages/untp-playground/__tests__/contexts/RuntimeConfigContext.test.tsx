@@ -7,7 +7,13 @@ import { RuntimeConfigProvider, useRuntimeConfig, defaultConfig } from '@/contex
 
 function ConfigConsumer() {
   const config = useRuntimeConfig();
-  return <span data-testid='headerTitle'>{config.headerTitle}</span>;
+  return (
+    <>
+      <span data-testid='headerTitle'>{config.headerTitle}</span>
+      <span data-testid='specUrl'>{config.specUrl}</span>
+      <span data-testid='testSuiteUrl'>{config.testSuiteUrl}</span>
+    </>
+  );
 }
 
 describe('RuntimeConfigContext', () => {
@@ -18,14 +24,24 @@ describe('RuntimeConfigContext', () => {
       </RuntimeConfigProvider>,
     );
     expect(screen.getByTestId('headerTitle')).toHaveTextContent('UNTP Playground');
+    expect(screen.getByTestId('specUrl')).toHaveTextContent('https://untp.unece.org');
+    expect(screen.getByTestId('testSuiteUrl')).toHaveTextContent('https://github.com/uncefact/tests-untp');
   });
 
   it('provides custom config values', () => {
     render(
-      <RuntimeConfigProvider config={{ headerTitle: 'Custom App' }}>
+      <RuntimeConfigProvider
+        config={{
+          headerTitle: 'Custom App',
+          specUrl: 'https://custom-spec.example.com',
+          testSuiteUrl: 'https://custom-tests.example.com',
+        }}
+      >
         <ConfigConsumer />
       </RuntimeConfigProvider>,
     );
     expect(screen.getByTestId('headerTitle')).toHaveTextContent('Custom App');
+    expect(screen.getByTestId('specUrl')).toHaveTextContent('https://custom-spec.example.com');
+    expect(screen.getByTestId('testSuiteUrl')).toHaveTextContent('https://custom-tests.example.com');
   });
 });

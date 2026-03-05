@@ -32,6 +32,8 @@ export async function generateMetadata(): Promise<Metadata> {
 function getRuntimeConfig(): RuntimeConfig {
   return {
     headerTitle: process.env.HEADER_TITLE || 'UNTP Playground',
+    specUrl: process.env.SPEC_URL || 'https://untp.unece.org',
+    testSuiteUrl: process.env.TEST_SUITE_URL || 'https://github.com/uncefact/tests-untp',
   };
 }
 
