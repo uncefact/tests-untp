@@ -1,12 +1,12 @@
 import { getMapper } from '@uncefact/untp-ri-services';
 import type { ICredentialMapper } from '@uncefact/untp-ri-services';
 import { listDataModels } from '@/lib/prisma/repositories';
-import type { DataModelWithRelations } from '@/lib/prisma/repositories';
+import type { DataModelListItem } from '@/lib/prisma/repositories';
 import { CredentialType } from '@/lib/prisma/generated';
 import { ValidationError } from '@/lib/api/validation';
 
 export type ResolvedDataModel = {
-  dataModel: DataModelWithRelations;
+  dataModel: DataModelListItem;
   mapper: ICredentialMapper;
   schemaUrls: string[];
 };
