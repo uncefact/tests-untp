@@ -264,7 +264,8 @@ export const POST = withPublicRoute(async (req) => {
   }
 
   // ── Step 5: Validate credential type ───────────────────────────────
-  if (credential.type !== 'EnvelopedVerifiableCredential') {
+  const types = Array.isArray(credential.type) ? credential.type : [credential.type];
+  if (!types.includes('EnvelopedVerifiableCredential')) {
     return NextResponse.json(
       { error: 'Only EnvelopedVerifiableCredential is supported', code: 'UNSUPPORTED_CREDENTIAL_TYPE' },
       { status: 422 },

@@ -397,6 +397,20 @@ describe('POST /api/v1/credentials/verify', () => {
     );
   });
 
+  it('accepts credential.type as an array (W3C VC Data Model)', async () => {
+    const arrayTypeCredential = {
+      ...ENVELOPED_CREDENTIAL,
+      type: ['VerifiableCredential', 'EnvelopedVerifiableCredential'],
+    };
+    mockFetch.mockResolvedValue(createFetchResponse(arrayTypeCredential));
+    mockVcService.verify.mockResolvedValue({ verified: true });
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.verified).toBe(true);
+  });
+
   // ── Service Errors ────────────────────────────────────────────────
 
   it('returns 500 when VC service resolution fails', async () => {
