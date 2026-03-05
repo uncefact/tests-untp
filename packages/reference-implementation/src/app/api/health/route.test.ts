@@ -16,17 +16,19 @@ describe('GET /api/health', () => {
     jest.clearAllMocks();
   });
 
-  it('returns healthy with 200', () => {
-    GET();
-
-    expect(NextResponse.json).toHaveBeenCalledWith(expect.objectContaining({ status: 'healthy' }));
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
-  it('includes a timestamp', () => {
+  it('returns a healthy status and the current timestamp', () => {
+    const mockDate = new Date('2024-01-01T00:00:00.000Z');
+    jest.useFakeTimers().setSystemTime(mockDate);
+
     GET();
 
-    const call = (NextResponse.json as jest.Mock).mock.calls[0][0];
-    expect(call.timestamp).toBeDefined();
-    expect(() => new Date(call.timestamp)).not.toThrow();
+    expect(NextResponse.json).toHaveBeenCalledWith({
+      status: 'healthy',
+      timestamp: '2024-01-01T00:00:00.000Z',
+    });
   });
 });
