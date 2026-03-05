@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import {
-  CredentialType,
   DidMethod,
   DidStatus,
   DidType,
@@ -372,7 +371,7 @@ async function main() {
     {
       id: 'cxuj555flzqtp4ldvklv6ya39',
       templateId: 'ctehlnyxvdpmp4kv1cxa0tj0t',
-      credentialType: CredentialType.DigitalProductPassport,
+      credentialType: 'DigitalProductPassport',
       version: '0.6.0',
       name: 'Digital Product Passport v0.6.0',
       shortCode: 'dpp',
@@ -381,7 +380,7 @@ async function main() {
     {
       id: 'c3imzyum0txv1y9xkww88aktp',
       templateId: 'cb6ka4fhk68m1wqeitptm24z1',
-      credentialType: CredentialType.DigitalConformityCredential,
+      credentialType: 'DigitalConformityCredential',
       version: '0.6.0',
       name: 'Digital Conformity Credential v0.6.0',
       shortCode: 'dcc',
@@ -390,7 +389,7 @@ async function main() {
     {
       id: 'ctfgtrsuiwv1fedo9t5swxhnk',
       templateId: 'c62zomihgkn6iimbv7dzhr1fj',
-      credentialType: CredentialType.DigitalFacilityRecord,
+      credentialType: 'DigitalFacilityRecord',
       version: '0.6.0',
       name: 'Digital Facility Record v0.6.0',
       shortCode: 'dfr',
@@ -399,7 +398,7 @@ async function main() {
     {
       id: 'cz9raijqcay5nzmq59geoggrk',
       templateId: 'cv2ldbzupwtbluam7nrfqqv1e',
-      credentialType: CredentialType.DigitalIdentityAnchor,
+      credentialType: 'DigitalIdentityAnchor',
       version: '0.6.0',
       name: 'Digital Identity Anchor v0.6.0',
       shortCode: 'dia',
@@ -408,7 +407,7 @@ async function main() {
     {
       id: 'crqvpwffc0k2p4bvr8za1ii6j',
       templateId: 'c1fx8t9k9p6q8wcaxib6e6id1',
-      credentialType: CredentialType.DigitalTraceabilityEvent,
+      credentialType: 'DigitalTraceabilityEvent',
       version: '0.6.0',
       name: 'Digital Traceability Event v0.6.0',
       shortCode: 'dte',
@@ -417,7 +416,7 @@ async function main() {
     {
       id: 'c1pxfzzkeb86jgeel7hrvmcle',
       templateId: 'co3tub0ndto2lzq9l4rsnw22y',
-      credentialType: CredentialType.DigitalProductPassport,
+      credentialType: 'DigitalProductPassport',
       version: '0.6.1',
       name: 'Digital Product Passport v0.6.1',
       shortCode: 'dpp',
@@ -426,7 +425,7 @@ async function main() {
     {
       id: 'cttpz40pfgcfeue2wmbc3jti8',
       templateId: 'cx5qp969tkboeem04szgwyb32',
-      credentialType: CredentialType.DigitalConformityCredential,
+      credentialType: 'DigitalConformityCredential',
       version: '0.6.1',
       name: 'Digital Conformity Credential v0.6.1',
       shortCode: 'dcc',
@@ -435,7 +434,7 @@ async function main() {
     {
       id: 'csrtste8ai2llop7ui8u6n11l',
       templateId: 'c91eyblwyejyfoq1pfqsik0ty',
-      credentialType: CredentialType.DigitalFacilityRecord,
+      credentialType: 'DigitalFacilityRecord',
       version: '0.6.1',
       name: 'Digital Facility Record v0.6.1',
       shortCode: 'dfr',
@@ -444,7 +443,7 @@ async function main() {
     {
       id: 'cn5u63huxvqgdwppebaxmqt9l',
       templateId: 'c5khe5ju6ai3ptaw55r01vayo',
-      credentialType: CredentialType.DigitalIdentityAnchor,
+      credentialType: 'DigitalIdentityAnchor',
       version: '0.6.1',
       name: 'Digital Identity Anchor v0.6.1',
       shortCode: 'dia',
@@ -453,7 +452,7 @@ async function main() {
     {
       id: 'cwb7m3k0hpz9xqft6rjn2oe4s',
       templateId: 'c8yvd2gnmr5w1kbjx4hq0zp7f',
-      credentialType: CredentialType.DigitalTraceabilityEvent,
+      credentialType: 'DigitalTraceabilityEvent',
       version: '0.6.1',
       name: 'Digital Traceability Event v0.6.1',
       shortCode: 'dte',

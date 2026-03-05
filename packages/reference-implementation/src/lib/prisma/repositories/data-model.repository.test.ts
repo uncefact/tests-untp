@@ -96,7 +96,7 @@ describe('data-model.repository', () => {
 
       const result = await createDataModel(TENANT_ID, {
         name: 'Digital Product Passport v0.6.0',
-        credentialType: 'DigitalProductPassport' as never,
+        credentialType: 'DigitalProductPassport',
         version: '0.6.0',
         schemaUrl: 'https://example.com/schema.json',
         contextUrl: 'https://example.com/context.jsonld',
@@ -124,7 +124,7 @@ describe('data-model.repository', () => {
 
       const result = await createDataModel(TENANT_ID, {
         name: 'Custom DPP Extension',
-        credentialType: 'DigitalProductPassport' as never,
+        credentialType: 'DigitalProductPassport',
         version: '0.6.0',
         schemaUrl: 'https://example.com/ext-schema.json',
         contextUrl: 'https://example.com/ext-context.jsonld',
@@ -143,7 +143,7 @@ describe('data-model.repository', () => {
       await expect(
         createDataModel(TENANT_ID, {
           name: 'Extension Without Parent',
-          credentialType: 'DigitalProductPassport' as never,
+          credentialType: 'DigitalProductPassport',
           version: '0.6.0',
           schemaUrl: 'https://example.com/schema.json',
           contextUrl: 'https://example.com/context.jsonld',
@@ -158,7 +158,7 @@ describe('data-model.repository', () => {
       await expect(
         createDataModel(TENANT_ID, {
           name: 'Extension With Invalid Parent',
-          credentialType: 'DigitalProductPassport' as never,
+          credentialType: 'DigitalProductPassport',
           version: '0.6.0',
           schemaUrl: 'https://example.com/schema.json',
           contextUrl: 'https://example.com/context.jsonld',
@@ -177,7 +177,7 @@ describe('data-model.repository', () => {
       await expect(
         createDataModel(TENANT_ID, {
           name: 'Extension With Extension Parent',
-          credentialType: 'DigitalProductPassport' as never,
+          credentialType: 'DigitalProductPassport',
           version: '0.6.0',
           schemaUrl: 'https://example.com/schema.json',
           contextUrl: 'https://example.com/context.jsonld',
@@ -193,7 +193,7 @@ describe('data-model.repository', () => {
 
       await createDataModel(TENANT_ID, {
         name: 'Default Extension',
-        credentialType: 'DigitalProductPassport' as never,
+        credentialType: 'DigitalProductPassport',
         version: '0.6.0',
         schemaUrl: 'https://example.com/schema.json',
         contextUrl: 'https://example.com/context.jsonld',
@@ -278,7 +278,7 @@ describe('data-model.repository', () => {
       mockDataModel.count.mockResolvedValue(0);
 
       await listDataModels(TENANT_ID, {
-        credentialType: 'DigitalProductPassport' as never,
+        credentialType: 'DigitalProductPassport',
       });
 
       const expectedWhere = expect.objectContaining({ credentialType: 'DigitalProductPassport' });

@@ -2,7 +2,6 @@ import { getMapper } from '@uncefact/untp-ri-services';
 import type { ICredentialMapper } from '@uncefact/untp-ri-services';
 import { listDataModels } from '@/lib/prisma/repositories';
 import type { DataModelListItem } from '@/lib/prisma/repositories';
-import { CredentialType } from '@/lib/prisma/generated';
 import { ValidationError } from '@/lib/api/validation';
 
 export type ResolvedDataModel = {
@@ -24,7 +23,7 @@ export async function resolveDataModel(
   version: string,
 ): Promise<ResolvedDataModel> {
   const { data: dataModels } = await listDataModels(tenantId, {
-    credentialType: credentialType as CredentialType,
+    credentialType,
     version,
   });
 

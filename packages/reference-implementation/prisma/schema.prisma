@@ -46,14 +46,6 @@ enum ProductLevel {
   ITEM
 }
 
-enum CredentialType {
-  DigitalProductPassport
-  DigitalConformityCredential
-  DigitalFacilityRecord
-  DigitalIdentityAnchor
-  DigitalTraceabilityEvent
-}
-
 enum RenderMethodType {
   RenderTemplate2024
   WebRenderingTemplate2022
@@ -441,7 +433,7 @@ model DataModel {
   tenant           Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   name             String
-  credentialType   CredentialType
+  credentialType   String
   version          String
 
   isExtension      Boolean   @default(true)

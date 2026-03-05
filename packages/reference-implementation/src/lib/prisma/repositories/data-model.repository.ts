@@ -1,4 +1,4 @@
-import { CredentialType, Prisma } from '../generated';
+import { Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
@@ -43,7 +43,7 @@ export type DataModelListItem = Prisma.DataModelGetPayload<{
  */
 export type CreateDataModelInput = {
   name: string;
-  credentialType: CredentialType;
+  credentialType: string;
   version: string;
   schemaUrl: string;
   contextUrl: string;
@@ -68,7 +68,7 @@ export type UpdateDataModelInput = {
  */
 export type ListDataModelOptions = {
   isExtension?: boolean;
-  credentialType?: CredentialType;
+  credentialType?: string;
   version?: string;
   limit?: number;
   offset?: number;
