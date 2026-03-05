@@ -39,6 +39,36 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
+    it('GET /api/v1/data-models — list items do not include extensions or renderTemplates', () => {
+      cy.request('/api/v1/data-models').then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.data).to.be.an('array').that.is.not.empty;
+        response.body.data.forEach((dm: any) => {
+          expect(dm).to.not.have.property('extensions');
+          expect(dm).to.not.have.property('renderTemplates');
+        });
+      });
+    });
+
+    it('GET /api/v1/data-models/:id — detail response includes extensions and renderTemplates', function () {
+      if (!parentConfigId) this.skip();
+
+      cy.request(`/api/v1/data-models/${parentConfigId}`).then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body).to.have.property('extensions').that.is.an('array');
+        expect(response.body).to.have.property('renderTemplates').that.is.an('array');
+      });
+    });
+
+    it('GET /api/v1/data-models — filters by version', () => {
+      cy.request('/api/v1/data-models?version=0.6.0').then((response) => {
+        expect(response.status).to.eq(200);
+        response.body.data.forEach((dm: any) => {
+          expect(dm.version).to.eq('0.6.0');
+        });
+      });
+    });
+
     it('GET /api/v1/data-models — filters by isExtension=false', () => {
       cy.request('/api/v1/data-models?isExtension=false').then((response) => {
         expect(response.status).to.eq(200);
@@ -181,6 +211,32 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
+    it('POST /api/v1/data-models — accepts a custom credentialType for extensions', function () {
+      if (!parentConfigId) this.skip();
+
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/data-models',
+        body: {
+          name: `E2E Custom Type Extension ${RUN_ID}`,
+          credentialType: 'DigitalLivestockPassport',
+          version: '0.4.0',
+          schemaUrl: `https://example.com/e2e-custom-${RUN_ID}/schema.json`,
+          contextUrl: `https://example.com/e2e-custom-${RUN_ID}/context.jsonld`,
+          parentConfigId,
+          websiteUrl: `https://example.com/e2e-custom-${RUN_ID}`,
+        },
+      }).then((response) => {
+        expect(response.status).to.eq(201);
+        expect(response.body.credentialType).to.eq('DigitalLivestockPassport');
+        expect(response.body.isExtension).to.be.true;
+        expect(response.body.parentConfigId).to.eq(parentConfigId);
+
+        // Clean up
+        cy.request({ method: 'DELETE', url: `/api/v1/data-models/${response.body.id}` });
+      });
+    });
+
     it('DELETE /api/v1/data-models/:id — deletes the data model extension', function () {
       if (!createdDataModelId) this.skip();
 
@@ -241,24 +297,6 @@ describe('Data Model API', { testIsolation: false }, () => {
         url: '/api/v1/data-models',
         body: {
           name: 'Test',
-          version: '0.6.1',
-          schemaUrl: 'https://example.com/schema.json',
-          contextUrl: 'https://example.com/context.jsonld',
-          parentConfigId: 'some-id',
-        },
-        failOnStatusCode: false,
-      }).then((response) => {
-        expect(response.status).to.eq(400);
-      });
-    });
-
-    it('returns 400 when credentialType is invalid', () => {
-      cy.request({
-        method: 'POST',
-        url: '/api/v1/data-models',
-        body: {
-          name: 'Test',
-          credentialType: 'InvalidType',
           version: '0.6.1',
           schemaUrl: 'https://example.com/schema.json',
           contextUrl: 'https://example.com/context.jsonld',
@@ -342,16 +380,6 @@ describe('Data Model API', { testIsolation: false }, () => {
       cy.request({
         method: 'GET',
         url: '/api/v1/data-models?isExtension=maybe',
-        failOnStatusCode: false,
-      }).then((response) => {
-        expect(response.status).to.eq(400);
-      });
-    });
-
-    it('returns 400 for invalid credentialType filter', () => {
-      cy.request({
-        method: 'GET',
-        url: '/api/v1/data-models?credentialType=InvalidType',
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
