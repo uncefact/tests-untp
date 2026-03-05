@@ -75,6 +75,7 @@ async function applyTenantPrimaryOverride(
       serviceType: instance.serviceType,
       isPrimary: true,
     },
+    select: { id: true },
   });
 
   return tenantPrimary ? { ...instance, isPrimary: false } : instance;
@@ -133,18 +134,14 @@ export async function listServiceInstances(
 
   const tenantPrimaryTypes = new Set(tenantPrimaries.map((p) => p.serviceType));
 
-  if (tenantPrimaryTypes.size > 0) {
-    return {
-      data: data.map((i) =>
-        i.tenantId === SYSTEM_TENANT_ID && i.isPrimary && tenantPrimaryTypes.has(i.serviceType)
-          ? { ...i, isPrimary: false }
-          : i,
-      ),
-      total,
-    };
-  }
-
-  return { data, total };
+  return {
+    data: data.map((i) =>
+      i.tenantId === SYSTEM_TENANT_ID && i.isPrimary && tenantPrimaryTypes.has(i.serviceType)
+        ? { ...i, isPrimary: false }
+        : i,
+    ),
+    total,
+  };
 }
 
 /**
