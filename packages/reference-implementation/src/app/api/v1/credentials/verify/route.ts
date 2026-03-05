@@ -188,7 +188,8 @@ export const POST = withPublicRoute(async (req) => {
   let responseText: string;
   try {
     responseText = await fetchResponse.text();
-  } catch {
+  } catch (e: unknown) {
+    logger.warn({ uri: body.uri, err: e }, 'Failed to read credential response body');
     return NextResponse.json({ error: 'Failed to read credential response', code: 'UPSTREAM_ERROR' }, { status: 502 });
   }
 
@@ -203,7 +204,8 @@ export const POST = withPublicRoute(async (req) => {
   let fetchedData: unknown;
   try {
     fetchedData = JSON.parse(responseText);
-  } catch {
+  } catch (e: unknown) {
+    logger.warn({ uri: body.uri }, 'Storage URI returned non-JSON response');
     return NextResponse.json(
       { error: 'Response from storage URI is not valid JSON', code: 'INVALID_RESPONSE' },
       { status: 422 },
@@ -241,8 +243,8 @@ export const POST = withPublicRoute(async (req) => {
         type: encrypted.type as EncryptionAlgorithm,
       });
       credential = JSON.parse(decryptedString);
-    } catch {
-      logger.warn('Credential decryption failed');
+    } catch (e: unknown) {
+      logger.warn({ uri: body.uri, err: e }, 'Credential decryption failed');
       return NextResponse.json({ error: 'Failed to decrypt credential', code: 'DECRYPTION_FAILED' }, { status: 422 });
     }
   } else {
@@ -266,6 +268,7 @@ export const POST = withPublicRoute(async (req) => {
   // ── Step 5: Validate credential type ───────────────────────────────
   const types = Array.isArray(credential.type) ? credential.type : [credential.type];
   if (!types.includes('EnvelopedVerifiableCredential')) {
+    logger.warn({ uri: body.uri, credentialType: credential.type }, 'Unsupported credential type');
     return NextResponse.json(
       { error: 'Only EnvelopedVerifiableCredential is supported', code: 'UNSUPPORTED_CREDENTIAL_TYPE' },
       { status: 422 },
@@ -284,8 +287,8 @@ export const POST = withPublicRoute(async (req) => {
   try {
     const jwt = (credential.id as string).replace('data:application/vc+jwt,', '');
     decodedCredential = decodeJwt(jwt) as unknown as Record<string, unknown>;
-  } catch {
-    logger.warn('Failed to decode JWT from enveloped credential');
+  } catch (e: unknown) {
+    logger.warn({ err: e }, 'Failed to decode JWT from enveloped credential');
   }
 
   // ── Step 8: Return result ──────────────────────────────────────────

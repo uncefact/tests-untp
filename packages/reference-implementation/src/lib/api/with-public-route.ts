@@ -27,7 +27,7 @@ export function withPublicRoute(handler: PublicRouteHandler) {
         const errorResponse = handleRouteError(e);
         const logLevel = errorResponse.status >= 500 ? 'error' : 'warn';
         logger[logLevel](
-          { method, path, status: errorResponse.status, durationMs: Date.now() - start },
+          { method, path, status: errorResponse.status, durationMs: Date.now() - start, err: e },
           'Request completed with error',
         );
         return errorResponse;

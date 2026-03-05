@@ -291,6 +291,16 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.code).toBe('DECRYPTION_FAILED');
   });
 
+  it('returns 422 when decrypted output is not valid JSON', async () => {
+    mockFetch.mockResolvedValue(createFetchResponse(ENCRYPTED_DATA));
+    mockDecryptCredential.mockReturnValue('not-valid-json{{{');
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI, decryptionKey: VALID_KEY }));
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.code).toBe('DECRYPTION_FAILED');
+  });
+
   it('returns 422 when hash does not match', async () => {
     mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
     mockComputeHash.mockReturnValue('c'.repeat(64));
@@ -421,5 +431,15 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(res.status).toBe(500);
     const json = await res.json();
     expect(json.error).toContain('No service instance available');
+  });
+
+  it('returns 500 when vcService.verify() throws unexpectedly', async () => {
+    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockVcService.verify.mockRejectedValue(new Error('VCKit connection refused'));
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.error).toBe('VCKit connection refused');
   });
 });
