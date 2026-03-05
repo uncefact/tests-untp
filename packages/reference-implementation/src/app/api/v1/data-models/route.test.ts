@@ -224,6 +224,18 @@ describe('GET /api/v1/data-models', () => {
     });
   });
 
+  it('clamps limit to maximum of 100', async () => {
+    mockListDataModels.mockResolvedValue({ data: [], total: 0 });
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/data-models?limit=500',
+    });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListDataModels).toHaveBeenCalledWith('tenant-1', expect.objectContaining({ limit: 100 }));
+  });
+
   it('returns 400 for non-numeric limit', async () => {
     const req = createFakeRequest({
       method: 'GET',
@@ -459,6 +471,25 @@ describe('POST /api/v1/data-models', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('parentConfigId is required');
+  });
+
+  it('returns 400 when websiteUrl is empty string', async () => {
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+        websiteUrl: '',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('websiteUrl must be a non-empty string');
   });
 
   it('returns 400 for invalid JSON body', async () => {

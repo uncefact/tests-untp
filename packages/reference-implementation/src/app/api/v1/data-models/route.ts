@@ -14,6 +14,8 @@ import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/data-models' });
 
+const MAX_LIMIT = 100;
+
 /**
  * Parse a boolean string query parameter ("true" or "false").
  * Returns undefined if the raw value is null/undefined.
@@ -57,7 +59,8 @@ function parseBooleanParam(raw: string | null | undefined, paramName: string): b
  *         schema:
  *           type: integer
  *           minimum: 1
- *         description: Maximum number of results to return
+ *           maximum: 100
+ *         description: Maximum number of results to return (capped at 100)
  *       - in: query
  *         name: offset
  *         schema:
@@ -108,7 +111,8 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
     'credentialType',
   );
   const version = url.searchParams.get('version') ?? undefined;
-  const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_LIMIT) : undefined;
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   logger.info(
@@ -232,6 +236,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   if (!isNonEmptyString(body.contextUrl)) throw new ValidationError('contextUrl is required');
   if (!isNonEmptyString(body.parentConfigId)) {
     throw new ValidationError('parentConfigId is required');
+  }
+  if (body.websiteUrl !== undefined && !isNonEmptyString(body.websiteUrl)) {
+    throw new ValidationError('websiteUrl must be a non-empty string');
   }
 
   logger.info({ tenantId, credentialType, name: body.name }, 'Creating data model extension');

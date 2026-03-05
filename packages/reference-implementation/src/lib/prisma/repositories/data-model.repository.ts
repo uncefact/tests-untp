@@ -142,7 +142,7 @@ export async function listDataModels(
     where.version = version;
   }
 
-  const [data, total] = await Promise.all([
+  const [data, total] = await prisma.$transaction([
     prisma.dataModel.findMany({
       where,
       include: DATA_MODEL_INCLUDE,

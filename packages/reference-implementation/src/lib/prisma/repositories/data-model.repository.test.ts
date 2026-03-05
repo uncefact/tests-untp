@@ -26,7 +26,12 @@ jest.mock('../prisma', () => ({
       findMany: jest.fn(),
       count: jest.fn(),
     },
-    $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
+    $transaction: jest.fn((arg: unknown) => {
+      // Batch form: $transaction([promise1, promise2])
+      if (Array.isArray(arg)) return Promise.all(arg);
+      // Interactive form: $transaction(async (tx) => { ... })
+      return (arg as (tx: typeof mockTx) => Promise<unknown>)(mockTx);
+    }),
   },
 }));
 

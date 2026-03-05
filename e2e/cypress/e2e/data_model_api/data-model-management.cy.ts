@@ -9,9 +9,7 @@ describe('Data Model API', { testIsolation: false }, () => {
 
     // Find a core data model to use as parent for extension tests
     cy.request('/api/v1/data-models').then((response) => {
-      const core = response.body.dataModels.find(
-        (dm: any) => !dm.isExtension,
-      );
+      const core = response.body.data.find((dm: any) => !dm.isExtension);
       if (core) {
         parentConfigId = core.id;
       }
@@ -26,15 +24,16 @@ describe('Data Model API', { testIsolation: false }, () => {
     it('GET /api/v1/data-models — lists data models including system defaults', () => {
       cy.request('/api/v1/data-models').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.dataModels).to.be.an('array');
+        expect(response.body.data).to.be.an('array');
+        expect(response.body.pagination).to.exist;
+        expect(response.body.pagination.total).to.be.a('number');
       });
     });
 
     it('GET /api/v1/data-models — filters by credentialType', () => {
       cy.request('/api/v1/data-models?credentialType=DigitalProductPassport').then((response) => {
         expect(response.status).to.eq(200);
-        response.body.dataModels.forEach((dm: any) => {
+        response.body.data.forEach((dm: any) => {
           expect(dm.credentialType).to.eq('DigitalProductPassport');
         });
       });
@@ -43,7 +42,7 @@ describe('Data Model API', { testIsolation: false }, () => {
     it('GET /api/v1/data-models — filters by isExtension=false', () => {
       cy.request('/api/v1/data-models?isExtension=false').then((response) => {
         expect(response.status).to.eq(200);
-        response.body.dataModels.forEach((dm: any) => {
+        response.body.data.forEach((dm: any) => {
           expect(dm.isExtension).to.be.false;
         });
       });
@@ -67,14 +66,12 @@ describe('Data Model API', { testIsolation: false }, () => {
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.dataModel).to.exist;
-        expect(response.body.dataModel.name).to.eq(`E2E DPP Extension ${RUN_ID}`);
-        expect(response.body.dataModel.credentialType).to.eq('DigitalProductPassport');
-        expect(response.body.dataModel.version).to.eq('0.6.1');
-        expect(response.body.dataModel.isExtension).to.be.true;
+        expect(response.body.name).to.eq(`E2E DPP Extension ${RUN_ID}`);
+        expect(response.body.credentialType).to.eq('DigitalProductPassport');
+        expect(response.body.version).to.eq('0.6.1');
+        expect(response.body.isExtension).to.be.true;
 
-        createdDataModelId = response.body.dataModel.id;
+        createdDataModelId = response.body.id;
       });
     });
 
@@ -95,10 +92,10 @@ describe('Data Model API', { testIsolation: false }, () => {
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.dataModel.websiteUrl).to.eq(`https://example.com/e2e-dcc-${RUN_ID}`);
+        expect(response.body.websiteUrl).to.eq(`https://example.com/e2e-dcc-${RUN_ID}`);
 
         // Clean up — only keep the first extension for remaining tests
-        cy.request({ method: 'DELETE', url: `/api/v1/data-models/${response.body.dataModel.id}` });
+        cy.request({ method: 'DELETE', url: `/api/v1/data-models/${response.body.id}` });
       });
     });
 
@@ -107,9 +104,7 @@ describe('Data Model API', { testIsolation: false }, () => {
 
       cy.request('/api/v1/data-models').then((response) => {
         expect(response.status).to.eq(200);
-        const found = response.body.dataModels.find(
-          (dm: any) => dm.id === createdDataModelId,
-        );
+        const found = response.body.data.find((dm: any) => dm.id === createdDataModelId);
         expect(found).to.exist;
       });
     });
@@ -117,7 +112,7 @@ describe('Data Model API', { testIsolation: false }, () => {
     it('GET /api/v1/data-models — filters by isExtension=true', () => {
       cy.request('/api/v1/data-models?isExtension=true').then((response) => {
         expect(response.status).to.eq(200);
-        response.body.dataModels.forEach((dm: any) => {
+        response.body.data.forEach((dm: any) => {
           expect(dm.isExtension).to.be.true;
         });
       });
@@ -128,9 +123,8 @@ describe('Data Model API', { testIsolation: false }, () => {
 
       cy.request(`/api/v1/data-models/${createdDataModelId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.dataModel.id).to.eq(createdDataModelId);
-        expect(response.body.dataModel.name).to.eq(`E2E DPP Extension ${RUN_ID}`);
+        expect(response.body.id).to.eq(createdDataModelId);
+        expect(response.body.name).to.eq(`E2E DPP Extension ${RUN_ID}`);
       });
     });
 
@@ -143,8 +137,7 @@ describe('Data Model API', { testIsolation: false }, () => {
         body: { name: `Updated E2E Extension ${RUN_ID}` },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.dataModel.name).to.eq(`Updated E2E Extension ${RUN_ID}`);
+        expect(response.body.name).to.eq(`Updated E2E Extension ${RUN_ID}`);
       });
     });
 
@@ -160,8 +153,8 @@ describe('Data Model API', { testIsolation: false }, () => {
         },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.dataModel.schemaUrl).to.eq(`https://example.com/e2e-updated-${RUN_ID}/schema.json`);
-        expect(response.body.dataModel.contextUrl).to.eq(`https://example.com/e2e-updated-${RUN_ID}/context.jsonld`);
+        expect(response.body.schemaUrl).to.eq(`https://example.com/e2e-updated-${RUN_ID}/schema.json`);
+        expect(response.body.contextUrl).to.eq(`https://example.com/e2e-updated-${RUN_ID}/context.jsonld`);
       });
     });
 
@@ -170,8 +163,8 @@ describe('Data Model API', { testIsolation: false }, () => {
 
       cy.request(`/api/v1/data-models/${createdDataModelId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.dataModel.name).to.eq(`Updated E2E Extension ${RUN_ID}`);
-        expect(response.body.dataModel.schemaUrl).to.eq(`https://example.com/e2e-updated-${RUN_ID}/schema.json`);
+        expect(response.body.name).to.eq(`Updated E2E Extension ${RUN_ID}`);
+        expect(response.body.schemaUrl).to.eq(`https://example.com/e2e-updated-${RUN_ID}/schema.json`);
       });
     });
 
@@ -180,7 +173,6 @@ describe('Data Model API', { testIsolation: false }, () => {
 
       cy.request(`/api/v1/data-models/${createdDataModelId}/form-config`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
         expect(response.body.formConfig).to.exist;
         expect(response.body.formConfig.dataModelId).to.eq(createdDataModelId);
         expect(response.body.formConfig.credentialType).to.eq('DigitalProductPassport');
@@ -196,8 +188,7 @@ describe('Data Model API', { testIsolation: false }, () => {
         method: 'DELETE',
         url: `/api/v1/data-models/${createdDataModelId}`,
       }).then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
+        expect(response.status).to.eq(204);
       });
     });
 
@@ -218,7 +209,10 @@ describe('Data Model API', { testIsolation: false }, () => {
     it('supports limit and offset parameters', () => {
       cy.request('/api/v1/data-models?limit=1&offset=0').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.dataModels.length).to.be.at.most(1);
+        expect(response.body.data.length).to.be.at.most(1);
+        expect(response.body.pagination).to.exist;
+        expect(response.body.pagination.limit).to.eq(1);
+        expect(response.body.pagination.offset).to.eq(0);
       });
     });
   });
@@ -400,7 +394,7 @@ describe('Data Model API', { testIsolation: false }, () => {
           parentConfigId,
         },
       }).then((createResponse) => {
-        const tempId = createResponse.body.dataModel.id;
+        const tempId = createResponse.body.id;
 
         cy.request({
           method: 'PATCH',
