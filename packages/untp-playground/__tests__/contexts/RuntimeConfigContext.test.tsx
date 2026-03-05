@@ -7,7 +7,7 @@ import { RuntimeConfigProvider, useRuntimeConfig, defaultConfig } from '@/contex
 
 function ConfigConsumer() {
   const config = useRuntimeConfig();
-  return <span data-testid="headerTitle">{config.headerTitle}</span>;
+  return <span data-testid='headerTitle'>{config.headerTitle}</span>;
 }
 
 describe('RuntimeConfigContext', () => {

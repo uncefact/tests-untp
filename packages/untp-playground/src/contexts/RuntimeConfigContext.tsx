@@ -12,13 +12,7 @@ const defaultConfig: RuntimeConfig = {
 
 const RuntimeConfigContext = createContext<RuntimeConfig>(defaultConfig);
 
-export function RuntimeConfigProvider({
-  config,
-  children,
-}: {
-  config: RuntimeConfig;
-  children: React.ReactNode;
-}) {
+export function RuntimeConfigProvider({ config, children }: { config: RuntimeConfig; children: React.ReactNode }) {
   return <RuntimeConfigContext.Provider value={config}>{children}</RuntimeConfigContext.Provider>;
 }
 
