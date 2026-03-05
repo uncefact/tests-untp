@@ -52,7 +52,7 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
         assessmentLevel: 'Unspecified',
         attestationType: 'certification',
         issuedToParty: {
-          type: ['Entity'],
+          type: ['Party'],
           id: `https://example.com/e2e-cvc/party/${uniqueSuffix}`,
           name: `E2E Test Party ${RUN_ID}`,
         },
@@ -66,7 +66,7 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
                 version: '1.0.0',
                 validFrom: '2025-01-01',
                 owner: {
-                  type: ['Entity'],
+                  type: ['Party'],
                   id: 'https://example.com/e2e-cvc/scheme-owner',
                   name: 'E2E Scheme Owner',
                 },
