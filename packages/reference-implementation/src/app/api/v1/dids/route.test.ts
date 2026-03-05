@@ -318,7 +318,11 @@ describe('POST /api/v1/dids', () => {
     });
     await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
-    expect(mockDidService.normaliseAlias).toHaveBeenCalledWith('My Normalised Alias', DidMethod.DID_WEB);
+    expect(mockDidService.normaliseAlias).toHaveBeenCalledWith(
+      'My Normalised Alias',
+      DidMethod.DID_WEB,
+      DidType.MANAGED,
+    );
     expect(mockDidService.create).toHaveBeenCalledWith(expect.objectContaining({ alias: 'my-normalised-alias' }));
   });
 

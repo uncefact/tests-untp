@@ -116,6 +116,10 @@ describe('normaliseSelfManagedAlias', () => {
     expect(normaliseSelfManagedAlias('example.com:my_org@123!')).toBe('example.com:myorg123');
   });
 
+  it('handles complex whitespace and invalid characters', () => {
+    expect(normaliseSelfManagedAlias('  my-domain.com : my org  ')).toBe('my-domain.com:my-org');
+  });
+
   it('preserves hyphens', () => {
     expect(normaliseSelfManagedAlias('my-domain.io:my-org')).toBe('my-domain.io:my-org');
   });

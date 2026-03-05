@@ -91,14 +91,22 @@ export function normaliseDidWebAlias(alias: string): string {
  *
  * - Lowercases the input
  * - Trims whitespace
+ * - Collapses whitespace around structural characters (dots, colons, hyphens)
+ * - Replaces remaining whitespace with hyphens
  * - Keeps alphanumeric characters, dots, colons, and hyphens
+ * - Collapses consecutive hyphens
+ * - Trims leading/trailing hyphens
  * - Throws if the result is empty
  */
 export function normaliseSelfManagedAlias(alias: string): string {
   const normalised = alias
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9.:-]/g, '');
+    .replace(/\s*([:.-])\s*/g, '$1')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9.:-]/g, '')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-|-$/g, '');
 
   if (!normalised) {
     throw new DidInputError(`alias "${alias}" produces an empty identifier after normalisation`);
