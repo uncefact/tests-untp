@@ -142,7 +142,7 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
 
     // Look up the system default DID
     cy.request('/api/v1/dids').then((response) => {
-      const defaultDid = response.body.dids.find(
+      const defaultDid = response.body.data.find(
         (d: any) => d.isDefault === true,
       );
       expect(defaultDid).to.exist;
