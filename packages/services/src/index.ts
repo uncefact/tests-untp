@@ -34,7 +34,12 @@ export {
   verificationResultResponseSchema,
   didDocumentResponseSchema,
 } from './did-manager/schemas.js';
-export { didWebToUrl, parseDidMethod, normaliseDidWebAlias } from './did-manager/common/utils.js';
+export {
+  didWebToUrl,
+  parseDidMethod,
+  normaliseDidWebAlias,
+  normaliseSelfManagedAlias,
+} from './did-manager/common/utils.js';
 // Encryption
 export { AesGcmEncryptionAdapter } from './encryption/adapters/aes-gcm/aes-gcm.adapter.js';
 export { EncryptionAlgorithm, assertPermittedAlgorithm } from './encryption/encryption.interface.js';

@@ -81,3 +81,39 @@ export function normaliseDidWebAlias(alias: string): string {
 
   return normalised;
 }
+
+/**
+ * Light normalisation for self-managed DID aliases that include a domain.
+ *
+ * Unlike `normaliseDidWebAlias` (which strips dots and colons for single-segment
+ * aliases), this preserves dots and colons because self-managed aliases include
+ * the full domain and DID path.
+ *
+ * - Lowercases the input
+ * - Trims whitespace
+ * - Strips whitespace adjacent to structural characters (dots, colons, hyphens)
+ * - Replaces remaining whitespace with hyphens
+ * - Keeps alphanumeric characters, dots, colons, and hyphens
+ * - Collapses consecutive hyphens
+ * - Trims leading/trailing hyphens
+ * - Throws if the result is empty
+ */
+export function normaliseSelfManagedAlias(alias: string): string {
+  // Split on structural characters, trim each segment, then rejoin.
+  // This avoids polynomial regex when stripping whitespace around delimiters.
+  const trimmed = alias.toLowerCase().trim();
+  const tokens = trimmed.split(/([:.-])/);
+  const rejoined = tokens.map((t) => t.trim()).join('');
+
+  const normalised = rejoined
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9.:-]/g, '')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-|-$/g, '');
+
+  if (!normalised) {
+    throw new DidInputError(`alias "${alias}" produces an empty identifier after normalisation`);
+  }
+
+  return normalised;
+}
