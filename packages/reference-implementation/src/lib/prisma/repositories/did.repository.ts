@@ -40,50 +40,92 @@ export type ListDidsOptions = {
 };
 
 /**
- * Creates a new DID record scoped to an organisation
+ * Creates a new DID record scoped to an organisation.
+ * When isDefault is true, clears any existing tenant default
+ * (excluding system DEFAULT type DIDs) within a transaction.
  */
 export async function createDid(input: CreateDidInput): Promise<Did> {
-  return prisma.did.create({
-    data: {
-      tenantId: input.tenantId,
-      did: input.did,
-      type: input.type,
-      method: input.method ?? 'DID_WEB',
-      keyId: input.keyId,
-      name: input.name ?? input.did,
-      description: input.description,
-      isDefault: input.isDefault ?? false,
-      status: input.status ?? 'UNVERIFIED',
-      serviceInstanceId: input.serviceInstanceId,
-    },
-  });
+  const data = {
+    tenantId: input.tenantId,
+    did: input.did,
+    type: input.type,
+    method: input.method ?? 'DID_WEB',
+    keyId: input.keyId,
+    name: input.name ?? input.did,
+    description: input.description,
+    isDefault: input.isDefault ?? false,
+    status: input.status ?? 'UNVERIFIED',
+    serviceInstanceId: input.serviceInstanceId,
+  };
+
+  if (input.isDefault) {
+    return prisma.$transaction(async (tx) => {
+      await tx.did.updateMany({
+        where: {
+          tenantId: input.tenantId,
+          isDefault: true,
+          type: { not: 'DEFAULT' },
+        },
+        data: { isDefault: false },
+      });
+      return tx.did.create({ data });
+    });
+  }
+
+  return prisma.did.create({ data });
 }
 
 /**
  * Retrieves a DID by ID, scoped to an organisation.
  * Returns null if the DID does not exist or belongs to a different organisation.
+ * If the fetched DID is a system DEFAULT with isDefault true, checks whether the
+ * tenant has their own default set and overrides isDefault to false if so.
  */
 export async function getDidById(id: string, tenantId: string): Promise<Did | null> {
-  return prisma.did.findFirst({
+  const did = await prisma.did.findFirst({
     where: {
       id,
       OR: [{ tenantId }, { isDefault: true, type: 'DEFAULT' }],
     },
   });
+
+  if (did?.type === 'DEFAULT' && did.isDefault) {
+    const tenantDefault = await prisma.did.findFirst({
+      where: { tenantId, isDefault: true, type: { not: 'DEFAULT' } },
+    });
+    if (tenantDefault) {
+      return { ...did, isDefault: false };
+    }
+  }
+
+  return did;
 }
 
 /**
  * Retrieves a DID by its DID string (e.g. "did:web:example.com"), scoped to an organisation.
  * Also returns system default DIDs regardless of tenant. Returns null if the DID
  * does not exist or belongs to a different non-default organisation.
+ * If the fetched DID is a system DEFAULT with isDefault true, checks whether the
+ * tenant has their own default set and overrides isDefault to false if so.
  */
-export async function getDidByDid(did: string, tenantId: string): Promise<Did | null> {
-  return prisma.did.findFirst({
+export async function getDidByDid(didString: string, tenantId: string): Promise<Did | null> {
+  const did = await prisma.did.findFirst({
     where: {
-      did,
+      did: didString,
       OR: [{ tenantId }, { isDefault: true, type: 'DEFAULT' }],
     },
   });
+
+  if (did?.type === 'DEFAULT' && did.isDefault) {
+    const tenantDefault = await prisma.did.findFirst({
+      where: { tenantId, isDefault: true, type: { not: 'DEFAULT' } },
+    });
+    if (tenantDefault) {
+      return { ...did, isDefault: false };
+    }
+  }
+
+  return did;
 }
 
 /**
@@ -121,6 +163,16 @@ export async function listDids(
     }),
     prisma.did.count({ where }),
   ]);
+
+  // If the tenant has set their own default, override the system DID's isDefault
+  const tenantHasDefault = data.some((d) => d.isDefault && d.type !== 'DEFAULT');
+  if (tenantHasDefault) {
+    for (const d of data) {
+      if (d.type === 'DEFAULT' && d.isDefault) {
+        d.isDefault = false;
+      }
+    }
+  }
 
   return { data, total };
 }
@@ -210,10 +262,18 @@ export async function deleteDid(id: string, tenantId: string): Promise<void> {
 }
 
 /**
- * Returns the system default DID (if seeded).
+ * Returns the default DID. When a tenantId is provided, prefers the tenant's
+ * own default DID over the system default. Falls back to the system default
+ * if the tenant has no default set.
  */
-export async function getDefaultDid(): Promise<Did | null> {
+export async function getDefaultDid(tenantId?: string): Promise<Did | null> {
+  if (tenantId) {
+    const tenantDefault = await prisma.did.findFirst({
+      where: { tenantId, isDefault: true, type: { not: 'DEFAULT' } },
+    });
+    if (tenantDefault) return tenantDefault;
+  }
   return prisma.did.findFirst({
-    where: { isDefault: true },
+    where: { isDefault: true, type: 'DEFAULT' },
   });
 }
