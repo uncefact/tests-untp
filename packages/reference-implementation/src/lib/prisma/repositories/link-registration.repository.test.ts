@@ -14,6 +14,7 @@ jest.mock('../prisma', () => ({
       createMany: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
     },
     $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   },
@@ -35,6 +36,7 @@ const mockLinkRegistration = prisma.linkRegistration as unknown as {
   createMany: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
+  count: jest.Mock;
 };
 
 const SAMPLE_INPUT = {
@@ -112,6 +114,7 @@ describe('link-registration.repository', () => {
   describe('listLinkRegistrations', () => {
     it('lists link registrations for an identifier', async () => {
       mockLinkRegistration.findMany.mockResolvedValue([SAMPLE_RECORD]);
+      mockLinkRegistration.count.mockResolvedValue(1);
 
       const result = await listLinkRegistrations('ident-1', 'tenant-1');
 
@@ -119,7 +122,10 @@ describe('link-registration.repository', () => {
         where: { identifierId: 'ident-1', tenantId: 'tenant-1' },
         orderBy: { publishedAt: 'desc' },
       });
-      expect(result).toEqual([SAMPLE_RECORD]);
+      expect(mockLinkRegistration.count).toHaveBeenCalledWith({
+        where: { identifierId: 'ident-1', tenantId: 'tenant-1' },
+      });
+      expect(result).toEqual({ data: [SAMPLE_RECORD], total: 1 });
     });
   });
 
