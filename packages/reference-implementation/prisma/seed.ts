@@ -92,40 +92,46 @@ async function main() {
 
   const gs1Registrar = await prisma.registrar.upsert({
     where: { id: 'system-registrar-gs1' },
-    update: {},
+    update: {
+      idrServiceInstanceId: 'system-idr-pyx',
+    },
     create: {
       id: 'system-registrar-gs1',
       tenantId: SYSTEM_TENANT_ID,
       name: 'GS1',
       namespace: 'gs1',
       url: 'https://www.gs1.org',
-      isDefault: true,
+      idrServiceInstanceId: 'system-idr-pyx',
     },
   });
 
   const abrRegistrar = await prisma.registrar.upsert({
     where: { id: 'system-registrar-abr' },
-    update: {},
+    update: {
+      idrServiceInstanceId: 'system-idr-pyx',
+    },
     create: {
       id: 'system-registrar-abr',
       tenantId: SYSTEM_TENANT_ID,
       name: 'Australian Business Register',
       namespace: 'abr',
       url: 'https://abr.business.gov.au',
-      isDefault: true,
+      idrServiceInstanceId: 'system-idr-pyx',
     },
   });
 
   const asicRegistrar = await prisma.registrar.upsert({
     where: { id: 'system-registrar-asic' },
-    update: {},
+    update: {
+      idrServiceInstanceId: 'system-idr-pyx',
+    },
     create: {
       id: 'system-registrar-asic',
       tenantId: SYSTEM_TENANT_ID,
       name: 'ASIC',
       namespace: 'asic',
       url: 'https://asic.gov.au',
-      isDefault: true,
+      idrServiceInstanceId: 'system-idr-pyx',
     },
   });
 
@@ -142,7 +148,6 @@ async function main() {
       primaryKey: 'abn',
       validationPattern: '^\\d{11}$',
       linkTemplate: '/{primaryKey}/{value}',
-      isDefault: true,
     },
   });
 
@@ -157,7 +162,6 @@ async function main() {
       primaryKey: 'acn',
       validationPattern: '^\\d{9}$',
       linkTemplate: '/{primaryKey}/{value}',
-      isDefault: true,
     },
   });
 
@@ -172,7 +176,6 @@ async function main() {
       primaryKey: 'gln',
       validationPattern: '^\\d{13}$',
       linkTemplate: '/{primaryKey}/{value}',
-      isDefault: true,
     },
   });
 
@@ -187,7 +190,6 @@ async function main() {
       primaryKey: '01',
       validationPattern: '^\\d{14}$',
       linkTemplate: '/{primaryKey}/{value}',
-      isDefault: true,
     },
   });
 

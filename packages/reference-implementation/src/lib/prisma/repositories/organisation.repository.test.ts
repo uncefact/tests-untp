@@ -48,9 +48,6 @@ describe('organisation.repository', () => {
     name: 'GTIN',
     primaryKey: 'gtin',
     validationPattern: '^\\d{13,14}$',
-    namespace: 'gs1',
-    idrServiceInstanceId: null,
-    isDefault: false,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
   };

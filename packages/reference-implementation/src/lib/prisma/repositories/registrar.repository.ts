@@ -12,7 +12,6 @@ export type CreateRegistrarInput = {
   namespace: string;
   url?: string;
   idrServiceInstanceId?: string;
-  isDefault?: boolean;
 };
 
 /**
@@ -44,7 +43,6 @@ export async function createRegistrar(input: CreateRegistrarInput): Promise<Regi
       namespace: input.namespace,
       url: input.url,
       idrServiceInstanceId: input.idrServiceInstanceId,
-      isDefault: input.isDefault ?? false,
     },
   });
 }

@@ -14,7 +14,6 @@ export const registrarSchema = z.object({
   namespace: z.string().describe('Namespace identifier for IDR resolution'),
   url: z.string().nullable().describe('Registrar website URL'),
   idrServiceInstanceId: z.string().nullable().describe('Associated IDR service instance'),
-  isDefault: z.boolean().describe('Whether this is a system default'),
   createdAt: z.string().datetime().describe('Timestamp when created'),
   updatedAt: z.string().datetime().describe('Timestamp when last updated'),
 });
@@ -44,9 +43,7 @@ export const identifierSchemeSchema = z.object({
   primaryKey: z.string().describe('Primary identifier key per ISO 18975'),
   validationPattern: z.string().describe('Regex for validating identifier values'),
   linkTemplate: z.string().describe('ISO 18975 link template for URI construction'),
-  namespace: z.string().nullable().describe('Optional namespace override'),
   idrServiceInstanceId: z.string().nullable().describe('Associated IDR service instance'),
-  isDefault: z.boolean().describe('Whether this is a system default'),
   createdAt: z.string().datetime().describe('Timestamp when created'),
   updatedAt: z.string().datetime().describe('Timestamp when last updated'),
 });

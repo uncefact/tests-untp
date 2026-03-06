@@ -45,7 +45,6 @@ describe('registrar.repository', () => {
     namespace: 'gs1',
     url: 'https://gs1.org',
     idrServiceInstanceId: null,
-    isDefault: false,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     schemes: [],
@@ -72,26 +71,9 @@ describe('registrar.repository', () => {
           name: 'GS1',
           namespace: 'gs1',
           url: 'https://gs1.org',
-          isDefault: false,
         }),
       });
       expect(result).toEqual(REGISTRAR_RECORD);
-    });
-
-    it('defaults isDefault to false when not provided', async () => {
-      mockRegistrar.create.mockResolvedValue(REGISTRAR_RECORD);
-
-      await createRegistrar({
-        tenantId: TENANT_ID,
-        name: 'GS1',
-        namespace: 'gs1',
-      });
-
-      expect(mockRegistrar.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          isDefault: false,
-        }),
-      });
     });
 
     it('passes idrServiceInstanceId when provided', async () => {
@@ -135,7 +117,7 @@ describe('registrar.repository', () => {
     });
 
     it('returns a system default registrar', async () => {
-      const systemRegistrar = { ...REGISTRAR_RECORD, tenantId: 'system', isDefault: true };
+      const systemRegistrar = { ...REGISTRAR_RECORD, tenantId: 'system' };
       mockRegistrar.findFirst.mockResolvedValue(systemRegistrar);
 
       const result = await getRegistrarById('reg-1', TENANT_ID);

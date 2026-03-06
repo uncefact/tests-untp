@@ -50,9 +50,7 @@ describe('identifier-scheme.repository', () => {
     primaryKey: 'gtin',
     validationPattern: '^\\d{13,14}$',
     linkTemplate: '/{primaryKey}/{value}',
-    namespace: 'gs1',
     idrServiceInstanceId: null,
-    isDefault: false,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     qualifiers: [
@@ -74,7 +72,6 @@ describe('identifier-scheme.repository', () => {
       namespace: 'gs1',
       url: 'https://gs1.org',
       idrServiceInstanceId: null,
-      isDefault: false,
       createdAt: new Date('2024-01-01'),
       updatedAt: new Date('2024-01-01'),
     },
@@ -95,7 +92,6 @@ describe('identifier-scheme.repository', () => {
         primaryKey: 'gtin',
         validationPattern: '^\\d{13,14}$',
         linkTemplate: '/{primaryKey}/{value}',
-        namespace: 'gs1',
         qualifiers: [{ key: 'batch', description: 'Batch number', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
       });
 
@@ -107,8 +103,6 @@ describe('identifier-scheme.repository', () => {
           primaryKey: 'gtin',
           validationPattern: '^\\d{13,14}$',
           linkTemplate: '/{primaryKey}/{value}',
-          namespace: 'gs1',
-          isDefault: false,
           qualifiers: {
             create: [{ key: 'batch', description: 'Batch number', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
           },
@@ -144,26 +138,6 @@ describe('identifier-scheme.repository', () => {
         },
       });
     });
-
-    it('defaults isDefault to false when not provided', async () => {
-      mockIdentifierScheme.create.mockResolvedValue(SCHEME_RECORD);
-
-      await createIdentifierScheme({
-        tenantId: TENANT_ID,
-        registrarId: REGISTRAR_ID,
-        name: 'GTIN',
-        primaryKey: 'gtin',
-        validationPattern: '^\\d{13,14}$',
-        linkTemplate: '/{primaryKey}/{value}',
-      });
-
-      expect(mockIdentifierScheme.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          isDefault: false,
-        }),
-        include: expect.anything(),
-      });
-    });
   });
 
   describe('getIdentifierSchemeById', () => {
@@ -186,7 +160,7 @@ describe('identifier-scheme.repository', () => {
     });
 
     it('returns a system default scheme', async () => {
-      const systemScheme = { ...SCHEME_RECORD, tenantId: 'system', isDefault: true };
+      const systemScheme = { ...SCHEME_RECORD, tenantId: 'system' };
       mockIdentifierScheme.findFirst.mockResolvedValue(systemScheme);
 
       const result = await getIdentifierSchemeById('scheme-1', TENANT_ID);
