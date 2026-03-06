@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createOrganisations, listOrganisations } from '@/lib/prisma/repositories';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/organisations' });
@@ -40,12 +41,9 @@ const logger = apiLogger.child({ route: '/api/v1/organisations' });
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 organisations:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Organisation'
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Organisation'
  *       400:
  *         description: Validation error
  *         content:
@@ -66,6 +64,7 @@ const logger = apiLogger.child({ route: '/api/v1/organisations' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
+  logger.info({ tenantId }, 'Parsing request body');
   let body: unknown;
 
   try {
@@ -74,6 +73,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId }, 'Validating input parameters');
   if (!Array.isArray(body)) {
     throw new ValidationError('Request body must be an array');
   }
@@ -92,7 +92,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   const organisations = await createOrganisations(tenantId, body);
 
   logger.info({ tenantId, count: organisations.length }, 'Organisations created');
-  return NextResponse.json({ organisations }, { status: 201 });
+  return NextResponse.json(organisations, { status: 201 });
 });
 
 /**
@@ -129,10 +129,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *             schema:
  *               type: object
  *               properties:
- *                 organisations:
+ *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/Organisation'
+ *                     $ref: '#/components/schemas/OrganisationListItem'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Validation error
  *         content:
@@ -153,14 +155,15 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
+  logger.info({ tenantId }, 'Parsing query parameters');
   const url = new URL(req.url);
   const search = url.searchParams.get('search') ?? undefined;
   const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   logger.info({ tenantId, search, limit, offset }, 'Listing organisations');
-  const organisations = await listOrganisations(tenantId, { search, limit, offset });
+  const { data, total } = await listOrganisations(tenantId, { search, limit, offset });
 
-  logger.info({ tenantId, count: organisations.length }, 'Organisations listed');
-  return NextResponse.json({ organisations });
+  logger.info({ tenantId, count: data.length }, 'Organisations listed');
+  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

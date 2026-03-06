@@ -197,6 +197,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId, linkId } = await params;
 
+  logger.info({ tenantId, identifierId, linkId }, 'Parsing request body');
   let body: Record<string, unknown>;
   try {
     body = await req.json();

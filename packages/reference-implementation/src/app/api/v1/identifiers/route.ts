@@ -64,6 +64,7 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
+  logger.info({ tenantId }, 'Parsing request body');
   let body: {
     schemeId?: string;
     value?: string;
@@ -75,6 +76,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId, schemeId: body.schemeId }, 'Validating input parameters');
   if (!isNonEmptyString(body.schemeId)) throw new ValidationError('schemeId is required');
   if (!isNonEmptyString(body.value)) throw new ValidationError('value is required');
 
@@ -149,6 +151,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
+  logger.info({ tenantId }, 'Parsing query parameters');
   const url = new URL(req.url);
   const schemeId = url.searchParams.get('schemeId') ?? undefined;
   const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');

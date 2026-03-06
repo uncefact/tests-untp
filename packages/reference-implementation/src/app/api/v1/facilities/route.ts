@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createFacilities, listFacilities } from '@/lib/prisma/repositories';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/facilities' });
@@ -51,12 +52,9 @@ const logger = apiLogger.child({ route: '/api/v1/facilities' });
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 facilities:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Facility'
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Facility'
  *       400:
  *         description: Validation error
  *         content:
@@ -83,6 +81,7 @@ const logger = apiLogger.child({ route: '/api/v1/facilities' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
+  logger.info({ tenantId }, 'Parsing request body');
   let body: unknown;
 
   try {
@@ -91,6 +90,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId }, 'Validating input parameters');
   if (!Array.isArray(body)) {
     throw new ValidationError('Request body must be an array');
   }
@@ -109,7 +109,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   const facilities = await createFacilities(tenantId, body);
 
   logger.info({ tenantId, count: facilities.length }, 'Facilities created');
-  return NextResponse.json({ facilities }, { status: 201 });
+  return NextResponse.json(facilities, { status: 201 });
 });
 
 /**
@@ -145,16 +145,18 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         description: Number of facilities to skip for pagination
  *     responses:
  *       200:
- *         description: List of facilities retrieved successfully
+ *         description: Paginated list of facilities
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 facilities:
+ *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/Facility'
+ *                     $ref: '#/components/schemas/FacilityListItem'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Validation error
  *         content:
@@ -175,6 +177,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
+  logger.info({ tenantId }, 'Parsing query parameters');
   const url = new URL(req.url);
   const search = url.searchParams.get('search') ?? undefined;
   const organisationId = url.searchParams.get('organisationId') ?? undefined;
@@ -182,8 +185,8 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   logger.info({ tenantId, search, organisationId, limit, offset }, 'Listing facilities');
-  const facilities = await listFacilities(tenantId, { search, organisationId, limit, offset });
+  const { data, total } = await listFacilities(tenantId, { search, organisationId, limit, offset });
 
-  logger.info({ tenantId, count: facilities.length }, 'Facilities listed');
-  return NextResponse.json({ facilities });
+  logger.info({ tenantId, count: data.length }, 'Facilities listed');
+  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

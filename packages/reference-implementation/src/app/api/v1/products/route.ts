@@ -8,6 +8,7 @@ import {
 } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createProducts, listProducts, CreateProductInput } from '@/lib/prisma/repositories';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/products' });
@@ -53,12 +54,9 @@ const PRODUCT_LEVELS = ['MODEL', 'BATCH', 'ITEM'] as const;
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 products:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Product'
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Product'
  *       400:
  *         description: Validation error
  *         content:
@@ -85,6 +83,7 @@ const PRODUCT_LEVELS = ['MODEL', 'BATCH', 'ITEM'] as const;
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
+  logger.info({ tenantId }, 'Parsing request body');
   let body: Array<{
     name?: string;
     level?: string;
@@ -98,6 +97,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId }, 'Validating input parameters');
   if (!Array.isArray(body)) {
     throw new ValidationError('Request body must be an array');
   }
@@ -120,7 +120,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   const products = await createProducts(tenantId, body as CreateProductInput[]);
 
   logger.info({ tenantId, count: products.length }, 'Products created');
-  return NextResponse.json({ products }, { status: 201 });
+  return NextResponse.json(products, { status: 201 });
 });
 
 /**
@@ -178,10 +178,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *             schema:
  *               type: object
  *               properties:
- *                 products:
+ *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/Product'
+ *                     $ref: '#/components/schemas/ProductListItem'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Validation error
  *         content:
@@ -202,6 +204,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
+  logger.info({ tenantId }, 'Parsing query parameters');
   const url = new URL(req.url);
   const search = url.searchParams.get('search') ?? undefined;
   const level = validateEnum(url.searchParams.get('level') ?? undefined, PRODUCT_LEVELS, 'level');
@@ -212,8 +215,16 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   logger.info({ tenantId, search, level, parentId, organisationId, facilityId, limit, offset }, 'Listing products');
-  const products = await listProducts(tenantId, { search, level, parentId, organisationId, facilityId, limit, offset });
+  const { data, total } = await listProducts(tenantId, {
+    search,
+    level,
+    parentId,
+    organisationId,
+    facilityId,
+    limit,
+    offset,
+  });
 
-  logger.info({ tenantId, count: products.length }, 'Products listed');
-  return NextResponse.json({ products });
+  logger.info({ tenantId, count: data.length }, 'Products listed');
+  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

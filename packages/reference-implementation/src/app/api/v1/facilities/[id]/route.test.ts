@@ -71,7 +71,7 @@ describe('GET /api/v1/facilities/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.facility).toEqual(facility);
+    expect(json).toEqual(facility);
     expect(json).not.toHaveProperty('ok');
   });
 
@@ -112,7 +112,7 @@ describe('PATCH /api/v1/facilities/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.facility).toEqual(updated);
+    expect(json).toEqual(updated);
     expect(json).not.toHaveProperty('ok');
   });
 
@@ -178,15 +178,14 @@ describe('DELETE /api/v1/facilities/:id', () => {
     jest.clearAllMocks();
   });
 
-  it('deletes the facility and returns empty object', async () => {
+  it('deletes the facility and returns 204 with no body', async () => {
     mockDeleteFacility.mockResolvedValue({ id: 'fac-1' });
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('fac-1') as unknown as Parameters<typeof DELETE>[1]);
-    const json = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(json).toEqual({});
+    expect(res.status).toBe(204);
+    expect(res.body).toBeNull();
   });
 
   it('returns 404 when facility not found', async () => {

@@ -55,6 +55,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   if (!identifier) {
     throw new NotFoundError('Identifier not found');
   }
+  logger.info({ tenantId, identifierId: id }, 'Identifier retrieved');
   return NextResponse.json(identifier);
 });
 
@@ -118,6 +119,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  */
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
+  logger.info({ tenantId, identifierId: id }, 'Parsing request body');
 
   let body: { value?: string };
 
@@ -127,6 +129,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId, identifierId: id }, 'Validating update fields');
   if (!isNonEmptyString(body.value)) {
     throw new ValidationError('value is required');
   }

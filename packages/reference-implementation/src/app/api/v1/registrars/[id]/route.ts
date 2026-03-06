@@ -55,6 +55,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   if (!registrar) {
     throw new NotFoundError('Registrar not found');
   }
+  logger.info({ tenantId, registrarId: id }, 'Registrar retrieved');
   return NextResponse.json(registrar);
 });
 
@@ -128,6 +129,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  */
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
+  logger.info({ tenantId, registrarId: id }, 'Parsing request body');
 
   let body: {
     name?: string;
@@ -147,6 +149,10 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const hasUrl = isNonEmptyString(body.url);
   const hasIdrServiceInstanceId = body.idrServiceInstanceId !== undefined;
 
+  logger.info(
+    { tenantId, registrarId: id, fields: { hasName, hasNamespace, hasUrl, hasIdrServiceInstanceId } },
+    'Validating update fields',
+  );
   if (!hasName && !hasNamespace && !hasUrl && !hasIdrServiceInstanceId) {
     throw new ValidationError('At least one of name, namespace, url, or idrServiceInstanceId is required');
   }

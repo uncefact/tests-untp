@@ -55,6 +55,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   if (!scheme) {
     throw new NotFoundError('Identifier scheme not found');
   }
+  logger.info({ tenantId, schemeId: id }, 'Scheme retrieved');
   return NextResponse.json(scheme);
 });
 
@@ -147,6 +148,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  */
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
+  logger.info({ tenantId, schemeId: id }, 'Parsing request body');
 
   let body: {
     name?: string;
@@ -175,6 +177,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const hasIdrServiceInstanceId = body.idrServiceInstanceId !== undefined;
   const hasQualifiers = body.qualifiers !== undefined;
 
+  logger.info({ tenantId, schemeId: id }, 'Validating update fields');
   if (
     !hasName &&
     !hasPrimaryKey &&

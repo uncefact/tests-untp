@@ -4,24 +4,30 @@ import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { UntpLocation } from '@/lib/types';
 
-/**
- * Include shape used by all organisation queries.
- * Includes the primary identifier (with scheme and registrar) and all secondary
- * identifiers (via the join table, each with its identifier, scheme, and registrar).
- * The registrar is needed to construct ISO 18975 resolver URIs for UNTP credentials.
- */
-const ORGANISATION_INCLUDE = {
+/** Full relations for detail endpoints. */
+const ORGANISATION_DETAIL_INCLUDE = {
   primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
   secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
 } as const;
 
+/** Lightweight include for list endpoint — only secondary identifier IDs. */
+const ORGANISATION_LIST_INCLUDE = {
+  secondaryIdentifiers: { select: { identifierId: true } },
+} as const;
+
 /**
  * An organisation entity with its full identifier relations.
- * Matches the include shape defined by ORGANISATION_INCLUDE.
+ * Matches the include shape defined by ORGANISATION_DETAIL_INCLUDE.
  */
 export type OrganisationEntityWithRelations = Prisma.OrganisationEntityGetPayload<{
-  include: typeof ORGANISATION_INCLUDE;
+  include: typeof ORGANISATION_DETAIL_INCLUDE;
 }>;
+
+type OrganisationListRow = Prisma.OrganisationEntityGetPayload<{ include: typeof ORGANISATION_LIST_INCLUDE }>;
+
+export type OrganisationListItem = Omit<OrganisationListRow, 'secondaryIdentifiers'> & {
+  secondaryIdentifierIds: string[];
+};
 
 /**
  * Input for creating a new organisation entity.
@@ -120,7 +126,7 @@ export async function createOrganisations(
           ...(input.location !== undefined && { location: input.location as Prisma.InputJsonValue }),
           ...(input.primaryIdentifierId !== undefined && { primaryIdentifierId: input.primaryIdentifierId }),
         },
-        include: ORGANISATION_INCLUDE,
+        include: ORGANISATION_DETAIL_INCLUDE,
       });
 
       // Create join rows for secondary identifiers
@@ -135,7 +141,7 @@ export async function createOrganisations(
         // Re-fetch to include the newly created secondary identifier relations
         const refetched = await tx.organisationEntity.findUniqueOrThrow({
           where: { id: organisation.id },
-          include: ORGANISATION_INCLUDE,
+          include: ORGANISATION_DETAIL_INCLUDE,
         });
         results.push(refetched);
       } else {
@@ -157,18 +163,19 @@ export async function getOrganisationById(
 ): Promise<OrganisationEntityWithRelations | null> {
   return prisma.organisationEntity.findFirst({
     where: { id, tenantId },
-    include: ORGANISATION_INCLUDE,
+    include: ORGANISATION_DETAIL_INCLUDE,
   });
 }
 
 /**
  * Lists organisation entities for a tenant.
  * Supports optional search across name and identifier values.
+ * Returns lightweight records with flattened secondaryIdentifierIds.
  */
 export async function listOrganisations(
   tenantId: string,
   options: ListOrganisationsOptions = {},
-): Promise<OrganisationEntityWithRelations[]> {
+): Promise<{ data: OrganisationListItem[]; total: number }> {
   const { search, limit, offset } = options;
 
   const where: Prisma.OrganisationEntityWhereInput = {
@@ -189,13 +196,23 @@ export async function listOrganisations(
     ];
   }
 
-  return prisma.organisationEntity.findMany({
-    where,
-    include: ORGANISATION_INCLUDE,
-    take: limit ?? 100,
-    skip: offset,
-    orderBy: { createdAt: 'desc' },
-  });
+  const [rows, total] = await Promise.all([
+    prisma.organisationEntity.findMany({
+      where,
+      include: ORGANISATION_LIST_INCLUDE,
+      take: limit ?? 100,
+      skip: offset,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.organisationEntity.count({ where }),
+  ]);
+
+  const data = rows.map(({ secondaryIdentifiers, ...rest }) => ({
+    ...rest,
+    secondaryIdentifierIds: secondaryIdentifiers.map((si) => si.identifierId),
+  }));
+
+  return { data, total };
 }
 
 /**
@@ -263,7 +280,7 @@ export async function updateOrganisation(
     return tx.organisationEntity.update({
       where: { id },
       data,
-      include: ORGANISATION_INCLUDE,
+      include: ORGANISATION_DETAIL_INCLUDE,
     });
   });
 }
@@ -281,7 +298,7 @@ export async function getOrganisationByIdentifierValue(
       tenantId,
       primaryIdentifier: { value },
     },
-    include: ORGANISATION_INCLUDE,
+    include: ORGANISATION_DETAIL_INCLUDE,
   });
 }
 
@@ -301,7 +318,7 @@ export async function deleteOrganisation(id: string, tenantId: string): Promise<
 
     return tx.organisationEntity.delete({
       where: { id },
-      include: ORGANISATION_INCLUDE,
+      include: ORGANISATION_DETAIL_INCLUDE,
     });
   });
 }

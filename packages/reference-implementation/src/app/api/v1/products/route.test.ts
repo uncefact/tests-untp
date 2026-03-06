@@ -86,7 +86,7 @@ describe('POST /api/v1/products', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(json.products).toEqual(products);
+    expect(json).toEqual(products);
   });
 
   it('returns 400 when body is not an array', async () => {
@@ -173,18 +173,19 @@ describe('GET /api/v1/products', () => {
 
   it('lists products for the tenant', async () => {
     const products = [{ id: 'p-1', name: 'Widget A', level: 'MODEL' }];
-    mockListProducts.mockResolvedValue(products);
+    mockListProducts.mockResolvedValue({ data: products, total: 1 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/products' });
     const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.products).toEqual(products);
+    expect(json.data).toEqual(products);
+    expect(json.pagination).toEqual(expect.objectContaining({ total: 1, offset: 0 }));
   });
 
   it('passes all filter parameters to listProducts', async () => {
-    mockListProducts.mockResolvedValue([]);
+    mockListProducts.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -204,7 +205,7 @@ describe('GET /api/v1/products', () => {
   });
 
   it('handles no query parameters', async () => {
-    mockListProducts.mockResolvedValue([]);
+    mockListProducts.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/products' });
     await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
@@ -254,6 +255,19 @@ describe('GET /api/v1/products', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('offset must be a non-negative integer');
+  });
+
+  it('returns pagination metadata with custom limit and offset', async () => {
+    mockListProducts.mockResolvedValue({ data: [], total: 50 });
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/products?limit=10&offset=20',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(json.pagination).toEqual({ total: 50, limit: 10, offset: 20 });
   });
 
   it('returns 500 when listProducts throws', async () => {

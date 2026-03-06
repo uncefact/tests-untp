@@ -92,6 +92,7 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
 export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId } = await params;
 
+  logger.info({ tenantId, identifierId }, 'Parsing request body');
   let body: {
     links?: Array<Record<string, unknown>>;
     qualifierPath?: string;
@@ -103,6 +104,7 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId, identifierId }, 'Validating input parameters');
   if (!body.links || !Array.isArray(body.links) || body.links.length === 0) {
     throw new ValidationError('links is required and must be a non-empty array');
   }
@@ -212,6 +214,8 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
  */
 export const GET = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId } = await params;
+
+  logger.info({ tenantId, identifierId }, 'Parsing query parameters');
 
   logger.info({ tenantId, identifierId }, 'Looking up identifier for link listing');
   const identifier = await getIdentifierById(identifierId, tenantId);

@@ -83,7 +83,7 @@ describe('POST /api/v1/facilities', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(json.facilities).toEqual(facilities);
+    expect(json).toEqual(facilities);
     expect(json).not.toHaveProperty('ok');
   });
 
@@ -161,21 +161,22 @@ describe('GET /api/v1/facilities', () => {
     jest.clearAllMocks();
   });
 
-  it('lists facilities for the tenant', async () => {
+  it('lists facilities for the tenant with pagination', async () => {
     const facilities = [{ id: 'fac-1', name: 'Warehouse Alpha' }];
-    mockListFacilities.mockResolvedValue(facilities);
+    mockListFacilities.mockResolvedValue({ data: facilities, total: 1 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/facilities' });
     const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.facilities).toEqual(facilities);
+    expect(json.data).toEqual(facilities);
+    expect(json.pagination).toEqual({ total: 1, limit: 20, offset: 0, hasMore: false });
     expect(json).not.toHaveProperty('ok');
   });
 
   it('passes search and organisationId filters', async () => {
-    mockListFacilities.mockResolvedValue([]);
+    mockListFacilities.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -192,7 +193,7 @@ describe('GET /api/v1/facilities', () => {
   });
 
   it('passes pagination parameters', async () => {
-    mockListFacilities.mockResolvedValue([]);
+    mockListFacilities.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -209,7 +210,7 @@ describe('GET /api/v1/facilities', () => {
   });
 
   it('handles no query parameters', async () => {
-    mockListFacilities.mockResolvedValue([]);
+    mockListFacilities.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/facilities' });
     await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);

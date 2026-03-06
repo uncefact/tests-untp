@@ -10,14 +10,14 @@ import { ValidationError } from '@/lib/api/validation';
 const IDENTIFIER_INCLUDE = { include: { scheme: { include: { registrar: true } } } } as const;
 
 /**
- * Include shape used by all product queries.
+ * Full relations for detail endpoints.
  * Includes the primary identifier (with scheme and registrar), secondary
  * identifiers (via the join table, each with its identifier, scheme, and
  * registrar), brand organisation, manufacturing facility, and parent product
  * (with its primary identifier for qualifier-based URI construction).
  * The registrar is needed to construct ISO 18975 resolver URIs for UNTP credentials.
  */
-const PRODUCT_INCLUDE = {
+const PRODUCT_DETAIL_INCLUDE = {
   primaryIdentifier: IDENTIFIER_INCLUDE,
   secondaryIdentifiers: { include: { identifier: IDENTIFIER_INCLUDE } },
   producedByOrganisation: true,
@@ -25,13 +25,26 @@ const PRODUCT_INCLUDE = {
   parent: { include: { primaryIdentifier: IDENTIFIER_INCLUDE } },
 } as const;
 
+/** Lightweight include for list endpoint. */
+const PRODUCT_LIST_INCLUDE = {
+  secondaryIdentifiers: { select: { identifierId: true } },
+} as const;
+
 /**
  * A product with its full relations.
- * Matches the include shape defined by PRODUCT_INCLUDE.
+ * Matches the include shape defined by PRODUCT_DETAIL_INCLUDE.
  */
 export type ProductWithRelations = Prisma.ProductGetPayload<{
-  include: typeof PRODUCT_INCLUDE;
+  include: typeof PRODUCT_DETAIL_INCLUDE;
 }>;
+
+/** Raw row returned by the list query (before flattening). */
+type ProductListRow = Prisma.ProductGetPayload<{ include: typeof PRODUCT_LIST_INCLUDE }>;
+
+/** Lightweight product returned by the list endpoint. */
+export type ProductListItem = Omit<ProductListRow, 'secondaryIdentifiers'> & {
+  secondaryIdentifierIds: string[];
+};
 
 /**
  * Input for creating a new product.
@@ -197,7 +210,7 @@ export async function createProducts(tenantId: string, inputs: CreateProductInpu
           }),
           ...(input.primaryIdentifierId !== undefined && { primaryIdentifierId: input.primaryIdentifierId }),
         },
-        include: PRODUCT_INCLUDE,
+        include: PRODUCT_DETAIL_INCLUDE,
       });
 
       // Create join rows for secondary identifiers
@@ -212,7 +225,7 @@ export async function createProducts(tenantId: string, inputs: CreateProductInpu
         // Re-fetch to include the newly created secondary identifier relations
         const refetched = await tx.product.findUniqueOrThrow({
           where: { id: product.id },
-          include: PRODUCT_INCLUDE,
+          include: PRODUCT_DETAIL_INCLUDE,
         });
         results.push(refetched);
       } else {
@@ -231,7 +244,7 @@ export async function createProducts(tenantId: string, inputs: CreateProductInpu
 export async function getProductById(id: string, tenantId: string): Promise<ProductWithRelations | null> {
   return prisma.product.findFirst({
     where: { id, tenantId },
-    include: PRODUCT_INCLUDE,
+    include: PRODUCT_DETAIL_INCLUDE,
   });
 }
 
@@ -239,11 +252,12 @@ export async function getProductById(id: string, tenantId: string): Promise<Prod
  * Lists products for a tenant.
  * Supports optional search across name and identifier values,
  * plus filtering by level, parentId, organisation, and facility.
+ * Returns lightweight records with flattened secondaryIdentifierIds.
  */
 export async function listProducts(
   tenantId: string,
   options: ListProductsOptions = {},
-): Promise<ProductWithRelations[]> {
+): Promise<{ data: ProductListItem[]; total: number }> {
   const { search, level, parentId, organisationId, facilityId, limit, offset } = options;
 
   const where: Prisma.ProductWhereInput = {
@@ -280,13 +294,23 @@ export async function listProducts(
     where.manufacturingFacilityId = facilityId;
   }
 
-  return prisma.product.findMany({
-    where,
-    include: PRODUCT_INCLUDE,
-    take: limit ?? 100,
-    skip: offset,
-    orderBy: { createdAt: 'desc' },
-  });
+  const [rows, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      include: PRODUCT_LIST_INCLUDE,
+      take: limit ?? 100,
+      skip: offset,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.product.count({ where }),
+  ]);
+
+  const data: ProductListItem[] = rows.map(({ secondaryIdentifiers, ...rest }) => ({
+    ...rest,
+    secondaryIdentifierIds: secondaryIdentifiers.map((si) => si.identifierId),
+  }));
+
+  return { data, total };
 }
 
 /**
@@ -406,7 +430,7 @@ export async function updateProduct(
     return tx.product.update({
       where: { id },
       data,
-      include: PRODUCT_INCLUDE,
+      include: PRODUCT_DETAIL_INCLUDE,
     });
   });
 }
@@ -424,7 +448,7 @@ export async function getProductByIdentifierValue(
       tenantId,
       primaryIdentifier: { value },
     },
-    include: PRODUCT_INCLUDE,
+    include: PRODUCT_DETAIL_INCLUDE,
   });
 }
 

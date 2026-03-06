@@ -65,6 +65,7 @@ const logger = apiLogger.child({ route: '/api/v1/registrars' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
+  logger.info({ tenantId }, 'Parsing request body');
   let body: {
     name?: string;
     namespace?: string;
@@ -78,6 +79,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId, name: body.name, namespace: body.namespace }, 'Validating input parameters');
   if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
   if (!isNonEmptyString(body.namespace)) throw new ValidationError('namespace is required');
   if (!isNonEmptyString(body.url)) throw new ValidationError('url is required');
@@ -150,6 +152,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
+  logger.info({ tenantId }, 'Parsing query parameters');
   const url = new URL(req.url);
   const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
