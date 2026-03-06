@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createIdentifier, listIdentifiers } from '@/lib/prisma/repositories';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/identifiers' });
@@ -36,13 +37,7 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers' });
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 identifier:
- *                   $ref: '#/components/schemas/Identifier'
+ *               $ref: '#/components/schemas/Identifier'
  *       400:
  *         description: Validation error (e.g. value does not match scheme pattern)
  *         content:
@@ -91,7 +86,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   });
 
   logger.info({ tenantId, identifierId: identifier.id, schemeId: body.schemeId }, 'Identifier created');
-  return NextResponse.json({ ok: true, identifier }, { status: 201 });
+  return NextResponse.json(identifier, { status: 201 });
 });
 
 /**
@@ -128,13 +123,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *             schema:
  *               type: object
  *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 identifiers:
+ *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Identifier'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Validation error
  *         content:
@@ -161,8 +155,8 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   logger.info({ tenantId, schemeId, limit, offset }, 'Listing identifiers');
-  const identifiers = await listIdentifiers(tenantId, { schemeId, limit, offset });
+  const { data, total } = await listIdentifiers(tenantId, { schemeId, limit, offset });
 
-  logger.info({ tenantId, count: identifiers.length }, 'Identifiers listed');
-  return NextResponse.json({ ok: true, identifiers });
+  logger.info({ tenantId, count: data.length }, 'Identifiers listed');
+  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

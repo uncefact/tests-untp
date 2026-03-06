@@ -122,8 +122,12 @@ export async function getIdentifierById(id: string, tenantId: string): Promise<I
 /**
  * Lists identifiers for an organisation.
  * Supports optional filtering by schemeId.
+ * Returns flat identifier records (no scheme include) alongside a total count.
  */
-export async function listIdentifiers(tenantId: string, options: ListIdentifiersOptions = {}): Promise<Identifier[]> {
+export async function listIdentifiers(
+  tenantId: string,
+  options: ListIdentifiersOptions = {},
+): Promise<{ data: Identifier[]; total: number }> {
   const { schemeId, limit, offset } = options;
 
   const where: Prisma.IdentifierWhereInput = {
@@ -134,15 +138,17 @@ export async function listIdentifiers(tenantId: string, options: ListIdentifiers
     where.schemeId = schemeId;
   }
 
-  return prisma.identifier.findMany({
-    where,
-    include: {
-      scheme: true,
-    },
-    take: limit ?? 100,
-    skip: offset,
-    orderBy: { createdAt: 'desc' },
-  });
+  const [data, total] = await Promise.all([
+    prisma.identifier.findMany({
+      where,
+      take: limit ?? 100,
+      skip: offset,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.identifier.count({ where }),
+  ]);
+
+  return { data, total };
 }
 
 /**

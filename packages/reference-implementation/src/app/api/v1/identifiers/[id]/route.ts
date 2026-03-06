@@ -28,13 +28,7 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]' });
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 identifier:
- *                   $ref: '#/components/schemas/Identifier'
+ *               $ref: '#/components/schemas/Identifier'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -61,7 +55,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   if (!identifier) {
     throw new NotFoundError('Identifier not found');
   }
-  return NextResponse.json({ ok: true, identifier });
+  return NextResponse.json(identifier);
 });
 
 /**
@@ -96,13 +90,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 identifier:
- *                   $ref: '#/components/schemas/Identifier'
+ *               $ref: '#/components/schemas/Identifier'
  *       400:
  *         description: Validation error
  *         content:
@@ -149,7 +137,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   });
 
   logger.info({ tenantId, identifierId: id }, 'Identifier updated');
-  return NextResponse.json({ ok: true, identifier: updated });
+  return NextResponse.json(updated);
 });
 
 /**
@@ -168,16 +156,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *           type: string
  *         description: The database ID of the identifier
  *     responses:
- *       200:
+ *       204:
  *         description: Identifier deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -204,5 +184,5 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   await deleteIdentifier(id, tenantId);
 
   logger.info({ tenantId, identifierId: id }, 'Identifier deleted');
-  return NextResponse.json({ ok: true });
+  return new Response(null, { status: 204 });
 });

@@ -25,6 +25,7 @@ jest.mock('../prisma', () => ({
     identifier: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
     },
     $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   },
@@ -36,6 +37,7 @@ import { prisma } from '../prisma';
 const mockIdentifier = prisma.identifier as unknown as {
   findFirst: jest.Mock;
   findMany: jest.Mock;
+  count: jest.Mock;
 };
 
 describe('identifier.repository', () => {
@@ -152,8 +154,9 @@ describe('identifier.repository', () => {
   });
 
   describe('listIdentifiers', () => {
-    it('lists identifiers for the tenant', async () => {
+    it('lists identifiers for the tenant with total count', async () => {
       mockIdentifier.findMany.mockResolvedValue([IDENTIFIER_RECORD]);
+      mockIdentifier.count.mockResolvedValue(1);
 
       const result = await listIdentifiers(TENANT_ID);
 
@@ -161,18 +164,19 @@ describe('identifier.repository', () => {
         where: {
           tenantId: TENANT_ID,
         },
-        include: {
-          scheme: true,
-        },
         take: 100,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
-      expect(result).toEqual([IDENTIFIER_RECORD]);
+      expect(mockIdentifier.count).toHaveBeenCalledWith({
+        where: { tenantId: TENANT_ID },
+      });
+      expect(result).toEqual({ data: [IDENTIFIER_RECORD], total: 1 });
     });
 
     it('filters by schemeId', async () => {
       mockIdentifier.findMany.mockResolvedValue([]);
+      mockIdentifier.count.mockResolvedValue(0);
 
       await listIdentifiers(TENANT_ID, { schemeId: SCHEME_ID });
 
@@ -187,6 +191,7 @@ describe('identifier.repository', () => {
 
     it('applies pagination', async () => {
       mockIdentifier.findMany.mockResolvedValue([]);
+      mockIdentifier.count.mockResolvedValue(0);
 
       await listIdentifiers(TENANT_ID, { limit: 10, offset: 20 });
 

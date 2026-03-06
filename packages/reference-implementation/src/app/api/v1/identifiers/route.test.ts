@@ -1,3 +1,28 @@
+// Mock @uncefact/untp-ri-services to avoid ESM import issues in test environment
+jest.mock('@uncefact/untp-ri-services', () => ({
+  ServiceError: class ServiceError extends Error {
+    statusCode: number;
+    code?: string;
+    constructor(message: string, statusCode = 500, code?: string) {
+      super(message);
+      this.statusCode = statusCode;
+      this.code = code;
+    }
+  },
+}));
+
+jest.mock('@uncefact/untp-ri-services/logging', () => ({
+  createLogger: () => ({
+    child: () => ({
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+      child: jest.fn().mockReturnValue({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }),
+    }),
+  }),
+}));
+
 // Mock next/server before importing route handlers
 jest.mock('next/server', () => ({
   NextResponse: {
@@ -81,8 +106,7 @@ describe('POST /api/v1/identifiers', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(json.ok).toBe(true);
-    expect(json.identifier).toEqual(identifier);
+    expect(json).toEqual(identifier);
   });
 
   it('passes correct input to createIdentifier', async () => {
@@ -168,21 +192,26 @@ describe('GET /api/v1/identifiers', () => {
     jest.clearAllMocks();
   });
 
-  it('lists identifiers for the tenant', async () => {
+  it('lists identifiers for the tenant with pagination', async () => {
     const identifiers = [{ id: 'id-1', value: '09520123456788' }];
-    mockListIdentifiers.mockResolvedValue(identifiers);
+    mockListIdentifiers.mockResolvedValue({ data: identifiers, total: 1 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/identifiers' });
     const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.identifiers).toEqual(identifiers);
+    expect(json.data).toEqual(identifiers);
+    expect(json.pagination).toEqual({
+      total: 1,
+      limit: 20,
+      offset: 0,
+      hasMore: false,
+    });
   });
 
   it('passes schemeId filter to listIdentifiers', async () => {
-    mockListIdentifiers.mockResolvedValue([]);
+    mockListIdentifiers.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -198,7 +227,7 @@ describe('GET /api/v1/identifiers', () => {
   });
 
   it('passes pagination parameters', async () => {
-    mockListIdentifiers.mockResolvedValue([]);
+    mockListIdentifiers.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -214,7 +243,7 @@ describe('GET /api/v1/identifiers', () => {
   });
 
   it('handles no query parameters', async () => {
-    mockListIdentifiers.mockResolvedValue([]);
+    mockListIdentifiers.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/identifiers' });
     await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
