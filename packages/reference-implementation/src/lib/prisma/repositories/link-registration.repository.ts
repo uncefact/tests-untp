@@ -42,13 +42,25 @@ export async function getLinkRegistrationByIdrLinkId(
 }
 
 /**
- * Lists all link registrations for an identifier.
+ * Lists link registrations for an identifier with pagination support.
  */
-export async function listLinkRegistrations(identifierId: string, tenantId: string): Promise<LinkRegistration[]> {
-  return prisma.linkRegistration.findMany({
-    where: { identifierId, tenantId },
-    orderBy: { publishedAt: 'desc' },
-  });
+export async function listLinkRegistrations(
+  identifierId: string,
+  tenantId: string,
+  limit?: number,
+  offset?: number,
+): Promise<{ data: LinkRegistration[]; total: number }> {
+  const where = { identifierId, tenantId };
+  const [data, total] = await Promise.all([
+    prisma.linkRegistration.findMany({
+      where,
+      orderBy: { publishedAt: 'desc' },
+      ...(limit != null && { take: limit }),
+      ...(offset != null && { skip: offset }),
+    }),
+    prisma.linkRegistration.count({ where }),
+  ]);
+  return { data, total };
 }
 
 /**

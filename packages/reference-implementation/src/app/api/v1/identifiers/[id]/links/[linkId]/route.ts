@@ -18,24 +18,58 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links/[linkId]
  * @swagger
  * /identifiers/{id}/links/{linkId}:
  *   get:
- *     tags: [Links]
  *     summary: Get a link by IDR link ID
+ *     description: Retrieves a link from the upstream IDR along with the local audit record. Returns a desync flag if the link exists locally but is missing upstream.
+ *     tags:
+ *       - Links
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
+ *         description: The identifier ID
  *       - in: path
  *         name: linkId
  *         required: true
  *         schema:
  *           type: string
+ *         description: The IDR link ID
  *     responses:
  *       200:
- *         description: Link details (includes desync flag if upstream link is missing)
+ *         description: Link details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 link:
+ *                   type: object
+ *                   nullable: true
+ *                 localRecord:
+ *                   $ref: '#/components/schemas/LinkRegistration'
+ *                 desync:
+ *                   type: boolean
+ *                 warning:
+ *                   type: string
+ *       401:
+ *         description: Unauthorised
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Link not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id: identifierId, linkId } = await params;
@@ -64,13 +98,12 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   try {
     logger.info({ tenantId, identifierId, linkId }, 'Fetching live link data from IDR');
     const link = await idrService.getLinkById(linkId);
-    return NextResponse.json({ ok: true, link, localRecord });
+    return NextResponse.json({ link, localRecord });
   } catch (idrError: unknown) {
     if (idrError instanceof IdrLinkNotFoundError) {
       logger.warn({ tenantId, identifierId, linkId }, 'Link desync — exists locally but missing from upstream IDR');
       return NextResponse.json(
         {
-          ok: true,
           link: null,
           localRecord,
           desync: true,
@@ -87,32 +120,79 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  * @swagger
  * /identifiers/{id}/links/{linkId}:
  *   patch:
- *     tags: [Links]
  *     summary: Update a link
+ *     description: Updates a link on the upstream IDR and syncs the local audit record
+ *     tags:
+ *       - Links
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
+ *         description: The identifier ID
  *       - in: path
  *         name: linkId
  *         required: true
  *         schema:
  *           type: string
+ *         description: The IDR link ID
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             properties:
+ *               href:
+ *                 type: string
+ *               rel:
+ *                 type: string
+ *               type:
+ *                 type: string
  *     responses:
  *       200:
- *         description: Link updated
+ *         description: Link updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 href:
+ *                   type: string
+ *                 rel:
+ *                   type: string
+ *                 type:
+ *                   type: string
+ *       401:
+ *         description: Unauthorised
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Link not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       409:
- *         description: Desynchronisation - link no longer exists on the upstream IDR
+ *         description: Desynchronisation — link no longer exists on the upstream IDR
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                 desync:
+ *                   type: boolean
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId, linkId } = await params;
@@ -157,7 +237,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     });
 
     logger.info({ tenantId, identifierId, linkId }, 'Link updated');
-    return NextResponse.json({ ok: true, link: updatedLink });
+    return NextResponse.json(updatedLink);
   } catch (e: unknown) {
     if (e instanceof IdrLinkNotFoundError) {
       logger.warn({ tenantId, identifierId, linkId }, 'Link desync — cannot update, missing from upstream IDR');
@@ -177,28 +257,47 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  * @swagger
  * /identifiers/{id}/links/{linkId}:
  *   delete:
- *     tags: [Links]
  *     summary: Delete a link
  *     description: >
  *       Deletes a link from both the upstream IDR and the local record.
  *       If the link has already been removed from the upstream IDR (out-of-band),
- *       the local record is still cleaned up and the response includes a desync warning.
+ *       the local record is still cleaned up.
+ *     tags:
+ *       - Links
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
+ *         description: The identifier ID
  *       - in: path
  *         name: linkId
  *         required: true
  *         schema:
  *           type: string
+ *         description: The IDR link ID
  *     responses:
- *       200:
- *         description: Link deleted (may include desync warning if upstream link was already gone)
+ *       204:
+ *         description: Link deleted successfully
+ *       401:
+ *         description: Unauthorised
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Link not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id: identifierId, linkId } = await params;
@@ -224,14 +323,12 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
     registrar.idrServiceInstanceId,
   );
 
-  let desync = false;
   try {
     logger.info({ tenantId, identifierId, linkId }, 'Deleting link from upstream IDR');
     await idrService.deleteLink(linkId);
   } catch (idrError: unknown) {
     if (idrError instanceof IdrLinkNotFoundError) {
       logger.warn({ tenantId, identifierId, linkId }, 'Link desync — already absent from upstream IDR');
-      desync = true;
     } else {
       throw idrError;
     }
@@ -240,13 +337,6 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   logger.info({ tenantId, identifierId, linkId }, 'Cleaning up local link record');
   await deleteLinkRegistration(linkId, identifierId, tenantId);
 
-  logger.info({ tenantId, identifierId, linkId, desync }, 'Link deleted');
-  return NextResponse.json({
-    ok: true,
-    deleted: true,
-    ...(desync && {
-      desync: true,
-      warning: `Link "${linkId}" was already absent from the upstream IDR. Local record cleaned up.`,
-    }),
-  });
+  logger.info({ tenantId, identifierId, linkId }, 'Link deleted');
+  return new Response(null, { status: 204 });
 });
