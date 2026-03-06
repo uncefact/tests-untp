@@ -71,8 +71,7 @@ describe('GET /api/v1/registrars/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.registrar).toEqual(registrar);
+    expect(json).toEqual(registrar);
   });
 
   it('returns 404 when registrar not found', async () => {
@@ -112,8 +111,7 @@ describe('PATCH /api/v1/registrars/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.registrar.name).toBe('Updated GS1');
+    expect(json.name).toBe('Updated GS1');
   });
 
   it('updates namespace field', async () => {
@@ -125,7 +123,7 @@ describe('PATCH /api/v1/registrars/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.registrar.namespace).toBe('gs1-updated');
+    expect(json.namespace).toBe('gs1-updated');
   });
 
   it('returns 400 when no fields provided', async () => {
@@ -186,10 +184,9 @@ describe('DELETE /api/v1/registrars/:id', () => {
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('reg-1') as unknown as Parameters<typeof DELETE>[1]);
-    const json = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
+    expect(res.status).toBe(204);
+    expect(res.body).toBeNull();
   });
 
   it('returns 404 when registrar not found or access denied', async () => {

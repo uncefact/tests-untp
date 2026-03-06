@@ -28,13 +28,7 @@ const logger = apiLogger.child({ route: '/api/v1/registrars/[id]' });
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 registrar:
- *                   $ref: '#/components/schemas/Registrar'
+ *               $ref: '#/components/schemas/Registrar'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -61,7 +55,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   if (!registrar) {
     throw new NotFoundError('Registrar not found');
   }
-  return NextResponse.json({ ok: true, registrar });
+  return NextResponse.json(registrar);
 });
 
 /**
@@ -106,13 +100,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 registrar:
- *                   $ref: '#/components/schemas/Registrar'
+ *               $ref: '#/components/schemas/Registrar'
  *       400:
  *         description: Validation error - at least one field required
  *         content:
@@ -175,7 +163,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   });
 
   logger.info({ tenantId, registrarId: id }, 'Registrar updated');
-  return NextResponse.json({ ok: true, registrar: updated });
+  return NextResponse.json(updated);
 });
 
 /**
@@ -194,16 +182,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *           type: string
  *         description: The database ID of the registrar
  *     responses:
- *       200:
+ *       204:
  *         description: Registrar deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -230,5 +210,5 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   await deleteRegistrar(id, tenantId);
 
   logger.info({ tenantId, registrarId: id }, 'Registrar deleted');
-  return NextResponse.json({ ok: true });
+  return new Response(null, { status: 204 });
 });

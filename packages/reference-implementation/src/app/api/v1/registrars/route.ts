@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createRegistrar, listRegistrars } from '@/lib/prisma/repositories';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/registrars' });
@@ -43,13 +44,7 @@ const logger = apiLogger.child({ route: '/api/v1/registrars' });
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 registrar:
- *                   $ref: '#/components/schemas/Registrar'
+ *               $ref: '#/components/schemas/Registrar'
  *       400:
  *         description: Validation error
  *         content:
@@ -97,7 +92,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   });
 
   logger.info({ tenantId, registrarId: registrar.id }, 'Registrar created');
-  return NextResponse.json({ ok: true, registrar }, { status: 201 });
+  return NextResponse.json(registrar, { status: 201 });
 });
 
 /**
@@ -129,13 +124,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *             schema:
  *               type: object
  *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 registrars:
+ *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Registrar'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Validation error
  *         content:
@@ -161,8 +155,8 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   logger.info({ tenantId, limit, offset }, 'Listing registrars');
-  const registrars = await listRegistrars(tenantId, { limit, offset });
+  const { data, total } = await listRegistrars(tenantId, { limit, offset });
 
-  logger.info({ tenantId, count: registrars.length }, 'Registrars listed');
-  return NextResponse.json({ ok: true, registrars });
+  logger.info({ tenantId, count: data.length, total }, 'Registrars listed');
+  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

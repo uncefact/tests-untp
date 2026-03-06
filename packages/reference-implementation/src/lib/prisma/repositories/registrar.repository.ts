@@ -71,26 +71,27 @@ export async function getRegistrarById(id: string, tenantId: string): Promise<Re
 /**
  * Lists registrars for an organisation, including system defaults.
  */
-export async function listRegistrars(tenantId: string, options: ListRegistrarsOptions = {}): Promise<Registrar[]> {
+export async function listRegistrars(
+  tenantId: string,
+  options: ListRegistrarsOptions = {},
+): Promise<{ data: Registrar[]; total: number }> {
   const { limit, offset } = options;
 
   const where: Prisma.RegistrarWhereInput = {
     OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
   };
 
-  return prisma.registrar.findMany({
-    where,
-    include: {
-      schemes: {
-        include: {
-          qualifiers: true,
-        },
-      },
-    },
-    take: limit ?? 100,
-    skip: offset,
-    orderBy: { createdAt: 'desc' },
-  });
+  const [data, total] = await Promise.all([
+    prisma.registrar.findMany({
+      where,
+      take: limit ?? 100,
+      skip: offset,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.registrar.count({ where }),
+  ]);
+
+  return { data, total };
 }
 
 /**

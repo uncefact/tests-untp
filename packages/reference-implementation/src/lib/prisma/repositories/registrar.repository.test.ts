@@ -22,6 +22,7 @@ jest.mock('../prisma', () => ({
       create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
     },
     $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   },
@@ -34,6 +35,7 @@ const mockRegistrar = prisma.registrar as unknown as {
   create: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
+  count: jest.Mock;
 };
 
 describe('registrar.repository', () => {
@@ -135,6 +137,7 @@ describe('registrar.repository', () => {
   describe('listRegistrars', () => {
     it('lists registrars for the tenant including system defaults', async () => {
       mockRegistrar.findMany.mockResolvedValue([REGISTRAR_RECORD]);
+      mockRegistrar.count.mockResolvedValue(1);
 
       const result = await listRegistrars(TENANT_ID);
 
@@ -142,24 +145,24 @@ describe('registrar.repository', () => {
         where: {
           OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
         },
-        include: {
-          schemes: {
-            include: {
-              qualifiers: true,
-            },
-          },
-        },
         take: 100,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
-      expect(result).toEqual([REGISTRAR_RECORD]);
+      expect(mockRegistrar.count).toHaveBeenCalledWith({
+        where: {
+          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+        },
+      });
+      expect(result.data).toEqual([REGISTRAR_RECORD]);
+      expect(result.total).toBe(1);
     });
 
     it('applies pagination', async () => {
       mockRegistrar.findMany.mockResolvedValue([]);
+      mockRegistrar.count.mockResolvedValue(0);
 
-      await listRegistrars(TENANT_ID, { limit: 10, offset: 20 });
+      const result = await listRegistrars(TENANT_ID, { limit: 10, offset: 20 });
 
       expect(mockRegistrar.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -167,6 +170,8 @@ describe('registrar.repository', () => {
           skip: 20,
         }),
       );
+      expect(result.data).toEqual([]);
+      expect(result.total).toBe(0);
     });
   });
 
