@@ -11,7 +11,6 @@ import {
   // DID schemas
   didResponseSchema,
   verificationCheckSchema,
-  verificationErrorSchema,
   verificationResultResponseSchema,
   didDocumentResponseSchema,
   // IDR schemas
@@ -159,7 +158,6 @@ export const criterionSchema = z.object({
 export {
   didResponseSchema,
   verificationCheckSchema,
-  verificationErrorSchema,
   verificationResultResponseSchema,
   didDocumentResponseSchema,
   registrarSchema,
@@ -193,7 +191,6 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     VerificationResult: verificationResultResponseSchema,
     PaginationMeta: paginationMetaSchema,
     VerificationCheck: verificationCheckSchema,
-    VerificationError: verificationErrorSchema,
     DidDocument: didDocumentResponseSchema,
     CredentialIssueRequest: credentialIssueRequestSchema,
     CredentialIssueResponse: credentialIssueResponseSchema,

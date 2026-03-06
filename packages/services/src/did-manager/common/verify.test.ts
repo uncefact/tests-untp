@@ -88,7 +88,6 @@ describe('verifyDid', () => {
     expect(result.verified).toBe(true);
     expect(result.checks).toHaveLength(6);
     expect(result.checks.every((c) => c.passed)).toBe(true);
-    expect(result.errors).toBeUndefined();
   });
 
   it('returns structure failure when document is missing required fields', async () => {

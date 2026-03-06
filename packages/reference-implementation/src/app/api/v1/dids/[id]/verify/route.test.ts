@@ -118,7 +118,6 @@ describe('POST /api/v1/dids/:id/verify', () => {
     const verification = {
       verified: false,
       checks: [{ name: 'resolve', passed: false }],
-      errors: [{ name: 'resolve', message: 'Resolution failed' }],
     };
     mockDidService.verify.mockResolvedValue(verification);
     mockUpdateDidStatus.mockResolvedValue({ id: 'did-1', status: 'VERIFICATION_FAILED' });

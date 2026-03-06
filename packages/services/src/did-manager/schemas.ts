@@ -54,18 +54,12 @@ export const verificationCheckSchema = z.object({
   message: z.string().optional(),
 });
 
-export const verificationErrorSchema = z.object({
-  name: z.enum(VERIFICATION_CHECK_NAMES),
-  message: z.string(),
-});
-
 /**
  * Verification result as returned by the REST API.
  */
 export const verificationResultResponseSchema = z.object({
   verified: z.boolean().describe('Whether the DID was successfully verified'),
   checks: z.array(verificationCheckSchema).describe('Individual verification checks performed'),
-  errors: z.array(verificationErrorSchema).optional().describe('Errors encountered during verification'),
 });
 
 /**

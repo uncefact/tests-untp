@@ -335,7 +335,7 @@ describe('VCKitDidAdapter', () => {
   // verify() delegation test
   describe('verify', () => {
     it('delegates to verifyDid with provider keys from VCKit', async () => {
-      const mockResult = { verified: true, checks: [], errors: undefined };
+      const mockResult = { verified: true, checks: [] };
       (verifyDid as jest.Mock).mockResolvedValue(mockResult);
       (global.fetch as jest.Mock).mockResolvedValueOnce(
         createMockResponse({ keys: [{ kid: 'key-1' }, { kid: 'key-2' }] }),
@@ -364,8 +364,13 @@ describe('VCKitDidAdapter', () => {
       await expect(service.verify('')).rejects.toThrow(DidInputError);
     });
 
-    it('passes empty providerKeys and adds KEY_MATERIAL error when key fetch throws', async () => {
-      const mockResult = { verified: true, checks: [], errors: undefined };
+    it('replaces KEY_MATERIAL check and recalculates verified when key fetch throws', async () => {
+      const existingKeyCheck = {
+        name: DidVerificationCheckName.KEY_MATERIAL,
+        passed: true,
+        message: 'No provider keys to compare',
+      };
+      const mockResult = { verified: true, checks: [existingKeyCheck] };
       (verifyDid as jest.Mock).mockResolvedValue(mockResult);
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
@@ -375,16 +380,24 @@ describe('VCKitDidAdapter', () => {
         providerKeys: [],
       });
 
-      expect(result.errors).toEqual([
-        {
-          name: DidVerificationCheckName.KEY_MATERIAL,
-          message: 'Provider key material could not be fetched — key_material check may be incomplete',
-        },
-      ]);
+      // Should replace the existing KEY_MATERIAL check, not append
+      expect(result.checks.filter((c) => c.name === DidVerificationCheckName.KEY_MATERIAL)).toHaveLength(1);
+      expect(result.checks).toContainEqual({
+        name: DidVerificationCheckName.KEY_MATERIAL,
+        passed: false,
+        message: 'Provider key material could not be fetched — key_material check may be incomplete',
+      });
+      // verified should be recalculated to false
+      expect(result.verified).toBe(false);
     });
 
-    it('adds KEY_MATERIAL error when key fetch returns non-OK status', async () => {
-      const mockResult = { verified: true, checks: [], errors: undefined };
+    it('replaces KEY_MATERIAL check when key fetch returns non-OK status', async () => {
+      const existingKeyCheck = {
+        name: DidVerificationCheckName.KEY_MATERIAL,
+        passed: true,
+        message: 'No provider keys to compare',
+      };
+      const mockResult = { verified: true, checks: [existingKeyCheck] };
       (verifyDid as jest.Mock).mockResolvedValue(mockResult);
       (global.fetch as jest.Mock).mockResolvedValueOnce(createMockResponse({}, false, 500));
 
@@ -394,28 +407,31 @@ describe('VCKitDidAdapter', () => {
         providerKeys: [],
       });
 
-      expect(result.errors).toEqual([
-        {
-          name: DidVerificationCheckName.KEY_MATERIAL,
-          message: 'Provider key material could not be fetched — key_material check may be incomplete',
-        },
-      ]);
+      expect(result.checks.filter((c) => c.name === DidVerificationCheckName.KEY_MATERIAL)).toHaveLength(1);
+      expect(result.checks).toContainEqual({
+        name: DidVerificationCheckName.KEY_MATERIAL,
+        passed: false,
+        message: 'Provider key material could not be fetched — key_material check may be incomplete',
+      });
+      expect(result.verified).toBe(false);
     });
 
-    it('appends KEY_MATERIAL error to existing errors when key fetch fails', async () => {
-      const existingError = { name: DidVerificationCheckName.RESOLVE, message: 'Could not resolve' };
-      const mockResult = { verified: false, checks: [], errors: [existingError] };
+    it('pushes KEY_MATERIAL check when no existing KEY_MATERIAL check and key fetch fails', async () => {
+      const existingCheck = { name: DidVerificationCheckName.RESOLVE, passed: false, message: 'Could not resolve' };
+      const mockResult = { verified: false, checks: [existingCheck] };
       (verifyDid as jest.Mock).mockResolvedValue(mockResult);
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
       const result = await service.verify('did:web:example.com');
 
-      expect(result.errors).toHaveLength(2);
-      expect(result.errors![0]).toEqual(existingError);
-      expect(result.errors![1]).toEqual({
+      expect(result.checks).toHaveLength(2);
+      expect(result.checks[0]).toEqual(existingCheck);
+      expect(result.checks[1]).toEqual({
         name: DidVerificationCheckName.KEY_MATERIAL,
+        passed: false,
         message: 'Provider key material could not be fetched — key_material check may be incomplete',
       });
+      expect(result.verified).toBe(false);
     });
   });
 

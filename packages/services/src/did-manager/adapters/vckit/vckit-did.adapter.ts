@@ -222,11 +222,19 @@ export class VCKitDidAdapter implements IDidService {
     const result = await verifyDid(did, { providerKeys });
 
     if (keyFetchFailed) {
-      if (!result.errors) result.errors = [];
-      result.errors.push({
+      // Replace the vacuously-passing KEY_MATERIAL check with a failure
+      const keyCheckIndex = result.checks.findIndex((c) => c.name === DidVerificationCheckName.KEY_MATERIAL);
+      const failedCheck = {
         name: DidVerificationCheckName.KEY_MATERIAL,
+        passed: false,
         message: 'Provider key material could not be fetched — key_material check may be incomplete',
-      });
+      };
+      if (keyCheckIndex >= 0) {
+        result.checks[keyCheckIndex] = failedCheck;
+      } else {
+        result.checks.push(failedCheck);
+      }
+      result.verified = result.checks.every((c) => c.passed);
     }
 
     this.logger.info({ did, verified: result.verified }, 'DID verification completed');
