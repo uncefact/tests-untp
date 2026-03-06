@@ -176,7 +176,7 @@ export async function listRenderTemplates(
     }),
     prisma.renderTemplate.count({ where }),
     prisma.renderTemplate.findMany({
-      where: { tenantId, isDefault: true },
+      where: { tenantId, isDefault: true, ...(dataModelId && { dataModelId }) },
       select: { dataModelId: true },
     }),
   ]);
