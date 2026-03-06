@@ -8,17 +8,29 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withTenantAuth — skips auth but preserves error handling via handleRouteError
+// Mock withTenantAuth — skips auth but mirrors handleRouteError behaviour inline
 jest.mock('@/lib/api/with-tenant-auth', () => {
-  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
+  const { NotFoundError } = jest.requireActual('@/lib/api/errors');
+  const { ValidationError } = jest.requireActual('@/lib/api/validation');
+
+  function jsonResponse(body: unknown, init?: { status?: number }) {
+    return { status: init?.status ?? 200, json: async () => body };
+  }
+
   return {
     withTenantAuth:
       (handler: (...args: unknown[]) => unknown) =>
       async (...args: unknown[]) => {
         try {
           return await handler(...args);
-        } catch (e) {
-          return handleRouteError(e);
+        } catch (e: unknown) {
+          if (e instanceof ValidationError) {
+            return jsonResponse({ error: (e as Error).message }, { status: 400 });
+          }
+          if (e instanceof NotFoundError) {
+            return jsonResponse({ error: (e as Error).message }, { status: 404 });
+          }
+          return jsonResponse({ error: (e as Error).message }, { status: 500 });
         }
       },
   };
