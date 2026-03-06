@@ -18,9 +18,9 @@ import type { PrimaryEntityResult } from './resolve-primary-entity';
 const TENANT_ID = 'tenant-1';
 
 const SCHEME_INFO = {
-  namespace: 'gs1',
   primaryKey: 'gtin',
   idrServiceInstanceId: 'idr-svc-1',
+  registrar: { namespace: 'gs1' },
 };
 
 function makeEntity(id: string) {
