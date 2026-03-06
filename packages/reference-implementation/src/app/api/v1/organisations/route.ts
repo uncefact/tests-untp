@@ -33,8 +33,8 @@ const logger = apiLogger.child({ route: '/api/v1/organisations' });
  *                   type: string
  *                   description: Optional description
  *                 location:
- *                   type: string
- *                   description: Optional location
+ *                   type: object
+ *                   description: Optional UNTP location object
  *     responses:
  *       201:
  *         description: Organisations created successfully
@@ -132,7 +132,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/OrganisationListItem'
+ *                     $ref: '#/components/schemas/Organisation'
  *                 pagination:
  *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:

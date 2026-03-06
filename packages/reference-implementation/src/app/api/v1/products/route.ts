@@ -181,7 +181,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/ProductListItem'
+ *                     $ref: '#/components/schemas/Product'
  *                 pagination:
  *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:

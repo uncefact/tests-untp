@@ -71,7 +71,7 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Unauthorised
+ *         description: Unauthorised - missing or invalid authentication
  *         content:
  *           application/json:
  *             schema:
@@ -117,7 +117,7 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
 
   const scheme = identifier.scheme;
   const registrar = scheme.registrar;
-  const namespace = scheme.namespace ?? registrar.namespace;
+  const namespace = registrar.namespace;
 
   logger.info({ tenantId, identifierId, primaryKey: scheme.primaryKey, namespace }, 'Resolving IDR service');
   const { service: idrService } = await resolveIdrService(
@@ -194,7 +194,7 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
  *                 pagination:
  *                   $ref: '#/components/schemas/PaginationMeta'
  *       401:
- *         description: Unauthorised
+ *         description: Unauthorised - missing or invalid authentication
  *         content:
  *           application/json:
  *             schema:

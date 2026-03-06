@@ -53,7 +53,7 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links/[linkId]
  *                 warning:
  *                   type: string
  *       401:
- *         description: Unauthorised
+ *         description: Unauthorised - missing or invalid authentication
  *         content:
  *           application/json:
  *             schema:
@@ -165,7 +165,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                 type:
  *                   type: string
  *       401:
- *         description: Unauthorised
+ *         description: Unauthorised - missing or invalid authentication
  *         content:
  *           application/json:
  *             schema:
@@ -282,7 +282,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *       204:
  *         description: Link deleted successfully
  *       401:
- *         description: Unauthorised
+ *         description: Unauthorised - missing or invalid authentication
  *         content:
  *           application/json:
  *             schema:

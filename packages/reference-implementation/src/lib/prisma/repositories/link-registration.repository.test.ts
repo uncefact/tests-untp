@@ -121,6 +121,8 @@ describe('link-registration.repository', () => {
       expect(mockLinkRegistration.findMany).toHaveBeenCalledWith({
         where: { identifierId: 'ident-1', tenantId: 'tenant-1' },
         orderBy: { publishedAt: 'desc' },
+        take: 100,
+        skip: undefined,
       });
       expect(mockLinkRegistration.count).toHaveBeenCalledWith({
         where: { identifierId: 'ident-1', tenantId: 'tenant-1' },

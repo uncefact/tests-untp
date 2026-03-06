@@ -55,8 +55,8 @@ export async function listLinkRegistrations(
     prisma.linkRegistration.findMany({
       where,
       orderBy: { publishedAt: 'desc' },
-      ...(limit != null && { take: limit }),
-      ...(offset != null && { skip: offset }),
+      take: limit ?? 100,
+      skip: offset,
     }),
     prisma.linkRegistration.count({ where }),
   ]);

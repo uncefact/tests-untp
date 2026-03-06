@@ -267,7 +267,7 @@ describe('GET /api/v1/products', () => {
     const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
     const json = await res.json();
 
-    expect(json.pagination).toEqual({ total: 50, limit: 10, offset: 20 });
+    expect(json.pagination).toEqual({ total: 50, limit: 10, offset: 20, hasMore: true });
   });
 
   it('returns 500 when listProducts throws', async () => {
