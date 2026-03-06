@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { resolveDidService } from '@/lib/services/resolve-did-service';
-import { errorMessage } from '@/lib/api/errors';
+import { errorMessage, ConflictError } from '@/lib/api/errors';
 import { ValidationError, validateEnum, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { createDid, listDids } from '@/lib/prisma/repositories';
+import { createDid, listDids, findDidByAliasAndService } from '@/lib/prisma/repositories';
 import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
@@ -71,6 +71,12 @@ const logger = apiLogger.child({ route: '/api/v1/dids' });
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: A DID with this alias already exists on the service instance
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Service instance not found
  *         content:
@@ -129,6 +135,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     normalisedAlias = didService.normaliseAlias(body.alias, method, type);
   } catch (aliasErr) {
     throw new ValidationError(errorMessage(aliasErr, 'Invalid alias'));
+  }
+
+  logger.info({ alias: normalisedAlias, serviceInstanceId }, 'Checking for duplicate DID');
+  const aliasExists = await findDidByAliasAndService(normalisedAlias, serviceInstanceId);
+  if (aliasExists) {
+    throw new ConflictError(`A DID with alias "${normalisedAlias}" already exists on this service instance`);
   }
 
   logger.info({ type, method, alias: normalisedAlias, serviceInstanceId }, 'Creating DID via provider');

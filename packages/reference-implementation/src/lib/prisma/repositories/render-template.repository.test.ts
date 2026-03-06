@@ -4,7 +4,7 @@ import {
   listRenderTemplates,
   updateRenderTemplate,
   deleteRenderTemplate,
-  getPrimaryRenderTemplate,
+  getDefaultRenderTemplate,
 } from './render-template.repository';
 
 // Transaction mock — functions called via $transaction callback
@@ -63,7 +63,7 @@ describe('render-template.repository', () => {
     renderMethodType: 'RenderTemplate2024',
     storageUrl: 'https://storage.example.com/templates/dpp-default.html',
     hash: 'sha256-abc123',
-    isPrimary: false,
+    isDefault: false,
     storageServiceInstanceId: null,
     storageExternalId: null,
     storageBucket: null,
@@ -103,7 +103,7 @@ describe('render-template.repository', () => {
           renderMethodType: 'RenderTemplate2024',
           storageUrl: 'https://storage.example.com/templates/dpp-default.html',
           hash: 'sha256-abc123',
-          isPrimary: false,
+          isDefault: false,
           storageServiceInstanceId: undefined,
           storageExternalId: undefined,
           storageBucket: undefined,
@@ -117,7 +117,7 @@ describe('render-template.repository', () => {
       expect(result).toEqual(TEMPLATE_RECORD);
     });
 
-    it('defaults isPrimary to false', async () => {
+    it('defaults isDefault to false', async () => {
       mockTx.renderTemplate.create.mockResolvedValue(TEMPLATE_RECORD);
 
       await createRenderTemplate(TENANT_ID, {
@@ -130,37 +130,37 @@ describe('render-template.repository', () => {
 
       expect(mockTx.renderTemplate.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          isPrimary: false,
+          isDefault: false,
         }),
         include: INCLUDE_SHAPE,
       });
     });
 
-    it('unsets existing primary when isPrimary is true', async () => {
-      const primaryRecord = { ...TEMPLATE_RECORD, isPrimary: true };
+    it('unsets existing default when isDefault is true', async () => {
+      const defaultRecord = { ...TEMPLATE_RECORD, isDefault: true };
       mockTx.renderTemplate.updateMany.mockResolvedValue({ count: 1 });
-      mockTx.renderTemplate.create.mockResolvedValue(primaryRecord);
+      mockTx.renderTemplate.create.mockResolvedValue(defaultRecord);
 
       await createRenderTemplate(TENANT_ID, {
-        name: 'DPP Primary Template',
+        name: 'DPP Default Template',
         dataModelId: CONFIG_ID,
         renderMethodType: 'RenderTemplate2024',
-        storageUrl: 'https://storage.example.com/templates/dpp-primary.html',
+        storageUrl: 'https://storage.example.com/templates/dpp-default.html',
         hash: 'sha256-def456',
-        isPrimary: true,
+        isDefault: true,
       });
 
       expect(mockTx.renderTemplate.updateMany).toHaveBeenCalledWith({
         where: {
           tenantId: TENANT_ID,
           dataModelId: CONFIG_ID,
-          isPrimary: true,
+          isDefault: true,
         },
-        data: { isPrimary: false },
+        data: { isDefault: false },
       });
       expect(mockTx.renderTemplate.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          isPrimary: true,
+          isDefault: true,
         }),
         include: INCLUDE_SHAPE,
       });
@@ -203,11 +203,43 @@ describe('render-template.repository', () => {
       const result = await getRenderTemplateById('nonexistent', TENANT_ID);
       expect(result).toBeNull();
     });
+
+    it('overrides isDefault to false for system template when tenant has own default', async () => {
+      const systemTemplate = {
+        ...TEMPLATE_RECORD,
+        id: 'system-template-1',
+        tenantId: 'system',
+        isDefault: true,
+      };
+      mockRenderTemplate.findFirst
+        .mockResolvedValueOnce(systemTemplate) // getRenderTemplateById query
+        .mockResolvedValueOnce({ id: 'tenant-default' }); // applyTenantDefaultOverride check
+
+      const result = await getRenderTemplateById('system-template-1', TENANT_ID);
+
+      expect(result).toEqual({ ...systemTemplate, isDefault: false });
+    });
+
+    it('preserves isDefault for system template when tenant has no own default', async () => {
+      const systemTemplate = {
+        ...TEMPLATE_RECORD,
+        id: 'system-template-1',
+        tenantId: 'system',
+        isDefault: true,
+      };
+      mockRenderTemplate.findFirst.mockResolvedValueOnce(systemTemplate).mockResolvedValueOnce(null);
+
+      const result = await getRenderTemplateById('system-template-1', TENANT_ID);
+
+      expect(result).toEqual(systemTemplate);
+    });
   });
 
   describe('listRenderTemplates', () => {
     it('lists templates for tenant with total count', async () => {
-      mockRenderTemplate.findMany.mockResolvedValue([TEMPLATE_RECORD]);
+      mockRenderTemplate.findMany
+        .mockResolvedValueOnce([TEMPLATE_RECORD]) // main query
+        .mockResolvedValueOnce([]); // tenant defaults query
       mockRenderTemplate.count.mockResolvedValue(1);
 
       const result = await listRenderTemplates(TENANT_ID);
@@ -230,7 +262,9 @@ describe('render-template.repository', () => {
     });
 
     it('filters by dataModelId', async () => {
-      mockRenderTemplate.findMany.mockResolvedValue([TEMPLATE_RECORD]);
+      mockRenderTemplate.findMany
+        .mockResolvedValueOnce([TEMPLATE_RECORD]) // main query
+        .mockResolvedValueOnce([]); // tenant defaults query
       mockRenderTemplate.count.mockResolvedValue(1);
 
       await listRenderTemplates(TENANT_ID, { dataModelId: CONFIG_ID });
@@ -258,7 +292,9 @@ describe('render-template.repository', () => {
         tenantId: 'system',
         name: 'DPP System Default Template',
       };
-      mockRenderTemplate.findMany.mockResolvedValue([TEMPLATE_RECORD, SYSTEM_TEMPLATE_RECORD]);
+      mockRenderTemplate.findMany
+        .mockResolvedValueOnce([TEMPLATE_RECORD, SYSTEM_TEMPLATE_RECORD]) // main query
+        .mockResolvedValueOnce([]); // tenant defaults query
       mockRenderTemplate.count.mockResolvedValue(2);
 
       const result = await listRenderTemplates(TENANT_ID);
@@ -268,7 +304,9 @@ describe('render-template.repository', () => {
     });
 
     it('applies pagination', async () => {
-      mockRenderTemplate.findMany.mockResolvedValue([]);
+      mockRenderTemplate.findMany
+        .mockResolvedValueOnce([]) // main query
+        .mockResolvedValueOnce([]); // tenant defaults query
       mockRenderTemplate.count.mockResolvedValue(0);
 
       await listRenderTemplates(TENANT_ID, { limit: 10, offset: 20 });
@@ -279,6 +317,30 @@ describe('render-template.repository', () => {
           skip: 20,
         }),
       );
+    });
+
+    it('overrides isDefault on system templates when tenant has own default for same dataModelId', async () => {
+      const systemTemplate = {
+        ...TEMPLATE_RECORD,
+        id: 'system-template-1',
+        tenantId: 'system',
+        isDefault: true,
+      };
+      const tenantTemplate = {
+        ...TEMPLATE_RECORD,
+        id: 'tenant-template-1',
+        tenantId: TENANT_ID,
+        isDefault: true,
+      };
+      mockRenderTemplate.findMany
+        .mockResolvedValueOnce([tenantTemplate, systemTemplate]) // main query
+        .mockResolvedValueOnce([{ dataModelId: CONFIG_ID }]); // tenant defaults query
+      mockRenderTemplate.count.mockResolvedValue(2);
+
+      const result = await listRenderTemplates(TENANT_ID);
+
+      expect(result.data[0].isDefault).toBe(true); // tenant's own
+      expect(result.data[1].isDefault).toBe(false); // system overridden
     });
   });
 
@@ -311,28 +373,28 @@ describe('render-template.repository', () => {
       );
     });
 
-    it('unsets existing primary when setting isPrimary (excluding self)', async () => {
+    it('unsets existing default when setting isDefault (excluding self)', async () => {
       mockTx.renderTemplate.findFirst.mockResolvedValue(TEMPLATE_RECORD);
       mockTx.renderTemplate.updateMany.mockResolvedValue({ count: 1 });
       mockTx.renderTemplate.update.mockResolvedValue({
         ...TEMPLATE_RECORD,
-        isPrimary: true,
+        isDefault: true,
       });
 
-      await updateRenderTemplate('template-1', TENANT_ID, { isPrimary: true });
+      await updateRenderTemplate('template-1', TENANT_ID, { isDefault: true });
 
       expect(mockTx.renderTemplate.updateMany).toHaveBeenCalledWith({
         where: {
           tenantId: TENANT_ID,
           dataModelId: CONFIG_ID,
-          isPrimary: true,
+          isDefault: true,
           NOT: { id: 'template-1' },
         },
-        data: { isPrimary: false },
+        data: { isDefault: false },
       });
       expect(mockTx.renderTemplate.update).toHaveBeenCalledWith({
         where: { id: 'template-1' },
-        data: { isPrimary: true },
+        data: { isDefault: true },
         include: INCLUDE_SHAPE,
       });
     });
@@ -425,29 +487,56 @@ describe('render-template.repository', () => {
     });
   });
 
-  describe('getPrimaryRenderTemplate', () => {
-    it('returns the primary template for a tenant and config', async () => {
-      const primaryRecord = { ...TEMPLATE_RECORD, isPrimary: true };
-      mockRenderTemplate.findFirst.mockResolvedValue(primaryRecord);
+  describe('getDefaultRenderTemplate', () => {
+    it('returns the default template for a tenant and config', async () => {
+      const defaultRecord = { ...TEMPLATE_RECORD, isDefault: true };
+      mockRenderTemplate.findFirst.mockResolvedValueOnce(defaultRecord);
 
-      const result = await getPrimaryRenderTemplate(TENANT_ID, CONFIG_ID);
+      const result = await getDefaultRenderTemplate(TENANT_ID, CONFIG_ID);
 
       expect(mockRenderTemplate.findFirst).toHaveBeenCalledWith({
         where: {
-          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+          tenantId: TENANT_ID,
           dataModelId: CONFIG_ID,
-          isPrimary: true,
+          isDefault: true,
         },
         include: INCLUDE_SHAPE,
       });
-      expect(result).toEqual(primaryRecord);
+      expect(result).toEqual(defaultRecord);
     });
 
-    it('returns null when no primary template exists', async () => {
-      mockRenderTemplate.findFirst.mockResolvedValue(null);
+    it('returns null when no default template exists', async () => {
+      mockRenderTemplate.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
 
-      const result = await getPrimaryRenderTemplate(TENANT_ID, CONFIG_ID);
+      const result = await getDefaultRenderTemplate(TENANT_ID, CONFIG_ID);
       expect(result).toBeNull();
+    });
+
+    it('returns tenant default over system default', async () => {
+      const tenantDefault = { ...TEMPLATE_RECORD, isDefault: true };
+      mockRenderTemplate.findFirst.mockResolvedValueOnce(tenantDefault);
+
+      const result = await getDefaultRenderTemplate(TENANT_ID, CONFIG_ID);
+
+      expect(mockRenderTemplate.findFirst).toHaveBeenCalledWith({
+        where: { tenantId: TENANT_ID, dataModelId: CONFIG_ID, isDefault: true },
+        include: INCLUDE_SHAPE,
+      });
+      expect(result).toEqual(tenantDefault);
+    });
+
+    it('falls back to system default when tenant has none', async () => {
+      const systemDefault = { ...TEMPLATE_RECORD, tenantId: 'system', isDefault: true };
+      mockRenderTemplate.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(systemDefault);
+
+      const result = await getDefaultRenderTemplate(TENANT_ID, CONFIG_ID);
+
+      expect(mockRenderTemplate.findFirst).toHaveBeenCalledTimes(2);
+      expect(mockRenderTemplate.findFirst).toHaveBeenNthCalledWith(2, {
+        where: { tenantId: 'system', dataModelId: CONFIG_ID, isDefault: true },
+        include: INCLUDE_SHAPE,
+      });
+      expect(result).toEqual(systemDefault);
     });
   });
 });

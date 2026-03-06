@@ -36,7 +36,7 @@ services:
     restart: always
 
   storage-service:
-    image: ghcr.io/uncefact/project-storage-service:3.1.0
+    image: ghcr.io/uncefact/project-storage-service:3.2.1
     ports:
       - 3334:3334
     environment:
@@ -179,7 +179,7 @@ services:
       - AUTH_OIDC_CLIENT_SECRET=e2e-test-secret
       - AUTH_OIDC_ISSUER=http://localhost:8081/realms/ri-e2e
       - AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE=ri-api
-      - UNCEFACT_STORAGE_URL=http://storage-service:3334/api/3.0.0/public
+      - UNCEFACT_STORAGE_URL=http://storage-service:3334/api/3.1.0/public
       - UNCEFACT_STORAGE_API_KEY=test123
       - UNCEFACT_STORAGE_PUBLIC_BUCKET=${UNCEFACT_STORAGE_PUBLIC_BUCKET:-public-data}
       - UNCEFACT_STORAGE_PRIVATE_BUCKET=${UNCEFACT_STORAGE_PRIVATE_BUCKET:-private-data}

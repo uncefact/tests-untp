@@ -30,7 +30,6 @@ export {
   verificationMethodSchema,
   didResponseSchema,
   verificationCheckSchema,
-  verificationErrorSchema,
   verificationResultResponseSchema,
   didDocumentResponseSchema,
 } from './did-manager/schemas.js';

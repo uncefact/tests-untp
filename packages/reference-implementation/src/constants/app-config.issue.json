@@ -325,7 +325,7 @@
             "linkRegisterPath": "resolver"
           },
           "storage": {
-            "url": "http://localhost:3334/api/3.0.0/public",
+            "url": "http://localhost:3334/api/3.1.0/public",
             "params": {},
             "options": {
               "method": "POST",

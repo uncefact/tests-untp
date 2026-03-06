@@ -10,7 +10,7 @@ jest.mock('next/server', () => ({
 
 // Mock withTenantAuth to mirror handleRouteError behaviour
 jest.mock('@/lib/api/with-tenant-auth', () => {
-  const { NotFoundError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
+  const { NotFoundError, ConflictError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
   const { ValidationError } = jest.requireActual('@/lib/api/validation');
   const { ServiceError } = jest.requireActual('@uncefact/untp-ri-services');
 
@@ -26,6 +26,9 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
         } catch (e: unknown) {
           if (e instanceof ValidationError) {
             return jsonResponse({ error: (e as Error).message }, { status: 400 });
+          }
+          if (e instanceof ConflictError) {
+            return jsonResponse({ error: (e as Error).message }, { status: 409 });
           }
           if (e instanceof NotFoundError) {
             return jsonResponse({ error: (e as Error).message }, { status: 404 });
@@ -49,6 +52,7 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 const mockResolveDidService = jest.fn();
 const mockCreateDid = jest.fn();
 const mockListDids = jest.fn();
+const mockFindDidByAliasAndService = jest.fn();
 
 jest.mock('@/lib/services/resolve-did-service', () => ({
   resolveDidService: (...args: unknown[]) => mockResolveDidService(...args),
@@ -57,6 +61,8 @@ jest.mock('@/lib/services/resolve-did-service', () => ({
 jest.mock('@/lib/prisma/repositories', () => ({
   createDid: (input: unknown) => mockCreateDid(input),
   listDids: (orgId: string, opts: unknown) => mockListDids(orgId, opts),
+  findDidByAliasAndService: (alias: string, serviceInstanceId: string) =>
+    mockFindDidByAliasAndService(alias, serviceInstanceId),
 }));
 
 import { ServiceResolutionError } from '@/lib/api/errors';
@@ -103,6 +109,7 @@ describe('POST /api/v1/dids', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockResolveDidService.mockResolvedValue({ service: mockDidService, instanceId: 'inst-1' });
+    mockFindDidByAliasAndService.mockResolvedValue(false);
   });
 
   it('creates a managed DID and returns 201', async () => {
@@ -324,6 +331,23 @@ describe('POST /api/v1/dids', () => {
       DidType.MANAGED,
     );
     expect(mockDidService.create).toHaveBeenCalledWith(expect.objectContaining({ alias: 'my-normalised-alias' }));
+  });
+
+  it('returns 409 when DID with same alias already exists on service instance', async () => {
+    mockDidService.normaliseAlias.mockReturnValue('existing-alias');
+    mockFindDidByAliasAndService.mockResolvedValue(true);
+
+    const req = createFakeRequest({
+      body: { type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'existing-alias' },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toBeDefined();
+    expect(mockFindDidByAliasAndService).toHaveBeenCalledWith('existing-alias', 'inst-1');
+    expect(mockDidService.create).not.toHaveBeenCalled();
+    expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
   it('returns 400 when service does not support the requested method', async () => {

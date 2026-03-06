@@ -123,7 +123,7 @@ services:
       # Service URLs (using docker internal networking)
       ISSUER_API_URL: http://vckit-api:3332/v2
       ISSUER_AUTH_TOKEN: ${ISSUER_AUTH_TOKEN}
-      UNCEFACT_STORAGE_URL: http://storage-service:3334/api/3.0.0/public
+      UNCEFACT_STORAGE_URL: http://storage-service:3334/api/3.1.0/public
       UNCEFACT_STORAGE_PUBLIC_BUCKET: ${UNCEFACT_STORAGE_PUBLIC_BUCKET:-public-data}
       UNCEFACT_STORAGE_PRIVATE_BUCKET: ${UNCEFACT_STORAGE_PRIVATE_BUCKET:-private-data}
       IDR_API_URL: http://identity-resolver-service:3000/api/2.0.0
@@ -153,7 +153,7 @@ services:
     restart: always
 
   storage-service:
-    image: ghcr.io/uncefact/project-storage-service:3.1.0
+    image: ghcr.io/uncefact/project-storage-service:3.2.1
     ports:
       - 3334:3334
     environment:

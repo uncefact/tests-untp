@@ -102,15 +102,9 @@ export type DidVerificationCheck = {
   message?: string;
 };
 
-export type DidVerificationError = {
-  name: DidVerificationCheckName;
-  message: string;
-};
-
 export type DidVerificationResult = {
   verified: boolean;
   checks: DidVerificationCheck[];
-  errors?: DidVerificationError[];
 };
 
 /** Result returned by a method-specific verifier (e.g. did:web, did:webvh). */

@@ -22,7 +22,7 @@ describe('UncefactStorageAdapter', () => {
   const mockConfig: UncefactStorageConfig = {
     baseUrl: 'https://storage.example.com',
     apiKey: 'test-api-key',
-    apiVersion: '3.0.0',
+    apiVersion: '3.1.0',
   };
 
   const mockCredential: EnvelopedVerifiableCredential = {
@@ -90,7 +90,7 @@ describe('UncefactStorageAdapter', () => {
     it('should not include X-API-Key header when apiKey is omitted', async () => {
       const configWithoutKey: UncefactStorageConfig = {
         baseUrl: 'https://storage.example.com',
-        apiVersion: '3.0.0',
+        apiVersion: '3.1.0',
       };
       const adapter = new UncefactStorageAdapter(configWithoutKey, mockLogger);
       await adapter.store(mockCredential);
@@ -114,21 +114,21 @@ describe('UncefactStorageAdapter', () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.0.0/public', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.1.0/public', expect.any(Object));
     });
 
     it('should use /public endpoint for unencrypted storage (encrypt = false)', async () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential, false);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.0.0/public', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.1.0/public', expect.any(Object));
     });
 
     it('should use /public endpoint when encrypt is not specified (defaults to false)', async () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.0.0/public', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.1.0/public', expect.any(Object));
     });
 
     it('should use /private endpoint for encrypted storage (encrypt = true)', async () => {
@@ -145,7 +145,7 @@ describe('UncefactStorageAdapter', () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential, true);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.0.0/private', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.1.0/private', expect.any(Object));
     });
 
     it('should send correct payload with data and client-generated id', async () => {
@@ -309,7 +309,7 @@ describe('UncefactStorageAdapter', () => {
         // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(mockLogger.debug).toHaveBeenCalledWith(
           expect.objectContaining({
-            url: 'https://storage.example.com/api/3.0.0/public',
+            url: 'https://storage.example.com/api/3.1.0/public',
             encrypt: false,
             bucket: undefined,
             externalId: MOCK_UUID,
@@ -639,7 +639,7 @@ describe('UncefactStorageAdapter', () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
 
-      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.0.0/public', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.1.0/public', expect.any(Object));
     });
 
     it('should use /private endpoint for encrypted upload', async () => {
@@ -656,7 +656,7 @@ describe('UncefactStorageAdapter', () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.storeBinary('<html>Secret</html>', 'template.html', 'text/html', true);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.0.0/private', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.1.0/private', expect.any(Object));
     });
 
     it('should send FormData body with file field', async () => {
@@ -717,7 +717,7 @@ describe('UncefactStorageAdapter', () => {
     it('should not include X-API-Key header when apiKey is omitted', async () => {
       const configWithoutKey: UncefactStorageConfig = {
         baseUrl: 'https://storage.example.com',
-        apiVersion: '3.0.0',
+        apiVersion: '3.1.0',
       };
       const adapter = new UncefactStorageAdapter(configWithoutKey, mockLogger);
       await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
@@ -880,7 +880,7 @@ describe('UncefactStorageAdapter', () => {
       await adapter.delete('resource-id-42', 'my-bucket');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://storage.example.com/api/3.0.0/my-bucket/resource-id-42',
+        'https://storage.example.com/api/3.1.0/my-bucket/resource-id-42',
         expect.objectContaining({ method: 'DELETE' }),
       );
     });
@@ -909,7 +909,7 @@ describe('UncefactStorageAdapter', () => {
 
       const configWithoutKey: UncefactStorageConfig = {
         baseUrl: 'https://storage.example.com',
-        apiVersion: '3.0.0',
+        apiVersion: '3.1.0',
       };
       const adapter = new UncefactStorageAdapter(configWithoutKey, mockLogger);
       await adapter.delete('resource-id-42', 'my-bucket');
@@ -1119,12 +1119,12 @@ describe('UncefactStorageAdapter', () => {
       ).toThrow();
     });
 
-    it('should default apiVersion to "3.0.0" when not provided', () => {
+    it('should default apiVersion to "3.1.0" when not provided', () => {
       const config = {
         baseUrl: 'https://storage.example.com',
       };
       const result = uncefactStorageRegistryEntry.configSchema.parse(config);
-      expect(result.apiVersion).toBe('3.0.0');
+      expect(result.apiVersion).toBe('3.1.0');
     });
 
     it('should reject an unsupported apiVersion', () => {

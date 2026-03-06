@@ -59,7 +59,7 @@ const MOCK_CREATED_RECORD = {
   renderMethodType: 'RenderTemplate2024',
   storageUrl: MOCK_STORAGE_RESULT.uri,
   hash: MOCK_STORAGE_RESULT.hash,
-  isPrimary: false,
+  isDefault: false,
   dataModel: MOCK_DATA_MODEL,
 };
 
@@ -137,7 +137,7 @@ describe('createRenderTemplate', () => {
       renderMethodType: 'RenderTemplate2024',
       storageUrl: MOCK_STORAGE_RESULT.uri,
       hash: MOCK_STORAGE_RESULT.hash,
-      isPrimary: undefined,
+      isDefault: undefined,
       storageServiceInstanceId: 'storage-instance-1',
       storageExternalId: MOCK_STORAGE_RESULT.externalId,
       storageBucket: MOCK_STORAGE_RESULT.bucket,
@@ -152,10 +152,10 @@ describe('createRenderTemplate', () => {
     expect(result).toEqual(MOCK_CREATED_RECORD);
   });
 
-  it('passes isPrimary to repository when provided', async () => {
-    await createRenderTemplate(buildInput({ isPrimary: true }));
+  it('passes isDefault to repository when provided', async () => {
+    await createRenderTemplate(buildInput({ isDefault: true }));
 
-    expect(mockCreateRenderTemplateRepo).toHaveBeenCalledWith(TENANT_ID, expect.objectContaining({ isPrimary: true }));
+    expect(mockCreateRenderTemplateRepo).toHaveBeenCalledWith(TENANT_ID, expect.objectContaining({ isDefault: true }));
   });
 
   it('sanitises template content before upload', async () => {

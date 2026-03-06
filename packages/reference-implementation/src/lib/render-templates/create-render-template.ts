@@ -18,11 +18,11 @@ export type CreateRenderTemplateInput = {
   renderMethodType: RenderMethodType;
   template: string;
   storageService: ResolvedService<IStorageService>;
-  isPrimary?: boolean;
+  isDefault?: boolean;
 } & RenderMethodFields;
 
 export async function createRenderTemplate(input: CreateRenderTemplateInput): Promise<RenderTemplateWithRelations> {
-  const { tenantId, name, dataModelId, renderMethodType, template, storageService, isPrimary } = input;
+  const { tenantId, name, dataModelId, renderMethodType, template, storageService, isDefault } = input;
 
   logger.info({ dataModelId }, 'Verifying data model exists');
   const dataModel = await getDataModelById(dataModelId, tenantId);
@@ -51,7 +51,7 @@ export async function createRenderTemplate(input: CreateRenderTemplateInput): Pr
     renderMethodType,
     storageUrl: storageResult.uri,
     hash: storageResult.hash,
-    isPrimary,
+    isDefault,
     storageServiceInstanceId: storageService.instanceId,
     storageExternalId: storageResult.externalId,
     storageBucket: storageResult.bucket,

@@ -7,8 +7,9 @@ import {
   updateDidStatus,
   deleteDid,
   getDefaultDid,
+  findDidByAliasAndService,
 } from './did.repository';
-import type { DidStatus } from '../generated';
+import { DidStatus } from '../generated';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
@@ -507,6 +508,53 @@ describe('did.repository', () => {
 
       await expect(deleteDid('did-record-1', 'other-org')).rejects.toThrow('DID not found or access denied');
       expect(mockTx.did.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findDidByAliasAndService', () => {
+    it('returns true when a matching DID exists on the service instance', async () => {
+      mockDid.findFirst.mockResolvedValue({ id: 'did-record-1' });
+
+      const result = await findDidByAliasAndService('my-alias', 'si-1');
+
+      expect(mockDid.findFirst).toHaveBeenCalledWith({
+        where: {
+          serviceInstanceId: 'si-1',
+          did: { endsWith: ':my-alias' },
+        },
+        select: { id: true },
+      });
+      expect(result).toBe(true);
+    });
+
+    it('returns false when no matching DID exists', async () => {
+      mockDid.findFirst.mockResolvedValue(null);
+
+      const result = await findDidByAliasAndService('nonexistent', 'si-1');
+
+      expect(mockDid.findFirst).toHaveBeenCalledWith({
+        where: {
+          serviceInstanceId: 'si-1',
+          did: { endsWith: ':nonexistent' },
+        },
+        select: { id: true },
+      });
+      expect(result).toBe(false);
+    });
+
+    it('returns false when matching alias exists on a different service instance', async () => {
+      mockDid.findFirst.mockResolvedValue(null);
+
+      const result = await findDidByAliasAndService('my-alias', 'si-2');
+
+      expect(mockDid.findFirst).toHaveBeenCalledWith({
+        where: {
+          serviceInstanceId: 'si-2',
+          did: { endsWith: ':my-alias' },
+        },
+        select: { id: true },
+      });
+      expect(result).toBe(false);
     });
   });
 

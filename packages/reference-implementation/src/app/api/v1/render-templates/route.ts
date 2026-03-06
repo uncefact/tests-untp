@@ -127,9 +127,9 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
  *               template:
  *                 type: string
  *                 description: HTML content of the render template
- *               isPrimary:
+ *               isDefault:
  *                 type: boolean
- *                 description: Whether this is the primary template for the data model. Setting to true will unset any existing primary template for the same data model.
+ *                 description: Whether this is the default template for the data model. Setting to true will unset any existing default template for the same data model.
  *               inline:
  *                 type: boolean
  *                 description: Whether the template is inline (applicable to RenderTemplate2024)
@@ -198,8 +198,8 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   if (!isNonEmptyString(body.template)) throw new ValidationError('template is required');
 
   // Validate optional field types
-  if (body.isPrimary !== undefined && typeof body.isPrimary !== 'boolean') {
-    throw new ValidationError('isPrimary must be a boolean');
+  if (body.isDefault !== undefined && typeof body.isDefault !== 'boolean') {
+    throw new ValidationError('isDefault must be a boolean');
   }
   if (body.inline !== undefined && typeof body.inline !== 'boolean') {
     throw new ValidationError('inline must be a boolean');
@@ -225,7 +225,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     renderMethodType,
     template: body.template as string,
     storageService,
-    isPrimary: body.isPrimary,
+    isDefault: body.isDefault,
     inline: body.inline,
     mediaType: body.mediaType as string | undefined,
     mediaQuery: body.mediaQuery as string | undefined,

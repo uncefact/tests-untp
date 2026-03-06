@@ -81,7 +81,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST — creates with isPrimary', function () {
+    it('POST — creates with isDefault', function () {
       if (!dataModelId) this.skip();
 
       cy.request({
@@ -92,11 +92,11 @@ describe('Render Template API', { testIsolation: false }, () => {
           dataModelId,
           renderMethodType: 'WebRenderingTemplate2022',
           template: `<html><body><h1>Primary Template ${RUN_ID}</h1></body></html>`,
-          isPrimary: true,
+          isDefault: true,
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.isPrimary).to.be.true;
+        expect(response.body.isDefault).to.be.true;
 
         // Clean up — only keep the other templates for remaining tests
         cy.request({ method: 'DELETE', url: `/api/v1/render-templates/${response.body.id}` });
@@ -179,16 +179,16 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH — updates isPrimary', function () {
+    it('PATCH — updates isDefault', function () {
       if (!createdTemplateId) this.skip();
 
       cy.request({
         method: 'PATCH',
         url: `/api/v1/render-templates/${createdTemplateId}`,
-        body: { isPrimary: true },
+        body: { isDefault: true },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.isPrimary).to.be.true;
+        expect(response.body.isDefault).to.be.true;
       });
     });
 
@@ -212,7 +212,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       cy.request(`/api/v1/render-templates/${createdTemplateId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.name).to.eq(`Updated E2E Template ${RUN_ID}`);
-        expect(response.body.isPrimary).to.be.true;
+        expect(response.body.isDefault).to.be.true;
       });
     });
 
@@ -394,7 +394,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('returns 400 when isPrimary is not a boolean', () => {
+    it('returns 400 when isDefault is not a boolean', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/render-templates',
@@ -403,12 +403,12 @@ describe('Render Template API', { testIsolation: false }, () => {
           dataModelId: 'dm-1',
           renderMethodType: 'WebRenderingTemplate2022',
           template: '<html>test</html>',
-          isPrimary: 'yes',
+          isDefault: 'yes',
         },
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
-        expect(response.body.error).to.include('isPrimary');
+        expect(response.body.error).to.include('isDefault');
       });
     });
 
@@ -571,17 +571,17 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('returns 400 when isPrimary is not a boolean', function () {
+    it('returns 400 when isDefault is not a boolean', function () {
       if (!tempTemplateId) this.skip();
 
       cy.request({
         method: 'PATCH',
         url: `/api/v1/render-templates/${tempTemplateId}`,
-        body: { isPrimary: 'yes' },
+        body: { isDefault: 'yes' },
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
-        expect(response.body.error).to.include('isPrimary');
+        expect(response.body.error).to.include('isDefault');
       });
     });
 
