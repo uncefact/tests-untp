@@ -28,7 +28,7 @@ export async function resolvePrimaryEntity(
     return {
       primaryIdentifier,
       productId: entity.id,
-      schemeNamespace: entity.primaryIdentifier?.scheme?.namespace ?? undefined,
+      schemeNamespace: entity.primaryIdentifier?.scheme?.registrar?.namespace ?? undefined,
       schemePrimaryKey: entity.primaryIdentifier?.scheme?.primaryKey,
       schemeIdrServiceInstanceId: entity.primaryIdentifier?.scheme?.idrServiceInstanceId,
     };
@@ -40,7 +40,7 @@ export async function resolvePrimaryEntity(
     return {
       primaryIdentifier,
       facilityId: entity.id,
-      schemeNamespace: entity.primaryIdentifier?.scheme?.namespace ?? undefined,
+      schemeNamespace: entity.primaryIdentifier?.scheme?.registrar?.namespace ?? undefined,
       schemePrimaryKey: entity.primaryIdentifier?.scheme?.primaryKey,
       schemeIdrServiceInstanceId: entity.primaryIdentifier?.scheme?.idrServiceInstanceId,
     };
@@ -52,7 +52,7 @@ export async function resolvePrimaryEntity(
     return {
       primaryIdentifier,
       organisationId: entity.id,
-      schemeNamespace: entity.primaryIdentifier?.scheme?.namespace ?? undefined,
+      schemeNamespace: entity.primaryIdentifier?.scheme?.registrar?.namespace ?? undefined,
       schemePrimaryKey: entity.primaryIdentifier?.scheme?.primaryKey,
       schemeIdrServiceInstanceId: entity.primaryIdentifier?.scheme?.idrServiceInstanceId,
     };

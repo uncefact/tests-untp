@@ -1,18 +1,3 @@
-// Polyfill Response for jsdom — needed for `new Response(null, { status: 204 })`
-if (typeof globalThis.Response === 'undefined') {
-  globalThis.Response = class Response {
-    public status: number;
-    public body: unknown;
-    constructor(body: unknown, init?: { status?: number }) {
-      this.body = body;
-      this.status = init?.status ?? 200;
-    }
-    async json() {
-      return JSON.parse(this.body as string);
-    }
-  } as unknown as typeof globalThis.Response;
-}
-
 // Mock next/server before importing route handlers
 jest.mock('next/server', () => ({
   NextResponse: {
