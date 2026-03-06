@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createIdentifierScheme, listIdentifierSchemes } from '@/lib/prisma/repositories';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/schemes' });
@@ -42,9 +43,6 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *               linkTemplate:
  *                 type: string
  *                 description: ISO 18975 link template for URI construction (e.g. "/{primaryKey}/{value}")
- *               namespace:
- *                 type: string
- *                 description: Optional namespace for the scheme
  *               idrServiceInstanceId:
  *                 type: string
  *                 description: Optional IDR service instance ID
@@ -70,13 +68,7 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 scheme:
- *                   $ref: '#/components/schemas/IdentifierScheme'
+ *               $ref: '#/components/schemas/IdentifierScheme'
  *       400:
  *         description: Validation error
  *         content:
@@ -109,7 +101,6 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     primaryKey?: string;
     validationPattern?: string;
     linkTemplate?: string;
-    namespace?: string;
     idrServiceInstanceId?: string;
     qualifiers?: Array<{
       key: string;
@@ -159,13 +150,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     primaryKey: body.primaryKey,
     validationPattern: body.validationPattern,
     linkTemplate: body.linkTemplate,
-    namespace: body.namespace,
     idrServiceInstanceId: body.idrServiceInstanceId,
     qualifiers: body.qualifiers,
   });
 
   logger.info({ tenantId, schemeId: scheme.id }, 'Scheme created');
-  return NextResponse.json({ ok: true, scheme }, { status: 201 });
+  return NextResponse.json(scheme, { status: 201 });
 });
 
 /**
@@ -202,13 +192,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *             schema:
  *               type: object
  *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 schemes:
+ *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/IdentifierScheme'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Validation error
  *         content:
@@ -235,8 +224,8 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   logger.info({ tenantId, registrarId, limit, offset }, 'Listing schemes');
-  const schemes = await listIdentifierSchemes(tenantId, { registrarId, limit, offset });
+  const { data, total } = await listIdentifierSchemes(tenantId, { registrarId, limit, offset });
 
-  logger.info({ tenantId, count: schemes.length }, 'Schemes listed');
-  return NextResponse.json({ ok: true, schemes });
+  logger.info({ tenantId, count: data.length }, 'Schemes listed');
+  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

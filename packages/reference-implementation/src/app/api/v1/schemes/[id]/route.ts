@@ -28,13 +28,7 @@ const logger = apiLogger.child({ route: '/api/v1/schemes/[id]' });
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 scheme:
- *                   $ref: '#/components/schemas/IdentifierScheme'
+ *               $ref: '#/components/schemas/IdentifierScheme'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -61,7 +55,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   if (!scheme) {
     throw new NotFoundError('Identifier scheme not found');
   }
-  return NextResponse.json({ ok: true, scheme });
+  return NextResponse.json(scheme);
 });
 
 /**
@@ -98,9 +92,6 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *               linkTemplate:
  *                 type: string
  *                 description: New ISO 18975 link template for URI construction
- *               namespace:
- *                 type: string
- *                 description: New namespace
  *               idrServiceInstanceId:
  *                 type: string
  *                 nullable: true
@@ -128,13 +119,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *                 scheme:
- *                   $ref: '#/components/schemas/IdentifierScheme'
+ *               $ref: '#/components/schemas/IdentifierScheme'
  *       400:
  *         description: Validation error - at least one field required
  *         content:
@@ -168,7 +153,6 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     primaryKey?: string;
     validationPattern?: string;
     linkTemplate?: string;
-    namespace?: string;
     idrServiceInstanceId?: string | null;
     qualifiers?: Array<{
       key: string;
@@ -188,7 +172,6 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const hasPrimaryKey = isNonEmptyString(body.primaryKey);
   const hasValidationPattern = isNonEmptyString(body.validationPattern);
   const hasLinkTemplate = isNonEmptyString(body.linkTemplate);
-  const hasNamespace = isNonEmptyString(body.namespace);
   const hasIdrServiceInstanceId = body.idrServiceInstanceId !== undefined;
   const hasQualifiers = body.qualifiers !== undefined;
 
@@ -197,7 +180,6 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     !hasPrimaryKey &&
     !hasValidationPattern &&
     !hasLinkTemplate &&
-    !hasNamespace &&
     !hasIdrServiceInstanceId &&
     !hasQualifiers
   ) {
@@ -225,7 +207,6 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
         hasPrimaryKey,
         hasValidationPattern,
         hasLinkTemplate,
-        hasNamespace,
         hasIdrServiceInstanceId,
         hasQualifiers,
       },
@@ -237,13 +218,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     ...(hasPrimaryKey && { primaryKey: body.primaryKey }),
     ...(hasValidationPattern && { validationPattern: body.validationPattern }),
     ...(hasLinkTemplate && { linkTemplate: body.linkTemplate }),
-    ...(hasNamespace && { namespace: body.namespace }),
     ...(hasIdrServiceInstanceId && { idrServiceInstanceId: body.idrServiceInstanceId }),
     ...(hasQualifiers && { qualifiers: body.qualifiers }),
   });
 
   logger.info({ tenantId, schemeId: id }, 'Scheme updated');
-  return NextResponse.json({ ok: true, scheme: updated });
+  return NextResponse.json(updated);
 });
 
 /**
@@ -262,16 +242,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *           type: string
  *         description: The database ID of the scheme
  *     responses:
- *       200:
+ *       204:
  *         description: Scheme deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -298,5 +270,5 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   await deleteIdentifierScheme(id, tenantId);
 
   logger.info({ tenantId, schemeId: id }, 'Scheme deleted');
-  return NextResponse.json({ ok: true });
+  return new Response(null, { status: 204 });
 });

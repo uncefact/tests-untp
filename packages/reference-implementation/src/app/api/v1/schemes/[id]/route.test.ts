@@ -73,8 +73,7 @@ describe('GET /api/v1/schemes/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.scheme).toEqual(scheme);
+    expect(json).toEqual(scheme);
   });
 
   it('returns 404 when scheme not found', async () => {
@@ -114,8 +113,7 @@ describe('PATCH /api/v1/schemes/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.scheme.name).toBe('Updated GTIN');
+    expect(json.name).toBe('Updated GTIN');
   });
 
   it('updates with qualifier replacement', async () => {
@@ -133,7 +131,7 @@ describe('PATCH /api/v1/schemes/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.scheme.qualifiers).toHaveLength(1);
+    expect(json.qualifiers).toHaveLength(1);
     expect(mockUpdateIdentifierScheme).toHaveBeenCalledWith(
       'sch-1',
       'org-1',
@@ -248,10 +246,8 @@ describe('DELETE /api/v1/schemes/:id', () => {
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('sch-1') as unknown as Parameters<typeof DELETE>[1]);
-    const json = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
+    expect(res.status).toBe(204);
   });
 
   it('returns 404 when scheme not found or access denied', async () => {

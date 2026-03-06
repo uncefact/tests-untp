@@ -91,8 +91,7 @@ describe('POST /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(json.ok).toBe(true);
-    expect(json.scheme).toEqual(scheme);
+    expect(json).toEqual(scheme);
   });
 
   it('creates a scheme with nested qualifiers', async () => {
@@ -117,7 +116,7 @@ describe('POST /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(json.scheme.qualifiers).toHaveLength(1);
+    expect(json.qualifiers).toHaveLength(1);
     expect(mockCreateIdentifierScheme).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: 'org-1',
@@ -136,7 +135,6 @@ describe('POST /api/v1/schemes', () => {
         primaryKey: 'gtin',
         validationPattern: '^\\d{14}$',
         linkTemplate: '/{primaryKey}/{value}',
-        namespace: 'gs1',
         idrServiceInstanceId: 'inst-1',
       },
     });
@@ -144,7 +142,6 @@ describe('POST /api/v1/schemes', () => {
 
     expect(mockCreateIdentifierScheme).toHaveBeenCalledWith(
       expect.objectContaining({
-        namespace: 'gs1',
         idrServiceInstanceId: 'inst-1',
       }),
     );
@@ -313,19 +310,19 @@ describe('GET /api/v1/schemes', () => {
 
   it('lists schemes for the tenant', async () => {
     const schemes = [{ id: 'sch-1', name: 'GTIN' }];
-    mockListIdentifierSchemes.mockResolvedValue(schemes);
+    mockListIdentifierSchemes.mockResolvedValue({ data: schemes, total: 1 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/schemes' });
     const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.schemes).toEqual(schemes);
+    expect(json.data).toEqual(schemes);
+    expect(json.pagination).toEqual({ total: 1, limit: 20, offset: 0, hasMore: false });
   });
 
   it('passes registrarId filter to listIdentifierSchemes', async () => {
-    mockListIdentifierSchemes.mockResolvedValue([]);
+    mockListIdentifierSchemes.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -341,7 +338,7 @@ describe('GET /api/v1/schemes', () => {
   });
 
   it('passes pagination parameters', async () => {
-    mockListIdentifierSchemes.mockResolvedValue([]);
+    mockListIdentifierSchemes.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -357,7 +354,7 @@ describe('GET /api/v1/schemes', () => {
   });
 
   it('handles no query parameters', async () => {
-    mockListIdentifierSchemes.mockResolvedValue([]);
+    mockListIdentifierSchemes.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/schemes' });
     await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);

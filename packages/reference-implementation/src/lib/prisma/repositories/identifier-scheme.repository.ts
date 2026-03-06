@@ -104,7 +104,7 @@ export async function getIdentifierSchemeById(id: string, tenantId: string): Pro
 export async function listIdentifierSchemes(
   tenantId: string,
   options: ListIdentifierSchemesOptions = {},
-): Promise<IdentifierScheme[]> {
+): Promise<{ data: IdentifierScheme[]; total: number }> {
   const { registrarId, limit, offset } = options;
 
   const where: Prisma.IdentifierSchemeWhereInput = {
@@ -115,16 +115,20 @@ export async function listIdentifierSchemes(
     where.registrarId = registrarId;
   }
 
-  return prisma.identifierScheme.findMany({
-    where,
-    include: {
-      qualifiers: true,
-      registrar: true,
-    },
-    take: limit ?? 100,
-    skip: offset,
-    orderBy: { createdAt: 'desc' },
-  });
+  const [data, total] = await Promise.all([
+    prisma.identifierScheme.findMany({
+      where,
+      include: {
+        qualifiers: true,
+      },
+      take: limit ?? 100,
+      skip: offset,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.identifierScheme.count({ where }),
+  ]);
+
+  return { data, total };
 }
 
 /**
