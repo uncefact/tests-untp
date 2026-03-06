@@ -77,7 +77,7 @@ const MOCK_INSTANCE = {
 
 const VALID_CONFIG = {
   baseUrl: 'https://storage.example.com',
-  apiVersion: '3.0.0',
+  apiVersion: '3.1.0',
 };
 const VALID_JSON = JSON.stringify(VALID_CONFIG);
 

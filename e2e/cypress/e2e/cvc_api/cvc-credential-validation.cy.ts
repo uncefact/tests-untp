@@ -132,9 +132,9 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
         config: {
           baseUrl: 'http://storage-service:3334',
           apiKey: 'test123',
-          apiVersion: '3.0.0',
+          apiVersion: '3.1.0',
         },
-        apiVersion: '3.0.0',
+        apiVersion: '3.1.0',
         isPrimary: true,
       },
       failOnStatusCode: false,

@@ -713,7 +713,7 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/api/3.0.0/public",
+                    "url": "http://localhost:3334/api/3.1.0/public",
                     "params": {
                       "resultPath": "/uri"
                     },
@@ -1193,7 +1193,7 @@
                     "dlrAPIKey": "5555555555555"
                   },
                   "storage": {
-                    "url": "http://localhost:3334/api/3.0.0/public",
+                    "url": "http://localhost:3334/api/3.1.0/public",
                     "params": {
                       "resultPath": "/uri"
                     },
