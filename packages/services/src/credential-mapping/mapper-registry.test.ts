@@ -8,8 +8,28 @@ describe('mapper-registry', () => {
       'DigitalFacilityRecord',
       'DigitalIdentityAnchor',
       'DigitalTraceabilityEvent',
+    ])('returns a mapper for %s at version 0.6.0', (credentialType) => {
+      expect(getMapper(credentialType, '0.6.0')).toBeDefined();
+    });
+
+    it.each([
+      'DigitalProductPassport',
+      'DigitalConformityCredential',
+      'DigitalFacilityRecord',
+      'DigitalIdentityAnchor',
+      'DigitalTraceabilityEvent',
     ])('returns a mapper for %s at version 0.6.1', (credentialType) => {
       expect(getMapper(credentialType, '0.6.1')).toBeDefined();
+    });
+
+    it.each([
+      'DigitalProductPassport',
+      'DigitalConformityCredential',
+      'DigitalFacilityRecord',
+      'DigitalIdentityAnchor',
+      'DigitalTraceabilityEvent',
+    ])('returns different instances for %s at version 0.6.0 and 0.6.1', (credentialType) => {
+      expect(getMapper(credentialType, '0.6.0')).not.toBe(getMapper(credentialType, '0.6.1'));
     });
 
     it('returns undefined for an unknown credential type', () => {

@@ -1,15 +1,8 @@
 import { NextResponse } from 'next/server';
-import {
-  ValidationError,
-  validateEnum,
-  isNonEmptyString,
-  parsePositiveInt,
-  parseNonNegativeInt,
-} from '@/lib/api/validation';
+import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { listDataModels, createDataModel } from '@/lib/prisma/repositories';
-import { CredentialType } from '@/lib/prisma/generated';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/data-models' });
@@ -47,8 +40,7 @@ function parseBooleanParam(raw: string | null | undefined, paramName: string): b
  *         name: credentialType
  *         schema:
  *           type: string
- *           enum: [DigitalProductPassport, DigitalConformityCredential, DigitalFacilityRecord, DigitalIdentityAnchor, DigitalTraceabilityEvent]
- *         description: Filter by credential type
+ *         description: Filter by credential type (any string, e.g. DigitalProductPassport, DigitalLivestockPassport)
  *       - in: query
  *         name: version
  *         schema:
@@ -105,11 +97,8 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
 
   logger.info({ tenantId }, 'Parsing query filters');
   const isExtension = parseBooleanParam(url.searchParams.get('isExtension'), 'isExtension');
-  const credentialType = validateEnum(
-    url.searchParams.get('credentialType') ?? undefined,
-    Object.values(CredentialType),
-    'credentialType',
-  );
+  const rawCredentialType = url.searchParams.get('credentialType');
+  const credentialType = rawCredentialType && rawCredentialType.trim() !== '' ? rawCredentialType : undefined;
   const version = url.searchParams.get('version') ?? undefined;
   const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
   const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_LIMIT) : undefined;
@@ -158,8 +147,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
  *                 description: Human-readable name for the data model extension
  *               credentialType:
  *                 type: string
- *                 enum: [DigitalProductPassport, DigitalConformityCredential, DigitalFacilityRecord, DigitalIdentityAnchor, DigitalTraceabilityEvent]
- *                 description: The credential type this extension applies to
+ *                 description: The credential type this extension applies to (any string, e.g. DigitalProductPassport, DigitalLivestockPassport)
  *               version:
  *                 type: string
  *                 description: Specification version (e.g., "0.6.0")
@@ -228,8 +216,8 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   logger.info({ tenantId }, 'Validating input parameters');
   if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
 
-  const credentialType = validateEnum(body.credentialType, Object.values(CredentialType), 'credentialType');
-  if (!credentialType) throw new ValidationError('credentialType is required');
+  if (!isNonEmptyString(body.credentialType)) throw new ValidationError('credentialType is required');
+  const credentialType = body.credentialType;
 
   if (!isNonEmptyString(body.version)) throw new ValidationError('version is required');
   if (!isNonEmptyString(body.schemaUrl)) throw new ValidationError('schemaUrl is required');

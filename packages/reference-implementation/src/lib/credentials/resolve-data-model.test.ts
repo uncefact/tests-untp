@@ -1,14 +1,3 @@
-// Mock the Prisma generated enum
-jest.mock('@/lib/prisma/generated', () => ({
-  CredentialType: {
-    DigitalProductPassport: 'DigitalProductPassport',
-    DigitalConformityCredential: 'DigitalConformityCredential',
-    DigitalFacilityRecord: 'DigitalFacilityRecord',
-    DigitalIdentityAnchor: 'DigitalIdentityAnchor',
-    DigitalTraceabilityEvent: 'DigitalTraceabilityEvent',
-  },
-}));
-
 // Mock repository
 const mockListDataModels = jest.fn();
 jest.mock('@/lib/prisma/repositories', () => ({

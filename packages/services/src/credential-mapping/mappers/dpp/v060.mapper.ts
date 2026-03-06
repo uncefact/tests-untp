@@ -1,4 +1,4 @@
-import type { IdentifierScheme } from '../../verifiable-credential/types.js';
+import type { IdentifierScheme } from '../../../verifiable-credential/types.js';
 import type {
   ICredentialMapper,
   ResolvedEntities,
@@ -6,8 +6,8 @@ import type {
   DataModelConfig,
   MapperOutput,
   UntpLocation,
-} from '../types.js';
-import { buildIdentifierScheme, buildParty, buildContextAndTypes } from './shared-v061.js';
+} from '../../types.js';
+import { buildIdentifierScheme, buildParty, buildContextAndTypes } from '../shared/v060.js';
 
 type DppProduct = {
   type: ['Product'];
@@ -48,7 +48,7 @@ type DppFacility = {
   address?: DppAddress;
 };
 
-export class DppV061Mapper implements ICredentialMapper {
+export class DppV060Mapper implements ICredentialMapper {
   async buildPayload(entities: ResolvedEntities, config: DataModelConfig): Promise<MapperOutput> {
     const { organisation, facility, product } = entities;
     const { contexts, types } = buildContextAndTypes(config);

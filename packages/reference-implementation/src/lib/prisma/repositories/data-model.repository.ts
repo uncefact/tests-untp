@@ -1,25 +1,41 @@
-import { CredentialType, Prisma } from '../generated';
+import { Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 
 /**
- * Include shape used by all data model queries.
- * Includes the parent config, extensions, and render templates.
+ * Include shape for single data model queries (getById, create, update).
+ * Includes extensions and render templates for full detail.
  */
-const DATA_MODEL_INCLUDE = {
+const DATA_MODEL_DETAIL_INCLUDE = {
   parentConfig: true,
   extensions: true,
   renderTemplates: true,
 } as const;
 
 /**
- * A data model with its full relations.
- * Matches the include shape defined by DATA_MODEL_INCLUDE.
+ * Include shape for list queries.
+ * Omits extensions and renderTemplates to keep list responses lean.
+ */
+const DATA_MODEL_LIST_INCLUDE = {
+  parentConfig: true,
+} as const;
+
+/**
+ * A data model with its full relations (extensions + render templates).
+ * Used for single-record responses (getById, create, update).
  */
 export type DataModelWithRelations = Prisma.DataModelGetPayload<{
-  include: typeof DATA_MODEL_INCLUDE;
+  include: typeof DATA_MODEL_DETAIL_INCLUDE;
+}>;
+
+/**
+ * A data model with only the parent config relation.
+ * Used for list responses to avoid unnecessary payload.
+ */
+export type DataModelListItem = Prisma.DataModelGetPayload<{
+  include: typeof DATA_MODEL_LIST_INCLUDE;
 }>;
 
 /**
@@ -27,7 +43,7 @@ export type DataModelWithRelations = Prisma.DataModelGetPayload<{
  */
 export type CreateDataModelInput = {
   name: string;
-  credentialType: CredentialType;
+  credentialType: string;
   version: string;
   schemaUrl: string;
   contextUrl: string;
@@ -52,7 +68,7 @@ export type UpdateDataModelInput = {
  */
 export type ListDataModelOptions = {
   isExtension?: boolean;
-  credentialType?: CredentialType;
+  credentialType?: string;
   version?: string;
   limit?: number;
   offset?: number;
@@ -97,7 +113,7 @@ export async function createDataModel(tenantId: string, input: CreateDataModelIn
         ...(input.websiteUrl !== undefined && { websiteUrl: input.websiteUrl }),
         ...(input.parentConfigId !== undefined && { parentConfigId: input.parentConfigId }),
       },
-      include: DATA_MODEL_INCLUDE,
+      include: DATA_MODEL_DETAIL_INCLUDE,
     });
   });
 }
@@ -112,18 +128,19 @@ export async function getDataModelById(id: string, tenantId: string): Promise<Da
       id,
       OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
     },
-    include: DATA_MODEL_INCLUDE,
+    include: DATA_MODEL_DETAIL_INCLUDE,
   });
 }
 
 /**
  * Lists data models for a tenant, including system-provisioned configs.
  * Supports filtering by isExtension, credentialType, and version.
+ * Returns lean items without extensions or renderTemplates.
  */
 export async function listDataModels(
   tenantId: string,
   options: ListDataModelOptions = {},
-): Promise<{ data: DataModelWithRelations[]; total: number }> {
+): Promise<{ data: DataModelListItem[]; total: number }> {
   const { isExtension, credentialType, version, limit, offset } = options;
 
   const where: Prisma.DataModelWhereInput = {
@@ -145,7 +162,7 @@ export async function listDataModels(
   const [data, total] = await prisma.$transaction([
     prisma.dataModel.findMany({
       where,
-      include: DATA_MODEL_INCLUDE,
+      include: DATA_MODEL_LIST_INCLUDE,
       take: limit ?? 20,
       skip: offset,
       orderBy: { createdAt: 'desc' },
@@ -183,7 +200,7 @@ export async function updateDataModel(
         ...(input.contextUrl !== undefined && { contextUrl: input.contextUrl }),
         ...(input.websiteUrl !== undefined && { websiteUrl: input.websiteUrl }),
       },
-      include: DATA_MODEL_INCLUDE,
+      include: DATA_MODEL_DETAIL_INCLUDE,
     });
   });
 }

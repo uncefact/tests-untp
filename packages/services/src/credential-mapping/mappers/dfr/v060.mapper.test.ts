@@ -1,10 +1,10 @@
-import { DfrV061Mapper } from './dfr-v061.mapper';
-import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
+import { DfrV060Mapper } from './v060.mapper';
+import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../../types';
 
 // -- Mock data model configs --------------------------------------------------
 
 const mockCoreDataModel: DataModelConfig['core'] = {
-  contextUrl: 'https://test.uncefact.org/vocabulary/untp/dfr/0.6.1/',
+  contextUrl: 'https://test.uncefact.org/vocabulary/untp/dfr/0.6.0/',
   credentialType: 'DigitalFacilityRecord',
 };
 
@@ -54,8 +54,8 @@ const mockFacility: ResolvedEntities['facility'] = {
 
 // -- Tests --------------------------------------------------------------------
 
-describe('DfrV061Mapper', () => {
-  const mapper = new DfrV061Mapper();
+describe('DfrV060Mapper', () => {
+  const mapper = new DfrV060Mapper();
   const coreConfig: DataModelConfig = { core: mockCoreDataModel };
 
   const fullEntities: ResolvedEntities = {
@@ -69,7 +69,7 @@ describe('DfrV061Mapper', () => {
     it('returns @context array containing the core context URL', async () => {
       const result = await mapper.buildPayload(fullEntities, coreConfig);
 
-      expect(result['@context']).toEqual(['https://test.uncefact.org/vocabulary/untp/dfr/0.6.1/']);
+      expect(result['@context']).toEqual(['https://test.uncefact.org/vocabulary/untp/dfr/0.6.0/']);
     });
 
     it('merges extension context URL into @context when extension is present', async () => {
@@ -81,7 +81,7 @@ describe('DfrV061Mapper', () => {
       const result = await mapper.buildPayload(fullEntities, configWithExt);
 
       expect(result['@context']).toEqual([
-        'https://test.uncefact.org/vocabulary/untp/dfr/0.6.1/',
+        'https://test.uncefact.org/vocabulary/untp/dfr/0.6.0/',
         'https://example.org/facility-ext/v1/',
       ]);
     });
@@ -250,7 +250,7 @@ describe('DfrV061Mapper', () => {
   // -- extractEntityRefs ------------------------------------------------------
 
   describe('extractEntityRefs', () => {
-    const stubContext = ['https://test.uncefact.org/vocabulary/untp/dfr/0.6.1/'];
+    const stubContext = ['https://test.uncefact.org/vocabulary/untp/dfr/0.6.0/'];
     const stubType = ['DigitalFacilityRecord'];
 
     it('extracts facility and organisation registeredIds and sets primaryIdentifier to facility registeredId', () => {

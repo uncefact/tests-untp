@@ -46,10 +46,14 @@ const mockDataModel = prisma.dataModel as unknown as {
   count: jest.Mock;
 };
 
-const INCLUDE_SHAPE = {
+const DETAIL_INCLUDE_SHAPE = {
   parentConfig: true,
   extensions: true,
   renderTemplates: true,
+};
+
+const LIST_INCLUDE_SHAPE = {
+  parentConfig: true,
 };
 
 describe('data-model.repository', () => {
@@ -92,7 +96,7 @@ describe('data-model.repository', () => {
 
       const result = await createDataModel(TENANT_ID, {
         name: 'Digital Product Passport v0.6.0',
-        credentialType: 'DigitalProductPassport' as never,
+        credentialType: 'DigitalProductPassport',
         version: '0.6.0',
         schemaUrl: 'https://example.com/schema.json',
         contextUrl: 'https://example.com/context.jsonld',
@@ -109,7 +113,7 @@ describe('data-model.repository', () => {
           contextUrl: 'https://example.com/context.jsonld',
           isExtension: false,
         },
-        include: INCLUDE_SHAPE,
+        include: DETAIL_INCLUDE_SHAPE,
       });
       expect(result).toEqual(CONFIG_RECORD);
     });
@@ -120,7 +124,7 @@ describe('data-model.repository', () => {
 
       const result = await createDataModel(TENANT_ID, {
         name: 'Custom DPP Extension',
-        credentialType: 'DigitalProductPassport' as never,
+        credentialType: 'DigitalProductPassport',
         version: '0.6.0',
         schemaUrl: 'https://example.com/ext-schema.json',
         contextUrl: 'https://example.com/ext-context.jsonld',
@@ -139,7 +143,7 @@ describe('data-model.repository', () => {
       await expect(
         createDataModel(TENANT_ID, {
           name: 'Extension Without Parent',
-          credentialType: 'DigitalProductPassport' as never,
+          credentialType: 'DigitalProductPassport',
           version: '0.6.0',
           schemaUrl: 'https://example.com/schema.json',
           contextUrl: 'https://example.com/context.jsonld',
@@ -154,7 +158,7 @@ describe('data-model.repository', () => {
       await expect(
         createDataModel(TENANT_ID, {
           name: 'Extension With Invalid Parent',
-          credentialType: 'DigitalProductPassport' as never,
+          credentialType: 'DigitalProductPassport',
           version: '0.6.0',
           schemaUrl: 'https://example.com/schema.json',
           contextUrl: 'https://example.com/context.jsonld',
@@ -173,7 +177,7 @@ describe('data-model.repository', () => {
       await expect(
         createDataModel(TENANT_ID, {
           name: 'Extension With Extension Parent',
-          credentialType: 'DigitalProductPassport' as never,
+          credentialType: 'DigitalProductPassport',
           version: '0.6.0',
           schemaUrl: 'https://example.com/schema.json',
           contextUrl: 'https://example.com/context.jsonld',
@@ -189,7 +193,7 @@ describe('data-model.repository', () => {
 
       await createDataModel(TENANT_ID, {
         name: 'Default Extension',
-        credentialType: 'DigitalProductPassport' as never,
+        credentialType: 'DigitalProductPassport',
         version: '0.6.0',
         schemaUrl: 'https://example.com/schema.json',
         contextUrl: 'https://example.com/context.jsonld',
@@ -201,7 +205,7 @@ describe('data-model.repository', () => {
           isExtension: true,
           parentConfigId: 'config-1',
         }),
-        include: INCLUDE_SHAPE,
+        include: DETAIL_INCLUDE_SHAPE,
       });
     });
   });
@@ -217,7 +221,7 @@ describe('data-model.repository', () => {
           id: 'config-1',
           OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
-        include: INCLUDE_SHAPE,
+        include: DETAIL_INCLUDE_SHAPE,
       });
       expect(result).toEqual(CONFIG_RECORD);
     });
@@ -242,7 +246,7 @@ describe('data-model.repository', () => {
       };
       expect(mockDataModel.findMany).toHaveBeenCalledWith({
         where: expectedWhere,
-        include: INCLUDE_SHAPE,
+        include: LIST_INCLUDE_SHAPE,
         take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
@@ -261,7 +265,7 @@ describe('data-model.repository', () => {
       const expectedWhere = expect.objectContaining({ isExtension: false });
       expect(mockDataModel.findMany).toHaveBeenCalledWith({
         where: expectedWhere,
-        include: INCLUDE_SHAPE,
+        include: LIST_INCLUDE_SHAPE,
         take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
@@ -274,13 +278,13 @@ describe('data-model.repository', () => {
       mockDataModel.count.mockResolvedValue(0);
 
       await listDataModels(TENANT_ID, {
-        credentialType: 'DigitalProductPassport' as never,
+        credentialType: 'DigitalProductPassport',
       });
 
       const expectedWhere = expect.objectContaining({ credentialType: 'DigitalProductPassport' });
       expect(mockDataModel.findMany).toHaveBeenCalledWith({
         where: expectedWhere,
-        include: INCLUDE_SHAPE,
+        include: LIST_INCLUDE_SHAPE,
         take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
@@ -297,7 +301,7 @@ describe('data-model.repository', () => {
       const expectedWhere = expect.objectContaining({ version: '0.6.0' });
       expect(mockDataModel.findMany).toHaveBeenCalledWith({
         where: expectedWhere,
-        include: INCLUDE_SHAPE,
+        include: LIST_INCLUDE_SHAPE,
         take: 20,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
@@ -336,7 +340,7 @@ describe('data-model.repository', () => {
       expect(mockTx.dataModel.update).toHaveBeenCalledWith({
         where: { id: 'config-ext-1' },
         data: { name: 'Updated Name' },
-        include: INCLUDE_SHAPE,
+        include: DETAIL_INCLUDE_SHAPE,
       });
       expect(result.name).toBe('Updated Name');
     });
@@ -371,7 +375,7 @@ describe('data-model.repository', () => {
       expect(mockTx.dataModel.update).toHaveBeenCalledWith({
         where: { id: 'config-ext-1' },
         data: { schemaUrl: 'https://example.com/new-schema.json' },
-        include: INCLUDE_SHAPE,
+        include: DETAIL_INCLUDE_SHAPE,
       });
     });
   });

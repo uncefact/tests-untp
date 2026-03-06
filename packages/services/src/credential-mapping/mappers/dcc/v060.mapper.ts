@@ -1,4 +1,4 @@
-import type { IdentifierScheme } from '../../verifiable-credential/types.js';
+import type { IdentifierScheme } from '../../../verifiable-credential/types.js';
 import type {
   ICredentialMapper,
   ICvcAwareMapper,
@@ -7,9 +7,9 @@ import type {
   ExtractedCvcRefs,
   DataModelConfig,
   MapperOutput,
-} from '../types.js';
-import type { CredentialPayload } from '../../verifiable-credential/types.js';
-import { buildIdentifierScheme, buildParty, buildContextAndTypes } from './shared-v061.js';
+} from '../../types.js';
+import type { CredentialPayload } from '../../../verifiable-credential/types.js';
+import { buildIdentifierScheme, buildParty, buildContextAndTypes } from '../shared/v060.js';
 
 type DccParty = ReturnType<typeof buildParty>;
 
@@ -46,7 +46,7 @@ type DccAssessment = {
   assessedOrganisation?: DccParty;
 };
 
-export class DccV061Mapper implements ICredentialMapper, ICvcAwareMapper {
+export class DccV060Mapper implements ICredentialMapper, ICvcAwareMapper {
   async buildPayload(entities: ResolvedEntities, config: DataModelConfig): Promise<MapperOutput> {
     const { organisation, facility, product } = entities;
     const { contexts, types } = buildContextAndTypes(config);

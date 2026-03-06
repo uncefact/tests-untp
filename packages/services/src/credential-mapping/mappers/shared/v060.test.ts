@@ -1,5 +1,5 @@
-import { buildIdentifierScheme, buildParty, buildContextAndTypes } from './shared-v061';
-import type { OrganisationEntity, DataModelConfig } from '../types';
+import { buildIdentifierScheme, buildParty, buildContextAndTypes } from './v060';
+import type { OrganisationEntity, DataModelConfig } from '../../types';
 
 describe('buildIdentifierScheme', () => {
   it('returns IdentifierScheme object when scheme has both id and name', () => {

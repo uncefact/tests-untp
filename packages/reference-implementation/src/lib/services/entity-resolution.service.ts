@@ -1,6 +1,5 @@
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
-import { CredentialType } from '@/lib/prisma/generated';
 import {
   getOrganisationById,
   getFacilityById,
@@ -30,11 +29,11 @@ type EntityRequirement = {
 };
 
 const entityRequirements: Record<string, EntityRequirement> = {
-  [CredentialType.DigitalProductPassport]: { required: ['organisation', 'facility', 'product'], optional: [] },
-  [CredentialType.DigitalConformityCredential]: { required: ['organisation'], optional: ['facility', 'product'] },
-  [CredentialType.DigitalFacilityRecord]: { required: ['organisation', 'facility'], optional: [] },
-  [CredentialType.DigitalIdentityAnchor]: { required: ['organisation'], optional: [] },
-  [CredentialType.DigitalTraceabilityEvent]: { required: ['organisation', 'product'], optional: [] },
+  DigitalProductPassport: { required: ['organisation', 'facility', 'product'], optional: [] },
+  DigitalConformityCredential: { required: ['organisation'], optional: ['facility', 'product'] },
+  DigitalFacilityRecord: { required: ['organisation', 'facility'], optional: [] },
+  DigitalIdentityAnchor: { required: ['organisation'], optional: [] },
+  DigitalTraceabilityEvent: { required: ['organisation', 'product'], optional: [] },
 };
 
 /**

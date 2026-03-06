@@ -158,16 +158,22 @@ describe('GET /api/v1/data-models', () => {
     });
   });
 
-  it('returns 400 for invalid credentialType', async () => {
+  it('accepts any non-empty credentialType string as a filter', async () => {
+    mockListDataModels.mockResolvedValue({ data: [], total: 0 });
+
     const req = createFakeRequest({
       method: 'GET',
-      url: 'http://localhost/api/v1/data-models?credentialType=InvalidType',
+      url: 'http://localhost/api/v1/data-models?credentialType=DigitalLivestockPassport',
     });
-    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-    const json = await res.json();
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
 
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('credentialType must be one of');
+    expect(mockListDataModels).toHaveBeenCalledWith('tenant-1', {
+      isExtension: undefined,
+      credentialType: 'DigitalLivestockPassport',
+      version: undefined,
+      limit: undefined,
+      offset: undefined,
+    });
   });
 
   it('passes version filter correctly', async () => {
@@ -387,11 +393,23 @@ describe('POST /api/v1/data-models', () => {
     expect(json.error).toContain('credentialType is required');
   });
 
-  it('returns 400 when credentialType is invalid', async () => {
+  it('accepts a custom credentialType string', async () => {
+    const created = {
+      id: 'cfg-custom',
+      name: 'Livestock Passport Extension',
+      credentialType: 'DigitalLivestockPassport',
+      version: '0.6.0',
+      schemaUrl: 'https://example.com/schema.json',
+      contextUrl: 'https://example.com/context.jsonld',
+      isExtension: true,
+      parentConfigId: 'cfg-parent',
+    };
+    mockCreateDataModel.mockResolvedValue(created);
+
     const req = createFakeRequest({
       body: {
-        name: 'Extension',
-        credentialType: 'InvalidType',
+        name: 'Livestock Passport Extension',
+        credentialType: 'DigitalLivestockPassport',
         version: '0.6.0',
         schemaUrl: 'https://example.com/schema.json',
         contextUrl: 'https://example.com/context.jsonld',
@@ -401,8 +419,14 @@ describe('POST /api/v1/data-models', () => {
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('credentialType must be one of');
+    expect(res.status).toBe(201);
+    expect(json.credentialType).toBe('DigitalLivestockPassport');
+    expect(mockCreateDataModel).toHaveBeenCalledWith(
+      'tenant-1',
+      expect.objectContaining({
+        credentialType: 'DigitalLivestockPassport',
+      }),
+    );
   });
 
   it('returns 400 when version is missing', async () => {

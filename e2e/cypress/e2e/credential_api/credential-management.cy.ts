@@ -184,6 +184,101 @@ describe('Credential API', { testIsolation: false }, () => {
   });
 
   // -----------------------------------------------------------------------
+  // v0.6.0 credential issuance
+  // -----------------------------------------------------------------------
+  describe('v0.6.0 credential issuance', () => {
+    it('POST /api/v1/credentials — issues a v0.6.0 DPP credential', () => {
+      const payload = {
+        '@context': [
+          'https://www.w3.org/ns/credentials/v2',
+          'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/',
+        ],
+        id: `urn:uuid:e2e-v060-dpp-${RUN_ID}`,
+        type: ['DigitalProductPassport', 'VerifiableCredential'],
+        issuer: {
+          type: ['CredentialIssuer'],
+          id: defaultDidValue,
+          name: `E2E v0.6.0 DPP Issuer ${RUN_ID}`,
+        },
+        credentialSubject: {
+          type: ['ProductPassport'],
+          id: `https://example.com/products/e2e-v060-${RUN_ID}`,
+        },
+      };
+
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        body: {
+          credentialPayload: payload,
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.0',
+        },
+      }).then((response) => {
+        expect(response.status).to.eq(201);
+        expect(response.body.credentialId).to.be.a('string');
+      });
+    });
+
+    it('POST /api/v1/credentials — issues a v0.6.0 DCC credential with CVC validation', () => {
+      const uniqueSuffix = `${RUN_ID}-${Math.random().toString(36).slice(2, 8)}`;
+      const payload = {
+        '@context': [
+          'https://www.w3.org/ns/credentials/v2',
+          'https://test.uncefact.org/vocabulary/untp/dcc/0.6.0/',
+        ],
+        id: `urn:uuid:e2e-v060-dcc-${uniqueSuffix}`,
+        type: ['DigitalConformityCredential', 'VerifiableCredential'],
+        issuer: {
+          type: ['CredentialIssuer'],
+          id: defaultDidValue,
+          name: `E2E v0.6.0 DCC Issuer ${RUN_ID}`,
+        },
+        credentialSubject: {
+          type: ['ConformityAttestation', 'Attestation'],
+          id: `https://example.com/e2e-v060/attestation/${uniqueSuffix}`,
+          assessorLevel: 'Self',
+          assessmentLevel: 'Unspecified',
+          attestationType: 'certification',
+          issuedToParty: {
+            type: ['Party'],
+            id: `https://example.com/e2e-v060/party/${uniqueSuffix}`,
+            name: `E2E v0.6.0 Test Party ${RUN_ID}`,
+          },
+        },
+      };
+
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        body: {
+          credentialPayload: payload,
+          credentialType: 'DigitalConformityCredential',
+          version: '0.6.0',
+        },
+      }).then((response) => {
+        expect(response.status).to.eq(201);
+        expect(response.body.credentialId).to.be.a('string');
+      });
+    });
+
+    it('returns 400 when requesting a nonexistent version', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        body: {
+          credentialPayload: buildCredentialPayload(defaultDidValue),
+          credentialType: 'DigitalProductPassport',
+          version: '99.99.99',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+      });
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // Validation errors
   // -----------------------------------------------------------------------
   describe('Validation errors', () => {

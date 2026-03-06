@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import {
-  CredentialType,
   DidMethod,
   DidStatus,
   DidType,
@@ -370,45 +369,90 @@ async function main() {
 
   const coreDataModels = [
     {
-      id: 'a1b2c3d4-0001-4000-8000-000000000001',
-      templateId: 'b2c3d4e5-0001-4000-8000-000000000001',
-      credentialType: CredentialType.DigitalProductPassport,
+      id: 'cxuj555flzqtp4ldvklv6ya39',
+      templateId: 'ctehlnyxvdpmp4kv1cxa0tj0t',
+      credentialType: 'DigitalProductPassport',
+      version: '0.6.0',
+      name: 'Digital Product Passport v0.6.0',
+      shortCode: 'dpp',
+      templateDir: 'digital_product_passport',
+    },
+    {
+      id: 'c3imzyum0txv1y9xkww88aktp',
+      templateId: 'cb6ka4fhk68m1wqeitptm24z1',
+      credentialType: 'DigitalConformityCredential',
+      version: '0.6.0',
+      name: 'Digital Conformity Credential v0.6.0',
+      shortCode: 'dcc',
+      templateDir: 'digital_conformity_credential',
+    },
+    {
+      id: 'ctfgtrsuiwv1fedo9t5swxhnk',
+      templateId: 'c62zomihgkn6iimbv7dzhr1fj',
+      credentialType: 'DigitalFacilityRecord',
+      version: '0.6.0',
+      name: 'Digital Facility Record v0.6.0',
+      shortCode: 'dfr',
+      templateDir: 'digital_facility_record',
+    },
+    {
+      id: 'cz9raijqcay5nzmq59geoggrk',
+      templateId: 'cv2ldbzupwtbluam7nrfqqv1e',
+      credentialType: 'DigitalIdentityAnchor',
+      version: '0.6.0',
+      name: 'Digital Identity Anchor v0.6.0',
+      shortCode: 'dia',
+      templateDir: 'digital_identity_anchor',
+    },
+    {
+      id: 'crqvpwffc0k2p4bvr8za1ii6j',
+      templateId: 'c1fx8t9k9p6q8wcaxib6e6id1',
+      credentialType: 'DigitalTraceabilityEvent',
+      version: '0.6.0',
+      name: 'Digital Traceability Event v0.6.0',
+      shortCode: 'dte',
+      templateDir: 'digital_traceability_event',
+    },
+    {
+      id: 'c1pxfzzkeb86jgeel7hrvmcle',
+      templateId: 'co3tub0ndto2lzq9l4rsnw22y',
+      credentialType: 'DigitalProductPassport',
       version: '0.6.1',
       name: 'Digital Product Passport v0.6.1',
       shortCode: 'dpp',
       templateDir: 'digital_product_passport',
     },
     {
-      id: 'a1b2c3d4-0002-4000-8000-000000000002',
-      templateId: 'b2c3d4e5-0002-4000-8000-000000000002',
-      credentialType: CredentialType.DigitalConformityCredential,
+      id: 'cttpz40pfgcfeue2wmbc3jti8',
+      templateId: 'cx5qp969tkboeem04szgwyb32',
+      credentialType: 'DigitalConformityCredential',
       version: '0.6.1',
       name: 'Digital Conformity Credential v0.6.1',
       shortCode: 'dcc',
       templateDir: 'digital_conformity_credential',
     },
     {
-      id: 'a1b2c3d4-0003-4000-8000-000000000003',
-      templateId: 'b2c3d4e5-0003-4000-8000-000000000003',
-      credentialType: CredentialType.DigitalFacilityRecord,
+      id: 'csrtste8ai2llop7ui8u6n11l',
+      templateId: 'c91eyblwyejyfoq1pfqsik0ty',
+      credentialType: 'DigitalFacilityRecord',
       version: '0.6.1',
       name: 'Digital Facility Record v0.6.1',
       shortCode: 'dfr',
       templateDir: 'digital_facility_record',
     },
     {
-      id: 'a1b2c3d4-0004-4000-8000-000000000004',
-      templateId: 'b2c3d4e5-0004-4000-8000-000000000004',
-      credentialType: CredentialType.DigitalIdentityAnchor,
+      id: 'cn5u63huxvqgdwppebaxmqt9l',
+      templateId: 'c5khe5ju6ai3ptaw55r01vayo',
+      credentialType: 'DigitalIdentityAnchor',
       version: '0.6.1',
       name: 'Digital Identity Anchor v0.6.1',
       shortCode: 'dia',
       templateDir: 'digital_identity_anchor',
     },
     {
-      id: 'a1b2c3d4-0005-4000-8000-000000000005',
-      templateId: 'b2c3d4e5-0005-4000-8000-000000000005',
-      credentialType: CredentialType.DigitalTraceabilityEvent,
+      id: 'cwb7m3k0hpz9xqft6rjn2oe4s',
+      templateId: 'c8yvd2gnmr5w1kbjx4hq0zp7f',
+      credentialType: 'DigitalTraceabilityEvent',
       version: '0.6.1',
       name: 'Digital Traceability Event v0.6.1',
       shortCode: 'dte',
@@ -433,6 +477,7 @@ async function main() {
         isExtension: false,
         schemaUrl: `${UNTP_BASE}/${dm.shortCode}/untp-${dm.shortCode}-schema-${dm.version}.json`,
         contextUrl: `${UNTP_BASE}/${dm.shortCode}/${dm.version}/context/`,
+        websiteUrl: 'https://untp.unece.org/',
       },
     });
 
@@ -451,7 +496,7 @@ async function main() {
       const storageBaseUrl = new URL(storageServiceUrl).origin;
       const storageBucket = process.env.UNCEFACT_STORAGE_PUBLIC_BUCKET || 'public-data';
 
-      const TEMPLATES_DIR = path.resolve(__dirname, '../src/templates/v0.6.0');
+      const TEMPLATES_BASE = path.resolve(__dirname, '../src/templates');
 
       for (const dm of coreDataModels) {
         const exists = await prisma.renderTemplate.findUnique({ where: { id: dm.templateId } });
@@ -463,7 +508,7 @@ async function main() {
           continue;
         }
 
-        const templatePath = path.join(TEMPLATES_DIR, dm.templateDir, 'template.hbs');
+        const templatePath = path.join(TEMPLATES_BASE, `v${dm.version}`, dm.templateDir, 'template.hbs');
         if (!fs.existsSync(templatePath)) {
           logger.warn({ templatePath, credentialType: dm.credentialType }, 'Template file not found, skipping');
           continue;

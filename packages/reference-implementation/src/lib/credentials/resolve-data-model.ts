@@ -1,17 +1,16 @@
 import { getMapper } from '@uncefact/untp-ri-services';
 import type { ICredentialMapper } from '@uncefact/untp-ri-services';
 import { listDataModels } from '@/lib/prisma/repositories';
-import type { DataModelWithRelations } from '@/lib/prisma/repositories';
-import { CredentialType } from '@/lib/prisma/generated';
+import type { DataModelListItem } from '@/lib/prisma/repositories';
 import { ValidationError } from '@/lib/api/validation';
 
 export type ResolvedDataModel = {
-  dataModel: DataModelWithRelations;
+  dataModel: DataModelListItem;
   mapper: ICredentialMapper;
   schemaUrls: string[];
 };
 
-export function isDccDataModel(dataModel: DataModelWithRelations): boolean {
+export function isDccDataModel(dataModel: DataModelListItem): boolean {
   return (
     dataModel.credentialType === 'DigitalConformityCredential' ||
     (dataModel.isExtension === true && dataModel.parentConfig?.credentialType === 'DigitalConformityCredential')
@@ -24,7 +23,7 @@ export async function resolveDataModel(
   version: string,
 ): Promise<ResolvedDataModel> {
   const { data: dataModels } = await listDataModels(tenantId, {
-    credentialType: credentialType as CredentialType,
+    credentialType,
     version,
   });
 

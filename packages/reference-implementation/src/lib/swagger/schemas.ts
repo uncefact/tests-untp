@@ -52,14 +52,8 @@ const publishingOptionsSchema = z.object({
 export const credentialIssueRequestSchema = z.object({
   credentialPayload: z.record(z.unknown()).describe('The full credential payload to sign'),
   credentialType: z
-    .enum([
-      'DigitalProductPassport',
-      'DigitalConformityCredential',
-      'DigitalFacilityRecord',
-      'DigitalIdentityAnchor',
-      'DigitalTraceabilityEvent',
-    ])
-    .describe('Type of credential to issue'),
+    .string()
+    .describe('Type of credential to issue (e.g. DigitalProductPassport, DigitalLivestockPassport)'),
   version: z.string().describe('Data model version'),
   signingOptions: signingOptionsSchema.optional().describe('Signing service options'),
   storageOptions: storageOptionsSchema.optional().describe('Storage service options'),
@@ -153,6 +147,50 @@ export const criterionSchema = z.object({
 });
 
 // ============================================================================
+// Data Model Schemas
+// ============================================================================
+
+/**
+ * DataModel resource representation.
+ */
+export const dataModelSchema = z.object({
+  id: z.string(),
+  tenantId: z.string().nullable(),
+  name: z.string(),
+  credentialType: z.string(),
+  version: z.string(),
+  isExtension: z.boolean(),
+  parentConfigId: z.string().nullable(),
+  schemaUrl: z.string(),
+  contextUrl: z.string(),
+  websiteUrl: z.string().nullable(),
+  createdAt: z.string().describe('ISO 8601 timestamp'),
+  updatedAt: z.string().describe('ISO 8601 timestamp'),
+});
+
+/**
+ * RenderTemplate resource representation.
+ */
+export const renderTemplateSchema = z.object({
+  id: z.string(),
+  tenantId: z.string().nullable(),
+  dataModelId: z.string(),
+  name: z.string(),
+  storageUrl: z.string(),
+  hash: z.string(),
+  isPrimary: z.boolean(),
+  renderMethodType: z.string(),
+  inline: z.boolean(),
+  mediaType: z.string(),
+  storageExternalId: z.string().nullable(),
+  storageBucket: z.string().nullable(),
+  storageContentType: z.string().nullable(),
+  storageServiceInstanceId: z.string().nullable(),
+  createdAt: z.string().describe('ISO 8601 timestamp'),
+  updatedAt: z.string().describe('ISO 8601 timestamp'),
+});
+
+// ============================================================================
 // Re-export imported schemas so existing consumers continue to work
 // ============================================================================
 
@@ -210,6 +248,8 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     ConformityScheme: conformitySchemeSchema,
     ConformityProfile: conformityProfileSchema,
     Criterion: criterionSchema,
+    DataModel: dataModelSchema,
+    RenderTemplate: renderTemplateSchema,
   };
 
   const openAPISchemas: Record<string, OpenAPISchema> = {};

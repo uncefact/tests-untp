@@ -192,4 +192,4 @@ export type {
   UntpLocation,
 } from './credential-mapping/index.js';
 export { getMapper } from './credential-mapping/index.js';
-export { DccV061Mapper } from './credential-mapping/mappers/dcc-v061.mapper.js';
+export { DccV061Mapper } from './credential-mapping/mappers/dcc/v061.mapper.js';

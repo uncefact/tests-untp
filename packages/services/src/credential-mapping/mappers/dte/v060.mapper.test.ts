@@ -1,10 +1,10 @@
-import { DteV061Mapper } from './dte-v061.mapper';
-import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
+import { DteV060Mapper } from './v060.mapper';
+import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../../types';
 
 // -- Mock data model configs --------------------------------------------------
 
 const mockCoreDataModel: DataModelConfig['core'] = {
-  contextUrl: 'https://test.uncefact.org/vocabulary/untp/dte/0.6.1/',
+  contextUrl: 'https://test.uncefact.org/vocabulary/untp/dte/0.6.0/',
   credentialType: 'DigitalTraceabilityEvent',
 };
 
@@ -28,8 +28,8 @@ const mockProduct: ResolvedEntities['product'] = {
 
 // -- Tests --------------------------------------------------------------------
 
-describe('DteV061Mapper', () => {
-  const mapper = new DteV061Mapper();
+describe('DteV060Mapper', () => {
+  const mapper = new DteV060Mapper();
   const coreConfig: DataModelConfig = { core: mockCoreDataModel };
 
   const fullEntities: ResolvedEntities = {
@@ -42,7 +42,7 @@ describe('DteV061Mapper', () => {
     it('returns @context array containing the core context URL', async () => {
       const result = await mapper.buildPayload(fullEntities, coreConfig);
 
-      expect(result['@context']).toEqual(['https://test.uncefact.org/vocabulary/untp/dte/0.6.1/']);
+      expect(result['@context']).toEqual(['https://test.uncefact.org/vocabulary/untp/dte/0.6.0/']);
     });
 
     it('merges extension context URL into @context when extension is present', async () => {
@@ -54,7 +54,7 @@ describe('DteV061Mapper', () => {
       const result = await mapper.buildPayload(fullEntities, configWithExt);
 
       expect(result['@context']).toEqual([
-        'https://test.uncefact.org/vocabulary/untp/dte/0.6.1/',
+        'https://test.uncefact.org/vocabulary/untp/dte/0.6.0/',
         'https://example.org/traceability-ext/v1/',
       ]);
     });
@@ -113,7 +113,7 @@ describe('DteV061Mapper', () => {
   // -- extractEntityRefs ------------------------------------------------------
 
   describe('extractEntityRefs', () => {
-    const stubContext = ['https://test.uncefact.org/vocabulary/untp/dte/0.6.1/'];
+    const stubContext = ['https://test.uncefact.org/vocabulary/untp/dte/0.6.0/'];
     const stubType = ['DigitalTraceabilityEvent'];
 
     it('extracts product id from the first item in epcList and sets primaryIdentifier', () => {

@@ -61,17 +61,6 @@ jest.mock('@/lib/api/logger', () => ({
   },
 }));
 
-// Mock the Prisma generated enum so the route can validate credentialType
-jest.mock('@/lib/prisma/generated', () => ({
-  CredentialType: {
-    DigitalProductPassport: 'DigitalProductPassport',
-    DigitalConformityCredential: 'DigitalConformityCredential',
-    DigitalFacilityRecord: 'DigitalFacilityRecord',
-    DigitalIdentityAnchor: 'DigitalIdentityAnchor',
-    DigitalTraceabilityEvent: 'DigitalTraceabilityEvent',
-  },
-}));
-
 // Mock the new lib modules
 const mockResolveDataModel = jest.fn();
 jest.mock('@/lib/credentials/resolve-data-model', () => ({
@@ -258,13 +247,11 @@ describe('POST /api/v1/credentials', () => {
       expect(json.error).toContain('credentialType is required');
     });
 
-    it('returns 400 when credentialType is not a valid enum value', async () => {
-      const req = createFakeRequest(validBody({ credentialType: 'InvalidType' }));
-      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-      const json = await res.json();
+    it('accepts any non-empty credentialType string', async () => {
+      const req = createFakeRequest(validBody({ credentialType: 'DigitalLivestockPassport' }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
-      expect(res.status).toBe(400);
-      expect(json.error).toContain('credentialType must be one of');
+      expect(mockResolveDataModel).toHaveBeenCalledWith('tenant-1', 'DigitalLivestockPassport', '0.6.1');
     });
 
     it('returns 400 when version is missing', async () => {

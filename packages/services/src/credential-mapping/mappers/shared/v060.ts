@@ -1,5 +1,5 @@
-import type { IdentifierScheme } from '../../verifiable-credential/types.js';
-import type { DataModelConfig, OrganisationEntity } from '../types.js';
+import type { IdentifierScheme } from '../../../verifiable-credential/types.js';
+import type { DataModelConfig, OrganisationEntity } from '../../types.js';
 
 export function buildIdentifierScheme(
   scheme: { id?: string; name?: string } | null | undefined,

@@ -1,10 +1,10 @@
-import { DppV061Mapper } from './dpp-v061.mapper';
-import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../types';
+import { DppV060Mapper } from './v060.mapper';
+import type { ResolvedEntities, DataModelConfig, MapperOutput } from '../../types';
 
 // -- Mock data model configs --------------------------------------------------
 
 const mockCoreDataModel: DataModelConfig['core'] = {
-  contextUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/',
+  contextUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/',
   credentialType: 'DigitalProductPassport',
 };
 
@@ -70,8 +70,8 @@ const mockProduct: ResolvedEntities['product'] = {
 
 // -- Tests --------------------------------------------------------------------
 
-describe('DppV061Mapper', () => {
-  const mapper = new DppV061Mapper();
+describe('DppV060Mapper', () => {
+  const mapper = new DppV060Mapper();
   const coreConfig: DataModelConfig = { core: mockCoreDataModel };
 
   const fullEntities: ResolvedEntities = {
@@ -86,7 +86,7 @@ describe('DppV061Mapper', () => {
     it('returns @context array containing the core context URL', async () => {
       const result = await mapper.buildPayload(fullEntities, coreConfig);
 
-      expect(result['@context']).toEqual(['https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/']);
+      expect(result['@context']).toEqual(['https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/']);
     });
 
     it('merges extension context URL into @context when extension is present', async () => {
@@ -98,7 +98,7 @@ describe('DppV061Mapper', () => {
       const result = await mapper.buildPayload(fullEntities, configWithExt);
 
       expect(result['@context']).toEqual([
-        'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/',
+        'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/',
         'https://example.org/aus-agri/v1/',
       ]);
     });
@@ -129,7 +129,7 @@ describe('DppV061Mapper', () => {
       const result = await mapper.buildPayload(fullEntities, configWithDifferentType);
 
       expect(result['@context']).toEqual([
-        'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/',
+        'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/',
         'https://example.org/conformity-ext/v1/',
       ]);
       expect(result.type).toEqual(['DigitalProductPassport', 'DigitalConformityCredential']);
@@ -371,7 +371,7 @@ describe('DppV061Mapper', () => {
   // -- extractEntityRefs ------------------------------------------------------
 
   describe('extractEntityRefs', () => {
-    const stubContext = ['https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/'];
+    const stubContext = ['https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/'];
     const stubType = ['DigitalProductPassport'];
 
     it('extracts registered IDs and sets primaryIdentifier to product registeredId', () => {

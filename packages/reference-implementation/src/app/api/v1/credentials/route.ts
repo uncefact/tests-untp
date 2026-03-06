@@ -10,7 +10,6 @@ import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { buildPublishLinks } from '@uncefact/untp-ri-services';
-import { CredentialType } from '@/lib/prisma/generated';
 import type { CredentialPayload, ICvcAwareMapper, ExtractedCvcRefs } from '@uncefact/untp-ri-services';
 import { validateCvcCompliance } from '@/lib/services/cvc-validation.service';
 import type { CvcValidationWarning } from '@/lib/services/cvc-validation.service';
@@ -20,9 +19,6 @@ const logger = apiLogger.child({ route: '/api/v1/credentials' });
 function isCvcAwareMapper(mapper: unknown): mapper is ICvcAwareMapper {
   return typeof (mapper as ICvcAwareMapper).extractCvcRefs === 'function';
 }
-
-/** Valid credential type strings (must match Prisma CredentialType enum). */
-const VALID_CREDENTIAL_TYPES = Object.values(CredentialType) as string[];
 
 // ---------------------------------------------------------------------------
 // POST /api/v1/credentials
@@ -107,10 +103,6 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   if (!isNonEmptyString(body.credentialType)) {
     throw new ValidationError('credentialType is required');
-  }
-
-  if (!VALID_CREDENTIAL_TYPES.includes(body.credentialType)) {
-    throw new ValidationError(`credentialType must be one of: ${VALID_CREDENTIAL_TYPES.join(', ')}`);
   }
 
   if (!isNonEmptyString(body.version)) {
