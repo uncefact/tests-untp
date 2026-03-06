@@ -258,6 +258,21 @@ export async function deleteDid(id: string, tenantId: string): Promise<void> {
  * own default DID over the system default. Falls back to the system default
  * if the tenant has no default set.
  */
+/**
+ * Checks whether a DID with the given alias already exists on the specified service instance.
+ * Uses endsWith matching since the normalised alias forms the trailing segment(s) of the DID URI.
+ */
+export async function findDidByAliasAndService(normalisedAlias: string, serviceInstanceId: string): Promise<boolean> {
+  const existing = await prisma.did.findFirst({
+    where: {
+      serviceInstanceId,
+      did: { endsWith: `:${normalisedAlias}` },
+    },
+    select: { id: true },
+  });
+  return existing !== null;
+}
+
 export async function getDefaultDid(tenantId?: string): Promise<Did | null> {
   if (tenantId) {
     const tenantDefault = await prisma.did.findFirst({
