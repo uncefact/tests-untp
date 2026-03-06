@@ -87,7 +87,7 @@ describe('GET /api/v1/render-templates/:id', () => {
       name: 'DPP Default Template',
       storageUrl: 'https://storage.example.com/templates/dpp.html',
       hash: 'abc123',
-      isPrimary: true,
+      isDefault: true,
       dataModel: { id: 'dm-1', name: 'DPP v0.6.0' },
     };
     mockGetRenderTemplateById.mockResolvedValue(renderTemplate);
@@ -135,7 +135,7 @@ describe('PATCH /api/v1/render-templates/:id', () => {
       name: 'Updated Template',
       storageUrl: 'https://storage.example.com/templates/dpp.html',
       hash: 'abc123',
-      isPrimary: false,
+      isDefault: false,
       dataModel: { id: 'dm-1', name: 'DPP v0.6.0' },
     };
     mockUpdateRenderTemplate.mockResolvedValue(updated);
@@ -152,7 +152,7 @@ describe('PATCH /api/v1/render-templates/:id', () => {
       name: 'Updated Template',
       template: undefined,
       storageService: undefined,
-      isPrimary: undefined,
+      isDefault: undefined,
       inline: undefined,
       mediaType: undefined,
       mediaQuery: undefined,
@@ -172,7 +172,7 @@ describe('PATCH /api/v1/render-templates/:id', () => {
       name: 'DPP Template',
       storageUrl: 'https://storage.example.com/templates/new.html',
       hash: 'newhash',
-      isPrimary: false,
+      isDefault: false,
       dataModel: { id: 'dm-1', name: 'DPP v0.6.0' },
     };
     mockUpdateRenderTemplate.mockResolvedValue(updated);
@@ -190,7 +190,7 @@ describe('PATCH /api/v1/render-templates/:id', () => {
       name: undefined,
       template: '<div>new</div>',
       storageService: mockStorageService,
-      isPrimary: undefined,
+      isDefault: undefined,
       inline: undefined,
       mediaType: undefined,
       mediaQuery: undefined,

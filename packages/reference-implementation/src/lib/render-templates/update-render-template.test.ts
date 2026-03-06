@@ -39,7 +39,7 @@ const MOCK_EXISTING = {
   storageBucket: 'old-bucket',
   storageContentType: 'text/html',
   storageServiceInstanceId: 'old-storage-instance',
-  isPrimary: false,
+  isDefault: false,
   inline: false,
   mediaType: 'text/html',
   mediaQuery: null,
@@ -183,13 +183,13 @@ describe('updateRenderTemplate', () => {
     expect(repoCallArg).not.toHaveProperty('storageExternalId');
   });
 
-  it('passes isPrimary to repository when provided', async () => {
-    await updateRenderTemplate(buildInput({ isPrimary: true }));
+  it('passes isDefault to repository when provided', async () => {
+    await updateRenderTemplate(buildInput({ isDefault: true }));
 
     expect(mockUpdateRenderTemplateRepo).toHaveBeenCalledWith(
       'rt-1',
       'tenant-1',
-      expect.objectContaining({ isPrimary: true }),
+      expect.objectContaining({ isDefault: true }),
     );
   });
 

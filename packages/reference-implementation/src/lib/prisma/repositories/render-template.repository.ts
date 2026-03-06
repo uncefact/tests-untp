@@ -28,7 +28,7 @@ export type CreateRenderTemplateInput = {
   renderMethodType: RenderMethodType;
   storageUrl: string;
   hash: string;
-  isPrimary?: boolean;
+  isDefault?: boolean;
   storageServiceInstanceId?: string;
   storageExternalId?: string;
   storageBucket?: string;
@@ -45,7 +45,7 @@ export type UpdateRenderTemplateInput = {
   name?: string;
   storageUrl?: string;
   hash?: string;
-  isPrimary?: boolean;
+  isDefault?: boolean;
   storageServiceInstanceId?: string;
   storageExternalId?: string;
   storageBucket?: string;
@@ -65,8 +65,31 @@ export type ListRenderTemplatesOptions = {
 };
 
 /**
+ * When a system default render template has isDefault true but the tenant
+ * has set their own default for the same dataModelId, the system template's
+ * isDefault should appear as false for that tenant.
+ */
+async function applyTenantDefaultOverride(
+  template: RenderTemplateWithRelations | null,
+  tenantId: string,
+): Promise<RenderTemplateWithRelations | null> {
+  if (!template || template.tenantId !== SYSTEM_TENANT_ID || !template.isDefault) return template;
+
+  const tenantDefault = await prisma.renderTemplate.findFirst({
+    where: {
+      tenantId,
+      dataModelId: template.dataModelId,
+      isDefault: true,
+    },
+    select: { id: true },
+  });
+
+  return tenantDefault ? { ...template, isDefault: false } : template;
+}
+
+/**
  * Creates a new render template scoped to a tenant.
- * When isPrimary is true, first unsets any existing primary for the same
+ * When isDefault is true, first unsets any existing default for the same
  * tenant + dataModelId combination.
  */
 export async function createRenderTemplate(
@@ -74,14 +97,14 @@ export async function createRenderTemplate(
   input: CreateRenderTemplateInput,
 ): Promise<RenderTemplateWithRelations> {
   return prisma.$transaction(async (tx) => {
-    if (input.isPrimary) {
+    if (input.isDefault) {
       await tx.renderTemplate.updateMany({
         where: {
           tenantId,
           dataModelId: input.dataModelId,
-          isPrimary: true,
+          isDefault: true,
         },
-        data: { isPrimary: false },
+        data: { isDefault: false },
       });
     }
 
@@ -93,7 +116,7 @@ export async function createRenderTemplate(
         renderMethodType: input.renderMethodType,
         storageUrl: input.storageUrl,
         hash: input.hash,
-        isPrimary: input.isPrimary ?? false,
+        isDefault: input.isDefault ?? false,
         storageServiceInstanceId: input.storageServiceInstanceId,
         storageExternalId: input.storageExternalId,
         storageBucket: input.storageBucket,
@@ -110,20 +133,24 @@ export async function createRenderTemplate(
 /**
  * Retrieves a render template by ID.
  * Returns templates visible to the tenant OR system-provisioned.
+ * Applies tenant default override for system templates.
  */
 export async function getRenderTemplateById(id: string, tenantId: string): Promise<RenderTemplateWithRelations | null> {
-  return prisma.renderTemplate.findFirst({
+  const result = await prisma.renderTemplate.findFirst({
     where: {
       id,
       OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
     },
     include: RENDER_TEMPLATE_INCLUDE,
   });
+
+  return applyTenantDefaultOverride(result, tenantId);
 }
 
 /**
  * Lists render templates for a tenant, including system-provisioned templates.
  * Supports filtering by dataModelId and pagination.
+ * Applies tenant default override for system templates.
  */
 export async function listRenderTemplates(
   tenantId: string,
@@ -139,7 +166,7 @@ export async function listRenderTemplates(
     where.dataModelId = dataModelId;
   }
 
-  const [data, total] = await Promise.all([
+  const [data, total, tenantDefaults] = await Promise.all([
     prisma.renderTemplate.findMany({
       where,
       include: RENDER_TEMPLATE_INCLUDE,
@@ -148,14 +175,27 @@ export async function listRenderTemplates(
       orderBy: { createdAt: 'desc' },
     }),
     prisma.renderTemplate.count({ where }),
+    prisma.renderTemplate.findMany({
+      where: { tenantId, isDefault: true },
+      select: { dataModelId: true },
+    }),
   ]);
 
-  return { data, total };
+  const tenantDefaultDataModels = new Set(tenantDefaults.map((t) => t.dataModelId));
+
+  return {
+    data: data.map((t) =>
+      t.tenantId === SYSTEM_TENANT_ID && t.isDefault && tenantDefaultDataModels.has(t.dataModelId)
+        ? { ...t, isDefault: false }
+        : t,
+    ),
+    total,
+  };
 }
 
 /**
  * Updates a render template. Only tenant-owned templates can be updated.
- * When setting isPrimary to true, unsets any existing primary for the same
+ * When setting isDefault to true, unsets any existing default for the same
  * tenant + dataModelId combination (excluding self).
  */
 export async function updateRenderTemplate(
@@ -172,15 +212,15 @@ export async function updateRenderTemplate(
       throw new NotFoundError('Render template not found or access denied');
     }
 
-    if (input.isPrimary) {
+    if (input.isDefault) {
       await tx.renderTemplate.updateMany({
         where: {
           tenantId,
           dataModelId: existing.dataModelId,
-          isPrimary: true,
+          isDefault: true,
           NOT: { id },
         },
-        data: { isPrimary: false },
+        data: { isDefault: false },
       });
     }
 
@@ -190,7 +230,7 @@ export async function updateRenderTemplate(
         ...(input.name !== undefined && { name: input.name }),
         ...(input.storageUrl !== undefined && { storageUrl: input.storageUrl }),
         ...(input.hash !== undefined && { hash: input.hash }),
-        ...(input.isPrimary !== undefined && { isPrimary: input.isPrimary }),
+        ...(input.isDefault !== undefined && { isDefault: input.isDefault }),
         ...(input.storageServiceInstanceId !== undefined && {
           storageServiceInstanceId: input.storageServiceInstanceId,
         }),
@@ -227,20 +267,24 @@ export async function deleteRenderTemplate(id: string, tenantId: string): Promis
 }
 
 /**
- * Returns the primary render template for a tenant + dataModelId
- * combination, including system-provisioned templates.
+ * Returns the default render template for a tenant + dataModelId combination.
+ * Prefers the tenant's own default; falls back to the system default.
  * Returns null if none is set.
  */
-export async function getPrimaryRenderTemplate(
+export async function getDefaultRenderTemplate(
   tenantId: string,
   dataModelId: string,
 ): Promise<RenderTemplateWithRelations | null> {
+  // Tenant's own default first
+  const tenantDefault = await prisma.renderTemplate.findFirst({
+    where: { tenantId, dataModelId, isDefault: true },
+    include: RENDER_TEMPLATE_INCLUDE,
+  });
+  if (tenantDefault) return tenantDefault;
+
+  // Fall back to system default
   return prisma.renderTemplate.findFirst({
-    where: {
-      OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
-      dataModelId,
-      isPrimary: true,
-    },
+    where: { tenantId: SYSTEM_TENANT_ID, dataModelId, isDefault: true },
     include: RENDER_TEMPLATE_INCLUDE,
   });
 }

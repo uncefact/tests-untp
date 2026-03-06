@@ -11,7 +11,7 @@ import { apiLogger } from '@/lib/api/logger';
 const logger = apiLogger.child({ route: '/api/v1/render-templates/[id]' });
 
 const REJECTED_FIELDS = ['storageUrl', 'hash', 'renderMethodType'] as const;
-const PATCHABLE_FIELDS = ['name', 'template', 'isPrimary', 'inline', 'mediaType', 'mediaQuery'] as const;
+const PATCHABLE_FIELDS = ['name', 'template', 'isDefault', 'inline', 'mediaType', 'mediaQuery'] as const;
 
 /**
  * @swagger
@@ -74,7 +74,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *       Updates one or more fields of a tenant-owned render template.
  *       The fields storageUrl, hash, and renderMethodType cannot be set directly — they are managed by the server.
  *       When template content is provided, the server re-uploads it to storage and updates storageUrl/hash automatically.
- *       When setting isPrimary to true, any existing primary template for the same data model will be unset.
+ *       When setting isDefault to true, any existing default template for the same data model will be unset.
  *     tags:
  *       - Render Templates
  *     parameters:
@@ -97,9 +97,9 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *               template:
  *                 type: string
  *                 description: HTML content to replace the existing template
- *               isPrimary:
+ *               isDefault:
  *                 type: boolean
- *                 description: Whether this is the primary template for its data model
+ *                 description: Whether this is the default template for its data model
  *               inline:
  *                 type: boolean
  *                 description: Whether to inline the template (RenderTemplate2024 only)
@@ -184,8 +184,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   if (body.name !== undefined && !isNonEmptyString(body.name)) {
     throw new ValidationError('name must be a non-empty string');
   }
-  if (body.isPrimary !== undefined && typeof body.isPrimary !== 'boolean') {
-    throw new ValidationError('isPrimary must be a boolean');
+  if (body.isDefault !== undefined && typeof body.isDefault !== 'boolean') {
+    throw new ValidationError('isDefault must be a boolean');
   }
   if (body.inline !== undefined && typeof body.inline !== 'boolean') {
     throw new ValidationError('inline must be a boolean');
@@ -198,7 +198,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     name: body.name as string | undefined,
     template: body.template as string | undefined,
     storageService,
-    isPrimary: body.isPrimary,
+    isDefault: body.isDefault,
     inline: body.inline,
     mediaType: body.mediaType as string | undefined,
     mediaQuery: body.mediaQuery as string | undefined,

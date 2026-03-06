@@ -287,7 +287,7 @@ async function main() {
       const storageServiceConfig = JSON.stringify({
         baseUrl: new URL(storageServiceUrl).origin,
         ...(storageApiKey && { apiKey: storageApiKey }),
-        apiVersion: '3.0.0',
+        apiVersion: '3.1.0',
         publicBucket: process.env.UNCEFACT_STORAGE_PUBLIC_BUCKET || 'public-data',
         privateBucket: process.env.UNCEFACT_STORAGE_PRIVATE_BUCKET || 'private-data',
       });
@@ -487,7 +487,7 @@ async function main() {
           uploadHeaders['X-API-Key'] = storageApiKey;
         }
 
-        const uploadUrl = `${storageBaseUrl}/api/3.0.0/public`;
+        const uploadUrl = `${storageBaseUrl}/api/3.1.0/public`;
         const response = await fetch(uploadUrl, {
           method: 'POST',
           headers: uploadHeaders,
@@ -524,7 +524,7 @@ async function main() {
             name: `${dm.name} Default Template`,
             storageUrl: uri,
             hash: hash ?? crypto.createHash('sha256').update(templateContent).digest('hex'),
-            isPrimary: true,
+            isDefault: true,
             renderMethodType: RenderMethodType.RenderTemplate2024,
             inline: false,
             mediaType: 'text/html',

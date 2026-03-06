@@ -16,11 +16,11 @@ export type UpdateRenderTemplateInput = {
   name?: string;
   template?: string;
   storageService?: ResolvedService<IStorageService>;
-  isPrimary?: boolean;
+  isDefault?: boolean;
 } & RenderMethodFields;
 
 export async function updateRenderTemplate(input: UpdateRenderTemplateInput): Promise<RenderTemplateWithRelations> {
-  const { id, tenantId, name, template, storageService, isPrimary } = input;
+  const { id, tenantId, name, template, storageService, isDefault } = input;
 
   logger.info({ renderTemplateId: id }, 'Looking up existing render template');
   const existing = await getRenderTemplateById(id, tenantId);
@@ -81,7 +81,7 @@ export async function updateRenderTemplate(input: UpdateRenderTemplateInput): Pr
   logger.info({ renderTemplateId: id }, 'Updating render template record');
   return updateRenderTemplateRepo(id, tenantId, {
     ...(name !== undefined && { name }),
-    ...(isPrimary !== undefined && { isPrimary }),
+    ...(isDefault !== undefined && { isDefault }),
     ...storageUpdates,
     ...(input.inline !== undefined && { inline: validatedFields.inline }),
     ...(input.mediaType !== undefined && { mediaType: validatedFields.mediaType }),

@@ -463,7 +463,7 @@ model DataModel {
 
 /**
  * Render template references for credential types.
- * Stores storage URLs and hashes, with an isPrimary flag for tenant default selection.
+ * Stores storage URLs and hashes, with an isDefault flag for tenant default selection.
  */
 model RenderTemplate {
   id                       String                @id @default(cuid())
@@ -476,7 +476,7 @@ model RenderTemplate {
   name                     String
   storageUrl               String
   hash                     String
-  isPrimary                Boolean   @default(false)
+  isDefault                Boolean   @default(false)
   renderMethodType          RenderMethodType
   storageServiceInstanceId  String?
   storageExternalId         String?

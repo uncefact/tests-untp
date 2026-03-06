@@ -205,7 +205,7 @@ describe('POST /api/v1/render-templates', () => {
       renderMethodType: 'RenderTemplate2024',
       storageUrl: 'https://example.com/template.html',
       hash: 'sha256-abc123',
-      isPrimary: false,
+      isDefault: false,
     };
     mockCreateRenderTemplate.mockResolvedValue(created);
 
@@ -229,7 +229,7 @@ describe('POST /api/v1/render-templates', () => {
       renderMethodType: 'RenderTemplate2024',
       template: '<div>Hello</div>',
       storageService: defaultStorageService,
-      isPrimary: undefined,
+      isDefault: undefined,
       inline: undefined,
       mediaType: undefined,
       mediaQuery: undefined,
