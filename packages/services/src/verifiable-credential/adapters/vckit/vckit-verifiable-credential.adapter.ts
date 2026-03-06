@@ -124,7 +124,8 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
   }
 
   private async issueVerifiableCredential(vc: UNTPVerifiableCredential): Promise<EnvelopedVerifiableCredential> {
-    const response = await fetch(`${this.baseURL}/credentials/issue`, {
+    const host = new URL(this.baseURL).origin;
+    const response = await fetch(`${host}/v2/credentials/issue`, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify({ credential: vc, options: { proofFormat: PROOF_FORMAT } }),

@@ -144,7 +144,7 @@ describe('VCKitVerifiableCredentialService', () => {
 
       // Second call: issue endpoint
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://vckit.example.com/credentials/issue',
+        'https://vckit.example.com/v2/credentials/issue',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
