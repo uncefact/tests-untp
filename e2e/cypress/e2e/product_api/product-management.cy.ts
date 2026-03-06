@@ -25,7 +25,7 @@ describe('Product API', { testIsolation: false }, () => {
         url: `https://prod-reg-${RUN_ID}.example.com`,
       },
     }).then((regResponse) => {
-      registrarId = regResponse.body.registrar.id;
+      registrarId = regResponse.body.id;
 
       cy.request({
         method: 'POST',
@@ -38,7 +38,7 @@ describe('Product API', { testIsolation: false }, () => {
           linkTemplate: '/{primaryKey}/{value}',
         },
       }).then((schemeResponse) => {
-        schemeId = schemeResponse.body.scheme.id;
+        schemeId = schemeResponse.body.id;
 
         // Create primary identifier
         cy.request({
@@ -49,7 +49,7 @@ describe('Product API', { testIsolation: false }, () => {
             value: '11111111111',
           },
         }).then((identResponse) => {
-          identifierId = identResponse.body.identifier.id;
+          identifierId = identResponse.body.id;
         });
 
         // Create secondary identifier
@@ -61,7 +61,7 @@ describe('Product API', { testIsolation: false }, () => {
             value: '22222222222',
           },
         }).then((secIdentResponse) => {
-          secondaryIdentifierId = secIdentResponse.body.identifier.id;
+          secondaryIdentifierId = secIdentResponse.body.id;
         });
       });
     });
@@ -72,7 +72,7 @@ describe('Product API', { testIsolation: false }, () => {
       url: '/api/v1/organisations',
       body: [{ name: `Prod Test Org ${RUN_ID}` }],
     }).then((orgResponse) => {
-      organisationId = orgResponse.body.organisations[0].id;
+      organisationId = orgResponse.body[0].id;
     });
 
     // Create prerequisite facility
@@ -81,7 +81,7 @@ describe('Product API', { testIsolation: false }, () => {
       url: '/api/v1/facilities',
       body: [{ name: `Prod Test Facility ${RUN_ID}` }],
     }).then((facResponse) => {
-      facilityId = facResponse.body.facilities[0].id;
+      facilityId = facResponse.body[0].id;
     });
   });
 
@@ -104,15 +104,15 @@ describe('Product API', { testIsolation: false }, () => {
         ],
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.products).to.be.an('array');
-        expect(response.body.products).to.have.length(1);
-        expect(response.body.products[0].name).to.eq(
+        expect(response.body).to.be.an('array');
+        expect(response.body).to.have.length(1);
+        expect(response.body[0].name).to.eq(
           `Model Product ${RUN_ID}`,
         );
-        expect(response.body.products[0].level).to.eq('MODEL');
-        expect(response.body.products[0].parentId).to.be.null;
+        expect(response.body[0].level).to.eq('MODEL');
+        expect(response.body[0].parentId).to.be.null;
 
-        modelProductId = response.body.products[0].id;
+        modelProductId = response.body[0].id;
       });
     });
 
@@ -129,15 +129,15 @@ describe('Product API', { testIsolation: false }, () => {
         ],
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.products).to.be.an('array');
-        expect(response.body.products).to.have.length(1);
-        expect(response.body.products[0].name).to.eq(
+        expect(response.body).to.be.an('array');
+        expect(response.body).to.have.length(1);
+        expect(response.body[0].name).to.eq(
           `Batch Product ${RUN_ID}`,
         );
-        expect(response.body.products[0].level).to.eq('BATCH');
-        expect(response.body.products[0].parentId).to.eq(modelProductId);
+        expect(response.body[0].level).to.eq('BATCH');
+        expect(response.body[0].parentId).to.eq(modelProductId);
 
-        batchProductId = response.body.products[0].id;
+        batchProductId = response.body[0].id;
       });
     });
 
@@ -154,15 +154,15 @@ describe('Product API', { testIsolation: false }, () => {
         ],
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.products).to.be.an('array');
-        expect(response.body.products).to.have.length(1);
-        expect(response.body.products[0].name).to.eq(
+        expect(response.body).to.be.an('array');
+        expect(response.body).to.have.length(1);
+        expect(response.body[0].name).to.eq(
           `Item Product ${RUN_ID}`,
         );
-        expect(response.body.products[0].level).to.eq('ITEM');
-        expect(response.body.products[0].parentId).to.eq(batchProductId);
+        expect(response.body[0].level).to.eq('ITEM');
+        expect(response.body[0].parentId).to.eq(batchProductId);
 
-        itemProductId = response.body.products[0].id;
+        itemProductId = response.body[0].id;
       });
     });
 
@@ -178,24 +178,25 @@ describe('Product API', { testIsolation: false }, () => {
         ],
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.products).to.be.an('array');
-        expect(response.body.products).to.have.length(1);
-        expect(response.body.products[0].name).to.eq(
+        expect(response.body).to.be.an('array');
+        expect(response.body).to.have.length(1);
+        expect(response.body[0].name).to.eq(
           `Standalone Item ${RUN_ID}`,
         );
-        expect(response.body.products[0].level).to.eq('ITEM');
-        expect(response.body.products[0].parentId).to.be.null;
+        expect(response.body[0].level).to.eq('ITEM');
+        expect(response.body[0].parentId).to.be.null;
 
-        standaloneItemId = response.body.products[0].id;
+        standaloneItemId = response.body[0].id;
       });
     });
 
     it('GET /api/v1/products — lists products', () => {
       cy.request('/api/v1/products').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.products).to.be.an('array');
+        expect(response.body.data).to.be.an('array');
+        expect(response.body.pagination).to.exist;
 
-        const created = response.body.products.find(
+        const created = response.body.data.find(
           (p: any) => p.id === modelProductId,
         );
         expect(created).to.exist;
@@ -205,10 +206,10 @@ describe('Product API', { testIsolation: false }, () => {
     it('GET /api/v1/products — filters by level', () => {
       cy.request('/api/v1/products?level=MODEL').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.products).to.be.an('array');
-        expect(response.body.products.length).to.be.greaterThan(0);
+        expect(response.body.data).to.be.an('array');
+        expect(response.body.data.length).to.be.greaterThan(0);
 
-        response.body.products.forEach((p: any) => {
+        response.body.data.forEach((p: any) => {
           expect(p.level).to.eq('MODEL');
         });
       });
@@ -218,14 +219,14 @@ describe('Product API', { testIsolation: false }, () => {
       cy.request(`/api/v1/products?parentId=${modelProductId}`).then(
         (response) => {
           expect(response.status).to.eq(200);
-          expect(response.body.products).to.be.an('array');
-          expect(response.body.products.length).to.be.greaterThan(0);
+          expect(response.body.data).to.be.an('array');
+          expect(response.body.data.length).to.be.greaterThan(0);
 
-          response.body.products.forEach((p: any) => {
+          response.body.data.forEach((p: any) => {
             expect(p.parentId).to.eq(modelProductId);
           });
 
-          const batch = response.body.products.find(
+          const batch = response.body.data.find(
             (p: any) => p.id === batchProductId,
           );
           expect(batch).to.exist;
@@ -237,9 +238,9 @@ describe('Product API', { testIsolation: false }, () => {
       cy.request(`/api/v1/products?organisationId=${organisationId}`).then(
         (response) => {
           expect(response.status).to.eq(200);
-          expect(response.body.products).to.be.an('array');
+          expect(response.body.data).to.be.an('array');
 
-          response.body.products.forEach((p: any) => {
+          response.body.data.forEach((p: any) => {
             expect(p.producedByOrganisationId).to.eq(organisationId);
           });
         },
@@ -250,9 +251,9 @@ describe('Product API', { testIsolation: false }, () => {
       cy.request(`/api/v1/products?facilityId=${facilityId}`).then(
         (response) => {
           expect(response.status).to.eq(200);
-          expect(response.body.products).to.be.an('array');
+          expect(response.body.data).to.be.an('array');
 
-          response.body.products.forEach((p: any) => {
+          response.body.data.forEach((p: any) => {
             expect(p.manufacturingFacilityId).to.eq(facilityId);
           });
         },
@@ -262,10 +263,9 @@ describe('Product API', { testIsolation: false }, () => {
     it('GET /api/v1/products/:id — retrieves specific product', () => {
       cy.request(`/api/v1/products/${modelProductId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.product).to.exist;
-        expect(response.body.product.id).to.eq(modelProductId);
-        expect(response.body.product.name).to.eq(`Model Product ${RUN_ID}`);
-        expect(response.body.product.level).to.eq('MODEL');
+        expect(response.body.id).to.eq(modelProductId);
+        expect(response.body.name).to.eq(`Model Product ${RUN_ID}`);
+        expect(response.body.level).to.eq('MODEL');
       });
     });
 
@@ -276,7 +276,7 @@ describe('Product API', { testIsolation: false }, () => {
         body: { name: `Updated Model ${RUN_ID}` },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.product.name).to.eq(`Updated Model ${RUN_ID}`);
+        expect(response.body.name).to.eq(`Updated Model ${RUN_ID}`);
       });
     });
 
@@ -287,16 +287,16 @@ describe('Product API', { testIsolation: false }, () => {
         body: { name: `Still Model ${RUN_ID}`, level: 'BATCH' },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.product.name).to.eq(`Still Model ${RUN_ID}`);
-        expect(response.body.product.level).to.eq('MODEL');
+        expect(response.body.name).to.eq(`Still Model ${RUN_ID}`);
+        expect(response.body.level).to.eq('MODEL');
       });
     });
 
     it('GET /api/v1/products/:id — confirms update persisted', () => {
       cy.request(`/api/v1/products/${modelProductId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.product.name).to.eq(`Still Model ${RUN_ID}`);
-        expect(response.body.product.level).to.eq('MODEL');
+        expect(response.body.name).to.eq(`Still Model ${RUN_ID}`);
+        expect(response.body.level).to.eq('MODEL');
       });
     });
 
@@ -310,7 +310,6 @@ describe('Product API', { testIsolation: false }, () => {
         },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.product).to.exist;
       });
     });
 
@@ -318,7 +317,7 @@ describe('Product API', { testIsolation: false }, () => {
       cy.request(`/api/v1/products/${modelProductId}`).then((response) => {
         expect(response.status).to.eq(200);
 
-        const product = response.body.product;
+        const product = response.body;
         expect(product.primaryIdentifier).to.exist;
         expect(product.primaryIdentifier.id).to.eq(identifierId);
         expect(product.secondaryIdentifiers).to.be.an('array');
@@ -398,16 +397,15 @@ describe('Product API', { testIsolation: false }, () => {
         method: 'DELETE',
         url: `/api/v1/products/${batchProductId}`,
       }).then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body).to.deep.eq({});
+        expect(response.status).to.eq(204);
       });
     });
 
     it('confirms ITEM is now parentless after BATCH deletion', () => {
       cy.request(`/api/v1/products/${itemProductId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.product.id).to.eq(itemProductId);
-        expect(response.body.product.parentId).to.be.null;
+        expect(response.body.id).to.eq(itemProductId);
+        expect(response.body.parentId).to.be.null;
       });
     });
 
@@ -417,8 +415,7 @@ describe('Product API', { testIsolation: false }, () => {
         method: 'DELETE',
         url: `/api/v1/products/${standaloneItemId}`,
       }).then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body).to.deep.eq({});
+        expect(response.status).to.eq(204);
       });
 
       // Delete the detached item
@@ -426,8 +423,7 @@ describe('Product API', { testIsolation: false }, () => {
         method: 'DELETE',
         url: `/api/v1/products/${itemProductId}`,
       }).then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body).to.deep.eq({});
+        expect(response.status).to.eq(204);
       });
 
       // Delete model (now has no BATCH children)
@@ -435,8 +431,7 @@ describe('Product API', { testIsolation: false }, () => {
         method: 'DELETE',
         url: `/api/v1/products/${modelProductId}`,
       }).then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body).to.deep.eq({});
+        expect(response.status).to.eq(204);
       });
     });
 
@@ -542,7 +537,7 @@ describe('Product API', { testIsolation: false }, () => {
     it('supports limit and offset parameters', () => {
       cy.request('/api/v1/products?limit=1&offset=0').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.products.length).to.be.at.most(1);
+        expect(response.body.data.length).to.be.at.most(1);
       });
     });
   });

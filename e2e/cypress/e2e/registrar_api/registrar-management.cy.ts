@@ -23,23 +23,22 @@ describe('Registrar API', { testIsolation: false }, () => {
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.registrar).to.exist;
-        expect(response.body.registrar.name).to.eq(`E2E Test Registrar ${RUN_ID}`);
-        expect(response.body.registrar.namespace).to.eq(`e2e-ns-${RUN_ID}`);
-        expect(response.body.registrar.url).to.eq(`https://registrar-${RUN_ID}.example.com`);
+        expect(response.body.name).to.eq(`E2E Test Registrar ${RUN_ID}`);
+        expect(response.body.namespace).to.eq(`e2e-ns-${RUN_ID}`);
+        expect(response.body.url).to.eq(`https://registrar-${RUN_ID}.example.com`);
 
-        createdRegistrarId = response.body.registrar.id;
+        createdRegistrarId = response.body.id;
       });
     });
 
     it('GET /api/v1/registrars — lists registrars', () => {
       cy.request('/api/v1/registrars').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.registrars).to.be.an('array');
+        expect(response.body.data).to.be.an('array');
+        expect(response.body.pagination).to.exist;
+        expect(response.body.pagination.total).to.be.a('number');
 
-        const created = response.body.registrars.find(
+        const created = response.body.data.find(
           (r: any) => r.id === createdRegistrarId,
         );
         expect(created).to.exist;
@@ -49,9 +48,8 @@ describe('Registrar API', { testIsolation: false }, () => {
     it('GET /api/v1/registrars/:id — retrieves a specific registrar', () => {
       cy.request(`/api/v1/registrars/${createdRegistrarId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.registrar.id).to.eq(createdRegistrarId);
-        expect(response.body.registrar.name).to.eq(`E2E Test Registrar ${RUN_ID}`);
+        expect(response.body.id).to.eq(createdRegistrarId);
+        expect(response.body.name).to.eq(`E2E Test Registrar ${RUN_ID}`);
       });
     });
 
@@ -62,8 +60,7 @@ describe('Registrar API', { testIsolation: false }, () => {
         body: { name: `Updated E2E Registrar ${RUN_ID}` },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.registrar.name).to.eq(`Updated E2E Registrar ${RUN_ID}`);
+        expect(response.body.name).to.eq(`Updated E2E Registrar ${RUN_ID}`);
       });
     });
 
@@ -77,16 +74,16 @@ describe('Registrar API', { testIsolation: false }, () => {
         },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.registrar.namespace).to.eq(`updated-ns-${RUN_ID}`);
-        expect(response.body.registrar.url).to.eq(`https://updated-registrar-${RUN_ID}.example.com`);
+        expect(response.body.namespace).to.eq(`updated-ns-${RUN_ID}`);
+        expect(response.body.url).to.eq(`https://updated-registrar-${RUN_ID}.example.com`);
       });
     });
 
     it('GET /api/v1/registrars/:id — confirms updates persisted', () => {
       cy.request(`/api/v1/registrars/${createdRegistrarId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.registrar.name).to.eq(`Updated E2E Registrar ${RUN_ID}`);
-        expect(response.body.registrar.namespace).to.eq(`updated-ns-${RUN_ID}`);
+        expect(response.body.name).to.eq(`Updated E2E Registrar ${RUN_ID}`);
+        expect(response.body.namespace).to.eq(`updated-ns-${RUN_ID}`);
       });
     });
 
@@ -95,8 +92,7 @@ describe('Registrar API', { testIsolation: false }, () => {
         method: 'DELETE',
         url: `/api/v1/registrars/${createdRegistrarId}`,
       }).then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
+        expect(response.status).to.eq(204);
       });
     });
 
@@ -115,7 +111,9 @@ describe('Registrar API', { testIsolation: false }, () => {
     it('supports limit and offset parameters', () => {
       cy.request('/api/v1/registrars?limit=1&offset=0').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.registrars.length).to.be.at.most(1);
+        expect(response.body.data.length).to.be.at.most(1);
+        expect(response.body.pagination).to.exist;
+        expect(response.body.pagination.total).to.be.a('number');
       });
     });
   });
@@ -165,7 +163,7 @@ describe('Registrar API', { testIsolation: false }, () => {
           url: `https://temp-${RUN_ID}.example.com`,
         },
       }).then((createResponse) => {
-        const tempId = createResponse.body.registrar.id;
+        const tempId = createResponse.body.id;
 
         cy.request({
           method: 'PATCH',
