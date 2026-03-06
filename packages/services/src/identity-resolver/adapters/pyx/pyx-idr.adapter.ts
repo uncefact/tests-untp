@@ -92,8 +92,9 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
         ianaLanguage,
         context,
         mimeType: link.type,
-        linkTitle: link.title,
+        title: link.title,
         targetUrl: link.href,
+        active: true,
         defaultLinkType: link.rel === defaultLinkType,
         defaultMimeType: link.type === defaultMimeType,
         defaultIanaLanguage: ianaLanguage === defaultIanaLanguage,
@@ -158,7 +159,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
       href: result.targetUrl,
       rel: result.linkType,
       type: result.mimeType,
-      title: result.linkTitle ?? '',
+      title: result.title ?? result.linkTitle ?? '',
       hreflang: result.ianaLanguage ? [result.ianaLanguage] : undefined,
     };
   }
@@ -169,7 +170,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
     if (link.href !== undefined) payload.targetUrl = link.href;
     if (link.rel !== undefined) payload.linkType = link.rel;
     if (link.type !== undefined) payload.mimeType = link.type;
-    if (link.title !== undefined) payload.linkTitle = link.title;
+    if (link.title !== undefined) payload.title = link.title;
 
     const response = await fetch(`${this.apiBasePath}/resolver/links/${linkId}`, {
       method: 'PUT',
@@ -190,7 +191,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
       href: result.targetUrl,
       rel: result.linkType,
       type: result.mimeType,
-      title: result.linkTitle ?? '',
+      title: result.title ?? result.linkTitle ?? '',
       hreflang: result.ianaLanguage ? [result.ianaLanguage] : undefined,
     };
   }
