@@ -149,10 +149,6 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const hasUrl = isNonEmptyString(body.url);
   const hasIdrServiceInstanceId = body.idrServiceInstanceId !== undefined;
 
-  logger.info(
-    { tenantId, registrarId: id, fields: { hasName, hasNamespace, hasUrl, hasIdrServiceInstanceId } },
-    'Validating update fields',
-  );
   if (!hasName && !hasNamespace && !hasUrl && !hasIdrServiceInstanceId) {
     throw new ValidationError('At least one of name, namespace, url, or idrServiceInstanceId is required');
   }

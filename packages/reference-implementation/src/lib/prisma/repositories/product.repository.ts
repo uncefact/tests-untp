@@ -2,6 +2,7 @@ import { Product, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
  * Shared include fragment for an identifier with its scheme and registrar.
@@ -298,7 +299,7 @@ export async function listProducts(
     prisma.product.findMany({
       where,
       include: PRODUCT_LIST_INCLUDE,
-      take: limit ?? 100,
+      take: limit ?? DEFAULT_PAGE_LIMIT,
       skip: offset,
       orderBy: { createdAt: 'desc' },
     }),

@@ -5,6 +5,7 @@ import {
   updateIdentifierScheme,
   deleteIdentifierScheme,
 } from './identifier-scheme.repository';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Transaction mock helper — wraps the callback with the same mock methods
 const mockTx = {
@@ -191,7 +192,7 @@ describe('identifier-scheme.repository', () => {
         include: {
           qualifiers: true,
         },
-        take: 100,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });

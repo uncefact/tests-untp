@@ -2,6 +2,7 @@ import { Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { UntpLocation } from '@/lib/types';
 
 /** Full relations for detail endpoints. */
@@ -200,7 +201,7 @@ export async function listOrganisations(
     prisma.organisationEntity.findMany({
       where,
       include: ORGANISATION_LIST_INCLUDE,
-      take: limit ?? 100,
+      take: limit ?? DEFAULT_PAGE_LIMIT,
       skip: offset,
       orderBy: { createdAt: 'desc' },
     }),

@@ -215,8 +215,6 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
 export const GET = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId } = await params;
 
-  logger.info({ tenantId, identifierId }, 'Parsing query parameters');
-
   logger.info({ tenantId, identifierId }, 'Looking up identifier for link listing');
   const identifier = await getIdentifierById(identifierId, tenantId);
   if (!identifier) {

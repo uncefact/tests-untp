@@ -5,6 +5,7 @@ import {
   updateRegistrar,
   deleteRegistrar,
 } from './registrar.repository';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
@@ -145,7 +146,7 @@ describe('registrar.repository', () => {
         where: {
           OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
         },
-        take: 100,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });

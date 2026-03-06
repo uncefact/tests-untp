@@ -5,6 +5,7 @@ import {
   updateOrganisation,
   deleteOrganisation,
 } from './organisation.repository';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
 jest.mock('../prisma', () => ({
@@ -331,7 +332,7 @@ describe('organisation.repository', () => {
         include: {
           secondaryIdentifiers: { select: { identifierId: true } },
         },
-        take: 100,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });

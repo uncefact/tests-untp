@@ -30,6 +30,7 @@ import {
   deleteLinkRegistration,
 } from './link-registration.repository';
 import { NotFoundError } from '@/lib/api/errors';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 const mockLinkRegistration = prisma.linkRegistration as unknown as {
   create: jest.Mock;
@@ -121,7 +122,7 @@ describe('link-registration.repository', () => {
       expect(mockLinkRegistration.findMany).toHaveBeenCalledWith({
         where: { identifierId: 'ident-1', tenantId: 'tenant-1' },
         orderBy: { publishedAt: 'desc' },
-        take: 100,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
       });
       expect(mockLinkRegistration.count).toHaveBeenCalledWith({

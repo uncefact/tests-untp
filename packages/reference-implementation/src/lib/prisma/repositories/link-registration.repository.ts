@@ -1,6 +1,7 @@
 import { LinkRegistration } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 export type CreateLinkRegistrationInput = {
   tenantId: string;
@@ -55,7 +56,7 @@ export async function listLinkRegistrations(
     prisma.linkRegistration.findMany({
       where,
       orderBy: { publishedAt: 'desc' },
-      take: limit ?? 100,
+      take: limit ?? DEFAULT_PAGE_LIMIT,
       skip: offset,
     }),
     prisma.linkRegistration.count({ where }),

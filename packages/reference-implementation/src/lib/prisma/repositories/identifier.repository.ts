@@ -2,6 +2,7 @@ import { Identifier, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -141,7 +142,7 @@ export async function listIdentifiers(
   const [data, total] = await Promise.all([
     prisma.identifier.findMany({
       where,
-      take: limit ?? 100,
+      take: limit ?? DEFAULT_PAGE_LIMIT,
       skip: offset,
       orderBy: { createdAt: 'desc' },
     }),

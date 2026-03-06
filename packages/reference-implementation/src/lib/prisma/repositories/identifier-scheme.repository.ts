@@ -2,6 +2,7 @@ import { IdentifierScheme, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
  * Input for creating a new identifier scheme
@@ -121,7 +122,7 @@ export async function listIdentifierSchemes(
       include: {
         qualifiers: true,
       },
-      take: limit ?? 100,
+      take: limit ?? DEFAULT_PAGE_LIMIT,
       skip: offset,
       orderBy: { createdAt: 'desc' },
     }),
