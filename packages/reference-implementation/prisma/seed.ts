@@ -92,46 +92,37 @@ async function main() {
 
   const gs1Registrar = await prisma.registrar.upsert({
     where: { id: 'system-registrar-gs1' },
-    update: {
-      idrServiceInstanceId: 'system-idr-pyx',
-    },
+    update: {},
     create: {
       id: 'system-registrar-gs1',
       tenantId: SYSTEM_TENANT_ID,
       name: 'GS1',
       namespace: 'gs1',
       url: 'https://www.gs1.org',
-      idrServiceInstanceId: 'system-idr-pyx',
     },
   });
 
   const abrRegistrar = await prisma.registrar.upsert({
     where: { id: 'system-registrar-abr' },
-    update: {
-      idrServiceInstanceId: 'system-idr-pyx',
-    },
+    update: {},
     create: {
       id: 'system-registrar-abr',
       tenantId: SYSTEM_TENANT_ID,
       name: 'Australian Business Register',
       namespace: 'abr',
       url: 'https://abr.business.gov.au',
-      idrServiceInstanceId: 'system-idr-pyx',
     },
   });
 
   const asicRegistrar = await prisma.registrar.upsert({
     where: { id: 'system-registrar-asic' },
-    update: {
-      idrServiceInstanceId: 'system-idr-pyx',
-    },
+    update: {},
     create: {
       id: 'system-registrar-asic',
       tenantId: SYSTEM_TENANT_ID,
       name: 'ASIC',
       namespace: 'asic',
       url: 'https://asic.gov.au',
-      idrServiceInstanceId: 'system-idr-pyx',
     },
   });
 
@@ -271,6 +262,12 @@ async function main() {
         },
       });
       idrSeeded = true;
+
+      // Link registrars to the IDR service instance (must happen after the instance exists)
+      await prisma.registrar.updateMany({
+        where: { id: { in: ['system-registrar-gs1', 'system-registrar-abr', 'system-registrar-asic'] } },
+        data: { idrServiceInstanceId: 'system-idr-pyx' },
+      });
     } catch (error) {
       logger.warn(
         { error: error instanceof Error ? error.message : error },
