@@ -2,11 +2,7 @@ class IssuePage {
   constructor() {}
 
   beforeAll() {
-    cy.loadAppConfig();
-  }
-
-  testAppConfig() {
-    cy.verifyAppConfig();
+    // App config loading removed — tests use direct API calls
   }
 
   // General method to generate workflow. Parameters can be overridden in child classes
