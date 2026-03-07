@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { listCatalogues } from '@/lib/prisma/repositories';
 import { importCvc } from '@/lib/services/cvc-import.service';
@@ -63,7 +64,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   logger.info({ limit: parsedLimit, offset: parsedOffset }, 'Querying catalogues from database');
   const { data, total } = await listCatalogues(tenantId, { limit: parsedLimit, offset: parsedOffset });
 
-  const limit = parsedLimit ?? 20;
+  const limit = parsedLimit ?? DEFAULT_PAGE_LIMIT;
   const offset = parsedOffset ?? 0;
 
   logger.info({ count: data.length, total }, 'Catalogues retrieved');
