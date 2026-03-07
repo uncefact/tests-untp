@@ -2,13 +2,12 @@ import { extractFromElementString, constructIdentifierData, constructElementStri
 import { Box } from '@mui/material';
 import { useEffect, useState } from 'react';
 import Barcode from 'react-barcode';
-import appConfig from '../../constants/app-config.json';
-import { DataCarrierType } from '../../types/common.types';
 import { toastMessage, Status } from '../ToastMessage/ToastMessage';
 
 export interface IBarcodeProps {
   data?: string[];
   dataPath?: string;
+  validatePattern?: string;
 }
 export const BarcodeGenerator = (props: IBarcodeProps) => {
   const [values, setValues] = useState<string[]>([]);
@@ -27,18 +26,9 @@ export const BarcodeGenerator = (props: IBarcodeProps) => {
   const validateData = (aiData: any) => {
     if (!aiData) return false;
     if (!aiData.primary || !aiData.primary.ai || !aiData.primary.value) return false;
-    const identifierSchemesForBarcode = (appConfig.identifierSchemes || []).filter(
-      (scheme) => scheme.carriers && scheme.carriers.includes(DataCarrierType.Barcode),
-    );
-    if (identifierSchemesForBarcode.length === 0) return false;
-
-    return identifierSchemesForBarcode.some((scheme) => {
-      const regex = new RegExp(scheme.format);
-      if (regex.test(aiData.primary.value)) {
-        return true;
-      }
-      return false;
-    });
+    if (!props.validatePattern) return true;
+    const regex = new RegExp(props.validatePattern);
+    return regex.test(aiData.primary.value);
   };
 
   const constructBarcode = (data: string) => {
