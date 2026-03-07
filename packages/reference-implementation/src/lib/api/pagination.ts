@@ -9,6 +9,8 @@ export const paginationMetaSchema = z.object({
 
 export type PaginationMeta = z.infer<typeof paginationMetaSchema>;
 
+export const DEFAULT_PAGE_LIMIT = 100;
+
 export interface PaginatedResponse<T> {
   data: T[];
   pagination: PaginationMeta;
@@ -20,7 +22,7 @@ export function buildPaginatedResponse<T>(
   limit?: number,
   offset?: number,
 ): PaginatedResponse<T> {
-  const effectiveLimit = limit ?? 20;
+  const effectiveLimit = limit ?? DEFAULT_PAGE_LIMIT;
   const effectiveOffset = offset ?? 0;
   return {
     data,

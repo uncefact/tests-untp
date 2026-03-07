@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { listSchemes } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
@@ -68,7 +69,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   logger.info({ filters: { catalogueId }, limit: parsedLimit, offset: parsedOffset }, 'Querying schemes from database');
   const { data, total } = await listSchemes(tenantId, { catalogueId, limit: parsedLimit, offset: parsedOffset });
 
-  const limit = parsedLimit ?? 20;
+  const limit = parsedLimit ?? DEFAULT_PAGE_LIMIT;
   const offset = parsedOffset ?? 0;
 
   logger.info({ count: data.length, total }, 'Schemes retrieved');

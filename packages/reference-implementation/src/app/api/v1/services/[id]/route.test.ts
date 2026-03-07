@@ -1,14 +1,3 @@
-// Provide a minimal Response constructor for the DELETE handler
-// (jsdom does not expose the Fetch API's Response)
-global.Response = class Response {
-  status: number;
-  body: unknown;
-  constructor(body: unknown, init?: { status?: number }) {
-    this.body = body;
-    this.status = init?.status ?? 200;
-  }
-} as unknown as typeof globalThis.Response;
-
 // Mock next/server before importing route handlers
 jest.mock('next/server', () => ({
   NextResponse: {

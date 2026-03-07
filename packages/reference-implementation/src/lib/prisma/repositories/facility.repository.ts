@@ -2,23 +2,43 @@ import { Facility, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { UntpLocation } from '@/lib/types';
 
 /**
- * Include shape for facility queries — eagerly loads primary and secondary
+ * Include shape for facility detail queries — eagerly loads primary and secondary
  * identifiers (with their schemes and registrars) and the operating organisation.
  * The registrar is needed to construct ISO 18975 resolver URIs for UNTP credentials.
  */
-const FACILITY_INCLUDE = {
+const FACILITY_DETAIL_INCLUDE = {
   primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
   secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
   operatingOrganisation: true,
 } as const;
 
 /**
- * A facility with all eagerly-loaded relations matching `FACILITY_INCLUDE`.
+ * Lightweight include shape for list queries — only fetches secondary identifier IDs.
  */
-export type FacilityWithRelations = Prisma.FacilityGetPayload<{ include: typeof FACILITY_INCLUDE }>;
+const FACILITY_LIST_INCLUDE = {
+  secondaryIdentifiers: { select: { identifierId: true } },
+} as const;
+
+/**
+ * A facility with all eagerly-loaded relations matching `FACILITY_DETAIL_INCLUDE`.
+ */
+export type FacilityWithRelations = Prisma.FacilityGetPayload<{ include: typeof FACILITY_DETAIL_INCLUDE }>;
+
+/**
+ * Raw row shape returned by the list query before flattening.
+ */
+type FacilityListRow = Prisma.FacilityGetPayload<{ include: typeof FACILITY_LIST_INCLUDE }>;
+
+/**
+ * Lightweight facility returned from list queries with flattened secondary identifier IDs.
+ */
+export type FacilityListItem = Omit<FacilityListRow, 'secondaryIdentifiers'> & {
+  secondaryIdentifierIds: string[];
+};
 
 /**
  * Input for creating a new facility.
@@ -130,7 +150,7 @@ export async function createFacilities(
             },
           }),
         },
-        include: FACILITY_INCLUDE,
+        include: FACILITY_DETAIL_INCLUDE,
       });
 
       results.push(facility);
@@ -147,7 +167,7 @@ export async function createFacilities(
 export async function getFacilityById(id: string, tenantId: string): Promise<FacilityWithRelations | null> {
   return prisma.facility.findFirst({
     where: { id, tenantId },
-    include: FACILITY_INCLUDE,
+    include: FACILITY_DETAIL_INCLUDE,
   });
 }
 
@@ -158,7 +178,7 @@ export async function getFacilityById(id: string, tenantId: string): Promise<Fac
 export async function listFacilities(
   tenantId: string,
   options: ListFacilitiesOptions = {},
-): Promise<FacilityWithRelations[]> {
+): Promise<{ data: FacilityListItem[]; total: number }> {
   const { search, organisationId, limit, offset } = options;
 
   const where: Prisma.FacilityWhereInput = {
@@ -183,13 +203,23 @@ export async function listFacilities(
     ];
   }
 
-  return prisma.facility.findMany({
-    where,
-    include: FACILITY_INCLUDE,
-    take: limit ?? 100,
-    skip: offset,
-    orderBy: { createdAt: 'desc' },
-  });
+  const [rows, total] = await Promise.all([
+    prisma.facility.findMany({
+      where,
+      include: FACILITY_LIST_INCLUDE,
+      take: limit ?? DEFAULT_PAGE_LIMIT,
+      skip: offset,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.facility.count({ where }),
+  ]);
+
+  const data: FacilityListItem[] = rows.map(({ secondaryIdentifiers, ...rest }) => ({
+    ...rest,
+    secondaryIdentifierIds: secondaryIdentifiers.map((si) => si.identifierId),
+  }));
+
+  return { data, total };
 }
 
 /**
@@ -274,7 +304,7 @@ export async function updateFacility(
     return tx.facility.update({
       where: { id },
       data,
-      include: FACILITY_INCLUDE,
+      include: FACILITY_DETAIL_INCLUDE,
     });
   });
 }
@@ -292,7 +322,7 @@ export async function getFacilityByIdentifierValue(
       tenantId,
       primaryIdentifier: { value },
     },
-    include: FACILITY_INCLUDE,
+    include: FACILITY_DETAIL_INCLUDE,
   });
 }
 

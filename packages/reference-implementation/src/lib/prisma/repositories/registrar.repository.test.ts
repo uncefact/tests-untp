@@ -5,6 +5,7 @@ import {
   updateRegistrar,
   deleteRegistrar,
 } from './registrar.repository';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
@@ -22,6 +23,7 @@ jest.mock('../prisma', () => ({
       create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
     },
     $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   },
@@ -34,6 +36,7 @@ const mockRegistrar = prisma.registrar as unknown as {
   create: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
+  count: jest.Mock;
 };
 
 describe('registrar.repository', () => {
@@ -45,7 +48,6 @@ describe('registrar.repository', () => {
     namespace: 'gs1',
     url: 'https://gs1.org',
     idrServiceInstanceId: null,
-    isDefault: false,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     schemes: [],
@@ -72,26 +74,9 @@ describe('registrar.repository', () => {
           name: 'GS1',
           namespace: 'gs1',
           url: 'https://gs1.org',
-          isDefault: false,
         }),
       });
       expect(result).toEqual(REGISTRAR_RECORD);
-    });
-
-    it('defaults isDefault to false when not provided', async () => {
-      mockRegistrar.create.mockResolvedValue(REGISTRAR_RECORD);
-
-      await createRegistrar({
-        tenantId: TENANT_ID,
-        name: 'GS1',
-        namespace: 'gs1',
-      });
-
-      expect(mockRegistrar.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          isDefault: false,
-        }),
-      });
     });
 
     it('passes idrServiceInstanceId when provided', async () => {
@@ -135,7 +120,7 @@ describe('registrar.repository', () => {
     });
 
     it('returns a system default registrar', async () => {
-      const systemRegistrar = { ...REGISTRAR_RECORD, tenantId: 'system', isDefault: true };
+      const systemRegistrar = { ...REGISTRAR_RECORD, tenantId: 'system' };
       mockRegistrar.findFirst.mockResolvedValue(systemRegistrar);
 
       const result = await getRegistrarById('reg-1', TENANT_ID);
@@ -153,6 +138,7 @@ describe('registrar.repository', () => {
   describe('listRegistrars', () => {
     it('lists registrars for the tenant including system defaults', async () => {
       mockRegistrar.findMany.mockResolvedValue([REGISTRAR_RECORD]);
+      mockRegistrar.count.mockResolvedValue(1);
 
       const result = await listRegistrars(TENANT_ID);
 
@@ -160,24 +146,24 @@ describe('registrar.repository', () => {
         where: {
           OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
         },
-        include: {
-          schemes: {
-            include: {
-              qualifiers: true,
-            },
-          },
-        },
-        take: 100,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
-      expect(result).toEqual([REGISTRAR_RECORD]);
+      expect(mockRegistrar.count).toHaveBeenCalledWith({
+        where: {
+          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+        },
+      });
+      expect(result.data).toEqual([REGISTRAR_RECORD]);
+      expect(result.total).toBe(1);
     });
 
     it('applies pagination', async () => {
       mockRegistrar.findMany.mockResolvedValue([]);
+      mockRegistrar.count.mockResolvedValue(0);
 
-      await listRegistrars(TENANT_ID, { limit: 10, offset: 20 });
+      const result = await listRegistrars(TENANT_ID, { limit: 10, offset: 20 });
 
       expect(mockRegistrar.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -185,6 +171,8 @@ describe('registrar.repository', () => {
           skip: 20,
         }),
       );
+      expect(result.data).toEqual([]);
+      expect(result.total).toBe(0);
     });
   });
 

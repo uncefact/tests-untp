@@ -72,7 +72,7 @@ describe('GET /api/v1/products/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.product).toEqual(product);
+    expect(json).toEqual(product);
   });
 
   it('returns 404 when product not found', async () => {
@@ -112,7 +112,7 @@ describe('PATCH /api/v1/products/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.product).toEqual(updated);
+    expect(json).toEqual(updated);
   });
 
   it('returns 400 when no updatable fields provided', async () => {
@@ -160,7 +160,7 @@ describe('PATCH /api/v1/products/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.product).toEqual(updated);
+    expect(json).toEqual(updated);
     // Verify level was stripped from the update call
     expect(mockUpdateProduct).toHaveBeenCalledWith('p-1', 'org-1', { name: 'Updated Widget' });
   });
@@ -191,15 +191,14 @@ describe('DELETE /api/v1/products/:id', () => {
     jest.clearAllMocks();
   });
 
-  it('deletes the product and returns empty object', async () => {
+  it('deletes the product and returns 204 with no body', async () => {
     mockDeleteProduct.mockResolvedValue({ id: 'p-1' });
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('p-1') as unknown as Parameters<typeof DELETE>[1]);
-    const json = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(json).toEqual({});
+    expect(res.status).toBe(204);
+    expect(res.body).toBeNull();
   });
 
   it('returns 404 when product not found', async () => {

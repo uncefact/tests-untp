@@ -46,6 +46,7 @@ jest.mock('@/lib/services/cvc-import.service', () => ({
   importCvc: (...args: unknown[]) => mockImportCvc(...args),
 }));
 
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { GET, POST } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -81,7 +82,7 @@ describe('GET /api/v1/cvc/catalogues', () => {
 
     expect(res.status).toBe(200);
     expect(json.data).toEqual(catalogues);
-    expect(json.pagination).toEqual({ total: 1, limit: 20, offset: 0, hasMore: false });
+    expect(json.pagination).toEqual({ total: 1, limit: DEFAULT_PAGE_LIMIT, offset: 0, hasMore: false });
     expect(mockListCatalogues).toHaveBeenCalledWith('org-1', {
       limit: undefined,
       offset: undefined,

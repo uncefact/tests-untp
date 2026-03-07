@@ -5,6 +5,8 @@ import { constructVerifyURL } from '../../utils/helpers.js';
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type BuildPublishLinksOptions = {
+  /** UNTP link relation type for the credential links (defaults to gs1:sustainabilityInfo) */
+  linkType?: string;
   /** URL of the machine-readable verification service (omit to skip) */
   machineVerificationUrl?: string;
   /** Base URL of the human-readable verification page (omit to skip) */
@@ -33,9 +35,8 @@ export function buildPublishLinks(
   options?: BuildPublishLinksOptions,
 ): Link[] {
   const links: Link[] = [];
+  const credentialLinkType = options?.linkType ?? 'gs1:sustainabilityInfo';
 
-  // GS1 link relation types per UNTP specification.
-  // TODO: Make configurable via credential type mapper service.
   if (options?.machineVerificationUrl) {
     links.push({
       href: options.machineVerificationUrl,
@@ -47,7 +48,7 @@ export function buildPublishLinks(
 
   links.push({
     href: storage.uri,
-    rel: 'gs1:sustainabilityInfo',
+    rel: credentialLinkType,
     type: 'application/json',
     title: linkTitle,
   });
@@ -59,7 +60,7 @@ export function buildPublishLinks(
         uri: storage.uri,
         hash: storage.hash,
       }),
-      rel: 'gs1:sustainabilityInfo',
+      rel: credentialLinkType,
       type: 'text/html',
       title: linkTitle,
     });

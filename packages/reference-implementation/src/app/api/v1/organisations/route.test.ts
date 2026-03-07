@@ -33,6 +33,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
 }));
 
 import { NotFoundError } from '@/lib/api/errors';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -83,7 +84,7 @@ describe('POST /api/v1/organisations', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(json.organisations).toEqual(organisations);
+    expect(json).toEqual(organisations);
   });
 
   it('returns 400 when body is not an array', async () => {
@@ -150,20 +151,26 @@ describe('GET /api/v1/organisations', () => {
     jest.clearAllMocks();
   });
 
-  it('lists organisations for the tenant', async () => {
-    const organisations = [{ id: 'org-a', name: 'Acme Corp' }];
-    mockListOrganisations.mockResolvedValue(organisations);
+  it('lists organisations for the tenant with pagination', async () => {
+    const organisations = [{ id: 'org-a', name: 'Acme Corp', secondaryIdentifierIds: [] }];
+    mockListOrganisations.mockResolvedValue({ data: organisations, total: 1 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/organisations' });
     const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.organisations).toEqual(organisations);
+    expect(json.data).toEqual(organisations);
+    expect(json.pagination).toEqual({
+      total: 1,
+      limit: DEFAULT_PAGE_LIMIT,
+      offset: 0,
+      hasMore: false,
+    });
   });
 
   it('passes search and pagination params to listOrganisations', async () => {
-    mockListOrganisations.mockResolvedValue([]);
+    mockListOrganisations.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -179,7 +186,7 @@ describe('GET /api/v1/organisations', () => {
   });
 
   it('handles no query parameters', async () => {
-    mockListOrganisations.mockResolvedValue([]);
+    mockListOrganisations.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/organisations' });
     await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
@@ -224,5 +231,26 @@ describe('GET /api/v1/organisations', () => {
 
     expect(res.status).toBe(500);
     expect(json.error).toContain('Database error');
+  });
+
+  it('returns correct pagination when limit and offset are provided', async () => {
+    const organisations = [{ id: 'org-a', name: 'Acme Corp', secondaryIdentifierIds: [] }];
+    mockListOrganisations.mockResolvedValue({ data: organisations, total: 25 });
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/organisations?limit=10&offset=5',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.data).toEqual(organisations);
+    expect(json.pagination).toEqual({
+      total: 25,
+      limit: 10,
+      offset: 5,
+      hasMore: true,
+    });
   });
 });

@@ -5,6 +5,7 @@ import {
   updateIdentifierScheme,
   deleteIdentifierScheme,
 } from './identifier-scheme.repository';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Transaction mock helper — wraps the callback with the same mock methods
 const mockTx = {
@@ -25,6 +26,7 @@ jest.mock('../prisma', () => ({
       create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
     },
     $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   },
@@ -37,6 +39,7 @@ const mockIdentifierScheme = prisma.identifierScheme as unknown as {
   create: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
+  count: jest.Mock;
 };
 
 describe('identifier-scheme.repository', () => {
@@ -50,9 +53,7 @@ describe('identifier-scheme.repository', () => {
     primaryKey: 'gtin',
     validationPattern: '^\\d{13,14}$',
     linkTemplate: '/{primaryKey}/{value}',
-    namespace: 'gs1',
     idrServiceInstanceId: null,
-    isDefault: false,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     qualifiers: [
@@ -74,7 +75,6 @@ describe('identifier-scheme.repository', () => {
       namespace: 'gs1',
       url: 'https://gs1.org',
       idrServiceInstanceId: null,
-      isDefault: false,
       createdAt: new Date('2024-01-01'),
       updatedAt: new Date('2024-01-01'),
     },
@@ -95,7 +95,6 @@ describe('identifier-scheme.repository', () => {
         primaryKey: 'gtin',
         validationPattern: '^\\d{13,14}$',
         linkTemplate: '/{primaryKey}/{value}',
-        namespace: 'gs1',
         qualifiers: [{ key: 'batch', description: 'Batch number', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
       });
 
@@ -107,8 +106,6 @@ describe('identifier-scheme.repository', () => {
           primaryKey: 'gtin',
           validationPattern: '^\\d{13,14}$',
           linkTemplate: '/{primaryKey}/{value}',
-          namespace: 'gs1',
-          isDefault: false,
           qualifiers: {
             create: [{ key: 'batch', description: 'Batch number', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
           },
@@ -144,26 +141,6 @@ describe('identifier-scheme.repository', () => {
         },
       });
     });
-
-    it('defaults isDefault to false when not provided', async () => {
-      mockIdentifierScheme.create.mockResolvedValue(SCHEME_RECORD);
-
-      await createIdentifierScheme({
-        tenantId: TENANT_ID,
-        registrarId: REGISTRAR_ID,
-        name: 'GTIN',
-        primaryKey: 'gtin',
-        validationPattern: '^\\d{13,14}$',
-        linkTemplate: '/{primaryKey}/{value}',
-      });
-
-      expect(mockIdentifierScheme.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          isDefault: false,
-        }),
-        include: expect.anything(),
-      });
-    });
   });
 
   describe('getIdentifierSchemeById', () => {
@@ -186,7 +163,7 @@ describe('identifier-scheme.repository', () => {
     });
 
     it('returns a system default scheme', async () => {
-      const systemScheme = { ...SCHEME_RECORD, tenantId: 'system', isDefault: true };
+      const systemScheme = { ...SCHEME_RECORD, tenantId: 'system' };
       mockIdentifierScheme.findFirst.mockResolvedValue(systemScheme);
 
       const result = await getIdentifierSchemeById('scheme-1', TENANT_ID);
@@ -204,6 +181,7 @@ describe('identifier-scheme.repository', () => {
   describe('listIdentifierSchemes', () => {
     it('lists schemes for the tenant including system defaults', async () => {
       mockIdentifierScheme.findMany.mockResolvedValue([SCHEME_RECORD]);
+      mockIdentifierScheme.count.mockResolvedValue(1);
 
       const result = await listIdentifierSchemes(TENANT_ID);
 
@@ -213,17 +191,22 @@ describe('identifier-scheme.repository', () => {
         },
         include: {
           qualifiers: true,
-          registrar: true,
         },
-        take: 100,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
-      expect(result).toEqual([SCHEME_RECORD]);
+      expect(mockIdentifierScheme.count).toHaveBeenCalledWith({
+        where: {
+          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+        },
+      });
+      expect(result).toEqual({ data: [SCHEME_RECORD], total: 1 });
     });
 
     it('filters by registrarId', async () => {
       mockIdentifierScheme.findMany.mockResolvedValue([]);
+      mockIdentifierScheme.count.mockResolvedValue(0);
 
       await listIdentifierSchemes(TENANT_ID, { registrarId: REGISTRAR_ID });
 
@@ -238,6 +221,7 @@ describe('identifier-scheme.repository', () => {
 
     it('applies pagination', async () => {
       mockIdentifierScheme.findMany.mockResolvedValue([]);
+      mockIdentifierScheme.count.mockResolvedValue(0);
 
       await listIdentifierSchemes(TENANT_ID, { limit: 10, offset: 20 });
 

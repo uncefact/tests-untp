@@ -7,6 +7,15 @@ jest.mock('next/server', () => ({
   },
 }));
 
+// Mock @uncefact/untp-ri-services — spread actual to preserve error classes
+// while avoiding ESM resolution issues with transitive deps like uuid
+jest.mock('@uncefact/untp-ri-services', () => {
+  const actual = jest.requireActual('@uncefact/untp-ri-services');
+  return {
+    ...actual,
+  };
+});
+
 jest.mock('@/lib/api/with-tenant-auth', () => {
   const { NotFoundError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
   const { ValidationError } = jest.requireActual('@/lib/api/validation');
@@ -145,7 +154,6 @@ describe('GET /api/v1/identifiers/[id]/links/[linkId]', () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.ok).toBe(true);
     expect(body.link).toBeDefined();
     expect(body.localRecord).toBeDefined();
     expect(body.desync).toBeUndefined();
@@ -159,7 +167,6 @@ describe('GET /api/v1/identifiers/[id]/links/[linkId]', () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.ok).toBe(true);
     expect(body.link).toBeNull();
     expect(body.localRecord).toBeDefined();
     expect(body.desync).toBe(true);
@@ -215,7 +222,8 @@ describe('PATCH /api/v1/identifiers/[id]/links/[linkId]', () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.ok).toBe(true);
+    expect(body.href).toBe('https://updated.com/cred.json');
+    expect(body.rel).toBe('untp:dpp');
     expect(MOCK_IDR_SERVICE.updateLink).toHaveBeenCalledWith('idr-link-1', {
       href: 'https://updated.com/cred.json',
     });
@@ -258,15 +266,11 @@ describe('DELETE /api/v1/identifiers/[id]/links/[linkId]', () => {
     mockDeleteLinkRegistration.mockResolvedValue(MOCK_LOCAL_RECORD);
   });
 
-  it('deletes link from IDR and local record, returns 200', async () => {
+  it('deletes link from IDR and local record, returns 204', async () => {
     const req = createFakeRequest();
     const res = await DELETE(req, createContext());
-    const body = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(body.ok).toBe(true);
-    expect(body.deleted).toBe(true);
-    expect(body.desync).toBeUndefined();
+    expect(res.status).toBe(204);
     expect(MOCK_IDR_SERVICE.deleteLink).toHaveBeenCalledWith('idr-link-1');
     expect(mockDeleteLinkRegistration).toHaveBeenCalledWith('idr-link-1', 'ident-1', 'tenant-1');
   });
@@ -276,13 +280,8 @@ describe('DELETE /api/v1/identifiers/[id]/links/[linkId]', () => {
 
     const req = createFakeRequest();
     const res = await DELETE(req, createContext());
-    const body = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(body.ok).toBe(true);
-    expect(body.deleted).toBe(true);
-    expect(body.desync).toBe(true);
-    expect(body.warning).toContain('already absent from the upstream IDR');
+    expect(res.status).toBe(204);
     expect(mockDeleteLinkRegistration).toHaveBeenCalledWith('idr-link-1', 'ident-1', 'tenant-1');
   });
 

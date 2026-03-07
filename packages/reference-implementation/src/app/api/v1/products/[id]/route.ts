@@ -39,10 +39,7 @@ const UPDATABLE_FIELDS = [
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 product:
- *                   $ref: '#/components/schemas/Product'
+ *               $ref: '#/components/schemas/Product'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -69,7 +66,8 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   if (!product) {
     throw new NotFoundError('Product not found');
   }
-  return NextResponse.json({ product });
+  logger.info({ tenantId, productId: id }, 'Product retrieved');
+  return NextResponse.json(product);
 });
 
 /**
@@ -126,10 +124,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 product:
- *                   $ref: '#/components/schemas/Product'
+ *               $ref: '#/components/schemas/Product'
  *       400:
  *         description: Validation error
  *         content:
@@ -158,6 +153,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
+  logger.info({ tenantId, productId: id }, 'Parsing request body');
   let body: Record<string, unknown>;
 
   try {
@@ -166,6 +162,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId, productId: id }, 'Validating update fields');
   // Strip the immutable level field if provided
   const { level: _level, ...updateFields } = body;
 
@@ -179,10 +176,10 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   }
 
   logger.info({ tenantId, productId: id }, 'Updating product');
-  const product = await updateProduct(id, tenantId, updateFields);
+  const updated = await updateProduct(id, tenantId, updateFields);
 
   logger.info({ tenantId, productId: id }, 'Product updated');
-  return NextResponse.json({ product });
+  return NextResponse.json(updated);
 });
 
 /**
@@ -201,12 +198,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *           type: string
  *         description: The database ID of the product
  *     responses:
- *       200:
+ *       204:
  *         description: Product deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -233,5 +226,5 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   await deleteProduct(id, tenantId);
 
   logger.info({ tenantId, productId: id }, 'Product deleted');
-  return NextResponse.json({});
+  return new Response(null, { status: 204 });
 });

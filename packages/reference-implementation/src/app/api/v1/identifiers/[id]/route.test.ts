@@ -1,3 +1,28 @@
+// Mock @uncefact/untp-ri-services to avoid ESM import issues in test environment
+jest.mock('@uncefact/untp-ri-services', () => ({
+  ServiceError: class ServiceError extends Error {
+    statusCode: number;
+    code?: string;
+    constructor(message: string, statusCode = 500, code?: string) {
+      super(message);
+      this.statusCode = statusCode;
+      this.code = code;
+    }
+  },
+}));
+
+jest.mock('@uncefact/untp-ri-services/logging', () => ({
+  createLogger: () => ({
+    child: () => ({
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+      child: jest.fn().mockReturnValue({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }),
+    }),
+  }),
+}));
+
 // Mock next/server before importing route handlers
 jest.mock('next/server', () => ({
   NextResponse: {
@@ -72,8 +97,7 @@ describe('GET /api/v1/identifiers/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.identifier).toEqual(identifier);
+    expect(json).toEqual(identifier);
   });
 
   it('returns 404 when identifier not found', async () => {
@@ -113,8 +137,7 @@ describe('PATCH /api/v1/identifiers/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.identifier.value).toBe('09520123456799');
+    expect(json.value).toBe('09520123456799');
   });
 
   it('returns 400 when no value provided', async () => {
@@ -183,15 +206,14 @@ describe('DELETE /api/v1/identifiers/:id', () => {
     jest.clearAllMocks();
   });
 
-  it('deletes the identifier', async () => {
+  it('deletes the identifier and returns 204', async () => {
     mockDeleteIdentifier.mockResolvedValue({ id: 'id-1' });
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('id-1') as unknown as Parameters<typeof DELETE>[1]);
-    const json = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
+    expect(res.status).toBe(204);
+    expect(res.body).toBeNull();
   });
 
   it('returns 404 when identifier not found or access denied', async () => {

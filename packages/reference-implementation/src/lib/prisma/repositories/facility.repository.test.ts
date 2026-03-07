@@ -5,6 +5,7 @@ import {
   updateFacility,
   deleteFacility,
 } from './facility.repository';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
 const mockTx = {
@@ -34,6 +35,7 @@ jest.mock('../prisma', () => ({
     facility: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
       delete: jest.fn(),
     },
   },
@@ -45,6 +47,7 @@ import { prisma } from '../prisma';
 const mockFacility = prisma.facility as unknown as {
   findFirst: jest.Mock;
   findMany: jest.Mock;
+  count: jest.Mock;
 };
 
 describe('facility.repository', () => {
@@ -215,27 +218,48 @@ describe('facility.repository', () => {
   });
 
   describe('listFacilities', () => {
-    it('lists facilities with default pagination', async () => {
-      mockFacility.findMany.mockResolvedValue([FACILITY_RECORD]);
+    const LIST_ROW = {
+      id: 'facility-1',
+      tenantId: TENANT_ID,
+      name: 'Main Warehouse',
+      description: 'Central distribution warehouse',
+      location: { address: { streetAddress: '123 High Street' } },
+      operatingOrganisationId: ORG_ID,
+      primaryIdentifierId: PRIMARY_ID,
+      createdAt: new Date('2024-01-01'),
+      updatedAt: new Date('2024-01-01'),
+      secondaryIdentifiers: [{ identifierId: SECONDARY_ID_A }],
+    };
+
+    it('lists facilities with default pagination and flattens secondary identifiers', async () => {
+      mockFacility.findMany.mockResolvedValue([LIST_ROW]);
+      mockFacility.count.mockResolvedValue(1);
 
       const result = await listFacilities(TENANT_ID);
 
       expect(mockFacility.findMany).toHaveBeenCalledWith({
         where: { tenantId: TENANT_ID },
         include: {
-          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
-          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
-          operatingOrganisation: true,
+          secondaryIdentifiers: { select: { identifierId: true } },
         },
-        take: 100,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
-      expect(result).toEqual([FACILITY_RECORD]);
+      expect(mockFacility.count).toHaveBeenCalledWith({ where: { tenantId: TENANT_ID } });
+      expect(result.data).toEqual([
+        expect.objectContaining({
+          id: 'facility-1',
+          secondaryIdentifierIds: [SECONDARY_ID_A],
+        }),
+      ]);
+      expect(result.data[0]).not.toHaveProperty('secondaryIdentifiers');
+      expect(result.total).toBe(1);
     });
 
     it('applies custom pagination', async () => {
       mockFacility.findMany.mockResolvedValue([]);
+      mockFacility.count.mockResolvedValue(0);
 
       await listFacilities(TENANT_ID, { limit: 10, offset: 20 });
 
@@ -249,6 +273,7 @@ describe('facility.repository', () => {
 
     it('searches by name', async () => {
       mockFacility.findMany.mockResolvedValue([]);
+      mockFacility.count.mockResolvedValue(0);
 
       await listFacilities(TENANT_ID, { search: 'warehouse' });
 
@@ -274,6 +299,7 @@ describe('facility.repository', () => {
 
     it('filters by organisationId', async () => {
       mockFacility.findMany.mockResolvedValue([]);
+      mockFacility.count.mockResolvedValue(0);
 
       await listFacilities(TENANT_ID, { organisationId: ORG_ID });
 
@@ -287,11 +313,12 @@ describe('facility.repository', () => {
       );
     });
 
-    it('returns empty array when no facilities match', async () => {
+    it('returns empty data array when no facilities match', async () => {
       mockFacility.findMany.mockResolvedValue([]);
+      mockFacility.count.mockResolvedValue(0);
 
       const result = await listFacilities(TENANT_ID, { search: 'nonexistent' });
-      expect(result).toEqual([]);
+      expect(result).toEqual({ data: [], total: 0 });
     });
   });
 

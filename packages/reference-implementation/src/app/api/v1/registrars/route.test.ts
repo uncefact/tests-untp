@@ -77,8 +77,7 @@ describe('POST /api/v1/registrars', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(json.ok).toBe(true);
-    expect(json.registrar).toEqual(registrar);
+    expect(json).toEqual(registrar);
   });
 
   it('creates a registrar with optional fields', async () => {
@@ -98,7 +97,7 @@ describe('POST /api/v1/registrars', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(json.registrar.url).toBe('https://gs1.org');
+    expect(json.url).toBe('https://gs1.org');
     expect(mockCreateRegistrar).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: 'org-1',
@@ -156,19 +155,20 @@ describe('GET /api/v1/registrars', () => {
 
   it('lists registrars for the tenant', async () => {
     const registrars = [{ id: 'reg-1', name: 'GS1', namespace: 'gs1' }];
-    mockListRegistrars.mockResolvedValue(registrars);
+    mockListRegistrars.mockResolvedValue({ data: registrars, total: 1 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/registrars' });
     const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.registrars).toEqual(registrars);
+    expect(json.data).toEqual(registrars);
+    expect(json.pagination).toBeDefined();
+    expect(json.pagination.total).toBe(1);
   });
 
   it('passes pagination parameters to listRegistrars', async () => {
-    mockListRegistrars.mockResolvedValue([]);
+    mockListRegistrars.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
@@ -183,7 +183,7 @@ describe('GET /api/v1/registrars', () => {
   });
 
   it('handles no query parameters', async () => {
-    mockListRegistrars.mockResolvedValue([]);
+    mockListRegistrars.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/registrars' });
     await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);

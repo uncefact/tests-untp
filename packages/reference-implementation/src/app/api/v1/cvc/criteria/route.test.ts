@@ -30,6 +30,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
   listCriteria: (...args: unknown[]) => mockListCriteria(...args),
 }));
 
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { GET } from './route';
 
 function createFakeRequest(options: { method?: string; url?: string }): Request {
@@ -58,7 +59,7 @@ describe('GET /api/v1/cvc/criteria', () => {
 
     expect(res.status).toBe(200);
     expect(json.data).toEqual(criteria);
-    expect(json.pagination).toEqual({ total: 1, limit: 20, offset: 0, hasMore: false });
+    expect(json.pagination).toEqual({ total: 1, limit: DEFAULT_PAGE_LIMIT, offset: 0, hasMore: false });
     expect(mockListCriteria).toHaveBeenCalledWith('org-1', {
       profileId: undefined,
       limit: undefined,

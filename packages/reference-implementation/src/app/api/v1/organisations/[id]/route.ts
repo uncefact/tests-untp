@@ -35,10 +35,7 @@ const UPDATABLE_FIELDS = ['name', 'description', 'location', 'primaryIdentifierI
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 organisation:
- *                   $ref: '#/components/schemas/Organisation'
+ *               $ref: '#/components/schemas/Organisation'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -65,7 +62,8 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   if (!organisation) {
     throw new NotFoundError('Organisation not found');
   }
-  return NextResponse.json({ organisation });
+  logger.info({ tenantId, organisationId: id }, 'Organisation retrieved');
+  return NextResponse.json(organisation);
 });
 
 /**
@@ -114,10 +112,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 organisation:
- *                   $ref: '#/components/schemas/Organisation'
+ *               $ref: '#/components/schemas/Organisation'
  *       400:
  *         description: Validation error
  *         content:
@@ -146,6 +141,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
+  logger.info({ tenantId, organisationId: id }, 'Parsing request body');
   let body: Record<string, unknown>;
 
   try {
@@ -154,6 +150,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId, organisationId: id }, 'Validating update fields');
   const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
   if (!hasUpdatableField) {
     throw new ValidationError(`At least one updatable field must be provided: ${UPDATABLE_FIELDS.join(', ')}`);
@@ -164,10 +161,10 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   }
 
   logger.info({ tenantId, organisationId: id }, 'Updating organisation');
-  const organisation = await updateOrganisation(id, tenantId, body as UpdateOrganisationInput);
+  const updated = await updateOrganisation(id, tenantId, body as UpdateOrganisationInput);
 
   logger.info({ tenantId, organisationId: id }, 'Organisation updated');
-  return NextResponse.json({ organisation });
+  return NextResponse.json(updated);
 });
 
 /**
@@ -186,12 +183,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *           type: string
  *         description: The database ID of the organisation
  *     responses:
- *       200:
+ *       204:
  *         description: Organisation deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -218,5 +211,5 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   await deleteOrganisation(id, tenantId);
 
   logger.info({ tenantId, organisationId: id }, 'Organisation deleted');
-  return NextResponse.json({});
+  return new Response(null, { status: 204 });
 });

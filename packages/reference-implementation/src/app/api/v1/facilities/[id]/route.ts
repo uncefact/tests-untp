@@ -38,10 +38,7 @@ const UPDATABLE_FIELDS = [
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 facility:
- *                   $ref: '#/components/schemas/Facility'
+ *               $ref: '#/components/schemas/Facility'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -68,7 +65,8 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   if (!facility) {
     throw new NotFoundError('Facility not found');
   }
-  return NextResponse.json({ facility });
+  logger.info({ tenantId, facilityId: id }, 'Facility retrieved');
+  return NextResponse.json(facility);
 });
 
 /**
@@ -122,10 +120,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 facility:
- *                   $ref: '#/components/schemas/Facility'
+ *               $ref: '#/components/schemas/Facility'
  *       400:
  *         description: Validation error
  *         content:
@@ -154,6 +149,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
+  logger.info({ tenantId, facilityId: id }, 'Parsing request body');
   let body: Record<string, unknown>;
 
   try {
@@ -162,6 +158,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
+  logger.info({ tenantId, facilityId: id }, 'Validating update fields');
   // Ensure at least one updatable field is present
   const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
   if (!hasUpdatableField) {
@@ -174,10 +171,10 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   }
 
   logger.info({ tenantId, facilityId: id }, 'Updating facility');
-  const facility = await updateFacility(id, tenantId, body);
+  const updated = await updateFacility(id, tenantId, body);
 
   logger.info({ tenantId, facilityId: id }, 'Facility updated');
-  return NextResponse.json({ facility });
+  return NextResponse.json(updated);
 });
 
 /**
@@ -196,12 +193,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *           type: string
  *         description: The database ID of the facility
  *     responses:
- *       200:
+ *       204:
  *         description: Facility deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -228,5 +221,5 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   await deleteFacility(id, tenantId);
 
   logger.info({ tenantId, facilityId: id }, 'Facility deleted');
-  return NextResponse.json({});
+  return new Response(null, { status: 204 });
 });

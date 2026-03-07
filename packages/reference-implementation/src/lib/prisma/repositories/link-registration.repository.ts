@@ -1,6 +1,7 @@
 import { LinkRegistration } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 export type CreateLinkRegistrationInput = {
   tenantId: string;
@@ -42,13 +43,25 @@ export async function getLinkRegistrationByIdrLinkId(
 }
 
 /**
- * Lists all link registrations for an identifier.
+ * Lists link registrations for an identifier with pagination support.
  */
-export async function listLinkRegistrations(identifierId: string, tenantId: string): Promise<LinkRegistration[]> {
-  return prisma.linkRegistration.findMany({
-    where: { identifierId, tenantId },
-    orderBy: { publishedAt: 'desc' },
-  });
+export async function listLinkRegistrations(
+  identifierId: string,
+  tenantId: string,
+  limit?: number,
+  offset?: number,
+): Promise<{ data: LinkRegistration[]; total: number }> {
+  const where = { identifierId, tenantId };
+  const [data, total] = await Promise.all([
+    prisma.linkRegistration.findMany({
+      where,
+      orderBy: { publishedAt: 'desc' },
+      take: limit ?? DEFAULT_PAGE_LIMIT,
+      skip: offset,
+    }),
+    prisma.linkRegistration.count({ where }),
+  ]);
+  return { data, total };
 }
 
 /**

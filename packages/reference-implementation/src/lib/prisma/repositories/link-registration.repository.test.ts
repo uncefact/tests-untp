@@ -14,6 +14,7 @@ jest.mock('../prisma', () => ({
       createMany: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
     },
     $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   },
@@ -29,12 +30,14 @@ import {
   deleteLinkRegistration,
 } from './link-registration.repository';
 import { NotFoundError } from '@/lib/api/errors';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 const mockLinkRegistration = prisma.linkRegistration as unknown as {
   create: jest.Mock;
   createMany: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
+  count: jest.Mock;
 };
 
 const SAMPLE_INPUT = {
@@ -112,14 +115,20 @@ describe('link-registration.repository', () => {
   describe('listLinkRegistrations', () => {
     it('lists link registrations for an identifier', async () => {
       mockLinkRegistration.findMany.mockResolvedValue([SAMPLE_RECORD]);
+      mockLinkRegistration.count.mockResolvedValue(1);
 
       const result = await listLinkRegistrations('ident-1', 'tenant-1');
 
       expect(mockLinkRegistration.findMany).toHaveBeenCalledWith({
         where: { identifierId: 'ident-1', tenantId: 'tenant-1' },
         orderBy: { publishedAt: 'desc' },
+        take: DEFAULT_PAGE_LIMIT,
+        skip: undefined,
       });
-      expect(result).toEqual([SAMPLE_RECORD]);
+      expect(mockLinkRegistration.count).toHaveBeenCalledWith({
+        where: { identifierId: 'ident-1', tenantId: 'tenant-1' },
+      });
+      expect(result).toEqual({ data: [SAMPLE_RECORD], total: 1 });
     });
   });
 

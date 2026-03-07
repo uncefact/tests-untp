@@ -2,6 +2,7 @@ import { Registrar, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
  * Input for creating a new registrar
@@ -12,7 +13,6 @@ export type CreateRegistrarInput = {
   namespace: string;
   url?: string;
   idrServiceInstanceId?: string;
-  isDefault?: boolean;
 };
 
 /**
@@ -44,7 +44,6 @@ export async function createRegistrar(input: CreateRegistrarInput): Promise<Regi
       namespace: input.namespace,
       url: input.url,
       idrServiceInstanceId: input.idrServiceInstanceId,
-      isDefault: input.isDefault ?? false,
     },
   });
 }
@@ -73,26 +72,27 @@ export async function getRegistrarById(id: string, tenantId: string): Promise<Re
 /**
  * Lists registrars for an organisation, including system defaults.
  */
-export async function listRegistrars(tenantId: string, options: ListRegistrarsOptions = {}): Promise<Registrar[]> {
+export async function listRegistrars(
+  tenantId: string,
+  options: ListRegistrarsOptions = {},
+): Promise<{ data: Registrar[]; total: number }> {
   const { limit, offset } = options;
 
   const where: Prisma.RegistrarWhereInput = {
     OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
   };
 
-  return prisma.registrar.findMany({
-    where,
-    include: {
-      schemes: {
-        include: {
-          qualifiers: true,
-        },
-      },
-    },
-    take: limit ?? 100,
-    skip: offset,
-    orderBy: { createdAt: 'desc' },
-  });
+  const [data, total] = await Promise.all([
+    prisma.registrar.findMany({
+      where,
+      take: limit ?? DEFAULT_PAGE_LIMIT,
+      skip: offset,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.registrar.count({ where }),
+  ]);
+
+  return { data, total };
 }
 
 /**

@@ -40,6 +40,7 @@ jest.mock('@/lib/services/resolve-storage-service', () => ({
   resolveStorageService: (...args: unknown[]) => mockResolveStorageService(...args),
 }));
 
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { GET, POST } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -103,7 +104,7 @@ describe('GET /api/v1/render-templates', () => {
     expect(json.data).toEqual(renderTemplates);
     expect(json.pagination).toEqual({
       total: 2,
-      limit: 20,
+      limit: DEFAULT_PAGE_LIMIT,
       offset: 0,
       hasMore: false,
     });

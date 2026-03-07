@@ -18,7 +18,7 @@ describe('Identifier API', { testIsolation: false }, () => {
         url: `https://ident-reg-${RUN_ID}.example.com`,
       },
     }).then((regResponse) => {
-      registrarId = regResponse.body.registrar.id;
+      registrarId = regResponse.body.id;
 
       cy.request({
         method: 'POST',
@@ -31,7 +31,7 @@ describe('Identifier API', { testIsolation: false }, () => {
           linkTemplate: '/{primaryKey}/{value}',
         },
       }).then((schemeResponse) => {
-        schemeId = schemeResponse.body.scheme.id;
+        schemeId = schemeResponse.body.id;
       });
     });
   });
@@ -51,22 +51,20 @@ describe('Identifier API', { testIsolation: false }, () => {
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.identifier).to.exist;
-        expect(response.body.identifier.value).to.eq('51824753556');
-        expect(response.body.identifier.schemeId).to.eq(schemeId);
+        expect(response.body.value).to.eq('51824753556');
+        expect(response.body.schemeId).to.eq(schemeId);
 
-        createdIdentifierId = response.body.identifier.id;
+        createdIdentifierId = response.body.id;
       });
     });
 
     it('GET /api/v1/identifiers — lists identifiers', () => {
       cy.request('/api/v1/identifiers').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.identifiers).to.be.an('array');
+        expect(response.body.data).to.be.an('array');
+        expect(response.body.pagination).to.exist;
 
-        const created = response.body.identifiers.find(
+        const created = response.body.data.find(
           (i: any) => i.id === createdIdentifierId,
         );
         expect(created).to.exist;
@@ -76,7 +74,8 @@ describe('Identifier API', { testIsolation: false }, () => {
     it('GET /api/v1/identifiers — filters by schemeId', () => {
       cy.request(`/api/v1/identifiers?schemeId=${schemeId}`).then((response) => {
         expect(response.status).to.eq(200);
-        response.body.identifiers.forEach((i: any) => {
+        expect(response.body.pagination).to.exist;
+        response.body.data.forEach((i: any) => {
           expect(i.schemeId).to.eq(schemeId);
         });
       });
@@ -85,9 +84,8 @@ describe('Identifier API', { testIsolation: false }, () => {
     it('GET /api/v1/identifiers/:id — retrieves a specific identifier', () => {
       cy.request(`/api/v1/identifiers/${createdIdentifierId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.identifier.id).to.eq(createdIdentifierId);
-        expect(response.body.identifier.value).to.eq('51824753556');
+        expect(response.body.id).to.eq(createdIdentifierId);
+        expect(response.body.value).to.eq('51824753556');
       });
     });
 
@@ -98,15 +96,14 @@ describe('Identifier API', { testIsolation: false }, () => {
         body: { value: '12345678901' },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.identifier.value).to.eq('12345678901');
+        expect(response.body.value).to.eq('12345678901');
       });
     });
 
     it('GET /api/v1/identifiers/:id — confirms update persisted', () => {
       cy.request(`/api/v1/identifiers/${createdIdentifierId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.identifier.value).to.eq('12345678901');
+        expect(response.body.value).to.eq('12345678901');
       });
     });
 
@@ -115,8 +112,7 @@ describe('Identifier API', { testIsolation: false }, () => {
         method: 'DELETE',
         url: `/api/v1/identifiers/${createdIdentifierId}`,
       }).then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
+        expect(response.status).to.eq(204);
       });
     });
 
@@ -172,7 +168,7 @@ describe('Identifier API', { testIsolation: false }, () => {
         url: '/api/v1/identifiers',
         body: { schemeId, value: '99988877766' },
       }).then((createResponse) => {
-        const tempId = createResponse.body.identifier.id;
+        const tempId = createResponse.body.id;
 
         cy.request({
           method: 'PATCH',
@@ -222,7 +218,8 @@ describe('Identifier API', { testIsolation: false }, () => {
     it('supports limit and offset parameters', () => {
       cy.request('/api/v1/identifiers?limit=1&offset=0').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.identifiers.length).to.be.at.most(1);
+        expect(response.body.data.length).to.be.at.most(1);
+        expect(response.body.pagination).to.exist;
       });
     });
   });

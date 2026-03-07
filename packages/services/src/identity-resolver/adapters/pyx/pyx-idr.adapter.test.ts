@@ -200,7 +200,8 @@ describe('PyxIdentityResolverAdapter', () => {
         linkType: 'untp:dpp',
         targetUrl: 'https://storage.example.com/dpp-123.json',
         mimeType: 'application/json',
-        linkTitle: 'Digital Product Passport',
+        title: 'Digital Product Passport',
+        active: true,
         ianaLanguage: 'en',
         context: 'au',
         defaultLinkType: true, // 'untp:dpp' === config.defaultLinkType
@@ -354,7 +355,7 @@ describe('PyxIdentityResolverAdapter', () => {
           targetUrl: 'https://example.com/dpp.json',
           linkType: 'untp:dpp',
           mimeType: 'application/json',
-          linkTitle: 'My DPP',
+          title: 'My DPP',
           ianaLanguage: 'en',
         }),
       });
@@ -390,7 +391,7 @@ describe('PyxIdentityResolverAdapter', () => {
       );
     });
 
-    it('should handle missing linkTitle gracefully', async () => {
+    it('should handle missing title gracefully', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: jest.fn().mockResolvedValue({
@@ -468,7 +469,7 @@ describe('PyxIdentityResolverAdapter', () => {
           targetUrl: 'https://example.com/updated.json',
           linkType: 'untp:dpp',
           mimeType: 'application/ld+json',
-          linkTitle: 'Updated Title',
+          title: 'Updated Title',
           ianaLanguage: 'en',
         }),
       });
@@ -496,7 +497,7 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(body).toEqual({
         targetUrl: 'https://example.com/updated.json',
         mimeType: 'application/ld+json',
-        linkTitle: 'Updated Title',
+        title: 'Updated Title',
       });
     });
 
@@ -507,7 +508,7 @@ describe('PyxIdentityResolverAdapter', () => {
           targetUrl: 'https://example.com/resource.json',
           linkType: 'untp:dpp',
           mimeType: 'application/json',
-          linkTitle: 'New Title',
+          title: 'New Title',
         }),
       });
 
@@ -516,7 +517,7 @@ describe('PyxIdentityResolverAdapter', () => {
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
-      expect(body).toEqual({ linkTitle: 'New Title' });
+      expect(body).toEqual({ title: 'New Title' });
       expect(body.targetUrl).toBeUndefined();
       expect(body.linkType).toBeUndefined();
     });

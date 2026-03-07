@@ -126,6 +126,19 @@ describe('buildPublishLinks', () => {
     });
   });
 
+  it('uses custom linkType when provided', () => {
+    const options: BuildPublishLinksOptions = {
+      linkType: 'gs1:certificationInfo',
+      humanVerificationUrl: 'https://app.example.com',
+    };
+
+    const links = buildPublishLinks(storage, linkTitle, options);
+
+    expect(links).toHaveLength(2);
+    expect(links[0].rel).toBe('gs1:certificationInfo');
+    expect(links[1].rel).toBe('gs1:certificationInfo');
+  });
+
   it('returns only 1 link when options object is provided but both URLs are undefined', () => {
     const options: BuildPublishLinksOptions = {};
 

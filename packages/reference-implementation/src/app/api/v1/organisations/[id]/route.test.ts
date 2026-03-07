@@ -71,7 +71,7 @@ describe('GET /api/v1/organisations/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.organisation).toEqual(organisation);
+    expect(json).toEqual(organisation);
   });
 
   it('returns 404 when organisation not found', async () => {
@@ -111,7 +111,7 @@ describe('PATCH /api/v1/organisations/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.organisation).toEqual(updated);
+    expect(json).toEqual(updated);
   });
 
   it('returns 400 when no updatable fields are provided', async () => {
@@ -176,15 +176,14 @@ describe('DELETE /api/v1/organisations/:id', () => {
     jest.clearAllMocks();
   });
 
-  it('deletes the organisation and returns empty body', async () => {
+  it('deletes the organisation and returns 204 with no body', async () => {
     mockDeleteOrganisation.mockResolvedValue({ id: 'org-a' });
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('org-a') as unknown as Parameters<typeof DELETE>[1]);
-    const json = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(json).toEqual({});
+    expect(res.status).toBe(204);
+    expect(res.body).toBeNull();
   });
 
   it('returns 404 when organisation not found', async () => {

@@ -20,7 +20,7 @@ describe('Organisation API', { testIsolation: false }, () => {
         url: `https://org-reg-${RUN_ID}.example.com`,
       },
     }).then((regResponse) => {
-      registrarId = regResponse.body.registrar.id;
+      registrarId = regResponse.body.id;
 
       cy.request({
         method: 'POST',
@@ -33,7 +33,7 @@ describe('Organisation API', { testIsolation: false }, () => {
           linkTemplate: '/{primaryKey}/{value}',
         },
       }).then((schemeResponse) => {
-        schemeId = schemeResponse.body.scheme.id;
+        schemeId = schemeResponse.body.id;
 
         // Create primary identifier
         cy.request({
@@ -44,7 +44,7 @@ describe('Organisation API', { testIsolation: false }, () => {
             value: '11111111111',
           },
         }).then((identResponse) => {
-          identifierId = identResponse.body.identifier.id;
+          identifierId = identResponse.body.id;
         });
 
         // Create secondary identifier
@@ -56,7 +56,7 @@ describe('Organisation API', { testIsolation: false }, () => {
             value: '22222222222',
           },
         }).then((secIdentResponse) => {
-          secondaryIdentifierId = secIdentResponse.body.identifier.id;
+          secondaryIdentifierId = secIdentResponse.body.id;
         });
       });
     });
@@ -78,22 +78,23 @@ describe('Organisation API', { testIsolation: false }, () => {
         ],
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.organisations).to.be.an('array');
-        expect(response.body.organisations).to.have.length(1);
-        expect(response.body.organisations[0].name).to.eq(
+        expect(response.body).to.be.an('array');
+        expect(response.body).to.have.length(1);
+        expect(response.body[0].name).to.eq(
           `Test Organisation ${RUN_ID}`,
         );
 
-        createdOrgId = response.body.organisations[0].id;
+        createdOrgId = response.body[0].id;
       });
     });
 
     it('GET /api/v1/organisations — lists organisations', () => {
       cy.request('/api/v1/organisations').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.organisations).to.be.an('array');
+        expect(response.body.data).to.be.an('array');
+        expect(response.body.pagination).to.exist;
 
-        const created = response.body.organisations.find(
+        const created = response.body.data.find(
           (o: any) => o.id === createdOrgId,
         );
         expect(created).to.exist;
@@ -105,10 +106,10 @@ describe('Organisation API', { testIsolation: false }, () => {
         `/api/v1/organisations?search=Test Organisation ${RUN_ID}`,
       ).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.organisations).to.be.an('array');
-        expect(response.body.organisations.length).to.be.greaterThan(0);
+        expect(response.body.data).to.be.an('array');
+        expect(response.body.data.length).to.be.greaterThan(0);
 
-        response.body.organisations.forEach((o: any) => {
+        response.body.data.forEach((o: any) => {
           expect(o.name).to.include(`${RUN_ID}`);
         });
       });
@@ -117,9 +118,8 @@ describe('Organisation API', { testIsolation: false }, () => {
     it('GET /api/v1/organisations/:id — retrieves specific organisation', () => {
       cy.request(`/api/v1/organisations/${createdOrgId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.organisation).to.exist;
-        expect(response.body.organisation.id).to.eq(createdOrgId);
-        expect(response.body.organisation.name).to.eq(
+        expect(response.body.id).to.eq(createdOrgId);
+        expect(response.body.name).to.eq(
           `Test Organisation ${RUN_ID}`,
         );
       });
@@ -132,7 +132,7 @@ describe('Organisation API', { testIsolation: false }, () => {
         body: { name: `Updated Organisation ${RUN_ID}` },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.organisation.name).to.eq(
+        expect(response.body.name).to.eq(
           `Updated Organisation ${RUN_ID}`,
         );
       });
@@ -141,7 +141,7 @@ describe('Organisation API', { testIsolation: false }, () => {
     it('GET /api/v1/organisations/:id — confirms update persisted', () => {
       cy.request(`/api/v1/organisations/${createdOrgId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.organisation.name).to.eq(
+        expect(response.body.name).to.eq(
           `Updated Organisation ${RUN_ID}`,
         );
       });
@@ -154,7 +154,7 @@ describe('Organisation API', { testIsolation: false }, () => {
         body: { primaryIdentifierId: identifierId },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.organisation.primaryIdentifierId).to.eq(
+        expect(response.body.primaryIdentifierId).to.eq(
           identifierId,
         );
       });
@@ -167,7 +167,6 @@ describe('Organisation API', { testIsolation: false }, () => {
         body: { secondaryIdentifierIds: [secondaryIdentifierId] },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.organisation).to.exist;
       });
     });
 
@@ -175,7 +174,7 @@ describe('Organisation API', { testIsolation: false }, () => {
       cy.request(`/api/v1/organisations/${createdOrgId}`).then((response) => {
         expect(response.status).to.eq(200);
 
-        const org = response.body.organisation;
+        const org = response.body;
         expect(org.primaryIdentifier).to.exist;
         expect(org.primaryIdentifier.id).to.eq(identifierId);
         expect(org.secondaryIdentifiers).to.be.an('array');
@@ -191,7 +190,7 @@ describe('Organisation API', { testIsolation: false }, () => {
         body: { secondaryIdentifierIds: [] },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.organisation).to.exist;
+        expect(response.body).to.exist;
       });
     });
 
@@ -200,8 +199,7 @@ describe('Organisation API', { testIsolation: false }, () => {
         method: 'DELETE',
         url: `/api/v1/organisations/${createdOrgId}`,
       }).then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body).to.deep.eq({});
+        expect(response.status).to.eq(204);
       });
     });
 
@@ -285,7 +283,7 @@ describe('Organisation API', { testIsolation: false }, () => {
     it('supports limit and offset parameters', () => {
       cy.request('/api/v1/organisations?limit=1&offset=0').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.organisations.length).to.be.at.most(1);
+        expect(response.body.data.length).to.be.at.most(1);
       });
     });
   });

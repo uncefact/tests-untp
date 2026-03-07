@@ -1,4 +1,5 @@
 import { createProducts, getProductById, listProducts, updateProduct, deleteProduct } from './product.repository';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
 const mockTx = {
@@ -31,6 +32,7 @@ jest.mock('../prisma', () => ({
     product: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
     },
@@ -57,6 +59,7 @@ import { prisma } from '../prisma';
 const mockProduct = prisma.product as unknown as {
   findFirst: jest.Mock;
   findMany: jest.Mock;
+  count: jest.Mock;
 };
 
 describe('product.repository', () => {
@@ -299,29 +302,51 @@ describe('product.repository', () => {
   });
 
   describe('listProducts', () => {
-    it('lists products with default pagination', async () => {
-      mockProduct.findMany.mockResolvedValue([PRODUCT_WITH_RELATIONS]);
+    const LIST_ROW = {
+      id: PRODUCT_ID,
+      tenantId: TENANT_ID,
+      name: 'Test Product',
+      description: 'A test product',
+      level: 'MODEL',
+      parentId: null,
+      producedByOrganisationId: null,
+      manufacturingFacilityId: null,
+      primaryIdentifierId: null,
+      createdAt: new Date('2024-01-01'),
+      updatedAt: new Date('2024-01-01'),
+      secondaryIdentifiers: [{ identifierId: 'sec-1' }, { identifierId: 'sec-2' }],
+    };
+
+    it('lists products with default pagination and flattens secondaryIdentifierIds', async () => {
+      mockProduct.findMany.mockResolvedValue([LIST_ROW]);
+      mockProduct.count.mockResolvedValue(1);
 
       const result = await listProducts(TENANT_ID);
 
       expect(mockProduct.findMany).toHaveBeenCalledWith({
         where: { tenantId: TENANT_ID },
         include: {
-          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
-          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
-          producedByOrganisation: true,
-          manufacturingFacility: true,
-          parent: { include: { primaryIdentifier: { include: { scheme: { include: { registrar: true } } } } } },
+          secondaryIdentifiers: { select: { identifierId: true } },
         },
-        take: 100,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
-      expect(result).toEqual([PRODUCT_WITH_RELATIONS]);
+      expect(mockProduct.count).toHaveBeenCalledWith({ where: { tenantId: TENANT_ID } });
+      expect(result.data).toEqual([
+        expect.objectContaining({
+          id: PRODUCT_ID,
+          secondaryIdentifierIds: ['sec-1', 'sec-2'],
+        }),
+      ]);
+      expect(result.total).toBe(1);
+      // Ensure raw secondaryIdentifiers is not present
+      expect(result.data[0]).not.toHaveProperty('secondaryIdentifiers');
     });
 
     it('applies custom pagination', async () => {
       mockProduct.findMany.mockResolvedValue([]);
+      mockProduct.count.mockResolvedValue(0);
 
       await listProducts(TENANT_ID, { limit: 10, offset: 20 });
 
@@ -335,6 +360,7 @@ describe('product.repository', () => {
 
     it('searches by name', async () => {
       mockProduct.findMany.mockResolvedValue([]);
+      mockProduct.count.mockResolvedValue(0);
 
       await listProducts(TENANT_ID, { search: 'Widget' });
 
@@ -359,6 +385,7 @@ describe('product.repository', () => {
 
     it('filters by level', async () => {
       mockProduct.findMany.mockResolvedValue([]);
+      mockProduct.count.mockResolvedValue(0);
 
       await listProducts(TENANT_ID, { level: 'MODEL' });
 
@@ -373,6 +400,7 @@ describe('product.repository', () => {
 
     it('filters by parentId', async () => {
       mockProduct.findMany.mockResolvedValue([]);
+      mockProduct.count.mockResolvedValue(0);
 
       await listProducts(TENANT_ID, { parentId: PARENT_ID });
 
@@ -387,6 +415,7 @@ describe('product.repository', () => {
 
     it('filters by organisationId (maps to producedByOrganisationId)', async () => {
       mockProduct.findMany.mockResolvedValue([]);
+      mockProduct.count.mockResolvedValue(0);
 
       await listProducts(TENANT_ID, { organisationId: ORG_ID });
 
@@ -401,6 +430,7 @@ describe('product.repository', () => {
 
     it('filters by facilityId (maps to manufacturingFacilityId)', async () => {
       mockProduct.findMany.mockResolvedValue([]);
+      mockProduct.count.mockResolvedValue(0);
 
       await listProducts(TENANT_ID, { facilityId: FACILITY_ID });
 
@@ -413,11 +443,12 @@ describe('product.repository', () => {
       );
     });
 
-    it('returns empty array for no matches', async () => {
+    it('returns empty data array for no matches', async () => {
       mockProduct.findMany.mockResolvedValue([]);
+      mockProduct.count.mockResolvedValue(0);
 
       const result = await listProducts(TENANT_ID, { search: 'nonexistent' });
-      expect(result).toEqual([]);
+      expect(result).toEqual({ data: [], total: 0 });
     });
   });
 

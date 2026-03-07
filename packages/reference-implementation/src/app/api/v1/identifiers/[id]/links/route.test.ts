@@ -7,6 +7,15 @@ jest.mock('next/server', () => ({
   },
 }));
 
+// Mock @uncefact/untp-ri-services — spread actual to preserve error classes
+// while avoiding ESM resolution issues with transitive deps like uuid
+jest.mock('@uncefact/untp-ri-services', () => {
+  const actual = jest.requireActual('@uncefact/untp-ri-services');
+  return {
+    ...actual,
+  };
+});
+
 jest.mock('@/lib/api/with-tenant-auth', () => {
   const { NotFoundError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
   const { ValidationError } = jest.requireActual('@/lib/api/validation');
@@ -134,8 +143,7 @@ describe('POST /api/v1/identifiers/[id]/links', () => {
     const body = await res.json();
 
     expect(res.status).toBe(201);
-    expect(body.ok).toBe(true);
-    expect(body.registration.resolverUri).toBe('https://resolver.example.com/01/09520123456788');
+    expect(body.resolverUri).toBe('https://resolver.example.com/01/09520123456788');
     expect(mockCreateManyLinkRegistrations).toHaveBeenCalledTimes(1);
   });
 
@@ -204,23 +212,27 @@ describe('GET /api/v1/identifiers/[id]/links', () => {
     jest.clearAllMocks();
   });
 
-  it('returns link registrations for an identifier', async () => {
+  it('returns link registrations with pagination', async () => {
     mockGetIdentifierById.mockResolvedValue(MOCK_IDENTIFIER);
-    mockListLinkRegistrations.mockResolvedValue([{ id: 'lr-1', idrLinkId: 'idr-link-1', linkType: 'untp:dpp' }]);
+    mockListLinkRegistrations.mockResolvedValue({
+      data: [{ id: 'lr-1', idrLinkId: 'idr-link-1', linkType: 'untp:dpp' }],
+      total: 1,
+    });
 
-    const req = { url: 'http://localhost/test' } as unknown as Request;
+    const req = { url: 'http://localhost/api/v1/identifiers/ident-1/links' } as unknown as Request;
     const res = await GET(req, createContext());
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.ok).toBe(true);
-    expect(body.linkRegistrations).toHaveLength(1);
+    expect(body.data).toHaveLength(1);
+    expect(body.pagination).toBeDefined();
+    expect(body.pagination.total).toBe(1);
   });
 
   it('returns 404 when identifier not found', async () => {
     mockGetIdentifierById.mockResolvedValue(null);
 
-    const req = { url: 'http://localhost/test' } as unknown as Request;
+    const req = { url: 'http://localhost/api/v1/identifiers/ident-1/links' } as unknown as Request;
     const res = await GET(req, createContext());
 
     expect(res.status).toBe(404);

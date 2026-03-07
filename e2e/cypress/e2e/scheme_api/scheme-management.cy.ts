@@ -17,7 +17,7 @@ describe('Scheme API', { testIsolation: false }, () => {
         url: `https://scheme-reg-${RUN_ID}.example.com`,
       },
     }).then((response) => {
-      registrarId = response.body.registrar.id;
+      registrarId = response.body.id;
     });
   });
 
@@ -39,14 +39,12 @@ describe('Scheme API', { testIsolation: false }, () => {
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.scheme).to.exist;
-        expect(response.body.scheme.name).to.eq(`E2E ABN Scheme ${RUN_ID}`);
-        expect(response.body.scheme.primaryKey).to.eq(`abn-${RUN_ID}`);
-        expect(response.body.scheme.validationPattern).to.eq('^\\d{11}$');
-        expect(response.body.scheme.registrarId).to.eq(registrarId);
+        expect(response.body.name).to.eq(`E2E ABN Scheme ${RUN_ID}`);
+        expect(response.body.primaryKey).to.eq(`abn-${RUN_ID}`);
+        expect(response.body.validationPattern).to.eq('^\\d{11}$');
+        expect(response.body.registrarId).to.eq(registrarId);
 
-        createdSchemeId = response.body.scheme.id;
+        createdSchemeId = response.body.id;
       });
     });
 
@@ -75,25 +73,25 @@ describe('Scheme API', { testIsolation: false }, () => {
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.scheme.qualifiers).to.be.an('array');
-        expect(response.body.scheme.qualifiers).to.have.length(2);
+        expect(response.body.qualifiers).to.be.an('array');
+        expect(response.body.qualifiers).to.have.length(2);
 
-        const keys = response.body.scheme.qualifiers.map((q: any) => q.key);
+        const keys = response.body.qualifiers.map((q: any) => q.key);
         expect(keys).to.include('lot');
         expect(keys).to.include('serial');
 
         // Clean up this scheme — we only need the first one for remaining tests
-        cy.request({ method: 'DELETE', url: `/api/v1/schemes/${response.body.scheme.id}` });
+        cy.request({ method: 'DELETE', url: `/api/v1/schemes/${response.body.id}` });
       });
     });
 
     it('GET /api/v1/schemes — lists schemes', () => {
       cy.request('/api/v1/schemes').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.schemes).to.be.an('array');
+        expect(response.body.data).to.be.an('array');
+        expect(response.body.pagination).to.exist;
 
-        const created = response.body.schemes.find(
+        const created = response.body.data.find(
           (s: any) => s.id === createdSchemeId,
         );
         expect(created).to.exist;
@@ -103,7 +101,8 @@ describe('Scheme API', { testIsolation: false }, () => {
     it('GET /api/v1/schemes — filters by registrarId', () => {
       cy.request(`/api/v1/schemes?registrarId=${registrarId}`).then((response) => {
         expect(response.status).to.eq(200);
-        response.body.schemes.forEach((s: any) => {
+        expect(response.body.pagination).to.exist;
+        response.body.data.forEach((s: any) => {
           expect(s.registrarId).to.eq(registrarId);
         });
       });
@@ -112,9 +111,8 @@ describe('Scheme API', { testIsolation: false }, () => {
     it('GET /api/v1/schemes/:id — retrieves a specific scheme', () => {
       cy.request(`/api/v1/schemes/${createdSchemeId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.scheme.id).to.eq(createdSchemeId);
-        expect(response.body.scheme.name).to.eq(`E2E ABN Scheme ${RUN_ID}`);
+        expect(response.body.id).to.eq(createdSchemeId);
+        expect(response.body.name).to.eq(`E2E ABN Scheme ${RUN_ID}`);
       });
     });
 
@@ -125,8 +123,7 @@ describe('Scheme API', { testIsolation: false }, () => {
         body: { name: `Updated ABN Scheme ${RUN_ID}` },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
-        expect(response.body.scheme.name).to.eq(`Updated ABN Scheme ${RUN_ID}`);
+        expect(response.body.name).to.eq(`Updated ABN Scheme ${RUN_ID}`);
       });
     });
 
@@ -145,8 +142,8 @@ describe('Scheme API', { testIsolation: false }, () => {
         },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.scheme.qualifiers).to.have.length(1);
-        expect(response.body.scheme.qualifiers[0].key).to.eq('cpv');
+        expect(response.body.qualifiers).to.have.length(1);
+        expect(response.body.qualifiers[0].key).to.eq('cpv');
       });
     });
 
@@ -171,8 +168,8 @@ describe('Scheme API', { testIsolation: false }, () => {
       }).then((response) => {
         expect(response.status).to.eq(200);
         // Previous 'cpv' qualifier should be gone — qualifiers are replaced, not appended
-        expect(response.body.scheme.qualifiers).to.have.length(2);
-        const keys = response.body.scheme.qualifiers.map((q: any) => q.key);
+        expect(response.body.qualifiers).to.have.length(2);
+        const keys = response.body.qualifiers.map((q: any) => q.key);
         expect(keys).to.include('lot');
         expect(keys).to.include('serial');
         expect(keys).to.not.include('cpv');
@@ -182,8 +179,8 @@ describe('Scheme API', { testIsolation: false }, () => {
     it('GET /api/v1/schemes/:id — confirms updates persisted', () => {
       cy.request(`/api/v1/schemes/${createdSchemeId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.scheme.name).to.eq(`Updated ABN Scheme ${RUN_ID}`);
-        expect(response.body.scheme.qualifiers).to.have.length(2);
+        expect(response.body.name).to.eq(`Updated ABN Scheme ${RUN_ID}`);
+        expect(response.body.qualifiers).to.have.length(2);
       });
     });
 
@@ -192,8 +189,7 @@ describe('Scheme API', { testIsolation: false }, () => {
         method: 'DELETE',
         url: `/api/v1/schemes/${createdSchemeId}`,
       }).then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body.ok).to.be.true;
+        expect(response.status).to.eq(204);
       });
     });
 
@@ -212,7 +208,8 @@ describe('Scheme API', { testIsolation: false }, () => {
     it('supports limit and offset parameters', () => {
       cy.request('/api/v1/schemes?limit=1&offset=0').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.schemes.length).to.be.at.most(1);
+        expect(response.body.data.length).to.be.at.most(1);
+        expect(response.body.pagination).to.exist;
       });
     });
   });
@@ -293,7 +290,7 @@ describe('Scheme API', { testIsolation: false }, () => {
           linkTemplate: '/{primaryKey}/{value}',
         },
       }).then((createResponse) => {
-        const tempId = createResponse.body.scheme.id;
+        const tempId = createResponse.body.id;
 
         cy.request({
           method: 'PATCH',

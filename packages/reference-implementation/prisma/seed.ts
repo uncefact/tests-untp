@@ -98,7 +98,6 @@ async function main() {
       name: 'GS1',
       namespace: 'gs1',
       url: 'https://www.gs1.org',
-      isDefault: true,
     },
   });
 
@@ -111,7 +110,6 @@ async function main() {
       name: 'Australian Business Register',
       namespace: 'abr',
       url: 'https://abr.business.gov.au',
-      isDefault: true,
     },
   });
 
@@ -124,7 +122,6 @@ async function main() {
       name: 'ASIC',
       namespace: 'asic',
       url: 'https://asic.gov.au',
-      isDefault: true,
     },
   });
 
@@ -141,7 +138,6 @@ async function main() {
       primaryKey: 'abn',
       validationPattern: '^\\d{11}$',
       linkTemplate: '/{primaryKey}/{value}',
-      isDefault: true,
     },
   });
 
@@ -156,7 +152,6 @@ async function main() {
       primaryKey: 'acn',
       validationPattern: '^\\d{9}$',
       linkTemplate: '/{primaryKey}/{value}',
-      isDefault: true,
     },
   });
 
@@ -171,7 +166,6 @@ async function main() {
       primaryKey: 'gln',
       validationPattern: '^\\d{13}$',
       linkTemplate: '/{primaryKey}/{value}',
-      isDefault: true,
     },
   });
 
@@ -186,7 +180,6 @@ async function main() {
       primaryKey: '01',
       validationPattern: '^\\d{14}$',
       linkTemplate: '/{primaryKey}/{value}',
-      isDefault: true,
     },
   });
 
@@ -268,6 +261,12 @@ async function main() {
         },
       });
       idrSeeded = true;
+
+      // Link registrars to the IDR service instance (must happen after the instance exists)
+      await prisma.registrar.updateMany({
+        where: { id: { in: ['system-registrar-gs1', 'system-registrar-abr', 'system-registrar-asic'] } },
+        data: { idrServiceInstanceId: 'system-idr-pyx' },
+      });
     } catch (error) {
       logger.warn(
         { error: error instanceof Error ? error.message : error },

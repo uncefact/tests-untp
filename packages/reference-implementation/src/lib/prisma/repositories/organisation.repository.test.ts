@@ -5,6 +5,7 @@ import {
   updateOrganisation,
   deleteOrganisation,
 } from './organisation.repository';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
 jest.mock('../prisma', () => ({
@@ -14,6 +15,7 @@ jest.mock('../prisma', () => ({
       findFirst: jest.fn(),
       findUniqueOrThrow: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
     },
@@ -34,6 +36,7 @@ import { prisma } from '../prisma';
 const mockOrganisationEntity = prisma.organisationEntity as unknown as {
   findFirst: jest.Mock;
   findMany: jest.Mock;
+  count: jest.Mock;
 };
 
 const mockTransaction = prisma.$transaction as unknown as jest.Mock;
@@ -48,9 +51,6 @@ describe('organisation.repository', () => {
     name: 'GTIN',
     primaryKey: 'gtin',
     validationPattern: '^\\d{13,14}$',
-    namespace: 'gs1',
-    idrServiceInstanceId: null,
-    isDefault: false,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
   };
@@ -309,26 +309,49 @@ describe('organisation.repository', () => {
   });
 
   describe('listOrganisations', () => {
-    it('lists organisations with default pagination', async () => {
-      mockOrganisationEntity.findMany.mockResolvedValue([ORG_RECORD]);
+    const LIST_ROW = {
+      id: 'org-1',
+      tenantId: TENANT_ID,
+      name: 'Acme Corp',
+      description: 'A test organisation',
+      location: { address: { streetAddress: '123 Main St' } },
+      primaryIdentifierId: 'ident-1',
+      createdAt: new Date('2024-01-01'),
+      updatedAt: new Date('2024-01-01'),
+      secondaryIdentifiers: [{ identifierId: 'ident-2' }],
+    };
+
+    it('lists organisations with default pagination and flattened secondaryIdentifierIds', async () => {
+      mockOrganisationEntity.findMany.mockResolvedValue([LIST_ROW]);
+      mockOrganisationEntity.count.mockResolvedValue(1);
 
       const result = await listOrganisations(TENANT_ID);
 
       expect(mockOrganisationEntity.findMany).toHaveBeenCalledWith({
         where: { tenantId: TENANT_ID },
         include: {
-          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
-          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
+          secondaryIdentifiers: { select: { identifierId: true } },
         },
-        take: 100,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
-      expect(result).toEqual([ORG_RECORD]);
+      expect(mockOrganisationEntity.count).toHaveBeenCalledWith({ where: { tenantId: TENANT_ID } });
+      expect(result.total).toBe(1);
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0]).toEqual(
+        expect.objectContaining({
+          id: 'org-1',
+          secondaryIdentifierIds: ['ident-2'],
+        }),
+      );
+      // Should not contain raw secondaryIdentifiers
+      expect(result.data[0]).not.toHaveProperty('secondaryIdentifiers');
     });
 
     it('applies custom pagination', async () => {
       mockOrganisationEntity.findMany.mockResolvedValue([]);
+      mockOrganisationEntity.count.mockResolvedValue(0);
 
       await listOrganisations(TENANT_ID, { limit: 10, offset: 20 });
 
@@ -341,7 +364,8 @@ describe('organisation.repository', () => {
     });
 
     it('searches by name', async () => {
-      mockOrganisationEntity.findMany.mockResolvedValue([ORG_RECORD]);
+      mockOrganisationEntity.findMany.mockResolvedValue([]);
+      mockOrganisationEntity.count.mockResolvedValue(0);
 
       await listOrganisations(TENANT_ID, { search: 'Acme' });
 
@@ -357,6 +381,7 @@ describe('organisation.repository', () => {
 
     it('searches by identifier value with OR clause', async () => {
       mockOrganisationEntity.findMany.mockResolvedValue([]);
+      mockOrganisationEntity.count.mockResolvedValue(0);
 
       await listOrganisations(TENANT_ID, { search: '12345' });
 
@@ -379,11 +404,12 @@ describe('organisation.repository', () => {
       );
     });
 
-    it('returns empty array when no matches', async () => {
+    it('returns empty data array when no matches', async () => {
       mockOrganisationEntity.findMany.mockResolvedValue([]);
+      mockOrganisationEntity.count.mockResolvedValue(0);
 
       const result = await listOrganisations(TENANT_ID, { search: 'nonexistent' });
-      expect(result).toEqual([]);
+      expect(result).toEqual({ data: [], total: 0 });
     });
   });
 

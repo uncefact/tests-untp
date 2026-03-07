@@ -202,7 +202,6 @@ model Registrar {
   namespace            String
   url                  String?
   idrServiceInstanceId String?
-  isDefault            Boolean  @default(false)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -225,9 +224,7 @@ model IdentifierScheme {
   primaryKey           String
   validationPattern    String
   linkTemplate         String   // ISO 18975 link template, e.g. "/{primaryKey}/{value}"
-  namespace            String?
   idrServiceInstanceId String?
-  isDefault            Boolean  @default(false)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

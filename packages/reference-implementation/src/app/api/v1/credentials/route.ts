@@ -83,6 +83,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     publishingOptions?: {
       publish?: boolean;
       serviceInstanceId?: string;
+      linkType?: string;
       linkTitle?: string;
       machineVerificationUrl?: string;
       humanVerificationUrl?: string;
@@ -196,6 +197,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
       const linkTitle = publishingOptions.linkTitle || dataModel.name;
       const links = buildPublishLinks(storageResponse, linkTitle, {
+        linkType: publishingOptions.linkType,
         machineVerificationUrl: publishingOptions.machineVerificationUrl,
         humanVerificationUrl: publishingOptions.humanVerificationUrl,
       });

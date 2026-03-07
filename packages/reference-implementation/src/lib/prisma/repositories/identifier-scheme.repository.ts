@@ -2,6 +2,7 @@ import { IdentifierScheme, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
  * Input for creating a new identifier scheme
@@ -13,9 +14,7 @@ export type CreateIdentifierSchemeInput = {
   primaryKey: string;
   validationPattern: string;
   linkTemplate: string;
-  namespace?: string;
   idrServiceInstanceId?: string;
-  isDefault?: boolean;
   qualifiers?: Array<{
     key: string;
     description: string;
@@ -32,7 +31,6 @@ export type UpdateIdentifierSchemeInput = {
   primaryKey?: string;
   validationPattern?: string;
   linkTemplate?: string;
-  namespace?: string;
   idrServiceInstanceId?: string | null;
   qualifiers?: Array<{
     key: string;
@@ -63,9 +61,7 @@ export async function createIdentifierScheme(input: CreateIdentifierSchemeInput)
       primaryKey: input.primaryKey,
       validationPattern: input.validationPattern,
       linkTemplate: input.linkTemplate,
-      namespace: input.namespace,
       idrServiceInstanceId: input.idrServiceInstanceId,
-      isDefault: input.isDefault ?? false,
       ...(input.qualifiers && {
         qualifiers: {
           create: input.qualifiers.map((q) => ({
@@ -109,7 +105,7 @@ export async function getIdentifierSchemeById(id: string, tenantId: string): Pro
 export async function listIdentifierSchemes(
   tenantId: string,
   options: ListIdentifierSchemesOptions = {},
-): Promise<IdentifierScheme[]> {
+): Promise<{ data: IdentifierScheme[]; total: number }> {
   const { registrarId, limit, offset } = options;
 
   const where: Prisma.IdentifierSchemeWhereInput = {
@@ -120,16 +116,20 @@ export async function listIdentifierSchemes(
     where.registrarId = registrarId;
   }
 
-  return prisma.identifierScheme.findMany({
-    where,
-    include: {
-      qualifiers: true,
-      registrar: true,
-    },
-    take: limit ?? 100,
-    skip: offset,
-    orderBy: { createdAt: 'desc' },
-  });
+  const [data, total] = await Promise.all([
+    prisma.identifierScheme.findMany({
+      where,
+      include: {
+        qualifiers: true,
+      },
+      take: limit ?? DEFAULT_PAGE_LIMIT,
+      skip: offset,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.identifierScheme.count({ where }),
+  ]);
+
+  return { data, total };
 }
 
 /**
@@ -165,7 +165,6 @@ export async function updateIdentifierScheme(
         ...(input.primaryKey !== undefined && { primaryKey: input.primaryKey }),
         ...(input.validationPattern !== undefined && { validationPattern: input.validationPattern }),
         ...(input.linkTemplate !== undefined && { linkTemplate: input.linkTemplate }),
-        ...(input.namespace !== undefined && { namespace: input.namespace }),
         ...(input.idrServiceInstanceId !== undefined && {
           idrServiceInstanceId: input.idrServiceInstanceId,
         }),

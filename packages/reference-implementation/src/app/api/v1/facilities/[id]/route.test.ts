@@ -8,17 +8,29 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withTenantAuth — skips auth but preserves error handling via handleRouteError
+// Mock withTenantAuth — skips auth but mirrors handleRouteError behaviour inline
 jest.mock('@/lib/api/with-tenant-auth', () => {
-  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
+  const { NotFoundError } = jest.requireActual('@/lib/api/errors');
+  const { ValidationError } = jest.requireActual('@/lib/api/validation');
+
+  function jsonResponse(body: unknown, init?: { status?: number }) {
+    return { status: init?.status ?? 200, json: async () => body };
+  }
+
   return {
     withTenantAuth:
       (handler: (...args: unknown[]) => unknown) =>
       async (...args: unknown[]) => {
         try {
           return await handler(...args);
-        } catch (e) {
-          return handleRouteError(e);
+        } catch (e: unknown) {
+          if (e instanceof ValidationError) {
+            return jsonResponse({ error: (e as Error).message }, { status: 400 });
+          }
+          if (e instanceof NotFoundError) {
+            return jsonResponse({ error: (e as Error).message }, { status: 404 });
+          }
+          return jsonResponse({ error: (e as Error).message }, { status: 500 });
         }
       },
   };
@@ -71,7 +83,7 @@ describe('GET /api/v1/facilities/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.facility).toEqual(facility);
+    expect(json).toEqual(facility);
     expect(json).not.toHaveProperty('ok');
   });
 
@@ -112,7 +124,7 @@ describe('PATCH /api/v1/facilities/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.facility).toEqual(updated);
+    expect(json).toEqual(updated);
     expect(json).not.toHaveProperty('ok');
   });
 
@@ -178,15 +190,14 @@ describe('DELETE /api/v1/facilities/:id', () => {
     jest.clearAllMocks();
   });
 
-  it('deletes the facility and returns empty object', async () => {
+  it('deletes the facility and returns 204 with no body', async () => {
     mockDeleteFacility.mockResolvedValue({ id: 'fac-1' });
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('fac-1') as unknown as Parameters<typeof DELETE>[1]);
-    const json = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(json).toEqual({});
+    expect(res.status).toBe(204);
+    expect(res.body).toBeNull();
   });
 
   it('returns 404 when facility not found', async () => {

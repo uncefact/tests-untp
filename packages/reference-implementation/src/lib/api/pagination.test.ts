@@ -1,4 +1,4 @@
-import { buildPaginatedResponse, paginationMetaSchema } from './pagination';
+import { buildPaginatedResponse, paginationMetaSchema, DEFAULT_PAGE_LIMIT } from './pagination';
 
 describe('buildPaginatedResponse', () => {
   it('returns correct pagination metadata with explicit limit and offset', () => {
@@ -33,12 +33,12 @@ describe('buildPaginatedResponse', () => {
     });
   });
 
-  it('defaults limit to 20 and offset to 0 when not provided', () => {
+  it('defaults limit to DEFAULT_PAGE_LIMIT and offset to 0 when not provided', () => {
     const items = [{ id: 1 }];
 
     const result = buildPaginatedResponse(items, 50);
 
-    expect(result.pagination.limit).toBe(20);
+    expect(result.pagination.limit).toBe(DEFAULT_PAGE_LIMIT);
     expect(result.pagination.offset).toBe(0);
     expect(result.pagination.hasMore).toBe(true);
   });
@@ -50,7 +50,7 @@ describe('buildPaginatedResponse', () => {
       data: [],
       pagination: {
         total: 0,
-        limit: 20,
+        limit: DEFAULT_PAGE_LIMIT,
         offset: 0,
         hasMore: false,
       },
