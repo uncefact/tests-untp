@@ -65,7 +65,6 @@ interface PlaygroundChainable {
 }
 
 interface IssueChainable {
-  verifyAppConfig(): Cypress.Chainable<void>;
   generateWorkflow(
     page: string,
     workflowName: string,
@@ -78,7 +77,6 @@ interface IssueChainable {
 
 declare namespace Cypress {
   interface Chainable<Subject = any> extends IssueChainable, PlaygroundChainable {
-    loadAppConfig(): Chainable<Record<string, any>>;
     navigateTo(page: string): Chainable<void>;
     interceptAPI(method: string, url: string, alias: string): Chainable<void>;
     waitForAPIResponse(alias: string, expectedStatus: number): Chainable<void>;

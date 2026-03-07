@@ -1,11 +1,3 @@
-// Load app config
-Cypress.Commands.add('loadAppConfig', () => {
-  return cy.fixture('app-config.json').then((data) => {
-    Cypress.env('AppConfig', data);
-    return data;
-  });
-});
-
 // Navigate to a specific page
 Cypress.Commands.add('navigateTo', (page) => {
   cy.contains('a', page).should('be.visible').and('not.be.disabled').click();

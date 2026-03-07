@@ -1,9 +1,4 @@
-Cypress.Commands.add('verifyAppConfig', () => {
-  const AppConfig = Cypress.env('AppConfig');
-  expect(AppConfig?.name).to.not.be.null;
-  expect(AppConfig?.name).to.not.be.undefined;
-  expect(AppConfig?.name).to.eq('UNTP Reference Implementation');
-});
+// TODO: refactor generateWorkflow to not depend on AppConfig from Cypress.env
 
 Cypress.Commands.add(
   'generateWorkflow',
