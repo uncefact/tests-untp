@@ -83,6 +83,7 @@ jest.mock('@/lib/api/logger', () => ({
   },
 }));
 
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';
 
 // ---------------------------------------------------------------------------
@@ -374,7 +375,7 @@ describe('GET /api/v1/services', () => {
     expect(json.data).toEqual([MOCK_MASKED]);
     expect(json.pagination).toEqual({
       total: 1,
-      limit: 20,
+      limit: DEFAULT_PAGE_LIMIT,
       offset: 0,
       hasMore: false,
     });

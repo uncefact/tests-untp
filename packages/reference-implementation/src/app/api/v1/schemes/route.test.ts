@@ -32,6 +32,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
   listIdentifierSchemes: (tenantId: string, opts: unknown) => mockListIdentifierSchemes(tenantId, opts),
 }));
 
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -318,7 +319,7 @@ describe('GET /api/v1/schemes', () => {
 
     expect(res.status).toBe(200);
     expect(json.data).toEqual(schemes);
-    expect(json.pagination).toEqual({ total: 1, limit: 20, offset: 0, hasMore: false });
+    expect(json.pagination).toEqual({ total: 1, limit: DEFAULT_PAGE_LIMIT, offset: 0, hasMore: false });
   });
 
   it('passes registrarId filter to listIdentifierSchemes', async () => {

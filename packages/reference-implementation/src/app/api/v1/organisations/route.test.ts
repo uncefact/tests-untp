@@ -33,6 +33,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
 }));
 
 import { NotFoundError } from '@/lib/api/errors';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -162,7 +163,7 @@ describe('GET /api/v1/organisations', () => {
     expect(json.data).toEqual(organisations);
     expect(json.pagination).toEqual({
       total: 1,
-      limit: 20,
+      limit: DEFAULT_PAGE_LIMIT,
       offset: 0,
       hasMore: false,
     });
