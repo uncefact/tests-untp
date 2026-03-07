@@ -137,7 +137,7 @@ External integrations use interfaces + implementations:
 - **Database**: Prisma ORM with entities: User, Organization, Did, Credential, ServiceInstance, Service, Adapter
 - **API Routes**: `/src/app/api/v1/` - `/dids`, `/credentials`, `/auth`
 - **Auth**: Keycloak via NextAuth.js with organization-level branding
-- **Config**: `app-config.json` determines app setup (copied to src at build time via `yarn copy-config`)
+- **Config**: Tenant configuration via database (replacing legacy app-config.json)
 
 ## Development Workflow
 
@@ -157,8 +157,7 @@ External integrations use interfaces + implementations:
 3. Restart mock-app
 
 ### Configuration Changes
-- Modifying `app-config.json` requires stopping and restarting mock-app
-- For E2E tests, use `e2e/cypress/fixtures/app-config.json`
+- Tenant configuration is managed via the database
 
 ## Testing Requirements
 
@@ -179,7 +178,7 @@ External integrations use interfaces + implementations:
 - MinIO - Object storage for IDR services
 
 ### Data Seeding
-- IDR services must be seeded for `app-config.json` to work
+- IDR services must be seeded for identifier resolution to work
 - Use `SEEDING=true` flag with docker compose
 - Manual seeding: `./seeding/idr-data.sh && ./seeding/mock-gs1-data.sh`
 - Reset: Delete `minio_data/` directories, re-run seed scripts
@@ -212,5 +211,4 @@ Each package has its own `tsconfig.json` (no centralized config)
 ### DO NOT
 - Mix E2E and standard Docker Compose setups
 - Run services without dependent Docker services
-- Commit changes to `app-config.json` without testing E2E
 - Skip test runs before committing
