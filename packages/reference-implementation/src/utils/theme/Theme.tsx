@@ -1,5 +1,10 @@
 import { createTheme } from '@mui/material';
-import { IStyles } from '@/types/common.types';
+interface IStyles {
+  primaryColor: string;
+  secondaryColor: string;
+  tertiaryColor: string;
+  menuIconColor?: string;
+}
 
 const ThemeSettings = (styles: Partial<IStyles> = {}) => {
   const baseMode = {
