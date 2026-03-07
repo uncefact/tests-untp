@@ -153,8 +153,6 @@ services:
       context: .
       dockerfile: packages/reference-implementation/Dockerfile
       target: development
-      args:
-        CONFIG_FILE: ./e2e/cypress/fixtures/app-config.json
     ports:
       - '3003:3003'
     environment:
