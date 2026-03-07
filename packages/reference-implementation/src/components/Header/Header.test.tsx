@@ -1,11 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import appConfig from './mocks/app-config.mock.json';
 
-import Header from '../components/Header/Header';
-
-// Mock the appConfig to provide test data
-jest.mock('../../src/constants/app-config.json', () => appConfig, { virtual: true });
+import Header from './Header';
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -15,18 +11,6 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/',
 }));
 
-jest.mock('../hooks/GlobalContext', () => ({
-  useGlobalContext: jest.fn(() => ({
-    theme: {
-      selectedTheme: { primaryColor: '#000000', secondaryColor: '#000000', tertiaryColor: '#000000' },
-      setSelectedTheme: jest
-        .fn()
-        .mockImplementation(() => ({ primaryColor: '#000000', secondaryColor: '#000000', tertiaryColor: '#000000' })),
-    },
-  })),
-}));
-
-// Mocking MUI components
 jest.mock('@mui/material', () => ({
   AppBar: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
     <div {...props}>{children}</div>
@@ -87,9 +71,6 @@ jest.mock('@mui/material', () => ({
   ListItemText: ({ primary, ...props }: { primary?: React.ReactNode; [key: string]: unknown }) => (
     <span {...props}>{primary}</span>
   ),
-  ListItemIcon: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
-    <span {...props}>{children}</span>
-  ),
   Box: ({
     children,
     onClick,
@@ -116,40 +97,12 @@ jest.mock('@mui/material', () => ({
       {children}
     </div>
   ),
-  Avatar: ({ alt, src, ...props }: { alt?: string; src?: string; [key: string]: unknown }) => (
-    <img alt={alt} src={src} {...props} />
-  ),
   Divider: (props: { [key: string]: unknown }) => <hr {...props} />,
-  Button: ({
-    children,
-    onClick,
-    ...props
-  }: {
-    children?: React.ReactNode;
-    onClick?: () => void;
-    [key: string]: unknown;
-  }) => (
-    <button onClick={onClick} {...props}>
-      {children}
-    </button>
-  ),
 }));
 
 jest.mock('@mui/icons-material/Menu', () => {
   return function MenuIcon() {
     return <span>MenuIcon</span>;
-  };
-});
-
-jest.mock('@mui/icons-material/Search', () => {
-  return function SearchIcon() {
-    return <span>SearchIcon</span>;
-  };
-});
-
-jest.mock('@mui/icons-material/Dialpad', () => {
-  return function DialpadIcon() {
-    return <span>DialpadIcon</span>;
   };
 });
 
@@ -175,7 +128,6 @@ describe('Header', () => {
   let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    // Suppress MUI component prop warnings
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation((message) => {
       if (typeof message === 'string' && message.includes('Invalid value for prop')) {
         return;
@@ -189,24 +141,15 @@ describe('Header', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('should render the header', () => {
+  it('should render the application name', () => {
     render(<Header />);
-    expect(screen.getByText(appConfig.name)).toBeInTheDocument();
+    expect(screen.getByText('UNTP Reference Implementation')).toBeInTheDocument();
   });
 
-  it('should open sidebar menu in header', () => {
+  it('should render a link to the dashboard when the drawer is opened', () => {
     render(<Header />);
 
     fireEvent.click(screen.getByTestId('icon-button'));
-    expect(screen.getByTestId('menu')).toBeInTheDocument();
-  });
-
-  it('should display app name in sidebar when menu is opened', () => {
-    render(<Header />);
-
-    fireEvent.click(screen.getByTestId('icon-button'));
-    const linkElement = screen.getByTestId('app-name');
-    expect(linkElement).toBeInTheDocument();
-    expect(linkElement).toHaveAttribute('href', '/');
+    expect(screen.getByText('Dashboard')).toBeInTheDocument();
   });
 });
