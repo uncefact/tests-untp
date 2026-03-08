@@ -64,27 +64,8 @@ interface PlaygroundChainable {
   downloadAndVerifyReport(implementationName: string, expectedPass: boolean, format?: string): Cypress.Chainable<any>;
 }
 
-interface IssueChainable {
-  generateWorkflow(
-    page: string,
-    workflowName: string,
-    schemaName: string,
-    configPath: string,
-    successMessage?: string,
-  ): Cypress.Chainable<void>;
-  runUntpTest(type: string, version: string, testData: any, expectResult?: string): Cypress.Chainable<void>;
-}
-
 declare namespace Cypress {
-  interface Chainable<Subject = any> extends IssueChainable, PlaygroundChainable {
-    navigateTo(page: string): Chainable<void>;
-    interceptAPI(method: string, url: string, alias: string): Chainable<void>;
-    waitForAPIResponse(alias: string, expectedStatus: number): Chainable<void>;
-    verifySuccessToast(successMessage: string): Chainable<JQuery<HTMLElement>>;
-    writeToFile(fileName: string, data: any): Chainable<void>;
-    verifyLinkType(url: string): Chainable<any>;
-    verifyFileDownload(buttonName: string, filePath: string): Chainable<any>;
-
+  interface Chainable<Subject = any> extends PlaygroundChainable {
     /**
      * Programmatic login via Keycloak for API testing.
      *
