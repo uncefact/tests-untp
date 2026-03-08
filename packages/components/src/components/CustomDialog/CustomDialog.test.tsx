@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent, screen } from '@testing-library/react';
-import { CustomDialog } from '../components/CustomDialog';
+import { CustomDialog } from '../CustomDialog';
 
 describe('CustomDialog Component', () => {
   it('should renders with title, content, and buttons', () => {

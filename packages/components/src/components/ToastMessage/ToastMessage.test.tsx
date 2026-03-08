@@ -1,7 +1,7 @@
 import React, { act } from 'react';
 import { render, waitFor } from '@testing-library/react';
 
-import { ToastMessage, toastMessage, Status } from '../../../components/ToastMessage/ToastMessage';
+import { ToastMessage, toastMessage, Status } from './ToastMessage';
 
 describe('Toast Message', () => {
   test('renders ToastMessage component and triggers toast', async () => {

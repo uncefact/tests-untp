@@ -1,4 +1,4 @@
-import { detectDevice } from '../utils/helpers'; // adjust the import path as needed
+import { detectDevice } from './helpers'; // adjust the import path as needed
 
 describe('detectDevice', () => {
   it('detects mobile devices', () => {

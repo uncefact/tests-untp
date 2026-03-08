@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 
-import { FallbackErrorContent, Layout, LayoutStatus, MessageText } from '../../../components/Layout/Layout';
+import { FallbackErrorContent, Layout, LayoutStatus, MessageText } from './Layout';
 
 describe('Layout', () => {
   test('should render Layout component with children', () => {

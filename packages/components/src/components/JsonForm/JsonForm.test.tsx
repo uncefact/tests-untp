@@ -1,10 +1,10 @@
 import React from 'react';
-import { fireEvent, render, screen, act } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import fetchMock from 'jest-fetch-mock';
 import { JsonForms } from '@jsonforms/react';
 
-import { schema, initialData, uiSchema } from './mocks/JsonForm.mock';
-import { JsonForm } from '../components/JsonForm/JsonForm';
+import { schema, initialData, uiSchema } from './JsonForm.mock';
+import { JsonForm } from './JsonForm';
 
 // Enable fetch mocks
 fetchMock.enableMocks();
@@ -108,17 +108,14 @@ describe('render json schema component', () => {
     // Mock the fetch response
     fetchMock.mockResponseOnce(JSON.stringify(schema));
 
-    // Wrap the rendering inside act(...)
-    await act(async () => {
-      render(
-        <JsonForm
-          schema={{ url: schemaUrl }}
-          data={initialData}
-          onChange={onChangeJsonSchemaForm}
-          className='json-form'
-        />,
-      );
-    });
+    render(
+      <JsonForm
+        schema={{ url: schemaUrl }}
+        data={initialData}
+        onChange={onChangeJsonSchemaForm}
+        className='json-form'
+      />,
+    );
 
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(schemaUrl);
@@ -137,9 +134,7 @@ describe('render json schema component', () => {
     const schemaUrl = 'https://example.io/schema.json';
     fetchMock.mockReject(new Error('Failed to fetch schema'));
 
-    await act(async () => {
-      render(<JsonForm schema={{ url: schemaUrl }} onChange={onChangeJsonSchemaForm} className='json-form' />);
-    });
+    render(<JsonForm schema={{ url: schemaUrl }} onChange={onChangeJsonSchemaForm} className='json-form' />);
 
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(schemaUrl);
