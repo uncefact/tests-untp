@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-webpack5';
-import { Footer } from '../src/components/Footer';
+import { Footer } from '../Footer';
 
 const meta = {
   title: 'Footer',

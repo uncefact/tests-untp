@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-webpack5';
-import { ToastMessage, toastMessage, Status } from '../src/components/ToastMessage/ToastMessage';
+import { ToastMessage, toastMessage, Status } from './ToastMessage';
 
 const meta = {
   title: 'ToastMessage',

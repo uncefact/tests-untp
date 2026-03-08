@@ -1,7 +1,7 @@
 import React from 'react';
 import { Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-webpack5';
-import { Layout } from '../src/components/Layout';
+import { Layout } from '../Layout';
 
 const meta = {
   title: 'Layout',

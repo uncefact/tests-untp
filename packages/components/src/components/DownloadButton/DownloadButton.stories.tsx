@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-webpack5';
-import { DownloadButton, DownloadFileType } from '../src/components/DownloadButton/DownloadButton';
+import { DownloadButton, DownloadFileType } from './DownloadButton';
 
 const meta: any = {
   title: 'DownloadButton',
