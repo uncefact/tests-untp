@@ -13,19 +13,12 @@
     "./globals.css": "./src/globals.css"
   },
   "scripts": {
-    "start": "react-scripts start",
     "build": "tsc && tsc-alias",
     "build:watch": "tsc -b --watch",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test": "jest",
     "test:coverage": "jest --coverage"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
   },
   "browserslist": {
     "production": [
@@ -48,7 +41,6 @@
     "@jsonforms/core": "^3.2.0",
     "@jsonforms/material-renderers": "^3.2.0",
     "@jsonforms/react": "^3.2.0",
-    "@uncefact/untp-ri-services": "0.1.0-dev.8",
     "@mui/icons-material": "^5.15.5",
     "@mui/lab": "5.0.0-alpha.161",
     "@mui/material": "^5.15.5",
@@ -59,23 +51,15 @@
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/postcss": "^4.1.16",
-    "@vckit/core-types": "^1.0.0-beta.7",
     "ajv": "^8.16.0",
-    "ajv-errors": "^3.0.0",
-    "ajv-formats": "^3.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "html5-qrcode": "^2.3.8",
-    "jest-fetch-mock": "^3.0.3",
-    "jsonpointer": "^5.0.1",
     "lucide-react": "^0.552.0",
     "postcss": "^8.5.6",
     "react": "19.2.4",
-    "react-barcode": "^1.5.3",
     "react-dom": "19.2.4",
     "react-error-boundary": "^4.0.12",
     "react-router-dom": "6.21.3",
-    "react-scripts": "5.0.1",
     "react-toastify": "^10.0.4",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.16"
@@ -98,6 +82,7 @@
     "css-loader": "^7.1.2",
     "jest": "29.7.0",
     "jest-environment-jsdom": "29.7.0",
+    "jest-fetch-mock": "^3.0.3",
     "postcss-loader": "^8.2.0",
     "prop-types": "^15.8.1",
     "storybook": "^10.0.2",

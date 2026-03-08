@@ -36,7 +36,7 @@ const Verify = () => {
             const parsed = JSON.parse(q);
             uri = parsed?.payload?.uri;
             hash = parsed?.payload?.hash;
-            decryptionKey = parsed?.payload?.key;
+            decryptionKey = parsed?.payload?.decryptionKey ?? parsed?.payload?.key;
           } catch (e) {
             console.error('Failed to parse legacy ?q= parameter:', e);
           }

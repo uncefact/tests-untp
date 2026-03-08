@@ -11,7 +11,6 @@ COPY package.json yarn.lock ./
 COPY packages/reference-implementation/package.json ./packages/reference-implementation/
 COPY packages/components/package.json ./packages/components/
 COPY packages/services/package.json ./packages/services/
-COPY digitallink_toolkit_server ./digitallink_toolkit_server/
 RUN yarn install --frozen-lockfile --network-timeout 600000
 
 # ---- Builder ----
@@ -27,12 +26,6 @@ COPY package.json ./
 COPY packages/reference-implementation/. ./packages/reference-implementation/
 COPY packages/components/. ./packages/components/
 COPY packages/services/. ./packages/services/
-COPY digitallink_toolkit_server ./digitallink_toolkit_server/
-
-ARG CONFIG_FILE=./app-config.json
-COPY ${CONFIG_FILE} ./packages/reference-implementation/src/constants/app-config.json
-COPY ${CONFIG_FILE} ./packages/components/src/constants/app-config.json
-
 # Recreate workspace symlinks after copying source files
 RUN yarn install --frozen-lockfile --network-timeout 600000
 
@@ -74,15 +67,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 COPY --from=builder --chown=nextjs:nodejs /app/packages/services/build ./packages/services/build
 COPY --from=builder --chown=nextjs:nodejs /app/packages/services/package.json ./packages/services/package.json
 
-# Copy built-in config files for fallback (when no runtime config is mounted)
-COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/constants/app-config*.json ./src/constants/
-
 # Copy and set up entrypoint script
 COPY --chown=nextjs:nodejs packages/reference-implementation/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
-
-# Create config directory for runtime configuration
-RUN mkdir -p /app/config && chown nextjs:nodejs /app/config
 
 USER nextjs
 

@@ -13,14 +13,12 @@
     ]
   },
   "scripts": {
-    "copy-config": "cp app-config.json packages/reference-implementation/src/constants/app-config.json && cp app-config.json packages/components/src/constants/app-config.json",
-    "copy-config-test": "cp e2e/cypress/fixtures/app-config.json packages/reference-implementation/src/constants/app-config.json && cp e2e/cypress/fixtures/app-config.json packages/components/src/constants/app-config.json",
-    "start": "yarn copy-config && cd packages/reference-implementation && yarn dev",
-    "start:e2e-test": "yarn copy-config-test && cd packages/reference-implementation && yarn start",
+    "start": "cd packages/reference-implementation && yarn dev",
+    "start:e2e-test": "cd packages/reference-implementation && yarn start",
     "start:untp-playground": "cd packages/untp-playground && PORT=4001 yarn dev",
     "start:e2e-dependencies": "SEEDING=true docker compose -f docker-compose.e2e.yml up -d --build",
     "stop:e2e-dependencies": "docker compose -f docker-compose.e2e.yml down",
-    "build": "yarn copy-config && yarn build:services && yarn build:components && yarn build:untp-test-suite && yarn build:ri && yarn build:playground",
+    "build": "yarn build:services && yarn build:components && yarn build:untp-test-suite && yarn build:ri && yarn build:playground",
     "build:services": "cd packages/services && yarn run build",
     "build:components": "cd packages/components && yarn run build",
     "build:ri": "cd packages/reference-implementation && yarn run build",
