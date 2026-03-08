@@ -9,7 +9,7 @@ jest.mock('@uncefact/vckit-renderer', () => ({
 }));
 
 // Mocking the convertBase64ToString utility function from ../utils
-jest.mock('../utils', () => ({
+jest.mock('../../utils', () => ({
   convertBase64ToString: jest.fn().mockImplementation(() => '<div>Credential render</div>'), // Mocking the conversion function
 }));
 
