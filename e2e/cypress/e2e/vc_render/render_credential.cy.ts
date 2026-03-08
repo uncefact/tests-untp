@@ -3,44 +3,87 @@ import RenderPage from 'cypress/page/renderPage';
 const renderPage = new RenderPage();
 
 describe('Verify page credential rendering', () => {
-  beforeEach(() => {
-    cy.fixture('credentials-e2e/valid-v2-enveloped-dpp.json').then((fixture) => {
-      // Decode the JWT payload from the enveloped credential
-      const jwt = fixture.id.replace('data:application/vc+jwt,', '');
-      const payload = jwt.split('.')[1];
-      const padded = payload.replace(/-/g, '+').replace(/_/g, '/');
-      const decoded = JSON.parse(atob(padded));
+  describe('successful verification', () => {
+    beforeEach(() => {
+      cy.fixture('credentials-e2e/valid-v2-enveloped-dpp.json').then((fixture) => {
+        // Decode the JWT payload from the enveloped credential
+        const jwt = fixture.id.replace('data:application/vc+jwt,', '');
+        const payload = jwt.split('.')[1];
+        const padded = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const decoded = JSON.parse(atob(padded));
 
-      cy.intercept('POST', '/api/v1/credentials/verify', {
-        statusCode: 200,
-        body: {
-          verified: true,
-          credential: fixture,
-          decodedCredential: decoded,
-        },
-      }).as('verifyCredential');
+        cy.intercept('POST', '/api/v1/credentials/verify', {
+          statusCode: 200,
+          body: {
+            verified: true,
+            credential: fixture,
+            decodedCredential: decoded,
+          },
+        }).as('verifyCredential');
+      });
+
+      cy.visit('/verify?uri=https://example.com/test-credential');
+      cy.wait('@verifyCredential');
     });
 
-    cy.visit('/verify?uri=https://example.com/test-credential');
-    cy.wait('@verifyCredential');
+    it('should display the correct credential type and issuer', () => {
+      renderPage.verifyPageTitleAndContent(
+        'DigitalProductPassport',
+        'did:web:uncefact.github.io:project-vckit:test-and-development',
+      );
+    });
+
+    it('should display Rendered, JSON, and Download controls', () => {
+      renderPage.verifyButtonsVisibilityAndText();
+    });
+
+    it('should download the credential as JSON', () => {
+      renderPage.verifyDownloadVC();
+    });
+
+    it('should display JSON content when JSON tab is clicked', () => {
+      renderPage.verifyJSONContentDisplay();
+    });
   });
 
-  it('should display the correct credential type and issuer', () => {
-    renderPage.verifyPageTitleAndContent(
-      'DigitalProductPassport',
-      'did:web:uncefact.github.io:project-vckit:test-and-development',
-    );
-  });
+  describe('failed verification', () => {
+    it('should display error message when credential verification fails', () => {
+      cy.fixture('credentials-e2e/valid-v2-enveloped-dpp.json').then((fixture) => {
+        cy.intercept('POST', '/api/v1/credentials/verify', {
+          statusCode: 200,
+          body: {
+            verified: false,
+            credential: fixture,
+            error: { type: 'status', message: 'Credential has been revoked' },
+          },
+        }).as('verifyCredential');
+      });
 
-  it('should display Rendered, JSON, and Download controls', () => {
-    renderPage.verifyButtonsVisibilityAndText();
-  });
+      cy.visit('/verify?uri=https://example.com/test-credential');
+      cy.wait('@verifyCredential');
 
-  it('should download the credential as JSON', () => {
-    renderPage.verifyDownloadVC();
-  });
+      cy.contains('Credential has been revoked', { timeout: 10000 }).should('be.visible');
 
-  it('should display JSON content when JSON tab is clicked', () => {
-    renderPage.verifyJSONContentDisplay();
+      // Credential tabs should not be rendered
+      cy.get('button').contains('JSON').should('not.exist');
+    });
+
+    it('should display error message when verify API returns an error', () => {
+      cy.intercept('POST', '/api/v1/credentials/verify', {
+        statusCode: 422,
+        body: {
+          error: 'Credential is encrypted but no decryptionKey was provided',
+          code: 'DECRYPTION_REQUIRED',
+        },
+      }).as('verifyCredential');
+
+      cy.visit('/verify?uri=https://example.com/test-credential');
+      cy.wait('@verifyCredential');
+
+      cy.contains('DECRYPTION_REQUIRED', { timeout: 10000 }).should('be.visible');
+
+      // Credential tabs should not be rendered
+      cy.get('button').contains('JSON').should('not.exist');
+    });
   });
 });
