@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import fetchMock from 'jest-fetch-mock';
 import { JsonForms } from '@jsonforms/react';
 
@@ -120,8 +120,10 @@ describe('render json schema component', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(schemaUrl);
 
-    const getStringField = screen.getByLabelText('Name');
-    expect(getStringField).toHaveValue(initialData.name);
+    await waitFor(() => {
+      const getStringField = screen.getByLabelText('Name');
+      expect(getStringField).toHaveValue(initialData.name);
+    });
 
     const getBooleanField = screen.getByLabelText('Vegetarian');
     expect(getBooleanField).toBeChecked();
@@ -139,8 +141,10 @@ describe('render json schema component', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(schemaUrl);
 
-    const errorElement = screen.getByText('Error setup schema');
-    expect(errorElement).toBeInTheDocument();
+    await waitFor(() => {
+      const errorElement = screen.getByText('Error setup schema');
+      expect(errorElement).toBeInTheDocument();
+    });
 
     // Restore console.error
     consoleErrorSpy.mockRestore();
