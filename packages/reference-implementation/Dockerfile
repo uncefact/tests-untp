@@ -11,7 +11,6 @@ COPY package.json yarn.lock ./
 COPY packages/reference-implementation/package.json ./packages/reference-implementation/
 COPY packages/components/package.json ./packages/components/
 COPY packages/services/package.json ./packages/services/
-COPY digitallink_toolkit_server ./digitallink_toolkit_server/
 RUN yarn install --frozen-lockfile --network-timeout 600000
 
 # ---- Builder ----
@@ -27,8 +26,6 @@ COPY package.json ./
 COPY packages/reference-implementation/. ./packages/reference-implementation/
 COPY packages/components/. ./packages/components/
 COPY packages/services/. ./packages/services/
-COPY digitallink_toolkit_server ./digitallink_toolkit_server/
-
 # Recreate workspace symlinks after copying source files
 RUN yarn install --frozen-lockfile --network-timeout 600000
 

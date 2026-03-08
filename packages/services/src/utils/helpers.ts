@@ -9,7 +9,7 @@ export function generateCurrentDatetime() {
   return new Date().toISOString();
 }
 
-export const constructVerifyURL = ({ baseUrl, uri, hash, key }: IVerifyURLPayload & { baseUrl?: string }) => {
+export const constructVerifyURL = ({ baseUrl, uri, hash, decryptionKey }: IVerifyURLPayload & { baseUrl?: string }) => {
   if (!uri || !hash) {
     throw new Error('URI and hash are required');
   }
@@ -20,7 +20,7 @@ export const constructVerifyURL = ({ baseUrl, uri, hash, key }: IVerifyURLPayloa
   }
 
   const payload: Record<string, string> = { uri, hash };
-  if (key) payload.key = key;
+  if (decryptionKey) payload.decryptionKey = decryptionKey;
 
   const queryString = `q=${encodeURIComponent(JSON.stringify({ payload }))}`;
   return `${baseUrl}/verify?${queryString}`;
