@@ -10,24 +10,25 @@ import type { LoggerService } from '../../../logging/types.js';
  * Accepts a 64-character hex string (32 bytes) as the encryption key.
  */
 export class AesGcmEncryptionAdapter extends BaseServiceAdapter implements IEncryptionService {
-  private readonly key: Buffer;
+  private readonly key: Uint8Array;
 
   constructor(key: string, logger: LoggerService) {
     super(logger.child({ service: 'Encryption - AesGcmEncryption' }));
     if (!/^[0-9a-f]{64}$/i.test(key)) {
       throw new Error('Encryption key must be a 64-character hex string (32 bytes)');
     }
-    this.key = Buffer.from(key, 'hex');
+    this.key = new Uint8Array(Buffer.from(key, 'hex'));
   }
 
   encrypt(plaintext: string, algorithm: EncryptionAlgorithm): EncryptedEnvelope {
     assertPermittedAlgorithm(algorithm);
     this.logger.debug({ algorithm, plaintextLength: plaintext.length }, 'Encrypting data');
 
-    const iv = crypto.randomBytes(12);
+    const iv = new Uint8Array(crypto.randomBytes(12));
     const cipher = crypto.createCipheriv(algorithm, this.key, iv);
 
-    const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+    const encryptedParts = [cipher.update(plaintext, 'utf8'), cipher.final()] as unknown as Uint8Array[];
+    const encrypted = Buffer.concat(encryptedParts);
 
     const authTag = cipher.getAuthTag();
 
@@ -35,7 +36,7 @@ export class AesGcmEncryptionAdapter extends BaseServiceAdapter implements IEncr
 
     return {
       cipherText: encrypted.toString('base64'),
-      iv: iv.toString('base64'),
+      iv: Buffer.from(iv).toString('base64'),
       tag: authTag.toString('base64'),
       type: algorithm,
     };
@@ -47,14 +48,15 @@ export class AesGcmEncryptionAdapter extends BaseServiceAdapter implements IEncr
 
     const { cipherText, iv: ivB64, tag: tagB64, type } = envelope;
 
-    const iv = Buffer.from(ivB64, 'base64');
-    const authTag = Buffer.from(tagB64, 'base64');
-    const encrypted = Buffer.from(cipherText, 'base64');
+    const iv = new Uint8Array(Buffer.from(ivB64, 'base64'));
+    const authTag = new Uint8Array(Buffer.from(tagB64, 'base64'));
+    const encrypted = new Uint8Array(Buffer.from(cipherText, 'base64'));
 
     const decipher = crypto.createDecipheriv(type, this.key, iv);
     decipher.setAuthTag(authTag);
 
-    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    const decryptedParts = [decipher.update(encrypted), decipher.final()] as unknown as Uint8Array[];
+    const decrypted = Buffer.concat(decryptedParts);
 
     this.logger.debug({ algorithm: envelope.type, decryptedLength: decrypted.length }, 'Data decrypted successfully');
 

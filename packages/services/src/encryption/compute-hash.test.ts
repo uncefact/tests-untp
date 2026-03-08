@@ -45,7 +45,7 @@ describe('computeHash', () => {
 
   it('should hash a Uint8Array input and match the Buffer equivalent', () => {
     const bytes = new Uint8Array([72, 101, 108, 108, 111]);
-    const expected = crypto.createHash('sha256').update(Buffer.from(bytes)).digest('hex');
+    const expected = crypto.createHash('sha256').update(new Uint8Array(bytes)).digest('hex');
     const hash = computeHash(bytes);
     expect(hash).toEqual(expected);
   });
