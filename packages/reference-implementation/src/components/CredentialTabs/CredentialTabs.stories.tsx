@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import { CredentialTabs } from '../src/components/CredentialTabs';
-import { storyCredentialMock } from './StoryVCMock';
+import { CredentialTabs } from '../CredentialTabs';
+import { storyCredentialMock } from '../__mocks__/StoryVCMock';
 
 const meta = {
   title: 'Credential Tabs',

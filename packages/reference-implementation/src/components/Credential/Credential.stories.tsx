@@ -1,17 +1,17 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import { CredentialInfo } from '../src/components/CredentialInfo';
-import { storyCredentialMock } from './StoryVCMock';
+import { Credential } from '../Credential';
+import { storyCredentialMock } from '../__mocks__/StoryVCMock';
 
 const meta = {
-  title: 'Credential Info',
-  component: CredentialInfo,
+  title: 'Credential',
+  component: Credential,
   parameters: { layout: 'centered' },
   tags: ['autodocs'],
-} satisfies Meta<typeof CredentialInfo>;
+} satisfies Meta<typeof Credential>;
 
 export default meta;
-type Story = StoryObj<typeof CredentialInfo>;
+type Story = StoryObj<typeof Credential>;
 
 export const Default: Story = {
   args: { credential: storyCredentialMock },

@@ -1,22 +1,18 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import { MessageText } from '../src/components/MessageText';
-import { Status } from '@reference-implementation/components';
+import { LoadingWithText } from '../LoadingWithText';
 
 const meta = {
-  title: 'Message text',
-  component: MessageText,
+  title: 'Loading with text',
+  component: LoadingWithText,
   parameters: { layout: 'centered' },
   tags: ['autodocs'],
-} satisfies Meta<typeof MessageText>;
+} satisfies Meta<typeof LoadingWithText>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-  args: {
-    status: Status.error,
-    text: 'Network error',
-  },
+  args: { text: 'Loading...' },
   decorators: [(Story) => <Story />],
 };

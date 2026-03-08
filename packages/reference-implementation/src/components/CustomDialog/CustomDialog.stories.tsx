@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import { CustomDialog } from '../src/components/CustomDialog';
+import { CustomDialog } from '../CustomDialog';
 
 const meta = {
   title: 'Custom Dialog',

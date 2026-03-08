@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import { Scanner } from '../src/components/Scanner';
+import { Scanner } from '../Scanner';
 
 const meta = {
   title: 'Scanner',

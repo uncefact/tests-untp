@@ -5,8 +5,7 @@ const jestConfig = {
   testEnvironment: 'jsdom',
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
   testMatch: [
-    '**/__tests__/**/*.test.{ts,tsx}',  // Old pattern: tests in __tests__ directories
-    '**/src/**/*.test.{ts,tsx}',         // New pattern: tests alongside components
+    '**/src/**/*.test.{ts,tsx}',
   ],
   testPathIgnorePatterns: ['<rootDir>/node_modules/'],
   transformIgnorePatterns: [

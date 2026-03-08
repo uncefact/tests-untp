@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import { CredentialRender } from '../src/components/CredentialRender';
-import { storyCredentialMock } from './StoryVCMock';
+import { CredentialRender } from '../CredentialRender';
+import { storyCredentialMock } from '../__mocks__/StoryVCMock';
 
 const meta = {
   title: 'Credential Render',

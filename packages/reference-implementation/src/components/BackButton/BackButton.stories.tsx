@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import { BackButton } from '../src/components/BackButton';
+import { BackButton } from '../BackButton';
 import { BrowserRouter } from 'react-router-dom';
 
 const meta = {

@@ -1,18 +1,19 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import { LoadingWithText } from '../src/components/LoadingWithText';
+import { JsonBlock } from '../JsonBlock';
+import { storyCredentialMock } from '../__mocks__/StoryVCMock';
 
 const meta = {
-  title: 'Loading with text',
-  component: LoadingWithText,
+  title: 'Json Block',
+  component: JsonBlock,
   parameters: { layout: 'centered' },
   tags: ['autodocs'],
-} satisfies Meta<typeof LoadingWithText>;
+} satisfies Meta<typeof JsonBlock>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-  args: { text: 'Loading...' },
+  args: { credential: storyCredentialMock },
   decorators: [(Story) => <Story />],
 };
