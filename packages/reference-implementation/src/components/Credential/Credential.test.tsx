@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { Credential } from '../components/Credential';
-import { MessageText } from '../components/MessageText';
+import { Credential } from '../Credential';
+import { MessageText } from '../MessageText';
 
 // Mocking MUI components
 jest.mock('@mui/material', () => ({
@@ -25,7 +25,7 @@ jest.mock('@mui/material', () => ({
 }));
 
 // Mocking the BackButton component and invoking its onNavigate prop
-jest.mock('../components/BackButton/BackButton', () => {
+jest.mock('../BackButton/BackButton', () => {
   const MockBackButton = ({ onNavigate }: { onNavigate?: () => void }) => {
     if (onNavigate) {
       onNavigate(); // Simulating the onNavigate action
@@ -37,7 +37,7 @@ jest.mock('../components/BackButton/BackButton', () => {
 });
 
 // Mocking the CredentialInfo component
-jest.mock('../components/CredentialInfo/CredentialInfo', () => {
+jest.mock('../CredentialInfo/CredentialInfo', () => {
   const MockCredentialInfo = () => {
     return <>CredentialInfo </>;
   };
@@ -46,7 +46,7 @@ jest.mock('../components/CredentialInfo/CredentialInfo', () => {
 });
 
 // Mocking the CredentialTabs component
-jest.mock('../components/CredentialTabs/CredentialTabs', () => {
+jest.mock('../CredentialTabs/CredentialTabs', () => {
   const MockCredentialTabs = () => {
     return <>CredentialTabs </>;
   };
@@ -62,7 +62,7 @@ jest.mock('@reference-implementation/components', () => ({
 }));
 
 // Mocking the MessageText component and its Status object
-jest.mock('../components/MessageText', () => ({
+jest.mock('../MessageText', () => ({
   MessageText: jest.fn(),
   Status: {
     error: 'error',

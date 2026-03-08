@@ -1,5 +1,5 @@
 import { screen, render, fireEvent } from '@testing-library/react';
-import { BackButton } from '../components/BackButton';
+import { BackButton } from '../BackButton';
 
 const mockReplace = jest.fn();
 jest.mock('next/navigation', () => ({

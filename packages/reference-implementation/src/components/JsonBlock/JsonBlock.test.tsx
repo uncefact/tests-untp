@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { JsonBlock } from '../components/JsonBlock';
+import { JsonBlock } from '../JsonBlock';
 
 // Mocking VerifiableCredential from @vckit/core-types
 jest.mock('@vckit/core-types', () => ({

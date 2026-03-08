@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { CredentialTabs } from '../components/CredentialTabs';
+import { CredentialTabs } from '../CredentialTabs';
 
 // Mocking modules from @uncefact/vckit-renderer
 jest.mock('@uncefact/vckit-renderer', () => ({
@@ -100,19 +100,19 @@ jest.mock('@mui/icons-material/CloudDownloadOutlined', () => {
 });
 
 // Mocking the CredentialRender component
-jest.mock('../components/CredentialRender/CredentialRender', () => {
+jest.mock('../CredentialRender/CredentialRender', () => {
   const MockCredentialRender = () => <>CredentialRender</>;
   MockCredentialRender.displayName = 'MockCredentialRender';
   return MockCredentialRender;
 });
 // Mocking the JsonBlock component
-jest.mock('../components/JsonBlock/JsonBlock', () => {
+jest.mock('../JsonBlock/JsonBlock', () => {
   const MockJsonBlock = () => <>JsonBlock</>;
   MockJsonBlock.displayName = 'MockJsonBlock';
   return MockJsonBlock;
 });
 // Mocking the DownloadCredentialButton component
-jest.mock('../components/DownloadCredentialButton/DownloadCredentialButton', () => ({
+jest.mock('../DownloadCredentialButton/DownloadCredentialButton', () => ({
   DownloadCredentialButton: ({ credential }: { credential: unknown }) => {
     const handleClick = () => {
       const file = new Blob([JSON.stringify({ verifiableCredential: credential }, null, 2)], {

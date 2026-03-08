@@ -1,5 +1,5 @@
 import { render, fireEvent, screen } from '@testing-library/react';
-import { CustomDialog } from '../components/CustomDialog';
+import { CustomDialog } from '../CustomDialog';
 
 // Mocking MUI components
 jest.mock('@mui/material/Dialog', () => ({

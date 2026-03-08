@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { CredentialInfo } from '../components/CredentialInfo';
+import { CredentialInfo } from '../CredentialInfo';
 
 // Mocking MUI components
 jest.mock('@mui/material', () => ({
