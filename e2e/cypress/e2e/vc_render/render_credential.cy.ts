@@ -3,6 +3,11 @@ import RenderPage from 'cypress/page/renderPage';
 const renderPage = new RenderPage();
 
 describe('Verify page credential rendering', () => {
+  function verifyErrorDisplayed(errorText: string) {
+    cy.contains(errorText, { timeout: 10000 }).should('be.visible');
+    cy.get('button').contains('JSON').should('not.exist');
+  }
+
   describe('successful verification', () => {
     beforeEach(() => {
       cy.fixture('credentials-e2e/valid-v2-enveloped-dpp.json').then((fixture) => {
@@ -46,11 +51,6 @@ describe('Verify page credential rendering', () => {
   });
 
   describe('verification failures', () => {
-    function verifyErrorDisplayed(errorText: string) {
-      cy.contains(errorText, { timeout: 10000 }).should('be.visible');
-      cy.get('button').contains('JSON').should('not.exist');
-    }
-
     it('should display error when credential has been revoked (status)', () => {
       cy.fixture('credentials-e2e/valid-v2-enveloped-dpp.json').then((fixture) => {
         cy.intercept('POST', '/api/v1/credentials/verify', {
@@ -104,11 +104,6 @@ describe('Verify page credential rendering', () => {
   });
 
   describe('API errors', () => {
-    function verifyErrorDisplayed(errorText: string) {
-      cy.contains(errorText, { timeout: 10000 }).should('be.visible');
-      cy.get('button').contains('JSON').should('not.exist');
-    }
-
     it('should display error when hash does not match', () => {
       cy.intercept('POST', '/api/v1/credentials/verify', {
         statusCode: 422,
