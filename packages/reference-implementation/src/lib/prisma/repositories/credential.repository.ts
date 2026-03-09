@@ -56,9 +56,11 @@ export async function getCredentialById(id: string, tenantId: string): Promise<C
 }
 
 /**
- * Lists credentials with optional filtering and pagination
+ * Lists credentials with optional filtering and pagination.
+ * Returns matching records alongside the total count for the filter
+ * criteria (via a parallel count query).
  */
-export async function listCredentials(options: ListCredentialsOptions): Promise<Credential[]> {
+export async function listCredentials(options: ListCredentialsOptions): Promise<{ data: Credential[]; total: number }> {
   const { tenantId, credentialType, isPublished, limit, offset } = options;
 
   const where: Prisma.CredentialWhereInput = { tenantId };
@@ -71,12 +73,17 @@ export async function listCredentials(options: ListCredentialsOptions): Promise<
     where.isPublished = isPublished;
   }
 
-  return prisma.credential.findMany({
-    where,
-    take: limit,
-    skip: offset,
-    orderBy: { createdAt: 'desc' },
-  });
+  const [data, total] = await Promise.all([
+    prisma.credential.findMany({
+      where,
+      take: limit,
+      skip: offset,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.credential.count({ where }),
+  ]);
+
+  return { data, total };
 }
 
 /**

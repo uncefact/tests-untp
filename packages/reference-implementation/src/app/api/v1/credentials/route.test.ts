@@ -101,8 +101,10 @@ jest.mock('@uncefact/untp-ri-services', () => ({
 
 // Repository mocks
 const mockUpdateCredentialPublished = jest.fn();
+const mockListCredentials = jest.fn();
 jest.mock('@/lib/prisma/repositories', () => ({
   updateCredentialPublished: (...args: unknown[]) => mockUpdateCredentialPublished(...args),
+  listCredentials: (...args: unknown[]) => mockListCredentials(...args),
 }));
 
 const mockValidateCvcCompliance = jest.fn();
@@ -110,7 +112,7 @@ jest.mock('@/lib/services/cvc-validation.service', () => ({
   validateCvcCompliance: (...args: unknown[]) => mockValidateCvcCompliance(...args),
 }));
 
-import { POST } from './route';
+import { POST, GET } from './route';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -139,6 +141,20 @@ function createBadJsonRequest(): Request {
     json: async () => {
       throw new SyntaxError('Unexpected token n in JSON at position 0');
     },
+  } as unknown as Request;
+}
+
+function createFakeGetRequest(queryParams?: Record<string, string>): Request {
+  const url = new URL('http://localhost/api/v1/credentials');
+  if (queryParams) {
+    Object.entries(queryParams).forEach(([key, value]) => {
+      url.searchParams.set(key, value);
+    });
+  }
+  return {
+    method: 'GET',
+    url: url.toString(),
+    headers: new Headers(),
   } as unknown as Request;
 }
 
@@ -689,5 +705,147 @@ describe('POST /api/v1/credentials', () => {
       expect(res.status).toBe(500);
       expect(json.error).toContain('Signing service unavailable');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/credentials
+// ---------------------------------------------------------------------------
+
+describe('GET /api/v1/credentials', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockListCredentials.mockResolvedValue({ data: [], total: 0 });
+  });
+
+  it('returns 200 with default pagination when no params provided', async () => {
+    const req = createFakeGetRequest();
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(mockListCredentials).toHaveBeenCalledWith({
+      tenantId: 'tenant-1',
+      credentialType: undefined,
+      isPublished: undefined,
+      limit: 100,
+      offset: undefined,
+    });
+    expect(res.status).toBe(200);
+    expect(json).toHaveProperty('data');
+    expect(json).toHaveProperty('pagination');
+    expect(Array.isArray(json.data)).toBe(true);
+  });
+
+  it('passes credentialType filter to repository', async () => {
+    const req = createFakeGetRequest({ credentialType: 'DPP' });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListCredentials).toHaveBeenCalledWith(expect.objectContaining({ credentialType: 'DPP' }));
+  });
+
+  it('passes isPublished=true filter to repository', async () => {
+    const req = createFakeGetRequest({ isPublished: 'true' });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListCredentials).toHaveBeenCalledWith(expect.objectContaining({ isPublished: true }));
+  });
+
+  it('passes isPublished=false filter to repository', async () => {
+    const req = createFakeGetRequest({ isPublished: 'false' });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListCredentials).toHaveBeenCalledWith(expect.objectContaining({ isPublished: false }));
+  });
+
+  it('passes limit and offset to repository', async () => {
+    const req = createFakeGetRequest({ limit: '10', offset: '20' });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListCredentials).toHaveBeenCalledWith(expect.objectContaining({ limit: 10, offset: 20 }));
+  });
+
+  it('returns 400 for invalid limit', async () => {
+    const req = createFakeGetRequest({ limit: 'abc' });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('limit');
+  });
+
+  it('returns 400 for limit=0', async () => {
+    const req = createFakeGetRequest({ limit: '0' });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for invalid offset', async () => {
+    const req = createFakeGetRequest({ offset: '-1' });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('offset');
+  });
+
+  it('returns 400 for invalid isPublished value', async () => {
+    const req = createFakeGetRequest({ isPublished: 'yes' });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('isPublished');
+  });
+
+  it('returns empty results for unknown credentialType (not 400)', async () => {
+    mockListCredentials.mockResolvedValue({ data: [], total: 0 });
+
+    const req = createFakeGetRequest({ credentialType: 'UnknownType' });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.data).toEqual([]);
+  });
+
+  it('returns correct pagination metadata', async () => {
+    mockListCredentials.mockResolvedValue({ data: [{ id: 'c1' }, { id: 'c2' }], total: 5 });
+
+    const req = createFakeGetRequest({ limit: '2', offset: '0' });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(json.pagination).toEqual({ total: 5, limit: 2, offset: 0, hasMore: true });
+  });
+
+  it('returns hasMore=false on last page', async () => {
+    mockListCredentials.mockResolvedValue({ data: [{ id: 'c1' }], total: 3 });
+
+    const req = createFakeGetRequest({ limit: '2', offset: '2' });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(json.pagination).toEqual({ total: 3, limit: 2, offset: 2, hasMore: false });
+  });
+
+  it('passes combined credentialType and isPublished filters to repository', async () => {
+    const req = createFakeGetRequest({ credentialType: 'DPP', isPublished: 'true' });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListCredentials).toHaveBeenCalledWith(
+      expect.objectContaining({ credentialType: 'DPP', isPublished: true }),
+    );
+  });
+
+  it('returns 500 when repository throws', async () => {
+    mockListCredentials.mockRejectedValue(new Error('Database connection lost'));
+
+    const req = createFakeGetRequest();
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(json.error).toContain('Database connection lost');
   });
 });

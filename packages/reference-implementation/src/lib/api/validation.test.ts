@@ -1,4 +1,11 @@
-import { ValidationError, isNonEmptyString, validateEnum, parsePositiveInt, parseNonNegativeInt } from './validation';
+import {
+  ValidationError,
+  isNonEmptyString,
+  validateEnum,
+  parsePositiveInt,
+  parseNonNegativeInt,
+  parseBooleanString,
+} from './validation';
 
 describe('isNonEmptyString', () => {
   it('returns true for a non-empty string', () => {
@@ -86,5 +93,40 @@ describe('parseNonNegativeInt', () => {
 
   it('throws for non-numeric strings', () => {
     expect(() => parseNonNegativeInt('abc', 'offset')).toThrow(ValidationError);
+  });
+});
+
+describe('parseBooleanString', () => {
+  it('returns undefined for null', () => {
+    expect(parseBooleanString(null, 'active')).toBeUndefined();
+  });
+
+  it('returns undefined for undefined', () => {
+    expect(parseBooleanString(undefined, 'active')).toBeUndefined();
+  });
+
+  it('returns true for "true"', () => {
+    expect(parseBooleanString('true', 'active')).toBe(true);
+  });
+
+  it('returns false for "false"', () => {
+    expect(parseBooleanString('false', 'active')).toBe(false);
+  });
+
+  it('throws for "TRUE" (case-sensitive)', () => {
+    expect(() => parseBooleanString('TRUE', 'active')).toThrow(ValidationError);
+    expect(() => parseBooleanString('TRUE', 'active')).toThrow('active must be "true" or "false"');
+  });
+
+  it('throws for "1"', () => {
+    expect(() => parseBooleanString('1', 'active')).toThrow(ValidationError);
+  });
+
+  it('throws for "yes"', () => {
+    expect(() => parseBooleanString('yes', 'active')).toThrow(ValidationError);
+  });
+
+  it('throws for empty string', () => {
+    expect(() => parseBooleanString('', 'active')).toThrow(ValidationError);
   });
 });
