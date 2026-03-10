@@ -413,8 +413,10 @@ async function main() {
       resolvedKeyId = didRecord.keyId;
       logger.info({ did: didRecord.did, keyId: resolvedKeyId }, 'DID created via VC service');
     } catch (error) {
-      if (error instanceof DidCreateError) {
-        // DID already exists — fetch its document to resolve the key ID
+      const isConflict =
+        error instanceof DidCreateError && (error.context as { httpStatus?: number })?.httpStatus === 409;
+      if (isConflict) {
+        // DID already exists (409 Conflict) — fetch its document to resolve the key ID
         logger.warn({ did: didString }, 'DID already exists in VC service — skipping creation');
         const document = await didAdapter.getDocument(didString);
         const verificationMethods: Array<{ id: string }> = document.verificationMethod ?? [];
