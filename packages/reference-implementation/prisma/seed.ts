@@ -39,7 +39,7 @@ const SYSTEM_DID_ID = 'cwomzqbdvw3qy4x6w2msi7cw2';
 const logger = createLogger().child({ module: 'prisma-seed' });
 
 // Load .env before accessing config (seed runs outside Next.js)
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 // Construct RI_DATABASE_URL from individual env vars (same as prisma.config.ts)
 // In Docker, these come from docker-compose; locally, from .env
@@ -656,13 +656,14 @@ async function main() {
             inline: false,
             mediaType: 'text/html',
             storageExternalId: storageRecord.externalId,
+            storageBucket: storageRecord.bucket,
             storageContentType: 'text/html',
             storageServiceInstanceId: SYSTEM_STORAGE_SERVICE_ID,
           },
         });
 
         logger.info(
-          { templateId: dm.templateId, uri, credentialType: dm.credentialType },
+          { templateId: dm.templateId, uri: storageRecord.uri, credentialType: dm.credentialType },
           'Template uploaded and seeded',
         );
       }
