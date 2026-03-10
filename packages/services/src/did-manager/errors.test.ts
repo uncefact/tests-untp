@@ -5,6 +5,7 @@ import {
   DidMethodNotSupportedError,
   DidInputError,
   DidCreateError,
+  DidConflictError,
   DidDeleteError,
   DidDocumentFetchError,
   DidParseError,
@@ -81,6 +82,19 @@ describe('DID errors', () => {
       const err = new DidCreateError('network failure');
       expect(err.message).toBe('Failed to create DID: network failure');
       expect(err.context).toEqual({ httpStatus: undefined });
+    });
+  });
+
+  describe('DidConflictError', () => {
+    it('constructs message from alias', () => {
+      const err = new DidConflictError('my-org');
+      expect(err.message).toBe('A DID with alias "my-org" already exists on the upstream provider');
+      expect(err.code).toBe('DID_CONFLICT');
+      expect(err.statusCode).toBe(409);
+      expect(err.context).toEqual({ alias: 'my-org' });
+      expect(err.name).toBe('DidConflictError');
+      expect(err).toBeInstanceOf(DidError);
+      expect(err).toBeInstanceOf(ServiceError);
     });
   });
 

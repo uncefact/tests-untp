@@ -15,7 +15,7 @@ import { AesGcmEncryptionAdapter, didAdapterRegistry } from '@uncefact/untp-ri-s
 import {
   EncryptionAlgorithm,
   createLogger,
-  DidCreateError,
+  DidConflictError,
   parseDidMethod,
   DidType as ServiceDidType,
   DidMethod as ServiceDidMethod,
@@ -413,10 +413,8 @@ async function main() {
       resolvedKeyId = didRecord.keyId;
       logger.info({ did: didRecord.did, keyId: resolvedKeyId }, 'DID created via VC service');
     } catch (error) {
-      const isConflict =
-        error instanceof DidCreateError && (error.context as { httpStatus?: number })?.httpStatus === 409;
-      if (isConflict) {
-        // DID already exists (409 Conflict) — fetch its document to resolve the key ID
+      if (error instanceof DidConflictError) {
+        // DID already exists on the upstream provider — fetch its document to resolve the key ID
         logger.warn({ did: didString }, 'DID already exists in VC service — skipping creation');
         const document = await didAdapter.getDocument(didString);
         const verificationMethods: Array<{ id: string }> = document.verificationMethod ?? [];

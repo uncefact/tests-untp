@@ -435,6 +435,54 @@ describe('DID API', { testIsolation: false }, () => {
     });
   });
 
+  describe('Duplicate DID handling', () => {
+    let duplicateTestDidId: string;
+    const duplicateAlias = `e2e-dup-${RUN_ID}`;
+
+    it('POST — creates a DID for the duplicate test', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids',
+        body: {
+          type: 'MANAGED',
+          method: 'DID_WEB',
+          alias: duplicateAlias,
+          name: `E2E Duplicate Test DID ${RUN_ID}`,
+        },
+      }).then((response) => {
+        expect(response.status).to.eq(201);
+        duplicateTestDidId = response.body.id;
+      });
+    });
+
+    it('POST — returns 409 when creating a DID with the same alias', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids',
+        body: {
+          type: 'MANAGED',
+          method: 'DID_WEB',
+          alias: duplicateAlias,
+          name: `E2E Duplicate DID ${RUN_ID}`,
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(409);
+        expect(response.body.error).to.be.a('string');
+        expect(response.body.error).to.include('already exists');
+      });
+    });
+
+    it('DELETE — cleans up the duplicate test DID', () => {
+      cy.request({
+        method: 'DELETE',
+        url: `/api/v1/dids/${duplicateTestDidId}`,
+      }).then((response) => {
+        expect(response.status).to.eq(204);
+      });
+    });
+  });
+
   describe('Error handling', () => {
     it('GET — returns 404 for non-existent DID', () => {
       cy.request({
