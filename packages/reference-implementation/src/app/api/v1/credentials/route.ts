@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import {
+  ValidationError,
+  isNonEmptyString,
+  parsePositiveInt,
+  parseNonNegativeInt,
+  parseBooleanString,
+} from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
 import { resolveDataModel, isDccDataModel } from '@/lib/credentials/resolve-data-model';
 import { validateCredentialPayload } from '@/lib/credentials/validate-credential-payload';
 import { issueCredential } from '@/lib/credentials/issue-credential';
-import { updateCredentialPublished } from '@/lib/prisma/repositories';
+import { updateCredentialPublished, listCredentials } from '@/lib/prisma/repositories';
+import { buildPaginatedResponse, DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
@@ -225,4 +232,107 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   const response: Record<string, unknown> = { credentialId };
   if (cvcWarnings.length > 0) response.warnings = cvcWarnings;
   return NextResponse.json(response, { status: 201 });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/credentials
+// ---------------------------------------------------------------------------
+
+/**
+ * @swagger
+ * /credentials:
+ *   get:
+ *     summary: List credentials
+ *     description: |
+ *       Returns a paginated, filterable list of credentials scoped to
+ *       the authenticated tenant.
+ *     tags:
+ *       - Credentials
+ *     parameters:
+ *       - in: query
+ *         name: credentialType
+ *         schema:
+ *           type: string
+ *         description: Filter by credential type (case-sensitive exact match)
+ *       - in: query
+ *         name: isPublished
+ *         schema:
+ *           type: string
+ *           enum: ["true", "false"]
+ *         description: Filter by published status
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 100
+ *         description: Maximum number of results
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *           default: 0
+ *         description: Number of results to skip
+ *     responses:
+ *       200:
+ *         description: Paginated list of credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required:
+ *                 - data
+ *                 - pagination
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Credential'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorised
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+export const GET = withTenantAuth(async (req, { tenantId }) => {
+  const url = new URL(req.url);
+
+  logger.info('Parsing query filters');
+  const credentialType = url.searchParams.get('credentialType') ?? undefined;
+  const isPublished = parseBooleanString(url.searchParams.get('isPublished'), 'isPublished');
+  const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+
+  const effectiveLimit = limit ?? DEFAULT_PAGE_LIMIT;
+
+  logger.info(
+    { filters: { credentialType, isPublished, limit: effectiveLimit, offset } },
+    'Querying credentials from database',
+  );
+  const { data, total } = await listCredentials({
+    tenantId,
+    credentialType,
+    isPublished,
+    limit: effectiveLimit,
+    offset,
+  });
+
+  logger.info({ count: data.length }, 'Credentials listed');
+  return NextResponse.json(buildPaginatedResponse(data, total, effectiveLimit, offset));
 });

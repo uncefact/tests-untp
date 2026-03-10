@@ -341,6 +341,132 @@ describe('Credential API', { testIsolation: false }, () => {
   });
 
   // -----------------------------------------------------------------------
+  // List credentials
+  // -----------------------------------------------------------------------
+  describe('List credentials', () => {
+    it('GET /api/v1/credentials — lists credentials with pagination metadata', () => {
+      cy.request('/api/v1/credentials').then((response) => {
+        expect(response.status).to.eq(200);
+
+        // Paginated response shape
+        expect(response.body.data).to.be.an('array');
+        expect(response.body.pagination).to.exist;
+        expect(response.body.pagination.total).to.be.a('number');
+        expect(response.body.pagination.limit).to.eq(100);
+        expect(response.body.pagination.offset).to.eq(0);
+        expect(response.body.pagination).to.have.property('hasMore');
+
+        // Should contain at least the credentials issued earlier in the suite
+        expect(response.body.data.length).to.be.at.least(2);
+
+        // Verify credential shape
+        const cred = response.body.data[0];
+        expect(cred.id).to.be.a('string');
+        expect(cred.storageUri).to.be.a('string');
+        expect(cred.hash).to.be.a('string');
+        expect(cred.credentialType).to.be.a('string');
+        expect(cred).to.have.property('isPublished');
+        expect(cred).to.have.property('createdAt');
+        expect(cred).to.have.property('updatedAt');
+      });
+    });
+
+    it('GET /api/v1/credentials?credentialType=DigitalProductPassport — filters by type', () => {
+      cy.request('/api/v1/credentials?credentialType=DigitalProductPassport').then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.data).to.be.an('array');
+        expect(response.body.data.length).to.be.at.least(1);
+
+        // All returned credentials should be DPP type
+        response.body.data.forEach((cred: any) => {
+          expect(cred.credentialType).to.eq('DigitalProductPassport');
+        });
+      });
+    });
+
+    it('GET /api/v1/credentials?isPublished=true — filters by published status', () => {
+      cy.request('/api/v1/credentials?isPublished=true').then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.data).to.be.an('array');
+
+        // All returned credentials should be published
+        response.body.data.forEach((cred: any) => {
+          expect(cred.isPublished).to.be.true;
+        });
+      });
+    });
+
+    it('GET /api/v1/credentials?isPublished=false — filters by unpublished', () => {
+      cy.request('/api/v1/credentials?isPublished=false').then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.data).to.be.an('array');
+
+        response.body.data.forEach((cred: any) => {
+          expect(cred.isPublished).to.be.false;
+        });
+      });
+    });
+
+    it('GET /api/v1/credentials?limit=1 — respects limit', () => {
+      cy.request('/api/v1/credentials?limit=1').then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.data).to.have.length(1);
+        expect(response.body.pagination.limit).to.eq(1);
+        expect(response.body.pagination.hasMore).to.be.true;
+      });
+    });
+
+    it('GET /api/v1/credentials?limit=1&offset=1 — respects offset', () => {
+      cy.request('/api/v1/credentials?limit=1&offset=1').then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.data).to.have.length(1);
+        expect(response.body.pagination.offset).to.eq(1);
+      });
+    });
+
+    it('GET /api/v1/credentials?credentialType=NonExistent — returns empty for unknown type', () => {
+      cy.request('/api/v1/credentials?credentialType=NonExistentType').then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.data).to.be.an('array').and.have.length(0);
+        expect(response.body.pagination.total).to.eq(0);
+      });
+    });
+
+    it('GET /api/v1/credentials?isPublished=yes — returns 400 for invalid boolean', () => {
+      cy.request({
+        method: 'GET',
+        url: '/api/v1/credentials?isPublished=yes',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('GET /api/v1/credentials?limit=0 — returns 400 for invalid limit', () => {
+      cy.request({
+        method: 'GET',
+        url: '/api/v1/credentials?limit=0',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('GET /api/v1/credentials?offset=-1 — returns 400 for invalid offset', () => {
+      cy.request({
+        method: 'GET',
+        url: '/api/v1/credentials?offset=-1',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // Error handling
   // -----------------------------------------------------------------------
   describe('Error handling', () => {

@@ -61,3 +61,14 @@ export function parseNonNegativeInt(raw: string | null | undefined, paramName: s
   }
   return parsed;
 }
+
+/**
+ * Parse a string as a boolean ("true" or "false").
+ * Returns undefined if the raw value is null/undefined.
+ */
+export function parseBooleanString(raw: string | null | undefined, paramName: string): boolean | undefined {
+  if (raw == null) return undefined;
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  throw new ValidationError(`${paramName} must be "true" or "false"`);
+}
