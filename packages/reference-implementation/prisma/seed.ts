@@ -23,18 +23,13 @@ import {
   ServiceType,
 } from '@uncefact/untp-ri-services';
 import { getDidConfig } from '../src/lib/config/did.config';
-/**
- * Must match the value in src/lib/prisma/constants.ts.
- * Inlined here because seed.ts runs via tsx outside the Next.js build,
- * so ../src/ path aliases are unavailable in the Docker container.
- */
-const SYSTEM_TENANT_ID = 'caq0ibyulrnh85itqtbgusfp3';
-
-/** Static CUIDs for system service instances — keeps seeding idempotent. */
-const SYSTEM_IDR_SERVICE_ID = 'csslhpc0y58qa8bqq75t4vpa9';
-const SYSTEM_STORAGE_SERVICE_ID = 'ctvr0veo08n4sbweelnoclrep';
-const SYSTEM_VC_SERVICE_ID = 'cblr5402swrgad9ai1cxqe5c3';
-const SYSTEM_DID_ID = 'cwomzqbdvw3qy4x6w2msi7cw2';
+import {
+  SYSTEM_TENANT_ID,
+  SYSTEM_IDR_SERVICE_ID,
+  SYSTEM_STORAGE_SERVICE_ID,
+  SYSTEM_VC_SERVICE_ID,
+  SYSTEM_DID_ID,
+} from '../src/lib/prisma/constants';
 
 const logger = createLogger().child({ module: 'prisma-seed' });
 

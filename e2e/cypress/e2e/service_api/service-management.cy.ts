@@ -1,3 +1,8 @@
+import {
+  SYSTEM_VC_SERVICE_ID,
+  SYSTEM_STORAGE_SERVICE_ID,
+} from '../../../../packages/reference-implementation/src/lib/prisma/constants';
+
 interface ServiceInstance {
   id: string;
   serviceType: string;
@@ -308,7 +313,7 @@ describe('Service API', { testIsolation: false }, () => {
       cy.request('/api/v1/services?serviceType=VC').then((response) => {
         expect(response.status).to.eq(200);
         const systemVc = response.body.data.find(
-          (s: ServiceInstance) => s.id === 'system-vc-vckit',
+          (s: ServiceInstance) => s.id === SYSTEM_VC_SERVICE_ID,
         );
         // No tenant primary exists yet — system default should be primary
         expect(systemVc).to.exist;
@@ -340,7 +345,7 @@ describe('Service API', { testIsolation: false }, () => {
       cy.request('/api/v1/services?serviceType=VC').then((response) => {
         expect(response.status).to.eq(200);
         const systemVc = response.body.data.find(
-          (s: ServiceInstance) => s.id === 'system-vc-vckit',
+          (s: ServiceInstance) => s.id === SYSTEM_VC_SERVICE_ID,
         );
         const tenantVc = response.body.data.find(
           (s: ServiceInstance) => s.id === tenantPrimaryId,
@@ -356,7 +361,7 @@ describe('Service API', { testIsolation: false }, () => {
       cy.request('/api/v1/services?serviceType=STORAGE').then((response) => {
         expect(response.status).to.eq(200);
         const systemStorage = response.body.data.find(
-          (s: ServiceInstance) => s.id === 'system-storage-uncefact',
+          (s: ServiceInstance) => s.id === SYSTEM_STORAGE_SERVICE_ID,
         );
         // Tenant has no STORAGE primary — system default stays primary
         expect(systemStorage).to.exist;
@@ -365,7 +370,7 @@ describe('Service API', { testIsolation: false }, () => {
     });
 
     it('GET by ID also applies override for system VC default', () => {
-      cy.request('/api/v1/services/system-vc-vckit').then((response) => {
+      cy.request(`/api/v1/services/${SYSTEM_VC_SERVICE_ID}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.isPrimary).to.be.false;
       });
@@ -383,7 +388,7 @@ describe('Service API', { testIsolation: false }, () => {
 
       cy.request('/api/v1/services?serviceType=VC').then((response) => {
         const systemVc = response.body.data.find(
-          (s: ServiceInstance) => s.id === 'system-vc-vckit',
+          (s: ServiceInstance) => s.id === SYSTEM_VC_SERVICE_ID,
         );
         expect(systemVc).to.exist;
         expect(systemVc.isPrimary).to.be.true;
@@ -402,7 +407,7 @@ describe('Service API', { testIsolation: false }, () => {
 
       cy.request('/api/v1/services?serviceType=VC').then((response) => {
         const systemVc = response.body.data.find(
-          (s: ServiceInstance) => s.id === 'system-vc-vckit',
+          (s: ServiceInstance) => s.id === SYSTEM_VC_SERVICE_ID,
         );
         expect(systemVc).to.exist;
         expect(systemVc.isPrimary).to.be.false;
@@ -419,7 +424,7 @@ describe('Service API', { testIsolation: false }, () => {
 
       cy.request('/api/v1/services?serviceType=VC').then((response) => {
         const systemVc = response.body.data.find(
-          (s: ServiceInstance) => s.id === 'system-vc-vckit',
+          (s: ServiceInstance) => s.id === SYSTEM_VC_SERVICE_ID,
         );
         expect(systemVc).to.exist;
         expect(systemVc.isPrimary).to.be.true;
