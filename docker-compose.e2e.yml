@@ -22,6 +22,12 @@ services:
       - 3332:3332
     depends_on:
       - db
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --quiet --spider http://localhost:3332/agent-api-docs || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   db:
     image: postgres:16-alpine
@@ -211,6 +217,10 @@ services:
       - 'localhost:host-gateway'
     depends_on:
       untp-playground:
+        condition: service_started
+      vckit-api:
+        condition: service_healthy
+      storage-service:
         condition: service_started
       e2e-keycloak:
         condition: service_healthy
