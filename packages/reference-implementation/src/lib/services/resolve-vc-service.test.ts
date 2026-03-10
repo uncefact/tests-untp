@@ -46,6 +46,7 @@ jest.mock('@uncefact/untp-ri-services/server', () => ({
 }));
 
 import { resolveVcService } from './resolve-vc-service';
+import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 
 import {
   ServiceResolutionError,
@@ -65,7 +66,7 @@ const MOCK_ENCRYPTED_ENVELOPE = {
 
 const MOCK_INSTANCE = {
   id: 'vc-inst-1',
-  tenantId: 'system',
+  tenantId: SYSTEM_TENANT_ID,
   serviceType: 'VC',
   adapterType: 'VCKIT_VC',
   name: 'System VCKit VC',
@@ -76,7 +77,7 @@ const MOCK_INSTANCE = {
 };
 
 const VALID_CONFIG = {
-  endpoint: 'https://vckit.example.com',
+  baseUrl: 'https://vckit.example.com',
   authToken: 'tok',
 };
 const VALID_JSON = JSON.stringify(VALID_CONFIG);

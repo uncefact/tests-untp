@@ -11,18 +11,30 @@ import {
   ServiceType as PrismaServiceType,
   AdapterType as PrismaAdapterType,
 } from '../src/lib/prisma/generated';
-import { AesGcmEncryptionAdapter } from '@uncefact/untp-ri-services/server';
-import { EncryptionAlgorithm, createLogger } from '@uncefact/untp-ri-services';
+import { AesGcmEncryptionAdapter, didAdapterRegistry } from '@uncefact/untp-ri-services/server';
+import {
+  EncryptionAlgorithm,
+  createLogger,
+  DidCreateError,
+  parseDidMethod,
+  DidType as ServiceDidType,
+  DidMethod as ServiceDidMethod,
+  adapterRegistry,
+  ServiceType,
+} from '@uncefact/untp-ri-services';
 import { getDidConfig } from '../src/lib/config/did.config';
-import { getIdrConfig } from '../src/lib/config/idr.config';
-import { getStorageConfig } from '../src/lib/config/storage.config';
-import { getVcConfig } from '../src/lib/config/vc.config';
 /**
  * Must match the value in src/lib/prisma/constants.ts.
  * Inlined here because seed.ts runs via tsx outside the Next.js build,
  * so ../src/ path aliases are unavailable in the Docker container.
  */
-const SYSTEM_TENANT_ID = 'system';
+const SYSTEM_TENANT_ID = 'caq0ibyulrnh85itqtbgusfp3';
+
+/** Static CUIDs for system service instances — keeps seeding idempotent. */
+const SYSTEM_IDR_SERVICE_ID = 'csslhpc0y58qa8bqq75t4vpa9';
+const SYSTEM_STORAGE_SERVICE_ID = 'ctvr0veo08n4sbweelnoclrep';
+const SYSTEM_VC_SERVICE_ID = 'cblr5402swrgad9ai1cxqe5c3';
+const SYSTEM_DID_ID = 'cwomzqbdvw3qy4x6w2msi7cw2';
 
 const logger = createLogger().child({ module: 'prisma-seed' });
 
@@ -49,42 +61,15 @@ async function main() {
     },
   });
 
-  // Upsert the system default DID (requires DID config env vars)
-  let defaultDid: string | null = null;
-  let defaultKeyId = '';
+  // Read DID configuration (DID creation happens after VC service is available)
+  let didConfig: { defaultDid: string; defaultKeyId?: string } | null = null;
   try {
-    const didConfig = getDidConfig();
-    defaultDid = didConfig.defaultDid;
-    defaultKeyId = didConfig.defaultKeyId;
+    didConfig = getDidConfig();
   } catch (error) {
     logger.warn(
       { error: error instanceof Error ? error.message : error },
       'DID configuration not available; skipping default DID seed',
     );
-  }
-
-  if (defaultDid) {
-    await prisma.did.upsert({
-      where: { did: defaultDid },
-      update: {
-        name: 'System Default DID',
-        description: 'System-wide default DID for the UNTP reference implementation',
-        keyId: defaultKeyId,
-        status: DidStatus.ACTIVE,
-        isDefault: true,
-      },
-      create: {
-        tenantId: SYSTEM_TENANT_ID,
-        did: defaultDid,
-        type: DidType.DEFAULT,
-        method: DidMethod.DID_WEB,
-        name: 'System Default DID',
-        description: 'System-wide default DID for the UNTP reference implementation',
-        keyId: defaultKeyId,
-        status: DidStatus.ACTIVE,
-        isDefault: true,
-      },
-    });
   }
 
   // ── Seed system registrars ──────────────────────────────────────────────────
@@ -229,33 +214,41 @@ async function main() {
   let idrSeeded = false;
   if (encryptionService) {
     try {
-      const { pyxIdrApiUrl, pyxIdrApiKey } = getIdrConfig();
-      const idrServiceConfig = JSON.stringify({
-        baseUrl: new URL(pyxIdrApiUrl).origin,
-        apiKey: pyxIdrApiKey,
-        apiVersion: '2.0.0',
-        ianaLanguage: 'en',
-        context: 'au',
-        defaultLinkType: 'untp:dpp',
-        defaultMimeType: 'text/html',
-        defaultIanaLanguage: 'en',
-        defaultContext: 'au',
-        fwqs: false,
+      const idrAdapters = adapterRegistry[ServiceType.IDR];
+      const permittedIdrTypes = Object.keys(idrAdapters) as Array<keyof typeof idrAdapters>;
+      const idrAdapterType = (process.env.SYSTEM_IDR_ADAPTER_TYPE as keyof typeof idrAdapters) || 'PYX_IDR';
+      const idrRegistryEntry = idrAdapters[idrAdapterType];
+      if (!idrRegistryEntry) {
+        throw new Error(
+          `Unknown IDR adapter type: "${idrAdapterType}". Permitted types: ${permittedIdrTypes.join(', ')}`,
+        );
+      }
+      const idrConfig = idrRegistryEntry.configSchema.parse({
+        baseUrl: process.env.SYSTEM_IDR_BASE_URL,
+        apiKey: process.env.SYSTEM_IDR_API_KEY,
+        apiVersion: process.env.SYSTEM_IDR_API_VERSION || undefined,
+        defaultLinkType: process.env.SYSTEM_IDR_DEFAULT_LINK_TYPE,
+        defaultMimeType: process.env.SYSTEM_IDR_DEFAULT_MIME_TYPE,
+        defaultIanaLanguage: process.env.SYSTEM_IDR_DEFAULT_LANGUAGE,
+        defaultContext: process.env.SYSTEM_IDR_DEFAULT_CONTEXT,
+        defaultFwqs: process.env.SYSTEM_IDR_DEFAULT_FWQS === 'true',
       });
+      const idrServiceConfig = JSON.stringify(idrConfig);
       const encryptedIdrConfig = JSON.stringify(
         encryptionService.encrypt(idrServiceConfig, EncryptionAlgorithm.AES_256_GCM),
       );
 
       await prisma.serviceInstance.upsert({
-        where: { id: 'system-idr-pyx' },
+        where: { id: SYSTEM_IDR_SERVICE_ID },
         update: { config: encryptedIdrConfig },
         create: {
-          id: 'system-idr-pyx',
+          id: SYSTEM_IDR_SERVICE_ID,
           tenantId: SYSTEM_TENANT_ID,
           serviceType: PrismaServiceType.IDR,
-          adapterType: PrismaAdapterType.PYX_IDR,
-          name: 'System Default Pyx IDR',
-          description: 'System-wide default Pyx Identity Resolver instance',
+          adapterType: idrAdapterType as unknown as PrismaAdapterType,
+          name: process.env.SYSTEM_IDR_SERVICE_NAME || 'System Default IDR',
+          description:
+            process.env.SYSTEM_IDR_SERVICE_DESCRIPTION || 'System-wide default Identity Resolver service instance',
           config: encryptedIdrConfig,
           isPrimary: true,
         },
@@ -265,7 +258,7 @@ async function main() {
       // Link registrars to the IDR service instance (must happen after the instance exists)
       await prisma.registrar.updateMany({
         where: { id: { in: ['system-registrar-gs1', 'system-registrar-abr', 'system-registrar-asic'] } },
-        data: { idrServiceInstanceId: 'system-idr-pyx' },
+        data: { idrServiceInstanceId: SYSTEM_IDR_SERVICE_ID },
       });
     } catch (error) {
       logger.warn(
@@ -278,31 +271,46 @@ async function main() {
   // ── Seed system UNCEFACT storage service instance ───────────────────────────
 
   let storageSeeded = false;
+  let storageRegistryEntry:
+    | (typeof adapterRegistry)[typeof ServiceType.STORAGE][keyof (typeof adapterRegistry)[typeof ServiceType.STORAGE]]
+    | null = null;
+  let storageConfig: unknown = null;
   if (encryptionService) {
     try {
-      const { storageServiceUrl } = getStorageConfig();
-      const storageApiKey = process.env.UNCEFACT_STORAGE_API_KEY;
-      const storageServiceConfig = JSON.stringify({
-        baseUrl: new URL(storageServiceUrl).origin,
-        ...(storageApiKey && { apiKey: storageApiKey }),
-        apiVersion: '3.1.0',
-        publicBucket: process.env.UNCEFACT_STORAGE_PUBLIC_BUCKET || 'public-data',
-        privateBucket: process.env.UNCEFACT_STORAGE_PRIVATE_BUCKET || 'private-data',
+      const storageAdapters = adapterRegistry[ServiceType.STORAGE];
+      const permittedStorageTypes = Object.keys(storageAdapters) as Array<keyof typeof storageAdapters>;
+      const storageAdapterType =
+        (process.env.SYSTEM_STORAGE_ADAPTER_TYPE as keyof typeof storageAdapters) || 'UNCEFACT_STORAGE';
+      const resolvedStorageEntry = storageAdapters[storageAdapterType];
+      if (!resolvedStorageEntry) {
+        throw new Error(
+          `Unknown storage adapter type: "${storageAdapterType}". Permitted types: ${permittedStorageTypes.join(', ')}`,
+        );
+      }
+      const parsedStorageConfig = resolvedStorageEntry.configSchema.parse({
+        baseUrl: process.env.SYSTEM_STORAGE_BASE_URL,
+        apiKey: process.env.SYSTEM_STORAGE_API_KEY || undefined,
+        apiVersion: process.env.SYSTEM_STORAGE_API_VERSION || undefined,
+        publicBucket: process.env.SYSTEM_STORAGE_PUBLIC_BUCKET || undefined,
+        privateBucket: process.env.SYSTEM_STORAGE_PRIVATE_BUCKET || undefined,
       });
+      storageConfig = parsedStorageConfig;
+      storageRegistryEntry = resolvedStorageEntry;
+      const storageServiceConfig = JSON.stringify(parsedStorageConfig);
       const encryptedStorageConfig = JSON.stringify(
         encryptionService.encrypt(storageServiceConfig, EncryptionAlgorithm.AES_256_GCM),
       );
 
       await prisma.serviceInstance.upsert({
-        where: { id: 'system-storage-uncefact' },
+        where: { id: SYSTEM_STORAGE_SERVICE_ID },
         update: { config: encryptedStorageConfig },
         create: {
-          id: 'system-storage-uncefact',
+          id: SYSTEM_STORAGE_SERVICE_ID,
           tenantId: SYSTEM_TENANT_ID,
           serviceType: PrismaServiceType.STORAGE,
-          adapterType: PrismaAdapterType.UNCEFACT_STORAGE,
-          name: 'System Default UNCEFACT Storage',
-          description: 'System-wide default UNCEFACT storage instance for credential persistence',
+          adapterType: storageAdapterType as unknown as PrismaAdapterType,
+          name: process.env.SYSTEM_STORAGE_SERVICE_NAME || 'System Default Storage',
+          description: process.env.SYSTEM_STORAGE_SERVICE_DESCRIPTION || 'System-wide default storage service instance',
           config: encryptedStorageConfig,
           isPrimary: true,
         },
@@ -316,49 +324,162 @@ async function main() {
     }
   }
 
-  // ── Seed system VCKit VC service instance ─────────────────────────────────
+  // ── Seed system VC service instance ───────────────────────────────────────
   let vcSeeded = false;
+  let vcAdapterType: string | null = null;
+  let vcConfig: unknown = null;
   if (encryptionService) {
     try {
-      const { vckitApiUrl, vckitApiKey } = getVcConfig();
-      const vcServiceConfig = JSON.stringify({
-        endpoint: new URL(vckitApiUrl).origin,
-        apiKey: vckitApiKey,
-        apiVersion: '1.0.0',
+      const vcAdapters = adapterRegistry[ServiceType.VC];
+      const permittedVcTypes = Object.keys(vcAdapters) as Array<keyof typeof vcAdapters>;
+      const resolvedVcAdapterType = (process.env.SYSTEM_VC_ADAPTER_TYPE as keyof typeof vcAdapters) || 'VCKIT';
+      const vcRegistryEntry = vcAdapters[resolvedVcAdapterType];
+      if (!vcRegistryEntry) {
+        throw new Error(
+          `Unknown VC adapter type: "${resolvedVcAdapterType}". Permitted types: ${permittedVcTypes.join(', ')}`,
+        );
+      }
+      vcConfig = vcRegistryEntry.configSchema.parse({
+        baseUrl: process.env.SYSTEM_VC_BASE_URL,
+        apiKey: process.env.SYSTEM_VC_API_KEY,
+        apiVersion: process.env.SYSTEM_VC_API_VERSION || undefined,
       });
+      vcAdapterType = resolvedVcAdapterType;
+      const vcServiceConfig = JSON.stringify(vcConfig);
       const encryptedVcConfig = JSON.stringify(
         encryptionService.encrypt(vcServiceConfig, EncryptionAlgorithm.AES_256_GCM),
       );
 
       await prisma.serviceInstance.upsert({
-        where: { id: 'system-vc-vckit' },
+        where: { id: SYSTEM_VC_SERVICE_ID },
         update: { config: encryptedVcConfig },
         create: {
-          id: 'system-vc-vckit',
+          id: SYSTEM_VC_SERVICE_ID,
           tenantId: SYSTEM_TENANT_ID,
           serviceType: PrismaServiceType.VC,
-          adapterType: PrismaAdapterType.VCKIT,
-          name: 'System Default VCKit',
-          description: 'System-wide default VCKit instance for DID management and verifiable credential operations',
+          adapterType: resolvedVcAdapterType as unknown as PrismaAdapterType,
+          name: process.env.SYSTEM_VC_SERVICE_NAME || 'System Default VC',
+          description:
+            process.env.SYSTEM_VC_SERVICE_DESCRIPTION || 'System-wide default verifiable credential service instance',
           config: encryptedVcConfig,
           isPrimary: true,
         },
       });
       vcSeeded = true;
-
-      // Link the system default DID to the VC service instance
-      if (defaultDid) {
-        await prisma.did.updateMany({
-          where: { did: defaultDid },
-          data: { serviceInstanceId: 'system-vc-vckit' },
-        });
-      }
     } catch (error) {
       logger.warn(
         { error: error instanceof Error ? error.message : error },
         'Skipping VC service instance seed: VC configuration not available',
       );
     }
+  }
+
+  // ── Seed system default DID via VC service ─────────────────────────────────
+  // Uses the DID adapter registry to resolve the correct DID adapter for the
+  // seeded VC service, creates the DID (if it doesn't already exist), resolves
+  // the key ID from the DID document, and records it in the database.
+
+  let defaultDid: string | null = null;
+  if (didConfig && vcSeeded && vcAdapterType && vcConfig) {
+    const { defaultDid: didString, defaultKeyId: envKeyId } = didConfig;
+
+    // 1. Validate DID format (parseDidMethod throws for invalid/unsupported methods)
+    parseDidMethod(didString);
+
+    // 2. Resolve the DID adapter from the registry using the seeded VC adapter type
+    const didRegistryEntry = didAdapterRegistry[vcAdapterType as keyof typeof didAdapterRegistry];
+    if (!didRegistryEntry) {
+      throw new Error(
+        `No DID adapter registered for VC adapter type: "${vcAdapterType}". ` +
+          `Permitted types: ${Object.keys(didAdapterRegistry).join(', ')}`,
+      );
+    }
+    const didAdapter = didRegistryEntry.factory(
+      vcConfig as Parameters<typeof didRegistryEntry.factory>[0],
+      logger.child({ service: 'DID - Seed' }),
+    );
+
+    // 3. Create DID via VC service (or confirm it already exists)
+    // Extract alias from the DID (everything after did:web:)
+    const alias = didString.replace(/^did:[^:]+:/, '');
+    let resolvedKeyId: string;
+
+    try {
+      const didRecord = await didAdapter.create({
+        type: ServiceDidType.SELF_MANAGED,
+        method: ServiceDidMethod.DID_WEB,
+        alias,
+      });
+      resolvedKeyId = didRecord.keyId;
+      logger.info({ did: didRecord.did, keyId: resolvedKeyId }, 'DID created via VC service');
+    } catch (error) {
+      if (error instanceof DidCreateError) {
+        // DID already exists — fetch its document to resolve the key ID
+        logger.warn({ did: didString }, 'DID already exists in VC service — skipping creation');
+        const document = await didAdapter.getDocument(didString);
+        const verificationMethods: Array<{ id: string }> = document.verificationMethod ?? [];
+        if (verificationMethods.length === 0) {
+          throw new Error(
+            `No verification methods found in DID document for "${didString}" — ` +
+              'cannot resolve key ID. Set SYSTEM_DID_KEY_ID explicitly.',
+          );
+        }
+        resolvedKeyId = verificationMethods[0].id;
+        logger.info({ did: didString, keyId: resolvedKeyId }, 'Resolved key ID from existing DID document');
+      } else {
+        throw error;
+      }
+    }
+
+    // 4. If SYSTEM_DID_KEY_ID is set, validate it matches the resolved key
+    if (envKeyId && envKeyId !== resolvedKeyId) {
+      // Fetch document to check all verification methods
+      const document = await didAdapter.getDocument(didString);
+      const verificationMethods: Array<{ id: string }> = document.verificationMethod ?? [];
+      const found = verificationMethods.some((vm) => vm.id === envKeyId || vm.id.endsWith(`#${envKeyId}`));
+      if (!found) {
+        throw new Error(
+          `SYSTEM_DID_KEY_ID "${envKeyId}" not found in DID document for "${didString}". ` +
+            `Available verification methods: ${verificationMethods.map((vm) => vm.id).join(', ') || 'none'}`,
+        );
+      }
+      resolvedKeyId = envKeyId;
+      logger.info({ did: didString, keyId: resolvedKeyId }, 'Using explicitly configured key ID');
+    }
+
+    // 5. Record DID in database
+    await prisma.did.upsert({
+      where: { id: SYSTEM_DID_ID },
+      update: {
+        did: didString,
+        name: process.env.SYSTEM_DID_NAME || 'System Default DID',
+        description:
+          process.env.SYSTEM_DID_DESCRIPTION || 'System-wide default DID for the UNTP reference implementation',
+        keyId: resolvedKeyId,
+        status: DidStatus.ACTIVE,
+        isDefault: true,
+        serviceInstanceId: SYSTEM_VC_SERVICE_ID,
+      },
+      create: {
+        id: SYSTEM_DID_ID,
+        tenantId: SYSTEM_TENANT_ID,
+        did: didString,
+        type: DidType.DEFAULT,
+        method: DidMethod.DID_WEB,
+        name: process.env.SYSTEM_DID_NAME || 'System Default DID',
+        description:
+          process.env.SYSTEM_DID_DESCRIPTION || 'System-wide default DID for the UNTP reference implementation',
+        keyId: resolvedKeyId,
+        status: DidStatus.ACTIVE,
+        isDefault: true,
+        serviceInstanceId: SYSTEM_VC_SERVICE_ID,
+      },
+    });
+    defaultDid = didString;
+
+    logger.info({ did: didString, keyId: resolvedKeyId }, 'Default DID seeded and linked to VC service instance');
+  } else if (didConfig && !vcSeeded) {
+    logger.warn('Skipping default DID seed: VC service instance was not seeded (required for DID creation)');
   }
 
   // ── Seed core data model configs ────────────────────────────────────────────
@@ -488,12 +609,12 @@ async function main() {
   // Requires the storage service to be available (skipped otherwise).
 
   let templatesSeeded = false;
-  if (storageSeeded) {
+  if (storageSeeded && storageRegistryEntry && storageConfig) {
     try {
-      const { storageServiceUrl } = getStorageConfig();
-      const storageApiKey = process.env.UNCEFACT_STORAGE_API_KEY;
-      const storageBaseUrl = new URL(storageServiceUrl).origin;
-      const storageBucket = process.env.UNCEFACT_STORAGE_PUBLIC_BUCKET || 'public-data';
+      const storageService = storageRegistryEntry.factory(
+        storageConfig as Parameters<typeof storageRegistryEntry.factory>[0],
+        logger.child({ service: 'Storage - Seed' }),
+      );
 
       const TEMPLATES_BASE = path.resolve(__dirname, '../src/templates');
 
@@ -515,50 +636,12 @@ async function main() {
 
         const templateContent = fs.readFileSync(templatePath, 'utf-8');
 
-        // Upload to the storage service public bucket using multipart FormData
-        // (matches the adapter pattern in uncefact-storage.adapter.ts)
-        const externalId = crypto.randomUUID();
-        const formData = new FormData();
-        const blob = new Blob([templateContent], { type: 'text/html' });
-        formData.append('file', blob, `${dm.shortCode}-template.hbs`);
-        formData.append('id', externalId);
-        formData.append('bucket', storageBucket);
-
-        // Build headers without Content-Type — the runtime must set
-        // multipart/form-data with the correct boundary automatically.
-        const uploadHeaders: Record<string, string> = {};
-        if (storageApiKey) {
-          uploadHeaders['X-API-Key'] = storageApiKey;
-        }
-
-        const uploadUrl = `${storageBaseUrl}/api/3.1.0/public`;
-        const response = await fetch(uploadUrl, {
-          method: 'POST',
-          headers: uploadHeaders,
-          body: formData,
-        });
-
-        if (!response.ok) {
-          logger.warn(
-            { httpStatus: response.status, credentialType: dm.credentialType },
-            'Failed to upload template to storage, skipping',
-          );
-          continue;
-        }
-
-        const result: unknown = await response.json();
-        if (
-          typeof result !== 'object' ||
-          result === null ||
-          typeof (result as Record<string, unknown>).uri !== 'string'
-        ) {
-          logger.warn(
-            { credentialType: dm.credentialType, responseBody: result },
-            'Storage service returned unexpected response shape, skipping template',
-          );
-          continue;
-        }
-        const { uri, hash } = result as { uri: string; hash?: string };
+        // Upload template to storage via the seeded storage service adapter
+        const storageRecord = await storageService.storeBinary(
+          templateContent,
+          `${dm.shortCode}-template.hbs`,
+          'text/html',
+        );
 
         await prisma.renderTemplate.create({
           data: {
@@ -566,16 +649,15 @@ async function main() {
             tenantId: SYSTEM_TENANT_ID,
             dataModelId: dm.id,
             name: `${dm.name} Default Template`,
-            storageUrl: uri,
-            hash: hash ?? crypto.createHash('sha256').update(templateContent).digest('hex'),
+            storageUrl: storageRecord.uri,
+            hash: storageRecord.hash ?? crypto.createHash('sha256').update(templateContent).digest('hex'),
             isDefault: true,
             renderMethodType: RenderMethodType.RenderTemplate2024,
             inline: false,
             mediaType: 'text/html',
-            storageExternalId: externalId,
-            storageBucket: storageBucket,
+            storageExternalId: storageRecord.externalId,
             storageContentType: 'text/html',
-            storageServiceInstanceId: 'system-storage-uncefact',
+            storageServiceInstanceId: SYSTEM_STORAGE_SERVICE_ID,
           },
         });
 

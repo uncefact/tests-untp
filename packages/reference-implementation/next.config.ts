@@ -9,22 +9,7 @@ import { PHASE_PRODUCTION_BUILD } from 'next/constants';
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const nextConfig = (phase: string): NextConfig => {
-  const {
-    RI_POSTGRES_USER,
-    RI_POSTGRES_PASSWORD,
-    RI_POSTGRES_DB,
-    RI_POSTGRES_HOST,
-    RI_POSTGRES_PORT,
-    AUTH_OIDC_ISSUER,
-    RI_APP_URL,
-    DEFAULT_HUMAN_VERIFICATION_URL,
-    DEFAULT_MACHINE_VERIFICATION_URL,
-    VCKIT_API_URL,
-    VCKIT_API_KEY,
-    DEFAULT_ISSUER_DID,
-    DEFAULT_ISSUER_KEY_ID,
-    SERVICE_ENCRYPTION_KEY,
-  } = process.env;
+  const { RI_POSTGRES_USER, RI_POSTGRES_PASSWORD, RI_POSTGRES_DB, RI_POSTGRES_HOST, RI_POSTGRES_PORT } = process.env;
 
   // Validate required environment variables (skip during build phase for Docker)
   if (phase !== PHASE_PRODUCTION_BUILD) {
@@ -34,15 +19,6 @@ const nextConfig = (phase: string): NextConfig => {
       RI_POSTGRES_DB,
       RI_POSTGRES_HOST,
       RI_POSTGRES_PORT,
-      AUTH_OIDC_ISSUER,
-      RI_APP_URL,
-      DEFAULT_HUMAN_VERIFICATION_URL,
-      DEFAULT_MACHINE_VERIFICATION_URL,
-      VCKIT_API_URL,
-      VCKIT_API_KEY,
-      DEFAULT_ISSUER_DID,
-      DEFAULT_ISSUER_KEY_ID,
-      SERVICE_ENCRYPTION_KEY,
     };
 
     const missingVars = Object.entries(requiredEnvVars)
@@ -67,11 +43,6 @@ const nextConfig = (phase: string): NextConfig => {
     reactStrictMode: false,
     eslint: { ignoreDuringBuilds: true },
     transpilePackages: ['@reference-implementation/components'],
-    env: {
-      NEXT_PUBLIC_NEXTAUTH_URL: RI_APP_URL || '',
-      NEXT_DEFAULT_HUMAN_VERIFICATION_URL: DEFAULT_HUMAN_VERIFICATION_URL || '',
-      NEXT_DEFAULT_MACHINE_VERIFICATION_URL: DEFAULT_MACHINE_VERIFICATION_URL || '',
-    },
   };
 };
 

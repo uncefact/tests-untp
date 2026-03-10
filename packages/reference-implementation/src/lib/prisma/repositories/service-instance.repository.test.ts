@@ -7,6 +7,7 @@ import {
   countServiceInstanceReferences,
   getInstanceByResolution,
 } from './service-instance.repository';
+import { SYSTEM_TENANT_ID } from '../constants';
 
 // Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
 const mockServiceInstance = {
@@ -149,14 +150,14 @@ describe('service-instance.repository', () => {
       expect(mockServiceInstance.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'instance-1',
-          OR: [{ tenantId: ORG_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: ORG_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
       });
       expect(result).toEqual(INSTANCE_RECORD);
     });
 
     it('returns system default', async () => {
-      const systemRecord = { ...INSTANCE_RECORD, tenantId: 'system' };
+      const systemRecord = { ...INSTANCE_RECORD, tenantId: SYSTEM_TENANT_ID };
       mockServiceInstance.findFirst.mockResolvedValue(systemRecord);
 
       const result = await getServiceInstanceById('instance-1', ORG_ID);
@@ -172,7 +173,7 @@ describe('service-instance.repository', () => {
     });
 
     it('overrides system default isPrimary when tenant has own primary for same serviceType', async () => {
-      const systemRecord = { ...INSTANCE_RECORD, tenantId: 'system', isPrimary: true, serviceType: 'VC' };
+      const systemRecord = { ...INSTANCE_RECORD, tenantId: SYSTEM_TENANT_ID, isPrimary: true, serviceType: 'VC' };
       const tenantPrimary = { ...INSTANCE_RECORD, id: 'tenant-vc', tenantId: ORG_ID, isPrimary: true };
       // First call: getServiceInstanceById lookup
       mockServiceInstance.findFirst.mockResolvedValueOnce(systemRecord);
@@ -185,7 +186,7 @@ describe('service-instance.repository', () => {
     });
 
     it('keeps system default isPrimary when tenant has no primary for same serviceType', async () => {
-      const systemRecord = { ...INSTANCE_RECORD, tenantId: 'system', isPrimary: true, serviceType: 'VC' };
+      const systemRecord = { ...INSTANCE_RECORD, tenantId: SYSTEM_TENANT_ID, isPrimary: true, serviceType: 'VC' };
       // First call: getServiceInstanceById lookup
       mockServiceInstance.findFirst.mockResolvedValueOnce(systemRecord);
       // Second call: applyTenantPrimaryOverride lookup — no tenant primary
@@ -208,7 +209,7 @@ describe('service-instance.repository', () => {
 
       expect(mockServiceInstance.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [{ tenantId: ORG_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: ORG_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
         take: 20,
         skip: undefined,
@@ -216,7 +217,7 @@ describe('service-instance.repository', () => {
       });
       expect(mockServiceInstance.count).toHaveBeenCalledWith({
         where: {
-          OR: [{ tenantId: ORG_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: ORG_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
       });
       expect(result.data).toEqual([INSTANCE_RECORD]);
@@ -279,8 +280,20 @@ describe('service-instance.repository', () => {
     });
 
     it('overrides system default isPrimary when tenant has own primary for same serviceType', async () => {
-      const systemVc = { ...INSTANCE_RECORD, id: 'sys-vc', tenantId: 'system', serviceType: 'VC', isPrimary: true };
-      const systemIdr = { ...INSTANCE_RECORD, id: 'sys-idr', tenantId: 'system', serviceType: 'IDR', isPrimary: true };
+      const systemVc = {
+        ...INSTANCE_RECORD,
+        id: 'sys-vc',
+        tenantId: SYSTEM_TENANT_ID,
+        serviceType: 'VC',
+        isPrimary: true,
+      };
+      const systemIdr = {
+        ...INSTANCE_RECORD,
+        id: 'sys-idr',
+        tenantId: SYSTEM_TENANT_ID,
+        serviceType: 'IDR',
+        isPrimary: true,
+      };
       const tenantVc = { ...INSTANCE_RECORD, id: 'tenant-vc', tenantId: ORG_ID, serviceType: 'VC', isPrimary: true };
 
       // First findMany: data query; second findMany: tenant primaries query
@@ -297,7 +310,13 @@ describe('service-instance.repository', () => {
     });
 
     it('overrides correctly even when tenant primary is on a different page', async () => {
-      const systemVc = { ...INSTANCE_RECORD, id: 'sys-vc', tenantId: 'system', serviceType: 'VC', isPrimary: true };
+      const systemVc = {
+        ...INSTANCE_RECORD,
+        id: 'sys-vc',
+        tenantId: SYSTEM_TENANT_ID,
+        serviceType: 'VC',
+        isPrimary: true,
+      };
 
       // Data query returns only system default (tenant primary on another page)
       mockServiceInstance.findMany.mockResolvedValueOnce([systemVc]);
@@ -311,7 +330,13 @@ describe('service-instance.repository', () => {
     });
 
     it('keeps system default isPrimary when tenant has no primary', async () => {
-      const systemVc = { ...INSTANCE_RECORD, id: 'sys-vc', tenantId: 'system', serviceType: 'VC', isPrimary: true };
+      const systemVc = {
+        ...INSTANCE_RECORD,
+        id: 'sys-vc',
+        tenantId: SYSTEM_TENANT_ID,
+        serviceType: 'VC',
+        isPrimary: true,
+      };
 
       mockServiceInstance.findMany.mockResolvedValueOnce([systemVc]);
       mockServiceInstance.findMany.mockResolvedValueOnce([]);
@@ -453,14 +478,14 @@ describe('service-instance.repository', () => {
       expect(mockServiceInstance.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'instance-1',
-          OR: [{ tenantId: ORG_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: ORG_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
       });
       expect(result).toEqual(INSTANCE_RECORD);
     });
 
     it('returns explicit instance by ID (system default)', async () => {
-      const systemRecord = { ...INSTANCE_RECORD, tenantId: 'system' };
+      const systemRecord = { ...INSTANCE_RECORD, tenantId: SYSTEM_TENANT_ID };
       mockServiceInstance.findFirst.mockResolvedValue(systemRecord);
 
       const result = await getInstanceByResolution(ORG_ID, 'VC', 'instance-1');
@@ -493,7 +518,7 @@ describe('service-instance.repository', () => {
     });
 
     it('returns system default when no tenant primary', async () => {
-      const systemRecord = { ...INSTANCE_RECORD, tenantId: 'system' };
+      const systemRecord = { ...INSTANCE_RECORD, tenantId: SYSTEM_TENANT_ID };
       // First call: tenant primary lookup returns null
       mockServiceInstance.findFirst.mockResolvedValueOnce(null);
       // Second call: system default lookup returns the system record
@@ -511,7 +536,7 @@ describe('service-instance.repository', () => {
       });
       expect(mockServiceInstance.findFirst).toHaveBeenNthCalledWith(2, {
         where: {
-          tenantId: 'system',
+          tenantId: SYSTEM_TENANT_ID,
           serviceType: 'VC',
         },
       });

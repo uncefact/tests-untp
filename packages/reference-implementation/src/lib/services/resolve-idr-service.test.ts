@@ -46,6 +46,7 @@ jest.mock('@uncefact/untp-ri-services/server', () => ({
 }));
 
 import { resolveIdrService } from './resolve-idr-service';
+import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 
 import {
   ServiceResolutionError,
@@ -65,7 +66,7 @@ const MOCK_ENCRYPTED_ENVELOPE = {
 
 const MOCK_INSTANCE = {
   id: 'idr-inst-1',
-  tenantId: 'system',
+  tenantId: SYSTEM_TENANT_ID,
   serviceType: 'IDR',
   adapterType: 'PYX_IDR',
   name: 'System Pyx IDR',

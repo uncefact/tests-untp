@@ -16,12 +16,12 @@ export const constructVerifyURL = ({ baseUrl, uri, hash, decryptionKey }: IVerif
 
   if (!baseUrl) {
     const url = new URL(window.location.href);
-    baseUrl = `${url.protocol}//${url.host}`;
+    baseUrl = `${url.protocol}//${url.host}/verify`;
   }
 
   const payload: Record<string, string> = { uri, hash };
   if (decryptionKey) payload.decryptionKey = decryptionKey;
 
   const queryString = `q=${encodeURIComponent(JSON.stringify({ payload }))}`;
-  return `${baseUrl}/verify?${queryString}`;
+  return `${baseUrl}?${queryString}`;
 };

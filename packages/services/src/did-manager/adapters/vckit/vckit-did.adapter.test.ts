@@ -468,12 +468,12 @@ describe('VCKitDidAdapter', () => {
   });
 
   describe('vckitDidConfigSchema', () => {
-    it('accepts valid config with endpoint and apiKey', () => {
+    it('accepts valid config with baseUrl and apiKey', () => {
       const result = vckitDidConfigSchema.parse({
-        endpoint: 'https://vckit.example.com',
+        baseUrl: 'https://vckit.example.com',
         apiKey: 'my-key',
       });
-      expect(result.endpoint).toBe('https://vckit.example.com');
+      expect(result.baseUrl).toBe('https://vckit.example.com');
       expect(result.apiKey).toBe('my-key');
     });
   });
@@ -481,7 +481,7 @@ describe('VCKitDidAdapter', () => {
   describe('vckitDidRegistryEntry', () => {
     it('factory creates an adapter using Logger', () => {
       const config = vckitDidConfigSchema.parse({
-        endpoint: 'https://vckit.example.com',
+        baseUrl: 'https://vckit.example.com',
         apiKey: 'my-key',
       });
       const adapter = vckitDidRegistryEntry.factory(config, mockLogger);

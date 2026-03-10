@@ -58,7 +58,7 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
 
   constructor(config: VCKitVerifiableCredentialConfig, logger: LoggerService) {
     super(logger.child({ service: 'VC - VCKitVerifiableCredential' }));
-    this.baseURL = config.endpoint;
+    this.baseURL = config.baseUrl;
     this.headers = {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${config.apiKey}`,

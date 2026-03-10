@@ -19,7 +19,7 @@ describe('VCKitVerifiableCredentialService', () => {
   };
 
   const mockConfig: VCKitVerifiableCredentialConfig = {
-    endpoint: 'https://vckit.example.com',
+    baseUrl: 'https://vckit.example.com',
     apiKey: 'test-api-key',
     apiVersion: '1.0.0',
   };
@@ -419,18 +419,18 @@ describe('VCKitVerifiableCredentialService', () => {
       expect(vckitVerifiableCredentialRegistryEntry.configSchema).toBeDefined();
 
       const validConfig = {
-        endpoint: 'https://vckit.example.com',
+        baseUrl: 'https://vckit.example.com',
         apiKey: 'test-key',
       };
       const result = vckitVerifiableCredentialRegistryEntry.configSchema.parse(validConfig);
-      expect(result.endpoint).toBe('https://vckit.example.com');
+      expect(result.baseUrl).toBe('https://vckit.example.com');
       expect(result.apiKey).toBe('test-key');
     });
 
     it('should reject invalid config (missing apiKey)', () => {
       expect(() =>
         vckitVerifiableCredentialRegistryEntry.configSchema.parse({
-          endpoint: 'https://vckit.example.com',
+          baseUrl: 'https://vckit.example.com',
         }),
       ).toThrow();
     });
@@ -438,7 +438,7 @@ describe('VCKitVerifiableCredentialService', () => {
     it('should reject invalid config (empty apiKey)', () => {
       expect(() =>
         vckitVerifiableCredentialRegistryEntry.configSchema.parse({
-          endpoint: 'https://vckit.example.com',
+          baseUrl: 'https://vckit.example.com',
           apiKey: '',
         }),
       ).toThrow();
@@ -447,13 +447,13 @@ describe('VCKitVerifiableCredentialService', () => {
     it('should reject invalid config (invalid URL)', () => {
       expect(() =>
         vckitVerifiableCredentialRegistryEntry.configSchema.parse({
-          endpoint: 'not-a-url',
+          baseUrl: 'not-a-url',
           apiKey: 'test-key',
         }),
       ).toThrow();
     });
 
-    it('should reject invalid config (missing endpoint)', () => {
+    it('should reject invalid config (missing baseUrl)', () => {
       expect(() =>
         vckitVerifiableCredentialRegistryEntry.configSchema.parse({
           apiKey: 'test-key',
@@ -463,7 +463,7 @@ describe('VCKitVerifiableCredentialService', () => {
 
     it('should create an adapter instance via factory', () => {
       const config = {
-        endpoint: 'https://vckit.example.com',
+        baseUrl: 'https://vckit.example.com',
         apiKey: 'test-key',
       };
       const parsed = vckitVerifiableCredentialRegistryEntry.configSchema.parse(config);

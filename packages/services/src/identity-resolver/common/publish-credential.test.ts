@@ -6,7 +6,7 @@ import type { StorageRecord } from '../../storage/types';
 jest.mock('../../utils/helpers', () => ({
   ...jest.requireActual('../../utils/helpers'),
   constructVerifyURL: jest.fn(({ baseUrl, uri, hash }: { baseUrl: string; uri: string; hash: string }) => {
-    return `${baseUrl}/verify?q=${encodeURIComponent(JSON.stringify({ payload: { uri, hash } }))}`;
+    return `${baseUrl}?q=${encodeURIComponent(JSON.stringify({ payload: { uri, hash } }))}`;
   }),
 }));
 import { constructVerifyURL } from '../../utils/helpers';
@@ -70,7 +70,7 @@ describe('buildPublishLinks', () => {
 
   it('returns 2 links (storage URI + human verification) with only humanVerificationUrl', () => {
     const options: BuildPublishLinksOptions = {
-      humanVerificationUrl: 'https://app.example.com',
+      humanVerificationUrl: 'https://app.example.com/verify',
     };
 
     const links = buildPublishLinks(storage, linkTitle, options);
@@ -87,7 +87,7 @@ describe('buildPublishLinks', () => {
     expect(links[1].type).toBe('text/html');
     expect(links[1].title).toBe(linkTitle);
     expect(mockConstructVerifyURL).toHaveBeenCalledWith({
-      baseUrl: 'https://app.example.com',
+      baseUrl: 'https://app.example.com/verify',
       uri: storage.uri,
       hash: storage.hash,
     });
@@ -96,7 +96,7 @@ describe('buildPublishLinks', () => {
   it('returns 3 links when both verification URLs are provided', () => {
     const options: BuildPublishLinksOptions = {
       machineVerificationUrl: 'https://vckit.example.com/verify',
-      humanVerificationUrl: 'https://app.example.com',
+      humanVerificationUrl: 'https://app.example.com/verify',
     };
 
     const links = buildPublishLinks(storage, linkTitle, options);
@@ -113,14 +113,14 @@ describe('buildPublishLinks', () => {
 
   it('uses constructVerifyURL to build the human verification link href', () => {
     const options: BuildPublishLinksOptions = {
-      humanVerificationUrl: 'https://app.example.com',
+      humanVerificationUrl: 'https://app.example.com/verify',
     };
 
     buildPublishLinks(storage, linkTitle, options);
 
     expect(mockConstructVerifyURL).toHaveBeenCalledTimes(1);
     expect(mockConstructVerifyURL).toHaveBeenCalledWith({
-      baseUrl: 'https://app.example.com',
+      baseUrl: 'https://app.example.com/verify',
       uri: storage.uri,
       hash: storage.hash,
     });
@@ -129,7 +129,7 @@ describe('buildPublishLinks', () => {
   it('uses custom linkType when provided', () => {
     const options: BuildPublishLinksOptions = {
       linkType: 'gs1:certificationInfo',
-      humanVerificationUrl: 'https://app.example.com',
+      humanVerificationUrl: 'https://app.example.com/verify',
     };
 
     const links = buildPublishLinks(storage, linkTitle, options);

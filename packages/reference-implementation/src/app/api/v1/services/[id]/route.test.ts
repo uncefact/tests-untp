@@ -157,7 +157,7 @@ const MOCK_INSTANCE = {
 
 const MOCK_MASKED = {
   ...MOCK_INSTANCE,
-  config: { endpoint: 'https://example.com', apiKey: '***' },
+  config: { baseUrl: 'https://example.com', apiKey: '***' },
 };
 
 // ---------------------------------------------------------------------------
@@ -237,9 +237,9 @@ describe('PATCH /api/v1/services/:id', () => {
   });
 
   it('updates config (merges with existing, validates against schema, encrypts)', async () => {
-    const existingPlainConfig = { endpoint: 'https://old.com', apiKey: 'old-key' };
-    const newConfigPatch = { endpoint: 'https://new.com' };
-    const mergedConfig = { endpoint: 'https://new.com', apiKey: 'old-key' };
+    const existingPlainConfig = { baseUrl: 'https://old.com', apiKey: 'old-key' };
+    const newConfigPatch = { baseUrl: 'https://new.com' };
+    const mergedConfig = { baseUrl: 'https://new.com', apiKey: 'old-key' };
     const encryptedEnvelope = { cipherText: 'new-cipher', iv: 'new-iv', tag: 'new-tag', type: 'aes-256-gcm' };
 
     mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
@@ -248,7 +248,7 @@ describe('PATCH /api/v1/services/:id', () => {
 
     const updated = { ...MOCK_INSTANCE, config: JSON.stringify(encryptedEnvelope) };
     mockUpdateServiceInstance.mockResolvedValue(updated);
-    mockMaskInstanceConfig.mockReturnValue({ ...MOCK_MASKED, config: { endpoint: 'https://new.com', apiKey: '***' } });
+    mockMaskInstanceConfig.mockReturnValue({ ...MOCK_MASKED, config: { baseUrl: 'https://new.com', apiKey: '***' } });
 
     const req = createFakeRequest({ method: 'PATCH', body: { config: newConfigPatch } });
     const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
@@ -260,7 +260,7 @@ describe('PATCH /api/v1/services/:id', () => {
     expect(mockUpdateServiceInstance).toHaveBeenCalledWith('svc-123', 'org-1', {
       config: JSON.stringify(encryptedEnvelope),
     });
-    expect(json.config.endpoint).toBe('https://new.com');
+    expect(json.config.baseUrl).toBe('https://new.com');
   });
 
   it('updates isPrimary', async () => {
@@ -324,13 +324,13 @@ describe('PATCH /api/v1/services/:id', () => {
   });
 
   it('returns 400 when config schema validation fails after merge', async () => {
-    // Existing config has valid endpoint + apiKey
-    const existingPlainConfig = { endpoint: 'https://old.com', apiKey: 'old-key' };
+    // Existing config has valid baseUrl + apiKey
+    const existingPlainConfig = { baseUrl: 'https://old.com', apiKey: 'old-key' };
     mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
     mockDecrypt.mockReturnValue(JSON.stringify(existingPlainConfig));
 
-    // Patch with invalid endpoint URL — merged config will fail schema validation
-    const req = createFakeRequest({ method: 'PATCH', body: { config: { endpoint: 'not-a-url' } } });
+    // Patch with invalid baseUrl URL — merged config will fail schema validation
+    const req = createFakeRequest({ method: 'PATCH', body: { config: { baseUrl: 'not-a-url' } } });
     const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
 
     expect(res.status).toBe(400);
@@ -355,7 +355,7 @@ describe('PATCH /api/v1/services/:id', () => {
       throw new Error('Decryption failed');
     });
 
-    const req = createFakeRequest({ method: 'PATCH', body: { config: { endpoint: 'https://new.com' } } });
+    const req = createFakeRequest({ method: 'PATCH', body: { config: { baseUrl: 'https://new.com' } } });
     const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
 
     expect(res.status).toBe(400);

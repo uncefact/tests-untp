@@ -6,6 +6,7 @@ import {
   deleteRegistrar,
 } from './registrar.repository';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import { SYSTEM_TENANT_ID } from '../constants';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
@@ -106,7 +107,7 @@ describe('registrar.repository', () => {
       expect(mockRegistrar.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'reg-1',
-          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
         include: {
           schemes: {
@@ -120,7 +121,7 @@ describe('registrar.repository', () => {
     });
 
     it('returns a system default registrar', async () => {
-      const systemRegistrar = { ...REGISTRAR_RECORD, tenantId: 'system' };
+      const systemRegistrar = { ...REGISTRAR_RECORD, tenantId: SYSTEM_TENANT_ID };
       mockRegistrar.findFirst.mockResolvedValue(systemRegistrar);
 
       const result = await getRegistrarById('reg-1', TENANT_ID);
@@ -144,7 +145,7 @@ describe('registrar.repository', () => {
 
       expect(mockRegistrar.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
         take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
@@ -152,7 +153,7 @@ describe('registrar.repository', () => {
       });
       expect(mockRegistrar.count).toHaveBeenCalledWith({
         where: {
-          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
       });
       expect(result.data).toEqual([REGISTRAR_RECORD]);

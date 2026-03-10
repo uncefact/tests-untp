@@ -40,7 +40,7 @@ describe('didAdapterRegistry', () => {
     it('creates a VCKitDidAdapter instance with valid config', () => {
       const entry = didAdapterRegistry[AdapterType.VCKIT];
       const parsed = entry.configSchema.parse({
-        endpoint: 'https://vckit.example.com',
+        baseUrl: 'https://vckit.example.com',
         apiKey: 'my-key',
       });
       const service = entry.factory(parsed, mockLogger);
@@ -48,10 +48,10 @@ describe('didAdapterRegistry', () => {
       expect(service).toBeInstanceOf(VCKitDidAdapter);
     });
 
-    it('passes endpoint, auth header, and hardcoded keyType to VCKitDidAdapter', () => {
+    it('passes baseUrl, auth header, and hardcoded keyType to VCKitDidAdapter', () => {
       const entry = didAdapterRegistry[AdapterType.VCKIT];
       const parsed = entry.configSchema.parse({
-        endpoint: 'https://vckit.example.com',
+        baseUrl: 'https://vckit.example.com',
         apiKey: 'my-key',
       });
       const service = entry.factory(parsed, mockLogger) as VCKitDidAdapter;
@@ -67,22 +67,22 @@ describe('didAdapterRegistry', () => {
 
     it('accepts valid config', () => {
       const result = schema.safeParse({
-        endpoint: 'https://vckit.example.com',
+        baseUrl: 'https://vckit.example.com',
         apiKey: 'my-key',
       });
       expect(result.success).toBe(true);
     });
 
-    it('rejects missing endpoint', () => {
+    it('rejects missing baseUrl', () => {
       const result = schema.safeParse({
         apiKey: 'my-key',
       });
       expect(result.success).toBe(false);
     });
 
-    it('rejects non-URL endpoint', () => {
+    it('rejects non-URL baseUrl', () => {
       const result = schema.safeParse({
-        endpoint: 'not-a-url',
+        baseUrl: 'not-a-url',
         apiKey: 'my-key',
       });
       expect(result.success).toBe(false);
@@ -90,14 +90,14 @@ describe('didAdapterRegistry', () => {
 
     it('rejects missing apiKey', () => {
       const result = schema.safeParse({
-        endpoint: 'https://vckit.example.com',
+        baseUrl: 'https://vckit.example.com',
       });
       expect(result.success).toBe(false);
     });
 
     it('rejects empty apiKey', () => {
       const result = schema.safeParse({
-        endpoint: 'https://vckit.example.com',
+        baseUrl: 'https://vckit.example.com',
         apiKey: '',
       });
       expect(result.success).toBe(false);
@@ -127,7 +127,7 @@ describe('adapterRegistry', () => {
       it('creates a VCKitVerifiableCredentialService instance with valid config', () => {
         const entry = adapterRegistry[ServiceType.VC][AdapterType.VCKIT];
         const parsed = entry.configSchema.parse({
-          endpoint: 'https://vckit.example.com',
+          baseUrl: 'https://vckit.example.com',
           apiKey: 'my-api-key',
         });
         const service = entry.factory(parsed, mockLogger);
@@ -141,22 +141,22 @@ describe('adapterRegistry', () => {
 
       it('accepts valid config', () => {
         const result = schema.safeParse({
-          endpoint: 'https://vckit.example.com',
+          baseUrl: 'https://vckit.example.com',
           apiKey: 'my-api-key',
         });
         expect(result.success).toBe(true);
       });
 
-      it('rejects missing endpoint', () => {
+      it('rejects missing baseUrl', () => {
         const result = schema.safeParse({
           apiKey: 'my-api-key',
         });
         expect(result.success).toBe(false);
       });
 
-      it('rejects non-URL endpoint', () => {
+      it('rejects non-URL baseUrl', () => {
         const result = schema.safeParse({
-          endpoint: 'not-a-url',
+          baseUrl: 'not-a-url',
           apiKey: 'my-api-key',
         });
         expect(result.success).toBe(false);
@@ -164,14 +164,14 @@ describe('adapterRegistry', () => {
 
       it('rejects missing apiKey', () => {
         const result = schema.safeParse({
-          endpoint: 'https://vckit.example.com',
+          baseUrl: 'https://vckit.example.com',
         });
         expect(result.success).toBe(false);
       });
 
       it('rejects empty apiKey', () => {
         const result = schema.safeParse({
-          endpoint: 'https://vckit.example.com',
+          baseUrl: 'https://vckit.example.com',
           apiKey: '',
         });
         expect(result.success).toBe(false);

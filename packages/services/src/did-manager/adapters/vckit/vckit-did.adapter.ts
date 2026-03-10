@@ -259,5 +259,5 @@ export const vckitDidRegistryEntry = {
   configSchema: vckitDidConfigSchema,
   sensitiveFields: vckitDidSensitiveFields,
   factory: (config: VCKitDidConfig, logger: LoggerService): IDidService =>
-    new VCKitDidAdapter(config.endpoint, { Authorization: `Bearer ${config.apiKey}` }, 'Ed25519', logger),
+    new VCKitDidAdapter(config.baseUrl, { Authorization: `Bearer ${config.apiKey}` }, 'Ed25519', logger),
 } satisfies AdapterRegistryEntry<VCKitDidConfig, IDidService>;

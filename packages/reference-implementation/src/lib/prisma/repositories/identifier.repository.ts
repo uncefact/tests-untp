@@ -1,5 +1,6 @@
 import { Identifier, Prisma } from '../generated';
 import { prisma } from '../prisma';
+import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
@@ -61,7 +62,7 @@ async function validateIdentifierValue(
   const scheme = await tx.identifierScheme.findFirst({
     where: {
       id: schemeId,
-      OR: [{ tenantId }, { tenantId: 'system' }],
+      OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
     },
   });
 

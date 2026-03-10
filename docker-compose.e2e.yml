@@ -163,7 +163,7 @@ services:
       - RI_POSTGRES_PORT=5432
       - RI_DATABASE_URL=postgresql://ri-postgres:ri-postgres@e2e-ri-db:5432/ri?schema=public
       - RI_APP_URL=http://localhost:3003
-      - DEFAULT_HUMAN_VERIFICATION_URL=http://localhost:3003
+      - DEFAULT_HUMAN_VERIFICATION_URL=http://localhost:3003/verify
       - DEFAULT_MACHINE_VERIFICATION_URL=http://vckit-api:3332/agent/routeVerificationCredential
       - VCKIT_API_URL=http://vckit-api:3332/v2
       - VCKIT_API_KEY=test123

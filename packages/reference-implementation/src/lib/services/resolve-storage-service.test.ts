@@ -46,6 +46,7 @@ jest.mock('@uncefact/untp-ri-services/server', () => ({
 }));
 
 import { resolveStorageService } from './resolve-storage-service';
+import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 
 import {
   ServiceResolutionError,
@@ -65,7 +66,7 @@ const MOCK_ENCRYPTED_ENVELOPE = {
 
 const MOCK_INSTANCE = {
   id: 'storage-inst-1',
-  tenantId: 'system',
+  tenantId: SYSTEM_TENANT_ID,
   serviceType: 'STORAGE',
   adapterType: 'UNCEFACT_STORAGE',
   name: 'System UNCEFACT Storage',
