@@ -89,70 +89,6 @@ services:
     volumes:
       - ./minio_data/identity-resolver-service-object-store/data-test:/data
 
-  mock-global-gs1-resolver:
-    image: ghcr.io/pyx-industries/pyx-identity-resolver:2.0.2
-    ports:
-      - '3001:3001'
-    environment:
-      - OBJECT_STORAGE_ENDPOINT=mock-global-gs1-resolver-object-store
-      - OBJECT_STORAGE_PORT=9000
-      - OBJECT_STORAGE_USE_SSL=false
-      - OBJECT_STORAGE_ACCESS_KEY=minioadmin
-      - OBJECT_STORAGE_SECRET_KEY=minioadmin
-      - OBJECT_STORAGE_BUCKET_NAME=idr-bucket-2
-      - OBJECT_STORAGE_PATH_STYLE=true
-      - IDENTIFIER_PATH=identifiers
-      - API_KEY=test456
-      - APP_ENDPOINT=http://localhost:3001
-      - APP_NAME=IDR-2
-      - RESOLVER_DOMAIN=http://localhost:3001/api/2.0.0
-      - LINK_TYPE_VOC_DOMAIN=http://localhost:3001/api/2.0.0/voc
-      - PORT=3001
-    depends_on:
-      - mock-global-gs1-resolver-object-store
-
-  mock-global-gs1-resolver-object-store:
-    image: quay.io/minio/minio:RELEASE.2024-08-17T01-24-54Z-cpuv1
-    command: server /data --console-address ":9090"
-    ports:
-      - '9001:9000'
-      - '9091:9090'
-    environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin
-    volumes:
-      - ./minio_data/mock-global-gs1-resolver-object-store/data-test:/data
-
-  seeding-data:
-    image: alpine:3.20.3
-    environment:
-      # IDR service environment variables
-      - IDR_SERVICE_HOST=identity-resolver-service
-      - IDR_SERVICE_API_VERSION=2.0.0
-      - IDR_SERVICE_PORT=3000
-      - IDR_SERVICE_API_KEY=test123
-
-      # Mock GS1 service environment variables
-      - IDR_SERVICE_DOMAIN=http://localhost:3000
-      - MOCK_GS1_SERVICE_HOST=mock-global-gs1-resolver
-      - MOCK_GS1_SERVICE_API_VERSION=2.0.0
-      - MOCK_GS1_SERVICE_PORT=3001
-      - MOCK_GS1_SERVICE_API_KEY=test456
-    command:
-      - /bin/sh
-      - -c
-      - |
-        if [ "$SEEDING" = "true" ]; then
-          apk add curl jq && \
-          ./seeding/idr-data.sh
-          ./seeding/mock-gs1-data.sh
-        fi
-    volumes:
-      - ./seeding:/seeding
-    depends_on:
-      - identity-resolver-service
-      - mock-global-gs1-resolver
-
   app:
     image: app:e2e
     build:
@@ -173,12 +109,11 @@ services:
       - DEFAULT_MACHINE_VERIFICATION_URL=http://vckit-api:3332/agent/routeVerificationCredential
       - VCKIT_API_URL=http://vckit-api:3332/v2
       - VCKIT_API_KEY=test123
-      - DEFAULT_ISSUER_DID=did:web:uncefact.github.io:project-vckit:test-and-development
-      - DEFAULT_ISSUER_KEY_ID=7af136a8efa11a4df2e9010b972bdb92a0013724b50e5efa45407a2ddea184e6
       - SERVICE_ENCRYPTION_KEY=dd1b7430915155b51c503806031f31f901e85563035f65421d707f042c75f44b
       - AUTH_SECRET=e2e-super-secret-key-for-testing
       - AUTH_TRUST_HOST=true
       - AUTH_URL=http://localhost:3003
+      - AUTH_OIDC_PROVIDER=keycloak
       - AUTH_OIDC_CLIENT_ID=ri-app-e2e
       - AUTH_OIDC_CLIENT_SECRET=e2e-test-secret
       - AUTH_OIDC_ISSUER=http://localhost:8081/realms/ri-e2e
@@ -190,6 +125,10 @@ services:
       - PYX_IDR_API_URL=http://identity-resolver-service:3000
       - PYX_IDR_API_KEY=test123
       - VERIFY_ALLOW_PRIVATE_URLS=true
+      # Tenant mode (default: open — override to "closed" for closed mode tests)
+      - TENANT_MODE=${TENANT_MODE:-open}
+      - TENANT_CLAIM_NAME=${TENANT_CLAIM_NAME:-groups}
+      - TENANT_CLAIM_FORMAT=${TENANT_CLAIM_FORMAT:-array_first}
       # System default service instances (used by seed.ts)
       - SYSTEM_VC_BASE_URL=http://vckit-api:3332
       - SYSTEM_VC_API_KEY=test123

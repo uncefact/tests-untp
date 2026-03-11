@@ -2,7 +2,7 @@ import clsx from 'clsx';
 
 const FeatureList = [
   {
-    title: 'Reference implementations',
+    title: 'Reference Implementation',
     Svg: require('@site/static/img/reference-implementation-icon.svg').default,
     description: (
       <>

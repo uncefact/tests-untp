@@ -39,7 +39,7 @@ npm install -g yarn@1.22.22
 cp .env.example .env  # All defaults work for local dev
 
 # Start dependent services (VCKit, Storage, IDR, Keycloak, Postgres)
-SEEDING=true docker compose up -d
+docker compose up -d
 
 # Install, build, and start
 yarn install
@@ -67,7 +67,7 @@ yarn test:mock-app            # Mock-app only
 yarn test:components          # Components only
 
 # E2E Testing (separate Docker setup)
-SEEDING=true docker compose -f docker-compose.e2e.yml up -d --build
+docker compose -f docker-compose.e2e.yml up -d --build
 yarn test:run-cypress         # Headless
 yarn test:open-cypress        # Interactive UI
 docker compose -f docker-compose.e2e.yml down  # Cleanup
@@ -104,8 +104,7 @@ tests-untp/
 │   ├── untp-playground/   # Validation tool
 │   └── untp-test-suite/   # CLI test suite
 ├── e2e/                   # Cypress tests
-├── documentation/         # Docusaurus site
-└── seeding/              # IDR data seeding scripts
+└── documentation/         # Docusaurus site
 ```
 
 ### Service Registry Pattern
@@ -172,16 +171,9 @@ External integrations use interfaces + implementations:
 - VCKit API - Verifiable credential operations
 - Storage Service - UNTP credential storage
 - Identity Resolver Service (IDR) - Identifier resolution
-- Mock GS1 IDR - GS1 resolver stand-in
 - PostgreSQL (vckit-db, ri-db) - Databases
 - Keycloak - OAuth2/OIDC provider
-- MinIO - Object storage for IDR services
-
-### Data Seeding
-- IDR services must be seeded for identifier resolution to work
-- Use `SEEDING=true` flag with docker compose
-- Manual seeding: `./seeding/idr-data.sh && ./seeding/mock-gs1-data.sh`
-- Reset: Delete `minio_data/` directories, re-run seed scripts
+- MinIO - Object storage for IDR service
 
 ## Important Notes
 

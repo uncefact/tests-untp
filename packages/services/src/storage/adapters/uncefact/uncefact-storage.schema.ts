@@ -7,13 +7,11 @@ export const uncefactStorageConfigSchema = z.object({
   publicBucket: z
     .string()
     .min(1)
-    .optional()
-    .describe('Public Bucket||Bucket name for public (unencrypted) storage. Omit to use the server default.'),
+    .describe('Public Bucket||Bucket name for public (unencrypted) storage. Can be the same as privateBucket.'),
   privateBucket: z
     .string()
     .min(1)
-    .optional()
-    .describe('Private Bucket||Bucket name for private (encrypted) storage. Omit to use the server default.'),
+    .describe('Private Bucket||Bucket name for private (encrypted) storage. Can be the same as publicBucket.'),
 });
 
 export type UncefactStorageConfig = z.infer<typeof uncefactStorageConfigSchema>;

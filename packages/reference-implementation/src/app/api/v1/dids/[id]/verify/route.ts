@@ -15,7 +15,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/verify' });
  *   post:
  *     summary: Verify a DID
  *     description: |
- *       Verifies ownership of a DID and updates its status accordingly.
+ *       Verifies that a DID can be resolved and updates its status accordingly.
  *       If verification succeeds, the DID status is set to VERIFIED.
  *       If verification fails, the DID status is set to VERIFICATION_FAILED.
  *     tags:
@@ -74,7 +74,7 @@ export const POST = withTenantAuth(async (_req, { tenantId, params }) => {
   logger.info({ didId: id, did: did.did }, 'Resolving DID service for verification');
   const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId ?? undefined);
 
-  logger.info({ didId: id, did: did.did }, 'Verifying DID ownership');
+  logger.info({ didId: id, did: did.did }, 'Verifying DID resolution');
   const verification = await didService.verify(did.did);
 
   const newStatus = verification.verified ? DidStatus.VERIFIED : DidStatus.VERIFICATION_FAILED;

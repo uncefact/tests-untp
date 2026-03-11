@@ -4,6 +4,7 @@ describe('DID API', { testIsolation: false }, () => {
   let createdDidId: string;
   let createdDid: string;
   let defaultDidId: string;
+  let vcServiceInstanceId: string;
 
   before(() => {
     // Login first — NextAuth creates the User record on first login
@@ -11,6 +12,25 @@ describe('DID API', { testIsolation: false }, () => {
 
     // Seed test organisation and link the logged-in user
     cy.task('seedTestOrg', { userEmail: 'e2e-admin@test.local' });
+
+    // Create VC service instance (needed for DID import)
+    cy.request({
+      method: 'POST',
+      url: '/api/v1/services',
+      body: {
+        serviceType: 'VC',
+        adapterType: 'VCKIT',
+        name: 'E2E VCKit VC',
+        config: {
+          baseUrl: 'http://vckit-api:3332',
+          apiKey: 'test123',
+        },
+        isPrimary: true,
+      },
+    }).then((res) => {
+      expect(res.status).to.eq(201);
+      vcServiceInstanceId = res.body.id;
+    });
   });
 
   after(() => {
@@ -336,6 +356,7 @@ describe('DID API', { testIsolation: false }, () => {
           did: importedDidString,
           method: 'DID_WEB',
           keyId: `imported-key-${RUN_ID}`,
+          serviceInstanceId: vcServiceInstanceId,
           name: `E2E Imported DID ${RUN_ID}`,
           description: 'Imported by Cypress E2E test',
         },
@@ -394,6 +415,7 @@ describe('DID API', { testIsolation: false }, () => {
         body: {
           did: `did:web:missing-method-${RUN_ID}.example.com`,
           keyId: 'some-key',
+          serviceInstanceId: vcServiceInstanceId,
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -425,6 +447,7 @@ describe('DID API', { testIsolation: false }, () => {
           did: importedDidString,
           method: 'DID_WEB',
           keyId: `imported-key-duplicate-${RUN_ID}`,
+          serviceInstanceId: vcServiceInstanceId,
           name: `E2E Duplicate Imported DID ${RUN_ID}`,
           description: 'Duplicate import by Cypress E2E test',
         },

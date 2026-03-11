@@ -16,7 +16,7 @@
     "start": "cd packages/reference-implementation && yarn dev",
     "start:e2e-test": "cd packages/reference-implementation && yarn start",
     "start:untp-playground": "cd packages/untp-playground && PORT=4001 yarn dev",
-    "start:e2e-dependencies": "SEEDING=true docker compose -f docker-compose.e2e.yml up -d --build",
+    "start:e2e-dependencies": "docker compose -f docker-compose.e2e.yml up -d --build",
     "stop:e2e-dependencies": "docker compose -f docker-compose.e2e.yml down",
     "build": "yarn build:services && yarn build:components && yarn build:untp-test-suite && yarn build:ri && yarn build:playground",
     "build:services": "cd packages/services && yarn run build",

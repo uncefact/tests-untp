@@ -72,6 +72,8 @@ describe('Verify Page', { testIsolation: false }, () => {
           baseUrl: 'http://storage-service:3334',
           apiKey: 'test123',
           apiVersion: '3.1.0',
+          publicBucket: 'public-data',
+          privateBucket: 'private-data',
         },
         apiVersion: '3.1.0',
         isPrimary: true,

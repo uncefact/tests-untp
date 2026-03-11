@@ -131,22 +131,11 @@ jobs:
             /usr/share/swift
           docker image prune -af
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker-container
-
-      - name: Build E2E images with layer cache
-        uses: docker/bake-action@v5
-        with:
-          files: docker-compose.e2e.yml
-          load: true
-          set: |
-            *.cache-from=type=gha
-            *.cache-to=type=gha,mode=max
+      - name: Build E2E images
+        run: docker compose -f docker-compose.e2e.yml build
 
       - name: Start E2E docker compose
-        run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d --no-build
+        run: docker compose -f docker-compose.e2e.yml up -d --no-build
 
       - name: Wait for app container and dump logs
         run: |
@@ -170,7 +159,7 @@ jobs:
         run: docker compose -f docker-compose.e2e.yml down -v
 
       - name: Start closed mode E2E docker compose
-        run: SEEDING=true docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml up -d --no-build
+        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml up -d --no-build
 
       - name: Wait for closed mode app container
         run: |
