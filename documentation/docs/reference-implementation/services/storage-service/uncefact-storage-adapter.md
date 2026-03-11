@@ -46,7 +46,7 @@ When creating or updating a UNCEFACT Storage service instance via the [Services 
 |-------|------|----------|---------|-------------|
 | `baseUrl` | `string` (URL) | Yes | — | Base URL of the storage service (e.g., `http://storage-service:3334`) |
 | `apiKey` | `string` | No | — | Authentication token for the storage service API. **Sensitive** — masked in API responses. |
-| `apiVersion` | `string` | Yes | `3.1.0` | API version to use when communicating with the storage service |
+| `apiVersion` | `string` | Yes | `3.1.0` | API version to use when communicating with the storage service. Currently only `3.1.0` is accepted. |
 | `publicBucket` | `string` | Yes | — | Bucket name for public (unencrypted) storage. Can be the same value as `privateBucket`. |
 | `privateBucket` | `string` | Yes | — | Bucket name for private (encrypted) storage. Can be the same value as `publicBucket`. |
 

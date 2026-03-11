@@ -47,8 +47,8 @@ When creating or updating a Pyx IDR service instance via the [Services API](../.
 |-------|------|----------|---------|-------------|
 | `baseUrl` | `string` (URL) | Yes | — | Base URL of the identity resolver (e.g., `http://identity-resolver-service:3000`) |
 | `apiKey` | `string` | Yes | — | Authentication token for the identity resolver API. **Sensitive** — masked in API responses. |
-| `apiVersion` | `string` | Yes | `2.0.0` | API version to use when communicating with the identity resolver |
-| `defaultLinkType` | `string` | Yes | — | Default link type for credential registration (e.g., `untp:dpp`) |
+| `apiVersion` | `string` | Yes | `2.0.0` | API version to use when communicating with the identity resolver. Currently only `2.0.0` is accepted. |
+| `defaultLinkType` | `string` (enum) | Yes | — | Default link type for credential registration. Accepted values: `untp:dpp`, `untp:dcc`, `untp:dte`, `untp:idr`, `untp:dfr`, `untp:dia`, `untp:cvc`. |
 | `defaultMimeType` | `string` | Yes | — | Default MIME type for linked resources (e.g., `text/html`) |
 | `defaultIanaLanguage` | `string` | Yes | — | Default language code (e.g., `en`) |
 | `defaultContext` | `string` | Yes | — | Default regional context (e.g., `au`) |
