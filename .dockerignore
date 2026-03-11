@@ -34,10 +34,8 @@ aws
 e2e/package.json
 e2e/yarn.lock
 e2e/node_modules
-seeding
 minio_data
 documentation
-initialisation
 local.env
 
 packages/untp-test-suite

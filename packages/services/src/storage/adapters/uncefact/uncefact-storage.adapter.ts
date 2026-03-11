@@ -13,8 +13,8 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
   private readonly baseUrl: string;
   private readonly headers: Record<string, string>;
   private readonly apiVersion: string;
-  private readonly publicBucket?: string;
-  private readonly privateBucket?: string;
+  private readonly publicBucket: string;
+  private readonly privateBucket: string;
 
   constructor(config: UncefactStorageConfig, logger: LoggerService) {
     super(logger.child({ service: 'Storage - UncefactStorage' }));

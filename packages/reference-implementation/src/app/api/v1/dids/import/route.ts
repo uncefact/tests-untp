@@ -24,6 +24,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *               - did
  *               - method
  *               - keyId
+ *               - serviceInstanceId
  *             properties:
  *               did:
  *                 type: string
@@ -43,7 +44,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *                 description: Description of the DID's purpose
  *               serviceInstanceId:
  *                 type: string
- *                 description: Optional service instance ID for verification
+ *                 description: Service instance ID — the verifiable credential service that holds the key material for this DID
  *     responses:
  *       201:
  *         description: DID imported successfully
@@ -93,6 +94,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   }
   if (!isNonEmptyString(body.keyId)) {
     throw new ValidationError('keyId is required');
+  }
+  if (!isNonEmptyString(body.serviceInstanceId)) {
+    throw new ValidationError('serviceInstanceId is required');
   }
 
   const method = validateEnum(body.method, Object.values(DidMethod), 'method');

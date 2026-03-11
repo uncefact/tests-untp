@@ -72,7 +72,7 @@ const MOCK_DID_RECORD = {
   keyId: 'key-1',
   status: 'UNVERIFIED',
   isDefault: false,
-  serviceInstanceId: null,
+  serviceInstanceId: 'inst-1',
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
 };
@@ -92,6 +92,7 @@ describe('POST /api/v1/dids/import', () => {
       keyId: 'key-1',
       name: 'My Imported DID',
       description: 'An externally managed DID',
+      serviceInstanceId: 'inst-1',
     });
 
     const res = await POST(req, createContext());
@@ -110,27 +111,11 @@ describe('POST /api/v1/dids/import', () => {
       name: 'My Imported DID',
       description: 'An externally managed DID',
       status: 'UNVERIFIED',
-      serviceInstanceId: undefined,
+      serviceInstanceId: 'inst-1',
     });
   });
 
   it('uses the DID string as the name when name is not provided', async () => {
-    const req = createFakeRequest({
-      did: 'did:web:example.com',
-      method: 'DID_WEB',
-      keyId: 'key-1',
-    });
-
-    await POST(req, createContext());
-
-    expect(mockCreateDid).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'did:web:example.com',
-      }),
-    );
-  });
-
-  it('passes serviceInstanceId when provided', async () => {
     const req = createFakeRequest({
       did: 'did:web:example.com',
       method: 'DID_WEB',
@@ -142,9 +127,38 @@ describe('POST /api/v1/dids/import', () => {
 
     expect(mockCreateDid).toHaveBeenCalledWith(
       expect.objectContaining({
-        serviceInstanceId: 'inst-1',
+        name: 'did:web:example.com',
       }),
     );
+  });
+
+  it('returns 400 when serviceInstanceId is missing', async () => {
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain('serviceInstanceId is required');
+  });
+
+  it('returns 400 when serviceInstanceId is an empty string', async () => {
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+      serviceInstanceId: '',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain('serviceInstanceId is required');
   });
 
   it('sets status to UNVERIFIED', async () => {
@@ -152,6 +166,7 @@ describe('POST /api/v1/dids/import', () => {
       did: 'did:web:example.com',
       method: 'DID_WEB',
       keyId: 'key-1',
+      serviceInstanceId: 'inst-1',
     });
 
     await POST(req, createContext());
@@ -168,6 +183,7 @@ describe('POST /api/v1/dids/import', () => {
       did: 'did:web:example.com',
       method: 'DID_WEB',
       keyId: 'key-1',
+      serviceInstanceId: 'inst-1',
     });
 
     await POST(req, createContext());
@@ -200,7 +216,7 @@ describe('POST /api/v1/dids/import', () => {
   });
 
   it('returns 400 when method is missing', async () => {
-    const req = createFakeRequest({ did: 'did:web:example.com', keyId: 'key-1' });
+    const req = createFakeRequest({ did: 'did:web:example.com', keyId: 'key-1', serviceInstanceId: 'inst-1' });
 
     const res = await POST(req, createContext());
     const body = await res.json();
@@ -210,7 +226,12 @@ describe('POST /api/v1/dids/import', () => {
   });
 
   it('returns 400 for invalid method', async () => {
-    const req = createFakeRequest({ did: 'did:web:example.com', keyId: 'key-1', method: 'INVALID' });
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      keyId: 'key-1',
+      method: 'INVALID',
+      serviceInstanceId: 'inst-1',
+    });
 
     const res = await POST(req, createContext());
     const body = await res.json();
@@ -238,6 +259,7 @@ describe('POST /api/v1/dids/import', () => {
       did: 'did:web:example.com',
       method: 'DID_WEB',
       keyId: 'key-1',
+      serviceInstanceId: 'inst-1',
     });
 
     await POST(req, createContext());
@@ -257,6 +279,7 @@ describe('POST /api/v1/dids/import', () => {
       did: 'did:web:example.com',
       method: 'DID_WEB',
       keyId: 'key-1',
+      serviceInstanceId: 'inst-1',
     });
 
     const res = await POST(req, createContext());
@@ -273,6 +296,7 @@ describe('POST /api/v1/dids/import', () => {
       did: 'did:web:example.com',
       method: 'DID_WEB',
       keyId: 'key-1',
+      serviceInstanceId: 'inst-1',
     });
 
     const res = await POST(req, createContext());
@@ -303,7 +327,12 @@ describe('POST /api/v1/dids/import', () => {
   });
 
   it('returns 400 when method is an empty string', async () => {
-    const req = createFakeRequest({ did: 'did:web:example.com', keyId: 'key-1', method: '' });
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      keyId: 'key-1',
+      method: '',
+      serviceInstanceId: 'inst-1',
+    });
 
     const res = await POST(req, createContext());
     const body = await res.json();
@@ -318,6 +347,7 @@ describe('POST /api/v1/dids/import', () => {
       method: 'DID_WEB',
       keyId: 'key-1',
       name: 'No Description DID',
+      serviceInstanceId: 'inst-1',
     });
 
     const res = await POST(req, createContext());

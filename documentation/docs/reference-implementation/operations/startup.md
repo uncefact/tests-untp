@@ -1,0 +1,87 @@
+---
+sidebar_position: 1
+title: Startup
+---
+
+# Startup
+
+Before the Reference Implementation begins accepting requests, its database schema must be up to date, and a set of default records must exist for the system to function — things like identifier schemes, data models, default service instances, and render templates.
+
+Rather than requiring operators to run these steps manually, the Docker container's [entrypoint script](https://github.com/uncefact/tests-untp/blob/main/packages/reference-implementation/docker-entrypoint.sh) handles them automatically. The entrypoint script runs database migrations and seeds default records before starting the application. If the database is already up to date, the process completes in seconds.
+
+How this is triggered depends on how you run the Reference Implementation:
+
+- **Docker** — The container's entrypoint script runs migrations and seeding automatically before starting the application. This applies whether you are using the Docker Compose configuration from the [repository](https://github.com/uncefact/tests-untp) or the standalone [Docker image](https://github.com/orgs/uncefact/packages/container/package/tests-untp%2Freference-implementation).
+- **Local development** — Migrations and seeding are run manually as part of the initial setup. See the [repository README](https://github.com/uncefact/tests-untp) for setup instructions.
+
+This page walks through what happens during startup, what gets created, and how to control the process.
+
+## What Happens on Startup
+
+The entrypoint script runs two steps in order before the application begins accepting requests:
+
+```mermaid
+flowchart TD
+    Start["Entrypoint script runs"] --> Migrations{"Run migrations?"}
+    Migrations -->|"Yes (default)"| RunMigrations["Apply pending database migrations"]
+    Migrations -->|"No (SKIP_MIGRATIONS=true)"| SkipMigrations["Skip migrations"]
+    RunMigrations --> Seed
+    SkipMigrations --> Seed
+    Seed{"Run seed?"}
+    Seed -->|"Yes (default)"| RunSeed["Create system default records"]
+    Seed -->|"No (SKIP_SEED=true)"| SkipSeed["Skip seed"]
+    RunSeed --> App["Start application"]
+    SkipSeed --> App
+```
+
+Both steps are **idempotent** — they can run repeatedly without duplicating data or causing errors. Migrations that have already been applied are skipped. Seed records that already exist are updated if the environment variables have changed (upsert), so you can modify configuration values and restart the container to apply them.
+
+## Step 1: Database Migrations
+
+Each version of the Reference Implementation may include changes to the database schema — new tables, new columns, or modified constraints. Migrations apply these changes so that the database matches the version of the application being started.
+
+If the database is already up to date, this step completes immediately.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SKIP_MIGRATIONS` | Set to `true` to skip automatic migrations | `false` |
+
+Set `SKIP_MIGRATIONS=true` if your deployment process applies migrations separately, for example in a CI/CD pipeline.
+
+## Step 2: Database Seed
+
+After migrations, the entrypoint script runs the [seed script](https://github.com/uncefact/tests-untp/blob/main/packages/reference-implementation/prisma/seed.ts) to create a set of system default records that the Reference Implementation needs to function. These are the baseline records that every instance requires — the data that makes the system usable out of the box.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SKIP_SEED` | Set to `true` to skip automatic seeding | `false` |
+
+### What gets seeded
+
+The seed creates the following defaults. Each category is independent — if a required environment variable is missing, that category is skipped with a warning and the rest still proceed.
+
+| What | Description | Additional Environment Variables Required |
+|------|-------------|------------------------------------------|
+| System tenant | An internal tenant that owns all system default records | None |
+| Registrars | Identifier registrars (GS1, Australian Business Register, ASIC) | None |
+| Identifier schemes | Identifier types (GTIN, GLN, ABN, ACN) with validation patterns and qualifiers | None |
+| Data models | UNTP credential types (DPP, DCC, DFR, DIA, DTE) for each supported spec version, with their schema and context URLs | None |
+| Service instances | Default [verifiable credential](../services/verifiable-credential-service), [storage](../services/storage-service), and [identity resolver](../services/identity-resolver-service) service instances — see each service's page for the required environment variables and what they do | `SERVICE_ENCRYPTION_KEY` and each service's `SYSTEM_*` variables |
+| Default DID | A system Decentralised Identifier (DID) created via the verifiable credential service | `SYSTEM_DID` and `SYSTEM_VC_*` variables |
+| Render templates | Default HTML render templates for each data model, uploaded to the storage service | `SYSTEM_STORAGE_*` variables (storage service must be reachable) |
+
+For example, if `SERVICE_ENCRYPTION_KEY` is not set, the service instances, default DID, and render templates are all skipped — but the system tenant, registrars, identifier schemes, and data models are still created. The skipped items must be configured before the system can issue, store, or resolve credentials — ensure all required environment variables are set.
+
+### Customising seed data
+
+The seed script is located at `packages/reference-implementation/prisma/seed.ts` in the [repository](https://github.com/uncefact/tests-untp). Organisations that need to modify what gets seeded — for example, adding custom identifier schemes or registrars — can edit this file directly.
+
+Render templates are loaded from `packages/reference-implementation/src/templates/` and uploaded to the storage service during seeding. To customise the default templates, replace the `.hbs` files in this directory before building the Docker image.
+
+:::note
+A mechanism for supplying custom seed data (such as render templates) via Docker volumes — without modifying the source — is planned but not yet implemented.
+:::
+
+## Step 3: Application Start
+
+Once migrations and seeding are complete, the application starts and begins accepting requests on port 3003.

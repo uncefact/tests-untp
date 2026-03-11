@@ -146,7 +146,7 @@ jobs:
             *.cache-to=type=gha,mode=max
 
       - name: Start E2E docker compose
-        run: SEEDING=true docker compose -f docker-compose.e2e.yml up -d --no-build
+        run: docker compose -f docker-compose.e2e.yml up -d --no-build
 
       - name: Wait for app container and dump logs
         run: |
@@ -170,7 +170,7 @@ jobs:
         run: docker compose -f docker-compose.e2e.yml down -v
 
       - name: Start closed mode E2E docker compose
-        run: SEEDING=true docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml up -d --no-build
+        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml up -d --no-build
 
       - name: Wait for closed mode app container
         run: |
