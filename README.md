@@ -2,9 +2,9 @@
 
 A comprehensive suite of tools for implementing and demonstrating the [UN Transparency Protocol (UNTP)](https://untp.unece.org/) specification. The repository includes:
 
-1. **[Reference Implementation](https://uncefact.github.io/tests-untp/docs/reference-implementation/overview)**: A multi-tenant application for issuing, storing, and verifying UNTP-compliant verifiable credentials such as Digital Product Passports (DPPs), Digital Conformity Credentials (DCCs), and more.
-2. **[Test Suites](https://uncefact.github.io/tests-untp/docs/test-suites)**: Technical interoperability, semantic interoperability, and graph validation testing.
-3. **[Playground](https://uncefact.github.io/tests-untp/docs/untp-playground)**: A web application for validating UNTP credentials against the specification.
+1. **[Reference Implementation](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/overview)**: A multi-tenant application for issuing, storing, and verifying UNTP-compliant verifiable credentials such as Digital Product Passports (DPPs), Digital Conformity Credentials (DCCs), and more.
+2. **[Test Suites](https://uncefact.github.io/tests-untp/docs/next/test-suites)**: Technical interoperability, semantic interoperability, and graph validation testing.
+3. **[Playground](https://uncefact.github.io/tests-untp/docs/next/untp-playground)**: A web application for validating UNTP credentials against the specification.
 4. **[Documentation Site](https://uncefact.github.io/tests-untp/)**: Comprehensive resources covering setup, configuration, and usage.
 
 ## Quick Start
@@ -33,7 +33,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-This starts the Reference Implementation and all dependent services. See the [Quick Start guide](https://uncefact.github.io/tests-untp/docs/reference-implementation/quick-start) for full details.
+This starts the Reference Implementation and all dependent services. See the [Quick Start guide](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/quick-start) for full details.
 
 ### Local Development
 
@@ -46,7 +46,7 @@ yarn build
 yarn start
 ```
 
-The dependent services continue running in Docker while the Reference Implementation runs locally at [http://localhost:3003](http://localhost:3003). See [Authentication](https://uncefact.github.io/tests-untp/docs/reference-implementation/authentication) for how to obtain an API token.
+The dependent services continue running in Docker while the Reference Implementation runs locally at [http://localhost:3003](http://localhost:3003). See [Authentication](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/authentication) for how to obtain an API token.
 
 ## Architecture
 
@@ -60,7 +60,7 @@ The Reference Implementation is an orchestration layer that delegates to several
 | **Identity Provider (Keycloak)** | Authentication and tenant resolution |
 | **PostgreSQL** | Database for the Reference Implementation and VC service |
 
-For a detailed overview of how these components connect, see [System Architecture](https://uncefact.github.io/tests-untp/docs/reference-implementation/system-architecture) and [Service Architecture](https://uncefact.github.io/tests-untp/docs/reference-implementation/services/service-architecture).
+For a detailed overview of how these components connect, see [System Architecture](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/system-architecture) and [Service Architecture](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/services/service-architecture).
 
 ## Documentation
 
@@ -68,10 +68,10 @@ The documentation site is included in the Docker Compose stack at [http://localh
 
 Key pages:
 
-- [Overview](https://uncefact.github.io/tests-untp/docs/reference-implementation/overview) — what the Reference Implementation does and why
-- [Quick Start](https://uncefact.github.io/tests-untp/docs/reference-implementation/quick-start) — getting started with Docker Compose
-- [System Architecture](https://uncefact.github.io/tests-untp/docs/reference-implementation/system-architecture) — how the components connect
-- [Authentication](https://uncefact.github.io/tests-untp/docs/reference-implementation/authentication) — browser sessions and service accounts
+- [Overview](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/overview) — what the Reference Implementation does and why
+- [Quick Start](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/quick-start) — getting started with Docker Compose
+- [System Architecture](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/system-architecture) — how the components connect
+- [Authentication](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/authentication) — browser sessions and service accounts
 - [API Documentation](http://localhost:3003/api-docs) — interactive Swagger UI (requires running instance)
 
 To run the documentation site outside Docker:

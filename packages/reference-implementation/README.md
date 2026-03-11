@@ -4,11 +4,11 @@ The **Reference Implementation (RI)** provides an environment for organisations 
 
 The RI is also used to facilitate **pilots and demonstrations**, helping stakeholders showcase the value of UNTP and its extensions at low cost.
 
-For a full understanding of the architecture and how the RI fits together, see the [documentation site](https://uncefact.github.io/tests-untp/docs/reference-implementation/overview).
+For a full understanding of the architecture and how the RI fits together, see the [documentation site](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/overview).
 
 ### Quick Start
 
-See the [Quick Start guide](https://uncefact.github.io/tests-untp/docs/reference-implementation/quick-start) for getting the full stack running with Docker Compose.
+See the [Quick Start guide](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/quick-start) for getting the full stack running with Docker Compose.
 
 For local development with hot reloading, stop the RI container and run it locally:
 
@@ -23,9 +23,9 @@ The RI runs on [http://localhost:3003](http://localhost:3003) with hot reloading
 
 ### Key Documentation
 
-- [System Architecture](https://uncefact.github.io/tests-untp/docs/reference-implementation/system-architecture) — how the RI connects to its dependent services
-- [Service Architecture](https://uncefact.github.io/tests-untp/docs/reference-implementation/services/service-architecture) — adapter pattern, encryption, service resolution
-- [Authentication](https://uncefact.github.io/tests-untp/docs/reference-implementation/authentication) — browser sessions, service accounts, and obtaining tokens
+- [System Architecture](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/system-architecture) — how the RI connects to its dependent services
+- [Service Architecture](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/services/service-architecture) — adapter pattern, encryption, service resolution
+- [Authentication](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/authentication) — browser sessions, service accounts, and obtaining tokens
 - [API Documentation](http://localhost:3003/api-docs) — interactive Swagger UI (requires running instance)
 
 ### Environment Variables
