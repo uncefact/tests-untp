@@ -49,6 +49,12 @@
       "enabled": true,
       "serviceAccountClientId": "ri-service-account-e2e",
       "groups": ["/e2e-org-alpha"]
+    },
+    {
+      "username": "service-account-ri-service-account-e2e-2",
+      "enabled": true,
+      "serviceAccountClientId": "ri-service-account-e2e-2",
+      "groups": ["/e2e-org-beta"]
     }
   ],
   "clients": [
@@ -96,6 +102,47 @@
       "protocol": "openid-connect",
       "publicClient": false,
       "secret": "e2e-service-account-secret",
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "consentRequired": false,
+      "defaultClientScopes": ["profile", "email", "roles"],
+      "protocolMappers": [
+        {
+          "name": "group-membership",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience-ri-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "ri-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "ri-service-account-e2e-2",
+      "name": "E2E Service Account 2",
+      "description": "Second service account client for E2E tenant isolation testing",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "e2e-service-account-secret-2",
       "bearerOnly": false,
       "standardFlowEnabled": false,
       "implicitFlowEnabled": false,

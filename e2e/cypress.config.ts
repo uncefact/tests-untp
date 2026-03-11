@@ -348,10 +348,10 @@ export default defineConfig({
             await client.end();
           }
         },
-        async getServiceAccountToken() {
+        async getServiceAccountToken(options?: { clientId?: string; clientSecret?: string }) {
           const tokenUrl = 'http://localhost:8081/realms/ri-e2e/protocol/openid-connect/token';
-          const clientId = 'ri-service-account-e2e';
-          const clientSecret = 'e2e-service-account-secret';
+          const clientId = options?.clientId ?? 'ri-service-account-e2e';
+          const clientSecret = options?.clientSecret ?? 'e2e-service-account-secret';
 
           const params = new URLSearchParams({
             grant_type: 'client_credentials',

@@ -4,14 +4,14 @@ services:
     ports:
       - 5433:5432
     environment:
-      - POSTGRES_USER=${RI_POSTGRES_USER}
-      - POSTGRES_PASSWORD=${RI_POSTGRES_PASSWORD}
-      - POSTGRES_DB=${RI_POSTGRES_DB}
+      - POSTGRES_USER=${RI_POSTGRES_USER:-ri-postgres}
+      - POSTGRES_PASSWORD=${RI_POSTGRES_PASSWORD:-changeme}
+      - POSTGRES_DB=${RI_POSTGRES_DB:-ri}
     volumes:
       - ri-db-data:/var/lib/postgresql/data
     restart: always
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${RI_POSTGRES_USER} -d ${RI_POSTGRES_DB}']
+      test: ['CMD-SHELL', 'pg_isready -U ${RI_POSTGRES_USER:-ri-postgres} -d ${RI_POSTGRES_DB:-ri}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,15 +22,16 @@ services:
       - start-dev
       - --import-realm
     environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-changeme}
       KC_HEALTH_ENABLED: 'true'
     ports:
-      - '127.0.0.1:${KEYCLOAK_PORT}:8080' # See https://github.com/quarkusio/quarkus/discussions/48905#discussioncomment-14213858
+      - '127.0.0.1:${KEYCLOAK_PORT:-8080}:8080' # See https://github.com/quarkusio/quarkus/discussions/48905#discussioncomment-14213858
       - '9990:9000' # Port for health checks
     volumes:
       - ./keycloak-realms:/opt/keycloak/data/import:ro
       - keycloak-data:/opt/keycloak/data
+
   documentation:
     build:
       context: ./documentation
@@ -80,37 +81,48 @@ services:
     ports:
       - '3003:3003'
     environment:
-      # Database (using docker internal networking)
-      RI_POSTGRES_USER: ${RI_POSTGRES_USER}
-      RI_POSTGRES_PASSWORD: ${RI_POSTGRES_PASSWORD}
-      RI_POSTGRES_DB: ${RI_POSTGRES_DB}
+      # Database (docker internal networking — host/port differ from .env)
+      RI_POSTGRES_USER: ${RI_POSTGRES_USER:-ri-postgres}
+      RI_POSTGRES_PASSWORD: ${RI_POSTGRES_PASSWORD:-changeme}
+      RI_POSTGRES_DB: ${RI_POSTGRES_DB:-ri}
       RI_POSTGRES_HOST: ri-db
       RI_POSTGRES_PORT: 5432
       # Auth
-      AUTH_OIDC_ISSUER: http://keycloak:8080/realms/${KEYCLOAK_REALM}
+      AUTH_OIDC_PROVIDER: ${AUTH_OIDC_PROVIDER:-keycloak}
+      AUTH_OIDC_CLIENT_ID: ${AUTH_OIDC_CLIENT_ID:-ri-app}
+      AUTH_OIDC_CLIENT_SECRET: ${AUTH_OIDC_CLIENT_SECRET:-changeme}
+      AUTH_OIDC_ISSUER: http://keycloak:8080/realms/${KEYCLOAK_REALM:-ri-local}
+      AUTH_OIDC_AUTHORIZATION_URL: http://localhost:${KEYCLOAK_PORT:-8080}/realms/${KEYCLOAK_REALM:-ri-local}/protocol/openid-connect/auth
+      AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE: ${AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE:-ri-api}
+      AUTH_SECRET: ${AUTH_SECRET:-change-me-in-production}
+      AUTH_TRUST_HOST: "true"
       RI_APP_URL: http://localhost:3003
+      # Tenant mode
+      TENANT_MODE: ${TENANT_MODE:-open}
+      TENANT_CLAIM_NAME: ${TENANT_CLAIM_NAME:-groups}
+      TENANT_CLAIM_FORMAT: ${TENANT_CLAIM_FORMAT:-array_first}
+      # Service registry encryption
+      SERVICE_ENCRYPTION_KEY: ${SERVICE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
       # Verification URLs
       DEFAULT_HUMAN_VERIFICATION_URL: http://localhost:3003/verify
       DEFAULT_MACHINE_VERIFICATION_URL: http://localhost:3332/agent/routeVerificationCredential
-      # Service URLs (using docker internal networking)
-      ISSUER_API_URL: http://vckit-api:3332/v2
-      ISSUER_AUTH_TOKEN: ${ISSUER_AUTH_TOKEN}
-      UNCEFACT_STORAGE_URL: http://storage-service:3334/api/3.1.0/public
-      UNCEFACT_STORAGE_PUBLIC_BUCKET: ${UNCEFACT_STORAGE_PUBLIC_BUCKET:-public-data}
-      UNCEFACT_STORAGE_PRIVATE_BUCKET: ${UNCEFACT_STORAGE_PRIVATE_BUCKET:-private-data}
-      IDR_API_URL: http://identity-resolver-service:3000/api/2.0.0
-      IDR_API_KEY: ${IDR_API_KEY}
+      # Credential verification
+      VERIFY_ALLOW_PRIVATE_URLS: "true"
       # System default service instances (used by seed.ts)
       SYSTEM_VC_BASE_URL: http://vckit-api:3332
       SYSTEM_VC_API_KEY: ${SYSTEM_VC_API_KEY:-test123}
       SYSTEM_VC_ADAPTER_TYPE: ${SYSTEM_VC_ADAPTER_TYPE:-VCKIT}
       SYSTEM_VC_API_VERSION: ${SYSTEM_VC_API_VERSION:-1.0.0}
+      SYSTEM_VC_SERVICE_NAME: ${SYSTEM_VC_SERVICE_NAME:-System Default VC}
+      SYSTEM_VC_SERVICE_DESCRIPTION: ${SYSTEM_VC_SERVICE_DESCRIPTION:-System-wide default verifiable credential service instance}
       SYSTEM_STORAGE_BASE_URL: http://storage-service:3334
       SYSTEM_STORAGE_API_KEY: ${SYSTEM_STORAGE_API_KEY:-test123}
       SYSTEM_STORAGE_ADAPTER_TYPE: ${SYSTEM_STORAGE_ADAPTER_TYPE:-UNCEFACT_STORAGE}
       SYSTEM_STORAGE_API_VERSION: ${SYSTEM_STORAGE_API_VERSION:-3.1.0}
       SYSTEM_STORAGE_PUBLIC_BUCKET: ${SYSTEM_STORAGE_PUBLIC_BUCKET:-public-data}
       SYSTEM_STORAGE_PRIVATE_BUCKET: ${SYSTEM_STORAGE_PRIVATE_BUCKET:-private-data}
+      SYSTEM_STORAGE_SERVICE_NAME: ${SYSTEM_STORAGE_SERVICE_NAME:-System Default Storage}
+      SYSTEM_STORAGE_SERVICE_DESCRIPTION: ${SYSTEM_STORAGE_SERVICE_DESCRIPTION:-System-wide default storage service instance}
       SYSTEM_IDR_BASE_URL: http://identity-resolver-service:3000
       SYSTEM_IDR_API_KEY: ${SYSTEM_IDR_API_KEY:-test123}
       SYSTEM_IDR_ADAPTER_TYPE: ${SYSTEM_IDR_ADAPTER_TYPE:-PYX_IDR}
@@ -120,9 +132,11 @@ services:
       SYSTEM_IDR_DEFAULT_LANGUAGE: ${SYSTEM_IDR_DEFAULT_LANGUAGE:-en}
       SYSTEM_IDR_DEFAULT_CONTEXT: ${SYSTEM_IDR_DEFAULT_CONTEXT:-au}
       SYSTEM_IDR_DEFAULT_FWQS: ${SYSTEM_IDR_DEFAULT_FWQS:-true}
+      SYSTEM_IDR_SERVICE_NAME: ${SYSTEM_IDR_SERVICE_NAME:-System Default IDR}
+      SYSTEM_IDR_SERVICE_DESCRIPTION: ${SYSTEM_IDR_SERVICE_DESCRIPTION:-System-wide default Identity Resolver service instance}
       SYSTEM_DID: ${SYSTEM_DID:-did:web:uncefact.github.io:project-vckit:test-and-development}
       SYSTEM_DID_NAME: ${SYSTEM_DID_NAME:-System Default DID}
-      SYSTEM_DID_DESCRIPTION: ${SYSTEM_DID_DESCRIPTION:-System-wide default DID}
+      SYSTEM_DID_DESCRIPTION: ${SYSTEM_DID_DESCRIPTION:-System-wide default DID for the UNTP reference implementation}
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:3003/api/health"]
       interval: 30s
