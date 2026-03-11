@@ -5,7 +5,7 @@ import { ValidationError, validateEnum, parsePositiveInt, parseNonNegativeInt } 
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createDid, listDids, findDidByAliasAndService } from '@/lib/prisma/repositories';
 import { buildPaginatedResponse } from '@/lib/api/pagination';
-import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus } from '@uncefact/untp-ri-services';
+import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus, DidConflictError } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/dids' });
@@ -144,13 +144,23 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   }
 
   logger.info({ type, method, alias: normalisedAlias, serviceInstanceId }, 'Creating DID via provider');
-  const providerResult = await didService.create({
-    type,
-    method,
-    alias: normalisedAlias,
-    name: body.name,
-    description: body.description,
-  });
+  let providerResult;
+  try {
+    providerResult = await didService.create({
+      type,
+      method,
+      alias: normalisedAlias,
+      name: body.name,
+      description: body.description,
+    });
+  } catch (err) {
+    // The upstream provider may report "already exists" even when the RI database has no record
+    // — e.g. after a DB reset without resetting the provider.
+    if (err instanceof DidConflictError) {
+      throw new ConflictError(err.message);
+    }
+    throw err;
+  }
 
   const status = type === DidType.SELF_MANAGED ? DidStatus.UNVERIFIED : DidStatus.ACTIVE;
 

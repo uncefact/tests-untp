@@ -225,7 +225,7 @@ export async function countServiceInstanceReferences(
  * Implements the instance resolution chain:
  * 1. Explicit instance ID - verify ownership or system default
  * 2. Tenant primary (isPrimary for org + serviceType)
- * 3. System default (tenantId === "system")
+ * 3. System default (tenantId === SYSTEM_TENANT_ID)
  * 4. Returns null if nothing found
  */
 export async function getInstanceByResolution(

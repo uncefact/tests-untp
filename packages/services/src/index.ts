@@ -64,6 +64,7 @@ export {
   DidMethodNotSupportedError,
   DidInputError,
   DidCreateError,
+  DidConflictError,
   DidDeleteError,
   DidDocumentFetchError,
   DidParseError,

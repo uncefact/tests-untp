@@ -112,7 +112,7 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
         adapterType: 'VCKIT',
         name: 'E2E CVC VCKit',
         config: {
-          endpoint: 'http://vckit-api:3332/v2',
+          baseUrl: 'http://vckit-api:3332',
           apiKey: 'test123',
         },
         apiVersion: '1.0.0',

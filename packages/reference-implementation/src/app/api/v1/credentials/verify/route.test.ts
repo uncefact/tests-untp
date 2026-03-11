@@ -77,6 +77,7 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 import { ServiceResolutionError } from '@/lib/api/errors';
+import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 import { POST } from './route';
 
 // ── Fixtures ──────────────────────────────────────────────────────────
@@ -468,7 +469,7 @@ describe('POST /api/v1/credentials/verify', () => {
 
     await POST(createFakeRequest({ uri: VALID_URI }));
 
-    expect(mockResolveVcService).toHaveBeenCalledWith('system');
+    expect(mockResolveVcService).toHaveBeenCalledWith(SYSTEM_TENANT_ID);
   });
 
   it('includes decodedCredential for enveloped credentials', async () => {
@@ -501,7 +502,7 @@ describe('POST /api/v1/credentials/verify', () => {
 
   it('returns 500 when VC service resolution fails', async () => {
     mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
-    mockResolveVcService.mockRejectedValue(new ServiceResolutionError('VC', 'system'));
+    mockResolveVcService.mockRejectedValue(new ServiceResolutionError('VC', SYSTEM_TENANT_ID));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(500);

@@ -10,6 +10,7 @@ import {
   findDidByAliasAndService,
 } from './did.repository';
 import { DidStatus } from '../generated';
+import { SYSTEM_TENANT_ID } from '../constants';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
@@ -217,7 +218,7 @@ describe('did.repository', () => {
     });
 
     it('returns system DEFAULT DID with isDefault false when tenant has own default', async () => {
-      const systemDid = { ...DID_RECORD, id: 'sys-did', type: 'DEFAULT', isDefault: true, tenantId: 'system' };
+      const systemDid = { ...DID_RECORD, id: 'sys-did', type: 'DEFAULT', isDefault: true, tenantId: SYSTEM_TENANT_ID };
       const tenantDid = { ...DID_RECORD, id: 'tenant-did', isDefault: true };
 
       // First call returns the system DID, second call finds tenant default
@@ -229,7 +230,7 @@ describe('did.repository', () => {
     });
 
     it('returns system DEFAULT DID with isDefault true when tenant has no default', async () => {
-      const systemDid = { ...DID_RECORD, id: 'sys-did', type: 'DEFAULT', isDefault: true, tenantId: 'system' };
+      const systemDid = { ...DID_RECORD, id: 'sys-did', type: 'DEFAULT', isDefault: true, tenantId: SYSTEM_TENANT_ID };
 
       // First call returns the system DID, second call finds no tenant default
       mockDid.findFirst.mockResolvedValueOnce(systemDid).mockResolvedValueOnce(null);
@@ -256,7 +257,7 @@ describe('did.repository', () => {
     });
 
     it('returns the system default DID even for a different tenant', async () => {
-      const defaultDid = { ...DID_RECORD, isDefault: true, tenantId: 'system' };
+      const defaultDid = { ...DID_RECORD, isDefault: true, tenantId: SYSTEM_TENANT_ID };
       mockDid.findFirst.mockResolvedValue(defaultDid);
 
       const result = await getDidByDid('did:web:example.com:org:123', 'other-org');
@@ -278,7 +279,7 @@ describe('did.repository', () => {
     });
 
     it('returns system DEFAULT DID with isDefault false when tenant has own default', async () => {
-      const systemDid = { ...DID_RECORD, type: 'DEFAULT', isDefault: true, tenantId: 'system' };
+      const systemDid = { ...DID_RECORD, type: 'DEFAULT', isDefault: true, tenantId: SYSTEM_TENANT_ID };
       const tenantDid = { ...DID_RECORD, id: 'tenant-did', isDefault: true };
 
       mockDid.findFirst.mockResolvedValueOnce(systemDid).mockResolvedValueOnce(tenantDid);
@@ -360,7 +361,7 @@ describe('did.repository', () => {
     });
 
     it('returns system DEFAULT DID with isDefault false when tenant has own default', async () => {
-      const systemDid = { ...DID_RECORD, id: 'sys-did', type: 'DEFAULT', isDefault: true, tenantId: 'system' };
+      const systemDid = { ...DID_RECORD, id: 'sys-did', type: 'DEFAULT', isDefault: true, tenantId: SYSTEM_TENANT_ID };
       const tenantDid = { ...DID_RECORD, id: 'tenant-did', type: 'MANAGED', isDefault: true };
 
       mockDid.findMany.mockResolvedValue([systemDid, tenantDid]);
@@ -373,7 +374,7 @@ describe('did.repository', () => {
     });
 
     it('keeps system DEFAULT DID with isDefault true when tenant has no default', async () => {
-      const systemDid = { ...DID_RECORD, id: 'sys-did', type: 'DEFAULT', isDefault: true, tenantId: 'system' };
+      const systemDid = { ...DID_RECORD, id: 'sys-did', type: 'DEFAULT', isDefault: true, tenantId: SYSTEM_TENANT_ID };
       const tenantDid = { ...DID_RECORD, id: 'tenant-did', type: 'MANAGED', isDefault: false };
 
       mockDid.findMany.mockResolvedValue([systemDid, tenantDid]);

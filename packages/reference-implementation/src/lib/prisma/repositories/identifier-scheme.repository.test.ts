@@ -6,6 +6,7 @@ import {
   deleteIdentifierScheme,
 } from './identifier-scheme.repository';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import { SYSTEM_TENANT_ID } from '../constants';
 
 // Transaction mock helper — wraps the callback with the same mock methods
 const mockTx = {
@@ -152,7 +153,7 @@ describe('identifier-scheme.repository', () => {
       expect(mockIdentifierScheme.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'scheme-1',
-          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
         include: {
           qualifiers: true,
@@ -163,7 +164,7 @@ describe('identifier-scheme.repository', () => {
     });
 
     it('returns a system default scheme', async () => {
-      const systemScheme = { ...SCHEME_RECORD, tenantId: 'system' };
+      const systemScheme = { ...SCHEME_RECORD, tenantId: SYSTEM_TENANT_ID };
       mockIdentifierScheme.findFirst.mockResolvedValue(systemScheme);
 
       const result = await getIdentifierSchemeById('scheme-1', TENANT_ID);
@@ -187,7 +188,7 @@ describe('identifier-scheme.repository', () => {
 
       expect(mockIdentifierScheme.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
         include: {
           qualifiers: true,
@@ -198,7 +199,7 @@ describe('identifier-scheme.repository', () => {
       });
       expect(mockIdentifierScheme.count).toHaveBeenCalledWith({
         where: {
-          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
       });
       expect(result).toEqual({ data: [SCHEME_RECORD], total: 1 });

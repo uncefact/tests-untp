@@ -138,11 +138,11 @@ const MOCK_RECORD = {
 
 const MOCK_MASKED = {
   ...MOCK_RECORD,
-  config: { endpoint: 'https://example.com', apiKey: '***' },
+  config: { baseUrl: 'https://example.com', apiKey: '***' },
 };
 
 const VALID_CONFIG = {
-  endpoint: 'https://vckit.example.com',
+  baseUrl: 'https://vckit.example.com',
   apiKey: 'test-api-key',
 };
 
@@ -307,7 +307,7 @@ describe('POST /api/v1/services', () => {
 
   it('returns 400 for config schema validation failure', async () => {
     const req = createFakeRequest({
-      body: { ...VALID_BODY, config: { endpoint: 'not-a-url' } },
+      body: { ...VALID_BODY, config: { baseUrl: 'not-a-url' } },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
@@ -383,7 +383,7 @@ describe('GET /api/v1/services', () => {
 
   it('masks each service instance config in the response', async () => {
     const secondRecord = { ...MOCK_RECORD, id: 'svc-456', name: 'Second Service' };
-    const secondMasked = { ...secondRecord, config: { endpoint: 'https://other.com', apiKey: '***' } };
+    const secondMasked = { ...secondRecord, config: { baseUrl: 'https://other.com', apiKey: '***' } };
     mockListServiceInstances.mockResolvedValue({ data: [MOCK_RECORD, secondRecord], total: 2 });
     mockMaskInstanceConfig.mockReturnValueOnce(MOCK_MASKED).mockReturnValueOnce(secondMasked);
 

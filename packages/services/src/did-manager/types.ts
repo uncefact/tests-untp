@@ -28,7 +28,7 @@ export enum DidMethod {
 /** Maps DID URI method strings (e.g. "web", "webvh") to DidMethod enum values. */
 export const DID_METHOD_BY_URI: Record<string, DidMethod> = {
   web: DidMethod.DID_WEB,
-  webvh: DidMethod.DID_WEB_VH,
+  // webvh: DidMethod.DID_WEB_VH, // TODO: Enable when did:webvh support is implemented
 };
 
 export enum DidStatus {

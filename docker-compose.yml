@@ -96,6 +96,12 @@ services:
       - 3332:3332
     depends_on:
       - db
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --quiet --spider http://localhost:3332/agent-api-docs || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   ri:
     build:
@@ -114,7 +120,7 @@ services:
       AUTH_OIDC_ISSUER: http://keycloak:8080/realms/${KEYCLOAK_REALM}
       RI_APP_URL: http://localhost:3003
       # Verification URLs
-      DEFAULT_HUMAN_VERIFICATION_URL: http://localhost:3003
+      DEFAULT_HUMAN_VERIFICATION_URL: http://localhost:3003/verify
       DEFAULT_MACHINE_VERIFICATION_URL: http://localhost:3332/agent/routeVerificationCredential
       # Service URLs (using docker internal networking)
       ISSUER_API_URL: http://vckit-api:3332/v2
@@ -124,6 +130,29 @@ services:
       UNCEFACT_STORAGE_PRIVATE_BUCKET: ${UNCEFACT_STORAGE_PRIVATE_BUCKET:-private-data}
       IDR_API_URL: http://identity-resolver-service:3000/api/2.0.0
       IDR_API_KEY: ${IDR_API_KEY}
+      # System default service instances (used by seed.ts)
+      SYSTEM_VC_BASE_URL: http://vckit-api:3332
+      SYSTEM_VC_API_KEY: ${SYSTEM_VC_API_KEY:-test123}
+      SYSTEM_VC_ADAPTER_TYPE: ${SYSTEM_VC_ADAPTER_TYPE:-VCKIT}
+      SYSTEM_VC_API_VERSION: ${SYSTEM_VC_API_VERSION:-1.0.0}
+      SYSTEM_STORAGE_BASE_URL: http://storage-service:3334
+      SYSTEM_STORAGE_API_KEY: ${SYSTEM_STORAGE_API_KEY:-test123}
+      SYSTEM_STORAGE_ADAPTER_TYPE: ${SYSTEM_STORAGE_ADAPTER_TYPE:-UNCEFACT_STORAGE}
+      SYSTEM_STORAGE_API_VERSION: ${SYSTEM_STORAGE_API_VERSION:-3.1.0}
+      SYSTEM_STORAGE_PUBLIC_BUCKET: ${SYSTEM_STORAGE_PUBLIC_BUCKET:-public-data}
+      SYSTEM_STORAGE_PRIVATE_BUCKET: ${SYSTEM_STORAGE_PRIVATE_BUCKET:-private-data}
+      SYSTEM_IDR_BASE_URL: http://identity-resolver-service:3000
+      SYSTEM_IDR_API_KEY: ${SYSTEM_IDR_API_KEY:-test123}
+      SYSTEM_IDR_ADAPTER_TYPE: ${SYSTEM_IDR_ADAPTER_TYPE:-PYX_IDR}
+      SYSTEM_IDR_API_VERSION: ${SYSTEM_IDR_API_VERSION:-2.0.0}
+      SYSTEM_IDR_DEFAULT_LINK_TYPE: ${SYSTEM_IDR_DEFAULT_LINK_TYPE:-untp:dpp}
+      SYSTEM_IDR_DEFAULT_MIME_TYPE: ${SYSTEM_IDR_DEFAULT_MIME_TYPE:-text/html}
+      SYSTEM_IDR_DEFAULT_LANGUAGE: ${SYSTEM_IDR_DEFAULT_LANGUAGE:-en}
+      SYSTEM_IDR_DEFAULT_CONTEXT: ${SYSTEM_IDR_DEFAULT_CONTEXT:-au}
+      SYSTEM_IDR_DEFAULT_FWQS: ${SYSTEM_IDR_DEFAULT_FWQS:-true}
+      SYSTEM_DID: ${SYSTEM_DID:-did:web:uncefact.github.io:project-vckit:test-and-development}
+      SYSTEM_DID_NAME: ${SYSTEM_DID_NAME:-System Default DID}
+      SYSTEM_DID_DESCRIPTION: ${SYSTEM_DID_DESCRIPTION:-System-wide default DID}
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:3003/api/health"]
       interval: 30s
@@ -132,6 +161,10 @@ services:
       start_period: 40s
     depends_on:
       keycloak:
+        condition: service_started
+      vckit-api:
+        condition: service_healthy
+      storage-service:
         condition: service_started
       ri-db:
         condition: service_healthy

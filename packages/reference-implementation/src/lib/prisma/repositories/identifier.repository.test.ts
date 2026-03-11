@@ -6,6 +6,7 @@ import {
   deleteIdentifier,
 } from './identifier.repository';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import { SYSTEM_TENANT_ID } from '../constants';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
@@ -82,7 +83,7 @@ describe('identifier.repository', () => {
       expect(mockTx.identifierScheme.findFirst).toHaveBeenCalledWith({
         where: {
           id: SCHEME_ID,
-          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
       });
       expect(mockTx.identifier.create).toHaveBeenCalledWith({
@@ -219,7 +220,7 @@ describe('identifier.repository', () => {
       expect(mockTx.identifierScheme.findFirst).toHaveBeenCalledWith({
         where: {
           id: SCHEME_ID,
-          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
       });
       expect(mockTx.identifier.update).toHaveBeenCalledWith({

@@ -36,6 +36,13 @@ export class DidCreateError extends DidError {
   }
 }
 
+/** A DID with the given alias already exists on the upstream provider. */
+export class DidConflictError extends DidError {
+  constructor(alias: string) {
+    super(`A DID with alias "${alias}" already exists on the upstream provider`, 'DID_CONFLICT', 409, { alias });
+  }
+}
+
 /** Failed to delete a DID via the upstream provider. */
 export class DidDeleteError extends DidError {
   constructor(detail: string, httpStatus?: number) {

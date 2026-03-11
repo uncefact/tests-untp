@@ -52,7 +52,7 @@ describe('Verify Page', { testIsolation: false }, () => {
         adapterType: 'VCKIT',
         name: 'Verify Page E2E VCKit',
         config: {
-          endpoint: 'http://vckit-api:3332/v2',
+          baseUrl: 'http://vckit-api:3332',
           apiKey: 'test123',
         },
         apiVersion: '1.0.0',

@@ -8,6 +8,7 @@ import {
   DidMethodNotSupportedError,
   DidInputError,
   DidCreateError,
+  DidConflictError,
   DidDeleteError,
   DidDocumentFetchError,
 } from '../../errors';
@@ -146,6 +147,43 @@ describe('VCKitDidAdapter', () => {
       await expect(
         service.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' }),
       ).rejects.toThrow(DidCreateError);
+    });
+
+    it('throws DidConflictError when upstream returns "already exists"', async () => {
+      const alreadyExistsBody =
+        '{"error":"illegal_argument: Identifier with alias: localhost:3332:test-org, provider: did:web already exists: did:web:localhost:3332:test-org"}';
+      const mockResponse = {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        json: jest.fn().mockResolvedValue({}),
+        text: jest.fn().mockResolvedValue(alreadyExistsBody),
+      } as unknown as Response;
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      await expect(
+        service.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' }),
+      ).rejects.toThrow(DidConflictError);
+    });
+
+    it('throws DidCreateError for non-duplicate 500 errors', async () => {
+      const genericBody = '{"error":"something went wrong"}';
+      const mockResponse = {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        json: jest.fn().mockResolvedValue({}),
+        text: jest.fn().mockResolvedValue(genericBody),
+      } as unknown as Response;
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      const error = await service
+        .create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' })
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(DidCreateError);
+      expect(error).not.toBeInstanceOf(DidConflictError);
+      expect((error.context as { httpStatus?: number }).httpStatus).toBe(500);
     });
 
     it('throws DidCreateError for network errors', async () => {
@@ -468,12 +506,12 @@ describe('VCKitDidAdapter', () => {
   });
 
   describe('vckitDidConfigSchema', () => {
-    it('accepts valid config with endpoint and apiKey', () => {
+    it('accepts valid config with baseUrl and apiKey', () => {
       const result = vckitDidConfigSchema.parse({
-        endpoint: 'https://vckit.example.com',
+        baseUrl: 'https://vckit.example.com',
         apiKey: 'my-key',
       });
-      expect(result.endpoint).toBe('https://vckit.example.com');
+      expect(result.baseUrl).toBe('https://vckit.example.com');
       expect(result.apiKey).toBe('my-key');
     });
   });
@@ -481,7 +519,7 @@ describe('VCKitDidAdapter', () => {
   describe('vckitDidRegistryEntry', () => {
     it('factory creates an adapter using Logger', () => {
       const config = vckitDidConfigSchema.parse({
-        endpoint: 'https://vckit.example.com',
+        baseUrl: 'https://vckit.example.com',
         apiKey: 'my-key',
       });
       const adapter = vckitDidRegistryEntry.factory(config, mockLogger);

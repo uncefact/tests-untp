@@ -12,6 +12,7 @@ import {
   DidMethodNotSupportedError,
   DidInputError,
   DidCreateError,
+  DidConflictError,
   DidDeleteError,
   DidDocumentFetchError,
 } from '../../errors.js';
@@ -99,7 +100,18 @@ export class VCKitDidAdapter implements IDidService {
       });
 
       if (!response.ok) {
-        this.logger.error({ status: response.status, statusText: response.statusText }, 'Failed to create DID');
+        const bodyText = await response.text().catch(() => '');
+        this.logger.error(
+          { status: response.status, statusText: response.statusText, body: bodyText },
+          'Failed to create DID',
+        );
+
+        // VCKit returns 500 with "already exists" for duplicate DIDs instead of 409.
+        // Throw a specific DidConflictError so callers don't need to inspect HTTP status codes.
+        if (bodyText.toLowerCase().includes('already exists')) {
+          throw new DidConflictError(resolvedAlias);
+        }
+
         throw new DidCreateError(`HTTP ${response.status}: ${response.statusText}`, response.status);
       }
 
@@ -259,5 +271,5 @@ export const vckitDidRegistryEntry = {
   configSchema: vckitDidConfigSchema,
   sensitiveFields: vckitDidSensitiveFields,
   factory: (config: VCKitDidConfig, logger: LoggerService): IDidService =>
-    new VCKitDidAdapter(config.endpoint, { Authorization: `Bearer ${config.apiKey}` }, 'Ed25519', logger),
+    new VCKitDidAdapter(config.baseUrl, { Authorization: `Bearer ${config.apiKey}` }, 'Ed25519', logger),
 } satisfies AdapterRegistryEntry<VCKitDidConfig, IDidService>;

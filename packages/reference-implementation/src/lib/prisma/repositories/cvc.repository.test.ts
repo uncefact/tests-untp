@@ -13,6 +13,7 @@ import {
   findProfileWithCriteriaByCanonicalId,
 } from './cvc.repository';
 import { NotFoundError } from '@/lib/api/errors';
+import { SYSTEM_TENANT_ID } from '../constants';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
@@ -91,7 +92,7 @@ const mockCriterion = prisma.criterion as unknown as {
 };
 
 const TENANT_ID = 'tenant-1';
-const SYSTEM_TENANT = 'system';
+const SYSTEM_TENANT = SYSTEM_TENANT_ID;
 const NOW = new Date('2025-01-01');
 
 const CATALOGUE_RECORD = {

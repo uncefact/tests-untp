@@ -14,10 +14,8 @@ describe('did.config', () => {
   });
 
   const validEnv = {
-    VCKIT_API_URL: 'https://vckit.example.com',
-    VCKIT_API_KEY: 'test-token-123',
-    DEFAULT_ISSUER_DID: 'did:web:example.com:org:123',
-    DEFAULT_ISSUER_KEY_ID: '7af136a8efa11a4df2e9010b972bdb92a0013724b50e5efa45407a2ddea184e6',
+    SYSTEM_DID: 'did:web:example.com:org:123',
+    SYSTEM_DID_KEY_ID: '7af136a8efa11a4df2e9010b972bdb92a0013724b50e5efa45407a2ddea184e6',
   };
 
   it('returns valid config when all env vars are set', () => {
@@ -26,38 +24,33 @@ describe('did.config', () => {
     const config = getDidConfig();
 
     expect(config).toEqual({
-      vckitApiUrl: validEnv.VCKIT_API_URL,
-      vckitApiKey: validEnv.VCKIT_API_KEY,
-      defaultDid: validEnv.DEFAULT_ISSUER_DID,
-      defaultKeyId: validEnv.DEFAULT_ISSUER_KEY_ID,
+      defaultDid: validEnv.SYSTEM_DID,
+      defaultKeyId: validEnv.SYSTEM_DID_KEY_ID,
     });
   });
 
-  it('throws listing ALL missing vars when none are set', () => {
-    delete process.env.VCKIT_API_URL;
-    delete process.env.VCKIT_API_KEY;
-    delete process.env.DEFAULT_ISSUER_DID;
-    delete process.env.DEFAULT_ISSUER_KEY_ID;
+  it('returns config with undefined defaultKeyId when SYSTEM_DID_KEY_ID is not set', () => {
+    process.env.SYSTEM_DID = validEnv.SYSTEM_DID;
+    delete process.env.SYSTEM_DID_KEY_ID;
 
-    expect(() => getDidConfig()).toThrow('Missing required DID configuration');
+    const config = getDidConfig();
 
-    try {
-      getDidConfig();
-    } catch (error) {
-      const message = (error as Error).message;
-      expect(message).toContain('VCKIT_API_URL');
-      expect(message).toContain('VCKIT_API_KEY');
-      expect(message).toContain('DEFAULT_ISSUER_DID');
-      expect(message).toContain('DEFAULT_ISSUER_KEY_ID');
-    }
+    expect(config).toEqual({
+      defaultDid: validEnv.SYSTEM_DID,
+      defaultKeyId: undefined,
+    });
+  });
+
+  it('throws when SYSTEM_DID is missing', () => {
+    delete process.env.SYSTEM_DID;
+
+    expect(() => getDidConfig()).toThrow('Missing required DID configuration: SYSTEM_DID');
   });
 
   it('includes .env guidance text in the error message', () => {
-    delete process.env.VCKIT_API_URL;
-    delete process.env.VCKIT_API_KEY;
-    delete process.env.DEFAULT_ISSUER_DID;
+    delete process.env.SYSTEM_DID;
 
-    expect(() => getDidConfig()).toThrow('Set these in your .env file or environment.');
+    expect(() => getDidConfig()).toThrow('Set this in your .env file or environment.');
   });
 
   it('caches config on repeated calls', () => {
@@ -66,12 +59,12 @@ describe('did.config', () => {
     const first = getDidConfig();
 
     // Mutate env after first call — cached value should still be returned
-    process.env.VCKIT_API_URL = 'https://changed.example.com';
+    process.env.SYSTEM_DID = 'did:web:changed.example.com';
 
     const second = getDidConfig();
 
     expect(second).toBe(first);
-    expect(second.vckitApiUrl).toBe(validEnv.VCKIT_API_URL);
+    expect(second.defaultDid).toBe(validEnv.SYSTEM_DID);
   });
 
   it('resetDidConfig() clears the cache so next call re-reads env', () => {
@@ -79,42 +72,14 @@ describe('did.config', () => {
 
     const first = getDidConfig();
 
-    const updatedUrl = 'https://updated.example.com';
-    process.env.VCKIT_API_URL = updatedUrl;
+    const updatedDid = 'did:web:updated.example.com';
+    process.env.SYSTEM_DID = updatedDid;
 
     resetDidConfig();
 
     const second = getDidConfig();
 
     expect(second).not.toBe(first);
-    expect(second.vckitApiUrl).toBe(updatedUrl);
-  });
-
-  it('throws when VCKIT_API_URL is missing', () => {
-    Object.assign(process.env, validEnv);
-    delete process.env.VCKIT_API_URL;
-
-    expect(() => getDidConfig()).toThrow('VCKIT_API_URL');
-  });
-
-  it('throws when VCKIT_API_KEY is missing', () => {
-    Object.assign(process.env, validEnv);
-    delete process.env.VCKIT_API_KEY;
-
-    expect(() => getDidConfig()).toThrow('VCKIT_API_KEY');
-  });
-
-  it('throws when DEFAULT_ISSUER_DID is missing', () => {
-    Object.assign(process.env, validEnv);
-    delete process.env.DEFAULT_ISSUER_DID;
-
-    expect(() => getDidConfig()).toThrow('DEFAULT_ISSUER_DID');
-  });
-
-  it('throws when DEFAULT_ISSUER_KEY_ID is missing', () => {
-    Object.assign(process.env, validEnv);
-    delete process.env.DEFAULT_ISSUER_KEY_ID;
-
-    expect(() => getDidConfig()).toThrow('DEFAULT_ISSUER_KEY_ID');
+    expect(second.defaultDid).toBe(updatedDid);
   });
 });

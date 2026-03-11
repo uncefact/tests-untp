@@ -36,8 +36,9 @@ describe('parseDidMethod', () => {
     expect(parseDidMethod('did:web:example.com')).toBe('web');
   });
 
-  it('returns "webvh" for a did:webvh DID', () => {
-    expect(parseDidMethod('did:webvh:example.com:abc')).toBe('webvh');
+  // TODO: Enable when did:webvh support is implemented
+  it('throws DidMethodNotSupportedError for did:webvh (not yet supported)', () => {
+    expect(() => parseDidMethod('did:webvh:example.com:abc')).toThrow(DidMethodNotSupportedError);
   });
 
   it('throws DidMethodNotSupportedError for unsupported did:key method', () => {

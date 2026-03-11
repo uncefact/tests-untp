@@ -37,19 +37,23 @@ describe('generateCurrentDatetime', () => {
 
 describe('constructVerifyURL', () => {
   it('throws when uri is missing', () => {
-    expect(() => constructVerifyURL({ baseUrl: 'https://example.com', uri: '', hash: 'h' })).toThrow(
+    expect(() => constructVerifyURL({ baseUrl: 'https://example.com/verify', uri: '', hash: 'h' })).toThrow(
       'URI and hash are required',
     );
   });
 
   it('throws when hash is missing', () => {
-    expect(() => constructVerifyURL({ baseUrl: 'https://example.com', uri: 'u', hash: '' })).toThrow(
+    expect(() => constructVerifyURL({ baseUrl: 'https://example.com/verify', uri: 'u', hash: '' })).toThrow(
       'URI and hash are required',
     );
   });
 
-  it('builds a verify URL with baseUrl, uri, and hash', () => {
-    const url = constructVerifyURL({ baseUrl: 'https://example.com', uri: 'https://store/cred.json', hash: 'abc123' });
+  it('appends query params to the provided baseUrl', () => {
+    const url = constructVerifyURL({
+      baseUrl: 'https://example.com/verify',
+      uri: 'https://store/cred.json',
+      hash: 'abc123',
+    });
 
     expect(url).toContain('https://example.com/verify?');
     const parsed = new URL(url);
@@ -61,7 +65,7 @@ describe('constructVerifyURL', () => {
 
   it('includes decryptionKey in payload when provided', () => {
     const url = constructVerifyURL({
-      baseUrl: 'https://example.com',
+      baseUrl: 'https://example.com/verify',
       uri: 'https://store/cred.json',
       hash: 'abc123',
       decryptionKey: 'deadbeef',
@@ -74,7 +78,7 @@ describe('constructVerifyURL', () => {
 
   it('omits decryptionKey from payload when not provided', () => {
     const url = constructVerifyURL({
-      baseUrl: 'https://example.com',
+      baseUrl: 'https://example.com/verify',
       uri: 'https://store/cred.json',
       hash: 'abc123',
     });
@@ -84,7 +88,7 @@ describe('constructVerifyURL', () => {
     expect(Object.keys(q.payload)).toEqual(['uri', 'hash']);
   });
 
-  it('falls back to window.location when baseUrl is not provided', () => {
+  it('falls back to window.location with /verify path when baseUrl is not provided', () => {
     // jsdom provides window.location = http://localhost by default
     const url = constructVerifyURL({ uri: 'https://store/cred.json', hash: 'abc123' });
     expect(url).toContain('http://localhost/verify?');

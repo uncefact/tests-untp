@@ -6,6 +6,7 @@ import {
   deleteRenderTemplate,
   getDefaultRenderTemplate,
 } from './render-template.repository';
+import { SYSTEM_TENANT_ID } from '../constants';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
@@ -176,7 +177,7 @@ describe('render-template.repository', () => {
       expect(mockRenderTemplate.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'template-1',
-          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
         include: INCLUDE_SHAPE,
       });
@@ -187,7 +188,7 @@ describe('render-template.repository', () => {
       const SYSTEM_TEMPLATE_RECORD = {
         ...TEMPLATE_RECORD,
         id: 'system-template-1',
-        tenantId: 'system',
+        tenantId: SYSTEM_TENANT_ID,
         name: 'DPP System Default Template',
       };
       mockRenderTemplate.findFirst.mockResolvedValue(SYSTEM_TEMPLATE_RECORD);
@@ -208,7 +209,7 @@ describe('render-template.repository', () => {
       const systemTemplate = {
         ...TEMPLATE_RECORD,
         id: 'system-template-1',
-        tenantId: 'system',
+        tenantId: SYSTEM_TENANT_ID,
         isDefault: true,
       };
       mockRenderTemplate.findFirst
@@ -224,7 +225,7 @@ describe('render-template.repository', () => {
       const systemTemplate = {
         ...TEMPLATE_RECORD,
         id: 'system-template-1',
-        tenantId: 'system',
+        tenantId: SYSTEM_TENANT_ID,
         isDefault: true,
       };
       mockRenderTemplate.findFirst.mockResolvedValueOnce(systemTemplate).mockResolvedValueOnce(null);
@@ -246,7 +247,7 @@ describe('render-template.repository', () => {
 
       expect(mockRenderTemplate.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
         include: INCLUDE_SHAPE,
         take: 20,
@@ -255,7 +256,7 @@ describe('render-template.repository', () => {
       });
       expect(mockRenderTemplate.count).toHaveBeenCalledWith({
         where: {
-          OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
       });
       expect(result).toEqual({ data: [TEMPLATE_RECORD], total: 1 });
@@ -270,7 +271,7 @@ describe('render-template.repository', () => {
       await listRenderTemplates(TENANT_ID, { dataModelId: CONFIG_ID });
 
       const expectedWhere = expect.objectContaining({
-        OR: [{ tenantId: TENANT_ID }, { tenantId: 'system' }],
+        OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         dataModelId: CONFIG_ID,
       });
       expect(mockRenderTemplate.findMany).toHaveBeenCalledWith({
@@ -289,7 +290,7 @@ describe('render-template.repository', () => {
       const SYSTEM_TEMPLATE_RECORD = {
         ...TEMPLATE_RECORD,
         id: 'system-template-1',
-        tenantId: 'system',
+        tenantId: SYSTEM_TENANT_ID,
         name: 'DPP System Default Template',
       };
       mockRenderTemplate.findMany
@@ -323,7 +324,7 @@ describe('render-template.repository', () => {
       const systemTemplate = {
         ...TEMPLATE_RECORD,
         id: 'system-template-1',
-        tenantId: 'system',
+        tenantId: SYSTEM_TENANT_ID,
         isDefault: true,
       };
       const tenantTemplate = {
@@ -526,14 +527,14 @@ describe('render-template.repository', () => {
     });
 
     it('falls back to system default when tenant has none', async () => {
-      const systemDefault = { ...TEMPLATE_RECORD, tenantId: 'system', isDefault: true };
+      const systemDefault = { ...TEMPLATE_RECORD, tenantId: SYSTEM_TENANT_ID, isDefault: true };
       mockRenderTemplate.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(systemDefault);
 
       const result = await getDefaultRenderTemplate(TENANT_ID, CONFIG_ID);
 
       expect(mockRenderTemplate.findFirst).toHaveBeenCalledTimes(2);
       expect(mockRenderTemplate.findFirst).toHaveBeenNthCalledWith(2, {
-        where: { tenantId: 'system', dataModelId: CONFIG_ID, isDefault: true },
+        where: { tenantId: SYSTEM_TENANT_ID, dataModelId: CONFIG_ID, isDefault: true },
         include: INCLUDE_SHAPE,
       });
       expect(result).toEqual(systemDefault);

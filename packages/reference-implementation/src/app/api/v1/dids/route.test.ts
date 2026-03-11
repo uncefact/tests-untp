@@ -351,6 +351,20 @@ describe('POST /api/v1/dids', () => {
     expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
+  it('returns 409 when upstream provider reports DID already exists', async () => {
+    const { DidConflictError } = jest.requireActual('@uncefact/untp-ri-services');
+    mockDidService.create.mockRejectedValue(new DidConflictError('existing-alias'));
+
+    const req = createFakeRequest({
+      body: { type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'existing-alias' },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toContain('already exists');
+  });
+
   it('returns 400 when service does not support the requested method', async () => {
     mockDidService.getSupportedMethods.mockReturnValue(['DID_WEB']);
 
