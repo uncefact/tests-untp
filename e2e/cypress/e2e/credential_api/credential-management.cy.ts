@@ -64,6 +64,8 @@ describe('Credential API', { testIsolation: false }, () => {
           baseUrl: 'http://storage-service:3334',
           apiKey: 'test123',
           apiVersion: '3.1.0',
+          publicBucket: 'verifiable-credentials',
+          privateBucket: 'verifiable-credentials',
         },
         apiVersion: '3.1.0',
         isPrimary: true,
