@@ -34,10 +34,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
 
     const bucket = encrypt ? this.privateBucket : this.publicBucket;
     const externalId = crypto.randomUUID();
-    const payload: Record<string, unknown> = { data: credential, id: externalId };
-    if (bucket) {
-      payload.bucket = bucket;
-    }
+    const payload: Record<string, unknown> = { data: credential, id: externalId, bucket };
 
     this.logger.debug({ url, encrypt, bucket, externalId }, 'Storing credential');
 
@@ -106,7 +103,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       hash,
       decryptionKey,
       externalId,
-      bucket: bucket ?? undefined,
+      bucket,
       mimeType: 'application/json',
     };
   }
@@ -124,9 +121,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
     const blob = new Blob([content], { type: contentType });
     formData.append('file', blob, filename);
     formData.append('id', externalId);
-    if (bucket) {
-      formData.append('bucket', bucket);
-    }
+    formData.append('bucket', bucket);
 
     // Build headers without Content-Type — the runtime must set
     // multipart/form-data with the correct boundary automatically.
@@ -200,7 +195,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       hash,
       decryptionKey,
       externalId,
-      bucket: bucket ?? undefined,
+      bucket,
       mimeType: contentType,
     };
   }

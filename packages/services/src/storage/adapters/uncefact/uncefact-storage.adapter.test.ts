@@ -1178,6 +1178,22 @@ describe('UncefactStorageAdapter', () => {
       expect(result.privateBucket).toBe('my-private-bucket');
     });
 
+    it('should reject config when publicBucket is missing', () => {
+      const config = {
+        baseUrl: 'https://storage.example.com',
+        privateBucket: 'private-data',
+      };
+      expect(() => uncefactStorageRegistryEntry.configSchema.parse(config)).toThrow();
+    });
+
+    it('should reject config when privateBucket is missing', () => {
+      const config = {
+        baseUrl: 'https://storage.example.com',
+        publicBucket: 'public-data',
+      };
+      expect(() => uncefactStorageRegistryEntry.configSchema.parse(config)).toThrow();
+    });
+
     it('should reject empty string publicBucket', () => {
       const config = {
         baseUrl: 'https://storage.example.com',
