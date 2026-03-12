@@ -35,6 +35,24 @@ docker compose up -d
 
 This starts the Reference Implementation and all dependent services. See the [Quick Start guide](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/quick-start) for full details.
 
+### Resetting Services
+
+To tear down all containers **and remove all data volumes** (databases, Keycloak realm data, etc.):
+
+```bash
+docker compose down -v
+```
+
+> **Warning**: The `-v` flag removes all named volumes. This deletes all database data and forces Keycloak to re-import its realm configuration on the next start. Only use this when you need a clean slate.
+
+To reset a specific service's data without affecting others, remove its volume individually. For example, to reset Keycloak so it re-imports the latest realm configuration:
+
+```bash
+docker compose down
+docker volume rm tests-untp_keycloak-data
+docker compose up -d
+```
+
 ### Local Development
 
 For development with hot reloading, stop the Reference Implementation container and run it locally instead:

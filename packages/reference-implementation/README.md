@@ -44,6 +44,24 @@ cp .env.example .env
 
 The default values in `.env.example` are sufficient for local development — no changes required.
 
+### Resetting Services
+
+To tear down all containers **and remove all data volumes** (databases, Keycloak realm data, etc.):
+
+```bash
+docker compose down -v
+```
+
+> **Warning**: The `-v` flag removes all named volumes. This deletes all database data and forces Keycloak to re-import its realm configuration on the next start. Only use this when you need a clean slate.
+
+To reset a specific service's data without affecting others, remove its volume individually. For example, to reset Keycloak so it re-imports the latest realm configuration:
+
+```bash
+docker compose down
+docker volume rm tests-untp_keycloak-data
+docker compose up -d
+```
+
 ### Database
 
 The RI uses **PostgreSQL** for all application-level data and **Prisma** as the database client.
