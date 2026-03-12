@@ -30,7 +30,7 @@ The fastest way to get everything running:
 git clone https://github.com/uncefact/tests-untp.git
 cd tests-untp
 cp .env.example .env
-docker compose up -d
+docker compose up -d --build
 ```
 
 This starts the Reference Implementation and all dependent services. See the [Quick Start guide](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/quick-start) for full details.
@@ -50,7 +50,7 @@ To reset a specific service's data without affecting others, remove its volume i
 ```bash
 docker compose down
 docker volume rm tests-untp_keycloak-data
-docker compose up -d
+docker compose up -d --build
 ```
 
 ### Local Development

@@ -23,7 +23,7 @@ Clone the repository and start all services:
 git clone https://github.com/uncefact/tests-untp.git
 cd tests-untp
 cp .env.example .env
-docker compose up -d
+docker compose up -d --build
 ```
 
 This starts the Reference Implementation along with all of its dependencies — the database, identity provider, verifiable credential service, storage service, and identity resolver service.
@@ -74,7 +74,7 @@ To reset a specific service's data without affecting others, remove its volume i
 ```bash
 docker compose down
 docker volume rm tests-untp_keycloak-data
-docker compose up -d
+docker compose up -d --build
 ```
 
 ## Next Steps

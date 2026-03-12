@@ -59,7 +59,7 @@ To reset a specific service's data without affecting others, remove its volume i
 ```bash
 docker compose down
 docker volume rm tests-untp_keycloak-data
-docker compose up -d
+docker compose up -d --build
 ```
 
 ### Database
