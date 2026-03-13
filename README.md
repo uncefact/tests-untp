@@ -20,6 +20,7 @@ We recommend using [Node Version Manager (NVM)](https://github.com/nvm-sh/nvm) t
 nvm install 20.12.2
 nvm use 20.12.2
 npm install -g yarn@1.22.22
+yarn install
 ```
 
 ### Start with Docker Compose
@@ -59,10 +60,11 @@ For development with hot reloading, stop the Reference Implementation container 
 
 ```bash
 docker compose stop ri
-yarn install
 yarn build
 yarn start
 ```
+
+> **Note**: Ensure you have completed the [Prerequisites](#prerequisites) before running locally.
 
 The dependent services continue running in Docker while the Reference Implementation runs locally at [http://localhost:3003](http://localhost:3003). See [Authentication](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/authentication) for how to obtain an API token.
 
@@ -111,21 +113,25 @@ yarn lint                     # ESLint across packages
 
 ## End-to-End Testing
 
-E2E tests use Cypress with a dedicated Docker Compose configuration:
+E2E tests use Cypress with dedicated Docker Compose configurations for each [tenant mode](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/authentication/tenant-modes). Ensure you have completed the [Prerequisites](#prerequisites) before running.
+
+**Open mode:**
 
 ```bash
-# Stop any running containers first
 docker compose down
-
-# Start E2E services
 docker compose -f docker-compose.e2e.yml up -d --build
-
-# Run tests
-yarn test:run-cypress       # Headless
-yarn test:open-cypress      # Interactive UI
-
-# Clean up
+yarn test:run-cypress         # Headless
+yarn test:open-cypress        # Interactive UI
 docker compose -f docker-compose.e2e.yml down
+```
+
+**Closed mode:**
+
+```bash
+docker compose down
+docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml up -d --build
+yarn test:run-cypress:closed-mode
+docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml down
 ```
 
 > **Note**: Do not mix E2E and standard Docker Compose setups. Stop existing containers before switching.

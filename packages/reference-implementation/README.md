@@ -6,28 +6,6 @@ The RI is also used to facilitate **pilots and demonstrations**, helping stakeho
 
 For a full understanding of the architecture and how the RI fits together, see the [documentation site](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/overview).
 
-### Quick Start
-
-See the [Quick Start guide](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/quick-start) for getting the full stack running with Docker Compose.
-
-For local development with hot reloading, stop the RI container and run it locally:
-
-```bash
-docker compose stop ri
-yarn install
-yarn build
-yarn start
-```
-
-The RI runs on [http://localhost:3003](http://localhost:3003) with hot reloading enabled.
-
-### Key Documentation
-
-- [System Architecture](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/system-architecture) — how the RI connects to its dependent services
-- [Service Architecture](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/services/service-architecture) — adapter pattern, encryption, service resolution
-- [Authentication](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/authentication) — browser sessions, service accounts, and obtaining tokens
-- [API Documentation](http://localhost:3003/api-docs) — interactive Swagger UI (requires running instance)
-
 ### Environment Variables
 
 Environment variables control how the RI is configured.
@@ -43,6 +21,29 @@ cp .env.example .env
 ```
 
 The default values in `.env.example` are sufficient for local development — no changes required.
+
+### Quick Start
+
+See the [Quick Start guide](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/quick-start) for getting the full stack running with Docker Compose.
+
+For local development with hot reloading, stop the RI container and run it locally from the **repository root**:
+
+```bash
+docker compose stop ri
+yarn build
+yarn start
+```
+
+> **Note**: Ensure you have completed the [Prerequisites](../../README.md#prerequisites) in the root README before running locally.
+
+The RI runs on [http://localhost:3003](http://localhost:3003) with hot reloading enabled.
+
+### Key Documentation
+
+- [System Architecture](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/system-architecture) — how the RI connects to its dependent services
+- [Service Architecture](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/services/service-architecture) — adapter pattern, encryption, service resolution
+- [Authentication](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/authentication) — browser sessions, service accounts, and obtaining tokens
+- [API Documentation](http://localhost:3003/api-docs) — interactive Swagger UI (requires running instance)
 
 ### Resetting Services
 
