@@ -1,2 +1,8 @@
-// v0.6.1 uses the same builder and extractor as v0.6.0
-export { dccV060Spec as dccV061Spec } from '../v060/index.js';
+import type { VersionSpec } from '../../../../types.js';
+import { buildDccSubjectV061 } from './builder.js';
+import { extractDccRefs } from '../v060/extractor.js';
+
+export const dccV061Spec: VersionSpec = {
+  builder: buildDccSubjectV061,
+  extractor: extractDccRefs,
+};

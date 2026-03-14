@@ -1,6 +1,5 @@
 import { makeBridge } from '../../../../make-bridge.js';
 import { dccV060Spec } from './index.js';
-import { dccV061Spec } from '../v061/index.js';
 import {
   createOrganisation,
   createFacility,
@@ -8,15 +7,9 @@ import {
   createConformityInput,
   createBridgeEntities,
 } from '../../../../__fixtures__/entities.js';
-import type { VersionSpec } from '../../../../types.js';
 
-const versions: [string, VersionSpec][] = [
-  ['v0.6.0', dccV060Spec],
-  ['v0.6.1', dccV061Spec],
-];
-
-describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
-  const bridge = makeBridge(spec);
+describe('buildDccSubject (v0.6.0)', () => {
+  const bridge = makeBridge(dccV060Spec);
 
   // ── credentialSubject root structure ─────────────────────────────────────────
 
