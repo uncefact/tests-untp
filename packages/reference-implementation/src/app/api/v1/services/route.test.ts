@@ -83,7 +83,7 @@ jest.mock('@/lib/api/logger', () => ({
   },
 }));
 
-import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';
 
 // ---------------------------------------------------------------------------
@@ -160,6 +160,8 @@ const VALID_BODY = {
 describe('POST /api/v1/services', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Allow private URLs by default so happy-path tests don't trigger real DNS resolution
+    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
     mockCreateServiceInstance.mockResolvedValue(MOCK_RECORD);
     mockMaskInstanceConfig.mockReturnValue(MOCK_MASKED);
     mockGetEncryptionService.mockReturnValue({
@@ -470,6 +472,18 @@ describe('GET /api/v1/services', () => {
       offset: 0,
       hasMore: true,
     });
+  });
+
+  it('clamps limit to MAX_PAGE_LIMIT', async () => {
+    mockListServiceInstances.mockResolvedValue({ data: [], total: 0 });
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/services?limit=500',
+    });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListServiceInstances).toHaveBeenCalledWith('org-1', expect.objectContaining({ limit: MAX_PAGE_LIMIT }));
   });
 
   it('returns 400 for invalid serviceType filter', async () => {

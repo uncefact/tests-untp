@@ -106,19 +106,19 @@ sequenceDiagram
 
     Client->>RI: POST /api/v1/render-templates
     RI->>RI: Validate fields and renderMethodType
+    RI->>DB: Resolve storage service instance
     RI->>DB: Verify data model exists for tenant
     alt data model not found
         RI-->>Client: 404 Not Found
     end
     RI->>RI: Validate render method fields
     RI->>RI: Sanitise template HTML
-    RI->>DB: Resolve storage service instance
     RI->>Storage: Upload sanitised HTML
     Storage-->>RI: URL, hash, externalId, bucket
-    RI->>DB: Insert render template record
     alt isDefault = true
         RI->>DB: Unset other defaults for same data model
     end
+    RI->>DB: Insert render template record
     DB-->>RI: Created record
     RI-->>Client: 201 Created (render template)
 ```
@@ -198,10 +198,10 @@ sequenceDiagram
         Storage-->>RI: URL, hash, externalId, bucket
         RI->>Storage: Delete old content (best-effort)
     end
-    RI->>DB: Update record
     alt isDefault = true
         RI->>DB: Unset other defaults for same data model
     end
+    RI->>DB: Update record
     DB-->>RI: Updated record
     RI-->>Client: 200 OK (updated render template)
 ```

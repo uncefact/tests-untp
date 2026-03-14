@@ -7,6 +7,7 @@ import {
   getDefaultRenderTemplate,
 } from './render-template.repository';
 import { SYSTEM_TENANT_ID } from '../constants';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
@@ -244,7 +245,7 @@ describe('render-template.repository', () => {
           OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
         include: INCLUDE_SHAPE,
-        take: 20,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
@@ -271,7 +272,7 @@ describe('render-template.repository', () => {
       expect(mockRenderTemplate.findMany).toHaveBeenCalledWith({
         where: expectedWhere,
         include: INCLUDE_SHAPE,
-        take: 20,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });

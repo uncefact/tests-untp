@@ -2,6 +2,7 @@ import { ServiceInstance, ServiceType, AdapterType, Prisma } from '../generated'
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 export type CreateServiceInstanceInput = {
   tenantId: string;
@@ -121,7 +122,7 @@ export async function listServiceInstances(
   const [data, total, tenantPrimaries] = await Promise.all([
     prisma.serviceInstance.findMany({
       where,
-      take: limit ?? 20,
+      take: limit ?? DEFAULT_PAGE_LIMIT,
       skip: offset,
       orderBy: { createdAt: 'desc' },
     }),

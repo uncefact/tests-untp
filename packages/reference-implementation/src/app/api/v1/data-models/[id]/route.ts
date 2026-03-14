@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString, assertPublicUrl } from '@/lib/api/validation';
+import { assertPublicUrl, ValidationError, isNonEmptyString } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDataModelById, updateDataModel, deleteDataModel } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
@@ -159,10 +159,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('websiteUrl must be a non-empty string');
   }
 
-  logger.info({ dataModelId: id }, 'Validating URLs are not internal');
-  if (isNonEmptyString(body.schemaUrl)) await assertPublicUrl(body.schemaUrl, 'schemaUrl');
-  if (isNonEmptyString(body.contextUrl)) await assertPublicUrl(body.contextUrl, 'contextUrl');
-  if (isNonEmptyString(body.websiteUrl)) await assertPublicUrl(body.websiteUrl, 'websiteUrl');
+  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+    logger.info({ dataModelId: id }, 'Validating URLs are not internal');
+    if (isNonEmptyString(body.schemaUrl)) await assertPublicUrl(body.schemaUrl, 'schemaUrl');
+    if (isNonEmptyString(body.contextUrl)) await assertPublicUrl(body.contextUrl, 'contextUrl');
+    if (isNonEmptyString(body.websiteUrl)) await assertPublicUrl(body.websiteUrl, 'websiteUrl');
+  }
 
   logger.info({ dataModelId: id }, 'Updating data model');
   const dataModel = await updateDataModel(id, tenantId, {

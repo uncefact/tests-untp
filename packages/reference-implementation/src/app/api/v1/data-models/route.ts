@@ -226,11 +226,13 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('websiteUrl must be a non-empty string');
   }
 
-  logger.info('Validating URLs are not internal');
-  await assertPublicUrl(body.schemaUrl, 'schemaUrl');
-  await assertPublicUrl(body.contextUrl, 'contextUrl');
-  if (body.websiteUrl) {
-    await assertPublicUrl(body.websiteUrl, 'websiteUrl');
+  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+    logger.info('Validating URLs are not internal');
+    await assertPublicUrl(body.schemaUrl, 'schemaUrl');
+    await assertPublicUrl(body.contextUrl, 'contextUrl');
+    if (body.websiteUrl) {
+      await assertPublicUrl(body.websiteUrl, 'websiteUrl');
+    }
   }
 
   logger.info({ credentialType, name: body.name }, 'Creating data model extension');

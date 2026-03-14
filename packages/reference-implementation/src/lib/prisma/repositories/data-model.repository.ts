@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
  * Include shape for single data model queries (getById, create, update).
@@ -165,7 +166,7 @@ export async function listDataModels(
     prisma.dataModel.findMany({
       where,
       include: DATA_MODEL_LIST_INCLUDE,
-      take: limit ?? 20,
+      take: limit ?? DEFAULT_PAGE_LIMIT,
       skip: offset,
       orderBy: { createdAt: 'desc' },
     }),

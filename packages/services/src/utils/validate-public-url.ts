@@ -62,8 +62,7 @@ export async function validatePublicUrl(url: URL): Promise<void> {
   try {
     resolved = await dns.promises.lookup(hostname);
   } catch {
-    // DNS resolution failure — let the caller's fetch handle the error naturally
-    return;
+    throw new Error('uri hostname could not be resolved');
   }
 
   const isPrivate = resolved.family === 4 ? isPrivateIpv4(resolved.address) : isPrivateIpv6(resolved.address);

@@ -2,6 +2,7 @@ import { Prisma, RenderMethodType } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
  * Include shape used by all render template queries.
@@ -168,7 +169,7 @@ export async function listRenderTemplates(
     prisma.renderTemplate.findMany({
       where,
       include: RENDER_TEMPLATE_INCLUDE,
-      take: limit ?? 20,
+      take: limit ?? DEFAULT_PAGE_LIMIT,
       skip: offset,
       orderBy: { createdAt: 'desc' },
     }),

@@ -254,7 +254,9 @@ describe('PATCH /api/v1/data-models/:id', () => {
   });
 
   it('returns 400 when schemaUrl points to a private address', async () => {
-    mockValidatePublicUrl.mockRejectedValueOnce(new Error('private'));
+    mockValidatePublicUrl.mockRejectedValueOnce(
+      new Error('uri must not point to a private or reserved network address'),
+    );
 
     const req = createFakeRequest({ method: 'PATCH', body: { schemaUrl: 'http://127.0.0.1/schema.json' } });
     const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);

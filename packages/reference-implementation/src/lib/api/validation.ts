@@ -88,7 +88,13 @@ export async function assertPublicUrl(url: string, paramName: string): Promise<v
   }
   try {
     await validatePublicUrl(parsed);
-  } catch {
-    throw new ValidationError(`${paramName} must not point to a private or reserved network address`);
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('could not be resolved')) {
+      throw new ValidationError(`${paramName} hostname could not be resolved`);
+    }
+    if (e instanceof Error && e.message.includes('private or reserved')) {
+      throw new ValidationError(`${paramName} must not point to a private or reserved network address`);
+    }
+    throw e;
   }
 }

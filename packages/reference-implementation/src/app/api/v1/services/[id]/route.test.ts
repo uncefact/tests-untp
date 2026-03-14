@@ -202,6 +202,8 @@ describe('GET /api/v1/services/:id', () => {
 describe('PATCH /api/v1/services/:id', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Allow private URLs by default so happy-path tests don't trigger real DNS resolution
+    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
     // Default encryption service mock
     mockGetEncryptionService.mockReturnValue({ encrypt: mockEncrypt, decrypt: mockDecrypt });
   });

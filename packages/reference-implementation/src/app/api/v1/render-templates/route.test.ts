@@ -52,7 +52,7 @@ jest.mock('@/lib/services/resolve-storage-service', () => ({
   resolveStorageService: (...args: unknown[]) => mockResolveStorageService(...args),
 }));
 
-import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { GET, POST } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -149,6 +149,21 @@ describe('GET /api/v1/render-templates', () => {
       offset: 20,
       hasMore: false,
     });
+  });
+
+  it('clamps limit to MAX_PAGE_LIMIT', async () => {
+    mockListRenderTemplates.mockResolvedValue({ data: [], total: 0 });
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/render-templates?limit=500',
+    });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListRenderTemplates).toHaveBeenCalledWith(
+      'tenant-1',
+      expect.objectContaining({ limit: MAX_PAGE_LIMIT }),
+    );
   });
 
   it('returns 400 for invalid limit', async () => {

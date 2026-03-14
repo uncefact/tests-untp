@@ -251,6 +251,34 @@ describe('GET /api/v1/data-models', () => {
     });
   });
 
+  it('strips parentConfig from the response data', async () => {
+    const dataModels = [
+      {
+        id: 'cfg-1',
+        name: 'DPP v0.6.0',
+        credentialType: 'DigitalProductPassport',
+        parentConfig: { id: 'parent-1', name: 'Parent' },
+      },
+      {
+        id: 'cfg-2',
+        name: 'DCC v0.6.0',
+        credentialType: 'DigitalConformityCredential',
+        parentConfig: { id: 'parent-2', name: 'Parent 2' },
+      },
+    ];
+    mockListDataModels.mockResolvedValue({ data: dataModels, total: 2 });
+
+    const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/data-models' });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    for (const item of json.data) {
+      expect(item).not.toHaveProperty('parentConfig');
+    }
+    expect(json.data[0]).toEqual({ id: 'cfg-1', name: 'DPP v0.6.0', credentialType: 'DigitalProductPassport' });
+  });
+
   it('clamps limit to maximum', async () => {
     mockListDataModels.mockResolvedValue({ data: [], total: 0 });
 
@@ -628,7 +656,9 @@ describe('POST /api/v1/data-models', () => {
   });
 
   it('returns 400 when schemaUrl points to a private address', async () => {
-    mockValidatePublicUrl.mockRejectedValueOnce(new Error('private'));
+    mockValidatePublicUrl.mockRejectedValueOnce(
+      new Error('uri must not point to a private or reserved network address'),
+    );
 
     const req = createFakeRequest({
       body: {
@@ -650,7 +680,7 @@ describe('POST /api/v1/data-models', () => {
   it('returns 400 when contextUrl points to a private address', async () => {
     mockValidatePublicUrl
       .mockResolvedValueOnce(undefined) // schemaUrl passes
-      .mockRejectedValueOnce(new Error('private')); // contextUrl fails
+      .mockRejectedValueOnce(new Error('uri must not point to a private or reserved network address')); // contextUrl fails
 
     const req = createFakeRequest({
       body: {
