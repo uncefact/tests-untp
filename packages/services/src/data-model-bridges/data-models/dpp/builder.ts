@@ -28,6 +28,8 @@ type ConformityClaim = {
 
 function buildFacility(facility: FacilityEntity | undefined): DppFacility {
   const location = facility?.location;
+  const locationInformation = buildLocationInformation(location);
+  const address = buildAddress(location?.address);
 
   return {
     type: ['Facility'],
@@ -38,8 +40,8 @@ function buildFacility(facility: FacilityEntity | undefined): DppFacility {
       registeredId: facility.primaryIdentifier.value,
       idScheme: buildIdentifierScheme(facility.primaryIdentifier.scheme),
     }),
-    ...(buildLocationInformation(location) && { locationInformation: buildLocationInformation(location) }),
-    ...(buildAddress(location?.address) && { address: buildAddress(location?.address) }),
+    ...(locationInformation && { locationInformation }),
+    ...(address && { address }),
   };
 }
 

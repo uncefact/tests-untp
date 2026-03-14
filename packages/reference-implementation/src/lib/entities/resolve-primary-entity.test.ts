@@ -1,3 +1,7 @@
+jest.mock('@/lib/api/logger', () => ({
+  apiLogger: { child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }) },
+}));
+
 const mockGetProductByIdentifierValue = jest.fn();
 const mockGetFacilityByIdentifierValue = jest.fn();
 const mockGetOrganisationByIdentifierValue = jest.fn();

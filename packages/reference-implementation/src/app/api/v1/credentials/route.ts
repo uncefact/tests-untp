@@ -145,6 +145,13 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     ];
   }
 
+  if (isDcc && refs && !refs.conformity) {
+    cvcWarnings.push({
+      code: 'CVC_NO_CONFORMITY' as const,
+      message: 'No conformity data found in DCC credential payload',
+    });
+  }
+
   if (isDcc && refs?.conformity) {
     try {
       const result = await validateCvcCompliance(tenantId, refs.conformity);
@@ -171,7 +178,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     tenantId,
     credentialPayload,
     credentialType,
-    bridge,
+    refs: refs ?? {},
     vcService,
     storageService,
     storageOptions,

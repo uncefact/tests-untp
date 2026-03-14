@@ -1,6 +1,7 @@
 export type {
   IDataModelBridge,
   ExtractedRefs,
+  ConformityRefs,
   ConformityInput,
   ResolvedEntities,
   OrganisationEntity,

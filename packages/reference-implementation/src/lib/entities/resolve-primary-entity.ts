@@ -4,6 +4,9 @@ import {
   getFacilityByIdentifierValue,
   getOrganisationByIdentifierValue,
 } from '@/lib/prisma/repositories';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ module: 'resolve-primary-entity' });
 
 export type PrimaryEntityResult = {
   primaryIdentifier?: string;
@@ -24,7 +27,10 @@ export type PrimaryEntityResult = {
 export async function resolvePrimaryEntity(refs: ExtractedRefs, tenantId: string): Promise<PrimaryEntityResult> {
   if (refs.product?.id) {
     const entity = await getProductByIdentifierValue(refs.product.id, tenantId);
-    if (!entity) return {};
+    if (!entity) {
+      logger.warn({ identifierValue: refs.product.id, tenantId }, 'Product not found for identifier');
+      return {};
+    }
     return {
       primaryIdentifier: refs.product.id,
       productId: entity.id,
@@ -36,7 +42,10 @@ export async function resolvePrimaryEntity(refs: ExtractedRefs, tenantId: string
 
   if (refs.facility?.id) {
     const entity = await getFacilityByIdentifierValue(refs.facility.id, tenantId);
-    if (!entity) return {};
+    if (!entity) {
+      logger.warn({ identifierValue: refs.facility.id, tenantId }, 'Facility not found for identifier');
+      return {};
+    }
     return {
       primaryIdentifier: refs.facility.id,
       facilityId: entity.id,
@@ -48,7 +57,10 @@ export async function resolvePrimaryEntity(refs: ExtractedRefs, tenantId: string
 
   if (refs.organisation?.id) {
     const entity = await getOrganisationByIdentifierValue(refs.organisation.id, tenantId);
-    if (!entity) return {};
+    if (!entity) {
+      logger.warn({ identifierValue: refs.organisation.id, tenantId }, 'Organisation not found for identifier');
+      return {};
+    }
     return {
       primaryIdentifier: refs.organisation.id,
       organisationId: entity.id,

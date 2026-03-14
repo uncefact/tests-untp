@@ -86,6 +86,8 @@ export type ExtractedRefs = {
   };
 };
 
+export type ConformityRefs = NonNullable<ExtractedRefs['conformity']>;
+
 // ── Bridge interface ──────────────────────────────────────────────────────────
 
 export interface IDataModelBridge {

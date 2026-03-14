@@ -1,15 +1,9 @@
 import { findCriteriaByCanonicalIds, findProfileWithCriteriaByCanonicalId } from '@/lib/prisma/repositories';
+import type { ConformityRefs } from '@uncefact/untp-ri-services';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-export type ConformityRefs = {
-  schemeUrl?: string;
-  standardUrls: string[];
-  regulationUrls: string[];
-  criteriaUrls: string[];
-};
 
 export type CvcValidationWarningCode =
   | 'CVC_NO_SCOPE'
@@ -17,6 +11,7 @@ export type CvcValidationWarningCode =
   | 'CVC_UNKNOWN_CRITERION'
   | 'CVC_MISSING_CRITERION'
   | 'CVC_NO_CRITERIA'
+  | 'CVC_NO_CONFORMITY'
   | 'CVC_VALIDATION_ERROR';
 
 export type CvcValidationWarning = {

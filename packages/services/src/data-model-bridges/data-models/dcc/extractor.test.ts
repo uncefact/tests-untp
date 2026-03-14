@@ -43,6 +43,19 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
       });
       expect(refs.conformity).toBeUndefined();
     });
+
+    it('extracts schemeUrl from scope.id when no assessments are present', () => {
+      const refs = bridge.extractRefs({
+        type: ['ConformityAttestation', 'Attestation'],
+        scope: { id: 'https://example.org/scheme' },
+      });
+      expect(refs.conformity).toEqual({
+        schemeUrl: 'https://example.org/scheme',
+        standardUrls: [],
+        regulationUrls: [],
+        criteriaUrls: [],
+      });
+    });
   });
 
   // ── organisation refs ────────────────────────────────────────────────────────

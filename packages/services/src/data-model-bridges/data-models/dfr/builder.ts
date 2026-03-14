@@ -32,6 +32,8 @@ function buildFacility(
   organisation: ResolvedEntities['organisation'],
 ): DfrFacility {
   const location = facility?.location;
+  const locationInformation = buildLocationInformation(location);
+  const address = buildAddress(location?.address);
 
   return {
     type: ['Facility'],
@@ -43,8 +45,8 @@ function buildFacility(
       idScheme: buildIdentifierScheme(facility.primaryIdentifier.scheme),
     }),
     operatedByParty: buildParty(organisation),
-    ...(buildLocationInformation(location) && { locationInformation: buildLocationInformation(location) }),
-    ...(buildAddress(location?.address) && { address: buildAddress(location?.address) }),
+    ...(locationInformation && { locationInformation }),
+    ...(address && { address }),
   };
 }
 

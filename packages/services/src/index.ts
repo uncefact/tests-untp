@@ -167,6 +167,7 @@ export { CvcV070Parser } from './cvc-parsing/index.js';
 export type {
   IDataModelBridge,
   ExtractedRefs,
+  ConformityRefs,
   ConformityInput,
   CredentialSubject as BridgeCredentialSubject,
   DataModelConfig,

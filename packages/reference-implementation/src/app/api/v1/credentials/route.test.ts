@@ -434,6 +434,32 @@ describe('POST /api/v1/credentials', () => {
       ]);
     });
 
+    it('adds CVC_NO_CONFORMITY warning when DCC has no conformity data', async () => {
+      const dccBridge = {
+        buildSubject: jest.fn().mockReturnValue({}),
+        extractRefs: jest.fn().mockReturnValue({ organisation: { id: '1234567890' } }),
+      };
+      mockResolveDataModel.mockResolvedValue({
+        dataModel: {
+          ...DATA_MODEL,
+          credentialType: 'DigitalConformityCredential',
+          name: 'Digital Conformity Credential',
+        },
+        bridge: dccBridge,
+        schemaUrls: [DATA_MODEL.schemaUrl],
+      });
+
+      const req = createFakeRequest(validBody({ credentialType: 'DigitalConformityCredential' }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings).toEqual([
+        { code: 'CVC_NO_CONFORMITY', message: 'No conformity data found in DCC credential payload' },
+      ]);
+      expect(mockValidateCvcCompliance).not.toHaveBeenCalled();
+    });
+
     it('runs CVC validation for DCC extension credential types', async () => {
       const dccBridge = {
         buildSubject: jest.fn().mockReturnValue({}),
@@ -512,7 +538,7 @@ describe('POST /api/v1/credentials', () => {
         tenantId: 'tenant-1',
         credentialPayload: VALID_PAYLOAD,
         credentialType: 'DigitalProductPassport',
-        bridge: stubBridge,
+        refs: {},
         vcService,
         storageService,
         storageOptions: {},

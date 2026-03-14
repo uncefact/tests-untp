@@ -144,6 +144,10 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 
   const sections = ENTITY_REQUIREMENTS[dataModel.credentialType] ?? [];
 
+  if (!ENTITY_REQUIREMENTS[dataModel.credentialType]) {
+    logger.warn({ credentialType: dataModel.credentialType }, 'No entity requirements configured for credential type');
+  }
+
   logger.info(
     { tenantId, dataModelId: id, credentialType: dataModel.credentialType, sectionCount: sections.length },
     'Form config resolved',

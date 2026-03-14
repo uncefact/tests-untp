@@ -52,11 +52,6 @@ const PRIMARY_ENTITY = {
   schemePrimaryKey: 'gtin',
 };
 
-const stubBridge = {
-  extractRefs: jest.fn().mockReturnValue(ENTITY_REFS),
-  buildSubject: jest.fn(),
-};
-
 const stubVcService = {
   service: { sign: jest.fn().mockResolvedValue(SIGNED_CREDENTIAL), verify: jest.fn() },
   instanceId: 'vc-inst-1',
@@ -74,7 +69,7 @@ function buildInput(overrides: Partial<IssueCredentialInput> = {}): IssueCredent
     tenantId: TENANT_ID,
     credentialPayload: PAYLOAD,
     credentialType: 'DigitalProductPassport',
-    bridge: stubBridge as unknown as IssueCredentialInput['bridge'],
+    refs: ENTITY_REFS,
     vcService: stubVcService as unknown as IssueCredentialInput['vcService'],
     storageService: stubStorageService as unknown as IssueCredentialInput['storageService'],
     storageOptions: { encrypt: true },
@@ -113,13 +108,7 @@ describe('issueCredential', () => {
     expect(stubStorageService.service.store).toHaveBeenCalledWith(SIGNED_CREDENTIAL, false);
   });
 
-  it('extracts entity refs from the credential subject', async () => {
-    await issueCredential(buildInput());
-
-    expect(stubBridge.extractRefs).toHaveBeenCalledWith(CREDENTIAL_SUBJECT);
-  });
-
-  it('resolves primary entity', async () => {
+  it('resolves primary entity with pre-computed refs', async () => {
     await issueCredential(buildInput());
 
     expect(mockResolvePrimaryEntity).toHaveBeenCalledWith(ENTITY_REFS, TENANT_ID);
