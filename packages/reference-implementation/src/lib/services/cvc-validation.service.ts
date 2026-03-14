@@ -1,9 +1,15 @@
-import type { ExtractedCvcRefs } from '@uncefact/untp-ri-services';
 import { findCriteriaByCanonicalIds, findProfileWithCriteriaByCanonicalId } from '@/lib/prisma/repositories';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+export type ConformityRefs = {
+  schemeUrl?: string;
+  standardUrls: string[];
+  regulationUrls: string[];
+  criteriaUrls: string[];
+};
 
 export type CvcValidationWarningCode =
   | 'CVC_NO_SCOPE'
@@ -32,11 +38,19 @@ export type CvcValidationResult = {
  * imported CVC catalogue data. Validation is advisory only — it produces
  * warnings, never errors.
  */
-export async function validateCvcCompliance(tenantId: string, cvcRefs: ExtractedCvcRefs): Promise<CvcValidationResult> {
+export async function validateCvcCompliance(
+  tenantId: string,
+  conformityRefs: ConformityRefs | undefined,
+): Promise<CvcValidationResult> {
   const warnings: CvcValidationWarning[] = [];
 
+  // Non-DCC credential or no conformity data — nothing to validate
+  if (!conformityRefs) {
+    return { warnings };
+  }
+
   // No conformity scope — short-circuit
-  if (!cvcRefs.scopeUrl) {
+  if (!conformityRefs.schemeUrl) {
     warnings.push({
       code: 'CVC_NO_SCOPE',
       message: 'No conformity scope found in credential payload',
@@ -45,7 +59,7 @@ export async function validateCvcCompliance(tenantId: string, cvcRefs: Extracted
   }
 
   // No criteria URLs — short-circuit
-  if (cvcRefs.criteriaUrls.length === 0) {
+  if (conformityRefs.criteriaUrls.length === 0) {
     warnings.push({
       code: 'CVC_NO_CRITERIA',
       message: 'No conformity criteria found in credential payload',
@@ -54,17 +68,17 @@ export async function validateCvcCompliance(tenantId: string, cvcRefs: Extracted
   }
 
   // Look up the profile matching the credential's scope URL
-  const profile = await findProfileWithCriteriaByCanonicalId(tenantId, cvcRefs.scopeUrl);
+  const profile = await findProfileWithCriteriaByCanonicalId(tenantId, conformityRefs.schemeUrl);
 
   if (!profile) {
     warnings.push({
       code: 'CVC_SCOPE_NOT_FOUND',
       message: 'Conformity scope does not match any imported profile',
-      detail: cvcRefs.scopeUrl,
+      detail: conformityRefs.schemeUrl,
     });
   } else {
     // Check for criteria required by the profile but absent from the credential
-    const credentialCriteriaSet = new Set(cvcRefs.criteriaUrls);
+    const credentialCriteriaSet = new Set(conformityRefs.criteriaUrls);
     for (const pc of profile.criteria) {
       if (!credentialCriteriaSet.has(pc.criterion.canonicalId)) {
         warnings.push({
@@ -77,11 +91,11 @@ export async function validateCvcCompliance(tenantId: string, cvcRefs: Extracted
   }
 
   // Look up criteria by canonical IDs
-  const foundCriteria = await findCriteriaByCanonicalIds(tenantId, cvcRefs.criteriaUrls);
+  const foundCriteria = await findCriteriaByCanonicalIds(tenantId, conformityRefs.criteriaUrls);
   const foundIds = new Set(foundCriteria.map((c) => c.canonicalId));
 
   // Flag any criteria URLs not found in the imported catalogues
-  for (const criterionUrl of cvcRefs.criteriaUrls) {
+  for (const criterionUrl of conformityRefs.criteriaUrls) {
     if (!foundIds.has(criterionUrl)) {
       warnings.push({
         code: 'CVC_UNKNOWN_CRITERION',
