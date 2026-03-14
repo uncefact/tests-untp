@@ -1,15 +1,15 @@
 import { makeBridge } from './make-bridge.js';
 import type { IDataModelBridge } from './types.js';
-import { dppV060Spec } from './data-models/dpp/versions/v060.js';
-import { dppV061Spec } from './data-models/dpp/versions/v061.js';
-import { dccV060Spec } from './data-models/dcc/versions/v060.js';
-import { dccV061Spec } from './data-models/dcc/versions/v061.js';
-import { dfrV060Spec } from './data-models/dfr/versions/v060.js';
-import { dfrV061Spec } from './data-models/dfr/versions/v061.js';
-import { diaV060Spec } from './data-models/dia/versions/v060.js';
-import { diaV061Spec } from './data-models/dia/versions/v061.js';
-import { dteV060Spec } from './data-models/dte/versions/v060.js';
-import { dteV061Spec } from './data-models/dte/versions/v061.js';
+import { dppV060Spec } from './data-models/dpp/versions/v060/index.js';
+import { dppV061Spec } from './data-models/dpp/versions/v061/index.js';
+import { dccV060Spec } from './data-models/dcc/versions/v060/index.js';
+import { dccV061Spec } from './data-models/dcc/versions/v061/index.js';
+import { dfrV060Spec } from './data-models/dfr/versions/v060/index.js';
+import { dfrV061Spec } from './data-models/dfr/versions/v061/index.js';
+import { diaV060Spec } from './data-models/dia/versions/v060/index.js';
+import { diaV061Spec } from './data-models/dia/versions/v061/index.js';
+import { dteV060Spec } from './data-models/dte/versions/v060/index.js';
+import { dteV061Spec } from './data-models/dte/versions/v061/index.js';
 
 const registry: Record<string, Record<string, IDataModelBridge>> = {
   DigitalProductPassport: {
