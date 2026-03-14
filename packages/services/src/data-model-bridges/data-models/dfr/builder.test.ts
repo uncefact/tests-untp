@@ -6,7 +6,7 @@ import {
   createFacility,
   createProduct,
   createConformityInput,
-  createResolvedEntities,
+  createBridgeEntities,
 } from '../../__fixtures__/entities.js';
 import type { VersionSpec } from '../../types.js';
 
@@ -22,27 +22,27 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
   describe('credentialSubject root', () => {
     it('sets type to FacilityRecord', () => {
-      const subject = bridge.buildSubject(createResolvedEntities());
+      const subject = bridge.buildSubject(createBridgeEntities());
       expect(subject.type).toEqual(['FacilityRecord']);
     });
 
     it('includes a facility field', () => {
-      const subject = bridge.buildSubject(createResolvedEntities());
+      const subject = bridge.buildSubject(createBridgeEntities());
       expect(subject.facility).toBeDefined();
     });
 
     it('omits conformityClaim when conformity is absent', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: undefined }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: undefined }));
       expect(subject.conformityClaim).toBeUndefined();
     });
 
     it('omits conformityClaim when conformity is an empty array', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: [] }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: [] }));
       expect(subject.conformityClaim).toBeUndefined();
     });
 
     it('silently ignores entities.product', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ product: createProduct() }));
+      const subject = bridge.buildSubject(createBridgeEntities({ product: createProduct() }));
       expect(subject.product).toBeUndefined();
     });
   });
@@ -51,14 +51,14 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
   describe('facility', () => {
     it('sets facility.type to Facility', () => {
-      const subject = bridge.buildSubject(createResolvedEntities());
+      const subject = bridge.buildSubject(createBridgeEntities());
       const facility = subject.facility as Record<string, unknown>;
       expect(facility.type).toEqual(['Facility']);
     });
 
     it('maps facility id and name', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           facility: createFacility({ id: 'did:web:example.com:facility:1', name: 'My Facility' }),
         }),
       );
@@ -69,7 +69,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
     it('includes description when present', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ facility: createFacility({ description: 'A fine facility' }) }),
+        createBridgeEntities({ facility: createFacility({ description: 'A fine facility' }) }),
       );
       const facility = subject.facility as Record<string, unknown>;
       expect(facility.description).toBe('A fine facility');
@@ -77,14 +77,14 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
     it('omits description when absent', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ facility: createFacility({ description: undefined }) }),
+        createBridgeEntities({ facility: createFacility({ description: undefined }) }),
       );
       const facility = subject.facility as Record<string, unknown>;
       expect(facility.description).toBeUndefined();
     });
 
     it('includes registeredId and idScheme when primaryIdentifier is present', () => {
-      const subject = bridge.buildSubject(createResolvedEntities());
+      const subject = bridge.buildSubject(createBridgeEntities());
       const facility = subject.facility as Record<string, unknown>;
       expect(facility.registeredId).toBe('4012345000009');
       expect(facility.idScheme).toEqual({
@@ -96,7 +96,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
     it('omits registeredId and idScheme when primaryIdentifier is absent', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ facility: createFacility({ primaryIdentifier: null }) }),
+        createBridgeEntities({ facility: createFacility({ primaryIdentifier: null }) }),
       );
       const facility = subject.facility as Record<string, unknown>;
       expect(facility.registeredId).toBeUndefined();
@@ -104,7 +104,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
     });
 
     it('maps locationInformation when geo fields are present', () => {
-      const subject = bridge.buildSubject(createResolvedEntities());
+      const subject = bridge.buildSubject(createBridgeEntities());
       const facility = subject.facility as Record<string, unknown>;
       expect(facility.locationInformation).toEqual({
         type: ['Location'],
@@ -114,7 +114,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
     });
 
     it('maps address when present', () => {
-      const subject = bridge.buildSubject(createResolvedEntities());
+      const subject = bridge.buildSubject(createBridgeEntities());
       const facility = subject.facility as Record<string, unknown>;
       expect(facility.address).toEqual({
         type: ['Address'],
@@ -128,7 +128,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
     it('omits locationInformation when facility has no geo data', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           facility: createFacility({ location: { address: { streetAddress: '123 Test Street' } } }),
         }),
       );
@@ -138,7 +138,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
     it('omits address when facility location has no address', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           facility: createFacility({ location: { geoLocation: { type: 'Point', coordinates: [151.2093, -33.8688] } } }),
         }),
       );
@@ -147,7 +147,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
     });
 
     it('omits both location and address when facility has no location data', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ facility: createFacility({ location: null }) }));
+      const subject = bridge.buildSubject(createBridgeEntities({ facility: createFacility({ location: null }) }));
       const facility = subject.facility as Record<string, unknown>;
       expect(facility.locationInformation).toBeUndefined();
       expect(facility.address).toBeUndefined();
@@ -158,7 +158,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
   describe('operatedByParty', () => {
     it('maps organisation to operatedByParty', () => {
-      const subject = bridge.buildSubject(createResolvedEntities());
+      const subject = bridge.buildSubject(createBridgeEntities());
       const facility = subject.facility as Record<string, unknown>;
       const party = facility.operatedByParty as Record<string, unknown>;
 
@@ -176,7 +176,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
     });
 
     it('handles missing organisation gracefully', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ organisation: undefined }));
+      const subject = bridge.buildSubject(createBridgeEntities({ organisation: undefined }));
       const facility = subject.facility as Record<string, unknown>;
       const party = facility.operatedByParty as Record<string, unknown>;
 
@@ -189,21 +189,21 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
   describe('conformityClaim', () => {
     it('builds conformityClaim array from conformity inputs', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: [createConformityInput()] }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: [createConformityInput()] }));
       const claims = subject.conformityClaim as unknown[];
       expect(Array.isArray(claims)).toBe(true);
       expect(claims).toHaveLength(1);
     });
 
     it('sets claim type to Claim and Declaration', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: [createConformityInput()] }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: [createConformityInput()] }));
       const claim = (subject.conformityClaim as Record<string, unknown>[])[0];
       expect(claim.type).toEqual(['Claim', 'Declaration']);
     });
 
     it('builds referenceStandard from standard input', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [
             createConformityInput({
               standard: { id: 'https://example.org/standard/1.0', name: 'Test Standard 1.0' },
@@ -221,7 +221,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
     it('omits referenceStandard when standard is absent', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ conformity: [createConformityInput({ standard: undefined })] }),
+        createBridgeEntities({ conformity: [createConformityInput({ standard: undefined })] }),
       );
       const claim = (subject.conformityClaim as Record<string, unknown>[])[0];
       expect(claim.referenceStandard).toBeUndefined();
@@ -229,7 +229,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
     it('builds referenceRegulation from regulation input', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [
             createConformityInput({
               regulation: { id: 'https://example.org/regulation/1.0', name: 'Test Regulation 1.0' },
@@ -247,7 +247,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
     it('omits referenceRegulation when regulation is absent', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ conformity: [createConformityInput({ regulation: undefined })] }),
+        createBridgeEntities({ conformity: [createConformityInput({ regulation: undefined })] }),
       );
       const claim = (subject.conformityClaim as Record<string, unknown>[])[0];
       expect(claim.referenceRegulation).toBeUndefined();
@@ -255,7 +255,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
     it('builds assessmentCriteria from criteria input', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [
             createConformityInput({
               criteria: [
@@ -278,7 +278,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
     it('filters out criteria with empty-string id', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [
             createConformityInput({
               criteria: [
@@ -297,7 +297,7 @@ describe.each(versions)('buildDfrSubject (%s)', (_version, spec) => {
 
     it('builds multiple conformity claims', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [createConformityInput(), createConformityInput({ standard: { id: 'https://other.org/std' } })],
         }),
       );

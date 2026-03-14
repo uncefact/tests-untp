@@ -6,7 +6,7 @@ import {
   createFacility,
   createProduct,
   createConformityInput,
-  createResolvedEntities,
+  createBridgeEntities,
 } from '../../__fixtures__/entities.js';
 import type { VersionSpec, CredentialSubject } from '../../types.js';
 
@@ -346,7 +346,7 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
 
   describe('round-trip (build → extract)', () => {
     it('extracts all refs from a fully built subject', () => {
-      const entities = createResolvedEntities({ conformity: [createConformityInput()] });
+      const entities = createBridgeEntities({ conformity: [createConformityInput()] });
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
@@ -361,7 +361,7 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
     });
 
     it('extracts schemeUrl and criteriaUrls correctly in round-trip', () => {
-      const entities = createResolvedEntities({
+      const entities = createBridgeEntities({
         conformity: [
           createConformityInput({
             scheme: { id: 'https://example.org/scheme-A' },
@@ -383,7 +383,7 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
     });
 
     it('handles multiple conformity inputs in round-trip', () => {
-      const entities = createResolvedEntities({
+      const entities = createBridgeEntities({
         conformity: [
           createConformityInput({
             scheme: { id: 'https://example.org/scheme-first' },
@@ -404,7 +404,7 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
     });
 
     it('extracts empty refs from a minimal built subject with no conformity', () => {
-      const entities = createResolvedEntities({
+      const entities = createBridgeEntities({
         organisation: createOrganisation({ primaryIdentifier: null }),
         facility: createFacility({ primaryIdentifier: null }),
         product: createProduct({ primaryIdentifier: null }),

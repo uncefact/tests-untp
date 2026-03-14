@@ -1,4 +1,4 @@
-import type { ResolvedEntities, CredentialSubject, ConformityInput } from '../../types.js';
+import type { BridgeEntities, CredentialSubject, ConformityInput } from '../../types.js';
 import { buildParty } from '../../primitives/party.js';
 import { buildIdentifierScheme } from '../../primitives/identifier.js';
 import { buildLocationInformation, buildAddress } from '../../primitives/location.js';
@@ -29,7 +29,7 @@ type ConformityClaim = {
 
 function buildFacility(
   facility: FacilityEntity | undefined,
-  organisation: ResolvedEntities['organisation'],
+  organisation: BridgeEntities['organisation'],
 ): DfrFacility {
   const location = facility?.location;
   const locationInformation = buildLocationInformation(location);
@@ -89,7 +89,7 @@ function buildConformityClaim(input: ConformityInput): ConformityClaim {
 
 // ── Public builder ─────────────────────────────────────────────────────────────
 
-export function buildDfrSubject(entities: ResolvedEntities): CredentialSubject {
+export function buildDfrSubject(entities: BridgeEntities): CredentialSubject {
   // entities.product is silently ignored — DFR is facility-scoped, not product-scoped
   const { organisation, facility, conformity } = entities;
 

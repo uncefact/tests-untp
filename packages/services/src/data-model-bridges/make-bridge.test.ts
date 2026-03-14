@@ -1,8 +1,8 @@
 import { makeBridge } from './make-bridge.js';
-import type { ResolvedEntities, CredentialSubject, ExtractedRefs, VersionSpec } from './types.js';
+import type { BridgeEntities, CredentialSubject, ExtractedRefs, VersionSpec } from './types.js';
 
 describe('makeBridge', () => {
-  const mockEntities: ResolvedEntities = {
+  const mockEntities: BridgeEntities = {
     organisation: { id: 'org-1', name: 'Test Org' },
   };
 

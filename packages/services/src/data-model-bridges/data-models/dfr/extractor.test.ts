@@ -1,7 +1,7 @@
 import { makeBridge } from '../../make-bridge.js';
 import { dfrV060Spec } from './versions/v060.js';
 import { dfrV061Spec } from './versions/v061.js';
-import { createFacility, createConformityInput, createResolvedEntities } from '../../__fixtures__/entities.js';
+import { createFacility, createConformityInput, createBridgeEntities } from '../../__fixtures__/entities.js';
 import type { VersionSpec, CredentialSubject } from '../../types.js';
 
 const versions: [string, VersionSpec][] = [
@@ -160,7 +160,7 @@ describe.each(versions)('extractDfrRefs (%s)', (_version, spec) => {
 
   describe('round-trip (build → extract)', () => {
     it('extracts all refs from a fully built subject', () => {
-      const entities = createResolvedEntities({ conformity: [createConformityInput()] });
+      const entities = createBridgeEntities({ conformity: [createConformityInput()] });
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
@@ -173,7 +173,7 @@ describe.each(versions)('extractDfrRefs (%s)', (_version, spec) => {
     });
 
     it('extracts no product ref from a built subject (DFR has no product)', () => {
-      const entities = createResolvedEntities();
+      const entities = createBridgeEntities();
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
@@ -181,7 +181,7 @@ describe.each(versions)('extractDfrRefs (%s)', (_version, spec) => {
     });
 
     it('extracts empty refs from a minimal built subject', () => {
-      const entities = createResolvedEntities({
+      const entities = createBridgeEntities({
         facility: createFacility({ primaryIdentifier: null }),
         organisation: undefined,
         conformity: undefined,

@@ -6,7 +6,7 @@ import {
   createProduct,
   createFacility,
   createConformityInput,
-  createResolvedEntities,
+  createBridgeEntities,
 } from '../../__fixtures__/entities.js';
 import type { VersionSpec } from '../../types.js';
 
@@ -22,26 +22,26 @@ describe.each(versions)('buildDiaSubject (%s)', (_version, spec) => {
 
   describe('credentialSubject root', () => {
     it('sets type to RegisteredIdentity', () => {
-      const subject = bridge.buildSubject(createResolvedEntities());
+      const subject = bridge.buildSubject(createBridgeEntities());
       expect(subject.type).toEqual(['RegisteredIdentity']);
     });
 
     it('maps organisation id', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ organisation: createOrganisation({ id: 'did:web:example.com:org:1' }) }),
+        createBridgeEntities({ organisation: createOrganisation({ id: 'did:web:example.com:org:1' }) }),
       );
       expect(subject.id).toBe('did:web:example.com:org:1');
     });
 
     it('maps organisation name', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ organisation: createOrganisation({ name: 'ACME Corp' }) }),
+        createBridgeEntities({ organisation: createOrganisation({ name: 'ACME Corp' }) }),
       );
       expect(subject.name).toBe('ACME Corp');
     });
 
     it('includes registeredId and idScheme when primaryIdentifier is present', () => {
-      const subject = bridge.buildSubject(createResolvedEntities());
+      const subject = bridge.buildSubject(createBridgeEntities());
       expect(subject.registeredId).toBe('9520123456788');
       expect(subject.idScheme).toEqual({
         type: ['IdentifierScheme'],
@@ -52,14 +52,14 @@ describe.each(versions)('buildDiaSubject (%s)', (_version, spec) => {
 
     it('omits registeredId and idScheme when primaryIdentifier is absent', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ organisation: createOrganisation({ primaryIdentifier: null }) }),
+        createBridgeEntities({ organisation: createOrganisation({ primaryIdentifier: null }) }),
       );
       expect(subject.registeredId).toBeUndefined();
       expect(subject.idScheme).toBeUndefined();
     });
 
     it('maps undefined id and name when organisation is absent', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ organisation: undefined }));
+      const subject = bridge.buildSubject(createBridgeEntities({ organisation: undefined }));
       expect(subject.id).toBeUndefined();
       expect(subject.name).toBeUndefined();
     });
@@ -69,17 +69,17 @@ describe.each(versions)('buildDiaSubject (%s)', (_version, spec) => {
 
   describe('silently ignored inputs', () => {
     it('does not include facility in subject', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ facility: createFacility() }));
+      const subject = bridge.buildSubject(createBridgeEntities({ facility: createFacility() }));
       expect(subject.facility).toBeUndefined();
     });
 
     it('does not include product in subject', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ product: createProduct() }));
+      const subject = bridge.buildSubject(createBridgeEntities({ product: createProduct() }));
       expect(subject.product).toBeUndefined();
     });
 
     it('does not include conformityClaim in subject', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: [createConformityInput()] }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: [createConformityInput()] }));
       expect(subject.conformityClaim).toBeUndefined();
     });
   });

@@ -6,7 +6,7 @@ import {
   createFacility,
   createProduct,
   createConformityInput,
-  createResolvedEntities,
+  createBridgeEntities,
 } from '../../__fixtures__/entities.js';
 import type { VersionSpec, CredentialSubject } from '../../types.js';
 
@@ -236,7 +236,7 @@ describe.each(versions)('extractDppRefs (%s)', (_version, spec) => {
 
   describe('round-trip (build → extract)', () => {
     it('extracts all refs from a fully built subject', () => {
-      const entities = createResolvedEntities({ conformity: [createConformityInput()] });
+      const entities = createBridgeEntities({ conformity: [createConformityInput()] });
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
@@ -253,7 +253,7 @@ describe.each(versions)('extractDppRefs (%s)', (_version, spec) => {
     });
 
     it('extracts empty refs from a minimal built subject', () => {
-      const entities = createResolvedEntities({
+      const entities = createBridgeEntities({
         product: createProduct({ primaryIdentifier: null }),
         organisation: undefined,
         facility: undefined,

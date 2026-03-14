@@ -1,9 +1,9 @@
-import type { ResolvedEntities, CredentialSubject } from '../../types.js';
+import type { BridgeEntities, CredentialSubject } from '../../types.js';
 import { buildIdentifierScheme } from '../../primitives/identifier.js';
 
 // ── Public builder ─────────────────────────────────────────────────────────────
 
-export function buildDiaSubject(entities: ResolvedEntities): CredentialSubject {
+export function buildDiaSubject(entities: BridgeEntities): CredentialSubject {
   // entities.conformity, entities.facility, and entities.product are silently ignored
   // DIA is organisation-identity only
   const { organisation } = entities;

@@ -1,4 +1,4 @@
-import type { ResolvedEntities, CredentialSubject, ConformityInput } from '../../types.js';
+import type { BridgeEntities, CredentialSubject, ConformityInput } from '../../types.js';
 import { buildParty } from '../../primitives/party.js';
 import { buildIdentifierScheme } from '../../primitives/identifier.js';
 import { buildLocationInformation, buildAddress } from '../../primitives/location.js';
@@ -84,7 +84,7 @@ function buildConformityClaim(input: ConformityInput): ConformityClaim {
 
 // ── Public builder ─────────────────────────────────────────────────────────────
 
-export function buildDppSubject(entities: ResolvedEntities): CredentialSubject {
+export function buildDppSubject(entities: BridgeEntities): CredentialSubject {
   const { organisation, facility, product, conformity } = entities;
 
   const conformityClaims = conformity && conformity.length > 0 ? conformity.map(buildConformityClaim) : undefined;

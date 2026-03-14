@@ -3,7 +3,7 @@ import type {
   FacilityEntity,
   ProductEntity,
   ConformityInput,
-  ResolvedEntities,
+  BridgeEntities,
   DataModelConfig,
 } from '../types.js';
 
@@ -89,7 +89,7 @@ export function createConformityInput(overrides?: Partial<ConformityInput>): Con
   };
 }
 
-export function createResolvedEntities(overrides?: Partial<ResolvedEntities>): ResolvedEntities {
+export function createBridgeEntities(overrides?: Partial<BridgeEntities>): BridgeEntities {
   return {
     organisation: createOrganisation(),
     facility: createFacility(),

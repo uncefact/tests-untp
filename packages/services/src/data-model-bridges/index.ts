@@ -3,7 +3,7 @@ export type {
   ExtractedRefs,
   ConformityRefs,
   ConformityInput,
-  ResolvedEntities,
+  BridgeEntities,
   OrganisationEntity,
   FacilityEntity,
   ProductEntity,

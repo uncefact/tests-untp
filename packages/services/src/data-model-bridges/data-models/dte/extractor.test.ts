@@ -1,7 +1,7 @@
 import { makeBridge } from '../../make-bridge.js';
 import { dteV060Spec } from './versions/v060.js';
 import { dteV061Spec } from './versions/v061.js';
-import { createProduct, createConformityInput, createResolvedEntities } from '../../__fixtures__/entities.js';
+import { createProduct, createConformityInput, createBridgeEntities } from '../../__fixtures__/entities.js';
 import type { VersionSpec, CredentialSubject } from '../../types.js';
 
 const versions: [string, VersionSpec][] = [
@@ -102,7 +102,7 @@ describe.each(versions)('extractDteRefs (%s)', (_version, spec) => {
 
   describe('round-trip (build → extract)', () => {
     it('extracts product ref from a fully built subject', () => {
-      const entities = createResolvedEntities({ conformity: [createConformityInput()] });
+      const entities = createBridgeEntities({ conformity: [createConformityInput()] });
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
@@ -110,7 +110,7 @@ describe.each(versions)('extractDteRefs (%s)', (_version, spec) => {
     });
 
     it('extracts empty refs when product is absent', () => {
-      const entities = createResolvedEntities({ product: undefined });
+      const entities = createBridgeEntities({ product: undefined });
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
@@ -118,7 +118,7 @@ describe.each(versions)('extractDteRefs (%s)', (_version, spec) => {
     });
 
     it('has no organisation, facility, or conformity refs after round-trip', () => {
-      const entities = createResolvedEntities({
+      const entities = createBridgeEntities({
         product: createProduct(),
         conformity: [createConformityInput()],
       });

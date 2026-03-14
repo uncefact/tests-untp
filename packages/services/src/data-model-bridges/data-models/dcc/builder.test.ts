@@ -6,7 +6,7 @@ import {
   createFacility,
   createProduct,
   createConformityInput,
-  createResolvedEntities,
+  createBridgeEntities,
 } from '../../__fixtures__/entities.js';
 import type { VersionSpec } from '../../types.js';
 
@@ -22,33 +22,33 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
   describe('credentialSubject root', () => {
     it('sets type to ConformityAttestation and Attestation', () => {
-      const subject = bridge.buildSubject(createResolvedEntities());
+      const subject = bridge.buildSubject(createBridgeEntities());
       expect(subject.type).toEqual(['ConformityAttestation', 'Attestation']);
     });
 
     it('includes issuedToParty field', () => {
-      const subject = bridge.buildSubject(createResolvedEntities());
+      const subject = bridge.buildSubject(createBridgeEntities());
       expect(subject.issuedToParty).toBeDefined();
     });
 
     it('omits assessment when conformity is absent', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: undefined }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: undefined }));
       expect(subject.assessment).toBeUndefined();
     });
 
     it('omits assessment when conformity is an empty array', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: [] }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: [] }));
       expect(subject.assessment).toBeUndefined();
     });
 
     it('omits scope when conformity is absent', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: undefined }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: undefined }));
       expect(subject.scope).toBeUndefined();
     });
 
     it('omits scope when first conformity input has no scheme', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ conformity: [createConformityInput({ scheme: undefined })] }),
+        createBridgeEntities({ conformity: [createConformityInput({ scheme: undefined })] }),
       );
       expect(subject.scope).toBeUndefined();
     });
@@ -58,7 +58,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
   describe('issuedToParty', () => {
     it('maps organisation to issuedToParty with all fields', () => {
-      const subject = bridge.buildSubject(createResolvedEntities());
+      const subject = bridge.buildSubject(createBridgeEntities());
       const party = subject.issuedToParty as Record<string, unknown>;
 
       expect(party).toEqual({
@@ -76,7 +76,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('omits description when organisation has none', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ organisation: createOrganisation({ description: undefined }) }),
+        createBridgeEntities({ organisation: createOrganisation({ description: undefined }) }),
       );
       const party = subject.issuedToParty as Record<string, unknown>;
       expect(party.description).toBeUndefined();
@@ -84,7 +84,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('omits registeredId and idScheme when organisation has no primaryIdentifier', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ organisation: createOrganisation({ primaryIdentifier: null }) }),
+        createBridgeEntities({ organisation: createOrganisation({ primaryIdentifier: null }) }),
       );
       const party = subject.issuedToParty as Record<string, unknown>;
       expect(party.registeredId).toBeUndefined();
@@ -92,7 +92,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
     });
 
     it('handles missing organisation gracefully', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ organisation: undefined }));
+      const subject = bridge.buildSubject(createBridgeEntities({ organisation: undefined }));
       const party = subject.issuedToParty as Record<string, unknown>;
       expect(party.id).toBeUndefined();
       expect(party.name).toBeUndefined();
@@ -104,7 +104,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
   describe('scope', () => {
     it('builds scope from first conformity input scheme', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [
             createConformityInput({
               scheme: { id: 'https://example.org/conformity-scheme', name: 'Test Conformity Scheme' },
@@ -123,7 +123,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('sets scope from first conformity input only when multiple inputs are present', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [
             createConformityInput({
               scheme: { id: 'https://example.org/scheme-first' },
@@ -140,7 +140,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('omits name from scope when scheme has no name', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [createConformityInput({ scheme: { id: 'https://example.org/scheme' } })],
         }),
       );
@@ -149,7 +149,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
     });
 
     it('sets scope type to ConformityAssessmentScheme and Standard', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: [createConformityInput()] }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: [createConformityInput()] }));
       const scope = subject.scope as Record<string, unknown>;
       expect(scope.type).toEqual(['ConformityAssessmentScheme', 'Standard']);
     });
@@ -160,7 +160,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
   describe('assessment', () => {
     it('builds one assessment per conformity input', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [createConformityInput(), createConformityInput()],
         }),
       );
@@ -169,14 +169,14 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
     });
 
     it('sets assessment type to ConformityAssessment and Declaration', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: [createConformityInput()] }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: [createConformityInput()] }));
       const assessment = (subject.assessment as Record<string, unknown>[])[0];
       expect(assessment.type).toEqual(['ConformityAssessment', 'Declaration']);
     });
 
     it('builds referenceStandard from standard input', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [
             createConformityInput({
               standard: { id: 'https://example.org/standard/1.0', name: 'Test Standard 1.0' },
@@ -194,7 +194,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('omits referenceStandard when standard is absent', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ conformity: [createConformityInput({ standard: undefined })] }),
+        createBridgeEntities({ conformity: [createConformityInput({ standard: undefined })] }),
       );
       const assessment = (subject.assessment as Record<string, unknown>[])[0];
       expect(assessment.referenceStandard).toBeUndefined();
@@ -202,7 +202,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('builds referenceRegulation from regulation input', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [
             createConformityInput({
               regulation: { id: 'https://example.org/regulation/1.0', name: 'Test Regulation 1.0' },
@@ -220,7 +220,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('omits referenceRegulation when regulation is absent', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ conformity: [createConformityInput({ regulation: undefined })] }),
+        createBridgeEntities({ conformity: [createConformityInput({ regulation: undefined })] }),
       );
       const assessment = (subject.assessment as Record<string, unknown>[])[0];
       expect(assessment.referenceRegulation).toBeUndefined();
@@ -228,7 +228,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('builds assessmentCriteria from criteria input', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [
             createConformityInput({
               criteria: [
@@ -251,7 +251,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('omits conformityTopic from criterion when absent', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [
             createConformityInput({
               criteria: [{ id: 'https://example.org/criteria/1', name: 'Criterion 1' }],
@@ -266,7 +266,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('filters out criteria with empty-string id', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [
             createConformityInput({
               criteria: [
@@ -285,7 +285,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('omits assessmentCriteria when all criteria have empty-string ids', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [createConformityInput({ criteria: [{ id: '', name: 'Empty' }] })],
         }),
       );
@@ -294,7 +294,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
     });
 
     it('each assessment includes assessedProduct when product is provided', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: [createConformityInput()] }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: [createConformityInput()] }));
       const assessment = (subject.assessment as Record<string, unknown>[])[0];
       const assessedProduct = assessment.assessedProduct as Record<string, unknown>[];
 
@@ -310,7 +310,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('assessedProduct includes batchNumber and serialNumber when present', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           product: createProduct({ batchNumber: 'BATCH-001', serialNumber: 'SN-999' }),
           conformity: [createConformityInput()],
         }),
@@ -322,7 +322,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
     });
 
     it('each assessment includes assessedFacility when facility is provided', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: [createConformityInput()] }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: [createConformityInput()] }));
       const assessment = (subject.assessment as Record<string, unknown>[])[0];
       const assessedFacility = assessment.assessedFacility as Record<string, unknown>[];
 
@@ -337,7 +337,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
     });
 
     it('each assessment includes assessedOrganisation when organisation is provided', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: [createConformityInput()] }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: [createConformityInput()] }));
       const assessment = (subject.assessment as Record<string, unknown>[])[0];
       const assessedOrg = assessment.assessedOrganisation as Record<string, unknown>;
 
@@ -349,7 +349,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('omits assessedProduct when product is not provided', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ product: undefined, conformity: [createConformityInput()] }),
+        createBridgeEntities({ product: undefined, conformity: [createConformityInput()] }),
       );
       const assessment = (subject.assessment as Record<string, unknown>[])[0];
       expect(assessment.assessedProduct).toBeUndefined();
@@ -357,7 +357,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('omits assessedFacility when facility is not provided', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ facility: undefined, conformity: [createConformityInput()] }),
+        createBridgeEntities({ facility: undefined, conformity: [createConformityInput()] }),
       );
       const assessment = (subject.assessment as Record<string, unknown>[])[0];
       expect(assessment.assessedFacility).toBeUndefined();
@@ -365,7 +365,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('omits assessedOrganisation when organisation is not provided', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({ organisation: undefined, conformity: [createConformityInput()] }),
+        createBridgeEntities({ organisation: undefined, conformity: [createConformityInput()] }),
       );
       const assessment = (subject.assessment as Record<string, unknown>[])[0];
       expect(assessment.assessedOrganisation).toBeUndefined();
@@ -373,7 +373,7 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
 
     it('builds multiple assessments from multiple conformity inputs', () => {
       const subject = bridge.buildSubject(
-        createResolvedEntities({
+        createBridgeEntities({
           conformity: [
             createConformityInput({ standard: { id: 'https://example.org/std/1' } }),
             createConformityInput({ standard: { id: 'https://example.org/std/2' } }),
@@ -387,14 +387,14 @@ describe.each(versions)('buildDccSubject (%s)', (_version, spec) => {
     });
 
     it('product type is set to Product inside assessedProduct', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: [createConformityInput()] }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: [createConformityInput()] }));
       const assessment = (subject.assessment as Record<string, unknown>[])[0];
       const product = (assessment.assessedProduct as Record<string, unknown>[])[0].product as Record<string, unknown>;
       expect(product.type).toEqual(['Product']);
     });
 
     it('facility type is set to Facility inside assessedFacility', () => {
-      const subject = bridge.buildSubject(createResolvedEntities({ conformity: [createConformityInput()] }));
+      const subject = bridge.buildSubject(createBridgeEntities({ conformity: [createConformityInput()] }));
       const assessment = (subject.assessment as Record<string, unknown>[])[0];
       const facility = (assessment.assessedFacility as Record<string, unknown>[])[0].facility as Record<
         string,

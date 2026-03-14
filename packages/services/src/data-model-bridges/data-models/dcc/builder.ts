@@ -1,4 +1,4 @@
-import type { ResolvedEntities, CredentialSubject, ConformityInput } from '../../types.js';
+import type { BridgeEntities, CredentialSubject, ConformityInput } from '../../types.js';
 import { buildParty } from '../../primitives/party.js';
 import { buildIdentifierScheme } from '../../primitives/identifier.js';
 
@@ -50,7 +50,7 @@ type DccAssessment = {
 
 // ── Private helpers ────────────────────────────────────────────────────────────
 
-function buildDccProduct(product: NonNullable<ResolvedEntities['product']>): DccProduct {
+function buildDccProduct(product: NonNullable<BridgeEntities['product']>): DccProduct {
   return {
     type: ['Product'],
     id: product.id,
@@ -64,7 +64,7 @@ function buildDccProduct(product: NonNullable<ResolvedEntities['product']>): Dcc
   };
 }
 
-function buildDccFacility(facility: NonNullable<ResolvedEntities['facility']>): DccFacility {
+function buildDccFacility(facility: NonNullable<BridgeEntities['facility']>): DccFacility {
   return {
     type: ['Facility'],
     id: facility.id,
@@ -76,7 +76,7 @@ function buildDccFacility(facility: NonNullable<ResolvedEntities['facility']>): 
   };
 }
 
-function buildAssessment(conformityInput: ConformityInput, entities: ResolvedEntities): DccAssessment {
+function buildAssessment(conformityInput: ConformityInput, entities: BridgeEntities): DccAssessment {
   const { organisation, facility, product } = entities;
   const assessment: DccAssessment = { type: ['ConformityAssessment', 'Declaration'] };
 
@@ -138,7 +138,7 @@ function buildAssessment(conformityInput: ConformityInput, entities: ResolvedEnt
 
 // ── Public builder ─────────────────────────────────────────────────────────────
 
-export function buildDccSubject(entities: ResolvedEntities): CredentialSubject {
+export function buildDccSubject(entities: BridgeEntities): CredentialSubject {
   const { organisation, conformity } = entities;
 
   // scope is derived from the first conformity input's scheme (DCC-only concept)

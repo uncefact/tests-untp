@@ -171,7 +171,7 @@ export type {
   ConformityInput,
   CredentialSubject as BridgeCredentialSubject,
   DataModelConfig,
-  ResolvedEntities,
+  BridgeEntities,
   OrganisationEntity,
   FacilityEntity,
   ProductEntity,

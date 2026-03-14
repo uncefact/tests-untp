@@ -56,9 +56,9 @@ export type ConformityInput = {
   criteria?: { id: string; name: string; conformityTopic?: string }[];
 };
 
-// ── Resolved entities (input to buildSubject) ─────────────────────────────────
+// ── Bridge entities (input to buildSubject) ──────────────────────────────────
 
-export type ResolvedEntities = {
+export type BridgeEntities = {
   organisation?: OrganisationEntity;
   facility?: FacilityEntity;
   product?: ProductEntity;
@@ -90,14 +90,14 @@ export type ConformityRefs = NonNullable<ExtractedRefs['conformity']>;
 
 // ── Bridge interface ──────────────────────────────────────────────────────────
 
-export interface IDataModelBridge {
-  buildSubject(entities: ResolvedEntities): CredentialSubject;
-  extractRefs(subject: CredentialSubject): ExtractedRefs;
+export interface IDataModelBridge<TSubject extends CredentialSubject = CredentialSubject> {
+  buildSubject(entities: BridgeEntities): TSubject;
+  extractRefs(subject: TSubject): ExtractedRefs;
 }
 
 // ── Internal types (not exported from index.ts) ───────────────────────────────
 
-export type SubjectBuilder = (entities: ResolvedEntities) => CredentialSubject;
+export type SubjectBuilder = (entities: BridgeEntities) => CredentialSubject;
 export type RefsExtractor = (subject: CredentialSubject) => ExtractedRefs;
 
 export interface VersionSpec {
