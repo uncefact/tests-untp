@@ -9,59 +9,59 @@ const versions: [string, VersionSpec][] = [
   ['v0.6.1', diaV061Spec],
 ];
 
+const EMPTY_ARRAYS = { organisations: [], facilities: [], products: [] };
+
 describe.each(versions)('extractDiaRefs (%s)', (_version, spec) => {
   const bridge = makeBridge(spec);
 
   // ── edge cases ───────────────────────────────────────────────────────────────
 
   describe('edge cases', () => {
-    it('returns empty object for null subject', () => {
+    it('returns empty arrays for null subject', () => {
       const refs = bridge.extractRefs(null as unknown as CredentialSubject);
-      expect(refs).toEqual({});
+      expect(refs).toEqual(EMPTY_ARRAYS);
     });
 
-    it('returns empty object for undefined subject', () => {
+    it('returns empty arrays for undefined subject', () => {
       const refs = bridge.extractRefs(undefined as unknown as CredentialSubject);
-      expect(refs).toEqual({});
+      expect(refs).toEqual(EMPTY_ARRAYS);
     });
 
-    it('returns empty object when registeredId is absent', () => {
+    it('returns empty arrays when registeredId is absent', () => {
       const refs = bridge.extractRefs({ type: ['RegisteredIdentity'], id: 'did:web:example.com:org:1' });
-      expect(refs).toEqual({});
+      expect(refs).toEqual(EMPTY_ARRAYS);
     });
   });
 
   // ── organisation refs ────────────────────────────────────────────────────────
 
   describe('organisation refs', () => {
-    it('extracts organisation.id from registeredId', () => {
+    it('extracts organisations[0].id from registeredId', () => {
       const refs = bridge.extractRefs({
         type: ['RegisteredIdentity'],
         registeredId: '9520123456788',
       });
-      expect(refs.organisation).toEqual({ id: '9520123456788' });
+      expect(refs.organisations).toEqual([{ id: '9520123456788' }]);
     });
   });
 
   // ── absent fields ─────────────────────────────────────────────────────────────
 
   describe('absent fields in result', () => {
-    it('does not include facility in refs', () => {
+    it('returns empty facilities array', () => {
       const refs = bridge.extractRefs({
         type: ['RegisteredIdentity'],
         registeredId: '9520123456788',
       });
-      expect(refs.facility).toBeUndefined();
-      expect(Object.prototype.hasOwnProperty.call(refs, 'facility')).toBe(false);
+      expect(refs.facilities).toEqual([]);
     });
 
-    it('does not include product in refs', () => {
+    it('returns empty products array', () => {
       const refs = bridge.extractRefs({
         type: ['RegisteredIdentity'],
         registeredId: '9520123456788',
       });
-      expect(refs.product).toBeUndefined();
-      expect(Object.prototype.hasOwnProperty.call(refs, 'product')).toBe(false);
+      expect(refs.products).toEqual([]);
     });
 
     it('does not include conformity in refs', () => {
@@ -70,7 +70,6 @@ describe.each(versions)('extractDiaRefs (%s)', (_version, spec) => {
         registeredId: '9520123456788',
       });
       expect(refs.conformity).toBeUndefined();
-      expect(Object.prototype.hasOwnProperty.call(refs, 'conformity')).toBe(false);
     });
   });
 
@@ -82,7 +81,7 @@ describe.each(versions)('extractDiaRefs (%s)', (_version, spec) => {
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
-      expect(refs.organisation).toEqual({ id: '9520123456788' });
+      expect(refs.organisations).toEqual([{ id: '9520123456788' }]);
     });
 
     it('extracts empty refs from a subject built with no primaryIdentifier', () => {
@@ -92,7 +91,7 @@ describe.each(versions)('extractDiaRefs (%s)', (_version, spec) => {
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
-      expect(refs.organisation).toBeUndefined();
+      expect(refs.organisations).toEqual([]);
     });
 
     it('has no facility, product, or conformity refs after round-trip', () => {
@@ -100,8 +99,8 @@ describe.each(versions)('extractDiaRefs (%s)', (_version, spec) => {
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
-      expect(refs.facility).toBeUndefined();
-      expect(refs.product).toBeUndefined();
+      expect(refs.facilities).toEqual([]);
+      expect(refs.products).toEqual([]);
       expect(refs.conformity).toBeUndefined();
     });
   });

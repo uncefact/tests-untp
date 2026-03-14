@@ -21,6 +21,8 @@ import type { PrimaryEntityResult } from './resolve-primary-entity';
 
 const TENANT_ID = 'tenant-1';
 
+const EMPTY_REFS = { organisations: [], facilities: [], products: [] };
+
 const SCHEME_INFO = {
   primaryKey: 'gtin',
   idrServiceInstanceId: 'idr-svc-1',
@@ -44,7 +46,7 @@ describe('resolvePrimaryEntity', () => {
   });
 
   it('returns empty result when no primaryIdentifier', async () => {
-    const result = await resolvePrimaryEntity({}, TENANT_ID);
+    const result = await resolvePrimaryEntity(EMPTY_REFS, TENANT_ID);
 
     expect(result).toEqual({});
     expect(mockGetProductByIdentifierValue).not.toHaveBeenCalled();
@@ -58,7 +60,8 @@ describe('resolvePrimaryEntity', () => {
 
     const result = await resolvePrimaryEntity(
       {
-        product: { id: '09506000134352' },
+        ...EMPTY_REFS,
+        products: [{ id: '09506000134352' }],
       },
       TENANT_ID,
     );
@@ -79,7 +82,8 @@ describe('resolvePrimaryEntity', () => {
 
     const result = await resolvePrimaryEntity(
       {
-        facility: { id: '9506000134' },
+        ...EMPTY_REFS,
+        facilities: [{ id: '9506000134' }],
       },
       TENANT_ID,
     );
@@ -100,7 +104,8 @@ describe('resolvePrimaryEntity', () => {
 
     const result = await resolvePrimaryEntity(
       {
-        organisation: { id: '9506000100' },
+        ...EMPTY_REFS,
+        organisations: [{ id: '9506000100' }],
       },
       TENANT_ID,
     );
@@ -120,7 +125,8 @@ describe('resolvePrimaryEntity', () => {
 
     const result = await resolvePrimaryEntity(
       {
-        product: { id: '09506000134352' },
+        ...EMPTY_REFS,
+        products: [{ id: '09506000134352' }],
       },
       TENANT_ID,
     );
@@ -135,9 +141,9 @@ describe('resolvePrimaryEntity', () => {
 
     const result = await resolvePrimaryEntity(
       {
-        product: { id: 'product-id' },
-        facility: { id: 'facility-id' },
-        organisation: { id: 'org-id' },
+        products: [{ id: 'product-id' }],
+        facilities: [{ id: 'facility-id' }],
+        organisations: [{ id: 'org-id' }],
       },
       TENANT_ID,
     );

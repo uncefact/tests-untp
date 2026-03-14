@@ -20,21 +20,23 @@ type DfrSubject = {
 
 // ── Public extractor ──────────────────────────────────────────────────────────
 
+const EMPTY_REFS: ExtractedRefs = { organisations: [], facilities: [], products: [] };
+
 export function extractDfrRefs(subject: CredentialSubject): ExtractedRefs {
-  if (!subject) return {};
+  if (!subject) return { ...EMPTY_REFS };
 
   const dfr = subject as DfrSubject;
   const facility = dfr.facility;
-  if (!facility) return {};
+  if (!facility) return { ...EMPTY_REFS };
 
-  const refs: ExtractedRefs = {};
+  const refs: ExtractedRefs = { organisations: [], facilities: [], products: [] };
 
   if (facility.registeredId) {
-    refs.facility = { id: facility.registeredId };
+    refs.facilities.push({ id: facility.registeredId });
   }
 
   if (facility.operatedByParty?.registeredId) {
-    refs.organisation = { id: facility.operatedByParty.registeredId };
+    refs.organisations.push({ id: facility.operatedByParty.registeredId });
   }
 
   if (dfr.conformityClaim && dfr.conformityClaim.length > 0) {

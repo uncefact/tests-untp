@@ -9,52 +9,54 @@ const versions: [string, VersionSpec][] = [
   ['v0.6.1', dfrV061Spec],
 ];
 
+const EMPTY_ARRAYS = { organisations: [], facilities: [], products: [] };
+
 describe.each(versions)('extractDfrRefs (%s)', (_version, spec) => {
   const bridge = makeBridge(spec);
 
   // ── edge cases ───────────────────────────────────────────────────────────────
 
   describe('edge cases', () => {
-    it('returns empty object for null subject', () => {
+    it('returns empty arrays for null subject', () => {
       const refs = bridge.extractRefs(null as unknown as CredentialSubject);
-      expect(refs).toEqual({});
+      expect(refs).toEqual(EMPTY_ARRAYS);
     });
 
-    it('returns empty object for undefined subject', () => {
+    it('returns empty arrays for undefined subject', () => {
       const refs = bridge.extractRefs(undefined as unknown as CredentialSubject);
-      expect(refs).toEqual({});
+      expect(refs).toEqual(EMPTY_ARRAYS);
     });
 
-    it('returns empty object when facility is missing from subject', () => {
+    it('returns empty arrays when facility is missing from subject', () => {
       const refs = bridge.extractRefs({ type: ['FacilityRecord'] });
-      expect(refs).toEqual({});
+      expect(refs).toEqual(EMPTY_ARRAYS);
     });
 
-    it('returns empty object (no facility ref) when facility has no registeredId', () => {
+    it('returns empty arrays (no facility ref) when facility has no registeredId', () => {
       const refs = bridge.extractRefs({
         type: ['FacilityRecord'],
         facility: { id: 'some-id', name: 'A facility', operatedByParty: {} },
       });
-      expect(refs.facility).toBeUndefined();
+      expect(refs.facilities).toEqual([]);
     });
   });
 
   // ── facility refs ─────────────────────────────────────────────────────────────
 
   describe('facility refs', () => {
-    it('extracts facility.id from facility.registeredId', () => {
+    it('extracts facilities[0].id from facility.registeredId', () => {
       const refs = bridge.extractRefs({
         type: ['FacilityRecord'],
         facility: { registeredId: '4012345000009' },
       });
-      expect(refs.facility).toEqual({ id: '4012345000009' });
+      expect(refs.facilities).toEqual([{ id: '4012345000009' }]);
     });
   });
 
   // ── organisation refs ────────────────────────────────────────────────────────
 
   describe('organisation refs', () => {
-    it('extracts organisation.id from facility.operatedByParty.registeredId', () => {
+    it('extracts organisations[0].id from facility.operatedByParty.registeredId', () => {
       const refs = bridge.extractRefs({
         type: ['FacilityRecord'],
         facility: {
@@ -62,10 +64,10 @@ describe.each(versions)('extractDfrRefs (%s)', (_version, spec) => {
           operatedByParty: { registeredId: '9520123456788' },
         },
       });
-      expect(refs.organisation).toEqual({ id: '9520123456788' });
+      expect(refs.organisations).toEqual([{ id: '9520123456788' }]);
     });
 
-    it('omits organisation when operatedByParty has no registeredId', () => {
+    it('returns empty organisations array when operatedByParty has no registeredId', () => {
       const refs = bridge.extractRefs({
         type: ['FacilityRecord'],
         facility: {
@@ -73,7 +75,7 @@ describe.each(versions)('extractDfrRefs (%s)', (_version, spec) => {
           operatedByParty: { name: 'An org' },
         },
       });
-      expect(refs.organisation).toBeUndefined();
+      expect(refs.organisations).toEqual([]);
     });
   });
 
@@ -164,8 +166,8 @@ describe.each(versions)('extractDfrRefs (%s)', (_version, spec) => {
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
-      expect(refs.facility).toEqual({ id: '4012345000009' });
-      expect(refs.organisation).toEqual({ id: '9520123456788' });
+      expect(refs.facilities).toEqual([{ id: '4012345000009' }]);
+      expect(refs.organisations).toEqual([{ id: '9520123456788' }]);
       expect(refs.conformity?.standardUrls).toContain('https://example.org/standard/1.0');
       expect(refs.conformity?.regulationUrls).toContain('https://example.org/regulation/1.0');
       expect(refs.conformity?.criteriaUrls).toContain('https://example.org/criteria/1');
@@ -177,7 +179,7 @@ describe.each(versions)('extractDfrRefs (%s)', (_version, spec) => {
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
-      expect(refs.product).toBeUndefined();
+      expect(refs.products).toEqual([]);
     });
 
     it('extracts empty refs from a minimal built subject', () => {
@@ -189,8 +191,8 @@ describe.each(versions)('extractDfrRefs (%s)', (_version, spec) => {
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
-      expect(refs.facility).toBeUndefined();
-      expect(refs.organisation).toBeUndefined();
+      expect(refs.facilities).toEqual([]);
+      expect(refs.organisations).toEqual([]);
       expect(refs.conformity).toBeUndefined();
     });
   });

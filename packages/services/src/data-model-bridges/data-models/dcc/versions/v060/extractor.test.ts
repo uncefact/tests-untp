@@ -15,25 +15,27 @@ const versions: [string, VersionSpec][] = [
   ['v0.6.1', dccV061Spec],
 ];
 
+const EMPTY_ARRAYS = { organisations: [], facilities: [], products: [] };
+
 describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
   const bridge = makeBridge(spec);
 
   // ── edge cases ───────────────────────────────────────────────────────────────
 
   describe('edge cases', () => {
-    it('returns empty object for null subject', () => {
+    it('returns empty arrays for null subject', () => {
       const refs = bridge.extractRefs(null as unknown as CredentialSubject);
-      expect(refs).toEqual({});
+      expect(refs).toEqual(EMPTY_ARRAYS);
     });
 
-    it('returns empty object for undefined subject', () => {
+    it('returns empty arrays for undefined subject', () => {
       const refs = bridge.extractRefs(undefined as unknown as CredentialSubject);
-      expect(refs).toEqual({});
+      expect(refs).toEqual(EMPTY_ARRAYS);
     });
 
-    it('returns empty object for minimal subject with no extractable refs', () => {
+    it('returns empty arrays for minimal subject with no extractable refs', () => {
       const refs = bridge.extractRefs({ type: ['ConformityAttestation', 'Attestation'] });
-      expect(refs).toEqual({});
+      expect(refs).toEqual(EMPTY_ARRAYS);
     });
 
     it('omits conformity when no assessments are present', () => {
@@ -61,12 +63,12 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
   // ── organisation refs ────────────────────────────────────────────────────────
 
   describe('organisation refs', () => {
-    it('extracts organisation.id from issuedToParty.registeredId', () => {
+    it('extracts organisations[0].id from issuedToParty.registeredId', () => {
       const refs = bridge.extractRefs({
         type: ['ConformityAttestation', 'Attestation'],
         issuedToParty: { registeredId: '1234567890' },
       });
-      expect(refs.organisation).toEqual({ id: '1234567890' });
+      expect(refs.organisations).toEqual([{ id: '1234567890' }]);
     });
 
     it('falls back to assessedOrganisation.registeredId when issuedToParty has no registeredId', () => {
@@ -80,7 +82,7 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
           },
         ],
       });
-      expect(refs.organisation).toEqual({ id: '9999999999' });
+      expect(refs.organisations).toEqual([{ id: '9999999999' }]);
     });
 
     it('uses issuedToParty.registeredId over assessedOrganisation.registeredId when both are present', () => {
@@ -94,10 +96,10 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
           },
         ],
       });
-      expect(refs.organisation).toEqual({ id: '1111111111' });
+      expect(refs.organisations).toEqual([{ id: '1111111111' }]);
     });
 
-    it('omits organisation when neither issuedToParty nor assessedOrganisation has registeredId', () => {
+    it('returns empty organisations array when neither issuedToParty nor assessedOrganisation has registeredId', () => {
       const refs = bridge.extractRefs({
         type: ['ConformityAttestation', 'Attestation'],
         issuedToParty: { name: 'Some org' },
@@ -107,14 +109,14 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
           },
         ],
       });
-      expect(refs.organisation).toBeUndefined();
+      expect(refs.organisations).toEqual([]);
     });
   });
 
   // ── product refs ─────────────────────────────────────────────────────────────
 
   describe('product refs', () => {
-    it('extracts product.id from assessment[0].assessedProduct[0].product.registeredId', () => {
+    it('extracts products[0].id from assessment[0].assessedProduct[0].product.registeredId', () => {
       const refs = bridge.extractRefs({
         type: ['ConformityAttestation', 'Attestation'],
         assessment: [
@@ -124,7 +126,7 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
           },
         ],
       });
-      expect(refs.product).toEqual({ id: '01234567890123' });
+      expect(refs.products).toEqual([{ id: '01234567890123' }]);
     });
 
     it('includes batchNumber when present', () => {
@@ -137,7 +139,7 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
           },
         ],
       });
-      expect(refs.product).toEqual({ id: '01234567890123', batchNumber: 'BATCH-001' });
+      expect(refs.products).toEqual([{ id: '01234567890123', batchNumber: 'BATCH-001' }]);
     });
 
     it('includes serialNumber when present', () => {
@@ -150,10 +152,10 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
           },
         ],
       });
-      expect(refs.product).toEqual({ id: '01234567890123', serialNumber: 'SN-12345' });
+      expect(refs.products).toEqual([{ id: '01234567890123', serialNumber: 'SN-12345' }]);
     });
 
-    it('omits product when assessedProduct has no registeredId', () => {
+    it('returns empty products array when assessedProduct has no registeredId', () => {
       const refs = bridge.extractRefs({
         type: ['ConformityAttestation', 'Attestation'],
         assessment: [
@@ -163,14 +165,48 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
           },
         ],
       });
-      expect(refs.product).toBeUndefined();
+      expect(refs.products).toEqual([]);
+    });
+
+    it('extracts products from ALL assessments', () => {
+      const refs = bridge.extractRefs({
+        type: ['ConformityAttestation', 'Attestation'],
+        assessment: [
+          {
+            type: ['ConformityAssessment', 'Declaration'],
+            assessedProduct: [{ product: { registeredId: 'PROD-001' } }],
+          },
+          {
+            type: ['ConformityAssessment', 'Declaration'],
+            assessedProduct: [{ product: { registeredId: 'PROD-002' } }],
+          },
+        ],
+      });
+      expect(refs.products).toEqual([{ id: 'PROD-001' }, { id: 'PROD-002' }]);
+    });
+
+    it('deduplicates products across assessments', () => {
+      const refs = bridge.extractRefs({
+        type: ['ConformityAttestation', 'Attestation'],
+        assessment: [
+          {
+            type: ['ConformityAssessment', 'Declaration'],
+            assessedProduct: [{ product: { registeredId: 'PROD-001' } }],
+          },
+          {
+            type: ['ConformityAssessment', 'Declaration'],
+            assessedProduct: [{ product: { registeredId: 'PROD-001' } }],
+          },
+        ],
+      });
+      expect(refs.products).toEqual([{ id: 'PROD-001' }]);
     });
   });
 
   // ── facility refs ────────────────────────────────────────────────────────────
 
   describe('facility refs', () => {
-    it('extracts facility.id from assessment[0].assessedFacility[0].facility.registeredId', () => {
+    it('extracts facilities[0].id from assessment[0].assessedFacility[0].facility.registeredId', () => {
       const refs = bridge.extractRefs({
         type: ['ConformityAttestation', 'Attestation'],
         assessment: [
@@ -180,10 +216,10 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
           },
         ],
       });
-      expect(refs.facility).toEqual({ id: '9876543210' });
+      expect(refs.facilities).toEqual([{ id: '9876543210' }]);
     });
 
-    it('omits facility when assessedFacility has no registeredId', () => {
+    it('returns empty facilities array when assessedFacility has no registeredId', () => {
       const refs = bridge.extractRefs({
         type: ['ConformityAttestation', 'Attestation'],
         assessment: [
@@ -193,7 +229,41 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
           },
         ],
       });
-      expect(refs.facility).toBeUndefined();
+      expect(refs.facilities).toEqual([]);
+    });
+
+    it('extracts facilities from ALL assessments', () => {
+      const refs = bridge.extractRefs({
+        type: ['ConformityAttestation', 'Attestation'],
+        assessment: [
+          {
+            type: ['ConformityAssessment', 'Declaration'],
+            assessedFacility: [{ facility: { registeredId: 'FAC-001' } }],
+          },
+          {
+            type: ['ConformityAssessment', 'Declaration'],
+            assessedFacility: [{ facility: { registeredId: 'FAC-002' } }],
+          },
+        ],
+      });
+      expect(refs.facilities).toEqual([{ id: 'FAC-001' }, { id: 'FAC-002' }]);
+    });
+
+    it('deduplicates facilities across assessments', () => {
+      const refs = bridge.extractRefs({
+        type: ['ConformityAttestation', 'Attestation'],
+        assessment: [
+          {
+            type: ['ConformityAssessment', 'Declaration'],
+            assessedFacility: [{ facility: { registeredId: 'FAC-001' } }],
+          },
+          {
+            type: ['ConformityAssessment', 'Declaration'],
+            assessedFacility: [{ facility: { registeredId: 'FAC-001' } }],
+          },
+        ],
+      });
+      expect(refs.facilities).toEqual([{ id: 'FAC-001' }]);
     });
   });
 
@@ -350,9 +420,9 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
-      expect(refs.organisation).toEqual({ id: '9520123456788' });
-      expect(refs.product).toEqual({ id: '9520123456788', batchNumber: 'BATCH-001' });
-      expect(refs.facility).toEqual({ id: '4012345000009' });
+      expect(refs.organisations).toEqual([{ id: '9520123456788' }]);
+      expect(refs.products).toEqual([{ id: '9520123456788', batchNumber: 'BATCH-001' }]);
+      expect(refs.facilities).toEqual([{ id: '4012345000009' }]);
       expect(refs.conformity?.schemeUrl).toBe('https://example.org/conformity-scheme');
       expect(refs.conformity?.standardUrls).toContain('https://example.org/standard/1.0');
       expect(refs.conformity?.regulationUrls).toContain('https://example.org/regulation/1.0');
@@ -413,9 +483,9 @@ describe.each(versions)('extractDccRefs (%s)', (_version, spec) => {
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
-      expect(refs.organisation).toBeUndefined();
-      expect(refs.product).toBeUndefined();
-      expect(refs.facility).toBeUndefined();
+      expect(refs.organisations).toEqual([]);
+      expect(refs.products).toEqual([]);
+      expect(refs.facilities).toEqual([]);
       expect(refs.conformity).toBeUndefined();
     });
   });

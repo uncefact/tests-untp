@@ -33,34 +33,52 @@ type DccSubject = {
 
 // ── Public extractor ──────────────────────────────────────────────────────────
 
+const EMPTY_REFS: ExtractedRefs = { organisations: [], facilities: [], products: [] };
+
 export function extractDccRefs(subject: CredentialSubject): ExtractedRefs {
-  if (!subject) return {};
+  if (!subject) return { ...EMPTY_REFS };
 
   const dcc = subject as DccSubject;
-  const refs: ExtractedRefs = {};
+  const refs: ExtractedRefs = { organisations: [], facilities: [], products: [] };
 
   // Organisation: issuedToParty is primary; assessedOrganisation is fallback.
   // Different DCC schemas may place the organisation in different locations.
   // This fallback chain is intentional — see spec resolved question #7.
   if (dcc.issuedToParty?.registeredId) {
-    refs.organisation = { id: dcc.issuedToParty.registeredId };
+    refs.organisations.push({ id: dcc.issuedToParty.registeredId });
   } else if (dcc.assessment?.[0]?.assessedOrganisation?.registeredId) {
-    refs.organisation = { id: dcc.assessment[0].assessedOrganisation.registeredId };
+    refs.organisations.push({ id: dcc.assessment[0].assessedOrganisation.registeredId });
   }
 
-  const firstAssessment = dcc.assessment?.[0];
+  // Extract products and facilities from ALL assessments, deduplicating by ID.
+  const seenProductIds = new Set<string>();
+  const seenFacilityIds = new Set<string>();
 
-  if (firstAssessment?.assessedProduct?.[0]?.product?.registeredId) {
-    const p = firstAssessment.assessedProduct[0].product;
-    refs.product = {
-      id: p.registeredId!,
-      ...(p.batchNumber && { batchNumber: p.batchNumber }),
-      ...(p.serialNumber && { serialNumber: p.serialNumber }),
-    };
-  }
+  if (dcc.assessment) {
+    for (const assessment of dcc.assessment) {
+      if (assessment.assessedProduct) {
+        for (const pv of assessment.assessedProduct) {
+          const p = pv.product;
+          if (p?.registeredId && !seenProductIds.has(p.registeredId)) {
+            seenProductIds.add(p.registeredId);
+            refs.products.push({
+              id: p.registeredId,
+              ...(p.batchNumber && { batchNumber: p.batchNumber }),
+              ...(p.serialNumber && { serialNumber: p.serialNumber }),
+            });
+          }
+        }
+      }
 
-  if (firstAssessment?.assessedFacility?.[0]?.facility?.registeredId) {
-    refs.facility = { id: firstAssessment.assessedFacility[0].facility.registeredId };
+      if (assessment.assessedFacility) {
+        for (const fv of assessment.assessedFacility) {
+          if (fv.facility?.registeredId && !seenFacilityIds.has(fv.facility.registeredId)) {
+            seenFacilityIds.add(fv.facility.registeredId);
+            refs.facilities.push({ id: fv.facility.registeredId });
+          }
+        }
+      }
+    }
   }
 
   // Extract conformity refs from scope and all assessments

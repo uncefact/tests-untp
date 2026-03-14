@@ -13,18 +13,22 @@ type DteSubject = {
 
 // ── Public extractor ──────────────────────────────────────────────────────────
 
+const EMPTY_REFS: ExtractedRefs = { organisations: [], facilities: [], products: [] };
+
 export function extractDteRefs(subject: CredentialSubject): ExtractedRefs {
-  if (!subject) return {};
+  if (!subject) return { ...EMPTY_REFS };
 
   const dte = subject as DteSubject;
   const epcList = dte.epcList;
 
-  if (!epcList || epcList.length === 0) return {};
+  if (!epcList || epcList.length === 0) return { ...EMPTY_REFS };
 
   const firstItem = epcList[0];
-  if (!firstItem?.id) return {};
+  if (!firstItem?.id) return { ...EMPTY_REFS };
 
   return {
-    product: { id: firstItem.id },
+    organisations: [],
+    facilities: [],
+    products: [{ id: firstItem.id }],
   };
 }

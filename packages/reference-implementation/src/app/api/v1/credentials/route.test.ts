@@ -175,7 +175,7 @@ const STORAGE_RESPONSE = {
 
 const stubBridge = {
   buildSubject: jest.fn().mockReturnValue({}),
-  extractRefs: jest.fn().mockReturnValue({}),
+  extractRefs: jest.fn().mockReturnValue({ organisations: [], facilities: [], products: [] }),
 };
 
 const DATA_MODEL = {
@@ -437,7 +437,7 @@ describe('POST /api/v1/credentials', () => {
     it('adds CVC_NO_CONFORMITY warning when DCC has no conformity data', async () => {
       const dccBridge = {
         buildSubject: jest.fn().mockReturnValue({}),
-        extractRefs: jest.fn().mockReturnValue({ organisation: { id: '1234567890' } }),
+        extractRefs: jest.fn().mockReturnValue({ organisations: [{ id: '1234567890' }], facilities: [], products: [] }),
       };
       mockResolveDataModel.mockResolvedValue({
         dataModel: {
@@ -538,7 +538,7 @@ describe('POST /api/v1/credentials', () => {
         tenantId: 'tenant-1',
         credentialPayload: VALID_PAYLOAD,
         credentialType: 'DigitalProductPassport',
-        refs: {},
+        refs: { organisations: [], facilities: [], products: [] },
         vcService,
         storageService,
         storageOptions: {},

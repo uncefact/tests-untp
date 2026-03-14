@@ -43,7 +43,9 @@ const STORAGE_RESPONSE = {
 };
 
 const ENTITY_REFS = {
-  product: { id: 'urn:epc:id:sgtin:0614141.107346' },
+  organisations: [],
+  facilities: [],
+  products: [{ id: 'urn:epc:id:sgtin:0614141.107346' }],
 };
 
 const PRIMARY_ENTITY = {

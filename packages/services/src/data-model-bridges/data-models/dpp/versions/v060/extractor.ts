@@ -23,29 +23,31 @@ type DppSubject = {
 
 // ── Public extractor ──────────────────────────────────────────────────────────
 
+const EMPTY_REFS: ExtractedRefs = { organisations: [], facilities: [], products: [] };
+
 export function extractDppRefs(subject: CredentialSubject): ExtractedRefs {
-  if (!subject) return {};
+  if (!subject) return { ...EMPTY_REFS };
 
   const dpp = subject as DppSubject;
   const product = dpp.product;
-  if (!product) return {};
+  if (!product) return { ...EMPTY_REFS };
 
-  const refs: ExtractedRefs = {};
+  const refs: ExtractedRefs = { organisations: [], facilities: [], products: [] };
 
   if (product.registeredId) {
-    refs.product = {
+    refs.products.push({
       id: product.registeredId,
       ...(product.batchNumber && { batchNumber: product.batchNumber }),
       ...(product.serialNumber && { serialNumber: product.serialNumber }),
-    };
+    });
   }
 
   if (product.producedByParty?.registeredId) {
-    refs.organisation = { id: product.producedByParty.registeredId };
+    refs.organisations.push({ id: product.producedByParty.registeredId });
   }
 
   if (product.producedAtFacility?.registeredId) {
-    refs.facility = { id: product.producedAtFacility.registeredId };
+    refs.facilities.push({ id: product.producedAtFacility.registeredId });
   }
 
   if (dpp.conformityClaim && dpp.conformityClaim.length > 0) {

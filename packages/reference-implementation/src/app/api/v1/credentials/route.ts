@@ -178,7 +178,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     tenantId,
     credentialPayload,
     credentialType,
-    refs: refs ?? {},
+    refs: refs ?? { organisations: [], facilities: [], products: [] },
     vcService,
     storageService,
     storageOptions,

@@ -8,14 +8,18 @@ type DiaSubject = {
 
 // ── Public extractor ──────────────────────────────────────────────────────────
 
+const EMPTY_REFS: ExtractedRefs = { organisations: [], facilities: [], products: [] };
+
 export function extractDiaRefs(subject: CredentialSubject): ExtractedRefs {
-  if (!subject) return {};
+  if (!subject) return { ...EMPTY_REFS };
 
   const dia = subject as DiaSubject;
 
-  if (!dia.registeredId) return {};
+  if (!dia.registeredId) return { ...EMPTY_REFS };
 
   return {
-    organisation: { id: dia.registeredId },
+    organisations: [{ id: dia.registeredId }],
+    facilities: [],
+    products: [],
   };
 }

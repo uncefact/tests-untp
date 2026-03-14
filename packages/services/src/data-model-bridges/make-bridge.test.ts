@@ -12,7 +12,9 @@ describe('makeBridge', () => {
   };
 
   const mockRefs: ExtractedRefs = {
-    organisation: { id: 'org-1' },
+    organisations: [{ id: 'org-1' }],
+    facilities: [],
+    products: [],
   };
 
   it('delegates buildSubject to spec.builder', () => {

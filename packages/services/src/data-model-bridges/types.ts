@@ -75,9 +75,9 @@ export type DataModelConfig = {
 // ── Extracted refs (output from extractRefs) ──────────────────────────────────
 
 export type ExtractedRefs = {
-  organisation?: { id: string };
-  facility?: { id: string };
-  product?: { id: string; batchNumber?: string; serialNumber?: string };
+  organisations: { id: string }[];
+  facilities: { id: string }[];
+  products: { id: string; batchNumber?: string; serialNumber?: string }[];
   conformity?: {
     schemeUrl?: string;
     standardUrls: string[];
