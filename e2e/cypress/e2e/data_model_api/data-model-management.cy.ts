@@ -487,7 +487,7 @@ describe('Data Model API', { testIsolation: false }, () => {
     });
 
     it('POST /api/v1/data-models — returns 400 when schemaUrl points to a private address', function () {
-      if (!parentConfigId) this.skip();
+      if (!parentConfigId || Cypress.env('VERIFY_ALLOW_PRIVATE_URLS') === 'true') this.skip();
 
       cy.request({
         method: 'POST',
@@ -508,7 +508,7 @@ describe('Data Model API', { testIsolation: false }, () => {
     });
 
     it('POST /api/v1/data-models — returns 400 when contextUrl points to a private address', function () {
-      if (!parentConfigId) this.skip();
+      if (!parentConfigId || Cypress.env('VERIFY_ALLOW_PRIVATE_URLS') === 'true') this.skip();
 
       cy.request({
         method: 'POST',
@@ -529,7 +529,7 @@ describe('Data Model API', { testIsolation: false }, () => {
     });
 
     it('PATCH /api/v1/data-models/:id — returns 400 when schemaUrl points to a private address', function () {
-      if (!parentConfigId) this.skip();
+      if (!parentConfigId || Cypress.env('VERIFY_ALLOW_PRIVATE_URLS') === 'true') this.skip();
 
       // Create a temporary extension to test PATCH validation
       cy.request({
@@ -562,7 +562,7 @@ describe('Data Model API', { testIsolation: false }, () => {
     });
 
     it('PATCH /api/v1/data-models/:id — returns 400 when contextUrl points to a private address', function () {
-      if (!parentConfigId) this.skip();
+      if (!parentConfigId || Cypress.env('VERIFY_ALLOW_PRIVATE_URLS') === 'true') this.skip();
 
       cy.request({
         method: 'POST',
