@@ -88,6 +88,19 @@ describe('GET /api/v1/data-models/:id/form-config', () => {
         { entityType: 'organisation', label: 'Organisation', endpoint: '/api/v1/organisations', required: true },
         { entityType: 'facility', label: 'Facility', endpoint: '/api/v1/facilities', required: true },
         { entityType: 'product', label: 'Product', endpoint: '/api/v1/products', required: true },
+        {
+          entityType: 'conformityScheme',
+          label: 'Conformity Scheme',
+          endpoint: '/api/v1/cvc/schemes',
+          required: false,
+        },
+        {
+          entityType: 'conformityProfile',
+          label: 'Conformity Profile',
+          endpoint: '/api/v1/cvc/profiles?schemeId=:conformityScheme',
+          required: false,
+          dependsOn: 'conformityScheme',
+        },
       ],
     });
     expect(mockGetDataModelById).toHaveBeenCalledWith('dm-1', 'tenant-1');
@@ -108,9 +121,17 @@ describe('GET /api/v1/data-models/:id/form-config', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.formConfig.sections).toHaveLength(1);
+    expect(json.formConfig.sections).toHaveLength(3);
     expect(json.formConfig.sections).toEqual([
       { entityType: 'organisation', label: 'Organisation', endpoint: '/api/v1/organisations', required: true },
+      { entityType: 'conformityScheme', label: 'Conformity Scheme', endpoint: '/api/v1/cvc/schemes', required: false },
+      {
+        entityType: 'conformityProfile',
+        label: 'Conformity Profile',
+        endpoint: '/api/v1/cvc/profiles?schemeId=:conformityScheme',
+        required: false,
+        dependsOn: 'conformityScheme',
+      },
     ]);
   });
 
@@ -129,10 +150,18 @@ describe('GET /api/v1/data-models/:id/form-config', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.formConfig.sections).toHaveLength(2);
+    expect(json.formConfig.sections).toHaveLength(4);
     expect(json.formConfig.sections).toEqual([
       { entityType: 'organisation', label: 'Organisation', endpoint: '/api/v1/organisations', required: true },
       { entityType: 'facility', label: 'Facility', endpoint: '/api/v1/facilities', required: true },
+      { entityType: 'conformityScheme', label: 'Conformity Scheme', endpoint: '/api/v1/cvc/schemes', required: false },
+      {
+        entityType: 'conformityProfile',
+        label: 'Conformity Profile',
+        endpoint: '/api/v1/cvc/profiles?schemeId=:conformityScheme',
+        required: false,
+        dependsOn: 'conformityScheme',
+      },
     ]);
   });
 
@@ -177,6 +206,89 @@ describe('GET /api/v1/data-models/:id/form-config', () => {
       { entityType: 'organisation', label: 'Organisation', endpoint: '/api/v1/organisations', required: true },
       { entityType: 'product', label: 'Product', endpoint: '/api/v1/products', required: true },
     ]);
+  });
+
+  it('does not include conformity sections for DigitalIdentityAnchor', async () => {
+    const dataModel = {
+      id: 'dm-4',
+      name: 'DIA v0.6.0',
+      credentialType: 'DigitalIdentityAnchor',
+      version: '0.6.0',
+      schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/',
+    };
+    mockGetDataModelById.mockResolvedValue(dataModel);
+
+    const req = createFakeRequest();
+    const res = await GET(req, createContext('dm-4') as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    const entityTypes = json.formConfig.sections.map((s: { entityType: string }) => s.entityType);
+    expect(entityTypes).not.toContain('conformityScheme');
+    expect(entityTypes).not.toContain('conformityProfile');
+  });
+
+  it('does not include conformity sections for DigitalTraceabilityEvent', async () => {
+    const dataModel = {
+      id: 'dm-5',
+      name: 'DTE v0.6.0',
+      credentialType: 'DigitalTraceabilityEvent',
+      version: '0.6.0',
+      schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dte/0.6.0/',
+    };
+    mockGetDataModelById.mockResolvedValue(dataModel);
+
+    const req = createFakeRequest();
+    const res = await GET(req, createContext('dm-5') as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    const entityTypes = json.formConfig.sections.map((s: { entityType: string }) => s.entityType);
+    expect(entityTypes).not.toContain('conformityScheme');
+    expect(entityTypes).not.toContain('conformityProfile');
+  });
+
+  it('conformityProfile section has dependsOn set to conformityScheme for DPP', async () => {
+    const dataModel = {
+      id: 'dm-1',
+      name: 'DPP v0.6.0',
+      credentialType: 'DigitalProductPassport',
+      version: '0.6.0',
+      schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/',
+    };
+    mockGetDataModelById.mockResolvedValue(dataModel);
+
+    const req = createFakeRequest();
+    const res = await GET(req, createContext('dm-1') as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    const profileSection = json.formConfig.sections.find(
+      (s: { entityType: string }) => s.entityType === 'conformityProfile',
+    );
+    expect(profileSection).toBeDefined();
+    expect(profileSection.dependsOn).toBe('conformityScheme');
+  });
+
+  it('all conformity sections have required: false', async () => {
+    const dataModels = [
+      { id: 'dm-1', credentialType: 'DigitalProductPassport', version: '0.6.0', schemaUrl: '' },
+      { id: 'dm-2', credentialType: 'DigitalConformityCredential', version: '0.6.0', schemaUrl: '' },
+      { id: 'dm-3', credentialType: 'DigitalFacilityRecord', version: '0.6.0', schemaUrl: '' },
+    ];
+
+    for (const dataModel of dataModels) {
+      mockGetDataModelById.mockResolvedValue(dataModel);
+
+      const req = createFakeRequest();
+      const res = await GET(req, createContext(dataModel.id) as unknown as Parameters<typeof GET>[1]);
+      const json = await res.json();
+
+      const conformitySections = json.formConfig.sections.filter((s: { entityType: string }) =>
+        ['conformityScheme', 'conformityProfile'].includes(s.entityType),
+      );
+      expect(conformitySections.length).toBeGreaterThan(0);
+      for (const section of conformitySections) {
+        expect(section.required).toBe(false);
+      }
+    }
   });
 
   it('returns empty sections for unknown credential type', async () => {
