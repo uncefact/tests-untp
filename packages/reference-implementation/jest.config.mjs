@@ -9,7 +9,7 @@ const jestConfig = {
   ],
   testPathIgnorePatterns: ['<rootDir>/node_modules/'],
   transformIgnorePatterns: [
-    'node_modules/(?!@reference-implementation)',
+    'node_modules/(?!@reference-implementation|uuid)',
   ],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   moduleNameMapper: {
