@@ -727,7 +727,7 @@ describe('GET /api/v1/credentials', () => {
       tenantId: 'tenant-1',
       credentialType: undefined,
       isPublished: undefined,
-      limit: 100,
+      limit: undefined,
       offset: undefined,
     });
     expect(res.status).toBe(200);

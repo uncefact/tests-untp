@@ -8,7 +8,7 @@ import {
 } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createProducts, listProducts, CreateProductInput } from '@/lib/prisma/repositories';
-import { buildPaginatedResponse } from '@/lib/api/pagination';
+import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/products' });
@@ -211,7 +211,8 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const parentId = url.searchParams.get('parentId') ?? undefined;
   const organisationId = url.searchParams.get('organisationId') ?? undefined;
   const facilityId = url.searchParams.get('facilityId') ?? undefined;
-  const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   logger.info({ tenantId, search, level, parentId, organisationId, facilityId, limit, offset }, 'Listing products');

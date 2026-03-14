@@ -4,7 +4,7 @@ import { errorMessage, ConflictError } from '@/lib/api/errors';
 import { ValidationError, validateEnum, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createDid, listDids, findDidByAliasAndService } from '@/lib/prisma/repositories';
-import { buildPaginatedResponse } from '@/lib/api/pagination';
+import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus, DidConflictError } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
 
@@ -260,7 +260,8 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const type = validateEnum(url.searchParams.get('type') ?? undefined, Object.values(DidType), 'type');
   const status = validateEnum(url.searchParams.get('status') ?? undefined, Object.values(DidStatus), 'status');
   const serviceInstanceId = url.searchParams.get('serviceInstanceId') ?? undefined;
-  const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   logger.info({ filters: { type, status, serviceInstanceId, limit, offset } }, 'Querying DIDs from database');

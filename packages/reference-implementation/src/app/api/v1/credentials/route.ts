@@ -12,7 +12,7 @@ import { resolveDataModel, isDccDataModel } from '@/lib/credentials/resolve-data
 import { validateCredentialPayload } from '@/lib/credentials/validate-credential-payload';
 import { issueCredential } from '@/lib/credentials/issue-credential';
 import { updateCredentialPublished, listCredentials } from '@/lib/prisma/repositories';
-import { buildPaginatedResponse, DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
@@ -316,23 +316,19 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   logger.info('Parsing query filters');
   const credentialType = url.searchParams.get('credentialType') ?? undefined;
   const isPublished = parseBooleanString(url.searchParams.get('isPublished'), 'isPublished');
-  const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  const effectiveLimit = limit ?? DEFAULT_PAGE_LIMIT;
-
-  logger.info(
-    { filters: { credentialType, isPublished, limit: effectiveLimit, offset } },
-    'Querying credentials from database',
-  );
+  logger.info({ filters: { credentialType, isPublished, limit, offset } }, 'Querying credentials from database');
   const { data, total } = await listCredentials({
     tenantId,
     credentialType,
     isPublished,
-    limit: effectiveLimit,
+    limit,
     offset,
   });
 
   logger.info({ count: data.length }, 'Credentials listed');
-  return NextResponse.json(buildPaginatedResponse(data, total, effectiveLimit, offset));
+  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

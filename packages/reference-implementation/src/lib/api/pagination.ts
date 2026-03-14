@@ -9,7 +9,8 @@ export const paginationMetaSchema = z.object({
 
 export type PaginationMeta = z.infer<typeof paginationMetaSchema>;
 
-export const DEFAULT_PAGE_LIMIT = 100;
+export const DEFAULT_PAGE_LIMIT = 20;
+export const MAX_PAGE_LIMIT = 100;
 
 export interface PaginatedResponse<T> {
   data: T[];

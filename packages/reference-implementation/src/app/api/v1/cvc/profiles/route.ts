@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
-import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { listProfiles } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
@@ -63,18 +63,13 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
 
   logger.info('Parsing and validating query filters');
   const schemeId = url.searchParams.get('schemeId') ?? undefined;
-  const parsedLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const parsedOffset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
+  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  logger.info({ filters: { schemeId }, limit: parsedLimit, offset: parsedOffset }, 'Querying profiles from database');
-  const { data, total } = await listProfiles(tenantId, { schemeId, limit: parsedLimit, offset: parsedOffset });
-
-  const limit = parsedLimit ?? DEFAULT_PAGE_LIMIT;
-  const offset = parsedOffset ?? 0;
+  logger.info({ filters: { schemeId }, limit, offset }, 'Querying profiles from database');
+  const { data, total } = await listProfiles(tenantId, { schemeId, limit, offset });
 
   logger.info({ count: data.length, total }, 'Profiles retrieved');
-  return NextResponse.json({
-    data,
-    pagination: { total, limit, offset, hasMore: offset + limit < total },
-  });
+  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });
