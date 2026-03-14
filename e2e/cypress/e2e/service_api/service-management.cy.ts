@@ -673,7 +673,7 @@ describe('Service API', { testIsolation: false }, () => {
     });
 
     it('PATCH /api/v1/services/:id — returns 400 when config.baseUrl points to a private address', function () {
-      if (Cypress.env('VERIFY_ALLOW_PRIVATE_URLS') === 'true') this.skip();
+      if (Cypress.env('VERIFY_ALLOW_PRIVATE_URLS')) this.skip();
 
       // Create a temporary service to test PATCH SSRF validation
       cy.request({
@@ -837,7 +837,7 @@ describe('Service API', { testIsolation: false }, () => {
     });
 
     it('returns 400 when config.baseUrl points to a private address (SSRF protection)', function () {
-      if (Cypress.env('VERIFY_ALLOW_PRIVATE_URLS') === 'true') this.skip();
+      if (Cypress.env('VERIFY_ALLOW_PRIVATE_URLS')) this.skip();
 
       cy.request({
         method: 'POST',
