@@ -1,6 +1,6 @@
 ---
 sidebar_position: 1
-title: Services API
+title: Services
 ---
 
 # Services API
@@ -63,6 +63,10 @@ sequenceDiagram
     RI->>Registry: Look up adapter by serviceType + adapterType
     Registry-->>RI: Adapter config schema
     RI->>RI: Validate config against adapter schema
+    RI->>RI: Validate config URLs are not internal (SSRF protection)
+    alt URL points to private/reserved address
+        RI-->>Client: 400 Bad Request
+    end
     RI->>RI: Encrypt config
     RI->>DB: Insert service instance
     alt isPrimary = true
@@ -132,6 +136,10 @@ sequenceDiagram
     RI->>RI: Merge new fields into existing config
     RI->>Registry: Look up adapter schema
     RI->>RI: Validate merged config against schema
+    RI->>RI: Validate config URLs are not internal (SSRF protection)
+    alt URL points to private/reserved address
+        RI-->>Client: 400 Bad Request
+    end
     RI->>RI: Encrypt merged config
     RI->>DB: Update record
     alt isPrimary = true
