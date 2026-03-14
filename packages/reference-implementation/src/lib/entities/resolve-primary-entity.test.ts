@@ -54,8 +54,7 @@ describe('resolvePrimaryEntity', () => {
 
     const result = await resolvePrimaryEntity(
       {
-        primaryIdentifier: '09506000134352',
-        product: { registeredId: '09506000134352' },
+        product: { id: '09506000134352' },
       },
       TENANT_ID,
     );
@@ -70,14 +69,13 @@ describe('resolvePrimaryEntity', () => {
     });
   });
 
-  it('resolves facility entity with scheme info', async () => {
+  it('resolves facility entity when no product ref is present', async () => {
     const entity = makeEntity('fac-1');
     mockGetFacilityByIdentifierValue.mockResolvedValue(entity);
 
     const result = await resolvePrimaryEntity(
       {
-        primaryIdentifier: '9506000134',
-        facility: { registeredId: '9506000134' },
+        facility: { id: '9506000134' },
       },
       TENANT_ID,
     );
@@ -92,14 +90,13 @@ describe('resolvePrimaryEntity', () => {
     });
   });
 
-  it('resolves organisation entity with scheme info', async () => {
+  it('resolves organisation entity when no product or facility ref is present', async () => {
     const entity = makeEntity('org-1');
     mockGetOrganisationByIdentifierValue.mockResolvedValue(entity);
 
     const result = await resolvePrimaryEntity(
       {
-        primaryIdentifier: '9506000100',
-        organisation: { registeredId: '9506000100' },
+        organisation: { id: '9506000100' },
       },
       TENANT_ID,
     );
@@ -119,8 +116,7 @@ describe('resolvePrimaryEntity', () => {
 
     const result = await resolvePrimaryEntity(
       {
-        primaryIdentifier: '09506000134352',
-        product: { registeredId: '09506000134352' },
+        product: { id: '09506000134352' },
       },
       TENANT_ID,
     );
@@ -129,20 +125,28 @@ describe('resolvePrimaryEntity', () => {
     expect(result).toEqual({});
   });
 
-  it('returns empty result when primaryIdentifier does not match any ref', async () => {
+  it('prioritises product over facility and organisation', async () => {
+    const entity = makeEntity('prod-1');
+    mockGetProductByIdentifierValue.mockResolvedValue(entity);
+
     const result = await resolvePrimaryEntity(
       {
-        primaryIdentifier: 'unknown-id-999',
-        product: { registeredId: 'different-id' },
-        facility: { registeredId: 'another-id' },
-        organisation: { registeredId: 'yet-another-id' },
+        product: { id: 'product-id' },
+        facility: { id: 'facility-id' },
+        organisation: { id: 'org-id' },
       },
       TENANT_ID,
     );
 
-    expect(result).toEqual({});
-    expect(mockGetProductByIdentifierValue).not.toHaveBeenCalled();
+    expect(mockGetProductByIdentifierValue).toHaveBeenCalledWith('product-id', TENANT_ID);
     expect(mockGetFacilityByIdentifierValue).not.toHaveBeenCalled();
     expect(mockGetOrganisationByIdentifierValue).not.toHaveBeenCalled();
+    expect(result).toEqual<PrimaryEntityResult>({
+      primaryIdentifier: 'product-id',
+      productId: 'prod-1',
+      schemeNamespace: 'gs1',
+      schemePrimaryKey: 'gtin',
+      schemeIdrServiceInstanceId: 'idr-svc-1',
+    });
   });
 });

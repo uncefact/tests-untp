@@ -167,13 +167,11 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   // ── Step 5: Issue credential ────────────────────────────────────────────
 
-  // TODO: issueCredential still expects ICredentialMapper — will be updated
-  // when old credential-mapping is removed (Task 16).
   const { credentialId, storageResponse, primaryEntity } = await issueCredential({
     tenantId,
     credentialPayload,
     credentialType,
-    mapper: bridge as unknown as Parameters<typeof issueCredential>[0]['mapper'],
+    bridge,
     vcService,
     storageService,
     storageOptions,

@@ -22,9 +22,12 @@ import type { IssueCredentialInput } from './issue-credential';
 
 const TENANT_ID = 'tenant-1';
 
+const CREDENTIAL_SUBJECT = { product: { registeredId: 'urn:epc:id:sgtin:0614141.107346' } };
+
 const PAYLOAD = {
   '@context': ['https://www.w3.org/ns/credentials/v2'],
   type: ['VerifiableCredential'],
+  credentialSubject: CREDENTIAL_SUBJECT,
 } as unknown as IssueCredentialInput['credentialPayload'];
 
 const SIGNED_CREDENTIAL = {
@@ -40,8 +43,7 @@ const STORAGE_RESPONSE = {
 };
 
 const ENTITY_REFS = {
-  primaryIdentifier: 'urn:epc:id:sgtin:0614141.107346',
-  product: { registeredId: 'urn:epc:id:sgtin:0614141.107346' },
+  product: { id: 'urn:epc:id:sgtin:0614141.107346' },
 };
 
 const PRIMARY_ENTITY = {
@@ -50,9 +52,9 @@ const PRIMARY_ENTITY = {
   schemePrimaryKey: 'gtin',
 };
 
-const stubMapper = {
-  extractEntityRefs: jest.fn().mockReturnValue(ENTITY_REFS),
-  buildPayload: jest.fn(),
+const stubBridge = {
+  extractRefs: jest.fn().mockReturnValue(ENTITY_REFS),
+  buildSubject: jest.fn(),
 };
 
 const stubVcService = {
@@ -72,7 +74,7 @@ function buildInput(overrides: Partial<IssueCredentialInput> = {}): IssueCredent
     tenantId: TENANT_ID,
     credentialPayload: PAYLOAD,
     credentialType: 'DigitalProductPassport',
-    mapper: stubMapper as unknown as IssueCredentialInput['mapper'],
+    bridge: stubBridge as unknown as IssueCredentialInput['bridge'],
     vcService: stubVcService as unknown as IssueCredentialInput['vcService'],
     storageService: stubStorageService as unknown as IssueCredentialInput['storageService'],
     storageOptions: { encrypt: true },
@@ -111,10 +113,10 @@ describe('issueCredential', () => {
     expect(stubStorageService.service.store).toHaveBeenCalledWith(SIGNED_CREDENTIAL, false);
   });
 
-  it('extracts entity refs from the payload', async () => {
+  it('extracts entity refs from the credential subject', async () => {
     await issueCredential(buildInput());
 
-    expect(stubMapper.extractEntityRefs).toHaveBeenCalledWith(PAYLOAD);
+    expect(stubBridge.extractRefs).toHaveBeenCalledWith(CREDENTIAL_SUBJECT);
   });
 
   it('resolves primary entity', async () => {

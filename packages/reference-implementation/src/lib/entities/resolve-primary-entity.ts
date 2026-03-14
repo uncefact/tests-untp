@@ -1,4 +1,4 @@
-import type { ExtractedIdentifierRefs } from '@uncefact/untp-ri-services';
+import type { ExtractedRefs } from '@uncefact/untp-ri-services';
 import {
   getProductByIdentifierValue,
   getFacilityByIdentifierValue,
@@ -15,18 +15,18 @@ export type PrimaryEntityResult = {
   schemeIdrServiceInstanceId?: string | null;
 };
 
-export async function resolvePrimaryEntity(
-  refs: ExtractedIdentifierRefs,
-  tenantId: string,
-): Promise<PrimaryEntityResult> {
-  const { primaryIdentifier } = refs;
-  if (!primaryIdentifier) return {};
-
-  if (refs.product?.registeredId === primaryIdentifier) {
-    const entity = await getProductByIdentifierValue(primaryIdentifier, tenantId);
+/**
+ * Resolves a primary entity from extracted credential references.
+ *
+ * Priority: product > facility > organisation. The first entity ref
+ * present in the refs object is treated as the primary identifier.
+ */
+export async function resolvePrimaryEntity(refs: ExtractedRefs, tenantId: string): Promise<PrimaryEntityResult> {
+  if (refs.product?.id) {
+    const entity = await getProductByIdentifierValue(refs.product.id, tenantId);
     if (!entity) return {};
     return {
-      primaryIdentifier,
+      primaryIdentifier: refs.product.id,
       productId: entity.id,
       schemeNamespace: entity.primaryIdentifier?.scheme?.registrar?.namespace ?? undefined,
       schemePrimaryKey: entity.primaryIdentifier?.scheme?.primaryKey,
@@ -34,11 +34,11 @@ export async function resolvePrimaryEntity(
     };
   }
 
-  if (refs.facility?.registeredId === primaryIdentifier) {
-    const entity = await getFacilityByIdentifierValue(primaryIdentifier, tenantId);
+  if (refs.facility?.id) {
+    const entity = await getFacilityByIdentifierValue(refs.facility.id, tenantId);
     if (!entity) return {};
     return {
-      primaryIdentifier,
+      primaryIdentifier: refs.facility.id,
       facilityId: entity.id,
       schemeNamespace: entity.primaryIdentifier?.scheme?.registrar?.namespace ?? undefined,
       schemePrimaryKey: entity.primaryIdentifier?.scheme?.primaryKey,
@@ -46,11 +46,11 @@ export async function resolvePrimaryEntity(
     };
   }
 
-  if (refs.organisation?.registeredId === primaryIdentifier) {
-    const entity = await getOrganisationByIdentifierValue(primaryIdentifier, tenantId);
+  if (refs.organisation?.id) {
+    const entity = await getOrganisationByIdentifierValue(refs.organisation.id, tenantId);
     if (!entity) return {};
     return {
-      primaryIdentifier,
+      primaryIdentifier: refs.organisation.id,
       organisationId: entity.id,
       schemeNamespace: entity.primaryIdentifier?.scheme?.registrar?.namespace ?? undefined,
       schemePrimaryKey: entity.primaryIdentifier?.scheme?.primaryKey,

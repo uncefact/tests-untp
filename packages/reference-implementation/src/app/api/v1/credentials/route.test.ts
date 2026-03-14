@@ -512,7 +512,7 @@ describe('POST /api/v1/credentials', () => {
         tenantId: 'tenant-1',
         credentialPayload: VALID_PAYLOAD,
         credentialType: 'DigitalProductPassport',
-        mapper: stubBridge,
+        bridge: stubBridge,
         vcService,
         storageService,
         storageOptions: {},

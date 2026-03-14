@@ -1,5 +1,5 @@
 import type {
-  ICredentialMapper,
+  IDataModelBridge,
   CredentialPayload,
   IVerifiableCredentialService,
   IStorageService,
@@ -17,7 +17,7 @@ export type IssueCredentialInput = {
   tenantId: string;
   credentialPayload: CredentialPayload;
   credentialType: string;
-  mapper: ICredentialMapper;
+  bridge: IDataModelBridge;
   vcService: ResolvedService<IVerifiableCredentialService>;
   storageService: ResolvedService<IStorageService>;
   storageOptions: {
@@ -32,7 +32,7 @@ export type IssueCredentialResult = {
 };
 
 export async function issueCredential(input: IssueCredentialInput): Promise<IssueCredentialResult> {
-  const { tenantId, credentialPayload, credentialType, mapper, vcService, storageService, storageOptions } = input;
+  const { tenantId, credentialPayload, credentialType, bridge, vcService, storageService, storageOptions } = input;
 
   const shouldEncrypt = storageOptions.encrypt !== false;
 
@@ -42,7 +42,8 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
   logger.info({ tenantId, storageInstanceId: storageService.instanceId, shouldEncrypt }, 'Storing credential');
   const storageResponse = await storageService.service.store(signedCredential, shouldEncrypt);
 
-  const refs = mapper.extractEntityRefs(credentialPayload);
+  const subject = credentialPayload.credentialSubject as Record<string, unknown>;
+  const refs = bridge.extractRefs(subject);
   const primaryEntity = await resolvePrimaryEntity(refs, tenantId);
 
   const credentialRecord = await createCredential({
