@@ -5,6 +5,7 @@ import {
   updateDataModel,
   deleteDataModel,
 } from './data-model.repository';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
@@ -247,7 +248,7 @@ describe('data-model.repository', () => {
       expect(mockDataModel.findMany).toHaveBeenCalledWith({
         where: expectedWhere,
         include: LIST_INCLUDE_SHAPE,
-        take: 20,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
@@ -266,7 +267,7 @@ describe('data-model.repository', () => {
       expect(mockDataModel.findMany).toHaveBeenCalledWith({
         where: expectedWhere,
         include: LIST_INCLUDE_SHAPE,
-        take: 20,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
@@ -285,7 +286,7 @@ describe('data-model.repository', () => {
       expect(mockDataModel.findMany).toHaveBeenCalledWith({
         where: expectedWhere,
         include: LIST_INCLUDE_SHAPE,
-        take: 20,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
@@ -302,7 +303,7 @@ describe('data-model.repository', () => {
       expect(mockDataModel.findMany).toHaveBeenCalledWith({
         where: expectedWhere,
         include: LIST_INCLUDE_SHAPE,
-        take: 20,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });

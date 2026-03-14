@@ -95,9 +95,11 @@ describe('validatePublicUrl', () => {
     );
   });
 
-  it('allows through when DNS resolution fails', async () => {
+  it('rejects when DNS resolution fails', async () => {
     mockDnsLookup.mockRejectedValue(new Error('ENOTFOUND'));
-    await expect(validatePublicUrl(new URL('https://nonexistent.invalid'))).resolves.toBeUndefined();
+    await expect(validatePublicUrl(new URL('https://nonexistent.invalid'))).rejects.toThrow(
+      'uri hostname could not be resolved',
+    );
   });
 
   it('rejects IPv6 private resolved address', async () => {

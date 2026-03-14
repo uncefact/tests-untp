@@ -1,25 +1,19 @@
-import { NextResponse } from 'next/server';
-import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
-import { buildPaginatedResponse } from '@/lib/api/pagination';
-import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { listDataModels, createDataModel } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
+import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
+import {
+  assertPublicUrl,
+  isNonEmptyString,
+  parseBooleanString,
+  parseNonNegativeInt,
+  parsePositiveInt,
+  ValidationError,
+} from '@/lib/api/validation';
+import { withTenantAuth } from '@/lib/api/with-tenant-auth';
+import { createDataModel, listDataModels } from '@/lib/prisma/repositories';
+
+import { NextResponse } from 'next/server';
 
 const logger = apiLogger.child({ route: '/api/v1/data-models' });
-
-const MAX_LIMIT = 100;
-
-/**
- * Parse a boolean string query parameter ("true" or "false").
- * Returns undefined if the raw value is null/undefined.
- * Throws ValidationError if the value is present but not "true" or "false".
- */
-function parseBooleanParam(raw: string | null | undefined, paramName: string): boolean | undefined {
-  if (raw == null) return undefined;
-  if (raw === 'true') return true;
-  if (raw === 'false') return false;
-  throw new ValidationError(`${paramName} must be "true" or "false"`);
-}
 
 /**
  * @swagger
@@ -95,17 +89,17 @@ function parseBooleanParam(raw: string | null | undefined, paramName: string): b
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   const url = new URL(req.url);
 
-  logger.info({ tenantId }, 'Parsing query filters');
-  const isExtension = parseBooleanParam(url.searchParams.get('isExtension'), 'isExtension');
+  logger.info('Parsing query filters');
+  const isExtension = parseBooleanString(url.searchParams.get('isExtension'), 'isExtension');
   const rawCredentialType = url.searchParams.get('credentialType');
   const credentialType = rawCredentialType && rawCredentialType.trim() !== '' ? rawCredentialType : undefined;
   const version = url.searchParams.get('version') ?? undefined;
   const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_LIMIT) : undefined;
+  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   logger.info(
-    { tenantId, filters: { isExtension, credentialType, version, limit, offset } },
+    { filters: { isExtension, credentialType, version, limit, offset } },
     'Querying data models from database',
   );
   const { data, total } = await listDataModels(tenantId, {
@@ -116,8 +110,11 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
     offset,
   });
 
-  logger.info({ tenantId, count: data.length, total }, 'Data models listed');
-  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
+  // Strip parentConfig from the response — it's used internally but not exposed to clients
+  const responseData = data.map(({ parentConfig: _, ...rest }) => rest);
+
+  logger.info({ count: responseData.length, total }, 'Data models listed');
+  return NextResponse.json(buildPaginatedResponse(responseData, total, limit, offset));
 });
 
 /**
@@ -196,7 +193,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info({ tenantId }, 'Parsing request body');
+  logger.info('Parsing request body');
   let body: {
     name?: string;
     credentialType?: string;
@@ -213,7 +210,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId }, 'Validating input parameters');
+  logger.info('Validating input parameters');
   if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
 
   if (!isNonEmptyString(body.credentialType)) throw new ValidationError('credentialType is required');
@@ -229,7 +226,16 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('websiteUrl must be a non-empty string');
   }
 
-  logger.info({ tenantId, credentialType, name: body.name }, 'Creating data model extension');
+  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+    logger.info('Validating URLs are not internal');
+    await assertPublicUrl(body.schemaUrl, 'schemaUrl');
+    await assertPublicUrl(body.contextUrl, 'contextUrl');
+    if (body.websiteUrl) {
+      await assertPublicUrl(body.websiteUrl, 'websiteUrl');
+    }
+  }
+
+  logger.info({ credentialType, name: body.name }, 'Creating data model extension');
   const dataModel = await createDataModel(tenantId, {
     name: body.name,
     credentialType,
@@ -241,6 +247,6 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     ...(body.websiteUrl !== undefined && { websiteUrl: body.websiteUrl }),
   });
 
-  logger.info({ tenantId, dataModelId: dataModel.id }, 'Data model extension created');
+  logger.info({ dataModelId: dataModel.id }, 'Data model extension created');
   return NextResponse.json(dataModel, { status: 201 });
 });

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import {
+  assertPublicUrl,
   ValidationError,
   validateEnum,
   isNonEmptyString,
@@ -8,7 +9,7 @@ import {
 } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
-import { buildPaginatedResponse } from '@/lib/api/pagination';
+import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { createServiceInstance, listServiceInstances } from '@/lib/prisma/repositories';
 import { getEncryptionService } from '@/lib/encryption/encryption';
 import {
@@ -152,6 +153,16 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError(`Invalid config: ${messages}`);
   }
 
+  // --- SSRF protection on config URLs --------------------------------------
+
+  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+    const configObj = body.config as Record<string, unknown>;
+    if (typeof configObj.baseUrl === 'string') {
+      logger.info('Validating config baseUrl is not internal');
+      await assertPublicUrl(configObj.baseUrl, 'config.baseUrl');
+    }
+  }
+
   // --- Encrypt & persist --------------------------------------------------
 
   logger.info({ serviceType, adapterType, name: body.name }, 'Encrypting and persisting service instance');
@@ -261,7 +272,8 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
     Object.values(AdapterType),
     'adapterType',
   );
-  const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   logger.info({ filters: { serviceType, adapterType, limit, offset } }, 'Querying service instances');

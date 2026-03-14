@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError, ConflictError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { assertPublicUrl, ValidationError, isNonEmptyString } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
 import {
@@ -212,6 +212,14 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     const result = entry.configSchema.safeParse(mergedConfig);
     if (!result.success) {
       throw new ValidationError(`Invalid configuration: ${result.error.message}`);
+    }
+
+    // SSRF protection on merged config URLs
+    if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+      if (typeof mergedConfig.baseUrl === 'string') {
+        logger.info({ serviceInstanceId: id }, 'Validating config baseUrl is not internal');
+        await assertPublicUrl(mergedConfig.baseUrl, 'config.baseUrl');
+      }
     }
 
     logger.info({ serviceInstanceId: id }, 'Encrypting config');

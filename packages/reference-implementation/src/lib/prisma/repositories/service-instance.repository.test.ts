@@ -8,6 +8,7 @@ import {
   getInstanceByResolution,
 } from './service-instance.repository';
 import { SYSTEM_TENANT_ID } from '../constants';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
 const mockServiceInstance = {
@@ -211,7 +212,7 @@ describe('service-instance.repository', () => {
         where: {
           OR: [{ tenantId: ORG_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
-        take: 20,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
@@ -235,7 +236,7 @@ describe('service-instance.repository', () => {
         where: expect.objectContaining({
           serviceType: 'VC',
         }),
-        take: 20,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
@@ -254,7 +255,7 @@ describe('service-instance.repository', () => {
         where: expect.objectContaining({
           adapterType: 'VCKIT',
         }),
-        take: 20,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });

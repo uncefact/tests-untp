@@ -354,7 +354,7 @@ describe('Credential API', { testIsolation: false }, () => {
         expect(response.body.data).to.be.an('array');
         expect(response.body.pagination).to.exist;
         expect(response.body.pagination.total).to.be.a('number');
-        expect(response.body.pagination.limit).to.eq(100);
+        expect(response.body.pagination.limit).to.eq(20);
         expect(response.body.pagination.offset).to.eq(0);
         expect(response.body.pagination).to.have.property('hasMore');
 

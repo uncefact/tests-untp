@@ -2,6 +2,7 @@ import { Did, DidStatus, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
  * Input for creating a new DID record
@@ -151,7 +152,7 @@ export async function listDids(
   const [data, total] = await Promise.all([
     prisma.did.findMany({
       where,
-      take: limit ?? 20,
+      take: limit ?? DEFAULT_PAGE_LIMIT,
       skip: offset,
       orderBy: { createdAt: 'desc' },
     }),

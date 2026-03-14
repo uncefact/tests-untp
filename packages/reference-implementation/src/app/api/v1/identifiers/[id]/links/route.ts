@@ -4,7 +4,7 @@ import { ValidationError, parsePositiveInt, parseNonNegativeInt } from '@/lib/ap
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getIdentifierById, createManyLinkRegistrations, listLinkRegistrations } from '@/lib/prisma/repositories';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
-import { buildPaginatedResponse } from '@/lib/api/pagination';
+import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 import type { Link } from '@uncefact/untp-ri-services';
 
@@ -222,7 +222,8 @@ export const GET = withTenantAuth(async (req, { tenantId, params }) => {
   }
 
   const url = new URL(req.url);
-  const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   const { data, total } = await listLinkRegistrations(identifierId, tenantId, limit, offset);

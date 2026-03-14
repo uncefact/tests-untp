@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
-import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { listCatalogues } from '@/lib/prisma/repositories';
 import { importCvc } from '@/lib/services/cvc-import.service';
@@ -58,20 +58,15 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const url = new URL(req.url);
 
   logger.info('Parsing pagination parameters');
-  const parsedLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const parsedOffset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
+  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  logger.info({ limit: parsedLimit, offset: parsedOffset }, 'Querying catalogues from database');
-  const { data, total } = await listCatalogues(tenantId, { limit: parsedLimit, offset: parsedOffset });
-
-  const limit = parsedLimit ?? DEFAULT_PAGE_LIMIT;
-  const offset = parsedOffset ?? 0;
+  logger.info({ limit, offset }, 'Querying catalogues from database');
+  const { data, total } = await listCatalogues(tenantId, { limit, offset });
 
   logger.info({ count: data.length, total }, 'Catalogues retrieved');
-  return NextResponse.json({
-    data,
-    pagination: { total, limit, offset, hasMore: offset + limit < total },
-  });
+  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });
 
 /**

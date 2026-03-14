@@ -104,7 +104,7 @@ const ENTITY_REQUIREMENTS: Record<
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, dataModelId: id }, 'Looking up data model for form config');
+  logger.info({ dataModelId: id }, 'Looking up data model for form config');
   const dataModel = await getDataModelById(id, tenantId);
   if (!dataModel) {
     throw new NotFoundError('Data model not found');

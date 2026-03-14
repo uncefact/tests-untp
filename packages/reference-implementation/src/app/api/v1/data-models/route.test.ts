@@ -8,6 +8,21 @@ jest.mock('next/server', () => ({
   },
 }));
 
+// Mock logger to prevent real logging during tests
+const mockLogger = {
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  child: jest.fn().mockReturnThis(),
+};
+
+jest.mock('@/lib/api/logger', () => ({
+  apiLogger: {
+    child: jest.fn().mockReturnValue(mockLogger),
+  },
+}));
+
 // Mock withTenantAuth — skips auth but preserves error handling via handleRouteError
 jest.mock('@/lib/api/with-tenant-auth', () => {
   const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
@@ -27,13 +42,18 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 const mockListDataModels = jest.fn();
 const mockCreateDataModel = jest.fn();
 
+const mockValidatePublicUrl = jest.fn();
+jest.mock('@uncefact/untp-ri-services/server', () => ({
+  validatePublicUrl: (...args: unknown[]) => mockValidatePublicUrl(...args),
+}));
+
 jest.mock('@/lib/prisma/repositories', () => ({
   listDataModels: (tenantId: string, opts: unknown) => mockListDataModels(tenantId, opts),
   createDataModel: (tenantId: string, input: unknown) => mockCreateDataModel(tenantId, input),
 }));
 
 import { NotFoundError } from '@/lib/api/errors';
-import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { GET, POST } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -231,7 +251,35 @@ describe('GET /api/v1/data-models', () => {
     });
   });
 
-  it('clamps limit to maximum of 100', async () => {
+  it('strips parentConfig from the response data', async () => {
+    const dataModels = [
+      {
+        id: 'cfg-1',
+        name: 'DPP v0.6.0',
+        credentialType: 'DigitalProductPassport',
+        parentConfig: { id: 'parent-1', name: 'Parent' },
+      },
+      {
+        id: 'cfg-2',
+        name: 'DCC v0.6.0',
+        credentialType: 'DigitalConformityCredential',
+        parentConfig: { id: 'parent-2', name: 'Parent 2' },
+      },
+    ];
+    mockListDataModels.mockResolvedValue({ data: dataModels, total: 2 });
+
+    const req = createFakeRequest({ method: 'GET', url: 'http://localhost/api/v1/data-models' });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    for (const item of json.data) {
+      expect(item).not.toHaveProperty('parentConfig');
+    }
+    expect(json.data[0]).toEqual({ id: 'cfg-1', name: 'DPP v0.6.0', credentialType: 'DigitalProductPassport' });
+  });
+
+  it('clamps limit to maximum', async () => {
     mockListDataModels.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
@@ -240,7 +288,7 @@ describe('GET /api/v1/data-models', () => {
     });
     await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
 
-    expect(mockListDataModels).toHaveBeenCalledWith('tenant-1', expect.objectContaining({ limit: 100 }));
+    expect(mockListDataModels).toHaveBeenCalledWith('tenant-1', expect.objectContaining({ limit: MAX_PAGE_LIMIT }));
   });
 
   it('returns 400 for non-numeric limit', async () => {
@@ -605,5 +653,67 @@ describe('POST /api/v1/data-models', () => {
 
     const callArgs = mockCreateDataModel.mock.calls[0][1];
     expect(callArgs).not.toHaveProperty('websiteUrl');
+  });
+
+  it('returns 400 when schemaUrl points to a private address', async () => {
+    mockValidatePublicUrl.mockRejectedValueOnce(
+      new Error('uri must not point to a private or reserved network address'),
+    );
+
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'http://127.0.0.1/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/schemaUrl.*private or reserved/);
+  });
+
+  it('returns 400 when contextUrl points to a private address', async () => {
+    mockValidatePublicUrl
+      .mockResolvedValueOnce(undefined) // schemaUrl passes
+      .mockRejectedValueOnce(new Error('uri must not point to a private or reserved network address')); // contextUrl fails
+
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'http://169.254.169.254/context.jsonld',
+        parentConfigId: 'cfg-parent',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/contextUrl.*private or reserved/);
+  });
+
+  it('returns 400 when schemaUrl is not a valid URL', async () => {
+    const req = createFakeRequest({
+      body: {
+        name: 'Extension',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'not-a-url',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/schemaUrl.*valid URL/);
   });
 });

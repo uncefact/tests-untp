@@ -11,6 +11,7 @@ import {
 } from './did.repository';
 import { DidStatus } from '../generated';
 import { SYSTEM_TENANT_ID } from '../constants';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
@@ -301,7 +302,7 @@ describe('did.repository', () => {
         where: {
           OR: [{ tenantId: ORG_ID }, { isDefault: true, type: 'DEFAULT' }],
         },
-        take: 20,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
@@ -324,7 +325,7 @@ describe('did.repository', () => {
           type: 'MANAGED',
           status: 'ACTIVE',
         }),
-        take: 20,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
@@ -340,7 +341,7 @@ describe('did.repository', () => {
         where: expect.objectContaining({
           serviceInstanceId: 'inst-1',
         }),
-        take: 20,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });

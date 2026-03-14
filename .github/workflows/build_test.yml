@@ -150,6 +150,7 @@ jobs:
         run: yarn test:run-cypress
         env:
           NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module' # See issue https://github.com/cypress-io/github-action/issues/1408
+          CYPRESS_VERIFY_ALLOW_PRIVATE_URLS: 'true' # Skip SSRF E2E tests — Docker services use internal addresses
 
       - name: Dump E2E container logs on failure
         if: failure()

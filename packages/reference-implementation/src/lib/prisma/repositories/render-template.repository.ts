@@ -2,18 +2,17 @@ import { Prisma, RenderMethodType } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
  * Include shape used by all render template queries.
- * Includes the parent data model.
+ * Omits the dataModel relation to keep responses lean — the dataModelId is sufficient.
  */
-const RENDER_TEMPLATE_INCLUDE = {
-  dataModel: true,
-} as const;
+const RENDER_TEMPLATE_INCLUDE = {} as const;
 
 /**
- * A render template with its data model relation.
- * Matches the include shape defined by RENDER_TEMPLATE_INCLUDE.
+ * A render template without relations.
+ * Used for all render template responses.
  */
 export type RenderTemplateWithRelations = Prisma.RenderTemplateGetPayload<{
   include: typeof RENDER_TEMPLATE_INCLUDE;
@@ -170,7 +169,7 @@ export async function listRenderTemplates(
     prisma.renderTemplate.findMany({
       where,
       include: RENDER_TEMPLATE_INCLUDE,
-      take: limit ?? 20,
+      take: limit ?? DEFAULT_PAGE_LIMIT,
       skip: offset,
       orderBy: { createdAt: 'desc' },
     }),

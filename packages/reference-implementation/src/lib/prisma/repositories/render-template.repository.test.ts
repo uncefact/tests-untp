@@ -7,6 +7,7 @@ import {
   getDefaultRenderTemplate,
 } from './render-template.repository';
 import { SYSTEM_TENANT_ID } from '../constants';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
@@ -49,9 +50,7 @@ const mockRenderTemplate = prisma.renderTemplate as unknown as {
   delete: jest.Mock;
 };
 
-const INCLUDE_SHAPE = {
-  dataModel: true,
-};
+const INCLUDE_SHAPE = {};
 
 describe('render-template.repository', () => {
   const TENANT_ID = 'tenant-1';
@@ -72,10 +71,6 @@ describe('render-template.repository', () => {
     inline: false,
     mediaType: 'text/html',
     mediaQuery: null,
-    dataModel: {
-      id: CONFIG_ID,
-      name: 'Digital Product Passport v0.6.0',
-    },
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
   };
@@ -250,7 +245,7 @@ describe('render-template.repository', () => {
           OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
         include: INCLUDE_SHAPE,
-        take: 20,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
@@ -277,7 +272,7 @@ describe('render-template.repository', () => {
       expect(mockRenderTemplate.findMany).toHaveBeenCalledWith({
         where: expectedWhere,
         include: INCLUDE_SHAPE,
-        take: 20,
+        take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
         orderBy: { createdAt: 'desc' },
       });
