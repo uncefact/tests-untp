@@ -58,11 +58,23 @@ export type ConformityInput = {
 
 // ── Bridge entities (input to buildSubject) ──────────────────────────────────
 
+export type TraceabilityEventInput = {
+  eventType: 'object' | 'transformation' | 'aggregation' | 'transaction' | 'association';
+  products?: ProductEntity[];
+  inputProducts?: ProductEntity[];
+  outputProducts?: ProductEntity[];
+  parentProduct?: ProductEntity;
+  childProducts?: ProductEntity[];
+  sourceParty?: string;
+  destinationParty?: string;
+};
+
 export type BridgeEntities = {
   organisation?: OrganisationEntity;
   facility?: FacilityEntity;
   product?: ProductEntity;
   conformity?: ConformityInput[];
+  event?: TraceabilityEventInput;
 };
 
 // ── Data model config ─────────────────────────────────────────────────────────

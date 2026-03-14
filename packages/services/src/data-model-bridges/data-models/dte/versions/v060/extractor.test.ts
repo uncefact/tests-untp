@@ -27,7 +27,7 @@ describe.each(versions)('extractDteRefs (%s)', (_version, spec) => {
       expect(refs).toEqual(EMPTY_ARRAYS);
     });
 
-    it('returns empty arrays when epcList is absent', () => {
+    it('returns empty arrays when no event fields present', () => {
       const refs = bridge.extractRefs({ type: ['Event'] });
       expect(refs).toEqual(EMPTY_ARRAYS);
     });
@@ -37,7 +37,7 @@ describe.each(versions)('extractDteRefs (%s)', (_version, spec) => {
       expect(refs).toEqual(EMPTY_ARRAYS);
     });
 
-    it('returns empty arrays when first item has no id', () => {
+    it('returns empty arrays when items have no id', () => {
       const refs = bridge.extractRefs({
         type: ['Event'],
         epcList: [{ type: ['Item'], name: 'A product' }],
@@ -46,44 +46,128 @@ describe.each(versions)('extractDteRefs (%s)', (_version, spec) => {
     });
   });
 
-  // ── product refs ─────────────────────────────────────────────────────────────
+  // ── ObjectEvent: epcList ──────────────────────────────────────────────────────
 
-  describe('product refs', () => {
-    it('extracts products[0].id from epcList[0].id', () => {
+  describe('ObjectEvent (epcList)', () => {
+    it('extracts product ids from epcList', () => {
       const refs = bridge.extractRefs({
-        type: ['Event'],
-        epcList: [{ type: ['Item'], id: 'did:web:example.com:product:1' }],
+        type: ['ObjectEvent', 'Event'],
+        epcList: [{ id: 'https://id.gs1.org/01/09520123456788' }, { id: 'https://id.gs1.org/01/09520123456799' }],
       });
-      expect(refs.products).toEqual([{ id: 'did:web:example.com:product:1' }]);
+      expect(refs.products).toEqual([
+        { id: 'https://id.gs1.org/01/09520123456788' },
+        { id: 'https://id.gs1.org/01/09520123456799' },
+      ]);
     });
 
-    it('extracts only from the first epcList item', () => {
+    it('deduplicates product ids', () => {
       const refs = bridge.extractRefs({
-        type: ['Event'],
-        epcList: [
-          { type: ['Item'], id: 'did:web:example.com:product:1' },
-          { type: ['Item'], id: 'did:web:example.com:product:2' },
-        ],
+        type: ['ObjectEvent', 'Event'],
+        epcList: [{ id: 'https://id.gs1.org/01/09520123456788' }, { id: 'https://id.gs1.org/01/09520123456788' }],
       });
-      expect(refs.products).toEqual([{ id: 'did:web:example.com:product:1' }]);
+      expect(refs.products).toEqual([{ id: 'https://id.gs1.org/01/09520123456788' }]);
+    });
+  });
+
+  // ── TransformationEvent: inputEPCList + outputEPCList ─────────────────────────
+
+  describe('TransformationEvent (inputEPCList + outputEPCList)', () => {
+    it('extracts product ids from inputEPCList', () => {
+      const refs = bridge.extractRefs({
+        type: ['TransformationEvent', 'Event'],
+        inputEPCList: [{ id: 'https://id.gs1.org/01/input-1' }],
+      });
+      expect(refs.products).toEqual([{ id: 'https://id.gs1.org/01/input-1' }]);
+    });
+
+    it('extracts product ids from outputEPCList', () => {
+      const refs = bridge.extractRefs({
+        type: ['TransformationEvent', 'Event'],
+        outputEPCList: [{ id: 'https://id.gs1.org/01/output-1' }],
+      });
+      expect(refs.products).toEqual([{ id: 'https://id.gs1.org/01/output-1' }]);
+    });
+
+    it('extracts from both input and output, deduplicated', () => {
+      const refs = bridge.extractRefs({
+        type: ['TransformationEvent', 'Event'],
+        inputEPCList: [{ id: 'https://id.gs1.org/01/input-1' }, { id: 'https://id.gs1.org/01/shared' }],
+        outputEPCList: [{ id: 'https://id.gs1.org/01/output-1' }, { id: 'https://id.gs1.org/01/shared' }],
+      });
+      expect(refs.products).toEqual([
+        { id: 'https://id.gs1.org/01/input-1' },
+        { id: 'https://id.gs1.org/01/shared' },
+        { id: 'https://id.gs1.org/01/output-1' },
+      ]);
+    });
+  });
+
+  // ── AggregationEvent / AssociationEvent: parentEPC + childEPCList ──────────────
+
+  describe('AggregationEvent (parentEPC + childEPCList)', () => {
+    it('extracts product id from parentEPC', () => {
+      const refs = bridge.extractRefs({
+        type: ['AggregationEvent', 'Event'],
+        parentEPC: { id: 'https://id.gs1.org/01/parent-1' },
+      });
+      expect(refs.products).toEqual([{ id: 'https://id.gs1.org/01/parent-1' }]);
+    });
+
+    it('extracts product ids from childEPCList', () => {
+      const refs = bridge.extractRefs({
+        type: ['AggregationEvent', 'Event'],
+        childEPCList: [{ id: 'https://id.gs1.org/01/child-1' }, { id: 'https://id.gs1.org/01/child-2' }],
+      });
+      expect(refs.products).toEqual([{ id: 'https://id.gs1.org/01/child-1' }, { id: 'https://id.gs1.org/01/child-2' }]);
+    });
+
+    it('extracts from both parent and children, deduplicated', () => {
+      const refs = bridge.extractRefs({
+        type: ['AssociationEvent', 'Event'],
+        parentEPC: { id: 'https://id.gs1.org/01/parent-1' },
+        childEPCList: [{ id: 'https://id.gs1.org/01/child-1' }, { id: 'https://id.gs1.org/01/parent-1' }],
+      });
+      expect(refs.products).toEqual([
+        { id: 'https://id.gs1.org/01/parent-1' },
+        { id: 'https://id.gs1.org/01/child-1' },
+      ]);
+    });
+  });
+
+  // ── TransactionEvent: sourceParty + destinationParty ──────────────────────────
+
+  describe('TransactionEvent (sourceParty + destinationParty)', () => {
+    it('extracts organisation ids from sourceParty and destinationParty', () => {
+      const refs = bridge.extractRefs({
+        type: ['TransactionEvent', 'Event'],
+        epcList: [{ id: 'https://id.gs1.org/01/product-1' }],
+        sourceParty: 'https://id.gs1.org/417/seller-gln',
+        destinationParty: 'https://id.gs1.org/417/buyer-gln',
+      });
+      expect(refs.organisations).toEqual([
+        { id: 'https://id.gs1.org/417/seller-gln' },
+        { id: 'https://id.gs1.org/417/buyer-gln' },
+      ]);
+      expect(refs.products).toEqual([{ id: 'https://id.gs1.org/01/product-1' }]);
+    });
+
+    it('deduplicates organisation ids', () => {
+      const refs = bridge.extractRefs({
+        type: ['TransactionEvent', 'Event'],
+        sourceParty: 'https://id.gs1.org/417/same-party',
+        destinationParty: 'https://id.gs1.org/417/same-party',
+      });
+      expect(refs.organisations).toEqual([{ id: 'https://id.gs1.org/417/same-party' }]);
     });
   });
 
   // ── absent fields ─────────────────────────────────────────────────────────────
 
   describe('absent fields in result', () => {
-    it('returns empty organisations array', () => {
+    it('returns empty facilities array (DTE has no facility refs)', () => {
       const refs = bridge.extractRefs({
         type: ['Event'],
-        epcList: [{ type: ['Item'], id: 'did:web:example.com:product:1' }],
-      });
-      expect(refs.organisations).toEqual([]);
-    });
-
-    it('returns empty facilities array', () => {
-      const refs = bridge.extractRefs({
-        type: ['Event'],
-        epcList: [{ type: ['Item'], id: 'did:web:example.com:product:1' }],
+        epcList: [{ id: 'https://id.gs1.org/01/product-1' }],
       });
       expect(refs.facilities).toEqual([]);
     });
@@ -91,7 +175,7 @@ describe.each(versions)('extractDteRefs (%s)', (_version, spec) => {
     it('does not include conformity in refs', () => {
       const refs = bridge.extractRefs({
         type: ['Event'],
-        epcList: [{ type: ['Item'], id: 'did:web:example.com:product:1' }],
+        epcList: [{ id: 'https://id.gs1.org/01/product-1' }],
       });
       expect(refs.conformity).toBeUndefined();
     });
@@ -105,7 +189,8 @@ describe.each(versions)('extractDteRefs (%s)', (_version, spec) => {
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
-      expect(refs.products).toEqual([{ id: 'did:web:example.com:product:1' }]);
+      expect(refs.products).toHaveLength(1);
+      expect(refs.products[0].id).toBe('did:web:example.com:product:1');
     });
 
     it('extracts empty refs when product is absent', () => {
@@ -114,19 +199,6 @@ describe.each(versions)('extractDteRefs (%s)', (_version, spec) => {
       const refs = bridge.extractRefs(subject);
 
       expect(refs.products).toEqual([]);
-    });
-
-    it('has no organisation, facility, or conformity refs after round-trip', () => {
-      const entities = createBridgeEntities({
-        product: createProduct(),
-        conformity: [createConformityInput()],
-      });
-      const subject = bridge.buildSubject(entities);
-      const refs = bridge.extractRefs(subject);
-
-      expect(refs.organisations).toEqual([]);
-      expect(refs.facilities).toEqual([]);
-      expect(refs.conformity).toBeUndefined();
     });
   });
 });

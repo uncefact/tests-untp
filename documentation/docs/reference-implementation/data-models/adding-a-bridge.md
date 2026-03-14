@@ -5,16 +5,12 @@ title: Adding a Bridge
 
 # Adding a Bridge
 
-This guide walks through adding a new data model bridge — either for a new UNTP specification version or for a new credential type. The process follows the same [delta pattern](./bridge-architecture#the-delta-pattern) used by the existing bridges.
+This guide walks through adding a data model bridge for a new version of a UNTP core data model. The process follows the same [delta pattern](./bridge-architecture#the-delta-pattern) used by the existing bridges.
 
-For the parallel pattern in the service layer, see [Adding an Adapter](../services/adding-an-adapter).
 
 ## When you need a new bridge
 
-You need to add a bridge when:
-
-- A **new UNTP version** is released with structural changes to one or more credential types — fields moved, renamed, or added in a way that changes how entities map to the credential subject
-- A **new credential type** is introduced by the UNTP specification
+You need to add a bridge when a new version of the UNTP specification is released.
 
 ## When you don't need one
 
@@ -90,9 +86,9 @@ If the new version introduces structural changes, add test cases that cover the 
 
 If the new version changes which entities a credential type requires (e.g., a credential type now requires a facility where it previously didn't), update the entity requirements in the form-config route handler.
 
-## Adding a new credential type
+## Adding a new UNTP core data model
 
-If adding a bridge for an entirely new credential type (not just a new version of an existing type):
+If the UNTP specification introduces an entirely new core data model type:
 
 1. Create a new directory under `data-models/` (e.g., `data-models/new-type/`)
 2. Create the first version directory with builder, extractor, and version spec
@@ -102,12 +98,4 @@ If adding a bridge for an entirely new credential type (not just a new version o
 
 ## Reference
 
-The existing bridges serve as the best reference for implementation patterns:
-
-- **DPP** — full entity extraction (product, facility, organisation) with conformity claims
-- **DCC** — scope and assessment structure, organisation extraction with fallback chain
-- **DFR** — facility-centric with operating organisation
-- **DIA** — minimal, organisation-only
-- **DTE** — minimal, single event with product
-
-See the [services package source](https://github.com/uncefact/tests-untp/tree/next/packages/services/src/data-model-bridges) for the full implementation.
+The existing bridges in the [services package](https://github.com/uncefact/tests-untp/tree/next/packages/services/src/data-model-bridges) serve as the best reference for implementation patterns.

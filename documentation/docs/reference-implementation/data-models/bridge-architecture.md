@@ -98,11 +98,11 @@ sequenceDiagram
 | DPP | Product passport with the product, the facility that manufactured it, and the organisation that produced it | Product identifier (with batch/serial qualifiers), manufacturing facility identifier, and producing organisation identifier | Standards, regulations, and criteria |
 | DCC | Conformity attestation with scope and assessments | Organisation (with fallback from the issued-to party to the assessed organisation), facility, and product | Scheme, standards, regulations, and criteria |
 | DFR | Facility record with the facility and the organisation that operates it | Facility identifier and operating organisation identifier | Standards, regulations, and criteria |
-| DIA | Registered identity with the organisation's name, registration number, and identifier scheme | Organisation identifier | None |
-| DTE | Single traceability event with the product in the event's item list | Product identifier | None |
+| DIA | Registered identity anchoring any entity type | Entity identifier, routed by the credential's register type | None |
+| DTE | Single traceability event — supports all five event types (object, transformation, aggregation, transaction, association) | Product identifiers from item lists; organisation identifiers from transaction parties | None |
 
 :::tip[DTE limitation]
-The UNTP schema allows DTE credentials to contain multiple events, but the current bridge builds and extracts a single event only. This is a known limitation being discussed with the UNTP working group.
+The UNTP schema allows the DTE credential subject to be an array of multiple events, but the current bridge builds and extracts a single event only. All five event types are supported individually. The multi-event limitation is being discussed with the UNTP working group.
 :::
 
 ## Shared Primitives

@@ -4,6 +4,7 @@ export type {
   ConformityRefs,
   ConformityInput,
   BridgeEntities,
+  TraceabilityEventInput,
   OrganisationEntity,
   FacilityEntity,
   ProductEntity,
