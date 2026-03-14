@@ -4,17 +4,28 @@ import { buildIdentifierScheme } from '../../../../primitives/identifier.js';
 // ── Public builder ─────────────────────────────────────────────────────────────
 
 export function buildDiaSubject(entities: BridgeEntities): CredentialSubject {
-  // entities.conformity, entities.facility, and entities.product are silently ignored
-  // DIA is organisation-identity only
-  const { organisation } = entities;
+  // DIA anchors a single entity identity — use whichever is provided
+  // Priority: organisation > facility > product (if multiple provided)
+  // entities.conformity is silently ignored — DIA has no conformity fields
+  const entity = entities.organisation ?? entities.facility ?? entities.product;
+
+  // Map entity source to the DIA registerType vocabulary
+  const registerType = entities.organisation
+    ? 'Business'
+    : entities.facility
+      ? 'Facility'
+      : entities.product
+        ? 'Product'
+        : undefined;
 
   return {
     type: ['RegisteredIdentity'],
-    id: organisation?.id,
-    name: organisation?.name,
-    ...(organisation?.primaryIdentifier && {
-      registeredId: organisation.primaryIdentifier.value,
-      idScheme: buildIdentifierScheme(organisation.primaryIdentifier.scheme),
+    id: entity?.id,
+    name: entity?.name,
+    ...(registerType && { registerType }),
+    ...(entity?.primaryIdentifier && {
+      registeredId: entity.primaryIdentifier.value,
+      idScheme: buildIdentifierScheme(entity.primaryIdentifier.scheme),
     }),
   };
 }

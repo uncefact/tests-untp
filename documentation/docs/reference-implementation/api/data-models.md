@@ -61,23 +61,9 @@ The `credentialType` field identifies which UNTP core data model the data model 
 
 ### Data Model Bridges
 
-As described in [Why data models?](#why-data-models), each UNTP core data model type and version has a corresponding **data model bridge** that maps between the credential structure and the Reference Implementation's internal entity models. The sections below describe each capability in more detail.
+Each UNTP core data model type and version has a corresponding **data model bridge** that maps between the credential structure and the Reference Implementation's internal entity models. Bridges handle [extraction](../data-models/index.md#extraction), [population](../data-models/index.md#population), and [validation](../data-models/index.md#validation) of entity data.
 
-#### Extraction
-
-When a credential is issued, the data model bridge extracts references to entities — organisations, facilities, products, and conformity vocabulary profiles — from the credential payload and links them to the corresponding records in the database. These extracted identifiers are also used in subsequent operations, such as publishing a link to the credential via the [identity resolver service](../services/identity-resolver-service/index.md) for a given identifier and qualifiers.
-
-#### Population
-
-Tenants define their entity data once through the master data APIs — dedicated routes for each entity type (organisations, facilities, products, and conformity vocabulary profiles). The web UI then uses data model bridges to automatically populate credential payloads from this existing data. Rather than manually re-entering entity information for each credential, the user selects from their existing entities and the bridge maps the data into the correct positions within the credential structure for that type and version. This is handled entirely by the frontend via the [form configuration endpoint](#get-form-configuration).
-
-#### Validation
-
-Data model bridges can validate credential content against expected requirements. For example, when issuing a Digital Conformity Credential against a specific conformity vocabulary profile, the bridge can verify that all required criteria for that profile are present in the credential's attestations — and warn the user if any are missing.
-
-#### Extensions
-
-Extensions inherit the data model bridge from their parent core data model. Because extensions are expected to retain the core properties defined by the parent, the same bridge can be applied to any extension of that type and version on a best-effort basis — retaining extraction, population, and validation capabilities.
+For a detailed understanding of how bridges work, see the [Data Models](../data-models/index.md) documentation section. For the technical architecture including the delta pattern and version composition, see [Bridge Architecture](../data-models/bridge-architecture).
 
 ### Schema and Context URLs
 
@@ -253,5 +239,7 @@ Returns entity picker metadata for the web UI, describing which entity types a c
 | `DigitalFacilityRecord` | Organisation, Facility |
 | `DigitalIdentityAnchor` | Organisation |
 | `DigitalTraceabilityEvent` | Organisation, Product |
+
+For credential types that support conformity (Digital Product Passport, Digital Conformity Credential, Digital Facility Record), the form configuration also includes optional conformity scheme and profile pickers. The profile picker uses a `dependsOn` field to indicate it depends on the scheme selection — see [Conformity Handling](../data-models/conformity-handling#form-configuration) for details.
 
 Unregistered credential types return an empty `sections` array.

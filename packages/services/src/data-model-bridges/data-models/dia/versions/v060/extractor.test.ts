@@ -1,7 +1,13 @@
 import { makeBridge } from '../../../../make-bridge.js';
 import { diaV060Spec } from './index.js';
 import { diaV061Spec } from '../v061/index.js';
-import { createOrganisation, createConformityInput, createBridgeEntities } from '../../../../__fixtures__/entities.js';
+import {
+  createOrganisation,
+  createFacility,
+  createProduct,
+  createConformityInput,
+  createBridgeEntities,
+} from '../../../../__fixtures__/entities.js';
 import type { VersionSpec, CredentialSubject } from '../../../../types.js';
 
 const versions: [string, VersionSpec][] = [
@@ -33,37 +39,89 @@ describe.each(versions)('extractDiaRefs (%s)', (_version, spec) => {
     });
   });
 
-  // ── organisation refs ────────────────────────────────────────────────────────
+  // ── registerType routing ───────────────────────────────────────────────────
 
-  describe('organisation refs', () => {
-    it('extracts organisations[0].id from registeredId', () => {
+  describe('registerType routing', () => {
+    it('places ref in organisations when registerType is Business', () => {
+      const refs = bridge.extractRefs({
+        type: ['RegisteredIdentity'],
+        registeredId: '9520123456788',
+        registerType: 'Business',
+      });
+      expect(refs.organisations).toEqual([{ id: '9520123456788' }]);
+      expect(refs.facilities).toEqual([]);
+      expect(refs.products).toEqual([]);
+    });
+
+    it('places ref in facilities when registerType is Facility', () => {
+      const refs = bridge.extractRefs({
+        type: ['RegisteredIdentity'],
+        registeredId: '4012345000009',
+        registerType: 'Facility',
+      });
+      expect(refs.organisations).toEqual([]);
+      expect(refs.facilities).toEqual([{ id: '4012345000009' }]);
+      expect(refs.products).toEqual([]);
+    });
+
+    it('places ref in products when registerType is Product', () => {
+      const refs = bridge.extractRefs({
+        type: ['RegisteredIdentity'],
+        registeredId: '9520123456788',
+        registerType: 'Product',
+      });
+      expect(refs.organisations).toEqual([]);
+      expect(refs.facilities).toEqual([]);
+      expect(refs.products).toEqual([{ id: '9520123456788' }]);
+    });
+
+    it('places ref in facilities when registerType is Land', () => {
+      const refs = bridge.extractRefs({
+        type: ['RegisteredIdentity'],
+        registeredId: 'LAND-001',
+        registerType: 'Land',
+      });
+      expect(refs.organisations).toEqual([]);
+      expect(refs.facilities).toEqual([{ id: 'LAND-001' }]);
+      expect(refs.products).toEqual([]);
+    });
+
+    it('returns empty arrays when registerType is absent', () => {
       const refs = bridge.extractRefs({
         type: ['RegisteredIdentity'],
         registeredId: '9520123456788',
       });
-      expect(refs.organisations).toEqual([{ id: '9520123456788' }]);
+      expect(refs.organisations).toEqual([]);
+      expect(refs.facilities).toEqual([]);
+      expect(refs.products).toEqual([]);
+    });
+
+    it('returns empty arrays when registerType is Trademark', () => {
+      const refs = bridge.extractRefs({
+        type: ['RegisteredIdentity'],
+        registeredId: 'TM-12345',
+        registerType: 'Trademark',
+      });
+      expect(refs.organisations).toEqual([]);
+      expect(refs.facilities).toEqual([]);
+      expect(refs.products).toEqual([]);
+    });
+
+    it('returns empty arrays when registerType is Accreditation', () => {
+      const refs = bridge.extractRefs({
+        type: ['RegisteredIdentity'],
+        registeredId: 'ACC-001',
+        registerType: 'Accreditation',
+      });
+      expect(refs.organisations).toEqual([]);
+      expect(refs.facilities).toEqual([]);
+      expect(refs.products).toEqual([]);
     });
   });
 
   // ── absent fields ─────────────────────────────────────────────────────────────
 
   describe('absent fields in result', () => {
-    it('returns empty facilities array', () => {
-      const refs = bridge.extractRefs({
-        type: ['RegisteredIdentity'],
-        registeredId: '9520123456788',
-      });
-      expect(refs.facilities).toEqual([]);
-    });
-
-    it('returns empty products array', () => {
-      const refs = bridge.extractRefs({
-        type: ['RegisteredIdentity'],
-        registeredId: '9520123456788',
-      });
-      expect(refs.products).toEqual([]);
-    });
-
     it('does not include conformity in refs', () => {
       const refs = bridge.extractRefs({
         type: ['RegisteredIdentity'],
@@ -76,12 +134,39 @@ describe.each(versions)('extractDiaRefs (%s)', (_version, spec) => {
   // ── round-trip ───────────────────────────────────────────────────────────────
 
   describe('round-trip (build → extract)', () => {
-    it('extracts organisation ref from a fully built subject', () => {
+    it('extracts organisation ref from a subject built with organisation', () => {
       const entities = createBridgeEntities({ conformity: [createConformityInput()] });
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
+      // Builder sets registerType to 'Business' when built from organisation
       expect(refs.organisations).toEqual([{ id: '9520123456788' }]);
+    });
+
+    it('extracts ref from a subject built with facility only', () => {
+      const entities = createBridgeEntities({
+        organisation: undefined,
+        facility: createFacility(),
+        product: undefined,
+      });
+      const subject = bridge.buildSubject(entities);
+      const refs = bridge.extractRefs(subject);
+
+      expect(refs.facilities).toEqual([{ id: '4012345000009' }]);
+      expect(refs.organisations).toEqual([]);
+    });
+
+    it('extracts ref from a subject built with product only', () => {
+      const entities = createBridgeEntities({
+        organisation: undefined,
+        facility: undefined,
+        product: createProduct(),
+      });
+      const subject = bridge.buildSubject(entities);
+      const refs = bridge.extractRefs(subject);
+
+      expect(refs.products).toEqual([{ id: '9520123456788' }]);
+      expect(refs.organisations).toEqual([]);
     });
 
     it('extracts empty refs from a subject built with no primaryIdentifier', () => {
@@ -94,13 +179,11 @@ describe.each(versions)('extractDiaRefs (%s)', (_version, spec) => {
       expect(refs.organisations).toEqual([]);
     });
 
-    it('has no facility, product, or conformity refs after round-trip', () => {
+    it('has no conformity refs after round-trip', () => {
       const entities = createBridgeEntities({ conformity: [createConformityInput()] });
       const subject = bridge.buildSubject(entities);
       const refs = bridge.extractRefs(subject);
 
-      expect(refs.facilities).toEqual([]);
-      expect(refs.products).toEqual([]);
       expect(refs.conformity).toBeUndefined();
     });
   });

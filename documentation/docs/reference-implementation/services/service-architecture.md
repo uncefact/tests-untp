@@ -19,6 +19,8 @@ Because the Reference Implementation only ever interacts with adapters — not w
 
 For example, an organisation might begin by using the bundled VCKit instance for credential signing. As they mature, they deploy their own VCKit instance on their own infrastructure — they register it as a service instance within their tenant, and the Reference Implementation starts using it for all their credential operations. Later, they might replace VCKit entirely with a different verifiable credential service by contributing a new adapter. At each stage, only the service configuration changes — the rest of the system remains the same.
 
+The same extensibility principle applies to [data model bridges](../data-models/bridge-architecture) — where service adapters abstract external service integrations, data model bridges abstract the mapping between credential structures and internal entity models. Both use a registry pattern for type-safe lookup and support incremental adoption through pluggable implementations.
+
 ## System Services vs Tenant Services
 
 Service instances exist at two levels:
