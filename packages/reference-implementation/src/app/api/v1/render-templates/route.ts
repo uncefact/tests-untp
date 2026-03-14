@@ -205,10 +205,10 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   if (body.inline !== undefined && typeof body.inline !== 'boolean') {
     throw new ValidationError('inline must be a boolean');
   }
-  if (body.mediaType !== undefined && !isNonEmptyString(body.mediaType)) {
+  if (body.mediaType !== undefined && body.mediaType !== null && !isNonEmptyString(body.mediaType)) {
     throw new ValidationError('mediaType must be a non-empty string');
   }
-  if (body.mediaQuery !== undefined && !isNonEmptyString(body.mediaQuery)) {
+  if (body.mediaQuery !== undefined && body.mediaQuery !== null && !isNonEmptyString(body.mediaQuery)) {
     throw new ValidationError('mediaQuery must be a non-empty string');
   }
 
