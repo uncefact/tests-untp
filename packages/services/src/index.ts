@@ -181,3 +181,13 @@ export type {
 } from './credential-mapping/index.js';
 export { getMapper } from './credential-mapping/index.js';
 export { DccV061Mapper } from './credential-mapping/mappers/dcc/v061.mapper.js';
+
+// ── Data model bridges (replaces credential-mapping) ────────────────────────
+export type {
+  IDataModelBridge,
+  ExtractedRefs,
+  ConformityInput,
+  CredentialSubject as BridgeCredentialSubject,
+} from './data-model-bridges/index.js';
+
+export { getBridge, buildContextAndTypes } from './data-model-bridges/index.js';
