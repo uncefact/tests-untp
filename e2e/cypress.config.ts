@@ -151,7 +151,7 @@ export default defineConfig({
       accessKey: process.env.OBJECT_STORAGE_ACCESS_KEY || 'minioadmin',
       secretKey: process.env.OBJECT_STORAGE_SECRET_KEY || 'minioadmin',
     },
-    VERIFY_ALLOW_PRIVATE_URLS: process.env.VERIFY_ALLOW_PRIVATE_URLS || process.env.CYPRESS_VERIFY_ALLOW_PRIVATE_URLS || 'false',
+    VERIFY_ALLOW_PRIVATE_URLS: process.env.VERIFY_ALLOW_PRIVATE_URLS ?? process.env.CYPRESS_VERIFY_ALLOW_PRIVATE_URLS ?? 'true',
   },
   e2e: {
     baseUrl: 'http://localhost:3003', // Replace with your application's base URL
