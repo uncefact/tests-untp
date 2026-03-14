@@ -27,12 +27,12 @@ When a user issues a credential through the web UI, they select entities (organi
 Population is UI-driven: the frontend calls the build endpoint during form submission, and the bridge produces the credential subject body. The consumer then wraps it with the appropriate `@context` and credential `type` arrays using the separate `buildContextAndTypes` utility.
 
 :::tip[Frontend not yet built]
-The web UI for entity-driven credential issuance is not yet implemented. The bridge infrastructure and API endpoints are in place, but the frontend that presents entity pickers and calls `buildSubject` during form submission is planned for a future iteration. Currently, credentials are issued by providing a pre-built `credentialPayload` directly to the [credentials API](../api/credentials).
+The web UI for entity-driven credential issuance is not yet implemented. The bridge infrastructure and API endpoints are in place, but the frontend that presents entity pickers and calls `buildSubject` during form submission is planned for a future iteration. Currently, credentials are issued by providing a pre-built `credentialPayload` directly to the credentials API.
 :::
 
 ### Extraction
 
-The bridge's `extractRefs` method reads the credential subject and extracts identifiers for the entities it references. Extraction happens once during [credential issuance](../api/credentials) and the results are used for multiple purposes:
+The bridge's `extractRefs` method reads the credential subject and extracts identifiers for the entities it references. Extraction happens once during credential issuance and the results are used for multiple purposes:
 
 - **CVC validation** — extracted conformity references (schemes, standards, regulations, criteria) are compared against the available conformity vocabulary profiles to verify that all required criteria are present in the credential's attestations. This produces advisory warnings, never blocking errors.
 - **Database linking** — the extracted entity identifiers (organisation, facility, product) are matched against existing database records, creating relationships between the credential and the entities it describes

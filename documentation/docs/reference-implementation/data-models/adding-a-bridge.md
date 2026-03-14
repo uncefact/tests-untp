@@ -52,7 +52,7 @@ The builder is a function that receives entity data (organisation, facility, pro
 
 - Use the shared primitives from `primitives/` for common structures (party objects, identifier schemes, locations, addresses)
 - Only use the entity fields relevant to the credential type — silently ignore the rest
-- For conformity data, route each input to the correct location within the credential subject (see [Conformity Handling](./conformity-handling#how-conformity-data-is-routed))
+- For conformity data, route each input to the correct location within the credential subject (see [Conformity Handling](./conformity-handling))
 
 If the builder logic hasn't changed from the previous version, import and reuse it directly — no need to duplicate.
 
