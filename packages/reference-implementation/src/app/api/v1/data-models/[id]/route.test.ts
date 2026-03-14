@@ -1,10 +1,34 @@
 // Mock next/server before importing route handlers
-jest.mock('next/server', () => ({
-  NextResponse: {
-    json: (body: unknown, init?: { status?: number }) => ({
-      status: init?.status ?? 200,
-      json: async () => body,
-    }),
+jest.mock('next/server', () => {
+  class MockNextResponse {
+    status: number;
+    body: unknown;
+    constructor(body: unknown, init?: { status?: number }) {
+      this.body = body;
+      this.status = init?.status ?? 200;
+    }
+    async json() {
+      return this.body;
+    }
+    static json(body: unknown, init?: { status?: number }) {
+      return new MockNextResponse(body, init);
+    }
+  }
+  return { NextResponse: MockNextResponse };
+});
+
+// Mock logger to prevent real logging during tests
+const mockLogger = {
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  child: jest.fn().mockReturnThis(),
+};
+
+jest.mock('@/lib/api/logger', () => ({
+  apiLogger: {
+    child: jest.fn().mockReturnValue(mockLogger),
   },
 }));
 
@@ -23,6 +47,11 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
       },
   };
 });
+
+const mockValidatePublicUrl = jest.fn();
+jest.mock('@uncefact/untp-ri-services/server', () => ({
+  validatePublicUrl: (...args: unknown[]) => mockValidatePublicUrl(...args),
+}));
 
 const mockGetDataModelById = jest.fn();
 const mockUpdateDataModel = jest.fn();
@@ -222,6 +251,26 @@ describe('PATCH /api/v1/data-models/:id', () => {
 
     expect(res.status).toBe(500);
     expect(json.error).toContain('Database error');
+  });
+
+  it('returns 400 when schemaUrl points to a private address', async () => {
+    mockValidatePublicUrl.mockRejectedValueOnce(new Error('private'));
+
+    const req = createFakeRequest({ method: 'PATCH', body: { schemaUrl: 'http://127.0.0.1/schema.json' } });
+    const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/schemaUrl.*private or reserved/);
+  });
+
+  it('returns 400 when schemaUrl is not a valid URL', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { schemaUrl: 'not-a-url' } });
+    const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/schemaUrl.*valid URL/);
   });
 });
 

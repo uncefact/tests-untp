@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { ValidationError, isNonEmptyString, assertPublicUrl } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDataModelById, updateDataModel, deleteDataModel } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
@@ -52,11 +52,12 @@ const UPDATABLE_FIELDS = ['name', 'schemaUrl', 'contextUrl', 'websiteUrl'] as co
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ tenantId, dataModelId: id }, 'Looking up data model');
+  logger.info({ dataModelId: id }, 'Looking up data model');
   const dataModel = await getDataModelById(id, tenantId);
   if (!dataModel) {
     throw new NotFoundError('Data model not found');
   }
+  logger.info({ dataModelId: id }, 'Data model retrieved');
   return NextResponse.json(dataModel);
 });
 
@@ -130,7 +131,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, dataModelId: id }, 'Parsing request body');
+  logger.info({ dataModelId: id }, 'Parsing request body');
   let body: Record<string, unknown>;
 
   try {
@@ -139,7 +140,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId, dataModelId: id }, 'Validating input parameters');
+  logger.info({ dataModelId: id }, 'Validating input parameters');
   const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
   if (!hasUpdatableField) {
     throw new ValidationError(`At least one updatable field must be provided: ${UPDATABLE_FIELDS.join(', ')}`);
@@ -158,7 +159,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('websiteUrl must be a non-empty string');
   }
 
-  logger.info({ tenantId, dataModelId: id }, 'Updating data model');
+  logger.info({ dataModelId: id }, 'Validating URLs are not internal');
+  if (isNonEmptyString(body.schemaUrl)) await assertPublicUrl(body.schemaUrl, 'schemaUrl');
+  if (isNonEmptyString(body.contextUrl)) await assertPublicUrl(body.contextUrl, 'contextUrl');
+  if (isNonEmptyString(body.websiteUrl)) await assertPublicUrl(body.websiteUrl, 'websiteUrl');
+
+  logger.info({ dataModelId: id }, 'Updating data model');
   const dataModel = await updateDataModel(id, tenantId, {
     ...(body.name !== undefined && { name: body.name as string }),
     ...(body.schemaUrl !== undefined && { schemaUrl: body.schemaUrl as string }),
@@ -166,7 +172,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     ...(body.websiteUrl !== undefined && { websiteUrl: body.websiteUrl as string }),
   });
 
-  logger.info({ tenantId, dataModelId: id }, 'Data model updated');
+  logger.info({ dataModelId: id }, 'Data model updated');
   return NextResponse.json(dataModel);
 });
 
@@ -210,9 +216,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, dataModelId: id }, 'Deleting data model');
+  logger.info({ dataModelId: id }, 'Deleting data model');
   await deleteDataModel(id, tenantId);
 
-  logger.info({ tenantId, dataModelId: id }, 'Data model deleted');
-  return new Response(null, { status: 204 });
+  logger.info({ dataModelId: id }, 'Data model deleted');
+  return new NextResponse(null, { status: 204 });
 });

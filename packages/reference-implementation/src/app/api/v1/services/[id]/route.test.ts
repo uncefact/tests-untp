@@ -362,6 +362,38 @@ describe('PATCH /api/v1/services/:id', () => {
     const json = await res.json();
     expect(json.error).toMatch(/cannot update configuration/i);
   });
+
+  it('returns 400 when merged config.baseUrl points to a private address', async () => {
+    delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+    mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
+    mockDecrypt.mockReturnValue(JSON.stringify({ baseUrl: 'https://old.example.com', apiKey: 'key' }));
+
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: { config: { baseUrl: 'http://127.0.0.1:3332' } },
+    });
+    const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/config\.baseUrl.*private or reserved/);
+  });
+
+  it('skips SSRF validation on PATCH when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
+    mockDecrypt.mockReturnValue(JSON.stringify({ baseUrl: 'https://old.example.com', apiKey: 'key' }));
+    mockUpdateServiceInstance.mockResolvedValue({ ...MOCK_INSTANCE, config: 'encrypted' });
+    mockMaskInstanceConfig.mockReturnValue({ id: 'svc-123', config: {} });
+
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: { config: { baseUrl: 'http://127.0.0.1:3332' } },
+    });
+    const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+  });
 });
 
 // ---------------------------------------------------------------------------

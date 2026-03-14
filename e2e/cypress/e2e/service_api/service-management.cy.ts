@@ -659,6 +659,56 @@ describe('Service API', { testIsolation: false }, () => {
       });
     });
 
+    it('returns 400 for invalid JSON body on POST', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/services',
+        body: 'not valid json',
+        headers: { 'Content-Type': 'application/json' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('PATCH /api/v1/services/:id — returns 400 when config.baseUrl points to a private address', function () {
+      if (Cypress.env('VERIFY_ALLOW_PRIVATE_URLS') === 'true') this.skip();
+
+      // Create a temporary service to test PATCH SSRF validation
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/services',
+        body: {
+          serviceType: 'VC',
+          adapterType: 'VCKIT',
+          name: `Temp SSRF PATCH Test ${RUN_ID}`,
+          config: {
+            baseUrl: 'https://example.com:3332',
+            apiKey: 'test-key',
+          },
+        },
+      }).then((createResponse) => {
+        const tempId = createResponse.body.id;
+
+        cy.request({
+          method: 'PATCH',
+          url: `/api/v1/services/${tempId}`,
+          body: { config: { baseUrl: 'http://10.0.0.1:3332' } },
+          failOnStatusCode: false,
+        }).then((response) => {
+          expect(response.status).to.eq(400);
+          expect(response.body.error).to.include('private or reserved');
+        });
+
+        // Clean up
+        cy.request({
+          method: 'DELETE',
+          url: `/api/v1/services/${tempId}?force=true`,
+        });
+      });
+    });
+
     it('returns 400 when PATCH body is empty', () => {
       cy.request({
         method: 'POST',
@@ -783,6 +833,28 @@ describe('Service API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+      });
+    });
+
+    it('returns 400 when config.baseUrl points to a private address (SSRF protection)', function () {
+      if (Cypress.env('VERIFY_ALLOW_PRIVATE_URLS') === 'true') this.skip();
+
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/services',
+        body: {
+          serviceType: 'VC',
+          adapterType: 'VCKIT',
+          name: 'SSRF Test',
+          config: {
+            baseUrl: 'http://127.0.0.1:3332',
+            apiKey: 'test-key',
+          },
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.include('private or reserved');
       });
     });
 

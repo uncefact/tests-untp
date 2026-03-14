@@ -342,6 +342,30 @@ describe('POST /api/v1/services', () => {
     );
   });
 
+  it('returns 400 when config.baseUrl points to a private address', async () => {
+    delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+
+    const req = createFakeRequest({
+      body: { ...VALID_BODY, config: { ...VALID_BODY.config, baseUrl: 'http://127.0.0.1:3332' } },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/config\.baseUrl.*private or reserved/);
+  });
+
+  it('skips SSRF validation when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+
+    const req = createFakeRequest({
+      body: { ...VALID_BODY, config: { ...VALID_BODY.config, baseUrl: 'http://127.0.0.1:3332' } },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(201);
+  });
+
   it('returns 500 when createServiceInstance throws', async () => {
     mockCreateServiceInstance.mockRejectedValue(new Error('Database error'));
 

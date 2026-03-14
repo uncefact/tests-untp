@@ -5,6 +5,8 @@
  * Routes catch ValidationError and return 400.
  */
 
+import { validatePublicUrl } from '@uncefact/untp-ri-services/server';
+
 export class ValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -71,4 +73,22 @@ export function parseBooleanString(raw: string | null | undefined, paramName: st
   if (raw === 'true') return true;
   if (raw === 'false') return false;
   throw new ValidationError(`${paramName} must be "true" or "false"`);
+}
+
+/**
+ * Validate that a URL string is well-formed and does not point to a private
+ * or reserved network address (SSRF protection).
+ */
+export async function assertPublicUrl(url: string, paramName: string): Promise<void> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new ValidationError(`${paramName} must be a valid URL`);
+  }
+  try {
+    await validatePublicUrl(parsed);
+  } catch {
+    throw new ValidationError(`${paramName} must not point to a private or reserved network address`);
+  }
 }
