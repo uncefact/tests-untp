@@ -5,15 +5,13 @@ import { NotFoundError } from '@/lib/api/errors';
 
 /**
  * Include shape used by all render template queries.
- * Includes the parent data model.
+ * Omits the dataModel relation to keep responses lean — the dataModelId is sufficient.
  */
-const RENDER_TEMPLATE_INCLUDE = {
-  dataModel: true,
-} as const;
+const RENDER_TEMPLATE_INCLUDE = {} as const;
 
 /**
- * A render template with its data model relation.
- * Matches the include shape defined by RENDER_TEMPLATE_INCLUDE.
+ * A render template without relations.
+ * Used for all render template responses.
  */
 export type RenderTemplateWithRelations = Prisma.RenderTemplateGetPayload<{
   include: typeof RENDER_TEMPLATE_INCLUDE;

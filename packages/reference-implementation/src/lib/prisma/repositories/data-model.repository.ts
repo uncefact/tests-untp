@@ -16,7 +16,9 @@ const DATA_MODEL_DETAIL_INCLUDE = {
 
 /**
  * Include shape for list queries.
+ * Includes parentConfig for internal use (e.g. credential issuance resolution).
  * Omits extensions and renderTemplates to keep list responses lean.
+ * The API route strips parentConfig from the response before returning to clients.
  */
 const DATA_MODEL_LIST_INCLUDE = {
   parentConfig: true,
@@ -31,8 +33,8 @@ export type DataModelWithRelations = Prisma.DataModelGetPayload<{
 }>;
 
 /**
- * A data model with only the parent config relation.
- * Used for list responses to avoid unnecessary payload.
+ * A data model with the parent config relation.
+ * Used for list responses and internal resolution.
  */
 export type DataModelListItem = Prisma.DataModelGetPayload<{
   include: typeof DATA_MODEL_LIST_INCLUDE;

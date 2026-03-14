@@ -49,9 +49,7 @@ const mockRenderTemplate = prisma.renderTemplate as unknown as {
   delete: jest.Mock;
 };
 
-const INCLUDE_SHAPE = {
-  dataModel: true,
-};
+const INCLUDE_SHAPE = {};
 
 describe('render-template.repository', () => {
   const TENANT_ID = 'tenant-1';
@@ -72,10 +70,6 @@ describe('render-template.repository', () => {
     inline: false,
     mediaType: 'text/html',
     mediaQuery: null,
-    dataModel: {
-      id: CONFIG_ID,
-      name: 'Digital Product Passport v0.6.0',
-    },
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
   };

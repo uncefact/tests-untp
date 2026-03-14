@@ -190,6 +190,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   if (body.inline !== undefined && typeof body.inline !== 'boolean') {
     throw new ValidationError('inline must be a boolean');
   }
+  if (body.mediaType !== undefined && !isNonEmptyString(body.mediaType)) {
+    throw new ValidationError('mediaType must be a non-empty string');
+  }
+  if (body.mediaQuery !== undefined && !isNonEmptyString(body.mediaQuery)) {
+    throw new ValidationError('mediaQuery must be a non-empty string');
+  }
 
   logger.info({ renderTemplateId: id }, 'Updating render template');
   const renderTemplate = await updateRenderTemplate({
@@ -248,13 +254,22 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ renderTemplateId: id }, 'Deleting render template');
+  logger.info({ renderTemplateId: id }, 'Deleting render template from database');
   const deleted = await deleteRenderTemplate(id, tenantId);
+  logger.info({ renderTemplateId: id }, 'Render template deleted from database');
 
   // Best-effort storage deletion using resource ID and bucket
   if (deleted.storageExternalId) {
+    logger.info(
+      { renderTemplateId: id, storageExternalId: deleted.storageExternalId, storageBucket: deleted.storageBucket },
+      'Resolving storage service for content deletion',
+    );
     try {
       const storageService = await resolveStorageService(tenantId, deleted.storageServiceInstanceId ?? undefined);
+      logger.info(
+        { renderTemplateId: id, storageExternalId: deleted.storageExternalId, storageBucket: deleted.storageBucket },
+        'Deleting template content from storage',
+      );
       await storageService.service.delete(deleted.storageExternalId, deleted.storageBucket ?? undefined);
       logger.info(
         { renderTemplateId: id, storageExternalId: deleted.storageExternalId },
@@ -268,11 +283,13 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
           storageServiceInstanceId: deleted.storageServiceInstanceId,
           error: e,
         },
-        'Failed to delete template content from storage',
+        'Failed to delete template content from storage — content may be orphaned',
       );
     }
+  } else {
+    logger.info({ renderTemplateId: id }, 'No storage content to delete — skipping storage cleanup');
   }
 
-  logger.info({ renderTemplateId: id }, 'Render template deleted');
-  return new Response(null, { status: 204 });
+  logger.info({ renderTemplateId: id }, 'Render template deletion complete');
+  return new NextResponse(null, { status: 204 });
 });

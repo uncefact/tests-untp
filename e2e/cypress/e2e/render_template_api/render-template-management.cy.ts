@@ -108,6 +108,7 @@ describe('Render Template API', { testIsolation: false }, () => {
 
       cy.request('/api/v1/render-templates').then((response) => {
         expect(response.status).to.eq(200);
+        expect(response.body).to.not.have.property('ok');
         // Paginated response shape
         expect(response.body.data).to.be.an('array');
         expect(response.body.pagination).to.exist;
@@ -261,6 +262,7 @@ describe('Render Template API', { testIsolation: false }, () => {
         expect(response.body.data.length).to.be.at.most(1);
         expect(response.body.pagination.limit).to.eq(1);
         expect(response.body.pagination.offset).to.eq(0);
+        expect(response.body.pagination.hasMore).to.be.a('boolean');
       });
     });
 
@@ -430,6 +432,19 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
+    it('returns 400 for invalid JSON body', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/render-templates',
+        body: 'not valid json',
+        headers: { 'Content-Type': 'application/json' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
     it('returns 404 when dataModelId does not exist', function () {
       if (!dataModelId) this.skip();
 
@@ -554,6 +569,21 @@ describe('Render Template API', { testIsolation: false }, () => {
       }).then((response) => {
         expect(response.status).to.eq(400);
         expect(response.body.error).to.include('renderMethodType');
+      });
+    });
+
+    it('returns 400 for invalid JSON body', function () {
+      if (!tempTemplateId) this.skip();
+
+      cy.request({
+        method: 'PATCH',
+        url: `/api/v1/render-templates/${tempTemplateId}`,
+        body: 'not valid json',
+        headers: { 'Content-Type': 'application/json' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 

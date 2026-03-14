@@ -8,7 +8,7 @@ import {
 } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { listRenderTemplates } from '@/lib/prisma/repositories';
-import { buildPaginatedResponse } from '@/lib/api/pagination';
+import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 import { RenderMethodType } from '@/lib/prisma/generated';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
@@ -80,7 +80,8 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
 
   logger.info('Parsing query filters');
   const dataModelId = url.searchParams.get('dataModelId') ?? undefined;
-  const limit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
+  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   logger.info({ filters: { dataModelId, limit, offset } }, 'Querying render templates');
@@ -203,6 +204,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   }
   if (body.inline !== undefined && typeof body.inline !== 'boolean') {
     throw new ValidationError('inline must be a boolean');
+  }
+  if (body.mediaType !== undefined && !isNonEmptyString(body.mediaType)) {
+    throw new ValidationError('mediaType must be a non-empty string');
+  }
+  if (body.mediaQuery !== undefined && !isNonEmptyString(body.mediaQuery)) {
+    throw new ValidationError('mediaQuery must be a non-empty string');
   }
 
   logger.info({ renderMethodType: body.renderMethodType }, 'Validating render method type');
