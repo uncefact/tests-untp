@@ -44,6 +44,12 @@ const jestConfig = {
           moduleResolution: 'bundler',
           resolveJsonModule: true,
           isolatedModules: true,
+          baseUrl: '.',
+          paths: {
+            '@uncefact/untp-ri-services': ['../services/build/index.d.ts'],
+            '@uncefact/untp-ri-services/*': ['../services/build/*.d.ts'],
+            '@/*': ['./src/*'],
+          },
         },
       },
     ],

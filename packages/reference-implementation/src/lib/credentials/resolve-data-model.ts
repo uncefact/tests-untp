@@ -1,12 +1,12 @@
-import { getMapper } from '@uncefact/untp-ri-services';
-import type { ICredentialMapper } from '@uncefact/untp-ri-services';
+import { getBridge } from '@uncefact/untp-ri-services';
+import type { IDataModelBridge } from '@uncefact/untp-ri-services';
 import { listDataModels } from '@/lib/prisma/repositories';
 import type { DataModelListItem } from '@/lib/prisma/repositories';
 import { ValidationError } from '@/lib/api/validation';
 
 export type ResolvedDataModel = {
   dataModel: DataModelListItem;
-  mapper: ICredentialMapper;
+  bridge: IDataModelBridge;
   schemaUrls: string[];
 };
 
@@ -37,9 +37,9 @@ export async function resolveDataModel(
   const mapperVersion =
     dataModel.isExtension && dataModel.parentConfig ? dataModel.parentConfig.version : dataModel.version;
 
-  const mapper = getMapper(mapperType, mapperVersion);
-  if (!mapper) {
-    throw new ValidationError(`No mapper registered for ${mapperType} v${mapperVersion}`);
+  const bridge = getBridge(mapperType, mapperVersion);
+  if (!bridge) {
+    throw new ValidationError(`No bridge registered for ${mapperType} v${mapperVersion}`);
   }
 
   const schemaUrls: string[] = [];
@@ -48,5 +48,5 @@ export async function resolveDataModel(
   }
   schemaUrls.push(dataModel.schemaUrl);
 
-  return { dataModel, mapper, schemaUrls };
+  return { dataModel, bridge, schemaUrls };
 }
