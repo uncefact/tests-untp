@@ -1,6 +1,6 @@
 import type {
-  ICredentialMapper,
   CredentialPayload,
+  ExtractedRefs,
   IVerifiableCredentialService,
   IStorageService,
   StorageRecord,
@@ -17,7 +17,7 @@ export type IssueCredentialInput = {
   tenantId: string;
   credentialPayload: CredentialPayload;
   credentialType: string;
-  mapper: ICredentialMapper;
+  refs: ExtractedRefs;
   vcService: ResolvedService<IVerifiableCredentialService>;
   storageService: ResolvedService<IStorageService>;
   storageOptions: {
@@ -32,7 +32,7 @@ export type IssueCredentialResult = {
 };
 
 export async function issueCredential(input: IssueCredentialInput): Promise<IssueCredentialResult> {
-  const { tenantId, credentialPayload, credentialType, mapper, vcService, storageService, storageOptions } = input;
+  const { tenantId, credentialPayload, credentialType, refs, vcService, storageService, storageOptions } = input;
 
   const shouldEncrypt = storageOptions.encrypt !== false;
 
@@ -42,7 +42,6 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
   logger.info({ tenantId, storageInstanceId: storageService.instanceId, shouldEncrypt }, 'Storing credential');
   const storageResponse = await storageService.service.store(signedCredential, shouldEncrypt);
 
-  const refs = mapper.extractEntityRefs(credentialPayload);
   const primaryEntity = await resolvePrimaryEntity(refs, tenantId);
 
   const credentialRecord = await createCredential({

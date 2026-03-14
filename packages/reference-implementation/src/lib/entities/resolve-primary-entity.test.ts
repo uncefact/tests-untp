@@ -1,3 +1,7 @@
+jest.mock('@/lib/api/logger', () => ({
+  apiLogger: { child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }) },
+}));
+
 const mockGetProductByIdentifierValue = jest.fn();
 const mockGetFacilityByIdentifierValue = jest.fn();
 const mockGetOrganisationByIdentifierValue = jest.fn();
@@ -16,6 +20,8 @@ import type { PrimaryEntityResult } from './resolve-primary-entity';
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
 const TENANT_ID = 'tenant-1';
+
+const EMPTY_REFS = { organisations: [], facilities: [], products: [] };
 
 const SCHEME_INFO = {
   primaryKey: 'gtin',
@@ -40,7 +46,7 @@ describe('resolvePrimaryEntity', () => {
   });
 
   it('returns empty result when no primaryIdentifier', async () => {
-    const result = await resolvePrimaryEntity({}, TENANT_ID);
+    const result = await resolvePrimaryEntity(EMPTY_REFS, TENANT_ID);
 
     expect(result).toEqual({});
     expect(mockGetProductByIdentifierValue).not.toHaveBeenCalled();
@@ -54,8 +60,8 @@ describe('resolvePrimaryEntity', () => {
 
     const result = await resolvePrimaryEntity(
       {
-        primaryIdentifier: '09506000134352',
-        product: { registeredId: '09506000134352' },
+        ...EMPTY_REFS,
+        products: [{ id: '09506000134352' }],
       },
       TENANT_ID,
     );
@@ -70,14 +76,14 @@ describe('resolvePrimaryEntity', () => {
     });
   });
 
-  it('resolves facility entity with scheme info', async () => {
+  it('resolves facility entity when no product ref is present', async () => {
     const entity = makeEntity('fac-1');
     mockGetFacilityByIdentifierValue.mockResolvedValue(entity);
 
     const result = await resolvePrimaryEntity(
       {
-        primaryIdentifier: '9506000134',
-        facility: { registeredId: '9506000134' },
+        ...EMPTY_REFS,
+        facilities: [{ id: '9506000134' }],
       },
       TENANT_ID,
     );
@@ -92,14 +98,14 @@ describe('resolvePrimaryEntity', () => {
     });
   });
 
-  it('resolves organisation entity with scheme info', async () => {
+  it('resolves organisation entity when no product or facility ref is present', async () => {
     const entity = makeEntity('org-1');
     mockGetOrganisationByIdentifierValue.mockResolvedValue(entity);
 
     const result = await resolvePrimaryEntity(
       {
-        primaryIdentifier: '9506000100',
-        organisation: { registeredId: '9506000100' },
+        ...EMPTY_REFS,
+        organisations: [{ id: '9506000100' }],
       },
       TENANT_ID,
     );
@@ -119,8 +125,8 @@ describe('resolvePrimaryEntity', () => {
 
     const result = await resolvePrimaryEntity(
       {
-        primaryIdentifier: '09506000134352',
-        product: { registeredId: '09506000134352' },
+        ...EMPTY_REFS,
+        products: [{ id: '09506000134352' }],
       },
       TENANT_ID,
     );
@@ -129,20 +135,28 @@ describe('resolvePrimaryEntity', () => {
     expect(result).toEqual({});
   });
 
-  it('returns empty result when primaryIdentifier does not match any ref', async () => {
+  it('prioritises product over facility and organisation', async () => {
+    const entity = makeEntity('prod-1');
+    mockGetProductByIdentifierValue.mockResolvedValue(entity);
+
     const result = await resolvePrimaryEntity(
       {
-        primaryIdentifier: 'unknown-id-999',
-        product: { registeredId: 'different-id' },
-        facility: { registeredId: 'another-id' },
-        organisation: { registeredId: 'yet-another-id' },
+        products: [{ id: 'product-id' }],
+        facilities: [{ id: 'facility-id' }],
+        organisations: [{ id: 'org-id' }],
       },
       TENANT_ID,
     );
 
-    expect(result).toEqual({});
-    expect(mockGetProductByIdentifierValue).not.toHaveBeenCalled();
+    expect(mockGetProductByIdentifierValue).toHaveBeenCalledWith('product-id', TENANT_ID);
     expect(mockGetFacilityByIdentifierValue).not.toHaveBeenCalled();
     expect(mockGetOrganisationByIdentifierValue).not.toHaveBeenCalled();
+    expect(result).toEqual<PrimaryEntityResult>({
+      primaryIdentifier: 'product-id',
+      productId: 'prod-1',
+      schemeNamespace: 'gs1',
+      schemePrimaryKey: 'gtin',
+      schemeIdrServiceInstanceId: 'idr-svc-1',
+    });
   });
 });

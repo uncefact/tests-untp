@@ -19,8 +19,17 @@ describe('validateCvcCompliance', () => {
     jest.clearAllMocks();
   });
 
-  it('returns CVC_NO_SCOPE when scopeUrl is undefined', async () => {
+  it('returns no warnings when conformityRefs is undefined', async () => {
+    const result = await validateCvcCompliance(TENANT_ID, undefined);
+
+    expect(result.warnings).toEqual([]);
+    expect(mockFindCriteriaByCanonicalIds).not.toHaveBeenCalled();
+  });
+
+  it('returns CVC_NO_SCOPE when schemeUrl is undefined', async () => {
     const result = await validateCvcCompliance(TENANT_ID, {
+      standardUrls: [],
+      regulationUrls: [],
       criteriaUrls: ['https://example.com/criterion/1'],
     });
 
@@ -32,7 +41,9 @@ describe('validateCvcCompliance', () => {
 
   it('returns CVC_NO_CRITERIA when criteriaUrls is empty', async () => {
     const result = await validateCvcCompliance(TENANT_ID, {
-      scopeUrl: 'https://example.com/scope/1',
+      schemeUrl: 'https://example.com/scope/1',
+      standardUrls: [],
+      regulationUrls: [],
       criteriaUrls: [],
     });
 
@@ -50,7 +61,9 @@ describe('validateCvcCompliance', () => {
     mockFindCriteriaByCanonicalIds.mockResolvedValue([{ canonicalId: 'c1' }, { canonicalId: 'c2' }]);
 
     const result = await validateCvcCompliance(TENANT_ID, {
-      scopeUrl: 'https://example.com/scope/1',
+      schemeUrl: 'https://example.com/scope/1',
+      standardUrls: [],
+      regulationUrls: [],
       criteriaUrls: ['c1', 'c2'],
     });
 
@@ -65,7 +78,9 @@ describe('validateCvcCompliance', () => {
     mockFindCriteriaByCanonicalIds.mockResolvedValue([{ canonicalId: 'c1' }]);
 
     const result = await validateCvcCompliance(TENANT_ID, {
-      scopeUrl: 'https://example.com/scope/1',
+      schemeUrl: 'https://example.com/scope/1',
+      standardUrls: [],
+      regulationUrls: [],
       criteriaUrls: ['c1', 'c2', 'c3'],
     });
 
@@ -84,15 +99,19 @@ describe('validateCvcCompliance', () => {
     mockFindCriteriaByCanonicalIds.mockResolvedValue([{ canonicalId: 'c1' }, { canonicalId: 'c2' }]);
 
     await validateCvcCompliance(TENANT_ID, {
-      scopeUrl: 'https://example.com/scope/1',
+      schemeUrl: 'https://example.com/scope/1',
+      standardUrls: [],
+      regulationUrls: [],
       criteriaUrls: ['c1', 'c2'],
     });
 
     expect(mockFindCriteriaByCanonicalIds).toHaveBeenCalledWith('org-1', ['c1', 'c2']);
   });
 
-  it('short-circuits before checking criteria when scopeUrl is missing', async () => {
+  it('short-circuits before checking criteria when schemeUrl is missing', async () => {
     const result = await validateCvcCompliance(TENANT_ID, {
+      standardUrls: [],
+      regulationUrls: [],
       criteriaUrls: ['c1'],
     });
 
@@ -108,7 +127,9 @@ describe('validateCvcCompliance', () => {
     mockFindCriteriaByCanonicalIds.mockResolvedValue([{ canonicalId: 'c1' }]);
 
     const result = await validateCvcCompliance(TENANT_ID, {
-      scopeUrl: 'https://example.com/scope/unknown',
+      schemeUrl: 'https://example.com/scope/unknown',
+      standardUrls: [],
+      regulationUrls: [],
       criteriaUrls: ['c1', 'c2'],
     });
 
@@ -142,7 +163,9 @@ describe('validateCvcCompliance', () => {
     mockFindCriteriaByCanonicalIds.mockResolvedValue([{ canonicalId: 'cA' }]);
 
     const result = await validateCvcCompliance(TENANT_ID, {
-      scopeUrl: 'https://example.com/scope/1',
+      schemeUrl: 'https://example.com/scope/1',
+      standardUrls: [],
+      regulationUrls: [],
       criteriaUrls: ['cA'],
     });
 
@@ -169,7 +192,9 @@ describe('validateCvcCompliance', () => {
     mockFindCriteriaByCanonicalIds.mockResolvedValue([{ canonicalId: 'cA' }, { canonicalId: 'cB' }]);
 
     const result = await validateCvcCompliance(TENANT_ID, {
-      scopeUrl: 'https://example.com/scope/1',
+      schemeUrl: 'https://example.com/scope/1',
+      standardUrls: [],
+      regulationUrls: [],
       criteriaUrls: ['cA', 'cB'],
     });
 
@@ -187,7 +212,9 @@ describe('validateCvcCompliance', () => {
     mockFindCriteriaByCanonicalIds.mockResolvedValue([{ canonicalId: 'cA' }]);
 
     const result = await validateCvcCompliance(TENANT_ID, {
-      scopeUrl: 'https://example.com/scope/1',
+      schemeUrl: 'https://example.com/scope/1',
+      standardUrls: [],
+      regulationUrls: [],
       criteriaUrls: ['cA', 'cX'],
     });
 

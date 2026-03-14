@@ -1,9 +1,12 @@
-import type { ExtractedIdentifierRefs } from '@uncefact/untp-ri-services';
+import type { ExtractedRefs } from '@uncefact/untp-ri-services';
 import {
   getProductByIdentifierValue,
   getFacilityByIdentifierValue,
   getOrganisationByIdentifierValue,
 } from '@/lib/prisma/repositories';
+import { apiLogger } from '@/lib/api/logger';
+
+const logger = apiLogger.child({ module: 'resolve-primary-entity' });
 
 export type PrimaryEntityResult = {
   primaryIdentifier?: string;
@@ -15,18 +18,21 @@ export type PrimaryEntityResult = {
   schemeIdrServiceInstanceId?: string | null;
 };
 
-export async function resolvePrimaryEntity(
-  refs: ExtractedIdentifierRefs,
-  tenantId: string,
-): Promise<PrimaryEntityResult> {
-  const { primaryIdentifier } = refs;
-  if (!primaryIdentifier) return {};
-
-  if (refs.product?.registeredId === primaryIdentifier) {
-    const entity = await getProductByIdentifierValue(primaryIdentifier, tenantId);
-    if (!entity) return {};
+/**
+ * Resolves a primary entity from extracted credential references.
+ *
+ * Priority: product > facility > organisation. The first entity ref
+ * present in the refs arrays is treated as the primary identifier.
+ */
+export async function resolvePrimaryEntity(refs: ExtractedRefs, tenantId: string): Promise<PrimaryEntityResult> {
+  if (refs.products[0]?.id) {
+    const entity = await getProductByIdentifierValue(refs.products[0].id, tenantId);
+    if (!entity) {
+      logger.warn({ identifierValue: refs.products[0].id, tenantId }, 'Product not found for identifier');
+      return {};
+    }
     return {
-      primaryIdentifier,
+      primaryIdentifier: refs.products[0].id,
       productId: entity.id,
       schemeNamespace: entity.primaryIdentifier?.scheme?.registrar?.namespace ?? undefined,
       schemePrimaryKey: entity.primaryIdentifier?.scheme?.primaryKey,
@@ -34,11 +40,14 @@ export async function resolvePrimaryEntity(
     };
   }
 
-  if (refs.facility?.registeredId === primaryIdentifier) {
-    const entity = await getFacilityByIdentifierValue(primaryIdentifier, tenantId);
-    if (!entity) return {};
+  if (refs.facilities[0]?.id) {
+    const entity = await getFacilityByIdentifierValue(refs.facilities[0].id, tenantId);
+    if (!entity) {
+      logger.warn({ identifierValue: refs.facilities[0].id, tenantId }, 'Facility not found for identifier');
+      return {};
+    }
     return {
-      primaryIdentifier,
+      primaryIdentifier: refs.facilities[0].id,
       facilityId: entity.id,
       schemeNamespace: entity.primaryIdentifier?.scheme?.registrar?.namespace ?? undefined,
       schemePrimaryKey: entity.primaryIdentifier?.scheme?.primaryKey,
@@ -46,11 +55,14 @@ export async function resolvePrimaryEntity(
     };
   }
 
-  if (refs.organisation?.registeredId === primaryIdentifier) {
-    const entity = await getOrganisationByIdentifierValue(primaryIdentifier, tenantId);
-    if (!entity) return {};
+  if (refs.organisations[0]?.id) {
+    const entity = await getOrganisationByIdentifierValue(refs.organisations[0].id, tenantId);
+    if (!entity) {
+      logger.warn({ identifierValue: refs.organisations[0].id, tenantId }, 'Organisation not found for identifier');
+      return {};
+    }
     return {
-      primaryIdentifier,
+      primaryIdentifier: refs.organisations[0].id,
       organisationId: entity.id,
       schemeNamespace: entity.primaryIdentifier?.scheme?.registrar?.namespace ?? undefined,
       schemePrimaryKey: entity.primaryIdentifier?.scheme?.primaryKey,

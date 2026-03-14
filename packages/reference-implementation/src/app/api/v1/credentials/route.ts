@@ -17,15 +17,11 @@ import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { buildPublishLinks } from '@uncefact/untp-ri-services';
-import type { CredentialPayload, ICvcAwareMapper, ExtractedCvcRefs } from '@uncefact/untp-ri-services';
+import type { CredentialPayload, ExtractedRefs } from '@uncefact/untp-ri-services';
 import { validateCvcCompliance } from '@/lib/services/cvc-validation.service';
 import type { CvcValidationWarning } from '@/lib/services/cvc-validation.service';
 
 const logger = apiLogger.child({ route: '/api/v1/credentials' });
-
-function isCvcAwareMapper(mapper: unknown): mapper is ICvcAwareMapper {
-  return typeof (mapper as ICvcAwareMapper).extractCvcRefs === 'function';
-}
 
 // ---------------------------------------------------------------------------
 // POST /api/v1/credentials
@@ -124,7 +120,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   // ── Step 2: Resolve data model ──────────────────────────────────────────
 
-  const { dataModel, mapper, schemaUrls } = await resolveDataModel(tenantId, credentialType, version);
+  const { dataModel, bridge, schemaUrls } = await resolveDataModel(tenantId, credentialType, version);
 
   // ── Step 3: Validate payload ────────────────────────────────────────────
 
@@ -133,41 +129,41 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // ── Step 3.5: CVC validation (advisory) ─────────────────────────────
 
   let cvcWarnings: CvcValidationWarning[] = [];
+  const isDcc = isDccDataModel(dataModel);
 
-  if (isDccDataModel(dataModel)) {
-    if (isCvcAwareMapper(mapper)) {
-      let cvcRefs: ExtractedCvcRefs | undefined;
-      try {
-        cvcRefs = (mapper as ICvcAwareMapper).extractCvcRefs(credentialPayload);
-      } catch (error) {
-        logger.error({ err: error, tenantId, credentialType }, 'CVC reference extraction failed');
-        cvcWarnings = [
-          {
-            code: 'CVC_VALIDATION_ERROR' as const,
-            message: 'Failed to extract CVC references from credential payload',
-          },
-        ];
-      }
+  let refs: ExtractedRefs | undefined;
+  try {
+    const subject = credentialPayload.credentialSubject as Record<string, unknown>;
+    refs = bridge.extractRefs(subject);
+  } catch (error) {
+    logger.error({ err: error, tenantId, credentialType }, 'Reference extraction failed');
+    cvcWarnings = [
+      {
+        code: 'CVC_VALIDATION_ERROR' as const,
+        message: 'Failed to extract references from credential payload',
+      },
+    ];
+  }
 
-      if (cvcRefs) {
-        try {
-          const result = await validateCvcCompliance(tenantId, cvcRefs);
-          cvcWarnings = result.warnings;
-        } catch (error) {
-          logger.error({ err: error, tenantId, credentialType }, 'CVC compliance validation failed');
-          cvcWarnings = [
-            {
-              code: 'CVC_VALIDATION_ERROR' as const,
-              message: 'CVC validation could not be performed — credential was issued without CVC checks',
-            },
-          ];
-        }
-      }
-    } else {
-      logger.warn(
-        { tenantId, credentialType, version },
-        'DCC mapper does not implement extractCvcRefs — skipping CVC validation',
-      );
+  if (isDcc && refs && !refs.conformity) {
+    cvcWarnings.push({
+      code: 'CVC_NO_CONFORMITY' as const,
+      message: 'No conformity data found in DCC credential payload',
+    });
+  }
+
+  if (isDcc && refs?.conformity) {
+    try {
+      const result = await validateCvcCompliance(tenantId, refs.conformity);
+      cvcWarnings = result.warnings;
+    } catch (error) {
+      logger.error({ err: error, tenantId, credentialType }, 'CVC compliance validation failed');
+      cvcWarnings = [
+        {
+          code: 'CVC_VALIDATION_ERROR' as const,
+          message: 'CVC validation could not be performed — credential was issued without CVC checks',
+        },
+      ];
     }
   }
 
@@ -182,7 +178,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     tenantId,
     credentialPayload,
     credentialType,
-    mapper,
+    refs: refs ?? { organisations: [], facilities: [], products: [] },
     vcService,
     storageService,
     storageOptions,

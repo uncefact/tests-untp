@@ -6,25 +6,54 @@ import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/data-models/[id]/form-config' });
 
+type FormSection = {
+  entityType: string;
+  label: string;
+  endpoint: string;
+  required: boolean;
+  dependsOn?: string;
+};
+
 /**
  * Entity requirements per credential type.
  * Defines which entity pickers are needed for SPA form rendering.
  */
-const ENTITY_REQUIREMENTS: Record<
-  string,
-  Array<{ entityType: string; label: string; endpoint: string; required: boolean }>
-> = {
+const ENTITY_REQUIREMENTS: Record<string, Array<FormSection>> = {
   DigitalProductPassport: [
     { entityType: 'organisation', label: 'Organisation', endpoint: '/api/v1/organisations', required: true },
     { entityType: 'facility', label: 'Facility', endpoint: '/api/v1/facilities', required: true },
     { entityType: 'product', label: 'Product', endpoint: '/api/v1/products', required: true },
+    { entityType: 'conformityScheme', label: 'Conformity Scheme', endpoint: '/api/v1/cvc/schemes', required: false },
+    {
+      entityType: 'conformityProfile',
+      label: 'Conformity Profile',
+      endpoint: '/api/v1/cvc/profiles?schemeId=:conformityScheme',
+      required: false,
+      dependsOn: 'conformityScheme',
+    },
   ],
   DigitalConformityCredential: [
     { entityType: 'organisation', label: 'Organisation', endpoint: '/api/v1/organisations', required: true },
+    { entityType: 'conformityScheme', label: 'Conformity Scheme', endpoint: '/api/v1/cvc/schemes', required: false },
+    {
+      entityType: 'conformityProfile',
+      label: 'Conformity Profile',
+      endpoint: '/api/v1/cvc/profiles?schemeId=:conformityScheme',
+      required: false,
+      dependsOn: 'conformityScheme',
+    },
   ],
   DigitalFacilityRecord: [
     { entityType: 'organisation', label: 'Organisation', endpoint: '/api/v1/organisations', required: true },
     { entityType: 'facility', label: 'Facility', endpoint: '/api/v1/facilities', required: true },
+    { entityType: 'conformityScheme', label: 'Conformity Scheme', endpoint: '/api/v1/cvc/schemes', required: false },
+    {
+      entityType: 'conformityProfile',
+      label: 'Conformity Profile',
+      endpoint: '/api/v1/cvc/profiles?schemeId=:conformityScheme',
+      required: false,
+      dependsOn: 'conformityScheme',
+    },
   ],
   DigitalIdentityAnchor: [
     { entityType: 'organisation', label: 'Organisation', endpoint: '/api/v1/organisations', required: true },
@@ -82,6 +111,9 @@ const ENTITY_REQUIREMENTS: Record<
  *                             type: string
  *                           required:
  *                             type: boolean
+ *                           dependsOn:
+ *                             type: string
+ *                             description: The entityType this section depends on. If set, this section is only active when the referenced section has a value.
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -111,6 +143,10 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   }
 
   const sections = ENTITY_REQUIREMENTS[dataModel.credentialType] ?? [];
+
+  if (!ENTITY_REQUIREMENTS[dataModel.credentialType]) {
+    logger.warn({ credentialType: dataModel.credentialType }, 'No entity requirements configured for credential type');
+  }
 
   logger.info(
     { tenantId, dataModelId: id, credentialType: dataModel.credentialType, sectionCount: sections.length },

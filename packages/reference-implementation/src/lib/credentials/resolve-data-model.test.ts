@@ -5,9 +5,9 @@ jest.mock('@/lib/prisma/repositories', () => ({
 }));
 
 // Mock services package
-const mockGetMapper = jest.fn();
+const mockGetBridge = jest.fn();
 jest.mock('@uncefact/untp-ri-services', () => ({
-  getMapper: (...args: unknown[]) => mockGetMapper(...args),
+  getBridge: (...args: unknown[]) => mockGetBridge(...args),
 }));
 
 import { resolveDataModel } from './resolve-data-model';
@@ -42,9 +42,9 @@ const EXTENSION_DATA_MODEL = {
   },
 };
 
-const MOCK_MAPPER = {
-  buildPayload: jest.fn(),
-  extractEntityRefs: jest.fn(),
+const MOCK_BRIDGE = {
+  buildSubject: jest.fn(),
+  extractRefs: jest.fn(),
 };
 
 // ── Tests ───────────────────────────────────────────────────────────────────
@@ -54,9 +54,9 @@ describe('resolveDataModel', () => {
     jest.clearAllMocks();
   });
 
-  it('resolves core data model, mapper, and schema URLs', async () => {
+  it('resolves core data model, bridge, and schema URLs', async () => {
     mockListDataModels.mockResolvedValue({ data: [CORE_DATA_MODEL], total: 1 });
-    mockGetMapper.mockReturnValue(MOCK_MAPPER);
+    mockGetBridge.mockReturnValue(MOCK_BRIDGE);
 
     const result = await resolveDataModel('tenant-1', 'DigitalProductPassport', '0.6.1');
 
@@ -64,27 +64,27 @@ describe('resolveDataModel', () => {
       credentialType: 'DigitalProductPassport',
       version: '0.6.1',
     });
-    expect(mockGetMapper).toHaveBeenCalledWith('DigitalProductPassport', '0.6.1');
+    expect(mockGetBridge).toHaveBeenCalledWith('DigitalProductPassport', '0.6.1');
     expect(result).toEqual({
       dataModel: CORE_DATA_MODEL,
-      mapper: MOCK_MAPPER,
+      bridge: MOCK_BRIDGE,
       schemaUrls: ['https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.1.json'],
     });
   });
 
-  it('infers mapper from parent config for extension data models', async () => {
+  it('infers bridge from parent config for extension data models', async () => {
     mockListDataModels.mockResolvedValue({ data: [EXTENSION_DATA_MODEL], total: 1 });
-    mockGetMapper.mockReturnValue(MOCK_MAPPER);
+    mockGetBridge.mockReturnValue(MOCK_BRIDGE);
 
     const result = await resolveDataModel('tenant-1', 'DigitalProductPassport', '0.6.1');
 
-    expect(mockGetMapper).toHaveBeenCalledWith('DigitalProductPassport', '0.6.1');
-    expect(result.mapper).toBe(MOCK_MAPPER);
+    expect(mockGetBridge).toHaveBeenCalledWith('DigitalProductPassport', '0.6.1');
+    expect(result.bridge).toBe(MOCK_BRIDGE);
   });
 
   it('returns core + extension schema URLs for extension data models', async () => {
     mockListDataModels.mockResolvedValue({ data: [EXTENSION_DATA_MODEL], total: 1 });
-    mockGetMapper.mockReturnValue(MOCK_MAPPER);
+    mockGetBridge.mockReturnValue(MOCK_BRIDGE);
 
     const result = await resolveDataModel('tenant-1', 'DigitalProductPassport', '0.6.1');
 
@@ -104,14 +104,14 @@ describe('resolveDataModel', () => {
     );
   });
 
-  it('throws ValidationError when no mapper found', async () => {
+  it('throws ValidationError when no bridge found', async () => {
     mockListDataModels.mockResolvedValue({ data: [CORE_DATA_MODEL], total: 1 });
-    mockGetMapper.mockReturnValue(undefined);
+    mockGetBridge.mockReturnValue(undefined);
 
     await expect(resolveDataModel('tenant-1', 'DigitalProductPassport', '0.6.1')).rejects.toThrow(ValidationError);
 
     await expect(resolveDataModel('tenant-1', 'DigitalProductPassport', '0.6.1')).rejects.toThrow(
-      'No mapper registered for DigitalProductPassport v0.6.1',
+      'No bridge registered for DigitalProductPassport v0.6.1',
     );
   });
 });

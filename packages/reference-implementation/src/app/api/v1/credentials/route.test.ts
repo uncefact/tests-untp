@@ -173,10 +173,9 @@ const STORAGE_RESPONSE = {
   decryptionKey: 'key-xyz',
 };
 
-const stubMapper = {
-  extractEntityRefs: jest.fn().mockReturnValue({ primaryIdentifier: '09506000134352' }),
-  buildPayload: jest.fn(),
-  extractCvcRefs: jest.fn().mockReturnValue({ scopeUrl: undefined, criteriaUrls: [] }),
+const stubBridge = {
+  buildSubject: jest.fn().mockReturnValue({}),
+  extractRefs: jest.fn().mockReturnValue({ organisations: [], facilities: [], products: [] }),
 };
 
 const DATA_MODEL = {
@@ -200,7 +199,7 @@ function validBody(overrides: Record<string, unknown> = {}) {
 function setupHappyPath() {
   mockResolveDataModel.mockResolvedValue({
     dataModel: DATA_MODEL,
-    mapper: stubMapper,
+    bridge: stubBridge,
     schemaUrls: [DATA_MODEL.schemaUrl],
   });
   mockValidateCredentialPayload.mockResolvedValue(undefined);
@@ -337,13 +336,23 @@ describe('POST /api/v1/credentials', () => {
     });
 
     it('runs CVC validation for DCC credential type', async () => {
+      const conformityRefs = {
+        schemeUrl: undefined,
+        standardUrls: [],
+        regulationUrls: [],
+        criteriaUrls: [],
+      };
+      const dccBridge = {
+        buildSubject: jest.fn().mockReturnValue({}),
+        extractRefs: jest.fn().mockReturnValue({ conformity: conformityRefs }),
+      };
       mockResolveDataModel.mockResolvedValue({
         dataModel: {
           ...DATA_MODEL,
           credentialType: 'DigitalConformityCredential',
           name: 'Digital Conformity Credential',
         },
-        mapper: stubMapper,
+        bridge: dccBridge,
         schemaUrls: [DATA_MODEL.schemaUrl],
       });
       mockValidateCvcCompliance.mockResolvedValue({ warnings: [] });
@@ -351,21 +360,24 @@ describe('POST /api/v1/credentials', () => {
       const req = createFakeRequest(validBody({ credentialType: 'DigitalConformityCredential' }));
       await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
-      expect(stubMapper.extractCvcRefs).toHaveBeenCalled();
-      expect(mockValidateCvcCompliance).toHaveBeenCalledWith('tenant-1', {
-        scopeUrl: undefined,
-        criteriaUrls: [],
-      });
+      expect(dccBridge.extractRefs).toHaveBeenCalled();
+      expect(mockValidateCvcCompliance).toHaveBeenCalledWith('tenant-1', conformityRefs);
     });
 
     it('includes CVC warnings in response when present', async () => {
+      const dccBridge = {
+        buildSubject: jest.fn().mockReturnValue({}),
+        extractRefs: jest.fn().mockReturnValue({
+          conformity: { schemeUrl: undefined, standardUrls: [], regulationUrls: [], criteriaUrls: [] },
+        }),
+      };
       mockResolveDataModel.mockResolvedValue({
         dataModel: {
           ...DATA_MODEL,
           credentialType: 'DigitalConformityCredential',
           name: 'Digital Conformity Credential',
         },
-        mapper: stubMapper,
+        bridge: dccBridge,
         schemaUrls: [DATA_MODEL.schemaUrl],
       });
       const warnings = [{ code: 'CVC_NO_SCOPE', message: 'No conformity scope found in credential payload' }];
@@ -391,13 +403,19 @@ describe('POST /api/v1/credentials', () => {
     });
 
     it('continues issuing credential even when CVC validation throws', async () => {
+      const dccBridge = {
+        buildSubject: jest.fn().mockReturnValue({}),
+        extractRefs: jest.fn().mockReturnValue({
+          conformity: { schemeUrl: undefined, standardUrls: [], regulationUrls: [], criteriaUrls: [] },
+        }),
+      };
       mockResolveDataModel.mockResolvedValue({
         dataModel: {
           ...DATA_MODEL,
           credentialType: 'DigitalConformityCredential',
           name: 'Digital Conformity Credential',
         },
-        mapper: stubMapper,
+        bridge: dccBridge,
         schemaUrls: [DATA_MODEL.schemaUrl],
       });
       mockValidateCvcCompliance.mockRejectedValue(new Error('DB connection lost'));
@@ -416,7 +434,39 @@ describe('POST /api/v1/credentials', () => {
       ]);
     });
 
+    it('adds CVC_NO_CONFORMITY warning when DCC has no conformity data', async () => {
+      const dccBridge = {
+        buildSubject: jest.fn().mockReturnValue({}),
+        extractRefs: jest.fn().mockReturnValue({ organisations: [{ id: '1234567890' }], facilities: [], products: [] }),
+      };
+      mockResolveDataModel.mockResolvedValue({
+        dataModel: {
+          ...DATA_MODEL,
+          credentialType: 'DigitalConformityCredential',
+          name: 'Digital Conformity Credential',
+        },
+        bridge: dccBridge,
+        schemaUrls: [DATA_MODEL.schemaUrl],
+      });
+
+      const req = createFakeRequest(validBody({ credentialType: 'DigitalConformityCredential' }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings).toEqual([
+        { code: 'CVC_NO_CONFORMITY', message: 'No conformity data found in DCC credential payload' },
+      ]);
+      expect(mockValidateCvcCompliance).not.toHaveBeenCalled();
+    });
+
     it('runs CVC validation for DCC extension credential types', async () => {
+      const dccBridge = {
+        buildSubject: jest.fn().mockReturnValue({}),
+        extractRefs: jest.fn().mockReturnValue({
+          conformity: { schemeUrl: undefined, standardUrls: [], regulationUrls: [], criteriaUrls: [] },
+        }),
+      };
       mockResolveDataModel.mockResolvedValue({
         dataModel: {
           ...DATA_MODEL,
@@ -428,7 +478,7 @@ describe('POST /api/v1/credentials', () => {
             schemaUrl: 'https://example.com/schema.json',
           },
         },
-        mapper: stubMapper,
+        bridge: dccBridge,
         schemaUrls: [DATA_MODEL.schemaUrl],
       });
       mockValidateCvcCompliance.mockResolvedValue({ warnings: [] });
@@ -488,7 +538,7 @@ describe('POST /api/v1/credentials', () => {
         tenantId: 'tenant-1',
         credentialPayload: VALID_PAYLOAD,
         credentialType: 'DigitalProductPassport',
-        mapper: stubMapper,
+        refs: { organisations: [], facilities: [], products: [] },
         vcService,
         storageService,
         storageOptions: {},

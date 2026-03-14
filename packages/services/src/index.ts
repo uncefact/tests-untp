@@ -163,21 +163,21 @@ export type {
 export { getCvcParser, SUPPORTED_CVC_VERSIONS } from './cvc-parsing/index.js';
 export { CvcV070Parser } from './cvc-parsing/index.js';
 
-// Credential mapping
+// ── Data model bridges ──────────────────────────────────────────────────────
 export type {
-  ICredentialMapper,
-  ICvcAwareMapper,
-  MapperOutput,
-  ExtractedIdentifierRefs,
-  ExtractedCvcRefs,
+  IDataModelBridge,
+  ExtractedRefs,
+  ConformityRefs,
+  ConformityInput,
+  CredentialSubject as BridgeCredentialSubject,
   DataModelConfig,
-  ResolvedEntities,
+  BridgeEntities,
   OrganisationEntity,
   FacilityEntity,
   ProductEntity,
   ProductLevel,
   EntityIdentifier,
   UntpLocation,
-} from './credential-mapping/index.js';
-export { getMapper } from './credential-mapping/index.js';
-export { DccV061Mapper } from './credential-mapping/mappers/dcc/v061.mapper.js';
+} from './data-model-bridges/index.js';
+
+export { getBridge, buildContextAndTypes } from './data-model-bridges/index.js';

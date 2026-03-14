@@ -9,7 +9,7 @@ const jestConfig = {
   ],
   testPathIgnorePatterns: ['<rootDir>/node_modules/'],
   transformIgnorePatterns: [
-    'node_modules/(?!@reference-implementation)',
+    'node_modules/(?!@reference-implementation|uuid)',
   ],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   moduleNameMapper: {
@@ -44,6 +44,12 @@ const jestConfig = {
           moduleResolution: 'bundler',
           resolveJsonModule: true,
           isolatedModules: true,
+          baseUrl: '.',
+          paths: {
+            '@uncefact/untp-ri-services': ['../services/build/index.d.ts'],
+            '@uncefact/untp-ri-services/*': ['../services/build/*.d.ts'],
+            '@/*': ['./src/*'],
+          },
         },
       },
     ],
