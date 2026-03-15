@@ -122,7 +122,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         name: search
  *         schema:
  *           type: string
- *         description: Search term to filter organisations
+ *         description: Search by organisation name or identifier value
  *       - in: query
  *         name: limit
  *         schema:

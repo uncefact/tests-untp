@@ -150,7 +150,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         name: search
  *         schema:
  *           type: string
- *         description: Search products by name
+ *         description: Search by product name or identifier value
  *       - in: query
  *         name: level
  *         schema:
@@ -166,7 +166,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         name: organisationId
  *         schema:
  *           type: string
- *         description: Filter by brand organisation ID
+ *         description: Filter by producing organisation ID
  *       - in: query
  *         name: facilityId
  *         schema:

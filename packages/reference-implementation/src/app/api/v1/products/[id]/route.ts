@@ -105,7 +105,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                 description: Updated parent product ID
  *               producedByOrganisationId:
  *                 type: string
- *                 description: Updated brand organisation ID
+ *                 description: Updated producing organisation ID
  *               manufacturingFacilityId:
  *                 type: string
  *                 description: Updated manufacturing facility ID
@@ -163,20 +163,25 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   }
 
   logger.info({ productId: id }, 'Validating update fields');
-  // Strip the immutable level field if provided
-  const { level: _level, ...updateFields } = body;
-
-  const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in updateFields);
+  const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
   if (!hasUpdatableField) {
     throw new ValidationError(`At least one updatable field must be provided: ${UPDATABLE_FIELDS.join(', ')}`);
   }
 
-  if (updateFields.name !== undefined && !isNonEmptyString(updateFields.name)) {
+  if (body.name !== undefined && !isNonEmptyString(body.name)) {
     throw new ValidationError('name must be a non-empty string');
   }
 
+  // Pick only known updatable fields (level is immutable and silently excluded)
+  const updateData: Record<string, unknown> = {};
+  for (const field of UPDATABLE_FIELDS) {
+    if (field in body) {
+      updateData[field] = body[field];
+    }
+  }
+
   logger.info({ productId: id }, 'Updating product');
-  const updated = await updateProduct(id, tenantId, updateFields);
+  const updated = await updateProduct(id, tenantId, updateData);
 
   logger.info({ productId: id }, 'Product updated');
   return NextResponse.json(updated);

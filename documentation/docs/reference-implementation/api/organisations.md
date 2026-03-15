@@ -115,7 +115,7 @@ Updates one or more fields of an existing organisation. At least one updatable f
 DELETE /api/v1/organisations/{id}
 ```
 
-Permanently deletes an organisation. Returns `204 No Content` with an empty body.
+Permanently deletes an organisation. If the organisation is referenced by products or facilities, those references are cleared (set to `null`) — the related records are not deleted.
 
 ```mermaid
 sequenceDiagram

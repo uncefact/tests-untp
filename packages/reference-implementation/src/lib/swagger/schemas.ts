@@ -207,6 +207,7 @@ export const productSchema = z.object({
   producedByOrganisationId: z.string().nullable(),
   manufacturingFacilityId: z.string().nullable(),
   primaryIdentifierId: z.string().nullable(),
+  secondaryIdentifierIds: z.array(z.string()).describe('IDs of secondary identifiers'),
   createdAt: z.string().describe('ISO 8601 timestamp'),
   updatedAt: z.string().describe('ISO 8601 timestamp'),
 });
@@ -218,6 +219,7 @@ export const organisationSchema = z.object({
   description: z.string().nullable(),
   location: z.record(z.unknown()).nullable().describe('UNTP location object'),
   primaryIdentifierId: z.string().nullable(),
+  secondaryIdentifierIds: z.array(z.string()).describe('IDs of secondary identifiers'),
   createdAt: z.string().describe('ISO 8601 timestamp'),
   updatedAt: z.string().describe('ISO 8601 timestamp'),
 });
@@ -230,6 +232,7 @@ export const facilitySchema = z.object({
   location: z.record(z.unknown()).nullable().describe('UNTP location object'),
   operatingOrganisationId: z.string().nullable(),
   primaryIdentifierId: z.string().nullable(),
+  secondaryIdentifierIds: z.array(z.string()).describe('IDs of secondary identifiers'),
   createdAt: z.string().describe('ISO 8601 timestamp'),
   updatedAt: z.string().describe('ISO 8601 timestamp'),
 });

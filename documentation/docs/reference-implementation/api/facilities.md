@@ -121,7 +121,7 @@ Updates one or more fields of an existing facility. At least one updatable field
 DELETE /api/v1/facilities/{id}
 ```
 
-Permanently deletes a facility. Returns `204 No Content` with an empty body.
+Permanently deletes a facility. If the facility is referenced as the manufacturing facility for any products, those references are cleared (set to `null`) — the product records are not deleted.
 
 ```mermaid
 sequenceDiagram
