@@ -160,8 +160,15 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('name must be a non-empty string');
   }
 
+  const updateData: Record<string, unknown> = {};
+  for (const field of UPDATABLE_FIELDS) {
+    if (field in body) {
+      updateData[field] = body[field];
+    }
+  }
+
   logger.info({ organisationId: id }, 'Updating organisation');
-  const updated = await updateOrganisation(id, tenantId, body as UpdateOrganisationInput);
+  const updated = await updateOrganisation(id, tenantId, updateData as UpdateOrganisationInput);
 
   logger.info({ organisationId: id }, 'Organisation updated');
   return NextResponse.json(updated);
