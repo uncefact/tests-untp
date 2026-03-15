@@ -146,11 +146,11 @@ jobs:
           echo "--- Container status ---"
           docker compose -f docker-compose.e2e.yml ps
 
-      - name: Run E2E tests
-        run: yarn test:run-cypress
+      - name: Run E2E tests (open mode)
+        run: yarn test:e2e:open
         env:
           NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module' # See issue https://github.com/cypress-io/github-action/issues/1408
-          CYPRESS_VERIFY_ALLOW_PRIVATE_URLS: 'true' # Skip SSRF E2E tests — Docker services use internal addresses
+          VERIFY_ALLOW_PRIVATE_URLS: 'true' # Skip SSRF E2E tests — Docker services use internal addresses
 
       - name: Dump E2E container logs on failure
         if: failure()
@@ -172,16 +172,17 @@ jobs:
           docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml ps
 
       - name: Run closed mode E2E tests
-        run: yarn test:run-cypress:closed-mode
+        run: yarn test:e2e:closed
         env:
           NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module'
+          VERIFY_ALLOW_PRIVATE_URLS: 'true'
 
       - name: Dump closed mode container logs on failure
         if: failure()
         run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml logs app
 
       - name: Stop closed mode docker compose
-        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml down
+        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml down -v
 
   build_docs:
     runs-on: ubuntu-latest
