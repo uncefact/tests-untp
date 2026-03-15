@@ -81,7 +81,7 @@ const logger = apiLogger.child({ route: '/api/v1/facilities' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info({ tenantId }, 'Parsing request body');
+  logger.info('Parsing request body');
   let body: unknown;
 
   try {
@@ -90,7 +90,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId }, 'Validating input parameters');
+  logger.info('Validating input parameters');
   if (!Array.isArray(body)) {
     throw new ValidationError('Request body must be an array');
   }
@@ -105,10 +105,10 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     }
   }
 
-  logger.info({ tenantId, count: body.length }, 'Creating facilities');
+  logger.info({ count: body.length }, 'Creating facilities');
   const facilities = await createFacilities(tenantId, body);
 
-  logger.info({ tenantId, count: facilities.length }, 'Facilities created');
+  logger.info({ count: facilities.length }, 'Facilities created');
   return NextResponse.json(facilities, { status: 201 });
 });
 
@@ -177,7 +177,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
-  logger.info({ tenantId }, 'Parsing query parameters');
+  logger.info('Parsing query filters');
   const url = new URL(req.url);
   const search = url.searchParams.get('search') ?? undefined;
   const organisationId = url.searchParams.get('organisationId') ?? undefined;
@@ -185,9 +185,9 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  logger.info({ tenantId, search, organisationId, limit, offset }, 'Listing facilities');
+  logger.info({ filters: { search, organisationId, limit, offset } }, 'Querying facilities');
   const { data, total } = await listFacilities(tenantId, { search, organisationId, limit, offset });
 
-  logger.info({ tenantId, count: data.length }, 'Facilities listed');
+  logger.info({ count: data.length, total }, 'Facilities listed');
   return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

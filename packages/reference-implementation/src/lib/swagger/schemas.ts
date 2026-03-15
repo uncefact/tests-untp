@@ -192,6 +192,49 @@ export const renderTemplateSchema = z.object({
 });
 
 // ============================================================================
+// Master Data Schemas
+// ============================================================================
+
+export const productSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  name: z.string(),
+  level: z.enum(['MODEL', 'BATCH', 'ITEM']),
+  description: z.string().nullable(),
+  batchNumber: z.string().nullable(),
+  serialNumber: z.string().nullable(),
+  parentId: z.string().nullable(),
+  producedByOrganisationId: z.string().nullable(),
+  manufacturingFacilityId: z.string().nullable(),
+  primaryIdentifierId: z.string().nullable(),
+  createdAt: z.string().describe('ISO 8601 timestamp'),
+  updatedAt: z.string().describe('ISO 8601 timestamp'),
+});
+
+export const organisationSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  location: z.record(z.unknown()).nullable().describe('UNTP location object'),
+  primaryIdentifierId: z.string().nullable(),
+  createdAt: z.string().describe('ISO 8601 timestamp'),
+  updatedAt: z.string().describe('ISO 8601 timestamp'),
+});
+
+export const facilitySchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  location: z.record(z.unknown()).nullable().describe('UNTP location object'),
+  operatingOrganisationId: z.string().nullable(),
+  primaryIdentifierId: z.string().nullable(),
+  createdAt: z.string().describe('ISO 8601 timestamp'),
+  updatedAt: z.string().describe('ISO 8601 timestamp'),
+});
+
+// ============================================================================
 // Re-export imported schemas so existing consumers continue to work
 // ============================================================================
 
@@ -249,6 +292,9 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     Criterion: criterionSchema,
     DataModel: dataModelSchema,
     RenderTemplate: renderTemplateSchema,
+    Product: productSchema,
+    Organisation: organisationSchema,
+    Facility: facilitySchema,
   };
 
   const openAPISchemas: Record<string, OpenAPISchema> = {};

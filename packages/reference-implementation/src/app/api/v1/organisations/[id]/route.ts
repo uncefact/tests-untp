@@ -57,12 +57,12 @@ const UPDATABLE_FIELDS = ['name', 'description', 'location', 'primaryIdentifierI
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ tenantId, organisationId: id }, 'Looking up organisation');
+  logger.info({ organisationId: id }, 'Looking up organisation');
   const organisation = await getOrganisationById(id, tenantId);
   if (!organisation) {
     throw new NotFoundError('Organisation not found');
   }
-  logger.info({ tenantId, organisationId: id }, 'Organisation retrieved');
+  logger.info({ organisationId: id }, 'Organisation retrieved');
   return NextResponse.json(organisation);
 });
 
@@ -95,8 +95,8 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                 type: string
  *                 description: Updated description
  *               location:
- *                 type: string
- *                 description: Updated location
+ *                 type: object
+ *                 description: Updated UNTP location object
  *               primaryIdentifierId:
  *                 type: string
  *                 description: ID of the primary identifier
@@ -141,7 +141,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, organisationId: id }, 'Parsing request body');
+  logger.info({ organisationId: id }, 'Parsing request body');
   let body: Record<string, unknown>;
 
   try {
@@ -150,7 +150,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId, organisationId: id }, 'Validating update fields');
+  logger.info({ organisationId: id }, 'Validating update fields');
   const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
   if (!hasUpdatableField) {
     throw new ValidationError(`At least one updatable field must be provided: ${UPDATABLE_FIELDS.join(', ')}`);
@@ -160,10 +160,10 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('name must be a non-empty string');
   }
 
-  logger.info({ tenantId, organisationId: id }, 'Updating organisation');
+  logger.info({ organisationId: id }, 'Updating organisation');
   const updated = await updateOrganisation(id, tenantId, body as UpdateOrganisationInput);
 
-  logger.info({ tenantId, organisationId: id }, 'Organisation updated');
+  logger.info({ organisationId: id }, 'Organisation updated');
   return NextResponse.json(updated);
 });
 
@@ -207,9 +207,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, organisationId: id }, 'Deleting organisation');
+  logger.info({ organisationId: id }, 'Deleting organisation');
   await deleteOrganisation(id, tenantId);
 
-  logger.info({ tenantId, organisationId: id }, 'Organisation deleted');
-  return new Response(null, { status: 204 });
+  logger.info({ organisationId: id }, 'Organisation deleted');
+  return new NextResponse(null, { status: 204 });
 });
