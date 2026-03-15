@@ -20,6 +20,8 @@ describe('Closed mode — tenant isolation', { testIsolation: false }, () => {
 
   let token1: string;
   let token2: string;
+  let sub1: string;
+  let sub2: string;
   let did1Id: string;
 
   before(() => {
@@ -30,16 +32,28 @@ describe('Closed mode — tenant isolation', { testIsolation: false }, () => {
     // Get tokens for both service accounts
     cy.task('getServiceAccountToken', SA1).then((result: any) => {
       token1 = result.accessToken;
+      const payload = JSON.parse(
+        Buffer.from(token1.split('.')[1], 'base64').toString(),
+      );
+      sub1 = payload.sub;
+      cy.task('cleanupServiceAccountData', { sub: sub1 });
     });
 
     cy.task('getServiceAccountToken', SA2).then((result: any) => {
       token2 = result.accessToken;
+      const payload = JSON.parse(
+        Buffer.from(token2.split('.')[1], 'base64').toString(),
+      );
+      sub2 = payload.sub;
+      cy.task('cleanupServiceAccountData', { sub: sub2 });
     });
   });
 
   after(() => {
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_ALPHA });
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_BETA });
+    cy.task('cleanupServiceAccountData', { sub: sub1 });
+    cy.task('cleanupServiceAccountData', { sub: sub2 });
   });
 
   it('SA1 (alpha) creates a DID', () => {

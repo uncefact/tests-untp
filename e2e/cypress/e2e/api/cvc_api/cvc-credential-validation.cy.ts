@@ -1,4 +1,4 @@
-import { config } from '../../support/config';
+import { config } from '../../../support/config';
 
 /**
  * Tests CVC validation during DCC credential issuance.
@@ -102,6 +102,7 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
   before(() => {
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: TEST_ORG_ID });
+    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
 
     cy.apiLogin();
     cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {

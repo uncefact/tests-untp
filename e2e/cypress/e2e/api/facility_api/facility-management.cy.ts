@@ -1,4 +1,4 @@
-import { config } from '../../support/config';
+import { config } from '../../../support/config';
 
 describe('Facility API', { testIsolation: false }, () => {
   const RUN_ID = Date.now();
@@ -13,6 +13,7 @@ describe('Facility API', { testIsolation: false }, () => {
   before(() => {
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
+    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
 
     cy.apiLogin();
     cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {

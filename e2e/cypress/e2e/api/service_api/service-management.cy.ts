@@ -1,8 +1,8 @@
 import {
   SYSTEM_VC_SERVICE_ID,
   SYSTEM_STORAGE_SERVICE_ID,
-} from '../../../../packages/reference-implementation/src/lib/prisma/constants';
-import { config } from '../../support/config';
+} from '../../../../../packages/reference-implementation/src/lib/prisma/constants';
+import { config } from '../../../support/config';
 
 interface ServiceInstance {
   id: string;
@@ -22,6 +22,7 @@ describe('Service API', { testIsolation: false }, () => {
   before(() => {
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
+    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
 
     cy.apiLogin();
     cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {

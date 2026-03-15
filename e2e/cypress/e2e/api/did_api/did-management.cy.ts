@@ -1,4 +1,4 @@
-import { config } from '../../support/config';
+import { config } from '../../../support/config';
 
 describe('DID API', { testIsolation: false }, () => {
   const RUN_ID = Date.now();
@@ -11,6 +11,7 @@ describe('DID API', { testIsolation: false }, () => {
   before(() => {
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
+    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
 
     // Login first — NextAuth creates the User record on first login
     cy.apiLogin();

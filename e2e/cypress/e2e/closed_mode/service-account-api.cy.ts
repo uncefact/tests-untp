@@ -13,19 +13,30 @@ import { config } from '../../support/config';
 describe('Closed mode — service account API', { testIsolation: false }, () => {
   const GROUP_CLAIM = config.groups.alpha;
   let accessToken: string;
+  let tokenSub: string;
 
   before(() => {
     // Clean up any leftover closed mode data
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
 
-    // Fetch a service account token from Keycloak
+    // Fetch a service account token
     cy.task('getServiceAccountToken').then((result: any) => {
       accessToken = result.accessToken;
+
+      // Decode the JWT payload to extract the sub claim for cleanup
+      const payload = JSON.parse(
+        Buffer.from(accessToken.split('.')[1], 'base64').toString(),
+      );
+      tokenSub = payload.sub;
+
+      // Clean up any leftover SA user from previous runs
+      cy.task('cleanupServiceAccountData', { sub: tokenSub });
     });
   });
 
   after(() => {
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
+    cy.task('cleanupServiceAccountData', { sub: tokenSub });
   });
 
   it('GET /api/v1/dids — authenticates via bearer token and resolves tenant by group', () => {

@@ -209,7 +209,9 @@ export default defineConfig({
     baseUrl: process.env.CYPRESS_BASE_URL || 'http://localhost:3003',
     supportFile: 'cypress/support/e2e.ts',
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
-    excludeSpecPattern: process.env.CYPRESS_INCLUDE_CLOSED_MODE === 'true' ? [] : ['cypress/e2e/closed_mode/**'], // env var needed because excludeSpecPattern takes precedence over --spec CLI flag
+    excludeSpecPattern: (process.env.E2E_TENANT_MODE || 'open') === 'closed'
+      ? ['cypress/e2e/open_mode/**']
+      : ['cypress/e2e/closed_mode/**'],
     video: false, // Disable video recording (optional)
     chromeWebSecurity: false, // Helps bypass security restrictions (if needed)
     retries: {
@@ -219,6 +221,34 @@ export default defineConfig({
     defaultCommandTimeout: 10000,
     defaultBrowser: 'chrome',
     setupNodeEvents(on) {
+      // Clean up all test artefacts after all specs complete
+      on('after:run', async () => {
+        const client = getDbClient();
+        try {
+          await client.connect();
+
+          // Clean up human test users and their OAuth accounts
+          const userEmail = process.env.E2E_USER_EMAIL || 'e2e-admin@test.local';
+          const user2Email = process.env.E2E_USER2_EMAIL || 'e2e-user@test.local';
+          for (const email of [userEmail, user2Email]) {
+            await client.query(
+              `DELETE FROM "Account" WHERE "userId" IN (SELECT id FROM "User" WHERE email = $1)`,
+              [email],
+            );
+            await client.query(`DELETE FROM "User" WHERE email = $1`, [email]);
+          }
+
+          // Clean up orphaned Account records (Account exists but User was already deleted)
+          await client.query(
+            `DELETE FROM "Account" WHERE "userId" NOT IN (SELECT id FROM "User")`,
+          );
+        } catch {
+          // Silently ignore — DB may not be reachable (e.g. local Docker already down)
+        } finally {
+          await client.end().catch(() => {});
+        }
+      });
+
       on('task', {
         writeToFile({ fileName, data }: { fileName: string; data: any }) {
           const filePath = path.resolve('cypress/fixtures/credentials-e2e', fileName);
@@ -486,10 +516,34 @@ export default defineConfig({
               await deleteTenantData(client, tenantId);
             }
 
+            // Delete OAuth account links for this user
+            await client.query(`DELETE FROM "Account" WHERE "userId" = $1`, [userId]);
+
             // Delete the auto-provisioned user itself
             await client.query(`DELETE FROM "User" WHERE id = $1`, [userId]);
 
             return { userId, tenantId };
+          } finally {
+            await client.end();
+          }
+        },
+        async cleanupTestUsers({ emails }: { emails: string[] }) {
+          const client = getDbClient();
+          try {
+            await client.connect();
+            for (const email of emails) {
+              // Delete OAuth account links
+              await client.query(
+                `DELETE FROM "Account" WHERE "userId" IN (SELECT id FROM "User" WHERE email = $1)`,
+                [email],
+              );
+              // Delete user
+              await client.query(
+                `DELETE FROM "User" WHERE email = $1`,
+                [email],
+              );
+            }
+            return null;
           } finally {
             await client.end();
           }
