@@ -1,36 +1,54 @@
+import { config } from '../config';
+
 /**
- * Programmatic login via Keycloak for API testing.
+ * Programmatic login via IDP (Keycloak or Zitadel) for API testing.
  *
- * Visits the NextAuth sign-in page, follows the Keycloak redirect,
+ * Visits the NextAuth sign-in page, follows the IDP redirect,
  * fills in credentials, and returns to the app with a valid session cookie.
  * Subsequent cy.request() calls automatically include the session cookie.
  */
 Cypress.Commands.add('apiLogin', (username?: string, password?: string) => {
-  const user = username ?? 'e2e-admin@test.local';
-  const pass = password ?? 'E2eTest123!';
+  const user = username ?? config.user.email;
+  const pass = password ?? config.user.password;
+  const provider = config.idp.provider || 'keycloak';
 
-  // Visit the NextAuth sign-in endpoint which redirects to Keycloak
+  // Visit the NextAuth sign-in endpoint which redirects to the IDP
   cy.visit('/api/auth/signin');
 
-  // Click the Keycloak provider button (if present)
+  // Click the provider button to trigger the redirect
   cy.get('body').then(($body) => {
-    if ($body.find('button:contains("Keycloak")').length) {
-      cy.contains('button', 'Keycloak').click();
+    // NextAuth shows provider buttons — find and click the right one
+    const buttons = $body.find('button');
+    const providerButton = buttons.filter((_i, el) => {
+      const text = el.textContent?.toLowerCase() || '';
+      return text.includes('keycloak') || text.includes('zitadel');
+    });
+    if (providerButton.length) {
+      cy.wrap(providerButton.first()).click();
     }
-    // If already on the Keycloak login page, continue
   });
 
-  // Fill in Keycloak credentials
+  // Fill in credentials on the IDP login page
   cy.origin(
-    'http://localhost:8081',
-    { args: { user, pass } },
-    ({ user, pass }) => {
-      cy.get('#username').type(user);
-      cy.get('#password').type(pass);
-      cy.get('#kc-login').click();
+    config.idp.baseUrl,
+    { args: { user, pass, provider } },
+    ({ user, pass, provider }) => {
+      if (provider === 'zitadel') {
+        // Zitadel: email first, then password on next screen
+        cy.get('#loginName').type(user);
+        cy.get('button[type="submit"]').click();
+        cy.get('#password').type(pass);
+        cy.get('button[type="submit"]').click();
+      } else {
+        // Keycloak
+        cy.get('#username').type(user);
+        cy.get('#password').type(pass);
+        cy.get('#kc-login').click();
+      }
     },
   );
 
   // Wait for redirect back to the app
-  cy.url().should('include', 'localhost:3003');
+  const appHost = new URL(Cypress.config('baseUrl')!).host;
+  cy.url().should('include', appHost);
 });

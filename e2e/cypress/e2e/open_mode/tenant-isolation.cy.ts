@@ -7,9 +7,11 @@
  *
  * Requires: docker-compose.e2e.yml (standard E2E stack, TENANT_MODE=open)
  */
+import { config } from '../../support/config';
+
 describe('Open mode — tenant isolation', { testIsolation: false }, () => {
-  const SA1 = { clientId: 'ri-service-account-e2e', clientSecret: 'e2e-service-account-secret' };
-  const SA2 = { clientId: 'ri-service-account-e2e-2', clientSecret: 'e2e-service-account-secret-2' };
+  const SA1 = config.serviceAccounts.sa1;
+  const SA2 = config.serviceAccounts.sa2;
 
   let token1: string;
   let token2: string;

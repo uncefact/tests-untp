@@ -1,6 +1,8 @@
+import { config } from '../../support/config';
+
 describe('Display Error Messages', () => {
   beforeEach(() => {
-    cy.visit('http://localhost:4000');
+    cy.visit(config.playground.baseUrl);
   });
 
   it('should show detail popup if upload file is not an object', () => {

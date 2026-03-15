@@ -2,6 +2,7 @@ import {
   SYSTEM_VC_SERVICE_ID,
   SYSTEM_STORAGE_SERVICE_ID,
 } from '../../../../packages/reference-implementation/src/lib/prisma/constants';
+import { config } from '../../support/config';
 
 interface ServiceInstance {
   id: string;
@@ -16,14 +17,21 @@ interface ServiceInstance {
 describe('Service API', { testIsolation: false }, () => {
   const RUN_ID = Date.now();
   let createdServiceId: string;
+  let testTenantId: string;
 
   before(() => {
+    // Clean up any stale data from a previous failed run
+    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
+
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: 'e2e-admin@test.local' });
+    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
+      testTenantId = result.tenantId;
+    });
   });
 
   after(() => {
-    cy.task('cleanupTestData', { tenantId: 'e2e-test-org' });
+    const preserveTenant = config.tenantMode === 'closed';
+    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
   });
 
   describe('CRUD operations', () => {
@@ -37,7 +45,7 @@ describe('Service API', { testIsolation: false }, () => {
           name: `E2E Test VC Service ${RUN_ID}`,
           description: 'Created by Cypress E2E test',
           config: {
-            baseUrl: 'https://vckit-e2e.example.com',
+            baseUrl: config.services.vckit.baseUrl,
             apiKey: 'e2e-test-key-123',
           },
         },
@@ -81,10 +89,10 @@ describe('Service API', { testIsolation: false }, () => {
 
     it('GET /api/v1/services/:id — masks sensitive config fields', () => {
       cy.request(`/api/v1/services/${createdServiceId}`).then((response) => {
-        const config = response.body.config;
-        expect(config).to.be.an('object');
-        expect(config.baseUrl).to.eq('https://vckit-e2e.example.com');
-        expect(config.apiKey).to.eq('***');
+        const serviceConfig = response.body.config;
+        expect(serviceConfig).to.be.an('object');
+        expect(serviceConfig.baseUrl).to.eq(config.services.vckit.baseUrl);
+        expect(serviceConfig.apiKey).to.eq('***');
       });
     });
 
@@ -116,14 +124,14 @@ describe('Service API', { testIsolation: false }, () => {
         url: `/api/v1/services/${createdServiceId}`,
         body: {
           config: {
-            baseUrl: 'https://vckit-e2e-updated.example.com',
+            baseUrl: config.services.storage.baseUrl,
           },
         },
       }).then((response) => {
         expect(response.status).to.eq(200);
         // Updated field reflected
         expect(response.body.config.baseUrl).to.eq(
-          'https://vckit-e2e-updated.example.com',
+          config.services.storage.baseUrl,
         );
         // apiKey preserved from original config (merged) and masked
         expect(response.body.config.apiKey).to.eq('***');
@@ -136,7 +144,7 @@ describe('Service API', { testIsolation: false }, () => {
         expect(response.body.name).to.eq(`Updated E2E VC Service ${RUN_ID}`);
         expect(response.body.description).to.eq('Updated description');
         expect(response.body.config.baseUrl).to.eq(
-          'https://vckit-e2e-updated.example.com',
+          config.services.storage.baseUrl,
         );
       });
     });
@@ -160,8 +168,8 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'VCKIT',
           name: `E2E Ref Check ${RUN_ID}`,
           config: {
-            baseUrl: 'http://vckit-api:3332',
-            apiKey: 'test123',
+            baseUrl: config.services.vckit.baseUrl,
+            apiKey: config.services.vckit.apiKey,
           },
         },
       }).then((createRes) => {
@@ -234,7 +242,7 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'VCKIT',
           name: `E2E Primary VC ${RUN_ID}`,
           config: {
-            baseUrl: 'https://primary.example.com',
+            baseUrl: config.services.vckit.baseUrl,
             apiKey: 'primary-key',
           },
           isPrimary: true,
@@ -260,7 +268,7 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'VCKIT',
           name: `E2E Second Primary VC ${RUN_ID}`,
           config: {
-            baseUrl: 'https://second.example.com',
+            baseUrl: config.services.storage.baseUrl,
             apiKey: 'second-key',
           },
           isPrimary: true,
@@ -330,7 +338,7 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'VCKIT',
           name: `E2E Override Test ${RUN_ID}`,
           config: {
-            baseUrl: 'https://override-test.example.com',
+            baseUrl: config.services.vckit.baseUrl,
             apiKey: 'override-key',
           },
           isPrimary: true,
@@ -510,7 +518,7 @@ describe('Service API', { testIsolation: false }, () => {
         body: {
           adapterType: 'VCKIT',
           name: 'Test',
-          config: { baseUrl: 'https://example.com', apiKey: 'key' },
+          config: { baseUrl: config.services.vckit.baseUrl, apiKey: 'key' },
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -525,7 +533,7 @@ describe('Service API', { testIsolation: false }, () => {
         body: {
           serviceType: 'VC',
           name: 'Test',
-          config: { baseUrl: 'https://example.com', apiKey: 'key' },
+          config: { baseUrl: config.services.vckit.baseUrl, apiKey: 'key' },
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -540,7 +548,7 @@ describe('Service API', { testIsolation: false }, () => {
         body: {
           serviceType: 'VC',
           adapterType: 'VCKIT',
-          config: { baseUrl: 'https://example.com', apiKey: 'key' },
+          config: { baseUrl: config.services.vckit.baseUrl, apiKey: 'key' },
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -571,7 +579,7 @@ describe('Service API', { testIsolation: false }, () => {
           serviceType: 'INVALID',
           adapterType: 'VCKIT',
           name: 'Test',
-          config: { baseUrl: 'https://example.com', apiKey: 'key' },
+          config: { baseUrl: config.services.vckit.baseUrl, apiKey: 'key' },
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -684,7 +692,7 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'VCKIT',
           name: `Temp SSRF PATCH Test ${RUN_ID}`,
           config: {
-            baseUrl: 'https://example.com:3332',
+            baseUrl: config.services.vckit.baseUrl,
             apiKey: 'test-key',
           },
         },
@@ -718,7 +726,7 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'VCKIT',
           name: `Temp Service ${RUN_ID}`,
           config: {
-            baseUrl: 'https://temp.example.com',
+            baseUrl: config.services.vckit.baseUrl,
             apiKey: 'temp-key',
           },
         },
@@ -751,7 +759,7 @@ describe('Service API', { testIsolation: false }, () => {
           adapterType: 'VCKIT',
           name: `Temp Config Type ${RUN_ID}`,
           config: {
-            baseUrl: 'https://temp.example.com',
+            baseUrl: config.services.vckit.baseUrl,
             apiKey: 'temp-key',
           },
         },

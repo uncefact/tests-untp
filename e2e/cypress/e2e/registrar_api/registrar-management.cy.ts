@@ -1,14 +1,23 @@
+import { config } from '../../support/config';
+
 describe('Registrar API', { testIsolation: false }, () => {
   const RUN_ID = Date.now();
   let createdRegistrarId: string;
+  let testTenantId: string;
 
   before(() => {
+    // Clean up any stale data from a previous failed run
+    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
+
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: 'e2e-admin@test.local' });
+    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
+      testTenantId = result.tenantId;
+    });
   });
 
   after(() => {
-    cy.task('cleanupTestData', { tenantId: 'e2e-test-org' });
+    const preserveTenant = config.tenantMode === 'closed';
+    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
   });
 
   describe('CRUD operations', () => {

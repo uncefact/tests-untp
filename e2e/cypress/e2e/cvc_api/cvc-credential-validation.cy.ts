@@ -1,3 +1,5 @@
+import { config } from '../../support/config';
+
 /**
  * Tests CVC validation during DCC credential issuance.
  *
@@ -6,7 +8,7 @@
  * or unrecognised.
  */
 describe('CVC Credential Validation', { testIsolation: false }, () => {
-  const TEST_ORG_ID = 'e2e-test-org';
+  const TEST_ORG_ID = config.testOrg.id;
   const RUN_ID = Date.now();
 
   // Canonical IDs matching the seeded CVC fixture
@@ -15,6 +17,7 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
   const CRITERION_2_CANONICAL_ID = 'https://example.com/e2e-cvc/criterion-2';
 
   let defaultDidValue: string;
+  let testTenantId: string;
 
   /**
    * Builds a schema-valid DCC v0.6.1 credential payload.
@@ -97,11 +100,16 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
   }
 
   before(() => {
-    cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: 'e2e-admin@test.local' });
+    // Clean up any stale data from a previous failed run
+    cy.task('cleanupTestData', { tenantId: TEST_ORG_ID });
 
-    // Seed CVC catalogue data
-    cy.task('seedCvcCatalogue', { tenantId: TEST_ORG_ID });
+    cy.apiLogin();
+    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
+      testTenantId = result.tenantId;
+    }).then(() => {
+      // Seed CVC catalogue data (must be inside .then() so testTenantId is set)
+      cy.task('seedCvcCatalogue', { tenantId: testTenantId });
+    });
 
     // Create VC service instance (required for signing)
     cy.request({
@@ -112,8 +120,8 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
         adapterType: 'VCKIT',
         name: 'E2E CVC VCKit',
         config: {
-          baseUrl: 'http://vckit-api:3332',
-          apiKey: 'test123',
+          baseUrl: config.services.vckit.baseUrl,
+          apiKey: config.services.vckit.apiKey,
         },
         apiVersion: '1.0.0',
         isPrimary: true,
@@ -130,9 +138,9 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
         adapterType: 'UNCEFACT_STORAGE',
         name: 'E2E CVC Storage',
         config: {
-          baseUrl: 'http://storage-service:3334',
-          apiKey: 'test123',
-          apiVersion: '3.1.0',
+          baseUrl: config.services.storage.baseUrl,
+          apiKey: config.services.storage.apiKey,
+          apiVersion: config.services.storage.apiVersion,
         },
         apiVersion: '3.1.0',
         isPrimary: true,
@@ -151,7 +159,8 @@ describe('CVC Credential Validation', { testIsolation: false }, () => {
   });
 
   after(() => {
-    cy.task('cleanupTestData', { tenantId: TEST_ORG_ID });
+    const preserveTenant = config.tenantMode === 'closed';
+    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
   });
 
   // -----------------------------------------------------------------------

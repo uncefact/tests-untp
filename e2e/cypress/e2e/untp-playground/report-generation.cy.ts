@@ -1,8 +1,9 @@
 import { TestCaseStatus } from '../../../../packages/untp-playground/constants';
+import { config } from '../../support/config';
 
 describe('Report Generation', () => {
   beforeEach(() => {
-    cy.visit('http://localhost:4000');
+    cy.visit(config.playground.baseUrl);
   });
 
   it('should disable report generation buttons initially', () => {

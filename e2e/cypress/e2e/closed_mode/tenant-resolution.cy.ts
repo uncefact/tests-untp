@@ -7,11 +7,13 @@
  *
  * Requires: docker-compose.e2e-closed.yml overlay
  */
+import { config } from '../../support/config';
+
 describe('Closed mode — tenant resolution', { testIsolation: false }, () => {
-  const GROUP_CLAIM = '/e2e-org-alpha';
-  const ADMIN_EMAIL = 'e2e-admin@test.local';
-  const USER_EMAIL = 'e2e-user@test.local';
-  const PASSWORD = 'E2eTest123!';
+  const GROUP_CLAIM = config.groups.alpha;
+  const ADMIN_EMAIL = config.user.email;
+  const USER_EMAIL = config.user2.email;
+  const PASSWORD = config.user.password;
 
   before(() => {
     // Clean up any leftover data from previous runs

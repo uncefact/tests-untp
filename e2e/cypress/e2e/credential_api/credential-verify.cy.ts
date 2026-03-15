@@ -1,6 +1,8 @@
+import { config } from '../../support/config';
+
 describe('Credential Verify API', { testIsolation: false }, () => {
-  const TEST_ORG_ID = 'e2e-test-org';
   const RUN_ID = Date.now();
+  let testTenantId: string;
   let defaultDidValue: string;
   let unencryptedUri: string;
   let unencryptedHash: string;
@@ -31,8 +33,13 @@ describe('Credential Verify API', { testIsolation: false }, () => {
   // ── Setup ──────────────────────────────────────────────────────────
 
   before(() => {
+    // Clean up any stale data from a previous failed run
+    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
+
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: 'e2e-admin@test.local' });
+    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
+      testTenantId = result.tenantId;
+    });
 
     // VC service instance
     cy.request({
@@ -43,8 +50,8 @@ describe('Credential Verify API', { testIsolation: false }, () => {
         adapterType: 'VCKIT',
         name: 'Verify E2E VCKit',
         config: {
-          baseUrl: 'http://vckit-api:3332',
-          apiKey: 'test123',
+          baseUrl: config.services.vckit.baseUrl,
+          apiKey: config.services.vckit.apiKey,
         },
         apiVersion: '1.0.0',
         isPrimary: true,
@@ -60,11 +67,11 @@ describe('Credential Verify API', { testIsolation: false }, () => {
         adapterType: 'UNCEFACT_STORAGE',
         name: 'Verify E2E Storage',
         config: {
-          baseUrl: 'http://storage-service:3334',
-          apiKey: 'test123',
-          apiVersion: '3.1.0',
-          publicBucket: 'public-data',
-          privateBucket: 'private-data',
+          baseUrl: config.services.storage.baseUrl,
+          apiKey: config.services.storage.apiKey,
+          apiVersion: config.services.storage.apiVersion,
+          publicBucket: config.services.storage.publicBucket,
+          privateBucket: config.services.storage.privateBucket,
         },
         apiVersion: '3.1.0',
         isPrimary: true,
@@ -82,7 +89,8 @@ describe('Credential Verify API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    cy.task('cleanupTestData', { tenantId: TEST_ORG_ID });
+    const preserveTenant = config.tenantMode === 'closed';
+    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
   });
 
   // ── Issue credentials for verification ─────────────────────────────
@@ -262,15 +270,21 @@ describe('Credential Verify API', { testIsolation: false }, () => {
       });
     });
 
-    it('returns 502 when storage URI is unreachable', () => {
+    it('returns error when storage URI is unreachable', () => {
+      const ssrfEnabled = !Cypress.env('VERIFY_ALLOW_PRIVATE_URLS');
       cy.request({
         method: 'POST',
         url: '/api/v1/credentials/verify',
         body: { uri: 'https://nonexistent.invalid/credential' },
         failOnStatusCode: false,
       }).then((response) => {
-        expect(response.status).to.eq(502);
-        expect(response.body.code).to.eq('UPSTREAM_ERROR');
+        if (ssrfEnabled) {
+          // SSRF validation rejects the URL before it reaches the upstream
+          expect(response.status).to.eq(400);
+        } else {
+          expect(response.status).to.eq(502);
+          expect(response.body.code).to.eq('UPSTREAM_ERROR');
+        }
       });
     });
   });

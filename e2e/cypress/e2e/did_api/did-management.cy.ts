@@ -1,17 +1,24 @@
+import { config } from '../../support/config';
+
 describe('DID API', { testIsolation: false }, () => {
-  const TEST_ORG_ID = 'e2e-test-org';
   const RUN_ID = Date.now();
+  let testTenantId: string;
   let createdDidId: string;
   let createdDid: string;
   let defaultDidId: string;
   let vcServiceInstanceId: string;
 
   before(() => {
+    // Clean up any stale data from a previous failed run
+    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
+
     // Login first — NextAuth creates the User record on first login
     cy.apiLogin();
 
     // Seed test organisation and link the logged-in user
-    cy.task('seedTestOrg', { userEmail: 'e2e-admin@test.local' });
+    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
+      testTenantId = result.tenantId;
+    });
 
     // Create VC service instance (needed for DID import)
     cy.request({
@@ -22,8 +29,8 @@ describe('DID API', { testIsolation: false }, () => {
         adapterType: 'VCKIT',
         name: 'E2E VCKit VC',
         config: {
-          baseUrl: 'http://vckit-api:3332',
-          apiKey: 'test123',
+          baseUrl: config.services.vckit.baseUrl,
+          apiKey: config.services.vckit.apiKey,
         },
         isPrimary: true,
       },
@@ -34,7 +41,8 @@ describe('DID API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    cy.task('cleanupTestData', { tenantId: TEST_ORG_ID });
+    const preserveTenant = config.tenantMode === 'closed';
+    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
   });
 
   describe('CRUD operations', () => {

@@ -1,9 +1,9 @@
 import { VCDM_CONTEXT_URLS } from '../../../../packages/untp-playground/constants';
+import { config } from '../../support/config';
 
 describe('VCDM Schema Validation', () => {
-  // TODO: Use endpoint defined in e2e config
   beforeEach(() => {
-    cy.visit('http://localhost:4000');
+    cy.visit(config.playground.baseUrl);
   });
 
   const validCredential = {

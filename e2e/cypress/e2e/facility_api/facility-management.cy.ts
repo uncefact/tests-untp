@@ -1,5 +1,8 @@
+import { config } from '../../support/config';
+
 describe('Facility API', { testIsolation: false }, () => {
   const RUN_ID = Date.now();
+  let testTenantId: string;
   let registrarId: string;
   let schemeId: string;
   let identifierId: string;
@@ -8,8 +11,13 @@ describe('Facility API', { testIsolation: false }, () => {
   let createdFacilityId: string;
 
   before(() => {
+    // Clean up any stale data from a previous failed run
+    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
+
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: 'e2e-admin@test.local' });
+    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
+      testTenantId = result.tenantId;
+    });
 
     // Create prerequisite chain:
     // 1. registrar -> scheme -> 2 identifiers (primary + secondary)
@@ -75,7 +83,8 @@ describe('Facility API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    cy.task('cleanupTestData', { tenantId: 'e2e-test-org' });
+    const preserveTenant = config.tenantMode === 'closed';
+    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
   });
 
   describe('CRUD operations', () => {

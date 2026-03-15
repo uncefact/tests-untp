@@ -1,16 +1,25 @@
+import { config } from '../../support/config';
+
 describe('CVC API', { testIsolation: false }, () => {
   let catalogueId: string;
   let schemeId: string;
   let profileId: string;
   let criterionId: string;
+  let testTenantId: string;
 
   before(() => {
+    // Clean up any stale data from a previous failed run
+    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
+
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: 'e2e-admin@test.local' });
+    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
+      testTenantId = result.tenantId;
+    });
   });
 
   after(() => {
-    cy.task('cleanupTestData', { tenantId: 'e2e-test-org' });
+    const preserveTenant = config.tenantMode === 'closed';
+    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
   });
 
   // -----------------------------------------------------------------------
@@ -18,7 +27,7 @@ describe('CVC API', { testIsolation: false }, () => {
   // -----------------------------------------------------------------------
   describe('Seed & Browse', () => {
     it('seeds a CVC catalogue via task', () => {
-      cy.task('seedCvcCatalogue', { tenantId: 'e2e-test-org' }).then((result: any) => {
+      cy.task('seedCvcCatalogue', { tenantId: testTenantId }).then((result: any) => {
         expect(result.catalogueId).to.be.a('string');
         expect(result.schemeId).to.be.a('string');
         expect(result.profileId).to.be.a('string');
@@ -356,7 +365,7 @@ describe('CVC API', { testIsolation: false }, () => {
   describe('Pagination', () => {
     before(() => {
       // Re-seed so pagination tests have data (previous section deleted it)
-      cy.task('seedCvcCatalogue', { tenantId: 'e2e-test-org' }).then((result: any) => {
+      cy.task('seedCvcCatalogue', { tenantId: testTenantId }).then((result: any) => {
         catalogueId = result.catalogueId;
       });
     });

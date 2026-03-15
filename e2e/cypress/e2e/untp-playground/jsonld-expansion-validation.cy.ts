@@ -1,8 +1,9 @@
 import { allowedContextValue } from '../../../../packages/untp-playground/constants';
+import { config } from '../../support/config';
 
 describe('JSON-LD Expansion and Validation', () => {
   beforeEach(() => {
-    cy.visit('http://localhost:4000');
+    cy.visit(config.playground.baseUrl);
   });
 
   const validCredential = {

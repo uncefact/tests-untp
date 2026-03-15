@@ -1,6 +1,8 @@
+import { config } from '../../support/config';
+
 describe('Verify Page', { testIsolation: false }, () => {
-  const TEST_ORG_ID = 'e2e-test-org';
   const RUN_ID = Date.now();
+  let testTenantId: string;
   let defaultDidValue: string;
   let unencryptedUri: string;
   let unencryptedHash: string;
@@ -40,8 +42,13 @@ describe('Verify Page', { testIsolation: false }, () => {
   // ── Setup ──────────────────────────────────────────────────────────
 
   before(() => {
+    // Clean up any stale data from a previous failed run
+    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
+
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: 'e2e-admin@test.local' });
+    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
+      testTenantId = result.tenantId;
+    });
 
     // VC service instance
     cy.request({
@@ -52,8 +59,8 @@ describe('Verify Page', { testIsolation: false }, () => {
         adapterType: 'VCKIT',
         name: 'Verify Page E2E VCKit',
         config: {
-          baseUrl: 'http://vckit-api:3332',
-          apiKey: 'test123',
+          baseUrl: config.services.vckit.baseUrl,
+          apiKey: config.services.vckit.apiKey,
         },
         apiVersion: '1.0.0',
         isPrimary: true,
@@ -69,11 +76,11 @@ describe('Verify Page', { testIsolation: false }, () => {
         adapterType: 'UNCEFACT_STORAGE',
         name: 'Verify Page E2E Storage',
         config: {
-          baseUrl: 'http://storage-service:3334',
-          apiKey: 'test123',
-          apiVersion: '3.1.0',
-          publicBucket: 'public-data',
-          privateBucket: 'private-data',
+          baseUrl: config.services.storage.baseUrl,
+          apiKey: config.services.storage.apiKey,
+          apiVersion: config.services.storage.apiVersion,
+          publicBucket: config.services.storage.publicBucket,
+          privateBucket: config.services.storage.privateBucket,
         },
         apiVersion: '3.1.0',
         isPrimary: true,
@@ -91,7 +98,8 @@ describe('Verify Page', { testIsolation: false }, () => {
   });
 
   after(() => {
-    cy.task('cleanupTestData', { tenantId: TEST_ORG_ID });
+    const preserveTenant = config.tenantMode === 'closed';
+    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
   });
 
   // ── Issue credentials for verification ─────────────────────────────
@@ -219,12 +227,18 @@ describe('Verify Page', { testIsolation: false }, () => {
     });
 
     it('shows error for unreachable URI', () => {
+      const ssrfEnabled = !Cypress.env('VERIFY_ALLOW_PRIVATE_URLS');
       cy.visit(buildDirectVerifyUrl({ uri: 'https://nonexistent.invalid/credential' }));
 
       cy.contains('Invalid verification link').should('not.exist');
 
-      // The API returns 502 UPSTREAM_ERROR; the page displays the thrown error
-      cy.contains('UPSTREAM_ERROR', { timeout: 30000 }).should('be.visible');
+      if (ssrfEnabled) {
+        // SSRF validation rejects the URL — page shows the rejection message
+        cy.contains('could not be resolved', { matchCase: false, timeout: 30000 }).should('be.visible');
+      } else {
+        // The API returns 502 UPSTREAM_ERROR; the page displays the thrown error
+        cy.contains('UPSTREAM_ERROR', { timeout: 30000 }).should('be.visible');
+      }
     });
 
     it('shows error when encrypted credential has no decryptionKey', () => {

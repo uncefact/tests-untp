@@ -1,6 +1,8 @@
+import { config } from '../../support/config';
+
 describe('Download Report', () => {
   beforeEach(() => {
-    cy.visit('http://localhost:4000');
+    cy.visit(config.playground.baseUrl);
   });
 
   it('should disable download report buttons initially', () => {
