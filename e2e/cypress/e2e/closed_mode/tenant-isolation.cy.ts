@@ -5,19 +5,23 @@
  * Keycloak groups are resolved to separate tenants and cannot see each
  * other's resources.
  *
- * SA1 (ri-service-account-e2e) → /e2e-org-alpha
- * SA2 (ri-service-account-e2e-2) → /e2e-org-beta
+ * SA1 → group alpha
+ * SA2 → group beta
  *
  * Requires: docker-compose.e2e-closed.yml overlay (TENANT_MODE=closed)
  */
+import { config } from '../../support/config';
+
 describe('Closed mode — tenant isolation', { testIsolation: false }, () => {
-  const SA1 = { clientId: 'ri-service-account-e2e', clientSecret: 'e2e-service-account-secret' };
-  const SA2 = { clientId: 'ri-service-account-e2e-2', clientSecret: 'e2e-service-account-secret-2' };
-  const GROUP_ALPHA = '/e2e-org-alpha';
-  const GROUP_BETA = '/e2e-org-beta';
+  const SA1 = config.serviceAccounts.sa1;
+  const SA2 = config.serviceAccounts.sa2;
+  const GROUP_ALPHA = config.groups.alpha;
+  const GROUP_BETA = config.groups.beta;
 
   let token1: string;
   let token2: string;
+  let sub1: string;
+  let sub2: string;
   let did1Id: string;
 
   before(() => {
@@ -28,16 +32,28 @@ describe('Closed mode — tenant isolation', { testIsolation: false }, () => {
     // Get tokens for both service accounts
     cy.task('getServiceAccountToken', SA1).then((result: any) => {
       token1 = result.accessToken;
+      const payload = JSON.parse(
+        Buffer.from(token1.split('.')[1], 'base64').toString(),
+      );
+      sub1 = payload.sub;
+      cy.task('cleanupServiceAccountData', { sub: sub1 });
     });
 
     cy.task('getServiceAccountToken', SA2).then((result: any) => {
       token2 = result.accessToken;
+      const payload = JSON.parse(
+        Buffer.from(token2.split('.')[1], 'base64').toString(),
+      );
+      sub2 = payload.sub;
+      cy.task('cleanupServiceAccountData', { sub: sub2 });
     });
   });
 
   after(() => {
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_ALPHA });
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_BETA });
+    cy.task('cleanupServiceAccountData', { sub: sub1 });
+    cy.task('cleanupServiceAccountData', { sub: sub2 });
   });
 
   it('SA1 (alpha) creates a DID', () => {

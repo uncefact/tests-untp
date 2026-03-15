@@ -35,6 +35,8 @@ yarn-error.log
 testem.log
 /typings
 .env
+.env.e2e
+.env.e2e.*
 minio_data/*
 
 # Yarn

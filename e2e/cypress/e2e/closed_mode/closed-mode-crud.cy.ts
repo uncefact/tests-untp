@@ -7,10 +7,10 @@
  *
  * Requires: docker-compose.e2e-closed.yml overlay
  */
+import { config } from '../../support/config';
+
 describe('Closed mode — DID CRUD', { testIsolation: false }, () => {
-  const GROUP_CLAIM = '/e2e-org-alpha';
-  const ADMIN_EMAIL = 'e2e-admin@test.local';
-  const PASSWORD = 'E2eTest123!';
+  const GROUP_CLAIM = config.groups.alpha;
   const RUN_ID = Date.now();
   let createdDidId: string;
 
@@ -19,7 +19,7 @@ describe('Closed mode — DID CRUD', { testIsolation: false }, () => {
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
 
     // Login — triggers closed mode tenant provisioning
-    cy.apiLogin(ADMIN_EMAIL, PASSWORD);
+    cy.apiLogin(config.user.email, config.user.password);
   });
 
   after(() => {

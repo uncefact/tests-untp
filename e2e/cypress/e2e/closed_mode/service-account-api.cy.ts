@@ -8,22 +8,35 @@
  *
  * Requires: docker-compose.e2e-closed.yml overlay
  */
+import { config } from '../../support/config';
+
 describe('Closed mode — service account API', { testIsolation: false }, () => {
-  const GROUP_CLAIM = '/e2e-org-alpha';
+  const GROUP_CLAIM = config.groups.alpha;
   let accessToken: string;
+  let tokenSub: string;
 
   before(() => {
     // Clean up any leftover closed mode data
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
 
-    // Fetch a service account token from Keycloak
+    // Fetch a service account token
     cy.task('getServiceAccountToken').then((result: any) => {
       accessToken = result.accessToken;
+
+      // Decode the JWT payload to extract the sub claim for cleanup
+      const payload = JSON.parse(
+        Buffer.from(accessToken.split('.')[1], 'base64').toString(),
+      );
+      tokenSub = payload.sub;
+
+      // Clean up any leftover SA user from previous runs
+      cy.task('cleanupServiceAccountData', { sub: tokenSub });
     });
   });
 
   after(() => {
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
+    cy.task('cleanupServiceAccountData', { sub: tokenSub });
   });
 
   it('GET /api/v1/dids — authenticates via bearer token and resolves tenant by group', () => {
@@ -69,7 +82,7 @@ describe('Closed mode — service account API', { testIsolation: false }, () => 
 
   it('session user and service account share the same group tenant', () => {
     // First, sign in via browser to create a session-based user in the same group
-    cy.apiLogin('e2e-admin@test.local', 'E2eTest123!');
+    cy.apiLogin(config.user.email, config.user.password);
 
     // Both the session user and service account user should be in the same tenant
     // because they share the /e2e-org-alpha group

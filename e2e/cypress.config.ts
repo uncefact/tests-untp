@@ -1,5 +1,6 @@
 import { exec } from 'child_process';
 import { defineConfig } from 'cypress';
+import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import util from 'util';
@@ -7,15 +8,24 @@ import { Client, ClientOptions } from 'minio';
 import pg from 'pg';
 const { Client: PgClient } = pg;
 
+// Load .env.e2e from the repo root (one level up from e2e/)
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '..', '.env.e2e') });
+
 const execPromise = util.promisify(exec);
 
 function getDbClient() {
+  const isRemoteDb = process.env.E2E_DB_HOST && process.env.E2E_DB_HOST !== 'localhost';
+  const rejectUnauthorized = (process.env.E2E_DB_SSL_REJECT_UNAUTHORIZED ?? 'true') === 'true';
   return new PgClient({
     host: process.env.E2E_DB_HOST || 'localhost',
     port: parseInt(process.env.E2E_DB_PORT || '5433', 10),
     user: process.env.E2E_DB_USER || 'ri-postgres',
     password: process.env.E2E_DB_PASSWORD || 'ri-postgres',
     database: process.env.E2E_DB_NAME || 'ri',
+    ssl: isRemoteDb ? { rejectUnauthorized } : undefined,
   });
 }
 
@@ -23,7 +33,7 @@ function getDbClient() {
 // - Credential has no FK to Tenant (legacy schema, tenantId is a plain column)
 // - Product self-reference is Restrict to prevent accidental orphaning of child products
 // - Identifier → IdentifierScheme is Restrict to prevent deleting schemes still in use
-async function deleteTenantData(client: any, tenantId: string) {
+async function deleteTenantData(client: any, tenantId: string, options?: { preserveTenant?: boolean }) {
   // Delete in dependency order (children first)
 
   // CVC tables (join table → profiles → schemes → catalogues → orphan criteria)
@@ -128,17 +138,19 @@ async function deleteTenantData(client: any, tenantId: string) {
     [tenantId],
   );
 
-  // Unlink users from tenant (don't delete users - NextAuth owns them)
-  await client.query(
-    `UPDATE "User" SET "tenantId" = NULL WHERE "tenantId" = $1`,
-    [tenantId],
-  );
+  if (!options?.preserveTenant) {
+    // Unlink users from tenant (don't delete users - NextAuth owns them)
+    await client.query(
+      `UPDATE "User" SET "tenantId" = NULL WHERE "tenantId" = $1`,
+      [tenantId],
+    );
 
-  // Delete tenant
-  await client.query(
-    `DELETE FROM "Tenant" WHERE id = $1`,
-    [tenantId],
-  );
+    // Delete tenant
+    await client.query(
+      `DELETE FROM "Tenant" WHERE id = $1`,
+      [tenantId],
+    );
+  }
 }
 
 export default defineConfig({
@@ -151,13 +163,56 @@ export default defineConfig({
       accessKey: process.env.OBJECT_STORAGE_ACCESS_KEY || 'minioadmin',
       secretKey: process.env.OBJECT_STORAGE_SECRET_KEY || 'minioadmin',
     },
-    VERIFY_ALLOW_PRIVATE_URLS: process.env.VERIFY_ALLOW_PRIVATE_URLS ?? process.env.CYPRESS_VERIFY_ALLOW_PRIVATE_URLS ?? 'true',
+    VERIFY_ALLOW_PRIVATE_URLS: (process.env.VERIFY_ALLOW_PRIVATE_URLS ?? process.env.CYPRESS_VERIFY_ALLOW_PRIVATE_URLS ?? 'true') === 'true',
+
+    // Identity provider
+    IDP_PROVIDER: process.env.E2E_IDP_PROVIDER || 'keycloak',
+    IDP_BASE_URL: process.env.E2E_IDP_BASE_URL || 'http://localhost:8081',
+    IDP_REALM: process.env.E2E_IDP_REALM || 'ri-e2e',
+    IDP_CLIENT_ID: process.env.E2E_IDP_CLIENT_ID || 'ri-app-e2e',
+    IDP_CLIENT_SECRET: process.env.E2E_IDP_CLIENT_SECRET || 'e2e-test-secret',
+    IDP_AUDIENCE: process.env.E2E_IDP_AUDIENCE || '',
+
+    // Test users
+    USER_EMAIL: process.env.E2E_USER_EMAIL || 'e2e-admin@test.local',
+    USER_PASSWORD: process.env.E2E_USER_PASSWORD || 'E2eTest123!',
+    USER2_EMAIL: process.env.E2E_USER2_EMAIL || 'e2e-user@test.local',
+
+    // Service accounts
+    SA1_CLIENT_ID: process.env.E2E_SA1_CLIENT_ID || 'ri-service-account-e2e',
+    SA1_CLIENT_SECRET: process.env.E2E_SA1_CLIENT_SECRET || 'e2e-service-account-secret',
+    SA2_CLIENT_ID: process.env.E2E_SA2_CLIENT_ID || 'ri-service-account-e2e-2',
+    SA2_CLIENT_SECRET: process.env.E2E_SA2_CLIENT_SECRET || 'e2e-service-account-secret-2',
+
+    // RI-internal services
+    VCKIT_BASE_URL: process.env.E2E_VCKIT_BASE_URL || 'http://vckit-api:3332',
+    VCKIT_API_KEY: process.env.E2E_VCKIT_API_KEY || 'test123',
+    STORAGE_BASE_URL: process.env.E2E_STORAGE_BASE_URL || 'http://storage-service:3334',
+    STORAGE_API_KEY: process.env.E2E_STORAGE_API_KEY || 'test123',
+    STORAGE_API_VERSION: process.env.E2E_STORAGE_API_VERSION || '3.1.0',
+    STORAGE_PUBLIC_BUCKET: process.env.E2E_STORAGE_PUBLIC_BUCKET || 'public-data',
+    STORAGE_PRIVATE_BUCKET: process.env.E2E_STORAGE_PRIVATE_BUCKET || 'private-data',
+
+    // Test organisation
+    TEST_ORG_ID: process.env.E2E_TEST_ORG_ID || 'e2e-test-org',
+
+    // Tenant mode
+    TENANT_MODE: process.env.E2E_TENANT_MODE || 'open',
+
+    // Closed-mode groups
+    GROUP_ALPHA: process.env.E2E_GROUP_ALPHA || '/e2e-org-alpha',
+    GROUP_BETA: process.env.E2E_GROUP_BETA || '/e2e-org-beta',
+
+    // Playground (optional)
+    PLAYGROUND_BASE_URL: process.env.E2E_PLAYGROUND_BASE_URL || '',
   },
   e2e: {
-    baseUrl: 'http://localhost:3003', // Replace with your application's base URL
+    baseUrl: process.env.CYPRESS_BASE_URL || 'http://localhost:3003',
     supportFile: 'cypress/support/e2e.ts',
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
-    excludeSpecPattern: process.env.CYPRESS_INCLUDE_CLOSED_MODE === 'true' ? [] : ['cypress/e2e/closed_mode/**'], // env var needed because excludeSpecPattern takes precedence over --spec CLI flag
+    excludeSpecPattern: (process.env.E2E_TENANT_MODE || 'open') === 'closed'
+      ? ['cypress/e2e/open_mode/**']
+      : ['cypress/e2e/closed_mode/**'],
     video: false, // Disable video recording (optional)
     chromeWebSecurity: false, // Helps bypass security restrictions (if needed)
     retries: {
@@ -167,6 +222,34 @@ export default defineConfig({
     defaultCommandTimeout: 10000,
     defaultBrowser: 'chrome',
     setupNodeEvents(on) {
+      // Clean up all test artefacts after all specs complete
+      on('after:run', async () => {
+        const client = getDbClient();
+        try {
+          await client.connect();
+
+          // Clean up human test users and their OAuth accounts
+          const userEmail = process.env.E2E_USER_EMAIL || 'e2e-admin@test.local';
+          const user2Email = process.env.E2E_USER2_EMAIL || 'e2e-user@test.local';
+          for (const email of [userEmail, user2Email]) {
+            await client.query(
+              `DELETE FROM "Account" WHERE "userId" IN (SELECT id FROM "User" WHERE email = $1)`,
+              [email],
+            );
+            await client.query(`DELETE FROM "User" WHERE email = $1`, [email]);
+          }
+
+          // Clean up orphaned Account records (Account exists but User was already deleted)
+          await client.query(
+            `DELETE FROM "Account" WHERE "userId" NOT IN (SELECT id FROM "User")`,
+          );
+        } catch {
+          // Silently ignore — DB may not be reachable (e.g. local Docker already down)
+        } finally {
+          await client.end().catch(() => {});
+        }
+      });
+
       on('task', {
         writeToFile({ fileName, data }: { fileName: string; data: any }) {
           const filePath = path.resolve('cypress/fixtures/credentials-e2e', fileName);
@@ -237,39 +320,63 @@ export default defineConfig({
           });
         },
         async seedTestOrg({ userEmail }: { userEmail: string }) {
+          const tenantMode = process.env.E2E_TENANT_MODE || 'open';
           const client = getDbClient();
           try {
             await client.connect();
 
-            // Create or update test tenant
+            if (tenantMode === 'closed') {
+              // In closed mode, the tenant is auto-provisioned from the IDP group.
+              // Find the user's existing tenant.
+              const result = await client.query(
+                `SELECT id, "tenantId" FROM "User" WHERE email = $1`,
+                [userEmail],
+              );
+
+              if (result.rowCount === 0) {
+                throw new Error(`User with email ${userEmail} not found. Has the user logged in?`);
+              }
+
+              const tenantId = result.rows[0].tenantId;
+              if (!tenantId) {
+                throw new Error(`User ${userEmail} has no tenant. In closed mode, the user must log in first to auto-provision a tenant.`);
+              }
+
+              // Clean existing test data so tests start fresh
+              await deleteTenantData(client, tenantId, { preserveTenant: true });
+
+              return { tenantId, userId: result.rows[0].id };
+            }
+
+            // Open mode: create or update test tenant
+            const testOrgId = process.env.E2E_TEST_ORG_ID || 'e2e-test-org';
             await client.query(`
               INSERT INTO "Tenant" (id, name, "createdAt", "updatedAt")
-              VALUES ('e2e-test-org', 'E2E Test Organisation', NOW(), NOW())
+              VALUES ($1, 'E2E Test Organisation', NOW(), NOW())
               ON CONFLICT (id) DO UPDATE SET "updatedAt" = NOW()
-            `);
+            `, [testOrgId]);
 
-            // Link the user (created by NextAuth on first login) to the test tenant
             const result = await client.query(
-              `UPDATE "User" SET "tenantId" = 'e2e-test-org', "updatedAt" = NOW()
-               WHERE email = $1
+              `UPDATE "User" SET "tenantId" = $1, "updatedAt" = NOW()
+               WHERE email = $2
                RETURNING id`,
-              [userEmail],
+              [testOrgId, userEmail],
             );
 
             if (result.rowCount === 0) {
               throw new Error(`User with email ${userEmail} not found. Has the user logged in?`);
             }
 
-            return { tenantId: 'e2e-test-org', userId: result.rows[0].id };
+            return { tenantId: testOrgId, userId: result.rows[0].id };
           } finally {
             await client.end();
           }
         },
-        async cleanupTestData({ tenantId }: { tenantId: string }) {
+        async cleanupTestData({ tenantId, preserveTenant }: { tenantId: string; preserveTenant?: boolean }) {
           const client = getDbClient();
           try {
             await client.connect();
-            await deleteTenantData(client, tenantId);
+            await deleteTenantData(client, tenantId, { preserveTenant });
             return null;
           } finally {
             await client.end();
@@ -350,14 +457,29 @@ export default defineConfig({
           }
         },
         async getServiceAccountToken(options?: { clientId?: string; clientSecret?: string }) {
-          const tokenUrl = 'http://localhost:8081/realms/ri-e2e/protocol/openid-connect/token';
-          const clientId = options?.clientId ?? 'ri-service-account-e2e';
-          const clientSecret = options?.clientSecret ?? 'e2e-service-account-secret';
+          const provider = process.env.E2E_IDP_PROVIDER || 'keycloak';
+          const idpBaseUrl = process.env.E2E_IDP_BASE_URL || 'http://localhost:8081';
+          const clientId = options?.clientId ?? (process.env.E2E_SA1_CLIENT_ID || 'ri-service-account-e2e');
+          const clientSecret = options?.clientSecret ?? (process.env.E2E_SA1_CLIENT_SECRET || 'e2e-service-account-secret');
+
+          let tokenUrl: string;
+          let scope: string;
+
+          if (provider === 'zitadel') {
+            tokenUrl = `${idpBaseUrl}/oauth/v2/token`;
+            const audience = process.env.E2E_IDP_AUDIENCE || '';
+            scope = `openid urn:zitadel:iam:org:project:id:${audience}:aud urn:zitadel:iam:org:projects:roles`;
+          } else {
+            const realm = process.env.E2E_IDP_REALM || 'ri-e2e';
+            tokenUrl = `${idpBaseUrl}/realms/${realm}/protocol/openid-connect/token`;
+            scope = 'openid';
+          }
 
           const params = new URLSearchParams({
             grant_type: 'client_credentials',
             client_id: clientId,
             client_secret: clientSecret,
+            scope,
           });
 
           const response = await fetch(tokenUrl, {
@@ -395,10 +517,34 @@ export default defineConfig({
               await deleteTenantData(client, tenantId);
             }
 
+            // Delete OAuth account links for this user
+            await client.query(`DELETE FROM "Account" WHERE "userId" = $1`, [userId]);
+
             // Delete the auto-provisioned user itself
             await client.query(`DELETE FROM "User" WHERE id = $1`, [userId]);
 
             return { userId, tenantId };
+          } finally {
+            await client.end();
+          }
+        },
+        async cleanupTestUsers({ emails }: { emails: string[] }) {
+          const client = getDbClient();
+          try {
+            await client.connect();
+            for (const email of emails) {
+              // Delete OAuth account links
+              await client.query(
+                `DELETE FROM "Account" WHERE "userId" IN (SELECT id FROM "User" WHERE email = $1)`,
+                [email],
+              );
+              // Delete user
+              await client.query(
+                `DELETE FROM "User" WHERE email = $1`,
+                [email],
+              );
+            }
+            return null;
           } finally {
             await client.end();
           }

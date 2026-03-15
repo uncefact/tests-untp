@@ -66,11 +66,14 @@ yarn test:services            # Services package only
 yarn test:mock-app            # Mock-app only
 yarn test:components          # Components only
 
-# E2E Testing (separate Docker setup)
+# E2E Testing (separate Docker setup — see e2e/README.md)
 docker compose -f docker-compose.e2e.yml up -d --build
-yarn test:run-cypress         # Headless
-yarn test:open-cypress        # Interactive UI
-docker compose -f docker-compose.e2e.yml down  # Cleanup
+yarn test:e2e                 # All tests (open mode by default)
+yarn test:e2e:open            # Explicit open mode
+yarn test:e2e:closed          # Closed mode
+yarn test:e2e:playground      # Playground tests only
+yarn test:e2e:open-ui         # Interactive UI
+docker compose -f docker-compose.e2e.yml down -v  # Cleanup (use -v for clean DB)
 ```
 
 ### Database

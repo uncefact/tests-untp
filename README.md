@@ -113,28 +113,7 @@ yarn lint                     # ESLint across packages
 
 ## End-to-End Testing
 
-E2E tests use Cypress with dedicated Docker Compose configurations for each [tenant mode](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/authentication/tenant-modes). Ensure you have completed the [Prerequisites](#prerequisites) before running.
-
-**Open mode:**
-
-```bash
-docker compose down
-docker compose -f docker-compose.e2e.yml up -d --build
-yarn test:run-cypress         # Headless
-yarn test:open-cypress        # Interactive UI
-docker compose -f docker-compose.e2e.yml down
-```
-
-**Closed mode:**
-
-```bash
-docker compose down
-docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml up -d --build
-yarn test:run-cypress:closed-mode
-docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml down
-```
-
-> **Note**: Do not mix E2E and standard Docker Compose setups. Stop existing containers before switching.
+E2E tests use Cypress and support both local Docker Compose and deployed instances. See [`e2e/README.md`](e2e/README.md) for full setup instructions, including local testing, deployed instance prerequisites, and tenant mode configuration.
 
 ## Release Management
 
