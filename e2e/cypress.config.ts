@@ -18,13 +18,14 @@ const execPromise = util.promisify(exec);
 
 function getDbClient() {
   const isRemoteDb = process.env.E2E_DB_HOST && process.env.E2E_DB_HOST !== 'localhost';
+  const rejectUnauthorized = (process.env.E2E_DB_SSL_REJECT_UNAUTHORIZED ?? 'true') === 'true';
   return new PgClient({
     host: process.env.E2E_DB_HOST || 'localhost',
     port: parseInt(process.env.E2E_DB_PORT || '5433', 10),
     user: process.env.E2E_DB_USER || 'ri-postgres',
     password: process.env.E2E_DB_PASSWORD || 'ri-postgres',
     database: process.env.E2E_DB_NAME || 'ri',
-    ssl: isRemoteDb ? { rejectUnauthorized: false } : undefined,
+    ssl: isRemoteDb ? { rejectUnauthorized } : undefined,
   });
 }
 
