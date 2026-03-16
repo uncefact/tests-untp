@@ -152,6 +152,8 @@ services:
       - SYSTEM_DID=did:web:uncefact.github.io:project-vckit:test-and-development
       - SYSTEM_DID_NAME=System Default DID
       - SYSTEM_DID_DESCRIPTION=System-wide default DID for E2E testing
+    volumes:
+      - ./examples/seed:/app/seed/custom:ro
     extra_hosts:
       - 'localhost:host-gateway'
     depends_on:

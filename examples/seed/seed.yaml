@@ -1,0 +1,109 @@
+# Example Custom Seed Manifest
+#
+# Provisions GS1/ABR/ASIC registrars, NLIS/PIC registrars for Australian livestock,
+# the AATP Digital Livestock Passport data model extension, a render template,
+# and a sustainability vocabulary catalogue.
+#
+# Mount this directory into the container at /app/seed/custom/:
+#   volumes:
+#     - ./examples/seed:/app/seed/custom:ro
+
+registrars:
+  # ── GS1 ──────────────────────────────────────────────────────────────────────
+  - id: "clgs1reg0000000000000000a"
+    name: "GS1"
+    namespace: "gs1"
+    url: "https://www.gs1.org"
+    identifierSchemes:
+      - id: "clgs1gln0000000000000000a"
+        name: "GS1 Global Location Number"
+        primaryKey: "gln"
+        validationPattern: "^\\d{13}$"
+        linkTemplate: "/{primaryKey}/{value}"
+      - id: "clgs1gtn0000000000000000a"
+        name: "GS1 Global Trade Item Number"
+        primaryKey: "01"
+        validationPattern: "^\\d{14}$"
+        linkTemplate: "/{primaryKey}/{value}"
+        qualifiers:
+          - id: "clgs1bat0000000000000000a"
+            key: "10"
+            description: "Batch/Lot Number"
+            validationPattern: "^[A-Za-z0-9]{1,20}$"
+            order: 0
+          - id: "clgs1ser0000000000000000a"
+            key: "21"
+            description: "Serial Number"
+            validationPattern: "^[A-Za-z0-9]{1,20}$"
+            order: 1
+
+  # ── Australian Business Register ─────────────────────────────────────────────
+  - id: "clabrreq0000000000000000a"
+    name: "Australian Business Register"
+    namespace: "abr"
+    url: "https://abr.business.gov.au"
+    identifierSchemes:
+      - id: "clabrabn0000000000000000a"
+        name: "Australian Business Number"
+        primaryKey: "abn"
+        validationPattern: "^\\d{11}$"
+        linkTemplate: "/{primaryKey}/{value}"
+
+  # ── ASIC ─────────────────────────────────────────────────────────────────────
+  - id: "clasicrg0000000000000000a"
+    name: "ASIC"
+    namespace: "asic"
+    url: "https://asic.gov.au"
+    identifierSchemes:
+      - id: "clasicac0000000000000000a"
+        name: "Australian Company Number"
+        primaryKey: "acn"
+        validationPattern: "^\\d{9}$"
+        linkTemplate: "/{primaryKey}/{value}"
+
+  # ── National Livestock Identification System ─────────────────────────────────
+  - id: "claatpnls000000000000000a"
+    name: "National Livestock Identification System"
+    namespace: "nlis"
+    url: "https://www.nlis.com.au"
+    identifierSchemes:
+      - id: "claatpnls100000000000000a"
+        name: "NLIS Device ID"
+        primaryKey: "nlis"
+        validationPattern: "^[A-Z0-9]{16}$"
+        linkTemplate: "/{primaryKey}/{value}"
+
+  # ── State Property Identification Registers ──────────────────────────────────
+  - id: "claatppic000000000000000a"
+    name: "State Property Identification Registers"
+    namespace: "pic"
+    url: "https://www.agriculture.gov.au"
+    identifierSchemes:
+      - id: "claatppic100000000000000a"
+        name: "Property Identification Code"
+        primaryKey: "pic"
+        validationPattern: "^[A-Z0-9]{8}$"
+        linkTemplate: "/{primaryKey}/{value}"
+
+# ── Data Model Extensions ────────────────────────────────────────────────────
+
+dataModels:
+  - id: "claatpdlp000000000000000a"
+    name: "AATP Digital Livestock Passport v0.4.0"
+    credentialType: "DigitalLivestockPassport"
+    version: "0.4.0"
+    parentConfigId: "c1pxfzzkeb86jgeel7hrvmcle"  # Core DPP v0.6.1
+    schemaUrl: "https://aatp.foodagility.com/assets/files/aatp-dlp-schema-0.4.0-9c0ad2b1ca6a9e497dedcfd8b87f35f1.json"
+    contextUrl: "https://aatp.foodagility.com/assets/files/aatp-dlp-context-0.4.0-7ed6f0cf85aa7626c480bd85212de2e4.jsonld"
+    websiteUrl: "https://aatp.foodagility.com/docs/livestock/DigitalLivestockPassport/"
+
+# ── Render Templates ─────────────────────────────────────────────────────────
+
+renderTemplates:
+  - id: "claatptpl000000000000000a"
+    name: "AATP DLP Default Template"
+    file: "render-templates/dlp-template.hbs"
+    dataModelId: "claatpdlp000000000000000a"
+    isDefault: true
+    renderMethodType: "RenderTemplate2024"
+    mediaType: "text/html"
