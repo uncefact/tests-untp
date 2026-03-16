@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { getFacilityById, updateFacility, deleteFacility } from '@/lib/prisma/repositories';
+import { getFacilityById, updateFacility, deleteFacility, UpdateFacilityInput } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/facilities/[id]' });
@@ -178,7 +178,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   }
 
   logger.info({ facilityId: id }, 'Updating facility');
-  const updated = await updateFacility(id, tenantId, updateData);
+  const updated = await updateFacility(id, tenantId, updateData as UpdateFacilityInput);
 
   logger.info({ facilityId: id }, 'Facility updated');
   return NextResponse.json(updated);

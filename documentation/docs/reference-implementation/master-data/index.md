@@ -116,7 +116,7 @@ The [population](../data-models/index.md#population) direction — where entity 
 
 ## Tenant Scoping
 
-All master data is scoped to the authenticated tenant. Each tenant maintains its own set of organisations, facilities, and products — they cannot see or modify entities belonging to other tenants. Unlike [data models](../data-models/index.md#untp-core-data-models-and-extensions) and [service instances](../services/service-architecture#system-services-vs-tenant-services), there are no system-level master data records — every entity is tenant-owned.
+All master data is scoped to the authenticated tenant. Each tenant maintains its own set of organisations, facilities, and products — they cannot see or modify entities belonging to other tenants. Unlike [data models](../api/data-models#untp-core-data-models-and-extensions) and [service instances](../services/service-architecture#system-services-vs-tenant-services), there are no system-level master data records — every entity is tenant-owned.
 
 ## Further Reading
 
