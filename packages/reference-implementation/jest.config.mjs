@@ -6,6 +6,7 @@ const jestConfig = {
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
   testMatch: [
     '**/src/**/*.test.{ts,tsx}',
+    '**/prisma/__tests__/**/*.test.{ts,tsx}',
   ],
   testPathIgnorePatterns: ['<rootDir>/node_modules/'],
   transformIgnorePatterns: [

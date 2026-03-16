@@ -67,130 +67,6 @@ async function main() {
     );
   }
 
-  // ── Seed system registrars ──────────────────────────────────────────────────
-
-  const gs1Registrar = await prisma.registrar.upsert({
-    where: { id: 'system-registrar-gs1' },
-    update: {},
-    create: {
-      id: 'system-registrar-gs1',
-      tenantId: SYSTEM_TENANT_ID,
-      name: 'GS1',
-      namespace: 'gs1',
-      url: 'https://www.gs1.org',
-    },
-  });
-
-  const abrRegistrar = await prisma.registrar.upsert({
-    where: { id: 'system-registrar-abr' },
-    update: {},
-    create: {
-      id: 'system-registrar-abr',
-      tenantId: SYSTEM_TENANT_ID,
-      name: 'Australian Business Register',
-      namespace: 'abr',
-      url: 'https://abr.business.gov.au',
-    },
-  });
-
-  const asicRegistrar = await prisma.registrar.upsert({
-    where: { id: 'system-registrar-asic' },
-    update: {},
-    create: {
-      id: 'system-registrar-asic',
-      tenantId: SYSTEM_TENANT_ID,
-      name: 'ASIC',
-      namespace: 'asic',
-      url: 'https://asic.gov.au',
-    },
-  });
-
-  // ── Seed system identifier schemes ──────────────────────────────────────────
-
-  await prisma.identifierScheme.upsert({
-    where: { id: 'system-scheme-abn' },
-    update: {},
-    create: {
-      id: 'system-scheme-abn',
-      tenantId: SYSTEM_TENANT_ID,
-      registrarId: abrRegistrar.id,
-      name: 'Australian Business Number',
-      primaryKey: 'abn',
-      validationPattern: '^\\d{11}$',
-      linkTemplate: '/{primaryKey}/{value}',
-    },
-  });
-
-  await prisma.identifierScheme.upsert({
-    where: { id: 'system-scheme-acn' },
-    update: {},
-    create: {
-      id: 'system-scheme-acn',
-      tenantId: SYSTEM_TENANT_ID,
-      registrarId: asicRegistrar.id,
-      name: 'Australian Company Number',
-      primaryKey: 'acn',
-      validationPattern: '^\\d{9}$',
-      linkTemplate: '/{primaryKey}/{value}',
-    },
-  });
-
-  await prisma.identifierScheme.upsert({
-    where: { id: 'system-scheme-gln' },
-    update: {},
-    create: {
-      id: 'system-scheme-gln',
-      tenantId: SYSTEM_TENANT_ID,
-      registrarId: gs1Registrar.id,
-      name: 'GS1 Global Location Number',
-      primaryKey: 'gln',
-      validationPattern: '^\\d{13}$',
-      linkTemplate: '/{primaryKey}/{value}',
-    },
-  });
-
-  const gtinScheme = await prisma.identifierScheme.upsert({
-    where: { id: 'system-scheme-gtin' },
-    update: {},
-    create: {
-      id: 'system-scheme-gtin',
-      tenantId: SYSTEM_TENANT_ID,
-      registrarId: gs1Registrar.id,
-      name: 'GS1 Global Trade Item Number',
-      primaryKey: '01',
-      validationPattern: '^\\d{14}$',
-      linkTemplate: '/{primaryKey}/{value}',
-    },
-  });
-
-  // ── Seed GTIN qualifiers ────────────────────────────────────────────────────
-
-  await prisma.schemeQualifier.upsert({
-    where: { id: 'system-qualifier-batch' },
-    update: {},
-    create: {
-      id: 'system-qualifier-batch',
-      schemeId: gtinScheme.id,
-      key: '10',
-      description: 'Batch/Lot Number',
-      validationPattern: '^[A-Za-z0-9]{1,20}$',
-      order: 0,
-    },
-  });
-
-  await prisma.schemeQualifier.upsert({
-    where: { id: 'system-qualifier-serial' },
-    update: {},
-    create: {
-      id: 'system-qualifier-serial',
-      schemeId: gtinScheme.id,
-      key: '21',
-      description: 'Serial Number',
-      validationPattern: '^[A-Za-z0-9]{1,20}$',
-      order: 1,
-    },
-  });
-
   // ── Seed service instances (requires SERVICE_ENCRYPTION_KEY) ────────────────
 
   const ENCRYPTION_KEY = process.env.SERVICE_ENCRYPTION_KEY;
@@ -249,12 +125,6 @@ async function main() {
         },
       });
       idrSeeded = true;
-
-      // Link registrars to the IDR service instance (must happen after the instance exists)
-      await prisma.registrar.updateMany({
-        where: { id: { in: ['system-registrar-gs1', 'system-registrar-abr', 'system-registrar-asic'] } },
-        data: { idrServiceInstanceId: SYSTEM_IDR_SERVICE_ID },
-      });
     } catch (error) {
       logger.warn(
         { error: error instanceof Error ? error.message : error },
@@ -673,11 +543,41 @@ async function main() {
     logger.warn('Skipping render template seed: storage service was not seeded');
   }
 
+  // ── Run custom seed (deployer-provided data) ──────────────────────────────
+  // Environment variables:
+  //   SKIP_CUSTOM_SEED=true   - Skip custom seed (deployer-provided data from /app/seed/custom/)
+  if (process.env.SKIP_CUSTOM_SEED !== 'true') {
+    const { runCustomSeed } = await import('./custom-seed');
+    const { SUPPORTED_CVC_VERSIONS, getCvcParser } = await import('@uncefact/untp-ri-services');
+    const { importCatalogue } = await import('../src/lib/prisma/repositories/cvc.repository');
+
+    await runCustomSeed({
+      logger: logger.child({ module: 'custom-seed' }),
+      prisma,
+      systemTenantId: SYSTEM_TENANT_ID,
+      customSeedDir: '/app/seed/custom',
+      storageService:
+        storageSeeded && storageRegistryEntry && storageConfig
+          ? storageRegistryEntry.factory(
+              storageConfig as Parameters<typeof storageRegistryEntry.factory>[0],
+              logger.child({ service: 'Storage - Custom Seed' }),
+            )
+          : null,
+      storageServiceInstanceId: SYSTEM_STORAGE_SERVICE_ID,
+      getCvcParser,
+      importCatalogue,
+      supportedCvcVersions: SUPPORTED_CVC_VERSIONS,
+    });
+  } else {
+    logger.info('Skipping custom seed (SKIP_CUSTOM_SEED is set)');
+  }
+
   logger.info(
     'Seed complete: system tenant' +
       (defaultDid ? ', default DID' : '') +
-      ', registrars, schemes, qualifiers, data models' +
+      ', data models' +
       (templatesSeeded ? ', render templates' : '') +
+      ', custom seed' +
       (idrSeeded ? ', IDR service instance' : '') +
       (storageSeeded ? ', storage service instance' : '') +
       (vcSeeded ? ', VC service instance' : '') +
