@@ -565,7 +565,7 @@ async function main() {
           : null,
       storageServiceInstanceId: SYSTEM_STORAGE_SERVICE_ID,
       getCvcParser,
-      importCatalogue,
+      importCatalogue: importCatalogue as (input: unknown) => Promise<unknown>,
       supportedCvcVersions: SUPPORTED_CVC_VERSIONS,
     });
   } else {
