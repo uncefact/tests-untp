@@ -35,6 +35,14 @@ const logger = apiLogger.child({ route: '/api/v1/organisations' });
  *                 location:
  *                   type: object
  *                   description: Optional UNTP location object
+ *                 primaryIdentifierId:
+ *                   type: string
+ *                   description: ID of the primary identifier
+ *                 secondaryIdentifierIds:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   description: IDs of secondary identifiers
  *     responses:
  *       201:
  *         description: Organisations created successfully
@@ -56,6 +64,12 @@ const logger = apiLogger.child({ route: '/api/v1/organisations' });
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Referenced entity not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
@@ -64,7 +78,7 @@ const logger = apiLogger.child({ route: '/api/v1/organisations' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info({ tenantId }, 'Parsing request body');
+  logger.info('Parsing request body');
   let body: unknown;
 
   try {
@@ -73,7 +87,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId }, 'Validating input parameters');
+  logger.info('Validating input parameters');
   if (!Array.isArray(body)) {
     throw new ValidationError('Request body must be an array');
   }
@@ -88,10 +102,10 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     }
   }
 
-  logger.info({ tenantId, count: body.length }, 'Creating organisations');
+  logger.info({ count: body.length }, 'Creating organisations');
   const organisations = await createOrganisations(tenantId, body);
 
-  logger.info({ tenantId, count: organisations.length }, 'Organisations created');
+  logger.info({ count: organisations.length }, 'Organisations created');
   return NextResponse.json(organisations, { status: 201 });
 });
 
@@ -108,7 +122,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         name: search
  *         schema:
  *           type: string
- *         description: Search term to filter organisations
+ *         description: Search by organisation name or identifier value
  *       - in: query
  *         name: limit
  *         schema:
@@ -155,16 +169,16 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
-  logger.info({ tenantId }, 'Parsing query parameters');
+  logger.info('Parsing query filters');
   const url = new URL(req.url);
   const search = url.searchParams.get('search') ?? undefined;
   const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
   const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  logger.info({ tenantId, search, limit, offset }, 'Listing organisations');
+  logger.info({ filters: { search, limit, offset } }, 'Querying organisations');
   const { data, total } = await listOrganisations(tenantId, { search, limit, offset });
 
-  logger.info({ tenantId, count: data.length }, 'Organisations listed');
+  logger.info({ count: data.length, total }, 'Organisations listed');
   return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

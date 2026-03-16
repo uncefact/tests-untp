@@ -101,6 +101,7 @@ describe('Organisation API', { testIsolation: false }, () => {
     it('GET /api/v1/organisations — lists organisations', () => {
       cy.request('/api/v1/organisations').then((response) => {
         expect(response.status).to.eq(200);
+        expect(response.body).to.not.have.property('ok');
         expect(response.body.data).to.be.an('array');
         expect(response.body.pagination).to.exist;
 
@@ -220,6 +221,7 @@ describe('Organisation API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
       });
     });
   });
@@ -233,6 +235,7 @@ describe('Organisation API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -244,6 +247,7 @@ describe('Organisation API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -255,6 +259,20 @@ describe('Organisation API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('returns 400 for invalid JSON body', function () {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/organisations',
+        body: 'not valid json',
+        headers: { 'Content-Type': 'application/json' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -265,6 +283,7 @@ describe('Organisation API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -275,6 +294,7 @@ describe('Organisation API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -285,6 +305,71 @@ describe('Organisation API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('returns 404 for nonexistent primaryIdentifierId', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/organisations',
+        body: [
+          {
+            name: `Org Bad Identifier ${RUN_ID}`,
+            primaryIdentifierId: 'nonexistent-identifier-id',
+          },
+        ],
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('PATCH returns 400 for empty body (no updatable fields)', () => {
+      cy.request({
+        method: 'PATCH',
+        url: '/api/v1/organisations/nonexistent-id',
+        body: {},
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('PATCH returns 400 for invalid name (empty string)', () => {
+      cy.request({
+        method: 'PATCH',
+        url: '/api/v1/organisations/nonexistent-id',
+        body: { name: '' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('PATCH returns 404 for nonexistent organisation', () => {
+      cy.request({
+        method: 'PATCH',
+        url: '/api/v1/organisations/nonexistent-id',
+        body: { name: `Nonexistent Organisation ${RUN_ID}` },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('DELETE returns 404 for nonexistent organisation', () => {
+      cy.request({
+        method: 'DELETE',
+        url: '/api/v1/organisations/nonexistent-id',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
       });
     });
   });
@@ -294,6 +379,10 @@ describe('Organisation API', { testIsolation: false }, () => {
       cy.request('/api/v1/organisations?limit=1&offset=0').then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data.length).to.be.at.most(1);
+        expect(response.body.pagination.limit).to.eq(1);
+        expect(response.body.pagination.offset).to.eq(0);
+        expect(response.body.pagination.hasMore).to.be.a('boolean');
+        expect(response.body.pagination.total).to.be.a('number');
       });
     });
   });

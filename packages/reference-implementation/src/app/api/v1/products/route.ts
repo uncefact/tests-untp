@@ -48,6 +48,20 @@ const PRODUCT_LEVELS = ['MODEL', 'BATCH', 'ITEM'] as const;
  *                 parentId:
  *                   type: string
  *                   description: Optional parent product ID
+ *                 producedByOrganisationId:
+ *                   type: string
+ *                   description: ID of the producing organisation
+ *                 manufacturingFacilityId:
+ *                   type: string
+ *                   description: ID of the manufacturing facility
+ *                 primaryIdentifierId:
+ *                   type: string
+ *                   description: ID of the primary identifier
+ *                 secondaryIdentifierIds:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   description: IDs of secondary identifiers
  *     responses:
  *       201:
  *         description: Products created successfully
@@ -83,7 +97,7 @@ const PRODUCT_LEVELS = ['MODEL', 'BATCH', 'ITEM'] as const;
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info({ tenantId }, 'Parsing request body');
+  logger.info('Parsing request body');
   let body: Array<{
     name?: string;
     level?: string;
@@ -97,7 +111,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId }, 'Validating input parameters');
+  logger.info('Validating input parameters');
   if (!Array.isArray(body)) {
     throw new ValidationError('Request body must be an array');
   }
@@ -116,10 +130,10 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     validateEnum(item.level, PRODUCT_LEVELS, 'level');
   }
 
-  logger.info({ tenantId, count: body.length }, 'Creating products');
+  logger.info({ count: body.length }, 'Creating products');
   const products = await createProducts(tenantId, body as CreateProductInput[]);
 
-  logger.info({ tenantId, count: products.length }, 'Products created');
+  logger.info({ count: products.length }, 'Products created');
   return NextResponse.json(products, { status: 201 });
 });
 
@@ -136,7 +150,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         name: search
  *         schema:
  *           type: string
- *         description: Search products by name
+ *         description: Search by product name or identifier value
  *       - in: query
  *         name: level
  *         schema:
@@ -152,7 +166,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         name: organisationId
  *         schema:
  *           type: string
- *         description: Filter by brand organisation ID
+ *         description: Filter by producing organisation ID
  *       - in: query
  *         name: facilityId
  *         schema:
@@ -204,7 +218,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
-  logger.info({ tenantId }, 'Parsing query parameters');
+  logger.info('Parsing query filters');
   const url = new URL(req.url);
   const search = url.searchParams.get('search') ?? undefined;
   const level = validateEnum(url.searchParams.get('level') ?? undefined, PRODUCT_LEVELS, 'level');
@@ -215,7 +229,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  logger.info({ tenantId, search, level, parentId, organisationId, facilityId, limit, offset }, 'Listing products');
+  logger.info({ filters: { search, level, parentId, organisationId, facilityId, limit, offset } }, 'Querying products');
   const { data, total } = await listProducts(tenantId, {
     search,
     level,
@@ -226,6 +240,6 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
     offset,
   });
 
-  logger.info({ tenantId, count: data.length }, 'Products listed');
+  logger.info({ count: data.length, total }, 'Products listed');
   return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

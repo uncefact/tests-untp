@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { getFacilityById, updateFacility, deleteFacility } from '@/lib/prisma/repositories';
+import { getFacilityById, updateFacility, deleteFacility, UpdateFacilityInput } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/facilities/[id]' });
@@ -60,12 +60,12 @@ const UPDATABLE_FIELDS = [
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ tenantId, facilityId: id }, 'Looking up facility');
+  logger.info({ facilityId: id }, 'Looking up facility');
   const facility = await getFacilityById(id, tenantId);
   if (!facility) {
     throw new NotFoundError('Facility not found');
   }
-  logger.info({ tenantId, facilityId: id }, 'Facility retrieved');
+  logger.info({ facilityId: id }, 'Facility retrieved');
   return NextResponse.json(facility);
 });
 
@@ -149,7 +149,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, facilityId: id }, 'Parsing request body');
+  logger.info({ facilityId: id }, 'Parsing request body');
   let body: Record<string, unknown>;
 
   try {
@@ -158,7 +158,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId, facilityId: id }, 'Validating update fields');
+  logger.info({ facilityId: id }, 'Validating update fields');
   // Ensure at least one updatable field is present
   const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
   if (!hasUpdatableField) {
@@ -170,10 +170,17 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('name must be a non-empty string');
   }
 
-  logger.info({ tenantId, facilityId: id }, 'Updating facility');
-  const updated = await updateFacility(id, tenantId, body);
+  const updateData: Record<string, unknown> = {};
+  for (const field of UPDATABLE_FIELDS) {
+    if (field in body) {
+      updateData[field] = body[field];
+    }
+  }
 
-  logger.info({ tenantId, facilityId: id }, 'Facility updated');
+  logger.info({ facilityId: id }, 'Updating facility');
+  const updated = await updateFacility(id, tenantId, updateData as UpdateFacilityInput);
+
+  logger.info({ facilityId: id }, 'Facility updated');
   return NextResponse.json(updated);
 });
 
@@ -217,9 +224,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, facilityId: id }, 'Deleting facility');
+  logger.info({ facilityId: id }, 'Deleting facility');
   await deleteFacility(id, tenantId);
 
-  logger.info({ tenantId, facilityId: id }, 'Facility deleted');
-  return new Response(null, { status: 204 });
+  logger.info({ facilityId: id }, 'Facility deleted');
+  return new NextResponse(null, { status: 204 });
 });

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { getProductById, updateProduct, deleteProduct } from '@/lib/prisma/repositories';
+import { getProductById, updateProduct, deleteProduct, UpdateProductInput } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/products/[id]' });
@@ -61,12 +61,12 @@ const UPDATABLE_FIELDS = [
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ tenantId, productId: id }, 'Looking up product');
+  logger.info({ productId: id }, 'Looking up product');
   const product = await getProductById(id, tenantId);
   if (!product) {
     throw new NotFoundError('Product not found');
   }
-  logger.info({ tenantId, productId: id }, 'Product retrieved');
+  logger.info({ productId: id }, 'Product retrieved');
   return NextResponse.json(product);
 });
 
@@ -105,7 +105,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                 description: Updated parent product ID
  *               producedByOrganisationId:
  *                 type: string
- *                 description: Updated brand organisation ID
+ *                 description: Updated producing organisation ID
  *               manufacturingFacilityId:
  *                 type: string
  *                 description: Updated manufacturing facility ID
@@ -153,7 +153,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, productId: id }, 'Parsing request body');
+  logger.info({ productId: id }, 'Parsing request body');
   let body: Record<string, unknown>;
 
   try {
@@ -162,23 +162,28 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId, productId: id }, 'Validating update fields');
-  // Strip the immutable level field if provided
-  const { level: _level, ...updateFields } = body;
-
-  const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in updateFields);
+  logger.info({ productId: id }, 'Validating update fields');
+  const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
   if (!hasUpdatableField) {
     throw new ValidationError(`At least one updatable field must be provided: ${UPDATABLE_FIELDS.join(', ')}`);
   }
 
-  if (updateFields.name !== undefined && !isNonEmptyString(updateFields.name)) {
+  if (body.name !== undefined && !isNonEmptyString(body.name)) {
     throw new ValidationError('name must be a non-empty string');
   }
 
-  logger.info({ tenantId, productId: id }, 'Updating product');
-  const updated = await updateProduct(id, tenantId, updateFields);
+  // Pick only known updatable fields (level is immutable and silently excluded)
+  const updateData: Record<string, unknown> = {};
+  for (const field of UPDATABLE_FIELDS) {
+    if (field in body) {
+      updateData[field] = body[field];
+    }
+  }
 
-  logger.info({ tenantId, productId: id }, 'Product updated');
+  logger.info({ productId: id }, 'Updating product');
+  const updated = await updateProduct(id, tenantId, updateData as UpdateProductInput);
+
+  logger.info({ productId: id }, 'Product updated');
   return NextResponse.json(updated);
 });
 
@@ -200,6 +205,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *     responses:
  *       204:
  *         description: Product deleted successfully
+ *       400:
+ *         description: Validation error — cannot delete product with dependent children
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -222,9 +233,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, productId: id }, 'Deleting product');
+  logger.info({ productId: id }, 'Deleting product');
   await deleteProduct(id, tenantId);
 
-  logger.info({ tenantId, productId: id }, 'Product deleted');
-  return new Response(null, { status: 204 });
+  logger.info({ productId: id }, 'Product deleted');
+  return new NextResponse(null, { status: 204 });
 });
