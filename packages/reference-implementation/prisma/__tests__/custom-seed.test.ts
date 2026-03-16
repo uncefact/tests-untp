@@ -19,7 +19,7 @@ jest.mock('yaml', () => ({
 
 const mockExit = jest.spyOn(process, 'exit').mockImplementation((() => {
   throw new Error('process.exit');
-}) as any);
+}) as () => never);
 
 // ── Import after mocks ──────────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ function createMockLogger() {
 function createMockPrisma() {
   const upsertFn = jest.fn().mockResolvedValue({});
   const findManyFn = jest.fn().mockResolvedValue([]);
-  const transactionFn = jest.fn().mockImplementation(async (fn: any) => {
+  const transactionFn = jest.fn().mockImplementation(async (fn: (tx: Record<string, unknown>) => Promise<unknown>) => {
     const tx = {
       registrar: { upsert: jest.fn().mockResolvedValue({}) },
       identifierScheme: { upsert: jest.fn().mockResolvedValue({}) },
@@ -102,7 +102,7 @@ beforeEach(() => {
   mockExit.mockClear();
   mockExit.mockImplementation((() => {
     throw new Error('process.exit');
-  }) as any);
+  }) as () => never);
 });
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -149,7 +149,7 @@ describe('runCustomSeed', () => {
       (fs.readFileSync as jest.Mock).mockReturnValue('bad yaml');
       (parseYaml as jest.Mock).mockImplementation(() => {
         const err = new Error('YAML parse error');
-        (err as any).linePos = [{ line: 3, col: 5 }];
+        Object.assign(err, { linePos: [{ line: 3, col: 5 }] });
         throw err;
       });
 
@@ -217,8 +217,8 @@ describe('runCustomSeed', () => {
       // Make Phase 2 validation pass by returning the dataModelId in allExistingDataModelIds
       // and making file exist within mount dir.
       const mockPrisma = createMockPrisma();
-      (mockPrisma.dataModel.findMany as jest.Mock).mockImplementation((query: any) => {
-        if (query?.where?.isExtension === false) {
+      (mockPrisma.dataModel.findMany as jest.Mock).mockImplementation((query: Record<string, unknown>) => {
+        if ((query?.where as Record<string, unknown>)?.isExtension === false) {
           return Promise.resolve([]);
         }
         return Promise.resolve([{ id: IDS.dataModel1 }]);

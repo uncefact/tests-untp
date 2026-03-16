@@ -3,7 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { parse as parseYaml } from 'yaml';
 import type { LoggerService as Logger, ICvcParser } from '@uncefact/untp-ri-services';
-import type { PrismaClient } from '../src/lib/prisma/generated';
+import type { PrismaClient, Prisma } from '../src/lib/prisma/generated';
 import { RenderMethodType } from '../src/lib/prisma/generated';
 import { customSeedSchema, type CustomSeedManifest } from './custom-seed-schema';
 import { validateManifestReferences, type ValidationContext } from './custom-seed-validate';
@@ -37,7 +37,7 @@ export interface CustomSeedDependencies {
   } | null;
   storageServiceInstanceId: string | null;
   getCvcParser: (version: string) => ICvcParser | undefined;
-  importCatalogue: (input: any) => Promise<any>;
+  importCatalogue: (input: unknown) => Promise<unknown>;
   supportedCvcVersions: string[];
 }
 
@@ -123,10 +123,12 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
   let rawData: unknown;
   try {
     rawData = parseYaml(rawYaml);
-  } catch (error: any) {
-    const line = error?.linePos?.[0]?.line ?? error?.line;
-    const col = error?.linePos?.[0]?.col ?? error?.col;
-    logger.error({ file: manifestPath, line, col, error: error?.message }, 'Failed to parse custom seed YAML');
+  } catch (error: unknown) {
+    const err = error as Record<string, unknown>;
+    const linePos = Array.isArray(err?.linePos) ? (err.linePos as Record<string, unknown>[]) : undefined;
+    const line = linePos?.[0]?.line ?? err?.line;
+    const col = linePos?.[0]?.col ?? err?.col;
+    logger.error({ file: manifestPath, line, col, error: err?.message }, 'Failed to parse custom seed YAML');
     process.exit(1);
   }
 
@@ -314,7 +316,7 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
 
   // ── 9. Atomic DB transaction ───────────────────────────────────────────
   await prisma.$transaction(
-    async (tx: any) => {
+    async (tx: Prisma.TransactionClient) => {
       // Upsert registrars
       for (const registrar of ops.registrars) {
         await tx.registrar.upsert({
@@ -479,7 +481,9 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
       specVersion: catalogue.version,
     });
 
-    logger.info({ catalogueId: catalogue.id, ...result.summary }, 'CVC catalogue imported');
+    const resultObj = result as Record<string, unknown>;
+    const summary = (resultObj?.summary ?? {}) as Record<string, unknown>;
+    logger.info({ catalogueId: catalogue.id, ...summary }, 'CVC catalogue imported');
   }
 
   // ── 11. Log success summary ────────────────────────────────────────────
