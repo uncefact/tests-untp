@@ -372,46 +372,34 @@ describe('DID API Service', () => {
         { status: 423, statusText: 'Locked', ok: false },
       );
 
-      try {
-        await getDid('locked-id');
-        fail('Expected ApiError to be thrown');
-      } catch (err) {
-        expect(err).toBeInstanceOf(ApiError);
-        const apiErr = err as ApiError;
-        expect(apiErr.code).toBe('RESOURCE_LOCKED');
-        expect(apiErr.message).toBe('Resource locked');
-        expect(apiErr.status).toBe(423);
-      }
+      await expect(getDid('locked-id')).rejects.toThrow(ApiError);
+      await expect(getDid('locked-id')).rejects.toMatchObject({
+        message: 'Resource locked',
+        status: 423,
+        code: 'RESOURCE_LOCKED',
+      });
     });
 
     it('should fall back to statusText when the error response body is not valid JSON', async () => {
       global.fetch = mockFetchErrorNonJson(500, 'Internal Server Error');
 
-      try {
-        await getDid('bad-response');
-        fail('Expected ApiError to be thrown');
-      } catch (err) {
-        expect(err).toBeInstanceOf(ApiError);
-        const apiErr = err as ApiError;
-        expect(apiErr.message).toBe('Internal Server Error');
-        expect(apiErr.status).toBe(500);
-        expect(apiErr.code).toBeUndefined();
-      }
+      await expect(getDid('bad-response')).rejects.toThrow(ApiError);
+      await expect(getDid('bad-response')).rejects.toMatchObject({
+        message: 'Internal Server Error',
+        status: 500,
+        code: undefined,
+      });
     });
 
     it('should fall back to statusText for non-JSON error on deleteDid', async () => {
       global.fetch = mockFetchErrorNonJson(500, 'Internal Server Error');
 
-      try {
-        await deleteDid('bad-response');
-        fail('Expected ApiError to be thrown');
-      } catch (err) {
-        expect(err).toBeInstanceOf(ApiError);
-        const apiErr = err as ApiError;
-        expect(apiErr.message).toBe('Internal Server Error');
-        expect(apiErr.status).toBe(500);
-        expect(apiErr.code).toBeUndefined();
-      }
+      await expect(deleteDid('bad-response')).rejects.toThrow(ApiError);
+      await expect(deleteDid('bad-response')).rejects.toMatchObject({
+        message: 'Internal Server Error',
+        status: 500,
+        code: undefined,
+      });
     });
   });
 });
