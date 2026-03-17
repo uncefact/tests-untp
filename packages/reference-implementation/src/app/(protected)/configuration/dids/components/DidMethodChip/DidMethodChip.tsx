@@ -12,7 +12,5 @@ const METHOD_LABELS: Record<DidMethod, string> = {
 };
 
 export default function DidMethodChip({ method }: IDidMethodChip) {
-  return (
-    <span className="font-['Roboto',sans-serif] text-base leading-[28px] text-black">{METHOD_LABELS[method]}</span>
-  );
+  return <span className='text-base leading-[28px] text-foreground'>{METHOD_LABELS[method]}</span>;
 }

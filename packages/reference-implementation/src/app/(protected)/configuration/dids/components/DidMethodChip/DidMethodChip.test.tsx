@@ -13,11 +13,10 @@ describe('DidMethodChip', () => {
     expect(screen.getByText('did:web+vh')).toBeInTheDocument();
   });
 
-  it('applies correct styling classes', () => {
+  it('renders as a span element with theme colour class', () => {
     const { container } = render(<DidMethodChip method={DidMethod.DID_WEB} />);
     const span = container.firstChild as HTMLElement;
     expect(span.tagName).toBe('SPAN');
-    expect(span.className).toContain('text-base');
-    expect(span.className).toContain('text-black');
+    expect(span.className).toContain('text-foreground');
   });
 });
