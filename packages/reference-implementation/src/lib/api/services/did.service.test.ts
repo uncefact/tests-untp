@@ -268,37 +268,3 @@ describe('verifyDid', () => {
     await expect(verifyDid('did-1')).rejects.toThrow(ApiError);
   });
 });
-
-describe('handleResponse (via non-JSON error)', () => {
-  it('falls back to statusText when error body is not JSON', async () => {
-    mockFetch.mockResolvedValueOnce(nonJsonErrorResponse(502, 'Bad Gateway'));
-
-    try {
-      await getDid('did-1');
-      fail('Expected ApiError');
-    } catch (err) {
-      expect(err).toBeInstanceOf(ApiError);
-      expect((err as ApiError).status).toBe(502);
-      expect((err as ApiError).message).toBe('Bad Gateway');
-      expect((err as ApiError).code).toBeUndefined();
-    }
-  });
-});
-
-describe('ApiError', () => {
-  it('has correct name, status, and code properties', () => {
-    const err = new ApiError('test error', 422, 'VALIDATION_ERROR');
-
-    expect(err.name).toBe('ApiError');
-    expect(err.message).toBe('test error');
-    expect(err.status).toBe(422);
-    expect(err.code).toBe('VALIDATION_ERROR');
-    expect(err).toBeInstanceOf(Error);
-  });
-
-  it('works without code', () => {
-    const err = new ApiError('server error', 500);
-
-    expect(err.code).toBeUndefined();
-  });
-});

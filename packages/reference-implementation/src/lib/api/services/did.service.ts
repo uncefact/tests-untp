@@ -1,103 +1,14 @@
+import type { DidDocument } from '@uncefact/untp-ri-services';
 import type { PaginatedResponse } from '@/lib/api/pagination';
-import type { DidType, DidMethod, DidStatus, DidDocument, DidVerificationResult } from '@uncefact/untp-ri-services';
+import { handleResponse, throwIfNotOk, buildQueryString } from './client';
+import type { DidRecord, ListDidsParams, CreateDidInput, UpdateDidInput, VerifyDidResponse } from './did.types';
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
-/** Serialised DID record as returned by the API (dates are ISO strings). */
-export interface DidRecord {
-  id: string;
-  tenantId: string;
-  did: string;
-  type: DidType;
-  method: DidMethod;
-  name: string;
-  description: string | null;
-  keyId: string;
-  status: DidStatus;
-  isDefault: boolean;
-  createdAt: string;
-  updatedAt: string;
-  serviceInstanceId: string | null;
-}
-
-export interface ListDidsParams {
-  type?: DidType;
-  status?: DidStatus;
-  serviceInstanceId?: string;
-  limit?: number;
-  offset?: number;
-}
-
-export interface CreateDidInput {
-  type: DidType;
-  method: DidMethod;
-  alias: string;
-  name?: string;
-  description?: string;
-  isDefault?: boolean;
-  serviceInstanceId?: string;
-}
-
-export interface UpdateDidInput {
-  name?: string;
-  description?: string;
-  isDefault?: boolean;
-}
-
-export interface VerifyDidResponse {
-  verification: DidVerificationResult;
-  did: DidRecord;
-}
-
-// ── Error ────────────────────────────────────────────────────────────────────
-
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly code?: string,
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-const BASE_PATH = '/api/v1/dids';
-
-async function throwIfNotOk(response: Response): Promise<void> {
-  if (!response.ok) {
-    let message = response.statusText;
-    let code: string | undefined;
-    try {
-      const body = await response.json();
-      if (body.error) message = body.error;
-      if (body.code) code = body.code;
-    } catch {
-      // Non-JSON error body — use statusText
-    }
-    throw new ApiError(message, response.status, code);
-  }
-}
-
-async function handleResponse<T>(response: Response): Promise<T> {
-  await throwIfNotOk(response);
-  return response.json() as Promise<T>;
-}
-
-function buildQueryString(params: Record<string, string | number | boolean | undefined | null>): string {
-  const searchParams = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null) {
-      searchParams.set(key, String(value));
-    }
-  }
-  const qs = searchParams.toString();
-  return qs ? `?${qs}` : '';
-}
+export type { DidRecord, ListDidsParams, CreateDidInput, UpdateDidInput, VerifyDidResponse } from './did.types';
+export { ApiError } from './client';
 
 // ── Service functions ────────────────────────────────────────────────────────
+
+const BASE_PATH = '/api/v1/dids';
 
 export async function listDids(params?: ListDidsParams): Promise<PaginatedResponse<DidRecord>> {
   const qs = params ? buildQueryString({ ...params }) : '';
