@@ -66,7 +66,7 @@ export class ApiError extends Error {
 
 const BASE_PATH = '/api/v1/dids';
 
-async function handleResponse<T>(response: Response): Promise<T> {
+async function throwIfNotOk(response: Response): Promise<void> {
   if (!response.ok) {
     let message = response.statusText;
     let code: string | undefined;
@@ -79,6 +79,10 @@ async function handleResponse<T>(response: Response): Promise<T> {
     }
     throw new ApiError(message, response.status, code);
   }
+}
+
+async function handleResponse<T>(response: Response): Promise<T> {
+  await throwIfNotOk(response);
   return response.json() as Promise<T>;
 }
 
@@ -126,18 +130,7 @@ export async function updateDid(id: string, input: UpdateDidInput): Promise<DidR
 
 export async function deleteDid(id: string): Promise<void> {
   const response = await fetch(`${BASE_PATH}/${id}`, { method: 'DELETE' });
-  if (!response.ok) {
-    let message = response.statusText;
-    let code: string | undefined;
-    try {
-      const body = await response.json();
-      if (body.error) message = body.error;
-      if (body.code) code = body.code;
-    } catch {
-      // Non-JSON error body — use statusText
-    }
-    throw new ApiError(message, response.status, code);
-  }
+  await throwIfNotOk(response);
 }
 
 export async function getDidDocument(id: string): Promise<DidDocument> {
