@@ -1,5 +1,6 @@
 'use client';
 
+import { type ReactNode } from 'react';
 import CheckIcon from '@mui/icons-material/Check';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { DidStatus } from '@uncefact/untp-ri-services';
@@ -8,7 +9,7 @@ interface IDidStatusChip {
   status: DidStatus;
 }
 
-const STATUS_CONFIG: Record<DidStatus, { label: string; colour: string; icon?: React.ReactNode }> = {
+const STATUS_CONFIG: Record<DidStatus, { label: string; colour: string; icon?: ReactNode }> = {
   [DidStatus.ACTIVE]: {
     label: 'Ready',
     colour: 'text-black',

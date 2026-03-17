@@ -1,3 +1,5 @@
+'use client';
+
 import { DidMethod } from '@uncefact/untp-ri-services';
 
 interface IDidMethodChip {
