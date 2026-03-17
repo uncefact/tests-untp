@@ -1,6 +1,7 @@
 import type { Did } from '@/lib/prisma/generated';
 import { DidType, DidMethod, DidStatus } from '@uncefact/untp-ri-services';
-import { ApiError, listDids, getDid, createDid, updateDid, deleteDid, getDidDocument, verifyDid } from './did.service';
+import { ApiError } from '@/lib/api/client';
+import { listDids, getDid, createDid, updateDid, deleteDid, getDidDocument, verifyDid } from './did.service';
 
 // ── Mock data ────────────────────────────────────────────────────────────────
 
@@ -89,6 +90,19 @@ function mockFetchErrorNonJson(status: number, statusText: string) {
   });
 }
 
+async function expectApiError(
+  fn: () => Promise<unknown>,
+  expected: { message: string; status: number; code?: string },
+) {
+  try {
+    await fn();
+    fail('Expected function to throw an ApiError');
+  } catch (error) {
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject(expected);
+  }
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('DID API Service', () => {
@@ -156,8 +170,7 @@ describe('DID API Service', () => {
         { status: 401, statusText: 'Unauthorized', ok: false },
       );
 
-      await expect(listDids()).rejects.toThrow(ApiError);
-      await expect(listDids()).rejects.toMatchObject({
+      await expectApiError(() => listDids(), {
         message: 'Unauthorised',
         status: 401,
         code: 'UNAUTHORISED',
@@ -180,8 +193,7 @@ describe('DID API Service', () => {
     it('should throw ApiError with 404 when the DID is not found', async () => {
       global.fetch = mockFetchResponse({ error: 'DID not found' }, { status: 404, statusText: 'Not Found', ok: false });
 
-      await expect(getDid('nonexistent')).rejects.toThrow(ApiError);
-      await expect(getDid('nonexistent')).rejects.toMatchObject({
+      await expectApiError(() => getDid('nonexistent'), {
         message: 'DID not found',
         status: 404,
       });
@@ -220,8 +232,7 @@ describe('DID API Service', () => {
         { status: 409, statusText: 'Conflict', ok: false },
       );
 
-      await expect(createDid(createInput)).rejects.toThrow(ApiError);
-      await expect(createDid(createInput)).rejects.toMatchObject({
+      await expectApiError(() => createDid(createInput), {
         message: 'DID already exists',
         status: 409,
         code: 'CONFLICT',
@@ -258,8 +269,7 @@ describe('DID API Service', () => {
         { status: 422, statusText: 'Unprocessable Entity', ok: false },
       );
 
-      await expect(updateDid('clx1abc000001', updateInput)).rejects.toThrow(ApiError);
-      await expect(updateDid('clx1abc000001', updateInput)).rejects.toMatchObject({
+      await expectApiError(() => updateDid('clx1abc000001', updateInput), {
         message: 'Validation failed',
         status: 422,
         code: 'VALIDATION_ERROR',
@@ -285,8 +295,7 @@ describe('DID API Service', () => {
         { status: 403, statusText: 'Forbidden', ok: false },
       );
 
-      await expect(deleteDid('clx1abc000001')).rejects.toThrow(ApiError);
-      await expect(deleteDid('clx1abc000001')).rejects.toMatchObject({
+      await expectApiError(() => deleteDid('clx1abc000001'), {
         message: 'Cannot delete default DID',
         status: 403,
         code: 'DELETE_FORBIDDEN',
@@ -312,8 +321,7 @@ describe('DID API Service', () => {
         { status: 502, statusText: 'Bad Gateway', ok: false },
       );
 
-      await expect(getDidDocument('clx1abc000001')).rejects.toThrow(ApiError);
-      await expect(getDidDocument('clx1abc000001')).rejects.toMatchObject({
+      await expectApiError(() => getDidDocument('clx1abc000001'), {
         message: 'Document resolution failed',
         status: 502,
       });
@@ -338,8 +346,7 @@ describe('DID API Service', () => {
         { status: 503, statusText: 'Service Unavailable', ok: false },
       );
 
-      await expect(verifyDid('clx1abc000001')).rejects.toThrow(ApiError);
-      await expect(verifyDid('clx1abc000001')).rejects.toMatchObject({
+      await expectApiError(() => verifyDid('clx1abc000001'), {
         message: 'Verification service unavailable',
         status: 503,
       });
@@ -372,8 +379,7 @@ describe('DID API Service', () => {
         { status: 423, statusText: 'Locked', ok: false },
       );
 
-      await expect(getDid('locked-id')).rejects.toThrow(ApiError);
-      await expect(getDid('locked-id')).rejects.toMatchObject({
+      await expectApiError(() => getDid('locked-id'), {
         message: 'Resource locked',
         status: 423,
         code: 'RESOURCE_LOCKED',
@@ -383,8 +389,7 @@ describe('DID API Service', () => {
     it('should fall back to statusText when the error response body is not valid JSON', async () => {
       global.fetch = mockFetchErrorNonJson(500, 'Internal Server Error');
 
-      await expect(getDid('bad-response')).rejects.toThrow(ApiError);
-      await expect(getDid('bad-response')).rejects.toMatchObject({
+      await expectApiError(() => getDid('bad-response'), {
         message: 'Internal Server Error',
         status: 500,
         code: undefined,
@@ -394,8 +399,7 @@ describe('DID API Service', () => {
     it('should fall back to statusText for non-JSON error on deleteDid', async () => {
       global.fetch = mockFetchErrorNonJson(500, 'Internal Server Error');
 
-      await expect(deleteDid('bad-response')).rejects.toThrow(ApiError);
-      await expect(deleteDid('bad-response')).rejects.toMatchObject({
+      await expectApiError(() => deleteDid('bad-response'), {
         message: 'Internal Server Error',
         status: 500,
         code: undefined,

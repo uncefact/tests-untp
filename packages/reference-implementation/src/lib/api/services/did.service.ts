@@ -1,85 +1,12 @@
 import type { Did } from '@/lib/prisma/generated';
 import type { PaginatedResponse } from '@/lib/api/pagination';
-import type {
-  DidType,
-  DidMethod,
-  DidStatus,
-  DidDocument,
-  DidVerificationResult,
-  CREATABLE_DID_TYPES,
-} from '@uncefact/untp-ri-services';
-
-type CreatableDidType = (typeof CREATABLE_DID_TYPES)[number];
-
-// ── Error type ───────────────────────────────────────────────────────────────
-
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly code?: string,
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
-
-// ── Request / response types ─────────────────────────────────────────────────
-
-export interface ListDidsParams {
-  type?: DidType;
-  status?: DidStatus;
-  serviceInstanceId?: string;
-  limit?: number;
-  offset?: number;
-}
-
-export interface CreateDidInput {
-  type: CreatableDidType;
-  method: DidMethod;
-  alias: string;
-  name?: string;
-  description?: string;
-  isDefault?: boolean;
-  serviceInstanceId?: string;
-}
-
-export interface UpdateDidInput {
-  name?: string;
-  description?: string;
-  isDefault?: boolean;
-}
-
-export interface VerifyDidResponse {
-  verification: DidVerificationResult;
-  did: Did;
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-const BASE_PATH = '/api/v1/dids';
-
-async function throwApiError(response: Response): Promise<never> {
-  let error = response.statusText;
-  let code: string | undefined;
-  try {
-    const body = await response.json();
-    if (body.error) error = body.error;
-    if (body.code) code = body.code;
-  } catch {
-    // Use statusText as fallback
-  }
-  throw new ApiError(error, response.status, code);
-}
-
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    await throwApiError(response);
-  }
-  return response.json() as Promise<T>;
-}
+import type { DidDocument } from '@uncefact/untp-ri-services';
+import type { ListDidsParams, CreateDidInput, UpdateDidInput, VerifyDidResponse } from '@/lib/api/types/did.types';
+import { handleResponse, throwApiError } from '@/lib/api/client';
 
 // ── Service functions ────────────────────────────────────────────────────────
+
+const BASE_PATH = '/api/v1/dids';
 
 export async function listDids(params?: ListDidsParams): Promise<PaginatedResponse<Did>> {
   const searchParams = new URLSearchParams();
