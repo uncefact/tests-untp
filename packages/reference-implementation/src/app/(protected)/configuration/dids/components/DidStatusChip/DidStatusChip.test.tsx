@@ -61,11 +61,11 @@ describe('DidStatusChip', () => {
   });
 
   it.each([
-    { status: DidStatus.ACTIVE, expectedClass: '.text-status-active' },
-    { status: DidStatus.VERIFIED, expectedClass: '.text-status-verified' },
-    { status: DidStatus.UNVERIFIED, expectedClass: '.text-status-unverified' },
-    { status: DidStatus.VERIFICATION_FAILED, expectedClass: '.text-status-failed' },
-    { status: DidStatus.INACTIVE, expectedClass: '.text-status-inactive' },
+    { status: DidStatus.ACTIVE, expectedClass: '.text-did-status-active' },
+    { status: DidStatus.VERIFIED, expectedClass: '.text-did-status-verified' },
+    { status: DidStatus.UNVERIFIED, expectedClass: '.text-did-status-unverified' },
+    { status: DidStatus.VERIFICATION_FAILED, expectedClass: '.text-did-status-failed' },
+    { status: DidStatus.INACTIVE, expectedClass: '.text-did-status-inactive' },
   ])('applies correct colour class for $status status', ({ status, expectedClass }) => {
     const { container } = render(<DidStatusChip status={status} />);
     expect(container.querySelector(expectedClass)).toBeInTheDocument();

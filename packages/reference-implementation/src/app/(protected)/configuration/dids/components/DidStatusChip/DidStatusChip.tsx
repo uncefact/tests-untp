@@ -11,25 +11,25 @@ interface DidStatusChipProps {
 const STATUS_CONFIG: Record<DidStatus, { label: string; colourClass: string; icon?: React.ReactNode }> = {
   [DidStatus.ACTIVE]: {
     label: 'Ready',
-    colourClass: 'text-status-active',
+    colourClass: 'text-did-status-active',
   },
   [DidStatus.VERIFIED]: {
     label: 'Verified',
-    colourClass: 'text-status-verified',
-    icon: <CheckIcon className='text-status-verified' sx={{ fontSize: 24 }} />,
+    colourClass: 'text-did-status-verified',
+    icon: <CheckIcon className='text-did-status-verified' sx={{ fontSize: 24 }} />,
   },
   [DidStatus.UNVERIFIED]: {
     label: 'Unverified',
-    colourClass: 'text-status-unverified',
+    colourClass: 'text-did-status-unverified',
   },
   [DidStatus.VERIFICATION_FAILED]: {
     label: 'Failed',
-    colourClass: 'text-status-failed',
-    icon: <ErrorOutlineIcon className='text-status-failed' sx={{ fontSize: 24 }} />,
+    colourClass: 'text-did-status-failed',
+    icon: <ErrorOutlineIcon className='text-did-status-failed' sx={{ fontSize: 24 }} />,
   },
   [DidStatus.INACTIVE]: {
     label: 'Inactive',
-    colourClass: 'text-status-inactive',
+    colourClass: 'text-did-status-inactive',
   },
 };
 

@@ -53,11 +53,11 @@
   --more-options-foreground: #333333;
   --loader: #666666;
   --loader-foreground: #666666;
-  --status-active: #000000;
-  --status-verified: #15803d;
-  --status-unverified: #067971;
-  --status-failed: #b91c1c;
-  --status-inactive: #737373;
+  --did-status-active: #000000;
+  --did-status-verified: #15803d;
+  --did-status-unverified: #067971;
+  --did-status-failed: #b91c1c;
+  --did-status-inactive: #737373;
 }
 
 .dark {
@@ -106,11 +106,11 @@
   --more-options-foreground: #e5e5e5;
   --loader: #999999;
   --loader-foreground: #999999;
-  --status-active: #ffffff;
-  --status-verified: #4ade80;
-  --status-unverified: #2dd4bf;
-  --status-failed: #f87171;
-  --status-inactive: #a3a3a3;
+  --did-status-active: #ffffff;
+  --did-status-verified: #4ade80;
+  --did-status-unverified: #2dd4bf;
+  --did-status-failed: #f87171;
+  --did-status-inactive: #a3a3a3;
 }
 
 @theme inline {
@@ -163,11 +163,11 @@
   --color-more-options-foreground: var(--more-options-foreground);
   --color-loader: var(--loader);
   --color-loader-foreground: var(--loader-foreground);
-  --color-status-active: var(--status-active);
-  --color-status-verified: var(--status-verified);
-  --color-status-unverified: var(--status-unverified);
-  --color-status-failed: var(--status-failed);
-  --color-status-inactive: var(--status-inactive);
+  --color-did-status-active: var(--did-status-active);
+  --color-did-status-verified: var(--did-status-verified);
+  --color-did-status-unverified: var(--did-status-unverified);
+  --color-did-status-failed: var(--did-status-failed);
+  --color-did-status-inactive: var(--did-status-inactive);
 }
 
 @layer base {
