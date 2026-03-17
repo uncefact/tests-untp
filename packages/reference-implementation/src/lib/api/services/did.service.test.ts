@@ -1,4 +1,5 @@
 import type { Did } from '@/lib/prisma/generated';
+import { DidType, DidMethod, DidStatus } from '@uncefact/untp-ri-services';
 import { ApiError, listDids, getDid, createDid, updateDid, deleteDid, getDidDocument, verifyDid } from './did.service';
 
 // ── Mock data ────────────────────────────────────────────────────────────────
@@ -7,7 +8,7 @@ const mockDid: Did = {
   id: 'clx1abc000001',
   tenantId: 'tenant-001',
   did: 'did:web:example.com:org:abc',
-  type: 'ISSUER' as Did['type'],
+  type: 'MANAGED' as Did['type'],
   method: 'DID_WEB' as Did['method'],
   name: 'Test DID',
   description: 'A test DID for unit tests',
@@ -23,7 +24,7 @@ const mockDid2: Did = {
   id: 'clx1abc000002',
   tenantId: 'tenant-001',
   did: 'did:web:example.com:org:def',
-  type: 'VERIFIER' as Did['type'],
+  type: 'SELF_MANAGED' as Did['type'],
   method: 'DID_WEB' as Did['method'],
   name: 'Secondary DID',
   description: null,
@@ -110,54 +111,43 @@ describe('DID API Service', () => {
 
       const result = await listDids();
 
-      expect(global.fetch).toHaveBeenCalledWith('http://localhost/api/v1/dids');
+      expect(global.fetch).toHaveBeenCalledWith('/api/v1/dids');
       expect(result).toEqual(paginatedResponse);
     });
 
     it('should include only provided params in the query string', async () => {
       global.fetch = mockFetchResponse(paginatedResponse);
 
-      await listDids({ type: 'ISSUER' as Did['type'], limit: 5 });
+      await listDids({ type: DidType.MANAGED, limit: 5 });
 
       const calledUrl = (global.fetch as jest.Mock).mock.calls[0][0] as string;
-      const url = new URL(calledUrl);
-      expect(url.searchParams.get('type')).toBe('ISSUER');
-      expect(url.searchParams.get('limit')).toBe('5');
-      expect(url.searchParams.has('status')).toBe(false);
-      expect(url.searchParams.has('offset')).toBe(false);
-      expect(url.searchParams.has('serviceInstanceId')).toBe(false);
+      expect(calledUrl).toBe('/api/v1/dids?type=MANAGED&limit=5');
     });
 
     it('should include all params in the query string when all are provided', async () => {
       global.fetch = mockFetchResponse(paginatedResponse);
 
       await listDids({
-        type: 'ISSUER' as Did['type'],
-        status: 'VERIFIED' as Did['status'],
+        type: DidType.MANAGED,
+        status: DidStatus.VERIFIED,
         serviceInstanceId: 'svc-inst-001',
         limit: 20,
         offset: 10,
       });
 
       const calledUrl = (global.fetch as jest.Mock).mock.calls[0][0] as string;
-      const url = new URL(calledUrl);
-      expect(url.searchParams.get('type')).toBe('ISSUER');
-      expect(url.searchParams.get('status')).toBe('VERIFIED');
-      expect(url.searchParams.get('serviceInstanceId')).toBe('svc-inst-001');
-      expect(url.searchParams.get('limit')).toBe('20');
-      expect(url.searchParams.get('offset')).toBe('10');
+      expect(calledUrl).toBe(
+        '/api/v1/dids?type=MANAGED&status=VERIFIED&serviceInstanceId=svc-inst-001&limit=20&offset=10',
+      );
     });
 
     it('should exclude undefined values from the query string', async () => {
       global.fetch = mockFetchResponse(paginatedResponse);
 
-      await listDids({ type: undefined, status: 'UNVERIFIED' as Did['status'], limit: undefined });
+      await listDids({ type: undefined, status: DidStatus.UNVERIFIED, limit: undefined });
 
       const calledUrl = (global.fetch as jest.Mock).mock.calls[0][0] as string;
-      const url = new URL(calledUrl);
-      expect(url.searchParams.has('type')).toBe(false);
-      expect(url.searchParams.get('status')).toBe('UNVERIFIED');
-      expect(url.searchParams.has('limit')).toBe(false);
+      expect(calledUrl).toBe('/api/v1/dids?status=UNVERIFIED');
     });
 
     it('should throw ApiError when the response is not ok', async () => {
@@ -202,8 +192,8 @@ describe('DID API Service', () => {
 
   describe('createDid', () => {
     const createInput = {
-      type: 'ISSUER' as const,
-      method: 'DID_WEB' as const,
+      type: DidType.MANAGED as const,
+      method: DidMethod.DID_WEB as const,
       alias: 'my-did',
       name: 'My New DID',
       description: 'Created in tests',

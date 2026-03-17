@@ -1,6 +1,15 @@
 import type { Did } from '@/lib/prisma/generated';
 import type { PaginatedResponse } from '@/lib/api/pagination';
-import type { DidType, DidMethod, DidStatus, DidDocument, DidVerificationResult } from '@uncefact/untp-ri-services';
+import type {
+  DidType,
+  DidMethod,
+  DidStatus,
+  DidDocument,
+  DidVerificationResult,
+  CREATABLE_DID_TYPES,
+} from '@uncefact/untp-ri-services';
+
+type CreatableDidType = (typeof CREATABLE_DID_TYPES)[number];
 
 // ── Error type ───────────────────────────────────────────────────────────────
 
@@ -26,7 +35,7 @@ export interface ListDidsParams {
 }
 
 export interface CreateDidInput {
-  type: DidType;
+  type: CreatableDidType;
   method: DidMethod;
   alias: string;
   name?: string;
@@ -50,18 +59,22 @@ export interface VerifyDidResponse {
 
 const BASE_PATH = '/api/v1/dids';
 
+async function throwApiError(response: Response): Promise<never> {
+  let error = response.statusText;
+  let code: string | undefined;
+  try {
+    const body = await response.json();
+    if (body.error) error = body.error;
+    if (body.code) code = body.code;
+  } catch {
+    // Use statusText as fallback
+  }
+  throw new ApiError(error, response.status, code);
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    let error = response.statusText;
-    let code: string | undefined;
-    try {
-      const body = await response.json();
-      if (body.error) error = body.error;
-      if (body.code) code = body.code;
-    } catch {
-      // Use statusText as fallback
-    }
-    throw new ApiError(error, response.status, code);
+    await throwApiError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -69,13 +82,15 @@ async function handleResponse<T>(response: Response): Promise<T> {
 // ── Service functions ────────────────────────────────────────────────────────
 
 export async function listDids(params?: ListDidsParams): Promise<PaginatedResponse<Did>> {
-  const url = new URL(BASE_PATH, window.location.origin);
+  const searchParams = new URLSearchParams();
   if (params) {
     for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined) url.searchParams.set(key, String(value));
+      if (value !== undefined) searchParams.set(key, String(value));
     }
   }
-  const response = await fetch(url.toString());
+  const query = searchParams.toString();
+  const url = query ? `${BASE_PATH}?${query}` : BASE_PATH;
+  const response = await fetch(url);
   return handleResponse<PaginatedResponse<Did>>(response);
 }
 
@@ -105,16 +120,7 @@ export async function updateDid(id: string, input: UpdateDidInput): Promise<Did>
 export async function deleteDid(id: string): Promise<void> {
   const response = await fetch(`${BASE_PATH}/${id}`, { method: 'DELETE' });
   if (!response.ok) {
-    let error = response.statusText;
-    let code: string | undefined;
-    try {
-      const body = await response.json();
-      if (body.error) error = body.error;
-      if (body.code) code = body.code;
-    } catch {
-      // Use statusText as fallback
-    }
-    throw new ApiError(error, response.status, code);
+    await throwApiError(response);
   }
 }
 
