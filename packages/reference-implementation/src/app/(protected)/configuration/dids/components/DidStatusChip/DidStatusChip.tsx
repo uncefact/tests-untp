@@ -4,7 +4,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { DidStatus } from '@uncefact/untp-ri-services';
 
-interface IDidStatusChip {
+interface DidStatusChipProps {
   status: DidStatus;
 }
 
@@ -33,11 +33,11 @@ const STATUS_CONFIG: Record<DidStatus, { label: string; colourClass: string; ico
   },
 };
 
-export default function DidStatusChip({ status }: IDidStatusChip) {
+export default function DidStatusChip({ status }: DidStatusChipProps) {
   const config = STATUS_CONFIG[status];
 
   return (
-    <span className='inline-flex items-center gap-[10px] text-base leading-[22px]'>
+    <span className='inline-flex items-center gap-2.5 text-base leading-snug'>
       {config.icon}
       <span className={config.colourClass}>{config.label}</span>
     </span>

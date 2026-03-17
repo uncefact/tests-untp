@@ -60,20 +60,14 @@ describe('DidStatusChip', () => {
     expect(screen.queryByTestId('error-icon')).not.toBeInTheDocument();
   });
 
-  it('applies theme-based colour class for each status', () => {
-    const { container: activeContainer } = render(<DidStatusChip status={DidStatus.ACTIVE} />);
-    expect(activeContainer.querySelector('.text-status-active')).toBeInTheDocument();
-
-    const { container: verifiedContainer } = render(<DidStatusChip status={DidStatus.VERIFIED} />);
-    expect(verifiedContainer.querySelector('.text-status-verified')).toBeInTheDocument();
-
-    const { container: unverifiedContainer } = render(<DidStatusChip status={DidStatus.UNVERIFIED} />);
-    expect(unverifiedContainer.querySelector('.text-status-unverified')).toBeInTheDocument();
-
-    const { container: failedContainer } = render(<DidStatusChip status={DidStatus.VERIFICATION_FAILED} />);
-    expect(failedContainer.querySelector('.text-status-failed')).toBeInTheDocument();
-
-    const { container: inactiveContainer } = render(<DidStatusChip status={DidStatus.INACTIVE} />);
-    expect(inactiveContainer.querySelector('.text-status-inactive')).toBeInTheDocument();
+  it.each([
+    { status: DidStatus.ACTIVE, expectedClass: '.text-status-active' },
+    { status: DidStatus.VERIFIED, expectedClass: '.text-status-verified' },
+    { status: DidStatus.UNVERIFIED, expectedClass: '.text-status-unverified' },
+    { status: DidStatus.VERIFICATION_FAILED, expectedClass: '.text-status-failed' },
+    { status: DidStatus.INACTIVE, expectedClass: '.text-status-inactive' },
+  ])('applies correct colour class for $status status', ({ status, expectedClass }) => {
+    const { container } = render(<DidStatusChip status={status} />);
+    expect(container.querySelector(expectedClass)).toBeInTheDocument();
   });
 });
