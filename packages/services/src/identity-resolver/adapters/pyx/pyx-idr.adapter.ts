@@ -20,6 +20,7 @@ import {
   IdrLinkDeleteError,
   IdrResolverFetchError,
   IdrLinkTypesFetchError,
+  IdrSchemeRegistrationError,
 } from '../../errors.js';
 export { IDR_SERVICE_TYPE } from '../../types.js';
 export { IdrLinkNotFoundError } from '../../errors.js';
@@ -282,7 +283,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => response.statusText);
-        this.logger.warn(`Failed to register scheme ${scheme.namespace}: HTTP ${response.status}: ${errorText}`);
+        throw new IdrSchemeRegistrationError(scheme.namespace, response.status, errorText);
       }
     }
   }

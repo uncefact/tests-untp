@@ -12,6 +12,7 @@ import {
   IdrLinkDeleteError,
   IdrResolverFetchError,
   IdrLinkTypesFetchError,
+  IdrSchemeRegistrationError,
 } from '../../errors';
 import type { Link } from '../../types';
 import type { PyxIdrConfig } from './pyx-idr.schema';
@@ -797,33 +798,32 @@ describe('PyxIdentityResolverAdapter', () => {
       );
     });
 
-    it('should log a warning when a scheme registration fails', async () => {
-      mockFetch.mockResolvedValueOnce({
+    it('should throw IdrSchemeRegistrationError when registration fails', async () => {
+      mockFetch.mockResolvedValue({
         ok: false,
-        status: 409,
-        statusText: 'Conflict',
-        text: jest.fn().mockResolvedValue('Already exists'),
+        status: 422,
+        text: jest.fn().mockResolvedValue('Validation failed'),
+        statusText: 'Unprocessable Entity',
       });
 
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
-      await adapter.registerSchemes([
-        {
-          namespace: 'untp',
-          applicationIdentifiers: [
-            {
-              title: 'ABN',
-              label: 'ABN',
-              shortcode: 'abn',
-              ai: '9991',
-              type: 'I' as const,
-              regex: '^\\d{11}$',
-            },
-          ],
-        },
-      ]);
-
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('Failed to register scheme untp'));
+      await expect(
+        adapter.registerSchemes([
+          {
+            namespace: 'untp',
+            applicationIdentifiers: [
+              {
+                title: 'ABN',
+                label: 'abn',
+                shortcode: 'abn',
+                ai: 'abn',
+                type: 'I' as const,
+                regex: '^\\d{11}$',
+              },
+            ],
+          },
+        ]),
+      ).rejects.toThrow(IdrSchemeRegistrationError);
     });
   });
 
