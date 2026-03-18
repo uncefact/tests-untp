@@ -98,3 +98,15 @@ export class IdrLinkTypesFetchError extends IdrError {
     );
   }
 }
+
+/** Failed to register an identifier scheme with the upstream IDR. */
+export class IdrSchemeRegistrationError extends IdrError {
+  constructor(namespace: string, httpStatus: number, detail: string) {
+    super(
+      `Failed to register scheme "${namespace}": HTTP ${httpStatus}: ${detail}`,
+      'IDR_SCHEME_REGISTRATION_FAILED',
+      502,
+      { namespace, httpStatus },
+    );
+  }
+}
