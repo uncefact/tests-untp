@@ -85,7 +85,6 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     };
     publishingOptions?: {
       publish?: boolean;
-      serviceInstanceId?: string;
       linkType?: string;
       linkTitle?: string;
       machineVerificationUrl?: string;
@@ -192,36 +191,44 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     } else if (!primaryEntity.primaryIdentifier) {
       logger.warn({ tenantId, credentialId }, 'Publishing requested but no primary identifier resolved — skipping');
     } else {
-      const idrService = await resolveIdrService(
-        tenantId,
-        primaryEntity.schemeIdrServiceInstanceId,
-        publishingOptions.serviceInstanceId,
-      );
+      try {
+        const idrService = await resolveIdrService(tenantId, primaryEntity.schemeIdrServiceInstanceId);
 
-      const linkTitle = publishingOptions.linkTitle || dataModel.name;
-      const links = buildPublishLinks(storageResponse, linkTitle, {
-        linkType: publishingOptions.linkType,
-        machineVerificationUrl: publishingOptions.machineVerificationUrl,
-        humanVerificationUrl: publishingOptions.humanVerificationUrl,
-      });
+        const linkTitle = publishingOptions.linkTitle || dataModel.name;
+        const links = buildPublishLinks(storageResponse, linkTitle, {
+          linkType: publishingOptions.linkType,
+          machineVerificationUrl: publishingOptions.machineVerificationUrl,
+          humanVerificationUrl: publishingOptions.humanVerificationUrl,
+        });
 
-      logger.info(
-        { tenantId, idrInstanceId: idrService.instanceId, primaryIdentifier: primaryEntity.primaryIdentifier },
-        'Publishing credential to IDR',
-      );
+        logger.info(
+          { tenantId, idrInstanceId: idrService.instanceId, primaryIdentifier: primaryEntity.primaryIdentifier },
+          'Publishing credential to IDR',
+        );
 
-      await idrService.service.publishLinks(
-        primaryEntity.schemePrimaryKey,
-        primaryEntity.primaryIdentifier,
-        links,
-        '/',
-        {
-          namespace: primaryEntity.schemeNamespace,
-          itemDescription: linkTitle,
-        },
-      );
+        await idrService.service.publishLinks(
+          primaryEntity.schemePrimaryKey,
+          primaryEntity.primaryIdentifier,
+          links,
+          '/',
+          {
+            namespace: primaryEntity.schemeNamespace,
+            itemDescription: linkTitle,
+          },
+        );
 
-      await updateCredentialPublished(credentialId, tenantId, true);
+        await updateCredentialPublished(credentialId, tenantId, true);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        logger.error(
+          { err: error, tenantId, credentialId, scheme: primaryEntity.schemePrimaryKey },
+          'Failed to publish credential to IDR',
+        );
+        cvcWarnings.push({
+          code: 'IDR_PUBLISH_FAILED',
+          message: `Failed to publish credential to identity resolver: ${detail}. Ensure the identifier scheme is registered with the IDR service. Contact your IDR operator if this persists.`,
+        });
+      }
     }
   }
 

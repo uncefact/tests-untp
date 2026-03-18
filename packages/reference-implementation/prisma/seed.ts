@@ -89,8 +89,9 @@ async function main() {
     try {
       const idrAdapters = adapterRegistry[ServiceType.IDR];
       const permittedIdrTypes = Object.keys(idrAdapters) as Array<keyof typeof idrAdapters>;
-      idrAdapterType = (process.env.SYSTEM_IDR_ADAPTER_TYPE as keyof typeof idrAdapters) || 'PYX_IDR';
-      const idrRegistryEntry = idrAdapters[idrAdapterType];
+      const resolvedIdrAdapterType = (process.env.SYSTEM_IDR_ADAPTER_TYPE as keyof typeof idrAdapters) || 'PYX_IDR';
+      idrAdapterType = resolvedIdrAdapterType;
+      const idrRegistryEntry = idrAdapters[resolvedIdrAdapterType];
       if (!idrRegistryEntry) {
         throw new Error(
           `Unknown IDR adapter type: "${idrAdapterType}". Permitted types: ${permittedIdrTypes.join(', ')}`,

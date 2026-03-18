@@ -615,8 +615,8 @@ describe('POST /api/v1/credentials', () => {
       const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
       await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
-      // resolveIdrService called with scheme and publishing service instance IDs
-      expect(mockResolveIdrService).toHaveBeenCalledWith('tenant-1', 'idr-scheme-1', undefined);
+      // resolveIdrService called with scheme IDR only
+      expect(mockResolveIdrService).toHaveBeenCalledWith('tenant-1', 'idr-scheme-1');
 
       // buildPublishLinks called with storage response, link title, and options
       expect(mockBuildPublishLinks).toHaveBeenCalledWith(STORAGE_RESPONSE, 'Digital Product Passport', {
@@ -634,7 +634,7 @@ describe('POST /api/v1/credentials', () => {
       expect(mockUpdateCredentialPublished).toHaveBeenCalledWith('cred-1', 'tenant-1', true);
     });
 
-    it('passes publishingOptions.serviceInstanceId to resolveIdrService', async () => {
+    it('ignores publishingOptions.serviceInstanceId (IDR determined by resolution chain)', async () => {
       setupPublishingHappyPath();
 
       const req = createFakeRequest(
@@ -642,7 +642,8 @@ describe('POST /api/v1/credentials', () => {
       );
       await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
-      expect(mockResolveIdrService).toHaveBeenCalledWith('tenant-1', 'idr-scheme-1', 'explicit-idr');
+      // serviceInstanceId should be ignored — resolveIdrService called with scheme IDR only
+      expect(mockResolveIdrService).toHaveBeenCalledWith('tenant-1', 'idr-scheme-1');
     });
 
     it('uses publishingOptions.linkTitle override when provided', async () => {
@@ -723,6 +724,36 @@ describe('POST /api/v1/credentials', () => {
       await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
       expect(mockResolveIdrService).not.toHaveBeenCalled();
+      expect(mockUpdateCredentialPublished).not.toHaveBeenCalled();
+    });
+
+    it('issues credential with IDR_PUBLISH_FAILED warning when publishLinks throws', async () => {
+      setupPublishingHappyPath();
+      mockPublishLinks.mockRejectedValueOnce(new Error('scheme not registered'));
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.credentialId).toBe('cred-1');
+      expect(json.warnings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'IDR_PUBLISH_FAILED',
+            message: expect.stringContaining('scheme not registered'),
+          }),
+        ]),
+      );
+    });
+
+    it('does not mark credential as published when publishLinks throws', async () => {
+      setupPublishingHappyPath();
+      mockPublishLinks.mockRejectedValueOnce(new Error('IDR unavailable'));
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
       expect(mockUpdateCredentialPublished).not.toHaveBeenCalled();
     });
 
