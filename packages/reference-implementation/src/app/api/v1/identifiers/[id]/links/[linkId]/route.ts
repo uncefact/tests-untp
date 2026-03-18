@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError } from '@/lib/api/validation';
+import { assertPublicUrl, ValidationError } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import {
   getIdentifierById,
@@ -74,7 +74,7 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links/[linkId]
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id: identifierId, linkId } = await params;
 
-  logger.info({ tenantId, identifierId, linkId }, 'Looking up identifier and local link record');
+  logger.info({ identifierId, linkId }, 'Looking up identifier and local link record');
   const identifier = await getIdentifierById(identifierId, tenantId);
   if (!identifier) {
     throw new NotFoundError('Identifier not found');
@@ -88,7 +88,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const scheme = identifier.scheme;
   const registrar = scheme.registrar;
 
-  logger.info({ tenantId, identifierId, linkId }, 'Resolving IDR service for link retrieval');
+  logger.info({ identifierId, linkId }, 'Resolving IDR service for link retrieval');
   const { service: idrService } = await resolveIdrService(
     tenantId,
     scheme.idrServiceInstanceId,
@@ -96,12 +96,12 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   );
 
   try {
-    logger.info({ tenantId, identifierId, linkId }, 'Fetching live link data from IDR');
+    logger.info({ identifierId, linkId }, 'Fetching live link data from IDR');
     const link = await idrService.getLinkById(linkId);
     return NextResponse.json({ link, localRecord });
   } catch (idrError: unknown) {
     if (idrError instanceof IdrLinkNotFoundError) {
-      logger.warn({ tenantId, identifierId, linkId }, 'Link desync — exists locally but missing from upstream IDR');
+      logger.warn({ identifierId, linkId }, 'Link desync — exists locally but missing from upstream IDR');
       return NextResponse.json(
         {
           link: null,
@@ -164,6 +164,12 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                   type: string
  *                 type:
  *                   type: string
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -197,7 +203,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId, linkId } = await params;
 
-  logger.info({ tenantId, identifierId, linkId }, 'Parsing request body');
+  logger.info({ identifierId, linkId }, 'Parsing request body');
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -205,7 +211,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId, identifierId, linkId }, 'Looking up identifier and local link record for update');
+  if (typeof body.href === 'string') await assertPublicUrl(body.href, 'href');
+
+  logger.info({ identifierId, linkId }, 'Looking up identifier and local link record for update');
   const identifier = await getIdentifierById(identifierId, tenantId);
   if (!identifier) {
     throw new NotFoundError('Identifier not found');
@@ -219,7 +227,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const scheme = identifier.scheme;
   const registrar = scheme.registrar;
 
-  logger.info({ tenantId, identifierId, linkId }, 'Resolving IDR service for link update');
+  logger.info({ identifierId, linkId }, 'Resolving IDR service for link update');
   const { service: idrService } = await resolveIdrService(
     tenantId,
     scheme.idrServiceInstanceId,
@@ -227,21 +235,21 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   );
 
   try {
-    logger.info({ tenantId, identifierId, linkId }, 'Updating link on upstream IDR');
+    logger.info({ identifierId, linkId }, 'Updating link on upstream IDR');
     const updatedLink = await idrService.updateLink(linkId, body);
 
-    logger.info({ tenantId, identifierId, linkId }, 'Syncing local record with upstream state');
+    logger.info({ identifierId, linkId }, 'Syncing local record with upstream state');
     await updateLinkRegistration(linkId, identifierId, tenantId, {
       linkType: updatedLink.rel,
       targetUrl: updatedLink.href,
       mimeType: updatedLink.type,
     });
 
-    logger.info({ tenantId, identifierId, linkId }, 'Link updated');
+    logger.info({ identifierId, linkId }, 'Link updated');
     return NextResponse.json(updatedLink);
   } catch (e: unknown) {
     if (e instanceof IdrLinkNotFoundError) {
-      logger.warn({ tenantId, identifierId, linkId }, 'Link desync — cannot update, missing from upstream IDR');
+      logger.warn({ identifierId, linkId }, 'Link desync — cannot update, missing from upstream IDR');
       return NextResponse.json(
         {
           error: `Link "${linkId}" no longer exists on the upstream IDR. It may have been removed out-of-band. Delete the local record to resolve this desynchronisation.`,
@@ -303,7 +311,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id: identifierId, linkId } = await params;
 
-  logger.info({ tenantId, identifierId, linkId }, 'Looking up identifier and local link record for deletion');
+  logger.info({ identifierId, linkId }, 'Looking up identifier and local link record for deletion');
   const identifier = await getIdentifierById(identifierId, tenantId);
   if (!identifier) {
     throw new NotFoundError('Identifier not found');
@@ -317,7 +325,7 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const scheme = identifier.scheme;
   const registrar = scheme.registrar;
 
-  logger.info({ tenantId, identifierId, linkId }, 'Resolving IDR service for link deletion');
+  logger.info({ identifierId, linkId }, 'Resolving IDR service for link deletion');
   const { service: idrService } = await resolveIdrService(
     tenantId,
     scheme.idrServiceInstanceId,
@@ -325,19 +333,19 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   );
 
   try {
-    logger.info({ tenantId, identifierId, linkId }, 'Deleting link from upstream IDR');
+    logger.info({ identifierId, linkId }, 'Deleting link from upstream IDR');
     await idrService.deleteLink(linkId);
   } catch (idrError: unknown) {
     if (idrError instanceof IdrLinkNotFoundError) {
-      logger.warn({ tenantId, identifierId, linkId }, 'Link desync — already absent from upstream IDR');
+      logger.warn({ identifierId, linkId }, 'Link desync — already absent from upstream IDR');
     } else {
       throw idrError;
     }
   }
 
-  logger.info({ tenantId, identifierId, linkId }, 'Cleaning up local link record');
+  logger.info({ identifierId, linkId }, 'Cleaning up local link record');
   await deleteLinkRegistration(linkId, identifierId, tenantId);
 
-  logger.info({ tenantId, identifierId, linkId }, 'Link deleted');
+  logger.info({ identifierId, linkId }, 'Link deleted');
   return new Response(null, { status: 204 });
 });

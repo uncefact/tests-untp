@@ -601,6 +601,7 @@ async function main() {
         grouped.get(ns)!.push(scheme);
       }
 
+      const failedNamespaces: string[] = [];
       for (const [namespace, nsSchemes] of grouped) {
         const applicationIdentifiers = nsSchemes.flatMap((s) => {
           const primary = {
@@ -631,8 +632,12 @@ async function main() {
           const message = error instanceof Error ? error.message : String(error);
 
           if (status === 409) {
-            logger.info({ namespace }, 'Schemes already registered with IDR — skipping');
+            logger.warn(
+              { namespace },
+              'Schemes already registered with IDR — skipping. If scheme definitions have changed, manually update or delete and re-register via the IDR.',
+            );
           } else if (status === 400 || status === 422) {
+            failedNamespaces.push(namespace);
             logger.error(
               { namespace, error: message },
               'IDR scheme registration validation error — skipping namespace',
@@ -644,7 +649,14 @@ async function main() {
         }
       }
 
-      logger.info('IDR scheme registration complete');
+      if (failedNamespaces.length > 0) {
+        logger.warn(
+          { failedNamespaces },
+          'IDR scheme registration completed with failures — some namespaces were not registered',
+        );
+      } else {
+        logger.info('IDR scheme registration complete');
+      }
     } catch (error) {
       logger.error({ error: error instanceof Error ? error.message : error }, 'IDR scheme registration failed');
       throw error;

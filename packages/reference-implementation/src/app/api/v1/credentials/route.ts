@@ -191,21 +191,22 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     } else if (!primaryEntity.primaryIdentifier) {
       logger.warn({ tenantId, credentialId }, 'Publishing requested but no primary identifier resolved — skipping');
     } else {
+      // Resolve IDR service outside try-catch — config failures should be fatal
+      const idrService = await resolveIdrService(tenantId, primaryEntity.schemeIdrServiceInstanceId);
+
+      const linkTitle = publishingOptions.linkTitle || dataModel.name;
+      const links = buildPublishLinks(storageResponse, linkTitle, {
+        linkType: publishingOptions.linkType,
+        machineVerificationUrl: publishingOptions.machineVerificationUrl,
+        humanVerificationUrl: publishingOptions.humanVerificationUrl,
+      });
+
+      logger.info(
+        { tenantId, idrInstanceId: idrService.instanceId, primaryIdentifier: primaryEntity.primaryIdentifier },
+        'Publishing credential to IDR',
+      );
+
       try {
-        const idrService = await resolveIdrService(tenantId, primaryEntity.schemeIdrServiceInstanceId);
-
-        const linkTitle = publishingOptions.linkTitle || dataModel.name;
-        const links = buildPublishLinks(storageResponse, linkTitle, {
-          linkType: publishingOptions.linkType,
-          machineVerificationUrl: publishingOptions.machineVerificationUrl,
-          humanVerificationUrl: publishingOptions.humanVerificationUrl,
-        });
-
-        logger.info(
-          { tenantId, idrInstanceId: idrService.instanceId, primaryIdentifier: primaryEntity.primaryIdentifier },
-          'Publishing credential to IDR',
-        );
-
         await idrService.service.publishLinks(
           primaryEntity.schemePrimaryKey,
           primaryEntity.primaryIdentifier,
@@ -216,8 +217,6 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
             itemDescription: linkTitle,
           },
         );
-
-        await updateCredentialPublished(credentialId, tenantId, true);
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         logger.error(
@@ -228,6 +227,11 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
           code: 'IDR_PUBLISH_FAILED',
           message: `Failed to publish credential to identity resolver: ${detail}. Ensure the identifier scheme is registered with the IDR service. Contact your IDR operator if this persists.`,
         });
+      }
+
+      // Update published state outside try-catch — DB failure after successful publish is a separate concern
+      if (!cvcWarnings.some((w) => w.code === 'IDR_PUBLISH_FAILED')) {
+        await updateCredentialPublished(credentialId, tenantId, true);
       }
     }
   }

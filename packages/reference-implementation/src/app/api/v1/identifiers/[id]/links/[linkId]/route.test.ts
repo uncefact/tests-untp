@@ -254,6 +254,20 @@ describe('PATCH /api/v1/identifiers/[id]/links/[linkId]', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('returns 400 for invalid JSON body', async () => {
+    const req = {
+      json: async () => {
+        throw new SyntaxError('Unexpected token');
+      },
+      url: 'http://localhost/api/v1/identifiers/ident-1/links/idr-link-1',
+    } as unknown as Request;
+    const res = await PATCH(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toBe('Invalid JSON body');
+  });
 });
 
 describe('DELETE /api/v1/identifiers/[id]/links/[linkId]', () => {
@@ -287,6 +301,15 @@ describe('DELETE /api/v1/identifiers/[id]/links/[linkId]', () => {
 
   it('returns 404 when link registration not found', async () => {
     mockGetLinkRegistrationByIdrLinkId.mockResolvedValue(null);
+
+    const req = createFakeRequest();
+    const res = await DELETE(req, createContext());
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 404 when identifier not found', async () => {
+    mockGetIdentifierById.mockResolvedValue(null);
 
     const req = createFakeRequest();
     const res = await DELETE(req, createContext());

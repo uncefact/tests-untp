@@ -44,6 +44,7 @@ describe('Registrar API', { testIsolation: false }, () => {
     it('GET /api/v1/registrars — lists registrars', () => {
       cy.request('/api/v1/registrars').then((response) => {
         expect(response.status).to.eq(200);
+        expect(response.body).to.not.have.property('ok');
         expect(response.body.data).to.be.an('array');
         expect(response.body.pagination).to.exist;
         expect(response.body.pagination.total).to.be.a('number');
@@ -124,6 +125,9 @@ describe('Registrar API', { testIsolation: false }, () => {
         expect(response.body.data.length).to.be.at.most(1);
         expect(response.body.pagination).to.exist;
         expect(response.body.pagination.total).to.be.a('number');
+        expect(response.body.pagination.limit).to.eq(1);
+        expect(response.body.pagination.offset).to.eq(0);
+        expect(response.body.pagination.hasMore).to.be.a('boolean');
       });
     });
   });
@@ -137,6 +141,7 @@ describe('Registrar API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -148,6 +153,7 @@ describe('Registrar API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -159,6 +165,20 @@ describe('Registrar API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('returns 400 for invalid JSON body', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/registrars',
+        body: 'not valid json',
+        headers: { 'Content-Type': 'application/json' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -182,6 +202,7 @@ describe('Registrar API', { testIsolation: false }, () => {
           failOnStatusCode: false,
         }).then((response) => {
           expect(response.status).to.eq(400);
+          expect(response.body.error).to.be.a('string');
         });
 
         // Clean up
@@ -196,6 +217,30 @@ describe('Registrar API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('PATCH — returns 404 for nonexistent registrar', () => {
+      cy.request({
+        method: 'PATCH',
+        url: '/api/v1/registrars/nonexistent-id',
+        body: { name: 'Should not work' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('DELETE — returns 404 for nonexistent registrar', () => {
+      cy.request({
+        method: 'DELETE',
+        url: '/api/v1/registrars/nonexistent-id',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -206,6 +251,7 @@ describe('Registrar API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -216,6 +262,7 @@ describe('Registrar API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
   });

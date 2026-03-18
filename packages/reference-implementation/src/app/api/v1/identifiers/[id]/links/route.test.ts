@@ -237,4 +237,26 @@ describe('GET /api/v1/identifiers/[id]/links', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('returns 400 for non-numeric limit', async () => {
+    mockGetIdentifierById.mockResolvedValue(MOCK_IDENTIFIER);
+
+    const req = { url: 'http://localhost/api/v1/identifiers/ident-1/links?limit=abc' } as unknown as Request;
+    const res = await GET(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain('limit must be a positive integer');
+  });
+
+  it('returns 400 for negative offset', async () => {
+    mockGetIdentifierById.mockResolvedValue(MOCK_IDENTIFIER);
+
+    const req = { url: 'http://localhost/api/v1/identifiers/ident-1/links?offset=-1' } as unknown as Request;
+    const res = await GET(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain('offset must be a non-negative integer');
+  });
 });

@@ -50,12 +50,12 @@ const logger = apiLogger.child({ route: '/api/v1/schemes/[id]' });
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ tenantId, schemeId: id }, 'Looking up scheme');
+  logger.info({ schemeId: id }, 'Looking up scheme');
   const scheme = await getIdentifierSchemeById(id, tenantId);
   if (!scheme) {
     throw new NotFoundError('Identifier scheme not found');
   }
-  logger.info({ tenantId, schemeId: id }, 'Scheme retrieved');
+  logger.info({ schemeId: id }, 'Scheme retrieved');
   return NextResponse.json(scheme);
 });
 
@@ -148,7 +148,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  */
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ tenantId, schemeId: id }, 'Parsing request body');
+  logger.info({ schemeId: id }, 'Parsing request body');
 
   let body: {
     name?: string;
@@ -177,7 +177,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const hasIdrServiceInstanceId = body.idrServiceInstanceId !== undefined;
   const hasQualifiers = body.qualifiers !== undefined;
 
-  logger.info({ tenantId, schemeId: id }, 'Validating update fields');
+  logger.info({ schemeId: id }, 'Validating update fields');
   if (
     !hasName &&
     !hasPrimaryKey &&
@@ -203,7 +203,6 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 
   logger.info(
     {
-      tenantId,
       schemeId: id,
       fields: {
         hasName,
@@ -225,7 +224,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     ...(hasQualifiers && { qualifiers: body.qualifiers }),
   });
 
-  logger.info({ tenantId, schemeId: id }, 'Scheme updated');
+  logger.info({ schemeId: id }, 'Scheme updated');
   return NextResponse.json(updated);
 });
 
@@ -269,9 +268,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, schemeId: id }, 'Deleting scheme');
+  logger.info({ schemeId: id }, 'Deleting scheme');
   await deleteIdentifierScheme(id, tenantId);
 
-  logger.info({ tenantId, schemeId: id }, 'Scheme deleted');
+  logger.info({ schemeId: id }, 'Scheme deleted');
   return new Response(null, { status: 204 });
 });

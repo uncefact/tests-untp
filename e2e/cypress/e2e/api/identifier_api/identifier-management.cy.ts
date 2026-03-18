@@ -71,6 +71,7 @@ describe('Identifier API', { testIsolation: false }, () => {
     it('GET /api/v1/identifiers — lists identifiers', () => {
       cy.request('/api/v1/identifiers').then((response) => {
         expect(response.status).to.eq(200);
+        expect(response.body).to.not.have.property('ok');
         expect(response.body.data).to.be.an('array');
         expect(response.body.pagination).to.exist;
 
@@ -146,6 +147,7 @@ describe('Identifier API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -157,6 +159,7 @@ describe('Identifier API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -168,6 +171,32 @@ describe('Identifier API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('returns 400 for invalid JSON body', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/identifiers',
+        body: 'not valid json',
+        headers: { 'Content-Type': 'application/json' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('returns 404 when POST references nonexistent schemeId', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/identifiers',
+        body: { schemeId: 'nonexistent-id', value: '51824753556' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -187,6 +216,7 @@ describe('Identifier API', { testIsolation: false }, () => {
           failOnStatusCode: false,
         }).then((response) => {
           expect(response.status).to.eq(400);
+          expect(response.body.error).to.be.a('string');
         });
 
         cy.request({ method: 'DELETE', url: `/api/v1/identifiers/${tempId}` });
@@ -200,6 +230,30 @@ describe('Identifier API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('PATCH — returns 404 for nonexistent identifier', () => {
+      cy.request({
+        method: 'PATCH',
+        url: '/api/v1/identifiers/nonexistent-id',
+        body: { value: '12345678901' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('DELETE — returns 404 for nonexistent identifier', () => {
+      cy.request({
+        method: 'DELETE',
+        url: '/api/v1/identifiers/nonexistent-id',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -210,6 +264,7 @@ describe('Identifier API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -220,6 +275,7 @@ describe('Identifier API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
   });
@@ -230,6 +286,9 @@ describe('Identifier API', { testIsolation: false }, () => {
         expect(response.status).to.eq(200);
         expect(response.body.data.length).to.be.at.most(1);
         expect(response.body.pagination).to.exist;
+        expect(response.body.pagination.limit).to.eq(1);
+        expect(response.body.pagination.offset).to.eq(0);
+        expect(response.body.pagination.hasMore).to.be.a('boolean');
       });
     });
   });

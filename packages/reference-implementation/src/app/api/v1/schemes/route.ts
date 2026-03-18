@@ -95,7 +95,7 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info({ tenantId }, 'Parsing request body');
+  logger.info('Parsing request body');
   let body: {
     registrarId?: string;
     name?: string;
@@ -117,7 +117,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId, registrarId: body.registrarId, name: body.name }, 'Validating input parameters');
+  logger.info({ registrarId: body.registrarId, name: body.name }, 'Validating input parameters');
   if (!isNonEmptyString(body.registrarId)) throw new ValidationError('registrarId is required');
   if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
   if (!isNonEmptyString(body.primaryKey)) throw new ValidationError('primaryKey is required');
@@ -138,7 +138,6 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   logger.info(
     {
-      tenantId,
       registrarId: body.registrarId,
       primaryKey: body.primaryKey,
       qualifierCount: body.qualifiers?.length ?? 0,
@@ -156,7 +155,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     qualifiers: body.qualifiers,
   });
 
-  logger.info({ tenantId, schemeId: scheme.id }, 'Scheme created');
+  logger.info({ schemeId: scheme.id }, 'Scheme created');
   return NextResponse.json(scheme, { status: 201 });
 });
 
@@ -220,16 +219,16 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
-  logger.info({ tenantId }, 'Parsing query parameters');
+  logger.info('Parsing query parameters');
   const url = new URL(req.url);
   const registrarId = url.searchParams.get('registrarId') ?? undefined;
   const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
   const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  logger.info({ tenantId, registrarId, limit, offset }, 'Listing schemes');
+  logger.info({ registrarId, limit, offset }, 'Listing schemes');
   const { data, total } = await listIdentifierSchemes(tenantId, { registrarId, limit, offset });
 
-  logger.info({ tenantId, count: data.length }, 'Schemes listed');
+  logger.info({ count: data.length }, 'Schemes listed');
   return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });
