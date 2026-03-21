@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { type NavMenuItemConfig, type MoreOptionGroup, Loader } from '@reference-implementation/components';
 import { AuthProvider, useAuth } from '@/contexts/auth';
+import { DidProvider } from '@/contexts/did/DidContext';
 import { Sidebar, MobileSidebar } from '@/components/sidebar';
 import { LogOut } from 'lucide-react';
 
@@ -147,7 +148,9 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 export default function ProtectedLayout({ children }: ProtectedLayoutProps) {
   return (
     <AuthProvider>
-      <ProtectedContent>{children}</ProtectedContent>
+      <DidProvider>
+        <ProtectedContent>{children}</ProtectedContent>
+      </DidProvider>
     </AuthProvider>
   );
 }
