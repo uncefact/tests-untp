@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { type NavMenuItemConfig, type MoreOptionGroup, Loader } from '@reference-implementation/components';
 import { AuthProvider, useAuth } from '@/contexts/auth';
 import { Sidebar, MobileSidebar } from '@/components/sidebar';
@@ -50,11 +50,33 @@ const navItems: NavMenuItemConfig[] = [
   },
 ];
 
+/**
+ * Maps nav item IDs to their corresponding route paths.
+ * Extend this map as new pages are added.
+ */
+const NAV_ROUTE_MAP: Record<string, string> = {
+  dids: '/configuration/dids',
+};
+
+/**
+ * Derives the reverse mapping from route paths to nav item IDs,
+ * sorted by path length descending so longer (more specific) paths match first.
+ */
+const ROUTE_TO_NAV_ENTRIES = Object.entries(NAV_ROUTE_MAP)
+  .map(([navId, path]) => ({ navId, path }))
+  .sort((a, b) => b.path.length - a.path.length);
+
+function resolveNavIdFromPathname(pathname: string): string | undefined {
+  const match = ROUTE_TO_NAV_ENTRIES.find(({ path }) => pathname.startsWith(path));
+  return match?.navId;
+}
+
 function ProtectedContent({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
-  const [selectedNavId, setSelectedNavId] = useState<string>('credentials');
+  const selectedNavId = pathname ? resolveNavIdFromPathname(pathname) : undefined;
 
   // Redirect to login page if user is not authenticated
   useEffect(() => {
@@ -85,9 +107,12 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 
   // Handle navigation click in the sidebar
   const handleNavClick = (navId: string) => {
-    // TODO: Implement navigation logic as pages become available.
-    setSelectedNavId(navId);
-    console.log('Navigation clicked:', navId);
+    const route = NAV_ROUTE_MAP[navId];
+    if (route) {
+      router.push(route);
+    } else if (process.env.NODE_ENV === 'development') {
+      console.warn(`No route mapped for nav item "${navId}"`);
+    }
   };
 
   // Handle logo click in the sidebar
@@ -105,34 +130,27 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   // Default logo for the sidebar. Will dynamically change based on organization settings.
   const logo = <span className='text-xl font-semibold'>UNTP Reference Implementation</span>;
 
+  const sidebarProps = {
+    user: userForSidebar,
+    menuGroups,
+    logo,
+    onLogoClick: handleLogoClick,
+    navItems,
+    selectedNavId,
+    onNavClick: handleNavClick,
+    isLoading,
+  };
+
   return (
     <div className='flex h-screen overflow-hidden'>
       {/* Mobile Sidebar/Navbar - hidden on desktop */}
       <div className='md:hidden'>
-        <MobileSidebar
-          user={userForSidebar}
-          menuGroups={menuGroups}
-          logo={logo}
-          onLogoClick={handleLogoClick}
-          navItems={navItems}
-          selectedNavId={selectedNavId}
-          onNavClick={handleNavClick}
-          isLoading={isLoading}
-        />
+        <MobileSidebar {...sidebarProps} />
       </div>
 
       {/* Desktop Sidebar - hidden on mobile */}
       <div className='hidden md:block'>
-        <Sidebar
-          user={userForSidebar}
-          menuGroups={menuGroups}
-          logo={logo}
-          onLogoClick={handleLogoClick}
-          navItems={navItems}
-          selectedNavId={selectedNavId}
-          onNavClick={handleNavClick}
-          isLoading={isLoading}
-        />
+        <Sidebar {...sidebarProps} />
       </div>
 
       <main className='flex-1 overflow-auto pt-16 md:pt-0'>
