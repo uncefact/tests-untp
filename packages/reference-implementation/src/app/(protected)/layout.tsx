@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useMemo, useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { type NavMenuItemConfig, type MoreOptionGroup, Loader } from '@reference-implementation/components';
 import { AuthProvider, useAuth } from '@/contexts/auth';
 import { Sidebar, MobileSidebar } from '@/components/sidebar';
@@ -50,11 +50,33 @@ const navItems: NavMenuItemConfig[] = [
   },
 ];
 
+/**
+ * Maps nav item IDs to their corresponding route paths.
+ * Extend this map as new pages are added.
+ */
+const NAV_ROUTE_MAP: Record<string, string> = {
+  dids: '/configuration/dids',
+};
+
+/**
+ * Derives the reverse mapping from route paths to nav item IDs,
+ * sorted by path length descending so longer (more specific) paths match first.
+ */
+const ROUTE_TO_NAV_ENTRIES = Object.entries(NAV_ROUTE_MAP)
+  .map(([navId, path]) => ({ navId, path }))
+  .sort((a, b) => b.path.length - a.path.length);
+
+function resolveNavIdFromPathname(pathname: string): string | undefined {
+  const match = ROUTE_TO_NAV_ENTRIES.find(({ path }) => pathname.startsWith(path));
+  return match?.navId;
+}
+
 function ProtectedContent({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
-  const [selectedNavId, setSelectedNavId] = useState<string>('credentials');
+  const selectedNavId = useMemo(() => resolveNavIdFromPathname(pathname), [pathname]);
 
   // Redirect to login page if user is not authenticated
   useEffect(() => {
@@ -85,9 +107,10 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 
   // Handle navigation click in the sidebar
   const handleNavClick = (navId: string) => {
-    // TODO: Implement navigation logic as pages become available.
-    setSelectedNavId(navId);
-    console.log('Navigation clicked:', navId);
+    const route = NAV_ROUTE_MAP[navId];
+    if (route) {
+      router.push(route);
+    }
   };
 
   // Handle logo click in the sidebar

@@ -6,3 +6,4 @@ export * from './sheet.js';
 export * from './tooltip.js';
 export * from './input.js';
 export * from './separator.js';
+export * from './tabs.js';
