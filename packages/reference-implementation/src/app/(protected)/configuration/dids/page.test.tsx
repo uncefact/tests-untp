@@ -94,12 +94,13 @@ describe('DidsPage', () => {
     expect(screen.getByTestId('managed-tab-content')).toBeInTheDocument();
   });
 
-  it('renders self-hosted tab content panel when selected', async () => {
+  it('renders self-hosted tab content panel and hides managed panel when selected', async () => {
     const user = userEvent.setup();
     render(<DidsPage />);
 
     await user.click(screen.getByRole('tab', { name: 'Self hosted' }));
 
     expect(screen.getByTestId('self-hosted-tab-content')).toBeInTheDocument();
+    expect(screen.queryByTestId('managed-tab-content')).not.toBeInTheDocument();
   });
 });

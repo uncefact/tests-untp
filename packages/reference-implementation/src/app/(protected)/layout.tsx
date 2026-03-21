@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { type NavMenuItemConfig, type MoreOptionGroup, Loader } from '@reference-implementation/components';
 import { AuthProvider, useAuth } from '@/contexts/auth';
@@ -76,7 +76,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const selectedNavId = useMemo(() => resolveNavIdFromPathname(pathname), [pathname]);
+  const selectedNavId = resolveNavIdFromPathname(pathname);
 
   // Redirect to login page if user is not authenticated
   useEffect(() => {
@@ -110,6 +110,8 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
     const route = NAV_ROUTE_MAP[navId];
     if (route) {
       router.push(route);
+    } else if (process.env.NODE_ENV === 'development') {
+      console.warn(`No route mapped for nav item "${navId}"`);
     }
   };
 
@@ -128,34 +130,27 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   // Default logo for the sidebar. Will dynamically change based on organization settings.
   const logo = <span className='text-xl font-semibold'>UNTP Reference Implementation</span>;
 
+  const sidebarProps = {
+    user: userForSidebar,
+    menuGroups,
+    logo,
+    onLogoClick: handleLogoClick,
+    navItems,
+    selectedNavId,
+    onNavClick: handleNavClick,
+    isLoading,
+  };
+
   return (
     <div className='flex h-screen overflow-hidden'>
       {/* Mobile Sidebar/Navbar - hidden on desktop */}
       <div className='md:hidden'>
-        <MobileSidebar
-          user={userForSidebar}
-          menuGroups={menuGroups}
-          logo={logo}
-          onLogoClick={handleLogoClick}
-          navItems={navItems}
-          selectedNavId={selectedNavId}
-          onNavClick={handleNavClick}
-          isLoading={isLoading}
-        />
+        <MobileSidebar {...sidebarProps} />
       </div>
 
       {/* Desktop Sidebar - hidden on mobile */}
       <div className='hidden md:block'>
-        <Sidebar
-          user={userForSidebar}
-          menuGroups={menuGroups}
-          logo={logo}
-          onLogoClick={handleLogoClick}
-          navItems={navItems}
-          selectedNavId={selectedNavId}
-          onNavClick={handleNavClick}
-          isLoading={isLoading}
-        />
+        <Sidebar {...sidebarProps} />
       </div>
 
       <main className='flex-1 overflow-auto pt-16 md:pt-0'>
