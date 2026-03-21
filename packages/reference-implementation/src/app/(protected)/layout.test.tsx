@@ -25,9 +25,15 @@ jest.mock('@/contexts/auth', () => ({
 jest.mock('@/components/sidebar', () => ({
   Sidebar: ({ onNavClick, selectedNavId }: { onNavClick: (id: string) => void; selectedNavId?: string }) => (
     <div data-testid='sidebar' data-selected-nav-id={selectedNavId}>
-      <button data-testid='nav-dids' onClick={() => onNavClick('dids')}>DIDs</button>
-      <button data-testid='nav-credentials' onClick={() => onNavClick('credentials')}>Credentials</button>
-      <button data-testid='nav-resources' onClick={() => onNavClick('resources')}>Resources</button>
+      <button data-testid='nav-dids' onClick={() => onNavClick('dids')}>
+        DIDs
+      </button>
+      <button data-testid='nav-credentials' onClick={() => onNavClick('credentials')}>
+        Credentials
+      </button>
+      <button data-testid='nav-resources' onClick={() => onNavClick('resources')}>
+        Resources
+      </button>
     </div>
   ),
   MobileSidebar: () => <div data-testid='mobile-sidebar' />,
@@ -48,7 +54,11 @@ describe('ProtectedLayout navigation', () => {
 
   it('calls router.push when clicking a mapped nav item', async () => {
     const user = userEvent.setup();
-    render(<ProtectedLayout><div>Content</div></ProtectedLayout>);
+    render(
+      <ProtectedLayout>
+        <div>Content</div>
+      </ProtectedLayout>,
+    );
 
     await user.click(screen.getByTestId('nav-dids'));
 
@@ -57,7 +67,11 @@ describe('ProtectedLayout navigation', () => {
 
   it('does not call router.push when clicking an unmapped nav item', async () => {
     const user = userEvent.setup();
-    render(<ProtectedLayout><div>Content</div></ProtectedLayout>);
+    render(
+      <ProtectedLayout>
+        <div>Content</div>
+      </ProtectedLayout>,
+    );
 
     await user.click(screen.getByTestId('nav-credentials'));
 
@@ -66,7 +80,11 @@ describe('ProtectedLayout navigation', () => {
 
   it('does not call router.push for external nav items', async () => {
     const user = userEvent.setup();
-    render(<ProtectedLayout><div>Content</div></ProtectedLayout>);
+    render(
+      <ProtectedLayout>
+        <div>Content</div>
+      </ProtectedLayout>,
+    );
 
     await user.click(screen.getByTestId('nav-resources'));
 
@@ -75,21 +93,33 @@ describe('ProtectedLayout navigation', () => {
 
   it('derives selectedNavId from the current pathname', () => {
     mockPathname.mockReturnValue('/configuration/dids');
-    render(<ProtectedLayout><div>Content</div></ProtectedLayout>);
+    render(
+      <ProtectedLayout>
+        <div>Content</div>
+      </ProtectedLayout>,
+    );
 
     expect(screen.getByTestId('sidebar')).toHaveAttribute('data-selected-nav-id', 'dids');
   });
 
   it('sets selectedNavId to undefined for unrecognised paths', () => {
     mockPathname.mockReturnValue('/dashboard');
-    render(<ProtectedLayout><div>Content</div></ProtectedLayout>);
+    render(
+      <ProtectedLayout>
+        <div>Content</div>
+      </ProtectedLayout>,
+    );
 
     expect(screen.getByTestId('sidebar')).not.toHaveAttribute('data-selected-nav-id', 'dids');
   });
 
   it('matches sub-paths to the correct nav item', () => {
     mockPathname.mockReturnValue('/configuration/dids/create');
-    render(<ProtectedLayout><div>Content</div></ProtectedLayout>);
+    render(
+      <ProtectedLayout>
+        <div>Content</div>
+      </ProtectedLayout>,
+    );
 
     expect(screen.getByTestId('sidebar')).toHaveAttribute('data-selected-nav-id', 'dids');
   });

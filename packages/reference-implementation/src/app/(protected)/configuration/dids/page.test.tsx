@@ -8,7 +8,10 @@ function MockTabs({ children, defaultValue }: { children: React.ReactNode; defau
     <div data-testid='tabs' data-active-tab={activeTab}>
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child)) {
-          return React.cloneElement(child as React.ReactElement<{ activeTab: string; setActiveTab: (v: string) => void }>, { activeTab, setActiveTab });
+          return React.cloneElement(
+            child as React.ReactElement<{ activeTab: string; setActiveTab: (v: string) => void }>,
+            { activeTab, setActiveTab },
+          );
         }
         return child;
       })}
@@ -16,12 +19,24 @@ function MockTabs({ children, defaultValue }: { children: React.ReactNode; defau
   );
 }
 
-function MockTabsList({ children, activeTab, setActiveTab, ...rest }: { children: React.ReactNode; activeTab?: string; setActiveTab?: (v: string) => void } & React.HTMLAttributes<HTMLDivElement>) {
+function MockTabsList({
+  children,
+  activeTab,
+  setActiveTab,
+  ...rest
+}: {
+  children: React.ReactNode;
+  activeTab?: string;
+  setActiveTab?: (v: string) => void;
+} & React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div role='tablist' {...rest}>
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child)) {
-          return React.cloneElement(child as React.ReactElement<{ activeTab: string; setActiveTab: (v: string) => void }>, { activeTab, setActiveTab });
+          return React.cloneElement(
+            child as React.ReactElement<{ activeTab: string; setActiveTab: (v: string) => void }>,
+            { activeTab, setActiveTab },
+          );
         }
         return child;
       })}
@@ -29,7 +44,16 @@ function MockTabsList({ children, activeTab, setActiveTab, ...rest }: { children
   );
 }
 
-function MockTabsTrigger({ children, value, activeTab, setActiveTab, ...rest }: { children: React.ReactNode; value: string; activeTab?: string; setActiveTab?: (v: string) => void } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'value'>) {
+function MockTabsTrigger({
+  children,
+  value,
+  activeTab,
+  setActiveTab,
+  ...rest
+}: { children: React.ReactNode; value: string; activeTab?: string; setActiveTab?: (v: string) => void } & Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  'value'
+>) {
   return (
     <button
       role='tab'
@@ -42,7 +66,12 @@ function MockTabsTrigger({ children, value, activeTab, setActiveTab, ...rest }: 
   );
 }
 
-function MockTabsContent({ children, value, activeTab, ...rest }: { children: React.ReactNode; value: string; activeTab?: string } & React.HTMLAttributes<HTMLDivElement>) {
+function MockTabsContent({
+  children,
+  value,
+  activeTab,
+  ...rest
+}: { children: React.ReactNode; value: string; activeTab?: string } & React.HTMLAttributes<HTMLDivElement>) {
   if (activeTab !== value) return null;
   return <div {...rest}>{children}</div>;
 }
