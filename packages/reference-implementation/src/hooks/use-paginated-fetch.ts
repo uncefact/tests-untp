@@ -84,7 +84,7 @@ export function usePaginatedFetch<T>(fetchFn: FetchFn<T>, options: UsePaginatedF
   const [state, dispatch] = useReducer(reducer<T>, {
     data: [],
     pagination: null,
-    isLoading: false,
+    isLoading: fetchOnMount,
     error: null,
     limit,
     offset: 0,
