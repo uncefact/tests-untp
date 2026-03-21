@@ -76,7 +76,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const selectedNavId = resolveNavIdFromPathname(pathname);
+  const selectedNavId = pathname ? resolveNavIdFromPathname(pathname) : undefined;
 
   // Redirect to login page if user is not authenticated
   useEffect(() => {
