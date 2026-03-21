@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, useMemo, ReactNode } from 'react';
 import type { Did } from '@/lib/prisma/generated';
 import type { PaginationMeta } from '@/lib/api/pagination';
 import { listDids } from '@/lib/api/services/did.service';
@@ -36,22 +36,25 @@ export function DidProvider({ children }: DidProviderProps) {
     setPageSize,
   } = usePaginatedFetch(({ limit, offset }) => listDids({ limit, offset }), { fetchOnMount: true });
 
-  const managedDids = dids.filter((d) => d.type === 'MANAGED');
-  const selfManagedDids = dids.filter((d) => d.type === 'SELF_MANAGED');
-  const defaultDid = dids.find((d) => d.isDefault) ?? null;
+  const managedDids = useMemo(() => dids.filter((d) => d.type === 'MANAGED'), [dids]);
+  const selfManagedDids = useMemo(() => dids.filter((d) => d.type === 'SELF_MANAGED'), [dids]);
+  const defaultDid = useMemo(() => dids.find((d) => d.isDefault) ?? null, [dids]);
 
-  const value: DidContextType = {
-    dids,
-    managedDids,
-    selfManagedDids,
-    defaultDid,
-    pagination,
-    isLoading,
-    error,
-    refresh,
-    goToPage,
-    setPageSize,
-  };
+  const value: DidContextType = useMemo(
+    () => ({
+      dids,
+      managedDids,
+      selfManagedDids,
+      defaultDid,
+      pagination,
+      isLoading,
+      error,
+      refresh,
+      goToPage,
+      setPageSize,
+    }),
+    [dids, managedDids, selfManagedDids, defaultDid, pagination, isLoading, error, refresh, goToPage, setPageSize],
+  );
 
   return <DidContext.Provider value={value}>{children}</DidContext.Provider>;
 }

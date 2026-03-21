@@ -138,7 +138,11 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 
       <main className='flex-1 overflow-auto pt-16 md:pt-0'>
         <div className='px-6 py-6'>
-          {isLoading ? <Loader size={60} text='Loading...' className='min-h-[calc(100vh-3rem)]' /> : children}
+          {isLoading ? (
+            <Loader size={60} text='Loading...' className='min-h-[calc(100vh-3rem)]' />
+          ) : (
+            <DidProvider>{children}</DidProvider>
+          )}
         </div>
       </main>
     </div>
@@ -148,9 +152,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 export default function ProtectedLayout({ children }: ProtectedLayoutProps) {
   return (
     <AuthProvider>
-      <DidProvider>
-        <ProtectedContent>{children}</ProtectedContent>
-      </DidProvider>
+      <ProtectedContent>{children}</ProtectedContent>
     </AuthProvider>
   );
 }
