@@ -125,7 +125,7 @@ The three required fields are validated:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `credentialPayload` | object | Yes | The full credential payload conforming to the UNTP schema |
+| `credentialPayload` | object | Yes | The full credential payload conforming to the UNTP schema for the specified type and version |
 | `credentialType` | string | Yes | Must match a registered [data model](./data-models) (e.g., `DigitalProductPassport`) |
 | `version` | string | Yes | Must match a registered data model version (e.g., `0.6.1`) |
 
@@ -298,7 +298,7 @@ sequenceDiagram
 | `hash` | string | No | Expected SHA-256 hash (64-character hex string). If provided, the fetched credential's hash is verified against it. |
 | `decryptionKey` | string | No | AES-GCM decryption key (64-character hex string). Required for encrypted credentials. |
 
-The endpoint always returns HTTP 200 when the verification pipeline completes, even if the credential fails verification. Check the `verified` field for the outcome. Processing errors (decryption failure, hash mismatch, unsupported type) return non-200 status codes with a `code` field.
+The endpoint always returns HTTP 200 for a completed verification attempt, even if the credential fails verification. Check the `verified` field for the outcome. Processing errors (decryption failure, hash mismatch, unsupported type) that prevent a verification attempt return non-200 status codes with a `code` field.
 
 ### Environment Variables
 
