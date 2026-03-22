@@ -165,11 +165,13 @@ describe('assertPublicUrl', () => {
     );
   });
 
-  it('re-throws unexpected errors from validatePublicUrl', async () => {
+  it('wraps unexpected errors from validatePublicUrl in ValidationError', async () => {
     mockValidatePublicUrl.mockRejectedValue(new TypeError('Unexpected internal error'));
 
-    await expect(assertPublicUrl('https://example.com/test', 'schemaUrl')).rejects.toThrow(TypeError);
-    await expect(assertPublicUrl('https://example.com/test', 'schemaUrl')).rejects.toThrow('Unexpected internal error');
+    await expect(assertPublicUrl('https://example.com/test', 'schemaUrl')).rejects.toThrow(ValidationError);
+    await expect(assertPublicUrl('https://example.com/test', 'schemaUrl')).rejects.toThrow(
+      /schemaUrl could not be validated: Unexpected internal error/,
+    );
   });
 
   it('resolves without throwing for a valid public URL', async () => {

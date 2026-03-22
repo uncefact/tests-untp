@@ -85,7 +85,7 @@ export type ListDataModelOptions = {
 export async function createDataModel(tenantId: string, input: CreateDataModelInput): Promise<DataModelWithRelations> {
   const isExtension = input.isExtension ?? true;
 
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     if (isExtension) {
       if (!input.parentConfigId) {
         throw new ValidationError('parentConfigId is required for extension configs');
@@ -186,7 +186,7 @@ export async function updateDataModel(
   tenantId: string,
   input: UpdateDataModelInput,
 ): Promise<DataModelWithRelations> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.dataModel.findFirst({
       where: { id, tenantId, isExtension: true },
     });
@@ -214,7 +214,7 @@ export async function updateDataModel(
  * System-provisioned and core configs cannot be removed by tenants.
  */
 export async function deleteDataModel(id: string, tenantId: string): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.dataModel.findFirst({
       where: { id, tenantId, isExtension: true },
     });

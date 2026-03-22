@@ -5,6 +5,7 @@ import {
   parsePositiveInt,
   parseNonNegativeInt,
   parseBooleanString,
+  assertPublicUrl,
 } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
@@ -64,6 +65,12 @@ const logger = apiLogger.child({ route: '/api/v1/credentials' });
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Data model or service instance not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
@@ -87,19 +94,23 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       publish?: boolean;
       linkType?: string;
       linkTitle?: string;
+      qualifierPath?: string;
       machineVerificationUrl?: string;
       humanVerificationUrl?: string;
     };
   };
 
+  logger.info('Parsing request body');
   try {
     body = await req.json();
-  } catch {
+  } catch (e) {
+    logger.warn({ err: e }, 'Failed to parse request body as JSON');
     throw new ValidationError('Invalid JSON body');
   }
 
   // ── Step 1: Validate request ────────────────────────────────────────────
 
+  logger.info('Validating input parameters');
   if (!body.credentialPayload || typeof body.credentialPayload !== 'object') {
     throw new ValidationError('credentialPayload is required and must be an object');
   }
@@ -117,12 +128,24 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   const storageOptions = body.storageOptions ?? {};
   const publishingOptions = body.publishingOptions ?? {};
 
+  // ── SSRF validation for URL fields ────────────────────────────────────
+  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+    if (publishingOptions.machineVerificationUrl) {
+      await assertPublicUrl(publishingOptions.machineVerificationUrl, 'publishingOptions.machineVerificationUrl');
+    }
+    if (publishingOptions.humanVerificationUrl) {
+      await assertPublicUrl(publishingOptions.humanVerificationUrl, 'publishingOptions.humanVerificationUrl');
+    }
+  }
+
   // ── Step 2: Resolve data model ──────────────────────────────────────────
 
+  logger.info({ credentialType, version }, 'Resolving data model');
   const { dataModel, bridge, schemaUrls } = await resolveDataModel(tenantId, credentialType, version);
 
   // ── Step 3: Validate payload ────────────────────────────────────────────
 
+  logger.info('Validating credential payload against schema');
   await validateCredentialPayload(credentialPayload, schemaUrls);
 
   // ── Step 3.5: CVC validation (advisory) ─────────────────────────────
@@ -135,11 +158,13 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     const subject = credentialPayload.credentialSubject as Record<string, unknown>;
     refs = bridge.extractRefs(subject);
   } catch (error) {
-    logger.error({ err: error, tenantId, credentialType }, 'Reference extraction failed');
+    logger.error({ err: error, credentialType }, 'Reference extraction failed');
     cvcWarnings = [
       {
         code: 'CVC_VALIDATION_ERROR' as const,
-        message: 'Failed to extract references from credential payload',
+        message: publishingOptions.publish
+          ? 'Failed to extract references from credential payload — publishing will be skipped'
+          : 'Failed to extract references from credential payload',
       },
     ];
   }
@@ -156,7 +181,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       const result = await validateCvcCompliance(tenantId, refs.conformity);
       cvcWarnings = result.warnings;
     } catch (error) {
-      logger.error({ err: error, tenantId, credentialType }, 'CVC compliance validation failed');
+      logger.error({ err: error, credentialType }, 'CVC compliance validation failed');
       cvcWarnings = [
         {
           code: 'CVC_VALIDATION_ERROR' as const,
@@ -168,11 +193,13 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   // ── Step 4: Resolve services ────────────────────────────────────────────
 
+  logger.info('Resolving VC and storage services');
   const vcService = await resolveVcService(tenantId, signingOptions.serviceInstanceId);
   const storageService = await resolveStorageService(tenantId, storageOptions.serviceInstanceId);
 
   // ── Step 5: Issue credential ────────────────────────────────────────────
 
+  logger.info({ credentialType }, 'Issuing credential');
   const { credentialId, storageResponse, primaryEntity } = await issueCredential({
     tenantId,
     credentialPayload,
@@ -187,9 +214,17 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   if (publishingOptions.publish === true) {
     if (!primaryEntity.schemePrimaryKey || !primaryEntity.schemeNamespace) {
-      logger.warn({ tenantId, credentialId }, 'Publishing requested but entity has no scheme configuration — skipping');
+      logger.warn({ credentialId }, 'Publishing requested but entity has no scheme configuration — skipping');
+      cvcWarnings.push({
+        code: 'PUBLISH_SKIPPED' as const,
+        message: 'Publishing was requested but the entity has no identity scheme configuration',
+      });
     } else if (!primaryEntity.primaryIdentifier) {
-      logger.warn({ tenantId, credentialId }, 'Publishing requested but no primary identifier resolved — skipping');
+      logger.warn({ credentialId }, 'Publishing requested but no primary identifier resolved — skipping');
+      cvcWarnings.push({
+        code: 'PUBLISH_SKIPPED' as const,
+        message: 'Publishing was requested but no primary identifier could be resolved from the credential payload',
+      });
     } else {
       // Resolve IDR service outside try-catch — config failures should be fatal
       const idrService = await resolveIdrService(tenantId, primaryEntity.schemeIdrServiceInstanceId);
@@ -202,7 +237,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       });
 
       logger.info(
-        { tenantId, idrInstanceId: idrService.instanceId, primaryIdentifier: primaryEntity.primaryIdentifier },
+        { idrInstanceId: idrService.instanceId, primaryIdentifier: primaryEntity.primaryIdentifier },
         'Publishing credential to IDR',
       );
 
@@ -211,7 +246,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
           primaryEntity.schemePrimaryKey,
           primaryEntity.primaryIdentifier,
           links,
-          '/',
+          publishingOptions.qualifierPath || '/',
           {
             namespace: primaryEntity.schemeNamespace,
             itemDescription: linkTitle,
@@ -220,7 +255,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         logger.error(
-          { err: error, tenantId, credentialId, scheme: primaryEntity.schemePrimaryKey },
+          { err: error, credentialId, scheme: primaryEntity.schemePrimaryKey },
           'Failed to publish credential to IDR',
         );
         cvcWarnings.push({
@@ -229,13 +264,24 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
         });
       }
 
-      // Update published state outside try-catch — DB failure after successful publish is a separate concern
       if (!cvcWarnings.some((w) => w.code === 'IDR_PUBLISH_FAILED')) {
-        await updateCredentialPublished(credentialId, tenantId, true);
+        try {
+          await updateCredentialPublished(credentialId, tenantId, true);
+        } catch (error) {
+          logger.error(
+            { err: error, credentialId },
+            'Failed to update published status — credential was published to IDR but DB record is stale',
+          );
+          cvcWarnings.push({
+            code: 'DB_STATUS_UPDATE_FAILED' as const,
+            message: 'Credential was published to IDR but the published status could not be saved',
+          });
+        }
       }
     }
   }
 
+  logger.info({ credentialId }, 'Credential issued successfully');
   const response: Record<string, unknown> = { credentialId };
   if (cvcWarnings.length > 0) response.warnings = cvcWarnings;
   return NextResponse.json(response, { status: 201 });
@@ -272,7 +318,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         schema:
  *           type: integer
  *           minimum: 1
- *           default: 100
+ *           default: 20
  *         description: Maximum number of results
  *       - in: query
  *         name: offset

@@ -112,7 +112,7 @@ describe('Credential Verify API', { testIsolation: false }, () => {
         const credId = response.body.credentialId;
 
         cy.request(`/api/v1/credentials/${credId}`).then((res) => {
-          const cred = res.body.credential;
+          const cred = res.body;
           unencryptedUri = cred.storageUri;
           unencryptedHash = cred.hash;
         });
@@ -133,7 +133,7 @@ describe('Credential Verify API', { testIsolation: false }, () => {
         const credId = response.body.credentialId;
 
         cy.request(`/api/v1/credentials/${credId}`).then((res) => {
-          const cred = res.body.credential;
+          const cred = res.body;
           encryptedUri = cred.storageUri;
           encryptedHash = cred.hash;
           encryptedKey = cred.decryptionKey;
@@ -239,6 +239,31 @@ describe('Credential Verify API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+      });
+    });
+
+    it('returns 400 for invalid decryptionKey format', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials/verify',
+        body: { uri: unencryptedUri, decryptionKey: 'too-short' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('returns 400 for invalid JSON body', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials/verify',
+        body: 'not valid json',
+        headers: { 'Content-Type': 'application/json' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
   });

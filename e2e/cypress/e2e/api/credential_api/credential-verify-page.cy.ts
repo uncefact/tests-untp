@@ -121,7 +121,7 @@ describe('Verify Page', { testIsolation: false }, () => {
         const credId = response.body.credentialId;
 
         cy.request(`/api/v1/credentials/${credId}`).then((res) => {
-          const cred = res.body.credential;
+          const cred = res.body;
           unencryptedUri = cred.storageUri;
           unencryptedHash = cred.hash;
         });
@@ -142,7 +142,7 @@ describe('Verify Page', { testIsolation: false }, () => {
         const credId = response.body.credentialId;
 
         cy.request(`/api/v1/credentials/${credId}`).then((res) => {
-          const cred = res.body.credential;
+          const cred = res.body;
           encryptedUri = cred.storageUri;
           encryptedHash = cred.hash;
           encryptedKey = cred.decryptionKey;

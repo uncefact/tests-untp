@@ -100,7 +100,7 @@ export async function listRegistrars(
  * Validates that the registrar belongs to the specified organisation.
  */
 export async function updateRegistrar(id: string, tenantId: string, input: UpdateRegistrarInput): Promise<Registrar> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.registrar.findFirst({
       where: { id, tenantId },
     });
@@ -126,7 +126,7 @@ export async function updateRegistrar(id: string, tenantId: string, input: Updat
  * Validates that the registrar belongs to the specified organisation.
  */
 export async function deleteRegistrar(id: string, tenantId: string): Promise<Registrar> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.registrar.findFirst({
       where: { id, tenantId },
     });

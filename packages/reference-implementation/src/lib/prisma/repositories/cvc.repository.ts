@@ -38,7 +38,7 @@ export async function importCatalogue(input: ImportCatalogueInput): Promise<Impo
   const { tenantId, canonicalId, name, sourceUrl, specVersion, metadata, schemes } = input;
 
   return prisma.$transaction(
-    async (tx) => {
+    async (tx: Prisma.TransactionClient) => {
       // Delete existing catalogue for the same canonicalId + tenantId
       await tx.cvcCatalogue.deleteMany({
         where: { canonicalId, tenantId },
@@ -105,7 +105,7 @@ export async function importCatalogue(input: ImportCatalogueInput): Promise<Impo
           specVersion,
           metadata: metadata as Prisma.InputJsonValue | undefined,
           schemes: {
-            create: schemes.map((scheme) => ({
+            create: schemes.map((scheme: ImportCatalogueInput['schemes'][0]) => ({
               canonicalId: scheme.canonicalId,
               tenantId,
               name: scheme.name,
@@ -113,7 +113,7 @@ export async function importCatalogue(input: ImportCatalogueInput): Promise<Impo
               description: scheme.description,
               metadata: scheme.metadata as Prisma.InputJsonValue | undefined,
               profiles: {
-                create: scheme.profiles.map((profile) => {
+                create: scheme.profiles.map((profile: ImportCatalogueInput['schemes'][0]['profiles'][0]) => {
                   profileCount++;
                   return {
                     canonicalId: profile.canonicalId,
@@ -140,19 +140,23 @@ export async function importCatalogue(input: ImportCatalogueInput): Promise<Impo
       // Create ProfileCriterion join rows
       for (const scheme of catalogue.schemes) {
         for (const profile of scheme.profiles) {
-          const inputScheme = schemes.find((s) => s.canonicalId === scheme.canonicalId);
+          const inputScheme = schemes.find(
+            (s: ImportCatalogueInput['schemes'][0]) => s.canonicalId === scheme.canonicalId,
+          );
           if (!inputScheme) {
             throw new Error(`Import consistency error: no input scheme for canonicalId "${scheme.canonicalId}"`);
           }
 
-          const inputProfile = inputScheme.profiles.find((p) => p.canonicalId === profile.canonicalId);
+          const inputProfile = inputScheme.profiles.find(
+            (p: ImportCatalogueInput['schemes'][0]['profiles'][0]) => p.canonicalId === profile.canonicalId,
+          );
           if (!inputProfile) {
             throw new Error(`Import consistency error: no input profile for canonicalId "${profile.canonicalId}"`);
           }
 
           if (inputProfile.criteria.length > 0) {
             await tx.profileCriterion.createMany({
-              data: inputProfile.criteria.map((c) => {
+              data: inputProfile.criteria.map((c: ImportCatalogueInput['schemes'][0]['profiles'][0]['criteria'][0]) => {
                 const criterionId = criterionIdMap.get(c.canonicalId);
                 if (criterionId === undefined) {
                   throw new Error(`Import consistency error: no criterion ID for canonicalId "${c.canonicalId}"`);
@@ -186,7 +190,7 @@ export async function importCatalogue(input: ImportCatalogueInput): Promise<Impo
 // ---------------------------------------------------------------------------
 
 export async function deleteCatalogue(id: string, tenantId: string): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.cvcCatalogue.findFirst({
       where: { id, tenantId },
     });

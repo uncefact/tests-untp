@@ -95,7 +95,7 @@ export async function createRenderTemplate(
   tenantId: string,
   input: CreateRenderTemplateInput,
 ): Promise<RenderTemplateWithRelations> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     if (input.isDefault) {
       await tx.renderTemplate.updateMany({
         where: {
@@ -180,10 +180,10 @@ export async function listRenderTemplates(
     }),
   ]);
 
-  const tenantDefaultDataModels = new Set(tenantDefaults.map((t) => t.dataModelId));
+  const tenantDefaultDataModels = new Set(tenantDefaults.map((t: { dataModelId: string }) => t.dataModelId));
 
   return {
-    data: data.map((t) =>
+    data: data.map((t: RenderTemplateWithRelations) =>
       t.tenantId === SYSTEM_TENANT_ID && t.isDefault && tenantDefaultDataModels.has(t.dataModelId)
         ? { ...t, isDefault: false }
         : t,
@@ -202,7 +202,7 @@ export async function updateRenderTemplate(
   tenantId: string,
   input: UpdateRenderTemplateInput,
 ): Promise<RenderTemplateWithRelations> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.renderTemplate.findFirst({
       where: { id, tenantId },
     });
@@ -249,7 +249,7 @@ export async function updateRenderTemplate(
  * Deletes a render template. Only tenant-owned templates can be deleted.
  */
 export async function deleteRenderTemplate(id: string, tenantId: string): Promise<RenderTemplateWithRelations> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.renderTemplate.findFirst({
       where: { id, tenantId },
     });

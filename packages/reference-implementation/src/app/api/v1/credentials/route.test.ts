@@ -107,6 +107,15 @@ jest.mock('@/lib/prisma/repositories', () => ({
   listCredentials: (...args: unknown[]) => mockListCredentials(...args),
 }));
 
+const mockAssertPublicUrl = jest.fn();
+jest.mock('@/lib/api/validation', () => {
+  const actual = jest.requireActual('@/lib/api/validation');
+  return {
+    ...actual,
+    assertPublicUrl: (...args: unknown[]) => mockAssertPublicUrl(...args),
+  };
+});
+
 const mockValidateCvcCompliance = jest.fn();
 jest.mock('@/lib/services/cvc-validation.service', () => ({
   validateCvcCompliance: (...args: unknown[]) => mockValidateCvcCompliance(...args),
@@ -220,6 +229,7 @@ function setupHappyPath() {
 describe('POST /api/v1/credentials', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
     setupHappyPath();
   });
 
@@ -276,6 +286,85 @@ describe('POST /api/v1/credentials', () => {
 
       expect(res.status).toBe(400);
       expect(json.error).toContain('version is required');
+    });
+  });
+
+  // ── SSRF validation ──────────────────────────────────────────────────
+
+  describe('SSRF validation', () => {
+    it('calls assertPublicUrl for machineVerificationUrl when SSRF protection enabled', async () => {
+      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      mockAssertPublicUrl.mockResolvedValue(undefined);
+
+      const req = createFakeRequest(
+        validBody({
+          publishingOptions: {
+            machineVerificationUrl: 'https://verify.example.com/api',
+          },
+        }),
+      );
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockAssertPublicUrl).toHaveBeenCalledWith(
+        'https://verify.example.com/api',
+        'publishingOptions.machineVerificationUrl',
+      );
+    });
+
+    it('calls assertPublicUrl for humanVerificationUrl when SSRF protection enabled', async () => {
+      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      mockAssertPublicUrl.mockResolvedValue(undefined);
+
+      const req = createFakeRequest(
+        validBody({
+          publishingOptions: {
+            humanVerificationUrl: 'https://verify.example.com/ui',
+          },
+        }),
+      );
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockAssertPublicUrl).toHaveBeenCalledWith(
+        'https://verify.example.com/ui',
+        'publishingOptions.humanVerificationUrl',
+      );
+    });
+
+    it('returns 400 when machineVerificationUrl is a private address', async () => {
+      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      const { ValidationError: VE } = jest.requireActual('@/lib/api/validation');
+      mockAssertPublicUrl.mockRejectedValue(
+        new VE('publishingOptions.machineVerificationUrl must not point to a private or reserved network address'),
+      );
+
+      const req = createFakeRequest(
+        validBody({
+          publishingOptions: {
+            machineVerificationUrl: 'http://127.0.0.1:3000/verify',
+          },
+        }),
+      );
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('private or reserved');
+    });
+
+    it('skips SSRF validation when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
+      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+
+      const req = createFakeRequest(
+        validBody({
+          publishingOptions: {
+            machineVerificationUrl: 'http://127.0.0.1:3000/verify',
+            humanVerificationUrl: 'http://127.0.0.1:3000/ui',
+          },
+        }),
+      );
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockAssertPublicUrl).not.toHaveBeenCalled();
     });
   });
 
@@ -694,6 +783,38 @@ describe('POST /api/v1/credentials', () => {
         machineVerificationUrl: 'https://verify.example.com/api',
         humanVerificationUrl: 'https://verify.example.com/ui',
       });
+    });
+
+    it('passes qualifierPath to publishLinks when provided', async () => {
+      setupPublishingHappyPath();
+
+      const req = createFakeRequest(
+        validBody({ publishingOptions: { publish: true, qualifierPath: '/10/LOT123/21/SER456' } }),
+      );
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockPublishLinks).toHaveBeenCalledWith(
+        'gtin',
+        '09506000134352',
+        expect.any(Array),
+        '/10/LOT123/21/SER456',
+        expect.objectContaining({ namespace: 'gs1' }),
+      );
+    });
+
+    it('defaults qualifierPath to / when not provided', async () => {
+      setupPublishingHappyPath();
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockPublishLinks).toHaveBeenCalledWith(
+        'gtin',
+        '09506000134352',
+        expect.any(Array),
+        '/',
+        expect.objectContaining({ namespace: 'gs1' }),
+      );
     });
 
     it('skips publishing when publish not requested', async () => {

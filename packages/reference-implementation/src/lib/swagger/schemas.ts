@@ -43,6 +43,10 @@ const publishingOptionsSchema = z.object({
   publish: z.boolean().optional().describe('Whether to publish the credential to the Identity Resolver'),
   linkType: z.string().optional().describe('UNTP link relation type (defaults to gs1:sustainabilityInfo)'),
   linkTitle: z.string().optional().describe('Title for the published link'),
+  qualifierPath: z
+    .string()
+    .optional()
+    .describe('Qualifier path for sub-identifiers (e.g. /10/LOT123/21/SER456). Defaults to /'),
   machineVerificationUrl: z.string().optional().describe('Machine verification URL'),
   humanVerificationUrl: z.string().optional().describe('Human verification URL'),
 });
@@ -70,6 +74,22 @@ export const cvcValidationWarningSchema = z.object({
 export const credentialIssueResponseSchema = z.object({
   credentialId: z.string().describe('Database ID of the stored credential record'),
   warnings: z.array(cvcValidationWarningSchema).optional().describe('CVC compliance warnings (advisory only)'),
+});
+
+/** Credential resource as returned by GET /credentials and GET /credentials/:id. */
+export const credentialSchema = z.object({
+  id: z.string().describe('Database ID'),
+  tenantId: z.string().describe('Tenant ID'),
+  storageUri: z.string().describe('URI where the credential is stored'),
+  hash: z.string().describe('Content hash of the stored credential'),
+  credentialType: z.string().describe('Type of credential (e.g. DigitalProductPassport)'),
+  decryptionKey: z.string().nullable().describe('AES-GCM decryption key (null if unencrypted)'),
+  isPublished: z.boolean().describe('Whether the credential has been published to IDR'),
+  organisationId: z.string().nullable().describe('ID of the linked organisation entity (null if none)'),
+  facilityId: z.string().nullable().describe('ID of the linked facility entity (null if none)'),
+  productId: z.string().nullable().describe('ID of the linked product entity (null if none)'),
+  createdAt: z.string().datetime().describe('ISO 8601 timestamp'),
+  updatedAt: z.string().datetime().describe('ISO 8601 timestamp'),
 });
 
 // ============================================================================
@@ -279,6 +299,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     DidDocument: didDocumentResponseSchema,
     CredentialIssueRequest: credentialIssueRequestSchema,
     CredentialIssueResponse: credentialIssueResponseSchema,
+    Credential: credentialSchema,
     CvcValidationWarning: cvcValidationWarningSchema,
     Registrar: registrarSchema,
     SchemeQualifier: schemeQualifierSchema,

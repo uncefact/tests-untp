@@ -1,4 +1,4 @@
-import { LinkRegistration } from '../generated';
+import { LinkRegistration, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
@@ -74,7 +74,7 @@ export async function updateLinkRegistration(
   tenantId: string,
   data: { linkType?: string; targetUrl?: string; mimeType?: string },
 ): Promise<LinkRegistration> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.linkRegistration.findFirst({
       where: { idrLinkId, identifierId, tenantId },
     });
@@ -97,7 +97,7 @@ export async function deleteLinkRegistration(
   identifierId: string,
   tenantId: string,
 ): Promise<LinkRegistration> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.linkRegistration.findFirst({
       where: { idrLinkId, identifierId, tenantId },
     });

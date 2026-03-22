@@ -83,7 +83,7 @@ async function validateIdentifierValue(
  * Identifiers are scoped to a single tenant (not shared with system defaults).
  */
 export async function createIdentifier(input: CreateIdentifierInput): Promise<Identifier> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await validateIdentifierValue(tx, input.schemeId, input.value, input.tenantId);
 
     return tx.identifier.create({
@@ -162,7 +162,7 @@ export async function updateIdentifier(
   tenantId: string,
   input: UpdateIdentifierInput,
 ): Promise<Identifier> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.identifier.findFirst({
       where: { id, tenantId },
     });
@@ -192,7 +192,7 @@ export async function updateIdentifier(
  * Validates that the identifier belongs to the specified organisation.
  */
 export async function deleteIdentifier(id: string, tenantId: string): Promise<Identifier> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.identifier.findFirst({
       where: { id, tenantId },
     });

@@ -33,7 +33,7 @@ export type ListServiceInstancesOptions = {
  * any existing primary for this org + serviceType combination.
  */
 export async function createServiceInstance(input: CreateServiceInstanceInput): Promise<ServiceInstance> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     if (input.isPrimary) {
       await tx.serviceInstance.updateMany({
         where: {
@@ -133,10 +133,10 @@ export async function listServiceInstances(
     }),
   ]);
 
-  const tenantPrimaryTypes = new Set(tenantPrimaries.map((p) => p.serviceType));
+  const tenantPrimaryTypes = new Set(tenantPrimaries.map((p: { serviceType: ServiceType }) => p.serviceType));
 
   return {
-    data: data.map((i) =>
+    data: data.map((i: ServiceInstance) =>
       i.tenantId === SYSTEM_TENANT_ID && i.isPrimary && tenantPrimaryTypes.has(i.serviceType)
         ? { ...i, isPrimary: false }
         : i,
@@ -154,7 +154,7 @@ export async function updateServiceInstance(
   tenantId: string,
   input: UpdateServiceInstanceInput,
 ): Promise<ServiceInstance> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.serviceInstance.findFirst({
       where: { id, tenantId },
     });
@@ -191,7 +191,7 @@ export async function updateServiceInstance(
  * Deletes a service instance. Cannot delete system defaults.
  */
 export async function deleteServiceInstance(id: string, tenantId: string): Promise<ServiceInstance> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.serviceInstance.findFirst({
       where: { id, tenantId },
     });
