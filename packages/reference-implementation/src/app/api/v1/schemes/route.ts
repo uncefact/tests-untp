@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { createIdentifierScheme, listIdentifierSchemes } from '@/lib/prisma/repositories';
+import { createIdentifierScheme, listIdentifierSchemes, getRegistrarById } from '@/lib/prisma/repositories';
+import { NotFoundError } from '@/lib/api/errors';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
@@ -134,6 +135,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       if (!isNonEmptyString(q.description)) throw new ValidationError('qualifier description is required');
       if (!isNonEmptyString(q.validationPattern)) throw new ValidationError('qualifier validationPattern is required');
     }
+  }
+
+  // Verify the registrar exists and belongs to this tenant
+  const registrar = await getRegistrarById(body.registrarId, tenantId);
+  if (!registrar) {
+    throw new NotFoundError('Registrar not found');
   }
 
   logger.info(
