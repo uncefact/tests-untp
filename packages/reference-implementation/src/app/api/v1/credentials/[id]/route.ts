@@ -27,31 +27,7 @@ const logger = apiLogger.child({ route: '/api/v1/credentials/[id]' });
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 credential:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                     storageUri:
- *                       type: string
- *                     hash:
- *                       type: string
- *                     credentialType:
- *                       type: string
- *                     decryptionKey:
- *                       type: string
- *                       nullable: true
- *                       description: Decryption key for encrypted credentials (null if unencrypted)
- *                     isPublished:
- *                       type: boolean
- *                     createdAt:
- *                       type: string
- *                       format: date-time
- *                     updatedAt:
- *                       type: string
- *                       format: date-time
+ *               $ref: '#/components/schemas/Credential'
  *       401:
  *         description: Unauthorised — missing or invalid authentication
  *         content:
@@ -73,12 +49,14 @@ const logger = apiLogger.child({ route: '/api/v1/credentials/[id]' });
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ tenantId, credentialId: id }, 'Looking up credential');
+  logger.info({ credentialId: id }, 'Looking up credential');
 
   const credential = await getCredentialById(id, tenantId);
   if (!credential) {
     throw new NotFoundError('Credential not found');
   }
 
-  return NextResponse.json({ credential });
+  logger.info({ credentialId: credential.id }, 'Credential retrieved');
+
+  return NextResponse.json(credential);
 });

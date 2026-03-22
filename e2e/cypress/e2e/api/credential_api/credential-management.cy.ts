@@ -123,9 +123,7 @@ describe('Credential API', { testIsolation: false }, () => {
       cy.request(`/api/v1/credentials/${encryptedCredentialId}`).then(
         (response) => {
           expect(response.status).to.eq(200);
-          expect(response.body.credential).to.exist;
-
-          const cred = response.body.credential;
+          const cred = response.body;
           expect(cred.id).to.eq(encryptedCredentialId);
           expect(cred.storageUri).to.be.a('string');
           expect(cred.hash).to.be.a('string');
@@ -162,7 +160,7 @@ describe('Credential API', { testIsolation: false }, () => {
       cy.request(`/api/v1/credentials/${unencryptedCredentialId}`).then(
         (response) => {
           expect(response.status).to.eq(200);
-          expect(response.body.credential.decryptionKey).to.be.null;
+          expect(response.body.decryptionKey).to.be.null;
         },
       );
     });
@@ -188,7 +186,7 @@ describe('Credential API', { testIsolation: false }, () => {
       cy.request(`/api/v1/credentials/${publishedCredentialId}`).then(
         (response) => {
           expect(response.status).to.eq(200);
-          expect(response.body.credential).to.exist;
+          expect(response.body.id).to.eq(publishedCredentialId);
         },
       );
     });
@@ -349,6 +347,49 @@ describe('Credential API', { testIsolation: false }, () => {
         expect(response.status).to.eq(400);
       });
     });
+
+    it('returns 400 for invalid JSON body', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        body: 'not valid json',
+        headers: { 'Content-Type': 'application/json' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('returns 400 when credentialType is missing', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        body: {
+          credentialPayload: buildCredentialPayload(defaultDidValue),
+          version: '0.6.1',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('returns 400 when version is missing', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        body: {
+          credentialPayload: buildCredentialPayload(defaultDidValue),
+          credentialType: 'DigitalProductPassport',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -361,11 +402,12 @@ describe('Credential API', { testIsolation: false }, () => {
 
         // Paginated response shape
         expect(response.body.data).to.be.an('array');
+        expect(response.body).to.not.have.property('ok');
         expect(response.body.pagination).to.exist;
         expect(response.body.pagination.total).to.be.a('number');
         expect(response.body.pagination.limit).to.eq(20);
         expect(response.body.pagination.offset).to.eq(0);
-        expect(response.body.pagination).to.have.property('hasMore');
+        expect(response.body.pagination.hasMore).to.be.a('boolean');
 
         // Should contain at least the credentials issued earlier in the suite
         expect(response.body.data.length).to.be.at.least(2);
@@ -469,6 +511,17 @@ describe('Credential API', { testIsolation: false }, () => {
       cy.request({
         method: 'GET',
         url: '/api/v1/credentials?offset=-1',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('GET /api/v1/credentials?limit=abc — returns 400 for non-numeric limit', () => {
+      cy.request({
+        method: 'GET',
+        url: '/api/v1/credentials?limit=abc',
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
