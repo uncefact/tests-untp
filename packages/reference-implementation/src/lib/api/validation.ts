@@ -95,6 +95,8 @@ export async function assertPublicUrl(url: string, paramName: string): Promise<v
     if (e instanceof Error && e.message.includes('private or reserved')) {
       throw new ValidationError(`${paramName} must not point to a private or reserved network address`);
     }
-    throw e;
+    throw new ValidationError(
+      `${paramName} could not be validated: ${e instanceof Error ? e.message : 'unexpected error'}`,
+    );
   }
 }

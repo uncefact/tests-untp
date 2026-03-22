@@ -59,14 +59,14 @@ const logger = apiLogger.child({ route: '/api/v1/credentials' });
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
- *       404:
- *         description: Data model or service instance not found
+ *       401:
+ *         description: Unauthorised
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
- *       401:
- *         description: Unauthorised
+ *       404:
+ *         description: Data model or service instance not found
  *         content:
  *           application/json:
  *             schema:
@@ -103,7 +103,8 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   logger.info('Parsing request body');
   try {
     body = await req.json();
-  } catch {
+  } catch (e) {
+    logger.warn({ err: e }, 'Failed to parse request body as JSON');
     throw new ValidationError('Invalid JSON body');
   }
 
@@ -161,7 +162,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     cvcWarnings = [
       {
         code: 'CVC_VALIDATION_ERROR' as const,
-        message: 'Failed to extract references from credential payload',
+        message: publishingOptions.publish
+          ? 'Failed to extract references from credential payload — publishing will be skipped'
+          : 'Failed to extract references from credential payload',
       },
     ];
   }
@@ -212,8 +215,16 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   if (publishingOptions.publish === true) {
     if (!primaryEntity.schemePrimaryKey || !primaryEntity.schemeNamespace) {
       logger.warn({ credentialId }, 'Publishing requested but entity has no scheme configuration — skipping');
+      cvcWarnings.push({
+        code: 'PUBLISH_SKIPPED' as const,
+        message: 'Publishing was requested but the entity has no identity scheme configuration',
+      });
     } else if (!primaryEntity.primaryIdentifier) {
       logger.warn({ credentialId }, 'Publishing requested but no primary identifier resolved — skipping');
+      cvcWarnings.push({
+        code: 'PUBLISH_SKIPPED' as const,
+        message: 'Publishing was requested but no primary identifier could be resolved from the credential payload',
+      });
     } else {
       // Resolve IDR service outside try-catch — config failures should be fatal
       const idrService = await resolveIdrService(tenantId, primaryEntity.schemeIdrServiceInstanceId);
@@ -253,9 +264,19 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
         });
       }
 
-      // Update published state outside try-catch — DB failure after successful publish is a separate concern
       if (!cvcWarnings.some((w) => w.code === 'IDR_PUBLISH_FAILED')) {
-        await updateCredentialPublished(credentialId, tenantId, true);
+        try {
+          await updateCredentialPublished(credentialId, tenantId, true);
+        } catch (error) {
+          logger.error(
+            { err: error, credentialId },
+            'Failed to update published status — credential was published to IDR but DB record is stale',
+          );
+          cvcWarnings.push({
+            code: 'DB_STATUS_UPDATE_FAILED' as const,
+            message: 'Credential was published to IDR but the published status could not be saved',
+          });
+        }
       }
     }
   }
