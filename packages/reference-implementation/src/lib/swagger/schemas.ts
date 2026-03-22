@@ -41,7 +41,6 @@ const storageOptionsSchema = z.object({
 
 const publishingOptionsSchema = z.object({
   publish: z.boolean().optional().describe('Whether to publish the credential to the Identity Resolver'),
-  serviceInstanceId: z.string().optional().describe('IDR service instance ID'),
   linkType: z.string().optional().describe('UNTP link relation type (defaults to gs1:sustainabilityInfo)'),
   linkTitle: z.string().optional().describe('Title for the published link'),
   machineVerificationUrl: z.string().optional().describe('Machine verification URL'),

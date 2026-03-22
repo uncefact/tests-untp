@@ -65,7 +65,7 @@ const logger = apiLogger.child({ route: '/api/v1/registrars' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info({ tenantId }, 'Parsing request body');
+  logger.info('Parsing request body');
   let body: {
     name?: string;
     namespace?: string;
@@ -79,12 +79,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId, name: body.name, namespace: body.namespace }, 'Validating input parameters');
+  logger.info({ name: body.name, namespace: body.namespace }, 'Validating input parameters');
   if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
   if (!isNonEmptyString(body.namespace)) throw new ValidationError('namespace is required');
   if (!isNonEmptyString(body.url)) throw new ValidationError('url is required');
 
-  logger.info({ tenantId, namespace: body.namespace }, 'Creating registrar');
+  logger.info({ namespace: body.namespace }, 'Creating registrar');
   const registrar = await createRegistrar({
     tenantId,
     name: body.name,
@@ -93,7 +93,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     idrServiceInstanceId: body.idrServiceInstanceId,
   });
 
-  logger.info({ tenantId, registrarId: registrar.id }, 'Registrar created');
+  logger.info({ registrarId: registrar.id }, 'Registrar created');
   return NextResponse.json(registrar, { status: 201 });
 });
 
@@ -152,15 +152,15 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
-  logger.info({ tenantId }, 'Parsing query parameters');
+  logger.info('Parsing query parameters');
   const url = new URL(req.url);
   const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
   const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  logger.info({ tenantId, limit, offset }, 'Listing registrars');
+  logger.info({ limit, offset }, 'Listing registrars');
   const { data, total } = await listRegistrars(tenantId, { limit, offset });
 
-  logger.info({ tenantId, count: data.length, total }, 'Registrars listed');
+  logger.info({ count: data.length, total }, 'Registrars listed');
   return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

@@ -85,7 +85,6 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     };
     publishingOptions?: {
       publish?: boolean;
-      serviceInstanceId?: string;
       linkType?: string;
       linkTitle?: string;
       machineVerificationUrl?: string;
@@ -192,11 +191,8 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     } else if (!primaryEntity.primaryIdentifier) {
       logger.warn({ tenantId, credentialId }, 'Publishing requested but no primary identifier resolved — skipping');
     } else {
-      const idrService = await resolveIdrService(
-        tenantId,
-        primaryEntity.schemeIdrServiceInstanceId,
-        publishingOptions.serviceInstanceId,
-      );
+      // Resolve IDR service outside try-catch — config failures should be fatal
+      const idrService = await resolveIdrService(tenantId, primaryEntity.schemeIdrServiceInstanceId);
 
       const linkTitle = publishingOptions.linkTitle || dataModel.name;
       const links = buildPublishLinks(storageResponse, linkTitle, {
@@ -210,18 +206,33 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
         'Publishing credential to IDR',
       );
 
-      await idrService.service.publishLinks(
-        primaryEntity.schemePrimaryKey,
-        primaryEntity.primaryIdentifier,
-        links,
-        '/',
-        {
-          namespace: primaryEntity.schemeNamespace,
-          itemDescription: linkTitle,
-        },
-      );
+      try {
+        await idrService.service.publishLinks(
+          primaryEntity.schemePrimaryKey,
+          primaryEntity.primaryIdentifier,
+          links,
+          '/',
+          {
+            namespace: primaryEntity.schemeNamespace,
+            itemDescription: linkTitle,
+          },
+        );
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        logger.error(
+          { err: error, tenantId, credentialId, scheme: primaryEntity.schemePrimaryKey },
+          'Failed to publish credential to IDR',
+        );
+        cvcWarnings.push({
+          code: 'IDR_PUBLISH_FAILED',
+          message: `Failed to publish credential to identity resolver: ${detail}. Ensure the identifier scheme is registered with the IDR service. Contact your IDR operator if this persists.`,
+        });
+      }
 
-      await updateCredentialPublished(credentialId, tenantId, true);
+      // Update published state outside try-catch — DB failure after successful publish is a separate concern
+      if (!cvcWarnings.some((w) => w.code === 'IDR_PUBLISH_FAILED')) {
+        await updateCredentialPublished(credentialId, tenantId, true);
+      }
     }
   }
 

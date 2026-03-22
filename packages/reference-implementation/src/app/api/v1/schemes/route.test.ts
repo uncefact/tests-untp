@@ -26,10 +26,12 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 
 const mockCreateIdentifierScheme = jest.fn();
 const mockListIdentifierSchemes = jest.fn();
+const mockGetRegistrarById = jest.fn();
 
 jest.mock('@/lib/prisma/repositories', () => ({
   createIdentifierScheme: (input: unknown) => mockCreateIdentifierScheme(input),
   listIdentifierSchemes: (tenantId: string, opts: unknown) => mockListIdentifierSchemes(tenantId, opts),
+  getRegistrarById: (id: string, tenantId: string) => mockGetRegistrarById(id, tenantId),
 }));
 
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
@@ -67,6 +69,7 @@ const AUTH_CONTEXT = { tenantId: 'org-1', params: Promise.resolve({}) };
 describe('POST /api/v1/schemes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetRegistrarById.mockResolvedValue({ id: 'reg-1', name: 'GS1' });
   });
 
   it('creates a scheme and returns 201', async () => {
@@ -282,6 +285,26 @@ describe('POST /api/v1/schemes', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('linkTemplate is required');
+  });
+
+  it('returns 404 when registrarId does not exist', async () => {
+    mockGetRegistrarById.mockResolvedValue(null);
+
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'nonexistent-reg',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(json.error).toContain('Registrar not found');
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
   });
 
   it('returns 500 when repository throws', async () => {

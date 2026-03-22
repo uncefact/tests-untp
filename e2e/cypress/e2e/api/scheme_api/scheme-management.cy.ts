@@ -98,6 +98,7 @@ describe('Scheme API', { testIsolation: false }, () => {
     it('GET /api/v1/schemes — lists schemes', () => {
       cy.request('/api/v1/schemes').then((response) => {
         expect(response.status).to.eq(200);
+        expect(response.body).to.not.have.property('ok');
         expect(response.body.data).to.be.an('array');
         expect(response.body.pagination).to.exist;
 
@@ -220,6 +221,9 @@ describe('Scheme API', { testIsolation: false }, () => {
         expect(response.status).to.eq(200);
         expect(response.body.data.length).to.be.at.most(1);
         expect(response.body.pagination).to.exist;
+        expect(response.body.pagination.limit).to.eq(1);
+        expect(response.body.pagination.offset).to.eq(0);
+        expect(response.body.pagination.hasMore).to.be.a('boolean');
       });
     });
   });
@@ -233,6 +237,7 @@ describe('Scheme API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -244,6 +249,7 @@ describe('Scheme API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -255,6 +261,7 @@ describe('Scheme API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -266,6 +273,7 @@ describe('Scheme API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -284,6 +292,38 @@ describe('Scheme API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('returns 400 for invalid JSON body', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/schemes',
+        body: 'not valid json',
+        headers: { 'Content-Type': 'application/json' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('returns 404 when POST references nonexistent registrarId', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/schemes',
+        body: {
+          registrarId: 'nonexistent-id',
+          name: 'Test',
+          primaryKey: `pk-nonexistent-${RUN_ID}`,
+          validationPattern: '.*',
+          linkTemplate: '/{primaryKey}/{value}',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -309,6 +349,7 @@ describe('Scheme API', { testIsolation: false }, () => {
           failOnStatusCode: false,
         }).then((response) => {
           expect(response.status).to.eq(400);
+          expect(response.body.error).to.be.a('string');
         });
 
         cy.request({ method: 'DELETE', url: `/api/v1/schemes/${tempId}` });
@@ -322,6 +363,30 @@ describe('Scheme API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('PATCH — returns 404 for nonexistent scheme', () => {
+      cy.request({
+        method: 'PATCH',
+        url: '/api/v1/schemes/nonexistent-id',
+        body: { name: 'Should not work' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('DELETE — returns 404 for nonexistent scheme', () => {
+      cy.request({
+        method: 'DELETE',
+        url: '/api/v1/schemes/nonexistent-id',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.error).to.be.a('string');
       });
     });
 
@@ -332,6 +397,18 @@ describe('Scheme API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    it('returns 400 for negative offset', () => {
+      cy.request({
+        method: 'GET',
+        url: '/api/v1/schemes?offset=-1',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.be.a('string');
       });
     });
   });

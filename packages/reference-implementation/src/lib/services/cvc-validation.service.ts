@@ -12,7 +12,8 @@ export type CvcValidationWarningCode =
   | 'CVC_MISSING_CRITERION'
   | 'CVC_NO_CRITERIA'
   | 'CVC_NO_CONFORMITY'
-  | 'CVC_VALIDATION_ERROR';
+  | 'CVC_VALIDATION_ERROR'
+  | 'IDR_PUBLISH_FAILED';
 
 export type CvcValidationWarning = {
   code: CvcValidationWarningCode;

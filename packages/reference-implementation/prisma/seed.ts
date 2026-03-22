@@ -82,19 +82,22 @@ async function main() {
 
   // ── Seed system Pyx IDR service instance ────────────────────────────────────
 
+  let idrAdapterType: string | null = null;
+  let idrConfig: unknown = null;
   let idrSeeded = false;
   if (encryptionService) {
     try {
       const idrAdapters = adapterRegistry[ServiceType.IDR];
       const permittedIdrTypes = Object.keys(idrAdapters) as Array<keyof typeof idrAdapters>;
-      const idrAdapterType = (process.env.SYSTEM_IDR_ADAPTER_TYPE as keyof typeof idrAdapters) || 'PYX_IDR';
-      const idrRegistryEntry = idrAdapters[idrAdapterType];
+      const resolvedIdrAdapterType = (process.env.SYSTEM_IDR_ADAPTER_TYPE as keyof typeof idrAdapters) || 'PYX_IDR';
+      idrAdapterType = resolvedIdrAdapterType;
+      const idrRegistryEntry = idrAdapters[resolvedIdrAdapterType];
       if (!idrRegistryEntry) {
         throw new Error(
           `Unknown IDR adapter type: "${idrAdapterType}". Permitted types: ${permittedIdrTypes.join(', ')}`,
         );
       }
-      const idrConfig = idrRegistryEntry.configSchema.parse({
+      idrConfig = idrRegistryEntry.configSchema.parse({
         baseUrl: process.env.SYSTEM_IDR_BASE_URL,
         apiKey: process.env.SYSTEM_IDR_API_KEY,
         apiVersion: process.env.SYSTEM_IDR_API_VERSION || undefined,
@@ -572,6 +575,94 @@ async function main() {
     });
   } else {
     logger.info('Skipping custom seed (SKIP_CUSTOM_SEED is set)');
+  }
+
+  // ── Register identifier schemes with IDR service ────────────────────────────
+  // In the dev environment, the RI operates the Pyx IDR — register seeded schemes.
+  if (idrSeeded && idrAdapterType === 'PYX_IDR') {
+    try {
+      const { PyxIdentityResolverAdapter } = await import('@uncefact/untp-ri-services/server');
+      const pyxAdapter = new PyxIdentityResolverAdapter(
+        idrConfig as ConstructorParameters<typeof PyxIdentityResolverAdapter>[0],
+        logger.child({ service: 'IDR - Seed' }),
+      );
+
+      // Fetch seeded schemes grouped by registrar namespace
+      const schemes = await prisma.identifierScheme.findMany({
+        where: { tenantId: SYSTEM_TENANT_ID },
+        include: { registrar: true, qualifiers: { orderBy: { order: 'asc' } } },
+      });
+
+      // Group by registrar namespace
+      const grouped = new Map<string, typeof schemes>();
+      for (const scheme of schemes) {
+        const ns = scheme.registrar.namespace;
+        if (!grouped.has(ns)) grouped.set(ns, []);
+        grouped.get(ns)!.push(scheme);
+      }
+
+      const failedNamespaces: string[] = [];
+      for (const [namespace, nsSchemes] of grouped) {
+        const applicationIdentifiers = nsSchemes.flatMap((s) => {
+          const primary = {
+            title: s.name,
+            label: s.primaryKey,
+            shortcode: s.primaryKey,
+            ai: s.primaryKey,
+            type: 'I' as const,
+            regex: s.validationPattern,
+            qualifiers: s.qualifiers.map((q) => q.key),
+          };
+          const quals = s.qualifiers.map((q) => ({
+            title: q.description,
+            label: q.key,
+            shortcode: q.key,
+            ai: q.key,
+            type: 'Q' as const,
+            regex: q.validationPattern,
+          }));
+          return [primary, ...quals];
+        });
+
+        try {
+          await pyxAdapter.registerSchemes([{ namespace, applicationIdentifiers }]);
+          logger.info({ namespace, count: applicationIdentifiers.length }, 'Registered schemes with IDR');
+        } catch (error) {
+          const status = (error as { context?: { httpStatus?: number } })?.context?.httpStatus;
+          const message = error instanceof Error ? error.message : String(error);
+
+          if (status === 409) {
+            logger.warn(
+              { namespace },
+              'Schemes already registered with IDR — skipping. If scheme definitions have changed, manually update or delete and re-register via the IDR.',
+            );
+          } else if (status === 400 || status === 422) {
+            failedNamespaces.push(namespace);
+            logger.error(
+              { namespace, error: message },
+              'IDR scheme registration validation error — skipping namespace',
+            );
+          } else {
+            // Fatal: auth errors (401/403), server errors (5xx), network errors
+            throw error;
+          }
+        }
+      }
+
+      if (failedNamespaces.length > 0) {
+        logger.warn(
+          { failedNamespaces },
+          'IDR scheme registration completed with failures — some namespaces were not registered',
+        );
+      } else {
+        logger.info('IDR scheme registration complete');
+      }
+    } catch (error) {
+      logger.error({ error: error instanceof Error ? error.message : error }, 'IDR scheme registration failed');
+      throw error;
+    }
+  } else if (idrSeeded) {
+    logger.info({ adapterType: idrAdapterType }, 'Non-Pyx IDR adapter — skipping scheme registration');
   }
 
   logger.info(

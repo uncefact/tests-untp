@@ -50,12 +50,12 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]' });
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ tenantId, identifierId: id }, 'Looking up identifier');
+  logger.info({ identifierId: id }, 'Looking up identifier');
   const identifier = await getIdentifierById(id, tenantId);
   if (!identifier) {
     throw new NotFoundError('Identifier not found');
   }
-  logger.info({ tenantId, identifierId: id }, 'Identifier retrieved');
+  logger.info({ identifierId: id }, 'Identifier retrieved');
   return NextResponse.json(identifier);
 });
 
@@ -119,7 +119,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  */
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ tenantId, identifierId: id }, 'Parsing request body');
+  logger.info({ identifierId: id }, 'Parsing request body');
 
   let body: { value?: string };
 
@@ -129,17 +129,17 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId, identifierId: id }, 'Validating update fields');
+  logger.info({ identifierId: id }, 'Validating update fields');
   if (!isNonEmptyString(body.value)) {
     throw new ValidationError('value is required');
   }
 
-  logger.info({ tenantId, identifierId: id }, 'Updating identifier');
+  logger.info({ identifierId: id }, 'Updating identifier');
   const updated = await updateIdentifier(id, tenantId, {
     value: body.value,
   });
 
-  logger.info({ tenantId, identifierId: id }, 'Identifier updated');
+  logger.info({ identifierId: id }, 'Identifier updated');
   return NextResponse.json(updated);
 });
 
@@ -183,9 +183,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, identifierId: id }, 'Deleting identifier');
+  logger.info({ identifierId: id }, 'Deleting identifier');
   await deleteIdentifier(id, tenantId);
 
-  logger.info({ tenantId, identifierId: id }, 'Identifier deleted');
+  logger.info({ identifierId: id }, 'Identifier deleted');
   return new Response(null, { status: 204 });
 });

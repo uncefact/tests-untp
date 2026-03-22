@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { assertPublicUrl, ValidationError, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getIdentifierById, createManyLinkRegistrations, listLinkRegistrations } from '@/lib/prisma/repositories';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
@@ -63,7 +63,28 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/LinkRegistration'
+ *               type: object
+ *               properties:
+ *                 resolverUri:
+ *                   type: string
+ *                   description: Canonical URI where this identifier can be resolved
+ *                 identifierScheme:
+ *                   type: string
+ *                   description: The identifier scheme (e.g. "gtin", "abn")
+ *                 identifier:
+ *                   type: string
+ *                   description: The identifier value
+ *                 links:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       idrLinkId:
+ *                         type: string
+ *                         description: IDR-assigned link identifier
+ *                       link:
+ *                         type: object
+ *                         description: The published link details
  *       400:
  *         description: Validation error
  *         content:
@@ -92,7 +113,7 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
 export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId } = await params;
 
-  logger.info({ tenantId, identifierId }, 'Parsing request body');
+  logger.info({ identifierId }, 'Parsing request body');
   let body: {
     links?: Array<Record<string, unknown>>;
     qualifierPath?: string;
@@ -104,12 +125,19 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId, identifierId }, 'Validating input parameters');
+  logger.info({ identifierId }, 'Validating input parameters');
   if (!body.links || !Array.isArray(body.links) || body.links.length === 0) {
     throw new ValidationError('links is required and must be a non-empty array');
   }
 
-  logger.info({ tenantId, identifierId, linkCount: body.links.length }, 'Looking up identifier for link publishing');
+  // Validate targetUrl in each link for SSRF protection
+  for (const link of body.links) {
+    if (typeof link.targetUrl === 'string') {
+      await assertPublicUrl(link.targetUrl, 'links[].targetUrl');
+    }
+  }
+
+  logger.info({ identifierId, linkCount: body.links.length }, 'Looking up identifier for link publishing');
   const identifier = await getIdentifierById(identifierId, tenantId);
   if (!identifier) {
     throw new NotFoundError('Identifier not found');
@@ -119,14 +147,14 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   const registrar = scheme.registrar;
   const namespace = registrar.namespace;
 
-  logger.info({ tenantId, identifierId, primaryKey: scheme.primaryKey, namespace }, 'Resolving IDR service');
+  logger.info({ identifierId, primaryKey: scheme.primaryKey, namespace }, 'Resolving IDR service');
   const { service: idrService } = await resolveIdrService(
     tenantId,
     scheme.idrServiceInstanceId,
     registrar.idrServiceInstanceId,
   );
 
-  logger.info({ tenantId, identifierId, linkCount: body.links.length }, 'Publishing links to IDR service');
+  logger.info({ identifierId, linkCount: body.links.length }, 'Publishing links to IDR service');
   const registration = await idrService.publishLinks(
     scheme.primaryKey,
     identifier.value,
@@ -135,7 +163,7 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
     { namespace, itemDescription: body.itemDescription },
   );
 
-  logger.info({ tenantId, identifierId, publishedCount: registration.links.length }, 'Storing audit records');
+  logger.info({ identifierId, publishedCount: registration.links.length }, 'Storing audit records');
   const auditRecords = registration.links.map((l) => ({
     tenantId,
     identifierId,
@@ -148,7 +176,7 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   }));
   await createManyLinkRegistrations(auditRecords);
 
-  logger.info({ tenantId, identifierId, linkCount: registration.links.length }, 'Links published');
+  logger.info({ identifierId, linkCount: registration.links.length }, 'Links published');
   return NextResponse.json(registration, { status: 201 });
 });
 
@@ -193,6 +221,12 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
  *                     $ref: '#/components/schemas/LinkRegistration'
  *                 pagination:
  *                   $ref: '#/components/schemas/PaginationMeta'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
  *         content:
@@ -215,7 +249,7 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
 export const GET = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId } = await params;
 
-  logger.info({ tenantId, identifierId }, 'Looking up identifier for link listing');
+  logger.info({ identifierId }, 'Looking up identifier for link listing');
   const identifier = await getIdentifierById(identifierId, tenantId);
   if (!identifier) {
     throw new NotFoundError('Identifier not found');
@@ -227,6 +261,6 @@ export const GET = withTenantAuth(async (req, { tenantId, params }) => {
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   const { data, total } = await listLinkRegistrations(identifierId, tenantId, limit, offset);
-  logger.info({ tenantId, identifierId, count: data.length }, 'Link registrations listed');
+  logger.info({ identifierId, count: data.length }, 'Link registrations listed');
   return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

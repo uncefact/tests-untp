@@ -91,6 +91,7 @@ export {
   IdrLinkDeleteError,
   IdrResolverFetchError,
   IdrLinkTypesFetchError,
+  IdrSchemeRegistrationError,
 } from './identity-resolver/errors.js';
 export { PYX_IDR_ADAPTER_TYPE } from './identity-resolver/adapters/pyx/pyx-idr.adapter.js';
 export type { PyxIdrConfig } from './identity-resolver/adapters/pyx/pyx-idr.schema.js';

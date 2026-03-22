@@ -64,7 +64,7 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info({ tenantId }, 'Parsing request body');
+  logger.info('Parsing request body');
   let body: {
     schemeId?: string;
     value?: string;
@@ -76,18 +76,18 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError('Invalid JSON body');
   }
 
-  logger.info({ tenantId, schemeId: body.schemeId }, 'Validating input parameters');
+  logger.info({ schemeId: body.schemeId }, 'Validating input parameters');
   if (!isNonEmptyString(body.schemeId)) throw new ValidationError('schemeId is required');
   if (!isNonEmptyString(body.value)) throw new ValidationError('value is required');
 
-  logger.info({ tenantId, schemeId: body.schemeId }, 'Creating identifier');
+  logger.info({ schemeId: body.schemeId }, 'Creating identifier');
   const identifier = await createIdentifier({
     tenantId,
     schemeId: body.schemeId,
     value: body.value,
   });
 
-  logger.info({ tenantId, identifierId: identifier.id, schemeId: body.schemeId }, 'Identifier created');
+  logger.info({ identifierId: identifier.id, schemeId: body.schemeId }, 'Identifier created');
   return NextResponse.json(identifier, { status: 201 });
 });
 
@@ -151,16 +151,16 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
-  logger.info({ tenantId }, 'Parsing query parameters');
+  logger.info('Parsing query parameters');
   const url = new URL(req.url);
   const schemeId = url.searchParams.get('schemeId') ?? undefined;
   const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
   const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
   const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
-  logger.info({ tenantId, schemeId, limit, offset }, 'Listing identifiers');
+  logger.info({ schemeId, limit, offset }, 'Listing identifiers');
   const { data, total } = await listIdentifiers(tenantId, { schemeId, limit, offset });
 
-  logger.info({ tenantId, count: data.length }, 'Identifiers listed');
+  logger.info({ count: data.length }, 'Identifiers listed');
   return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
 });

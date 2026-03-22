@@ -50,12 +50,12 @@ const logger = apiLogger.child({ route: '/api/v1/registrars/[id]' });
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ tenantId, registrarId: id }, 'Looking up registrar');
+  logger.info({ registrarId: id }, 'Looking up registrar');
   const registrar = await getRegistrarById(id, tenantId);
   if (!registrar) {
     throw new NotFoundError('Registrar not found');
   }
-  logger.info({ tenantId, registrarId: id }, 'Registrar retrieved');
+  logger.info({ registrarId: id }, 'Registrar retrieved');
   return NextResponse.json(registrar);
 });
 
@@ -129,7 +129,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  */
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ tenantId, registrarId: id }, 'Parsing request body');
+  logger.info({ registrarId: id }, 'Parsing request body');
 
   let body: {
     name?: string;
@@ -154,7 +154,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   }
 
   logger.info(
-    { tenantId, registrarId: id, fields: { hasName, hasNamespace, hasUrl, hasIdrServiceInstanceId } },
+    { registrarId: id, fields: { hasName, hasNamespace, hasUrl, hasIdrServiceInstanceId } },
     'Updating registrar',
   );
   const updated = await updateRegistrar(id, tenantId, {
@@ -164,7 +164,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     ...(hasIdrServiceInstanceId && { idrServiceInstanceId: body.idrServiceInstanceId }),
   });
 
-  logger.info({ tenantId, registrarId: id }, 'Registrar updated');
+  logger.info({ registrarId: id }, 'Registrar updated');
   return NextResponse.json(updated);
 });
 
@@ -208,9 +208,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ tenantId, registrarId: id }, 'Deleting registrar');
+  logger.info({ registrarId: id }, 'Deleting registrar');
   await deleteRegistrar(id, tenantId);
 
-  logger.info({ tenantId, registrarId: id }, 'Registrar deleted');
+  logger.info({ registrarId: id }, 'Registrar deleted');
   return new Response(null, { status: 204 });
 });
