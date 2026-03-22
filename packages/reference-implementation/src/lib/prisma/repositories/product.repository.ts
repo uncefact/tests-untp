@@ -147,7 +147,7 @@ function validateNoPrimarySecondaryOverlap(
  * Validates hierarchy constraints, foreign key references, and identifier ownership.
  */
 export async function createProducts(tenantId: string, inputs: CreateProductInput[]): Promise<ProductWithRelations[]> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const results: ProductWithRelations[] = [];
 
     for (const input of inputs) {
@@ -217,7 +217,7 @@ export async function createProducts(tenantId: string, inputs: CreateProductInpu
       // Create join rows for secondary identifiers
       if (input.secondaryIdentifierIds?.length) {
         await tx.productSecondaryIdentifier.createMany({
-          data: input.secondaryIdentifierIds.map((identifierId) => ({
+          data: input.secondaryIdentifierIds.map((identifierId: string) => ({
             productId: product.id,
             identifierId,
           })),
@@ -306,9 +306,9 @@ export async function listProducts(
     prisma.product.count({ where }),
   ]);
 
-  const data: ProductListItem[] = rows.map(({ secondaryIdentifiers, ...rest }) => ({
+  const data: ProductListItem[] = rows.map(({ secondaryIdentifiers, ...rest }: ProductListRow) => ({
     ...rest,
-    secondaryIdentifierIds: secondaryIdentifiers.map((si) => si.identifierId),
+    secondaryIdentifierIds: secondaryIdentifiers.map((si: { identifierId: string }) => si.identifierId),
   }));
 
   return { data, total };
@@ -324,7 +324,7 @@ export async function updateProduct(
   tenantId: string,
   input: UpdateProductInput,
 ): Promise<ProductWithRelations> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     // Ownership check
     const existing = await tx.product.findFirst({
       where: { id, tenantId },
@@ -386,7 +386,7 @@ export async function updateProduct(
       });
       if (input.secondaryIdentifierIds.length > 0) {
         await tx.productSecondaryIdentifier.createMany({
-          data: input.secondaryIdentifierIds.map((identifierId) => ({
+          data: input.secondaryIdentifierIds.map((identifierId: string) => ({
             productId: id,
             identifierId,
           })),
@@ -459,17 +459,17 @@ export async function getProductByIdentifierValue(
  * Detaches ITEM children (sets parentId to null) before deleting.
  */
 export async function deleteProduct(id: string, tenantId: string): Promise<Product> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.product.findFirst({ where: { id, tenantId } });
     if (!existing) throw new NotFoundError('Product not found or access denied');
 
     const children = await tx.product.findMany({ where: { parentId: id, tenantId } });
-    const batches = children.filter((c) => c.level === 'BATCH');
+    const batches = children.filter((c: Product) => c.level === 'BATCH');
     if (batches.length > 0) {
       throw new ValidationError(`Cannot delete: ${batches.length} BATCH product(s) depend on this MODEL`);
     }
 
-    const items = children.filter((c) => c.level === 'ITEM');
+    const items = children.filter((c: Product) => c.level === 'ITEM');
     if (items.length > 0) {
       await tx.product.updateMany({ where: { parentId: id, level: 'ITEM' }, data: { parentId: null } });
     }

@@ -99,7 +99,7 @@ export async function createOrganisations(
   tenantId: string,
   inputs: CreateOrganisationInput[],
 ): Promise<OrganisationEntityWithRelations[]> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const results: OrganisationEntityWithRelations[] = [];
 
     for (const input of inputs) {
@@ -133,7 +133,7 @@ export async function createOrganisations(
       // Create join rows for secondary identifiers
       if (input.secondaryIdentifierIds?.length) {
         await tx.organisationSecondaryIdentifier.createMany({
-          data: input.secondaryIdentifierIds.map((identifierId) => ({
+          data: input.secondaryIdentifierIds.map((identifierId: string) => ({
             organisationId: organisation.id,
             identifierId,
           })),
@@ -208,9 +208,9 @@ export async function listOrganisations(
     prisma.organisationEntity.count({ where }),
   ]);
 
-  const data = rows.map(({ secondaryIdentifiers, ...rest }) => ({
+  const data = rows.map(({ secondaryIdentifiers, ...rest }: OrganisationListRow) => ({
     ...rest,
-    secondaryIdentifierIds: secondaryIdentifiers.map((si) => si.identifierId),
+    secondaryIdentifierIds: secondaryIdentifiers.map((si: { identifierId: string }) => si.identifierId),
   }));
 
   return { data, total };
@@ -225,7 +225,7 @@ export async function updateOrganisation(
   tenantId: string,
   input: UpdateOrganisationInput,
 ): Promise<OrganisationEntityWithRelations> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     // Ownership check
     const existing = await tx.organisationEntity.findFirst({
       where: { id, tenantId },
@@ -256,7 +256,7 @@ export async function updateOrganisation(
       });
       if (input.secondaryIdentifierIds.length > 0) {
         await tx.organisationSecondaryIdentifier.createMany({
-          data: input.secondaryIdentifierIds.map((identifierId) => ({
+          data: input.secondaryIdentifierIds.map((identifierId: string) => ({
             organisationId: id,
             identifierId,
           })),
@@ -308,7 +308,7 @@ export async function getOrganisationByIdentifierValue(
  * Join table rows (secondary identifiers) cascade automatically.
  */
 export async function deleteOrganisation(id: string, tenantId: string): Promise<OrganisationEntityWithRelations> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.organisationEntity.findFirst({
       where: { id, tenantId },
     });

@@ -101,7 +101,7 @@ export async function createFacilities(
   tenantId: string,
   inputs: CreateFacilityInput[],
 ): Promise<FacilityWithRelations[]> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const results: FacilityWithRelations[] = [];
 
     for (const input of inputs) {
@@ -145,7 +145,7 @@ export async function createFacilities(
           ...(secondaryIdentifierIds?.length && {
             secondaryIdentifiers: {
               createMany: {
-                data: secondaryIdentifierIds.map((identifierId) => ({ identifierId })),
+                data: secondaryIdentifierIds.map((identifierId: string) => ({ identifierId })),
               },
             },
           }),
@@ -214,9 +214,9 @@ export async function listFacilities(
     prisma.facility.count({ where }),
   ]);
 
-  const data: FacilityListItem[] = rows.map(({ secondaryIdentifiers, ...rest }) => ({
+  const data: FacilityListItem[] = rows.map(({ secondaryIdentifiers, ...rest }: FacilityListRow) => ({
     ...rest,
-    secondaryIdentifierIds: secondaryIdentifiers.map((si) => si.identifierId),
+    secondaryIdentifierIds: secondaryIdentifiers.map((si: { identifierId: string }) => si.identifierId),
   }));
 
   return { data, total };
@@ -231,7 +231,7 @@ export async function updateFacility(
   tenantId: string,
   input: UpdateFacilityInput,
 ): Promise<FacilityWithRelations> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.facility.findFirst({
       where: { id, tenantId },
     });
@@ -273,7 +273,7 @@ export async function updateFacility(
       });
       if (secondaryIdentifierIds.length > 0) {
         await tx.facilitySecondaryIdentifier.createMany({
-          data: secondaryIdentifierIds.map((identifierId) => ({
+          data: secondaryIdentifierIds.map((identifierId: string) => ({
             facilityId: id,
             identifierId,
           })),
@@ -330,7 +330,7 @@ export async function getFacilityByIdentifierValue(
  * Deletes a facility. Validates tenant ownership before deletion.
  */
 export async function deleteFacility(id: string, tenantId: string): Promise<Facility> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.facility.findFirst({
       where: { id, tenantId },
     });

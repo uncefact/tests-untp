@@ -60,7 +60,7 @@ export async function createDid(input: CreateDidInput): Promise<Did> {
   };
 
   if (input.isDefault) {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.did.updateMany({
         where: {
           tenantId: input.tenantId,
@@ -159,10 +159,10 @@ export async function listDids(
     prisma.did.count({ where }),
   ]);
 
-  const tenantHasDefault = data.some((d) => d.isDefault && d.type !== 'DEFAULT');
+  const tenantHasDefault = data.some((d: Did) => d.isDefault && d.type !== 'DEFAULT');
   if (tenantHasDefault) {
     return {
-      data: data.map((d) => (d.type === 'DEFAULT' && d.isDefault ? { ...d, isDefault: false } : d)),
+      data: data.map((d: Did) => (d.type === 'DEFAULT' && d.isDefault ? { ...d, isDefault: false } : d)),
       total,
     };
   }
@@ -177,7 +177,7 @@ export async function listDids(
  * (excluding system DEFAULT type DIDs) within the same transaction.
  */
 export async function updateDid(id: string, tenantId: string, input: UpdateDidInput): Promise<Did> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.did.findFirst({
       where: { id, tenantId },
     });
@@ -218,7 +218,7 @@ export async function updateDid(id: string, tenantId: string, input: UpdateDidIn
  * Validates that the DID belongs to the specified organisation.
  */
 export async function updateDidStatus(id: string, tenantId: string, status: DidStatus): Promise<Did> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.did.findFirst({
       where: { id, tenantId },
     });
@@ -239,7 +239,7 @@ export async function updateDidStatus(id: string, tenantId: string, status: DidS
  * Validates that the DID exists and belongs to the specified organisation.
  */
 export async function deleteDid(id: string, tenantId: string): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.did.findFirst({
       where: { id, tenantId },
     });

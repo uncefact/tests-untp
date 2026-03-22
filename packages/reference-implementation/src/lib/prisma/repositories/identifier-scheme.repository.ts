@@ -43,6 +43,8 @@ export type UpdateIdentifierSchemeInput = {
 /**
  * Options for listing identifier schemes
  */
+type QualifierInput = { key: string; description: string; validationPattern: string; order?: number };
+
 export type ListIdentifierSchemesOptions = {
   registrarId?: string;
   limit?: number;
@@ -64,7 +66,7 @@ export async function createIdentifierScheme(input: CreateIdentifierSchemeInput)
       idrServiceInstanceId: input.idrServiceInstanceId,
       ...(input.qualifiers && {
         qualifiers: {
-          create: input.qualifiers.map((q) => ({
+          create: input.qualifiers.map((q: QualifierInput) => ({
             key: q.key,
             description: q.description,
             validationPattern: q.validationPattern,
@@ -142,7 +144,7 @@ export async function updateIdentifierScheme(
   tenantId: string,
   input: UpdateIdentifierSchemeInput,
 ): Promise<IdentifierScheme> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.identifierScheme.findFirst({
       where: { id, tenantId },
     });
@@ -170,7 +172,7 @@ export async function updateIdentifierScheme(
         }),
         ...(input.qualifiers !== undefined && {
           qualifiers: {
-            create: input.qualifiers.map((q) => ({
+            create: input.qualifiers.map((q: QualifierInput) => ({
               key: q.key,
               description: q.description,
               validationPattern: q.validationPattern,
@@ -192,7 +194,7 @@ export async function updateIdentifierScheme(
  * Validates that the scheme belongs to the specified organisation.
  */
 export async function deleteIdentifierScheme(id: string, tenantId: string): Promise<IdentifierScheme> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.identifierScheme.findFirst({
       where: { id, tenantId },
     });
