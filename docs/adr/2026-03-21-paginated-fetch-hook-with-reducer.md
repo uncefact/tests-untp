@@ -2,7 +2,7 @@
 
 ## Status
 
-proposed
+accepted
 
 ## Context
 
@@ -52,4 +52,3 @@ A related card exists to install React Query. Once available, the hook internals
 
 - `packages/reference-implementation/src/hooks/use-paginated-fetch.ts` — implementation
 - `packages/reference-implementation/src/lib/api/pagination.ts` — `PaginatedResponse<T>` and `PaginationMeta` types
-- Related card: "Install TanStack React Query and add QueryClientProvider to the reference implementation"
