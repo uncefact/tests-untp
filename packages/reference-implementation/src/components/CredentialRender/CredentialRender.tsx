@@ -71,10 +71,10 @@ class LenientRenderTemplate2024 extends RenderTemplate2024 {
     return result;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches parent class signature
   async renderCredential(args: {
     data: Record<string, unknown>;
     document: Record<string, unknown>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- context shape is defined by vckit-renderer
     context?: Record<string, any>;
   }) {
     const context = {
