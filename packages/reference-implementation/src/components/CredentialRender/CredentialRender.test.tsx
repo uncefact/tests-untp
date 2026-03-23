@@ -19,7 +19,7 @@ jest.mock('@uncefact/vckit-renderer', () => ({
   },
   WebRenderingTemplate2022: jest.fn(),
   RenderTemplate2024: class MockRenderTemplate2024 {
-    extractData(_data: any) {
+    extractData() {
       return {};
     }
     async renderCredential() {

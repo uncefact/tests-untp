@@ -43,7 +43,8 @@ const MEDIA_TYPE_IRI_ALIASES = [
   'https://www.w3.org/ns/credentials/issuer-dependent#mediaType',
 ];
 
-function findValue(data: any, iris: string[]): string | undefined {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- JSON-LD expanded data has dynamic IRI keys
+function findValue(data: Record<string, any>, iris: string[]): string | undefined {
   for (const iri of iris) {
     if (data[iri]?.[0]?.['@value']) {
       return data[iri][0]['@value'];
@@ -53,7 +54,8 @@ function findValue(data: any, iris: string[]): string | undefined {
 }
 
 class LenientRenderTemplate2024 extends RenderTemplate2024 {
-  extractData(data: any) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches parent class signature
+  extractData(data: Record<string, any>) {
     const result = super.extractData(data);
 
     if (!result.template) {
@@ -69,7 +71,12 @@ class LenientRenderTemplate2024 extends RenderTemplate2024 {
     return result;
   }
 
-  async renderCredential(args: { data: any; document: any; context?: any }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches parent class signature
+  async renderCredential(args: {
+    data: Record<string, unknown>;
+    document: Record<string, unknown>;
+    context?: Record<string, any>;
+  }) {
     const context = {
       ...args.context,
       agent: {

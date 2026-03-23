@@ -3,6 +3,7 @@ import { webcrypto } from 'crypto';
 import { base58Encode, computeDigestMultibase } from './helpers';
 
 // jsdom doesn't provide TextEncoder or crypto.subtle
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 global.TextEncoder = TextEncoder as any;
 Object.defineProperty(global, 'crypto', { value: webcrypto });
 
