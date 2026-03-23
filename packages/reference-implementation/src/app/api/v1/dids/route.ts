@@ -158,7 +158,10 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
             ? `${vcUrl.hostname}%3A${vcUrl.port}`
             : vcUrl.hostname;
 
-        if (normalisedAlias === vcDomain || normalisedAlias === vcUrl.hostname) {
+        if (
+          normalisedAlias.toLowerCase() === vcDomain.toLowerCase() ||
+          normalisedAlias.toLowerCase() === vcUrl.hostname.toLowerCase()
+        ) {
           logger.warn(
             { alias: normalisedAlias, tenantId, vcDomain },
             'Tenant attempted to create root DID for system VCKit domain',
