@@ -25,6 +25,28 @@ class RenderPage {
     cy.get('div[role="tabpanel"]#tabpanel-1').should('be.visible').and('contain.html', 'pre');
     cy.get('pre').should('contain.text', '"@context"');
   }
+
+  verifyRenderedTemplateContent(expectedText: string) {
+    cy.contains('button', 'Rendered').click();
+    cy.get('[data-testid="rendered-template"]', { timeout: 10000 })
+      .should('be.visible')
+      .and('contain.text', expectedText);
+  }
+
+  verifyRenderedTabIsActive() {
+    cy.get('div[role="tabpanel"]#tabpanel-0').should('be.visible');
+  }
+
+  verifyJSONTabIsActive() {
+    cy.get('div[role="tabpanel"]#tabpanel-1').should('be.visible');
+  }
+
+  verifyRenderedTemplateError(expectedErrorText: string) {
+    cy.contains('button', 'Rendered').click();
+    cy.get('[data-testid="rendered-template"]', { timeout: 10000 })
+      .should('be.visible')
+      .and('contain.text', expectedErrorText);
+  }
 }
 
 export default RenderPage;
