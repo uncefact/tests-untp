@@ -9,6 +9,7 @@ jest.mock('next/server', () => ({
 
 import {
   NotFoundError,
+  ForbiddenError,
   UnprocessableError,
   ServiceRegistryError,
   ServiceInstanceNotFoundError,
@@ -39,6 +40,14 @@ describe('handleRouteError', () => {
     expect(res.status).toBe(400);
     const body = await (res as unknown as MockResponse).json();
     expect(body).toEqual({ error: 'bad input' });
+  });
+
+  it('maps ForbiddenError to 403', async () => {
+    const res = handleRouteError(new ForbiddenError('not allowed'));
+
+    expect(res.status).toBe(403);
+    const body = await (res as unknown as MockResponse).json();
+    expect(body).toEqual({ error: 'not allowed' });
   });
 
   it('maps NotFoundError to 404', async () => {

@@ -10,7 +10,8 @@ jest.mock('next/server', () => ({
 
 // Mock withTenantAuth to mirror handleRouteError behaviour
 jest.mock('@/lib/api/with-tenant-auth', () => {
-  const { NotFoundError, ConflictError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
+  const { NotFoundError, ForbiddenError, ConflictError, errorMessage, ServiceRegistryError } =
+    jest.requireActual('@/lib/api/errors');
   const { ValidationError } = jest.requireActual('@/lib/api/validation');
   const { ServiceError } = jest.requireActual('@uncefact/untp-ri-services');
 
@@ -26,6 +27,9 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
         } catch (e: unknown) {
           if (e instanceof ValidationError) {
             return jsonResponse({ error: (e as Error).message }, { status: 400 });
+          }
+          if (e instanceof ForbiddenError) {
+            return jsonResponse({ error: (e as Error).message }, { status: 403 });
           }
           if (e instanceof ConflictError) {
             return jsonResponse({ error: (e as Error).message }, { status: 409 });
@@ -392,6 +396,87 @@ describe('POST /api/v1/dids', () => {
     await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
     expect(mockResolveDidService).toHaveBeenCalledWith('org-1', undefined);
+  });
+
+  describe('root DID protection', () => {
+    const SYSTEM_TENANT_CONTEXT = { tenantId: 'caq0ibyulrnh85itqtbgusfp3', params: Promise.resolve({}) };
+    const TENANT_CONTEXT = { tenantId: 'org-1', params: Promise.resolve({}) };
+
+    beforeEach(() => {
+      process.env.SYSTEM_VC_BASE_URL = 'http://vckit.example.com:3332';
+      mockDidService.getSupportedTypes.mockReturnValue(['MANAGED', 'SELF_MANAGED']);
+      mockDidService.getSupportedMethods.mockReturnValue(['DID_WEB']);
+      mockDidService.normaliseAlias.mockImplementation((alias: string) => alias);
+      mockDidService.create.mockResolvedValue({ did: 'did:web:vckit.example.com%3A3332', keyId: 'key-1' });
+      mockCreateDid.mockResolvedValue({ id: 'record-1' });
+    });
+
+    afterEach(() => {
+      delete process.env.SYSTEM_VC_BASE_URL;
+    });
+
+    it('returns 403 when a tenant creates a self-managed root DID matching the system VC domain', async () => {
+      const req = createFakeRequest({
+        body: { type: DidType.SELF_MANAGED, method: DidMethod.DID_WEB, alias: 'vckit.example.com%3A3332' },
+      });
+      const res = await POST(req, TENANT_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      expect(res.status).toBe(403);
+      const json = await res.json();
+      expect(json.error).toContain('system VC service domain');
+    });
+
+    it('returns 403 when a tenant creates a self-managed root DID matching the hostname without port', async () => {
+      const req = createFakeRequest({
+        body: { type: DidType.SELF_MANAGED, method: DidMethod.DID_WEB, alias: 'vckit.example.com' },
+      });
+      const res = await POST(req, TENANT_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      expect(res.status).toBe(403);
+      const json = await res.json();
+      expect(json.error).toContain('system VC service domain');
+    });
+
+    it('allows the system tenant to create a self-managed root DID for the VC domain', async () => {
+      const req = createFakeRequest({
+        body: { type: DidType.SELF_MANAGED, method: DidMethod.DID_WEB, alias: 'vckit.example.com%3A3332' },
+      });
+      const res = await POST(req, SYSTEM_TENANT_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      expect(res.status).toBe(201);
+    });
+
+    it('allows a tenant to create a self-managed DID with a path under the VC domain', async () => {
+      mockDidService.normaliseAlias.mockReturnValue('vckit.example.com:tenants:acme');
+      mockDidService.create.mockResolvedValue({ did: 'did:web:vckit.example.com:tenants:acme', keyId: 'key-2' });
+      mockCreateDid.mockResolvedValue({ id: 'record-2' });
+
+      const req = createFakeRequest({
+        body: { type: DidType.SELF_MANAGED, method: DidMethod.DID_WEB, alias: 'vckit.example.com:tenants:acme' },
+      });
+      const res = await POST(req, TENANT_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      expect(res.status).toBe(201);
+    });
+
+    it('allows a tenant to create a managed DID (not affected by root DID protection)', async () => {
+      mockDidService.create.mockResolvedValue({ did: 'did:web:vckit.example.com:org:123', keyId: 'key-3' });
+      mockCreateDid.mockResolvedValue({ id: 'record-3' });
+
+      const req = createFakeRequest({
+        body: { type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'my-did' },
+      });
+      const res = await POST(req, TENANT_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      expect(res.status).toBe(201);
+    });
+
+    it('skips the check when SYSTEM_VC_BASE_URL is not set', async () => {
+      delete process.env.SYSTEM_VC_BASE_URL;
+      mockDidService.create.mockResolvedValue({ did: 'did:web:anything.com', keyId: 'key-4' });
+      mockCreateDid.mockResolvedValue({ id: 'record-4' });
+
+      const req = createFakeRequest({
+        body: { type: DidType.SELF_MANAGED, method: DidMethod.DID_WEB, alias: 'anything.com' },
+      });
+      const res = await POST(req, TENANT_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      expect(res.status).toBe(201);
+    });
   });
 });
 
