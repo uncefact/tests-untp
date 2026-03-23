@@ -39,16 +39,15 @@ jest.mock('../../utils', () => ({
 }));
 
 describe('Credential render', () => {
-  let consoleLogSpy: jest.SpyInstance;
+  let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    // Suppress expected console.log errors from verify page
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     jest.clearAllMocks(); // Clearing all mock calls before each test
   });
 
   afterEach(() => {
-    consoleLogSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
   });
 
   // Fake data for the credential

@@ -135,7 +135,7 @@ const CredentialRender = ({ credential }: { credential: VerifiableCredential | U
       setDocuments(renderedTemplate);
       setIsLoading(false);
     } catch (error) {
-      console.log(error);
+      console.error('Failed to render credential template:', error);
       setIsLoading(false);
     }
   }, [credential]);

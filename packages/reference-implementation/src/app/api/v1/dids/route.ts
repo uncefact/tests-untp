@@ -167,7 +167,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
         }
       } catch (e) {
         if (e instanceof ForbiddenError) throw e;
-        // Invalid SYSTEM_VC_BASE_URL — skip the check rather than blocking all DID creation
+        logger.warn({ vcBaseUrl, err: e }, 'SYSTEM_VC_BASE_URL is not a valid URL — root DID domain guard is disabled');
       }
     }
   }
