@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { type NavMenuItemConfig, type MoreOptionGroup, Loader } from '@reference-implementation/components';
 import { AuthProvider, useAuth } from '@/contexts/auth';
+import { DidProvider } from '@/contexts/did/DidContext';
 import { Sidebar, MobileSidebar } from '@/components/sidebar';
 import { LogOut } from 'lucide-react';
 
@@ -155,7 +156,11 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 
       <main className='flex-1 overflow-auto pt-16 md:pt-0'>
         <div className='px-6 py-6'>
-          {isLoading ? <Loader size={60} text='Loading...' className='min-h-[calc(100vh-3rem)]' /> : children}
+          {isLoading ? (
+            <Loader size={60} text='Loading...' className='min-h-[calc(100vh-3rem)]' />
+          ) : (
+            <DidProvider>{children}</DidProvider>
+          )}
         </div>
       </main>
     </div>
