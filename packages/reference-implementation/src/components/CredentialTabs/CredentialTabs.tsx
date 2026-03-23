@@ -25,7 +25,8 @@ const CredentialTabs = ({ credential, decodedEnvelopedVC }: CredentialComponentP
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const configDefaultTabs = useCallback(() => {
-    if (decodedEnvelopedVC?.renderMethod?.[0]?.template) {
+    const rm = decodedEnvelopedVC?.renderMethod?.[0];
+    if (rm?.template || rm?.url) {
       return setCurrentTabIndex(0);
     }
 
@@ -52,7 +53,7 @@ const CredentialTabs = ({ credential, decodedEnvelopedVC }: CredentialComponentP
     index: number;
   } & React.HTMLAttributes<HTMLDivElement>) => (
     <div role='tabpanel' hidden={value !== index} id={`tabpanel-${index}`} aria-labelledby={`tab-${index}`} {...other}>
-      {value === index && <Box>{children}</Box>}
+      {value === index && <Box sx={{ pt: 2 }}>{children}</Box>}
     </div>
   );
 
@@ -78,12 +79,21 @@ const CredentialTabs = ({ credential, decodedEnvelopedVC }: CredentialComponentP
             flexGrow: 1,
             minWidth: 0,
             justifyContent: 'flex-start',
+            borderBottom: 0,
+            '& .MuiTabs-indicator': { backgroundColor: 'text.primary' },
           }}
           variant='scrollable'
           scrollButtons={isMobile ? 'auto' : false}
         >
           {credentialTabs.map((item, index) => (
-            <Tab key={index} label={item.label} />
+            <Tab
+              key={index}
+              label={item.label}
+              sx={{
+                color: 'text.secondary',
+                '&.Mui-selected': { color: 'text.primary', fontWeight: 500 },
+              }}
+            />
           ))}
         </Tabs>
 

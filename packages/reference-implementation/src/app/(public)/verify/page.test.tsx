@@ -16,22 +16,12 @@ jest.mock('@/services/credentials', () => ({
   verifyCredential: jest.fn(),
 }));
 
-// Mock BackButton component
-jest.mock('@/components/BackButton', () => ({
-  BackButton: ({ children }: { children: React.ReactNode }) => <div data-testid='back-button'>{children}</div>,
-}));
-
 // Mock Credential component
 jest.mock('@/components/Credential/Credential', () => ({
   __esModule: true,
   default: ({ credential }: { credential: Record<string, unknown> }) => (
     <div data-testid='credential'>{JSON.stringify(credential)}</div>
   ),
-}));
-
-// Mock LoadingWithText component
-jest.mock('@/components/LoadingWithText', () => ({
-  LoadingWithText: ({ text }: { text: string }) => <div data-testid='loading'>{text}</div>,
 }));
 
 // Mock MessageText component
@@ -41,6 +31,7 @@ jest.mock('@/components/MessageText', () => ({
 
 jest.mock('@reference-implementation/components', () => ({
   Status: { error: 'error', success: 'success' },
+  Loader: ({ text }: { text: string }) => <div data-testid='loader'>{text}</div>,
 }));
 
 const mockUseSearchParams = useSearchParams as jest.Mock;
@@ -71,13 +62,12 @@ describe('VerifyPage', () => {
   });
 
   it('renders loading state initially', () => {
-    // Service returns a promise that never resolves
     mockVerifyCredential.mockReturnValue(new Promise(() => {}));
     mockUseSearchParams.mockReturnValue(makeLegacySearchParams(makeValidLegacyPayload()));
 
     render(<VerifyPage />);
 
-    expect(screen.getByTestId('loading')).toHaveTextContent('Verifying the credential');
+    expect(screen.getByTestId('loader')).toHaveTextContent('Verifying the credential');
   });
 
   it('calls service with correct params from legacy ?q= format', async () => {
@@ -234,48 +224,5 @@ describe('VerifyPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('message-text')).toHaveTextContent('Invalid verification link');
     });
-  });
-
-  it('BackButton wraps success state', async () => {
-    mockUseSearchParams.mockReturnValue(makeLegacySearchParams(makeValidLegacyPayload()));
-    mockVerifyCredential.mockResolvedValue({
-      verified: true,
-      credential: { type: 'VerifiableCredential' },
-    });
-
-    await act(async () => {
-      render(<VerifyPage />);
-    });
-
-    await waitFor(() => {
-      const backButton = screen.getByTestId('back-button');
-      expect(backButton).toBeInTheDocument();
-      expect(backButton).toContainElement(screen.getByTestId('credential'));
-    });
-  });
-
-  it('BackButton wraps error state', async () => {
-    mockUseSearchParams.mockReturnValue(makeLegacySearchParams(makeValidLegacyPayload()));
-    mockVerifyCredential.mockRejectedValue(new Error('Something broke'));
-
-    await act(async () => {
-      render(<VerifyPage />);
-    });
-
-    await waitFor(() => {
-      const backButton = screen.getByTestId('back-button');
-      expect(backButton).toBeInTheDocument();
-      expect(backButton).toContainElement(screen.getByTestId('message-text'));
-    });
-  });
-
-  it('no BackButton during loading', () => {
-    mockVerifyCredential.mockReturnValue(new Promise(() => {}));
-    mockUseSearchParams.mockReturnValue(makeLegacySearchParams(makeValidLegacyPayload()));
-
-    render(<VerifyPage />);
-
-    expect(screen.queryByTestId('back-button')).not.toBeInTheDocument();
-    expect(screen.getByTestId('loading')).toBeInTheDocument();
   });
 });

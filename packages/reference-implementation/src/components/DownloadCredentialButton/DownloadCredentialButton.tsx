@@ -22,11 +22,16 @@ export const DownloadCredentialButton = ({ credential }: { credential: Verifiabl
   return (
     <>
       {isMobile ? (
-        <IconButton color='primary' aria-label='download' onClick={handleClickDownloadVC}>
+        <IconButton aria-label='download' onClick={handleClickDownloadVC} sx={{ color: 'text.primary' }}>
           <CloudDownloadOutlinedIcon />
         </IconButton>
       ) : (
-        <Button variant='text' onClick={handleClickDownloadVC} startIcon={<CloudDownloadOutlinedIcon />}>
+        <Button
+          variant='text'
+          onClick={handleClickDownloadVC}
+          startIcon={<CloudDownloadOutlinedIcon />}
+          sx={{ color: 'text.primary' }}
+        >
           Download
         </Button>
       )}

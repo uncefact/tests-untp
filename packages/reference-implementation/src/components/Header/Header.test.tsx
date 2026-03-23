@@ -146,10 +146,11 @@ describe('Header', () => {
     expect(screen.getByText('UNTP Reference Implementation')).toBeInTheDocument();
   });
 
-  it('should render a link to the dashboard when the drawer is opened', () => {
+  it('should open the drawer when the menu icon is clicked', () => {
     render(<Header />);
 
     fireEvent.click(screen.getByTestId('icon-button'));
-    expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    // Drawer opens and shows the app name
+    expect(screen.getAllByText('UNTP Reference Implementation').length).toBeGreaterThanOrEqual(2);
   });
 });
