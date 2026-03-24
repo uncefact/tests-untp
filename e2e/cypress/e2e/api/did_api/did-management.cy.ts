@@ -658,22 +658,34 @@ describe('DID API', { testIsolation: false }, () => {
   });
 
   describe('Root DID protection', () => {
-    it('returns 403 when creating a self-managed root DID matching the system VC domain (with port)', () => {
-      cy.request({
-        method: 'POST',
-        url: '/api/v1/dids',
-        body: {
-          type: 'SELF_MANAGED',
-          method: 'DID_WEB',
-          alias: 'vckit-api:3332',
-          name: 'Hijack attempt with port',
-        },
-        failOnStatusCode: false,
-      }).then((response) => {
-        expect(response.status).to.eq(403);
-        expect(response.body.error).to.include('system VC service domain');
+    // Derive the VC hostname and port from the env-provided VCKit base URL
+    // so these tests work in both Docker (vckit-api:3332) and deployed
+    // (vckit.labs.pyx.io) environments. The alias is passed as-is to the
+    // API; the server's normaliseSelfManagedAlias handles lowercasing and
+    // the route guard compares the normalised result against the hostname.
+    const vcUrl = new URL(config.services.vckit.baseUrl);
+    const vcHostname = vcUrl.hostname;
+    const vcHasNonStandardPort = vcUrl.port && vcUrl.port !== '443' && vcUrl.port !== '80';
+    const vcHostnameWithPort = vcHasNonStandardPort ? `${vcHostname}:${vcUrl.port}` : null;
+
+    if (vcHostnameWithPort) {
+      it('returns 403 when creating a self-managed root DID matching the system VC domain (with port)', () => {
+        cy.request({
+          method: 'POST',
+          url: '/api/v1/dids',
+          body: {
+            type: 'SELF_MANAGED',
+            method: 'DID_WEB',
+            alias: vcHostnameWithPort,
+            name: 'Hijack attempt with port',
+          },
+          failOnStatusCode: false,
+        }).then((response) => {
+          expect(response.status).to.eq(403);
+          expect(response.body.error).to.include('system VC service domain');
+        });
       });
-    });
+    }
 
     it('returns 403 when creating a self-managed root DID matching the system VC hostname', () => {
       cy.request({
@@ -682,7 +694,7 @@ describe('DID API', { testIsolation: false }, () => {
         body: {
           type: 'SELF_MANAGED',
           method: 'DID_WEB',
-          alias: 'vckit-api',
+          alias: vcHostname,
           name: 'Hijack attempt hostname only',
         },
         failOnStatusCode: false,
@@ -699,7 +711,7 @@ describe('DID API', { testIsolation: false }, () => {
         body: {
           type: 'SELF_MANAGED',
           method: 'DID_WEB',
-          alias: `vckit-api:tenants:e2e-${RUN_ID}`,
+          alias: `${vcHostname}:e2e-path-${RUN_ID}`,
           name: `Path-based DID ${RUN_ID}`,
         },
       }).then((response) => {
