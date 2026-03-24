@@ -665,7 +665,7 @@ describe('DID API', { testIsolation: false }, () => {
         body: {
           type: 'SELF_MANAGED',
           method: 'DID_WEB',
-          alias: 'vckit-api%3A3332',
+          alias: 'vckit-api:3332',
           name: 'Hijack attempt with port',
         },
         failOnStatusCode: false,
