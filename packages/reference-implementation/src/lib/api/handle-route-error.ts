@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError, ConflictError, UnprocessableError, errorMessage, ServiceRegistryError } from '@/lib/api/errors';
+import {
+  NotFoundError,
+  ForbiddenError,
+  ConflictError,
+  UnprocessableError,
+  errorMessage,
+  ServiceRegistryError,
+} from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { ServiceError } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
@@ -21,6 +28,10 @@ export function handleRouteError(e: unknown): Response {
   if (e instanceof ValidationError) {
     logger.warn({ err: e }, 'Validation error');
     return NextResponse.json({ error: e.message }, { status: 400 });
+  }
+  if (e instanceof ForbiddenError) {
+    logger.warn({ err: e }, 'Forbidden');
+    return NextResponse.json({ error: e.message }, { status: 403 });
   }
   if (e instanceof NotFoundError) {
     logger.warn({ err: e }, 'Not found');

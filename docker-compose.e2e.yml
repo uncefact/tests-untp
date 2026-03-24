@@ -56,7 +56,7 @@ services:
       - ALLOWED_UPLOAD_TYPES=image/png,image/jpeg,image/webp,application/pdf,text/html
 
   identity-resolver-service:
-    image: ghcr.io/pyx-industries/pyx-identity-resolver:2.0.2
+    image: ghcr.io/pyx-industries/pyx-identity-resolver:3.0.0
     ports:
       - '3000:3000'
     environment:
@@ -71,8 +71,8 @@ services:
       - API_KEY=test123
       - APP_ENDPOINT=http://localhost:3000
       - APP_NAME=IDR-1
-      - RESOLVER_DOMAIN=http://localhost:3000/api/2.0.0
-      - LINK_TYPE_VOC_DOMAIN=http://localhost:3000/api/2.0.0/voc
+      - RESOLVER_DOMAIN=http://localhost:3000/api/3.0.0
+      - LINK_TYPE_VOC_DOMAIN=http://localhost:3000/api/3.0.0/voc
       - PORT=3000
     depends_on:
       - identity-resolver-service-object-store
@@ -143,7 +143,7 @@ services:
       - SYSTEM_IDR_BASE_URL=http://identity-resolver-service:3000
       - SYSTEM_IDR_API_KEY=test123
       - SYSTEM_IDR_ADAPTER_TYPE=PYX_IDR
-      - SYSTEM_IDR_API_VERSION=2.0.0
+      - SYSTEM_IDR_API_VERSION=3.0.0
       - SYSTEM_IDR_DEFAULT_LINK_TYPE=untp:dpp
       - SYSTEM_IDR_DEFAULT_MIME_TYPE=text/html
       - SYSTEM_IDR_DEFAULT_LANGUAGE=en

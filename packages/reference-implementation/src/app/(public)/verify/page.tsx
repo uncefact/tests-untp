@@ -4,9 +4,8 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Status } from '@reference-implementation/components';
 import { VerifiableCredential, UnsignedCredential } from '@vckit/core-types';
-import { BackButton } from '@/components/BackButton';
+import { Loader } from '@reference-implementation/components';
 import Credential from '@/components/Credential/Credential';
-import { LoadingWithText } from '@/components/LoadingWithText';
 import { MessageText } from '@/components/MessageText';
 import { verifyCredential, VerifyCredentialResult } from '@/services/credentials';
 
@@ -63,32 +62,32 @@ const Verify = () => {
   }, [search]);
 
   if (state === 'loading') {
-    return <LoadingWithText text='Verifying the credential' />;
+    return (
+      <Loader text='Verifying the credential' className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' />
+    );
   }
 
   if (state === 'success' && result) {
     if (result.verified) {
       return (
-        <BackButton>
-          <Credential
-            credential={result.credential as VerifiableCredential}
-            decodedEnvelopedVC={result.decodedCredential as UnsignedCredential}
-          />
-        </BackButton>
+        <Credential
+          credential={result.credential as VerifiableCredential}
+          decodedEnvelopedVC={result.decodedCredential as UnsignedCredential}
+        />
       );
     }
 
     return (
-      <BackButton>
+      <div className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'>
         <MessageText status={Status.error} text={result.error?.message ?? 'Verification failed'} />
-      </BackButton>
+      </div>
     );
   }
 
   return (
-    <BackButton>
+    <div className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'>
       <MessageText status={Status.error} text={errorMessage} />
-    </BackButton>
+    </div>
   );
 };
 
@@ -97,7 +96,9 @@ const Verify = () => {
  */
 const VerifyPage = () => {
   return (
-    <Suspense fallback={<LoadingWithText text='Loading...' />}>
+    <Suspense
+      fallback={<Loader text='Loading...' className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' />}
+    >
       <Verify />
     </Suspense>
   );

@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { resolveDidService } from '@/lib/services/resolve-did-service';
-import { errorMessage, ConflictError } from '@/lib/api/errors';
+import { errorMessage, ConflictError, ForbiddenError } from '@/lib/api/errors';
 import { ValidationError, validateEnum, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createDid, listDids, findDidByAliasAndService } from '@/lib/prisma/repositories';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus, DidConflictError } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
+import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 
 const logger = apiLogger.child({ route: '/api/v1/dids' });
 
@@ -67,6 +68,12 @@ const logger = apiLogger.child({ route: '/api/v1/dids' });
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - cannot create a root DID for the system VC service domain
  *         content:
  *           application/json:
  *             schema:
@@ -135,6 +142,37 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     normalisedAlias = didService.normaliseAlias(body.alias, method, type);
   } catch (aliasErr) {
     throw new ValidationError(errorMessage(aliasErr, 'Invalid alias'));
+  }
+
+  // Prevent non-system tenants from creating self-managed root DIDs that match
+  // the system VCKit domain. A root did:web is one with no path segments — just
+  // the domain (e.g. did:web:vckit.example.com). This stops tenants from
+  // hijacking the VCKit instance's root DID.
+  if (type === DidType.SELF_MANAGED && method === DidMethod.DID_WEB && tenantId !== SYSTEM_TENANT_ID) {
+    const vcBaseUrl = process.env.SYSTEM_VC_BASE_URL;
+    if (vcBaseUrl) {
+      try {
+        const vcUrl = new URL(vcBaseUrl);
+        // Build both forms of the domain: with port (vckit-api:3332) and
+        // without (vckit-api). Use colon separator (not %3A) to match what
+        // normaliseSelfManagedAlias produces.
+        const reservedDomains = [vcUrl.hostname];
+        if (vcUrl.port && vcUrl.port !== '443' && vcUrl.port !== '80') {
+          reservedDomains.push(`${vcUrl.hostname}:${vcUrl.port}`);
+        }
+
+        if (reservedDomains.includes(normalisedAlias)) {
+          logger.warn(
+            { alias: normalisedAlias, tenantId, reservedDomains },
+            'Tenant attempted to create root DID for system VCKit domain',
+          );
+          throw new ForbiddenError(`Cannot create a root DID for the system VC service domain "${vcUrl.hostname}"`);
+        }
+      } catch (e) {
+        if (e instanceof ForbiddenError) throw e;
+        logger.warn({ vcBaseUrl, err: e }, 'SYSTEM_VC_BASE_URL is not a valid URL — root DID domain guard is disabled');
+      }
+    }
   }
 
   logger.info({ alias: normalisedAlias, serviceInstanceId }, 'Checking for duplicate DID');

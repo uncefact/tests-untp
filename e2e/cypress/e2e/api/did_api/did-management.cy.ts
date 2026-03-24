@@ -656,4 +656,78 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
   });
+
+  describe('Root DID protection', () => {
+    it('returns 403 when creating a self-managed root DID matching the system VC domain (with port)', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids',
+        body: {
+          type: 'SELF_MANAGED',
+          method: 'DID_WEB',
+          alias: 'vckit-api:3332',
+          name: 'Hijack attempt with port',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(403);
+        expect(response.body.error).to.include('system VC service domain');
+      });
+    });
+
+    it('returns 403 when creating a self-managed root DID matching the system VC hostname', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids',
+        body: {
+          type: 'SELF_MANAGED',
+          method: 'DID_WEB',
+          alias: 'vckit-api',
+          name: 'Hijack attempt hostname only',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(403);
+        expect(response.body.error).to.include('system VC service domain');
+      });
+    });
+
+    it('allows creating a self-managed DID with a path under the VC domain', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids',
+        body: {
+          type: 'SELF_MANAGED',
+          method: 'DID_WEB',
+          alias: `vckit-api:tenants:e2e-${RUN_ID}`,
+          name: `Path-based DID ${RUN_ID}`,
+        },
+      }).then((response) => {
+        expect(response.status).to.eq(201);
+        expect(response.body.type).to.eq('SELF_MANAGED');
+
+        // Clean up
+        cy.request({ method: 'DELETE', url: `/api/v1/dids/${response.body.id}` });
+      });
+    });
+
+    it('allows creating a managed DID (not affected by root DID protection)', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids',
+        body: {
+          type: 'MANAGED',
+          method: 'DID_WEB',
+          alias: `e2e-managed-safe-${RUN_ID}`,
+          name: `Managed DID ${RUN_ID}`,
+        },
+      }).then((response) => {
+        expect(response.status).to.eq(201);
+        expect(response.body.type).to.eq('MANAGED');
+
+        // Clean up
+        cy.request({ method: 'DELETE', url: `/api/v1/dids/${response.body.id}` });
+      });
+    });
+  });
 });

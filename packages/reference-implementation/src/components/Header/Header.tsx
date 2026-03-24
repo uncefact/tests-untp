@@ -3,21 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Container,
-  Box,
-  IconButton,
-  Stack,
-  Divider,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  Drawer,
-} from '@mui/material';
+import { AppBar, Toolbar, Typography, Container, Box, IconButton, Stack, Divider, Drawer } from '@mui/material';
 import { Menu as MenuIcon } from '@mui/icons-material';
 
 const APP_NAME = 'UNTP Reference Implementation';
@@ -53,13 +39,6 @@ function Header() {
                   </Typography>
                 </Stack>
                 <Divider />
-                <List>
-                  <ListItem disablePadding>
-                    <ListItemButton component={Link} href='/dashboard'>
-                      <ListItemText primary='Dashboard' />
-                    </ListItemButton>
-                  </ListItem>
-                </List>
               </Box>
             </Drawer>
 
