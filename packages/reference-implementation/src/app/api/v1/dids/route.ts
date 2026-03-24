@@ -153,17 +153,17 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     if (vcBaseUrl) {
       try {
         const vcUrl = new URL(vcBaseUrl);
-        const vcDomain =
-          vcUrl.port && vcUrl.port !== '443' && vcUrl.port !== '80'
-            ? `${vcUrl.hostname}%3A${vcUrl.port}`
-            : vcUrl.hostname;
+        // Build both forms of the domain: with port (vckit-api:3332) and
+        // without (vckit-api). Use colon separator (not %3A) to match what
+        // normaliseSelfManagedAlias produces.
+        const reservedDomains = [vcUrl.hostname];
+        if (vcUrl.port && vcUrl.port !== '443' && vcUrl.port !== '80') {
+          reservedDomains.push(`${vcUrl.hostname}:${vcUrl.port}`);
+        }
 
-        if (
-          normalisedAlias.toLowerCase() === vcDomain.toLowerCase() ||
-          normalisedAlias.toLowerCase() === vcUrl.hostname.toLowerCase()
-        ) {
+        if (reservedDomains.includes(normalisedAlias)) {
           logger.warn(
-            { alias: normalisedAlias, tenantId, vcDomain },
+            { alias: normalisedAlias, tenantId, reservedDomains },
             'Tenant attempted to create root DID for system VCKit domain',
           );
           throw new ForbiddenError(`Cannot create a root DID for the system VC service domain "${vcUrl.hostname}"`);

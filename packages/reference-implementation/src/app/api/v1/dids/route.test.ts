@@ -406,7 +406,9 @@ describe('POST /api/v1/dids', () => {
       process.env.SYSTEM_VC_BASE_URL = 'http://vckit.example.com:3332';
       mockDidService.getSupportedTypes.mockReturnValue(['MANAGED', 'SELF_MANAGED']);
       mockDidService.getSupportedMethods.mockReturnValue(['DID_WEB']);
-      mockDidService.normaliseAlias.mockImplementation((alias: string) => alias);
+      mockDidService.normaliseAlias.mockImplementation((alias: string) =>
+        alias.toLowerCase().replace(/[^a-z0-9.:-]/g, ''),
+      );
       mockDidService.create.mockResolvedValue({ did: 'did:web:vckit.example.com%3A3332', keyId: 'key-1' });
       mockCreateDid.mockResolvedValue({ id: 'record-1' });
     });
@@ -417,7 +419,7 @@ describe('POST /api/v1/dids', () => {
 
     it('returns 403 when a tenant creates a self-managed root DID matching the system VC domain', async () => {
       const req = createFakeRequest({
-        body: { type: DidType.SELF_MANAGED, method: DidMethod.DID_WEB, alias: 'vckit.example.com%3A3332' },
+        body: { type: DidType.SELF_MANAGED, method: DidMethod.DID_WEB, alias: 'vckit.example.com:3332' },
       });
       const res = await POST(req, TENANT_CONTEXT as unknown as Parameters<typeof POST>[1]);
       expect(res.status).toBe(403);
