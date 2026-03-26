@@ -99,7 +99,7 @@ export async function getDidById(id: string, tenantId: string): Promise<Did | nu
   const did = await prisma.did.findFirst({
     where: {
       id,
-      OR: [{ tenantId }, { isDefault: true, type: 'DEFAULT' }],
+      OR: [{ tenantId }, { type: 'DEFAULT' }],
     },
   });
 
@@ -116,7 +116,7 @@ export async function getDidByDid(didString: string, tenantId: string): Promise<
   const did = await prisma.did.findFirst({
     where: {
       did: didString,
-      OR: [{ tenantId }, { isDefault: true, type: 'DEFAULT' }],
+      OR: [{ tenantId }, { type: 'DEFAULT' }],
     },
   });
 
@@ -134,7 +134,7 @@ export async function listDids(
   const { type, status, serviceInstanceId, limit, offset } = options;
 
   const where: Prisma.DidWhereInput = {
-    OR: [{ tenantId }, { isDefault: true, type: 'DEFAULT' }],
+    OR: [{ tenantId }, { type: 'DEFAULT' }],
   };
 
   if (type !== undefined) {

@@ -83,7 +83,7 @@ CVC validation is **advisory only** — it never blocks issuance. If issues are 
 
 ### The Issuance Pipeline
 
-Issuing a credential involves six stages. Each stage can fail independently, and failures at different stages produce different HTTP status codes and warning codes. See the [Issue a Credential](#issue-a-credential) endpoint for the full request and response reference.
+Issuing a credential involves eight stages. Each stage can fail independently, and failures at different stages produce different HTTP status codes and warning codes. See the [Issue a Credential](#issue-a-credential) endpoint for the full request and response reference.
 
 ```mermaid
 sequenceDiagram
@@ -100,19 +100,22 @@ sequenceDiagram
     DB-->>RI: Data model config + schema URLs
     RI->>RI: 3. Validate payload (JSON Schema + JSON-LD)
     RI->>RI: 3.5. CVC validation (advisory, DCC only)
-    RI->>DB: 4. Resolve VC + storage service instances
+    RI->>DB: 4. Validate issuer DID ownership
+    DB-->>RI: DID record (tenant-owned or system default)
+    RI->>RI: 5. Validate DID has service association
+    RI->>DB: 6. Resolve services (VC from DID, storage + IDR by tenant)
     DB-->>RI: Decrypted service configs
-    RI->>VC: 5a. Issue credential status
+    RI->>VC: 7a. Issue credential status
     VC-->>RI: Credential status (BitstringStatusList entry)
-    RI->>VC: 5b. Sign credential (with status)
+    RI->>VC: 7b. Sign credential (with status)
     VC-->>RI: Enveloped verifiable credential
-    RI->>Storage: 5c. Store credential (optional encryption)
+    RI->>Storage: 7c. Store credential (optional encryption)
     Storage-->>RI: Storage URI + hash + decryption key
-    RI->>DB: 5d. Resolve primary entity from refs
-    RI->>DB: 5e. Save credential record
+    RI->>DB: 7d. Resolve primary entity from refs
+    RI->>DB: 7e. Save credential record
     DB-->>RI: Credential ID
     opt publish = true
-        RI->>IDR: 6. Publish links for primary identifier
+        RI->>IDR: 8. Publish links for primary identifier
         IDR-->>RI: Link registration
         RI->>DB: Update isPublished = true
     end
@@ -160,19 +163,32 @@ CVC validation is advisory only. It never blocks issuance. If the check fails or
 | `CVC_NO_CRITERIA` | No criteria found in the payload |
 | `CVC_VALIDATION_ERROR` | CVC validation could not be performed (infrastructure or extraction failure) |
 
-#### Stage 4: Service Resolution
+#### Stage 4: Issuer DID Ownership Validation
 
-Three external services are involved in issuance. Each is resolved via the [service resolution chain](../services/service-architecture#system-services-vs-tenant-services):
+The `issuer.id` field in the credential payload must contain a [DID](./dids) that the authenticated tenant is authorised to use. The Reference Implementation looks up the DID and verifies that it either:
 
-| Service | Purpose | Override Field |
-|---------|---------|---------------|
-| **VC Service** | Signs the credential payload | `signingOptions.serviceInstanceId` |
-| **Storage Service** | Stores the signed credential | `storageOptions.serviceInstanceId` |
-| **IDR Service** | Publishes links (only when `publish: true`) | Resolved from the entity's scheme configuration |
+- belongs to the authenticated tenant, or
+- is a [system default DID](./dids#system-dids-vs-tenant-dids) — available to all tenants as part of the [incremental adoption ramp](../overview#incremental-adoption)
 
-If no explicit `serviceInstanceId` is provided, the tenant's primary instance for that service type is used. If no primary exists, the system default is used.
+**If the DID is not registered to the tenant and is not a system default DID, the request is rejected with HTTP 400.** A tenant cannot issue credentials using a DID that belongs to another tenant.
 
-#### Stage 5: Sign, Store, and Record
+#### Stage 5: DID Service Association Check
+
+The issuer DID must have an associated [VC service instance](./services) — this is the service that holds the DID's key material and will perform signing. If the DID has no association (e.g., the service instance was [force-deleted](./services#delete-a-service-instance)), the request is rejected with HTTP 400. The DID must be re-imported or re-created to restore the association.
+
+#### Stage 6: Service Resolution
+
+The **VC service** is resolved from the issuer DID's associated service instance. This ensures signing always happens on the VC service that holds the DID's key material, regardless of whether the DID is a tenant-owned DID or a [system default DID](./dids#system-dids-vs-tenant-dids). The caller does not need to specify which VC service to use; the DID determines it.
+
+The **storage service** and **IDR service** follow the standard [resolution chain](../services/service-architecture#system-services-vs-tenant-services):
+
+| Service | Purpose | How Resolved |
+|---------|---------|-------------|
+| **VC Service** | Signs the credential payload | From the issuer DID's associated service instance |
+| **Storage Service** | Stores the signed credential | `storageOptions.serviceInstanceId`, or tenant primary, or system default |
+| **IDR Service** | Publishes links (only when `publish: true`) | From the entity's scheme configuration |
+
+#### Stage 7: Sign, Store, and Record
 
 The credential payload is signed by the VC service, producing an [Enveloped Verifiable Credential](https://www.w3.org/TR/vc-data-model-2.0/#enveloped-verifiable-credentials). The signed credential is then stored by the storage service.
 
@@ -180,7 +196,7 @@ The credential payload is signed by the VC service, producing an [Enveloped Veri
 
 **Entity linking**: The data model bridge extracts entity references (organisations, facilities, products) from the credential payload. The primary entity (priority: product > facility > organisation) is linked to the credential record in the database. This link enables the optional publishing step.
 
-#### Stage 6: IDR Publishing (Optional)
+#### Stage 8: IDR Publishing (Optional)
 
 When `publishingOptions.publish` is `true`, the Reference Implementation publishes a link to the stored credential on the [Identity Resolver](./identifiers#links) for the primary entity's identifier. This makes the credential discoverable via the entity's identifier scheme (e.g., resolving a GS1 GTIN leads to the credential).
 
@@ -217,7 +233,6 @@ Validates, signs, stores, and optionally publishes a verifiable credential. Retu
 | `credentialPayload` | object | Yes | Full credential payload conforming to the UNTP schema for the specified type and version |
 | `credentialType` | string | Yes | Registered data model type (e.g., `DigitalProductPassport`) |
 | `version` | string | Yes | Registered data model version (e.g., `0.6.1`) |
-| `signingOptions.serviceInstanceId` | string | No | Explicit VC service instance for signing |
 | `storageOptions.serviceInstanceId` | string | No | Explicit storage service instance |
 | `storageOptions.encrypt` | boolean | No | Whether to encrypt (default: `true`) |
 | `publishingOptions.publish` | boolean | No | Whether to publish to IDR |

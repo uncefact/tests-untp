@@ -137,3 +137,9 @@ All variables are documented in [`e2e/.env.e2e.example`](.env.e2e.example). Key 
 | `E2E_DB_PORT` | PostgreSQL port | `5433` |
 | `VERIFY_ALLOW_PRIVATE_URLS` | SSRF validation (`false` for deployed) | `true` |
 
+### did:web and HTTPS
+
+Some credential issuance tests (issuing with a tenant-created DID, issuing with a DID on a non-primary VC service instance) require VCKit to resolve `did:web` DID documents during signing. The `did:web` specification requires HTTPS, so these tests are **automatically skipped** when the VCKit base URL is not HTTPS (i.e. in the local Docker Compose environment where VCKit runs on `http://vckit-api:3332`).
+
+These tests run when VCKit is deployed with a publicly resolvable HTTPS domain (e.g. `https://vckit.example.com`). The remaining DID ownership enforcement tests (system default DID issuance, cross-tenant rejection, fabricated DID rejection) run in all environments.
+

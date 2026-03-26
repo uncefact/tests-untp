@@ -205,7 +205,7 @@ describe('did.repository', () => {
       expect(mockDid.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'did-record-1',
-          OR: [{ tenantId: ORG_ID }, { isDefault: true, type: 'DEFAULT' }],
+          OR: [{ tenantId: ORG_ID }, { type: 'DEFAULT' }],
         },
       });
       expect(result).toEqual(DID_RECORD);
@@ -251,7 +251,7 @@ describe('did.repository', () => {
       expect(mockDid.findFirst).toHaveBeenCalledWith({
         where: {
           did: 'did:web:example.com:org:123',
-          OR: [{ tenantId: ORG_ID }, { isDefault: true, type: 'DEFAULT' }],
+          OR: [{ tenantId: ORG_ID }, { type: 'DEFAULT' }],
         },
       });
       expect(result).toEqual(DID_RECORD);
@@ -266,7 +266,7 @@ describe('did.repository', () => {
       expect(mockDid.findFirst).toHaveBeenCalledWith({
         where: {
           did: 'did:web:example.com:org:123',
-          OR: [{ tenantId: 'other-org' }, { isDefault: true, type: 'DEFAULT' }],
+          OR: [{ tenantId: 'other-org' }, { type: 'DEFAULT' }],
         },
       });
       expect(result).toEqual(defaultDid);
@@ -300,7 +300,7 @@ describe('did.repository', () => {
 
       expect(mockDid.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [{ tenantId: ORG_ID }, { isDefault: true, type: 'DEFAULT' }],
+          OR: [{ tenantId: ORG_ID }, { type: 'DEFAULT' }],
         },
         take: DEFAULT_PAGE_LIMIT,
         skip: undefined,
@@ -308,7 +308,7 @@ describe('did.repository', () => {
       });
       expect(mockDid.count).toHaveBeenCalledWith({
         where: {
-          OR: [{ tenantId: ORG_ID }, { isDefault: true, type: 'DEFAULT' }],
+          OR: [{ tenantId: ORG_ID }, { type: 'DEFAULT' }],
         },
       });
       expect(result).toEqual({ data: [DID_RECORD], total: 1 });

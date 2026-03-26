@@ -102,9 +102,11 @@ jest.mock('@uncefact/untp-ri-services', () => ({
 // Repository mocks
 const mockUpdateCredentialPublished = jest.fn();
 const mockListCredentials = jest.fn();
+const mockGetDidByDid = jest.fn();
 jest.mock('@/lib/prisma/repositories', () => ({
   updateCredentialPublished: (...args: unknown[]) => mockUpdateCredentialPublished(...args),
   listCredentials: (...args: unknown[]) => mockListCredentials(...args),
+  getDidByDid: (...args: unknown[]) => mockGetDidByDid(...args),
 }));
 
 const mockAssertPublicUrl = jest.fn();
@@ -173,6 +175,7 @@ const AUTH_CONTEXT = { tenantId: 'tenant-1', params: Promise.resolve({}) };
 const VALID_PAYLOAD = {
   '@context': ['https://www.w3.org/ns/credentials/v2'],
   type: ['VerifiableCredential', 'DigitalProductPassport'],
+  issuer: { type: ['CredentialIssuer'], id: 'did:web:vckit.example.com:tenant-1', name: 'Tenant 1' },
   credentialSubject: { id: 'urn:example:product:123' },
 };
 
@@ -213,6 +216,12 @@ function setupHappyPath() {
   });
   mockValidateCredentialPayload.mockResolvedValue(undefined);
   mockValidateCvcCompliance.mockResolvedValue({ warnings: [] });
+  mockGetDidByDid.mockResolvedValue({
+    id: 'did-1',
+    did: 'did:web:vckit.example.com:tenant-1',
+    tenantId: 'tenant-1',
+    serviceInstanceId: 'vc-1',
+  });
   mockResolveVcService.mockResolvedValue({ service: {}, instanceId: 'vc-1' });
   mockResolveStorageService.mockResolvedValue({ service: {}, instanceId: 'storage-1' });
   mockIssueCredential.mockResolvedValue({
@@ -579,14 +588,160 @@ describe('POST /api/v1/credentials', () => {
     });
   });
 
+  // ── DID ownership validation ────────────────────────────────────────
+
+  describe('DID ownership validation', () => {
+    it('allows issuance when issuer DID belongs to the tenant', async () => {
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(res.status).toBe(201);
+      expect(mockGetDidByDid).toHaveBeenCalledWith('did:web:vckit.example.com:tenant-1', 'tenant-1');
+    });
+
+    it('allows issuance when issuer DID is a system default', async () => {
+      mockGetDidByDid.mockResolvedValue({
+        id: 'sys-did',
+        did: 'did:web:vckit.example.com',
+        type: 'DEFAULT',
+        tenantId: 'system-tenant',
+        serviceInstanceId: 'system-vc-instance',
+      });
+
+      const payload = {
+        ...VALID_PAYLOAD,
+        issuer: { type: ['CredentialIssuer'], id: 'did:web:vckit.example.com', name: 'System' },
+      };
+      const req = createFakeRequest(validBody({ credentialPayload: payload }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(res.status).toBe(201);
+    });
+
+    it('returns 400 when issuer DID does not belong to the tenant', async () => {
+      mockGetDidByDid.mockResolvedValue(null);
+
+      const payload = {
+        ...VALID_PAYLOAD,
+        issuer: { type: ['CredentialIssuer'], id: 'did:web:other-tenant.example.com', name: 'Other' },
+      };
+      const req = createFakeRequest(validBody({ credentialPayload: payload }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('not registered to your tenant');
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when issuer is missing from credential payload', async () => {
+      const { issuer: _, ...payloadWithoutIssuer } = VALID_PAYLOAD;
+      const req = createFakeRequest(validBody({ credentialPayload: payloadWithoutIssuer }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('credentialPayload.issuer.id is required');
+    });
+
+    it('returns 400 when issuer is an object without an id field', async () => {
+      const payload = {
+        ...VALID_PAYLOAD,
+        issuer: { type: ['CredentialIssuer'], name: 'No ID Issuer' },
+      };
+      const req = createFakeRequest(validBody({ credentialPayload: payload }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('credentialPayload.issuer.id is required');
+      expect(mockGetDidByDid).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 when getDidByDid throws an unexpected error', async () => {
+      mockGetDidByDid.mockRejectedValue(new Error('DB connection lost'));
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(res.status).toBe(500);
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('extracts issuer.id when issuer is a string', async () => {
+      const payload = { ...VALID_PAYLOAD, issuer: 'did:web:vckit.example.com:tenant-1' };
+      const req = createFakeRequest(validBody({ credentialPayload: payload }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockGetDidByDid).toHaveBeenCalledWith('did:web:vckit.example.com:tenant-1', 'tenant-1');
+    });
+
+    it('does not call service resolution when DID validation fails', async () => {
+      mockGetDidByDid.mockResolvedValue(null);
+
+      const payload = {
+        ...VALID_PAYLOAD,
+        issuer: { type: ['CredentialIssuer'], id: 'did:web:attacker.example.com', name: 'Attacker' },
+      };
+      const req = createFakeRequest(validBody({ credentialPayload: payload }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockResolveVcService).not.toHaveBeenCalled();
+      expect(mockResolveStorageService).not.toHaveBeenCalled();
+    });
+
+    it('resolves the VC service using the DID serviceInstanceId', async () => {
+      const req = createFakeRequest(validBody());
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockResolveVcService).toHaveBeenCalledWith('tenant-1', 'vc-1');
+    });
+
+    it('resolves the system DID VC service instance for system default DIDs', async () => {
+      mockGetDidByDid.mockResolvedValue({
+        id: 'sys-did',
+        did: 'did:web:vckit.example.com',
+        type: 'DEFAULT',
+        tenantId: 'system-tenant',
+        serviceInstanceId: 'system-vc-instance',
+      });
+
+      const payload = {
+        ...VALID_PAYLOAD,
+        issuer: { type: ['CredentialIssuer'], id: 'did:web:vckit.example.com', name: 'System' },
+      };
+      const req = createFakeRequest(validBody({ credentialPayload: payload }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockResolveVcService).toHaveBeenCalledWith('tenant-1', 'system-vc-instance');
+    });
+
+    it('returns 400 when DID has no associated VC service instance', async () => {
+      mockGetDidByDid.mockResolvedValue({
+        id: 'did-1',
+        did: 'did:web:vckit.example.com:tenant-1',
+        tenantId: 'tenant-1',
+        serviceInstanceId: null,
+      });
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('has no associated VC service instance');
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+  });
+
   // ── Service resolution ──────────────────────────────────────────────
 
   describe('service resolution', () => {
-    it('passes signingOptions.serviceInstanceId to resolveVcService', async () => {
-      const req = createFakeRequest(validBody({ signingOptions: { serviceInstanceId: 'custom-vc' } }));
+    it('resolves VC service using the DID serviceInstanceId by default', async () => {
+      const req = createFakeRequest(validBody());
       await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
-      expect(mockResolveVcService).toHaveBeenCalledWith('tenant-1', 'custom-vc');
+      expect(mockResolveVcService).toHaveBeenCalledWith('tenant-1', 'vc-1');
     });
 
     it('passes storageOptions.serviceInstanceId to resolveStorageService', async () => {
@@ -594,13 +749,6 @@ describe('POST /api/v1/credentials', () => {
       await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
       expect(mockResolveStorageService).toHaveBeenCalledWith('tenant-1', 'custom-storage');
-    });
-
-    it('passes undefined when no signingOptions provided', async () => {
-      const req = createFakeRequest(validBody());
-      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-
-      expect(mockResolveVcService).toHaveBeenCalledWith('tenant-1', undefined);
     });
 
     it('passes undefined when no storageOptions provided', async () => {

@@ -4,6 +4,7 @@ describe('Credential API', { testIsolation: false }, () => {
   const RUN_ID = Date.now();
   let testTenantId: string;
   let defaultDidValue: string;
+  let tenantDidValue: string;
   let encryptedCredentialId: string;
   let unencryptedCredentialId: string;
   let publishedCredentialId: string;
@@ -89,10 +90,13 @@ describe('Credential API', { testIsolation: false }, () => {
   });
 
   // -----------------------------------------------------------------------
-  // Issue and retrieve
+  // DID ownership enforcement
   // -----------------------------------------------------------------------
-  describe('Issue and retrieve credentials', () => {
-    it('looks up the system default DID to use as issuer', () => {
+  describe('DID ownership enforcement', () => {
+    let foreignDid: string;
+
+    before(() => {
+      // Look up the system default DID
       cy.request('/api/v1/dids').then((response) => {
         expect(response.status).to.eq(200);
         const defaultDid = response.body.data.find(
@@ -101,8 +105,158 @@ describe('Credential API', { testIsolation: false }, () => {
         expect(defaultDid).to.exist;
         defaultDidValue = defaultDid.did;
       });
+
+      // Create a tenant-owned MANAGED DID (only when VCKit has an HTTPS
+      // endpoint — did:web resolution requires HTTPS for signing)
+      if (config.services.vckit.baseUrl.startsWith('https://')) {
+        cy.request({
+          method: 'POST',
+          url: '/api/v1/dids',
+          body: {
+            type: 'MANAGED',
+            method: 'DID_WEB',
+            alias: `e2e-cred-did-${RUN_ID}`,
+            name: `E2E Credential DID ${RUN_ID}`,
+          },
+        }).then((response) => {
+          expect(response.status).to.eq(201);
+          tenantDidValue = response.body.did;
+        });
+      }
+
+      // Seed a DID belonging to a different tenant
+      cy.task('seedForeignTenantDid').then((result: any) => {
+        foreignDid = result.did;
+      });
     });
 
+    after(() => {
+      cy.task('cleanupForeignTenantDid');
+    });
+
+    it('issues a credential using the system default DID', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        body: {
+          credentialPayload: buildCredentialPayload(defaultDidValue),
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.1',
+        },
+      }).then((response) => {
+        expect(response.status).to.eq(201);
+        expect(response.body.credentialId).to.be.a('string');
+      });
+    });
+
+    // Signing with a tenant-created managed DID requires VCKit to resolve
+    // the did:web document over HTTPS. In Docker CI the VCKit domain is an
+    // internal hostname over HTTP, so did:web resolution fails. Skip when
+    // VCKit is not on an HTTPS endpoint.
+    it('issues a credential using a tenant-owned DID', function () {
+      if (!config.services.vckit.baseUrl.startsWith('https://')) this.skip();
+
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        body: {
+          credentialPayload: buildCredentialPayload(tenantDidValue),
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.1',
+        },
+      }).then((response) => {
+        expect(response.status).to.eq(201);
+        expect(response.body.credentialId).to.be.a('string');
+      });
+    });
+
+    it('rejects issuance with a DID belonging to another tenant', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        body: {
+          credentialPayload: buildCredentialPayload(foreignDid),
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.1',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.contain('not registered to your tenant');
+      });
+    });
+
+    it('rejects issuance with a fabricated DID that does not exist', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        body: {
+          credentialPayload: buildCredentialPayload('did:web:nonexistent.example.com'),
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.1',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.contain('not registered to your tenant');
+      });
+    });
+
+    // Same did:web HTTPS constraint as the tenant-owned DID test above.
+    it('issues a credential using a DID on a non-primary VC service instance', function () {
+      if (!config.services.vckit.baseUrl.startsWith('https://')) this.skip();
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/services',
+        body: {
+          serviceType: 'VC',
+          adapterType: 'VCKIT',
+          name: 'E2E VCKit VC Secondary',
+          config: {
+            baseUrl: config.services.vckit.baseUrl,
+            apiKey: config.services.vckit.apiKey,
+          },
+          isPrimary: false,
+        },
+      }).then((res) => {
+        expect(res.status).to.eq(201);
+        const secondVcServiceId = res.body.id;
+
+        return cy.request({
+          method: 'POST',
+          url: '/api/v1/dids',
+          body: {
+            type: 'MANAGED',
+            method: 'DID_WEB',
+            alias: `e2e-secondary-did-${RUN_ID}`,
+            name: `E2E Secondary DID ${RUN_ID}`,
+            serviceInstanceId: secondVcServiceId,
+          },
+        });
+      }).then((didRes) => {
+        expect(didRes.status).to.eq(201);
+        const secondaryDid = didRes.body.did;
+
+        cy.request({
+          method: 'POST',
+          url: '/api/v1/credentials',
+          body: {
+            credentialPayload: buildCredentialPayload(secondaryDid),
+            credentialType: 'DigitalProductPassport',
+            version: '0.6.1',
+          },
+        }).then((response) => {
+          expect(response.status).to.eq(201);
+          expect(response.body.credentialId).to.be.a('string');
+        });
+      });
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Issue and retrieve
+  // -----------------------------------------------------------------------
+  describe('Issue and retrieve credentials', () => {
     it('POST /api/v1/credentials — issues an encrypted credential', () => {
       cy.request({
         method: 'POST',

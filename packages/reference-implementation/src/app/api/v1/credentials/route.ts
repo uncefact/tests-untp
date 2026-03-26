@@ -17,6 +17,7 @@ import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
+import { getDidByDid } from '@/lib/prisma/repositories';
 import { buildPublishLinks } from '@uncefact/untp-ri-services';
 import type { CredentialPayload, ExtractedRefs } from '@uncefact/untp-ri-services';
 import { validateCvcCompliance } from '@/lib/services/cvc-validation.service';
@@ -35,9 +36,10 @@ const logger = apiLogger.child({ route: '/api/v1/credentials' });
  *     summary: Issue a verifiable credential
  *     description: |
  *       Validates a credential payload via JSON Schema and JSON-LD expansion,
- *       signs it, stores the enveloped credential (optionally encrypted),
- *       optionally publishes it to the Identity Resolver, links it to its
- *       primary entity, and returns the credential ID.
+ *       verifies that the issuer DID belongs to the authenticated tenant or is
+ *       a system default DID, signs it, stores the enveloped credential
+ *       (optionally encrypted), optionally publishes it to the Identity
+ *       Resolver, links it to its primary entity, and returns the credential ID.
  *     tags:
  *       - Credentials
  *     requestBody:
@@ -54,7 +56,7 @@ const logger = apiLogger.child({ route: '/api/v1/credentials' });
  *             schema:
  *               $ref: '#/components/schemas/CredentialIssueResponse'
  *       400:
- *         description: Validation error
+ *         description: Validation error (invalid payload, unknown data model, or issuer DID not registered to tenant)
  *         content:
  *           application/json:
  *             schema:
@@ -83,9 +85,6 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     credentialPayload?: CredentialPayload;
     credentialType?: string;
     version?: string;
-    signingOptions?: {
-      serviceInstanceId?: string;
-    };
     storageOptions?: {
       serviceInstanceId?: string;
       encrypt?: boolean;
@@ -124,7 +123,6 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   }
 
   const { credentialPayload, credentialType, version } = body;
-  const signingOptions = body.signingOptions ?? {};
   const storageOptions = body.storageOptions ?? {};
   const publishingOptions = body.publishingOptions ?? {};
 
@@ -191,13 +189,48 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     }
   }
 
-  // ── Step 4: Resolve services ────────────────────────────────────────────
+  // ── Step 4: Validate issuer DID ownership ────────────────────────────────
+  // The issuer DID in the credential payload must belong to the authenticated
+  // tenant or be the system default DID. This prevents a tenant from signing
+  // credentials with a DID they do not control.
 
-  logger.info('Resolving VC and storage services');
-  const vcService = await resolveVcService(tenantId, signingOptions.serviceInstanceId);
+  const issuer = credentialPayload.issuer;
+  const issuerDid = typeof issuer === 'string' ? issuer : issuer?.id;
+  if (!issuerDid) {
+    throw new ValidationError('credentialPayload.issuer.id is required');
+  }
+
+  logger.info({ issuerDid }, 'Validating issuer DID ownership');
+  const didRecord = await getDidByDid(issuerDid, tenantId);
+  if (!didRecord) {
+    logger.warn({ issuerDid, tenantId }, 'Issuer DID not found for tenant');
+    throw new ValidationError(
+      `Issuer DID "${issuerDid}" is not registered to your tenant. ` +
+        'You can only issue credentials with a DID that belongs to your tenant or the system default DID.',
+    );
+  }
+
+  // ── Step 5: Validate DID has a VC service association ──────────────────
+
+  if (!didRecord.serviceInstanceId) {
+    logger.warn({ issuerDid }, 'Issuer DID has no associated VC service instance');
+    throw new ValidationError(
+      `Issuer DID "${issuerDid}" has no associated VC service instance. ` +
+        'The DID may have lost its service association (e.g., the service instance was force-deleted). ' +
+        'Re-import or re-create the DID to restore the association.',
+    );
+  }
+
+  // ── Step 6: Resolve services ────────────────────────────────────────────
+  // The VC service is resolved from the DID's associated service instance,
+  // ensuring signing always happens on the VC service that holds the DID's
+  // key material. This works for both tenant-owned and system default DIDs.
+
+  logger.info({ vcServiceInstanceId: didRecord.serviceInstanceId }, 'Resolving VC and storage services');
+  const vcService = await resolveVcService(tenantId, didRecord.serviceInstanceId);
   const storageService = await resolveStorageService(tenantId, storageOptions.serviceInstanceId);
 
-  // ── Step 5: Issue credential ────────────────────────────────────────────
+  // ── Step 7: Issue credential ────────────────────────────────────────────
 
   logger.info({ credentialType }, 'Issuing credential');
   const { credentialId, storageResponse, primaryEntity } = await issueCredential({
@@ -210,7 +243,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     storageOptions,
   });
 
-  // ── Step 6: Publish to IDR ──────────────────────────────────────────────
+  // ── Step 8: Publish to IDR ──────────────────────────────────────────────
 
   if (publishingOptions.publish === true) {
     if (!primaryEntity.schemePrimaryKey || !primaryEntity.schemeNamespace) {
