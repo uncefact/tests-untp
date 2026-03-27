@@ -45,6 +45,14 @@ The RI runs on [http://localhost:3003](http://localhost:3003) with hot reloading
 - [Authentication](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/authentication) — browser sessions, service accounts, and obtaining tokens
 - [API Documentation](http://localhost:3003/api-docs) — interactive Swagger UI (requires running instance)
 
+### Credential Issuance and DID Ownership
+
+When issuing a credential, the `issuer.id` in the credential payload must be a DID that belongs to the authenticated tenant or a [system default DID](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/api/dids#system-dids-vs-tenant-dids). The VC service used for signing is determined by the DID's associated service instance, not the tenant's primary. This ensures signing always happens on the VC service that holds the DID's key material.
+
+**did:web and HTTPS**: Managed DIDs use the `did:web` method, which requires the DID document to be resolvable over HTTPS. In local Docker development, VCKit runs on HTTP with an internal hostname, so managed DIDs created locally cannot be used for credential issuance. Use the system default DID for local development, or deploy VCKit with a publicly resolvable HTTPS domain.
+
+See the [Credentials API documentation](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/api/credentials) for the full issuance pipeline.
+
 ### Resetting Services
 
 To tear down all containers **and remove all data volumes** (databases, Keycloak realm data, etc.):

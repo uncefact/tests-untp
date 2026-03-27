@@ -30,10 +30,6 @@ import { paginationMetaSchema } from '@/lib/api/pagination';
 // Credential Schemas (remain local — no credential service directory yet)
 // ============================================================================
 
-const signingOptionsSchema = z.object({
-  serviceInstanceId: z.string().optional().describe('Signing service instance ID'),
-});
-
 const storageOptionsSchema = z.object({
   serviceInstanceId: z.string().optional().describe('Storage service instance ID'),
   encrypt: z.boolean().optional().describe('Whether to encrypt the stored credential'),
@@ -58,7 +54,6 @@ export const credentialIssueRequestSchema = z.object({
     .string()
     .describe('Type of credential to issue (e.g. DigitalProductPassport, DigitalLivestockPassport)'),
   version: z.string().describe('Data model version'),
-  signingOptions: signingOptionsSchema.optional().describe('Signing service options'),
   storageOptions: storageOptionsSchema.optional().describe('Storage service options'),
   publishingOptions: publishingOptionsSchema.optional().describe('IDR publishing options'),
 });

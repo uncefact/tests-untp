@@ -91,6 +91,8 @@ The [verify endpoint](#verify-a-did) runs the following checks in order. All che
 
 DIDs exist at two levels — the **system default DID** (created during [startup](../operations/startup#step-2-database-seed), owned by the [system tenant](../system-architecture#system-tenant), read-only and visible to all tenants) and **tenant DIDs** (created or imported by a tenant through this API, scoped exclusively to that tenant). When listing DIDs, tenants see both their own DIDs and the system default.
 
+**Credential signing is restricted to these two pools.** When [issuing a credential](./credentials#stage-4-issuer-did-ownership-validation), the `issuer.id` in the credential payload must be a DID that belongs to the authenticated tenant or a system default DID — available to all tenants as part of the [incremental adoption ramp](../overview#incremental-adoption). A tenant cannot issue credentials using a DID that belongs to another tenant.
+
 ### Service Instance Association
 
 When creating a DID, you can specify which [verifiable credential service instance](./services) to use via `serviceInstanceId`. If omitted, the service instance is resolved using the same [resolution chain](../services/service-architecture#system-services-vs-tenant-services) as other operations — the tenant's [primary](./services#primary-instances) VC service instance if one is set, otherwise the system default.

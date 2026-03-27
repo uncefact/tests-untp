@@ -616,6 +616,45 @@ export default defineConfig({
             await client.end();
           }
         },
+        async seedForeignTenantDid() {
+          const client = getDbClient();
+          try {
+            await client.connect();
+            const foreignTenantId = 'e2e-foreign-tenant';
+            const foreignDidId = 'e2e-foreign-did';
+            const foreignDid = `did:web:foreign-tenant.example.com:e2e-${Date.now()}`;
+
+            // Create a foreign tenant (update timestamp if it already exists from a previous run)
+            await client.query(
+              `INSERT INTO "Tenant" (id, name, "createdAt", "updatedAt")
+               VALUES ($1, 'E2E Foreign Tenant', NOW(), NOW())
+               ON CONFLICT (id) DO UPDATE SET "updatedAt" = NOW()`,
+              [foreignTenantId],
+            );
+
+            // Create a DID belonging to that foreign tenant
+            await client.query(
+              `INSERT INTO "Did" (id, "tenantId", did, type, method, "keyId", name, status, "isDefault", "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, 'MANAGED', 'DID_WEB', 'foreign-key-1', 'Foreign DID', 'ACTIVE', false, NOW(), NOW())
+               ON CONFLICT (id) DO UPDATE SET did = $3, "updatedAt" = NOW()`,
+              [foreignDidId, foreignTenantId, foreignDid],
+            );
+
+            return { tenantId: foreignTenantId, didId: foreignDidId, did: foreignDid };
+          } finally {
+            await client.end();
+          }
+        },
+        async cleanupForeignTenantDid() {
+          const client = getDbClient();
+          try {
+            await client.connect();
+            await deleteTenantData(client, 'e2e-foreign-tenant');
+            return null;
+          } finally {
+            await client.end();
+          }
+        },
       });
     },
   },
