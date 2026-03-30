@@ -177,6 +177,7 @@ export default defineConfig({
     USER_EMAIL: process.env.E2E_USER_EMAIL || 'e2e-admin@test.local',
     USER_PASSWORD: process.env.E2E_USER_PASSWORD || 'E2eTest123!',
     USER2_EMAIL: process.env.E2E_USER2_EMAIL || 'e2e-user@test.local',
+    USER2_PASSWORD: process.env.E2E_USER2_PASSWORD || '',
 
     // Service accounts
     SA1_CLIENT_ID: process.env.E2E_SA1_CLIENT_ID || 'ri-service-account-e2e',

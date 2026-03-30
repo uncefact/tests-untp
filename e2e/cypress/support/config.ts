@@ -20,6 +20,7 @@ export const config = {
   },
   user2: {
     email: Cypress.env('USER2_EMAIL') as string,
+    password: Cypress.env('USER2_PASSWORD') as string,
   },
   serviceAccounts: {
     sa1: {

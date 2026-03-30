@@ -135,5 +135,7 @@ All variables are documented in [`e2e/.env.e2e.example`](.env.e2e.example). Key 
 | `E2E_TENANT_MODE` | `open` or `closed` | `open` |
 | `E2E_DB_HOST` | PostgreSQL host | `localhost` |
 | `E2E_DB_PORT` | PostgreSQL port | `5433` |
+| `E2E_USER2_PASSWORD` | Second test user password (if different from first) | (same as `E2E_USER_PASSWORD`) |
+| `E2E_DB_SSL_REJECT_UNAUTHORIZED` | Reject self-signed DB certs | `true` |
 | `VERIFY_ALLOW_PRIVATE_URLS` | SSRF validation (`false` for deployed) | `true` |
 
