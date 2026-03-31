@@ -155,7 +155,7 @@ describe('PyxIdentityResolverAdapter', () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
       await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, {
         ...mockOptions,
-        itemDescription: 'Test item',
+        description: 'Test item',
       });
 
       const callArgs = mockFetch.mock.calls[0];
@@ -164,7 +164,7 @@ describe('PyxIdentityResolverAdapter', () => {
         namespace: 'ato',
         identificationKey: '51824753556',
         identificationKeyType: 'abn',
-        itemDescription: 'Test item',
+        description: 'Test item',
         qualifierPath: '/',
         active: true,
       });

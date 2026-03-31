@@ -864,7 +864,7 @@ describe('POST /api/v1/credentials', () => {
       // idrService.publishLinks called
       expect(mockPublishLinks).toHaveBeenCalledWith('gtin', '09506000134352', expect.any(Array), '/', {
         namespace: 'gs1',
-        itemDescription: 'Digital Product Passport',
+        description: 'Digital Product Passport',
       });
 
       // updateCredentialPublished called
@@ -896,7 +896,7 @@ describe('POST /api/v1/credentials', () => {
         expect.any(String),
         expect.any(Array),
         '/',
-        expect.objectContaining({ itemDescription: 'Custom Title' }),
+        expect.objectContaining({ description: 'Custom Title' }),
       );
     });
 

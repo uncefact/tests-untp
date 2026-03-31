@@ -54,9 +54,9 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
  *               qualifierPath:
  *                 type: string
  *                 description: Optional qualifier path for the IDR link
- *               itemDescription:
+ *               description:
  *                 type: string
- *                 description: Optional human-readable description
+ *                 description: Description of the item being identified
  *     responses:
  *       201:
  *         description: Links published successfully
@@ -117,7 +117,7 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   let body: {
     links?: Array<Record<string, unknown>>;
     qualifierPath?: string;
-    itemDescription?: string;
+    description?: string;
   };
   try {
     body = await req.json();
@@ -160,7 +160,7 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
     identifier.value,
     body.links as Link[],
     body.qualifierPath,
-    { namespace, itemDescription: body.itemDescription },
+    { namespace, description: body.description },
   );
 
   logger.info({ identifierId, publishedCount: registration.links.length }, 'Storing audit records');

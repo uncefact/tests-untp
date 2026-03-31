@@ -85,7 +85,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
       namespace,
       identificationKeyType: identifierScheme,
       identificationKey: identifier,
-      itemDescription: options.itemDescription ?? '',
+      description: options.description ?? '',
       qualifierPath: qualifierPath ?? '/',
       active: true,
       responses: links.map((link) => ({
