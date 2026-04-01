@@ -147,6 +147,54 @@ describe('POST /api/v1/identifiers/[id]/links', () => {
     expect(mockCreateManyLinkRegistrations).toHaveBeenCalledTimes(1);
   });
 
+  it('passes description through to publishLinks options', async () => {
+    const req = createFakeRequest({
+      links: [{ href: 'https://example.com/cred.json', rel: 'untp:dpp', type: 'application/json' }],
+      description: 'A test product description',
+    });
+
+    const res = await POST(req, createContext());
+
+    expect(res.status).toBe(201);
+    expect(MOCK_IDR_SERVICE.publishLinks).toHaveBeenCalledWith('01', '09520123456788', expect.any(Array), undefined, {
+      namespace: 'gs1',
+      description: 'A test product description',
+    });
+  });
+
+  it('passes undefined description when not provided in request body', async () => {
+    const req = createFakeRequest({
+      links: [{ href: 'https://example.com/cred.json', rel: 'untp:dpp', type: 'application/json' }],
+    });
+
+    const res = await POST(req, createContext());
+
+    expect(res.status).toBe(201);
+    expect(MOCK_IDR_SERVICE.publishLinks).toHaveBeenCalledWith('01', '09520123456788', expect.any(Array), undefined, {
+      namespace: 'gs1',
+      description: undefined,
+    });
+  });
+
+  it('passes qualifierPath through to publishLinks', async () => {
+    const req = createFakeRequest({
+      links: [{ href: 'https://example.com/cred.json', rel: 'untp:dpp', type: 'application/json' }],
+      qualifierPath: '/lot/ABC123',
+      description: 'Product with qualifier',
+    });
+
+    const res = await POST(req, createContext());
+
+    expect(res.status).toBe(201);
+    expect(MOCK_IDR_SERVICE.publishLinks).toHaveBeenCalledWith(
+      '01',
+      '09520123456788',
+      expect.any(Array),
+      '/lot/ABC123',
+      { namespace: 'gs1', description: 'Product with qualifier' },
+    );
+  });
+
   it('returns 400 for missing links', async () => {
     const req = createFakeRequest({});
 
