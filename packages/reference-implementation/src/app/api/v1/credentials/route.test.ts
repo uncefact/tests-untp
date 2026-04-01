@@ -820,6 +820,8 @@ describe('POST /api/v1/credentials', () => {
         schemePrimaryKey: 'gtin',
         schemeNamespace: 'gs1',
         schemeIdrServiceInstanceId: 'idr-scheme-1',
+        entityName: 'Test Product',
+        entityDescription: 'A test product for E2E',
       };
       const primaryEntity = { ...defaults, ...overrides };
 
@@ -864,7 +866,7 @@ describe('POST /api/v1/credentials', () => {
       // idrService.publishLinks called
       expect(mockPublishLinks).toHaveBeenCalledWith('gtin', '09506000134352', expect.any(Array), '/', {
         namespace: 'gs1',
-        description: 'Digital Product Passport',
+        description: 'A test product for E2E',
       });
 
       // updateCredentialPublished called
@@ -896,7 +898,7 @@ describe('POST /api/v1/credentials', () => {
         expect.any(String),
         expect.any(Array),
         '/',
-        expect.objectContaining({ description: 'Custom Title' }),
+        expect.objectContaining({ description: 'A test product for E2E' }),
       );
     });
 

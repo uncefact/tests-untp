@@ -282,7 +282,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
           publishingOptions.qualifierPath || '/',
           {
             namespace: primaryEntity.schemeNamespace,
-            description: linkTitle,
+            description: primaryEntity.entityDescription || primaryEntity.entityName,
           },
         );
       } catch (error) {

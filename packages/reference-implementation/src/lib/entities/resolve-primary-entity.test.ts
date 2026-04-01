@@ -29,9 +29,11 @@ const SCHEME_INFO = {
   registrar: { namespace: 'gs1' },
 };
 
-function makeEntity(id: string) {
+function makeEntity(id: string, name = 'Test Entity', description: string | null = 'Test entity description') {
   return {
     id,
+    name,
+    description,
     primaryIdentifier: {
       scheme: SCHEME_INFO,
     },
@@ -70,6 +72,8 @@ describe('resolvePrimaryEntity', () => {
     expect(result).toEqual<PrimaryEntityResult>({
       primaryIdentifier: '09506000134352',
       productId: 'prod-1',
+      entityName: 'Test Entity',
+      entityDescription: 'Test entity description',
       schemeNamespace: 'gs1',
       schemePrimaryKey: 'gtin',
       schemeIdrServiceInstanceId: 'idr-svc-1',
@@ -92,6 +96,8 @@ describe('resolvePrimaryEntity', () => {
     expect(result).toEqual<PrimaryEntityResult>({
       primaryIdentifier: '9506000134',
       facilityId: 'fac-1',
+      entityName: 'Test Entity',
+      entityDescription: 'Test entity description',
       schemeNamespace: 'gs1',
       schemePrimaryKey: 'gtin',
       schemeIdrServiceInstanceId: 'idr-svc-1',
@@ -114,10 +120,28 @@ describe('resolvePrimaryEntity', () => {
     expect(result).toEqual<PrimaryEntityResult>({
       primaryIdentifier: '9506000100',
       organisationId: 'org-1',
+      entityName: 'Test Entity',
+      entityDescription: 'Test entity description',
       schemeNamespace: 'gs1',
       schemePrimaryKey: 'gtin',
       schemeIdrServiceInstanceId: 'idr-svc-1',
     });
+  });
+
+  it('omits entityDescription when entity description is null', async () => {
+    const entity = makeEntity('prod-1', 'My Product', null);
+    mockGetProductByIdentifierValue.mockResolvedValue(entity);
+
+    const result = await resolvePrimaryEntity(
+      {
+        ...EMPTY_REFS,
+        products: [{ id: '09506000134352' }],
+      },
+      TENANT_ID,
+    );
+
+    expect(result.entityName).toBe('My Product');
+    expect(result.entityDescription).toBeUndefined();
   });
 
   it('returns empty result when entity not found in DB', async () => {
@@ -154,6 +178,8 @@ describe('resolvePrimaryEntity', () => {
     expect(result).toEqual<PrimaryEntityResult>({
       primaryIdentifier: 'product-id',
       productId: 'prod-1',
+      entityName: 'Test Entity',
+      entityDescription: 'Test entity description',
       schemeNamespace: 'gs1',
       schemePrimaryKey: 'gtin',
       schemeIdrServiceInstanceId: 'idr-svc-1',
