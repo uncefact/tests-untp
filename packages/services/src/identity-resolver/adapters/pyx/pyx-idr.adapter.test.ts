@@ -292,6 +292,38 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(result.resolverUri).toBe('https://resolver.example.com/ato/abn/51824753556');
     });
 
+    it('should include qualifier path in constructed resolverUri when API response omits it', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          linkResponses: [{ id: 'link-1', linkType: 'untp:dpp' }],
+        }),
+        text: jest.fn().mockResolvedValue(''),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      const result = await adapter.publishLinks('01', '09520123456788', [mockLinks[0]], '/10/LOT123/21/SER456', {
+        namespace: 'gs1',
+      });
+
+      expect(result.resolverUri).toBe('https://resolver.example.com/gs1/01/09520123456788/10/LOT123/21/SER456');
+    });
+
+    it('should not append qualifiers to constructed resolverUri when qualifierPath is "/"', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          linkResponses: [{ id: 'link-1', linkType: 'untp:dpp' }],
+        }),
+        text: jest.fn().mockResolvedValue(''),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      const result = await adapter.publishLinks('abn', '51824753556', [mockLinks[0]], '/', mockOptions);
+
+      expect(result.resolverUri).toBe('https://resolver.example.com/ato/abn/51824753556');
+    });
+
     it('should return empty links array when API response has no linkResponses or responses', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -739,6 +771,35 @@ describe('PyxIdentityResolverAdapter', () => {
       });
 
       expect(result).toBe('https://resolver.example.com/ato/abn/51824753556');
+    });
+  });
+
+  describe('parseQualifierPath', () => {
+    it('returns undefined for undefined input', () => {
+      expect(PyxIdentityResolverAdapter.parseQualifierPath(undefined)).toBeUndefined();
+    });
+
+    it('returns undefined for empty string', () => {
+      expect(PyxIdentityResolverAdapter.parseQualifierPath('')).toBeUndefined();
+    });
+
+    it('returns undefined for root path "/"', () => {
+      expect(PyxIdentityResolverAdapter.parseQualifierPath('/')).toBeUndefined();
+    });
+
+    it('parses a single qualifier pair', () => {
+      expect(PyxIdentityResolverAdapter.parseQualifierPath('/10/LOT123')).toEqual([{ key: '10', value: 'LOT123' }]);
+    });
+
+    it('parses multiple qualifier pairs', () => {
+      expect(PyxIdentityResolverAdapter.parseQualifierPath('/10/LOT123/21/SER456')).toEqual([
+        { key: '10', value: 'LOT123' },
+        { key: '21', value: 'SER456' },
+      ]);
+    });
+
+    it('ignores a trailing odd segment (no value)', () => {
+      expect(PyxIdentityResolverAdapter.parseQualifierPath('/10')).toBeUndefined();
     });
   });
 

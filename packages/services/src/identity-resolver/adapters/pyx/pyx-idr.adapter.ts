@@ -134,6 +134,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
           primaryKey: identifierScheme,
           value: identifier,
           namespace,
+          qualifiers: PyxIdentityResolverAdapter.parseQualifierPath(qualifierPath),
         }),
       identifierScheme,
       identifier,
@@ -239,6 +240,27 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
     }
 
     return response.json();
+  }
+
+  /**
+   * Parses a qualifier path string (e.g. "/10/LOT123/21/SER456") into
+   * an array of key/value pairs suitable for {@link buildResolverUri}.
+   *
+   * Returns `undefined` when the path is absent, empty, or just "/".
+   */
+  static parseQualifierPath(qualifierPath: string | undefined): Array<{ key: string; value: string }> | undefined {
+    if (!qualifierPath || qualifierPath === '/') return undefined;
+
+    // Strip leading slash, then split into segments
+    const segments = qualifierPath.replace(/^\//, '').split('/');
+
+    // Segments come in key/value pairs
+    const qualifiers: Array<{ key: string; value: string }> = [];
+    for (let i = 0; i + 1 < segments.length; i += 2) {
+      qualifiers.push({ key: segments[i], value: segments[i + 1] });
+    }
+
+    return qualifiers.length > 0 ? qualifiers : undefined;
   }
 
   buildResolverUri(parts: ResolverUriParts): string {
