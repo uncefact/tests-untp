@@ -260,7 +260,7 @@ dataModels:
     name: "AU Digital Product Passport"
     credentialType: "DigitalProductPassport"
     version: "1.0.0"
-    parentConfigId: "cm1h9bv4700003b6kygq7ekv0"
+    parentConfigId: "c1pxfzzkeb86jgeel7hrvmcle"
     schemaUrl: "https://example.com/schemas/au-dpp-v1.json"
     contextUrl: "https://example.com/contexts/au-dpp-v1.jsonld"
     websiteUrl: "https://example.com/docs/au-dpp"
