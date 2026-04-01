@@ -665,8 +665,7 @@ describe('DID API', { testIsolation: false }, () => {
     // the route guard compares the normalised result against the hostname.
     const vcUrl = new URL(config.services.vckit.baseUrl);
     const vcHostname = vcUrl.hostname;
-    const vcHasNonStandardPort = vcUrl.port && vcUrl.port !== '443' && vcUrl.port !== '80';
-    const vcHostnameWithPort = vcHasNonStandardPort ? `${vcHostname}:${vcUrl.port}` : null;
+    const vcHostnameWithPort = (vcUrl.port && vcUrl.port !== '443' && vcUrl.port !== '80') ? `${vcHostname}:${vcUrl.port}` : null;
 
     if (vcHostnameWithPort) {
       it('returns 403 when creating a self-managed root DID matching the system VC domain (with port)', () => {
