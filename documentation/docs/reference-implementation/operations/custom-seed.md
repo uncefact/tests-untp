@@ -137,7 +137,7 @@ dataModels:
     name: "Australian DPP v1.0"
     credentialType: "DigitalProductPassport"
     version: "1.0.0"
-    parentConfigId: "cm1h9bv4700003b6kygq7ekv0"    # must reference a core data model
+    parentConfigId: "c1pxfzzkeb86jgeel7hrvmcle"    # must reference a core data model
     schemaUrl: "https://example.com/schemas/au-dpp.json"
     contextUrl: "https://example.com/contexts/au-dpp.jsonld"
     websiteUrl: "https://example.com/docs/au-dpp"    # optional
