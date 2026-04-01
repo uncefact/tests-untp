@@ -237,7 +237,7 @@ Validates, signs, stores, and optionally publishes a verifiable credential. Retu
 | `storageOptions.encrypt` | boolean | No | Whether to encrypt (default: `true`) |
 | `publishingOptions.publish` | boolean | No | Whether to publish to IDR |
 | `publishingOptions.linkType` | string | No | Link relation type |
-| `publishingOptions.linkTitle` | string | No | Link title |
+| `publishingOptions.linkTitle` | string | No | Link title (defaults to data model name) |
 | `publishingOptions.qualifierPath` | string | No | Qualifier path (default: `/`) |
 | `publishingOptions.machineVerificationUrl` | string | No | Machine verification URL |
 | `publishingOptions.humanVerificationUrl` | string | No | Human verification URL |

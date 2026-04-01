@@ -313,7 +313,7 @@ Publishes one or more links for an identifier to the upstream IDR service. Each 
 | Optional Field | Description |
 |----------------|-------------|
 | `qualifierPath` | Qualifier path appended to the IDR link |
-| `itemDescription` | Human-readable description for the IDR entry |
+| `description` | Description of the item being identified |
 
 ```mermaid
 sequenceDiagram

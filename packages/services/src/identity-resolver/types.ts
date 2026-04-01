@@ -149,8 +149,8 @@ export type LinkRegistration = {
 export type PublishLinksOptions = {
   /** Namespace for the identifier scheme (e.g., "untp", "gs1") */
   namespace: string;
-  /** Human-readable description of the item being registered */
-  itemDescription?: string;
+  /** Human-readable description of the item being identified */
+  description?: string;
   /** IANA language tag override (e.g., "en") — falls back to service config */
   ianaLanguage?: string;
   /** Regional/market context override (e.g., "au") — falls back to service config */
