@@ -12,8 +12,9 @@ import { config } from '../../support/config';
 describe('Closed mode — tenant resolution', { testIsolation: false }, () => {
   const GROUP_CLAIM = config.groups.alpha;
   const ADMIN_EMAIL = config.user.email;
+  const ADMIN_PASSWORD = config.user.password;
   const USER_EMAIL = config.user2.email;
-  const PASSWORD = config.user.password;
+  const USER_PASSWORD = config.user2.password || config.user.password;
 
   before(() => {
     // Clean up any leftover data from previous runs
@@ -26,7 +27,7 @@ describe('Closed mode — tenant resolution', { testIsolation: false }, () => {
 
   describe('First user sign-in provisions tenant', () => {
     it('admin signs in and can call the API', () => {
-      cy.apiLogin(ADMIN_EMAIL, PASSWORD);
+      cy.apiLogin(ADMIN_EMAIL, ADMIN_PASSWORD);
 
       // The sign-in event should have auto-provisioned a tenant from the
       // group claim.  Verify the session works by hitting a protected endpoint.
@@ -52,7 +53,7 @@ describe('Closed mode — tenant resolution', { testIsolation: false }, () => {
       // Clear all cookies to reset both app and Keycloak sessions
       cy.clearAllCookies();
 
-      cy.apiLogin(USER_EMAIL, PASSWORD);
+      cy.apiLogin(USER_EMAIL, USER_PASSWORD);
 
       cy.request('/api/v1/dids').then((response) => {
         expect(response.status).to.eq(200);

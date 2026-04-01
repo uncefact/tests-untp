@@ -446,12 +446,12 @@ describe('POST /api/v1/dids', () => {
     });
 
     it('allows a tenant to create a self-managed DID with a path under the VC domain', async () => {
-      mockDidService.normaliseAlias.mockReturnValue('vckit.example.com:tenants:acme');
-      mockDidService.create.mockResolvedValue({ did: 'did:web:vckit.example.com:tenants:acme', keyId: 'key-2' });
+      mockDidService.normaliseAlias.mockReturnValue('vckit.example.com:org:acme');
+      mockDidService.create.mockResolvedValue({ did: 'did:web:vckit.example.com:org:acme', keyId: 'key-2' });
       mockCreateDid.mockResolvedValue({ id: 'record-2' });
 
       const req = createFakeRequest({
-        body: { type: DidType.SELF_MANAGED, method: DidMethod.DID_WEB, alias: 'vckit.example.com:tenants:acme' },
+        body: { type: DidType.SELF_MANAGED, method: DidMethod.DID_WEB, alias: 'vckit.example.com:org:acme' },
       });
       const res = await POST(req, TENANT_CONTEXT as unknown as Parameters<typeof POST>[1]);
       expect(res.status).toBe(201);
