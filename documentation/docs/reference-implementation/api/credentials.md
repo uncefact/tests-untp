@@ -207,6 +207,8 @@ Publishing requires the primary entity to have:
 
 If any of these are missing, publishing is silently skipped and a `PUBLISH_SKIPPED` warning is included in the response.
 
+The IDR entry's `description` field is taken from the primary entity's `description`, falling back to the entity's `name` if no description is set.
+
 | Publishing Option | Type | Description |
 |-------------------|------|-------------|
 | `publish` | boolean | Whether to publish to the identity resolver |
