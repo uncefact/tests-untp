@@ -101,7 +101,7 @@ describe('credentialService', () => {
     it('should detect version from UNTP context', () => {
       const credential = {
         type: ['DigitalProductPassport'],
-        '@context': ['https://test.uncefact.org/vocabulary/untp/dpp/0.5.0'],
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.5.0'],
       };
 
       expect(detectVersion(credential)).toBe('0.5.0');
@@ -110,10 +110,34 @@ describe('credentialService', () => {
     it('should detect pre-release version from UNTP context', () => {
       const credential = {
         type: ['DigitalProductPassport'],
-        '@context': ['https://test.uncefact.org/vocabulary/untp/dpp/0.6.0-alpha2'],
+        '@context': [
+          'https://www.w3.org/ns/credentials/v2',
+          'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0-alpha2',
+        ],
       };
 
       expect(detectVersion(credential)).toBe('0.6.0-alpha2');
+    });
+
+    it('should detect version from v0.7.0 vocabulary.uncefact.org context', () => {
+      const credential = {
+        type: ['DigitalProductPassport', 'VerifiableCredential'],
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+      };
+
+      expect(detectVersion(credential)).toBe('0.7.0');
+    });
+
+    it('should detect pre-release version from vocabulary.uncefact.org context', () => {
+      const credential = {
+        type: ['DigitalConformityCredential', 'VerifiableCredential'],
+        '@context': [
+          'https://www.w3.org/ns/credentials/v2',
+          'https://vocabulary.uncefact.org/untp/0.7.0-beta1/context/',
+        ],
+      };
+
+      expect(detectVersion(credential)).toBe('0.7.0-beta1');
     });
 
     it('should detect version from custom domain', () => {
@@ -141,6 +165,45 @@ describe('credentialService', () => {
       };
 
       expect(detectVersion(credential)).toBe('unknown');
+    });
+
+    it('should return unknown when the second context is not a UNTP domain', () => {
+      const credential = {
+        type: ['DigitalProductPassport'],
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://example.com/other/1.2.3'],
+      };
+
+      expect(detectVersion(credential)).toBe('unknown');
+    });
+
+    it('should return unknown when @context is not an array', () => {
+      const credential = {
+        type: ['DigitalProductPassport'],
+        '@context': 'https://vocabulary.uncefact.org/untp/0.7.0/context/',
+      } as unknown as Parameters<typeof detectVersion>[0];
+
+      expect(detectVersion(credential)).toBe('unknown');
+    });
+
+    it('should return unknown when @context is missing', () => {
+      const credential = {
+        type: ['DigitalProductPassport'],
+      } as unknown as Parameters<typeof detectVersion>[0];
+
+      expect(detectVersion(credential)).toBe('unknown');
+    });
+
+    it('should ignore non-string entries when searching by domain', () => {
+      const credential = {
+        type: ['DigitalLivestockPassport'],
+        '@context': [
+          'https://www.w3.org/ns/credentials/v2',
+          { '@vocab': 'https://aatp.foodagility.com/terms/' },
+          'https://aatp.foodagility.com/vocabulary/aatp/dlp/0.4.0',
+        ],
+      } as unknown as Parameters<typeof detectVersion>[0];
+
+      expect(detectVersion(credential, 'aatp.foodagility.com')).toBe('0.4.0');
     });
   });
 

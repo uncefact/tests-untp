@@ -1,6 +1,6 @@
 import type { Credential } from '@/types/credential';
 import { jwtDecode } from 'jwt-decode';
-import { CredentialType } from '../../constants';
+import { CredentialType, UNTP_CONTEXT_DOMAINS } from '../../constants';
 
 export function decodeEnvelopedCredential(credential: any): Credential {
   if (!isEnvelopedProof(credential)) {
@@ -34,11 +34,24 @@ export function detectCredentialType(credential: Credential): string {
 }
 
 export function detectVersion(credential: Credential, domain?: string): string {
-  const contextUrl = credential['@context']?.find((ctx) => ctx.includes(domain || 'test.uncefact.org'));
+  const contexts = credential['@context'];
+  if (!Array.isArray(contexts)) return 'unknown';
 
-  if (!contextUrl) return 'unknown';
+  let contextUri: string | undefined;
+  if (domain) {
+    contextUri = contexts.find((ctx): ctx is string => typeof ctx === 'string' && ctx.includes(domain));
+  } else {
+    // By convention, the core UNTP context URI is the second entry of @context
+    // (after the required VCDM context).
+    const candidate = contexts[1];
+    if (typeof candidate === 'string' && UNTP_CONTEXT_DOMAINS.some((d) => candidate.includes(d))) {
+      contextUri = candidate;
+    }
+  }
 
-  const versionMatch = contextUrl.match(/(\d+\.\d+\.\d+(?:-[a-zA-Z0-9]+)?)/);
+  if (!contextUri) return 'unknown';
+
+  const versionMatch = contextUri.match(/(\d+\.\d+\.\d+(?:-[a-zA-Z0-9]+)?)/);
   return versionMatch ? versionMatch[1] : 'unknown';
 }
 

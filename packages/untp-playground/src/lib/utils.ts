@@ -38,6 +38,18 @@ export function isPermittedCredentialType(type: CredentialType): type is Permitt
   return permittedCredentialTypes.includes(type as PermittedCredentialType);
 }
 
+/**
+ * Returns true when the given UNTP version string is v0.7.0 or newer.
+ * Used to switch between legacy and current schema URL formats.
+ */
+export function isUntpV070OrAbove(version: string): boolean {
+  const match = version.match(/^(\d+)\.(\d+)/);
+  if (!match) return false;
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  return major > 0 || (major === 0 && minor >= 7);
+}
+
 const downloadFile = (content: string, filename: string, mimeType: string) => {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
