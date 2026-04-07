@@ -41,6 +41,30 @@ export const VCDM_SCHEMA_URLS = {
     'https://w3c.github.io/vc-data-model/schema/verifiable-credential/verifiable-credential-schema.json',
 };
 
+// Domains used in UNTP credential @context URIs. v0.7.0 introduced the
+// `vocabulary.uncefact.org` domain; earlier versions use `test.uncefact.org`.
+export const UNTP_CONTEXT_DOMAINS = ['vocabulary.uncefact.org', 'test.uncefact.org'] as const;
+
+// Short names (URL segment) for each UNTP core credential type.
+export const UNTP_SHORT_CREDENTIAL_TYPES: Record<string, string> = {
+  DigitalProductPassport: 'dpp',
+  DigitalConformityCredential: 'dcc',
+  DigitalTraceabilityEvent: 'dte',
+  DigitalFacilityRecord: 'dfr',
+  DigitalIdentityAnchor: 'dia',
+};
+
+// Schema filename (without `.json`) for each UNTP core credential type. Applies
+// to v0.7.0 and above — most types match their credential type name verbatim,
+// but DCC was renamed from `DigitalConformityCredential` to `ConformityCredential`.
+export const UNTP_CORE_SCHEMA_FILENAMES: Record<string, string> = {
+  DigitalProductPassport: 'DigitalProductPassport',
+  DigitalConformityCredential: 'ConformityCredential',
+  DigitalTraceabilityEvent: 'DigitalTraceabilityEvent',
+  DigitalFacilityRecord: 'DigitalFacilityRecord',
+  DigitalIdentityAnchor: 'DigitalIdentityAnchor',
+};
+
 export enum TestCaseStatus {
   PENDING = 'pending',
   IN_PROGRESS = 'in-progress',

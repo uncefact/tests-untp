@@ -55,6 +55,158 @@ describe('schemaValidation', () => {
       expect(result.errors).toEqual([]);
     });
 
+    it('should construct the legacy schema URL for a v0.6.0 DPP credential', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ $schema: 'https://json-schema.org/draft/2020-12/schema', properties: {} }),
+      });
+
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+      (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+
+      await validateCredentialSchema({ type: 'DigitalProductPassport' });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/schema?url=${encodeURIComponent(
+          'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.0.json',
+        )}`,
+      );
+    });
+
+    it('should construct the v0.7.0 schema URL for a DPP credential', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ $schema: 'https://json-schema.org/draft/2020-12/schema', properties: {} }),
+      });
+
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+      (detectVersion as jest.Mock).mockReturnValue('0.7.0');
+
+      await validateCredentialSchema({ type: 'DigitalProductPassport' });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/schema?url=${encodeURIComponent(
+          'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json',
+        )}`,
+      );
+    });
+
+    it('should use the renamed ConformityCredential schema filename for a v0.7.0 DCC credential', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ $schema: 'https://json-schema.org/draft/2020-12/schema', properties: {} }),
+      });
+
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalConformityCredential');
+      (detectVersion as jest.Mock).mockReturnValue('0.7.0');
+
+      await validateCredentialSchema({ type: 'DigitalConformityCredential' });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/schema?url=${encodeURIComponent(
+          'https://untp.unece.org/artefacts/schema/v0.7.0/dcc/ConformityCredential.json',
+        )}`,
+      );
+    });
+
+    describe('with real detectCredentialType and detectVersion (integration)', () => {
+      const realCredentialService =
+        jest.requireActual<typeof import('@/lib/credentialService')>('@/lib/credentialService');
+
+      beforeEach(() => {
+        (detectCredentialType as jest.Mock).mockImplementation(realCredentialService.detectCredentialType);
+        (detectVersion as jest.Mock).mockImplementation(realCredentialService.detectVersion);
+      });
+
+      it('constructs the legacy schema URL from a real v0.6.0 DPP credential', async () => {
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ $schema: 'https://json-schema.org/draft/2020-12/schema', properties: {} }),
+        });
+
+        const credential = {
+          type: ['DigitalProductPassport', 'VerifiableCredential'],
+          '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/'],
+        };
+
+        await validateCredentialSchema(credential);
+
+        expect(global.fetch).toHaveBeenCalledWith(
+          `/api/schema?url=${encodeURIComponent(
+            'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.0.json',
+          )}`,
+        );
+      });
+
+      it('constructs the v0.7.0 schema URL from a real v0.7.0 DPP credential', async () => {
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ $schema: 'https://json-schema.org/draft/2020-12/schema', properties: {} }),
+        });
+
+        const credential = {
+          type: ['DigitalProductPassport', 'VerifiableCredential'],
+          '@context': ['https://www.w3.org/ns/credentials/v2', 'https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+        };
+
+        await validateCredentialSchema(credential);
+
+        expect(global.fetch).toHaveBeenCalledWith(
+          `/api/schema?url=${encodeURIComponent(
+            'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json',
+          )}`,
+        );
+      });
+
+      it('constructs the renamed v0.7.0 DCC schema URL from a real v0.7.0 DCC credential', async () => {
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ $schema: 'https://json-schema.org/draft/2020-12/schema', properties: {} }),
+        });
+
+        const credential = {
+          type: ['DigitalConformityCredential', 'VerifiableCredential'],
+          '@context': ['https://www.w3.org/ns/credentials/v2', 'https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+        };
+
+        await validateCredentialSchema(credential);
+
+        expect(global.fetch).toHaveBeenCalledWith(
+          `/api/schema?url=${encodeURIComponent(
+            'https://untp.unece.org/artefacts/schema/v0.7.0/dcc/ConformityCredential.json',
+          )}`,
+        );
+      });
+    });
+
+    it('should construct v0.7.0 schema URLs for the remaining core credential types', async () => {
+      const cases: Array<{ type: string; short: string; file: string }> = [
+        { type: 'DigitalTraceabilityEvent', short: 'dte', file: 'DigitalTraceabilityEvent' },
+        { type: 'DigitalFacilityRecord', short: 'dfr', file: 'DigitalFacilityRecord' },
+        { type: 'DigitalIdentityAnchor', short: 'dia', file: 'DigitalIdentityAnchor' },
+      ];
+
+      for (const { type, short, file } of cases) {
+        (global.fetch as jest.Mock).mockClear();
+        schemaCache.clear();
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ $schema: 'https://json-schema.org/draft/2020-12/schema', properties: {} }),
+        });
+
+        (detectCredentialType as jest.Mock).mockReturnValue(type);
+        (detectVersion as jest.Mock).mockReturnValue('0.7.0');
+
+        await validateCredentialSchema({ type });
+
+        expect(global.fetch).toHaveBeenCalledWith(
+          `/api/schema?url=${encodeURIComponent(
+            `https://untp.unece.org/artefacts/schema/v0.7.0/${short}/${file}.json`,
+          )}`,
+        );
+      }
+    });
+
     it('should validate a valid DLP credential', async () => {
       const mockSchema = {
         $schema: 'https://json-schema.org/draft/2020-12/schema',

@@ -1,7 +1,13 @@
 import addFormats from 'ajv-formats';
 import Ajv2020 from 'ajv/dist/2020';
-import { VCDM_SCHEMA_URLS, VCDMVersion } from '../../constants';
+import {
+  UNTP_CORE_SCHEMA_FILENAMES,
+  UNTP_SHORT_CREDENTIAL_TYPES,
+  VCDM_SCHEMA_URLS,
+  VCDMVersion,
+} from '../../constants';
 import { detectCredentialType, detectVersion } from './credentialService';
+import { isUntpV070OrAbove } from './utils';
 
 const ajv = new Ajv2020({
   allErrors: true,
@@ -52,14 +58,14 @@ export const EXTENSION_VERSIONS: Record<string, ExtensionConfig> = {
 };
 
 const schemaURLConstructor = (type: string, version: string) => {
-  const shortCredentialTypes: Record<string, string> = {
-    DigitalProductPassport: 'dpp',
-    DigitalConformityCredential: 'dcc',
-    DigitalTraceabilityEvent: 'dte',
-    DigitalFacilityRecord: 'dfr',
-    DigitalIdentityAnchor: 'dia',
-  };
-  return `https://test.uncefact.org/vocabulary/untp/${shortCredentialTypes[type]}/untp-${shortCredentialTypes[type]}-schema-${version}.json`;
+  const shortType = UNTP_SHORT_CREDENTIAL_TYPES[type];
+
+  if (isUntpV070OrAbove(version)) {
+    const fileName = UNTP_CORE_SCHEMA_FILENAMES[type];
+    return `https://untp.unece.org/artefacts/schema/v${version}/${shortType}/${fileName}.json`;
+  }
+
+  return `https://test.uncefact.org/vocabulary/untp/${shortType}/untp-${shortType}-schema-${version}.json`;
 };
 
 const findExtensionSchemaURL = (type: string, version: string) => {

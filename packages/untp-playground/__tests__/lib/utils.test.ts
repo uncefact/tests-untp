@@ -2,6 +2,7 @@ import {
   detectVcdmVersion,
   downloadJson,
   isPermittedCredentialType,
+  isUntpV070OrAbove,
   validateNormalizedCredential,
   downloadHtml,
 } from '@/lib/utils';
@@ -117,6 +118,41 @@ describe('utils', () => {
     it('handles case sensitivity', () => {
       expect(isPermittedCredentialType('digitalproductpassport' as CredentialType)).toBeFalsy();
       expect(isPermittedCredentialType('DIGITALPRODUCTPASSPORT' as CredentialType)).toBeFalsy();
+    });
+  });
+
+  describe('isUntpV070OrAbove', () => {
+    it('returns true for v0.7.0', () => {
+      expect(isUntpV070OrAbove('0.7.0')).toBe(true);
+    });
+
+    it('returns true for v0.7.0 pre-release versions', () => {
+      expect(isUntpV070OrAbove('0.7.0-beta1')).toBe(true);
+      expect(isUntpV070OrAbove('0.7.0-rc2')).toBe(true);
+      expect(isUntpV070OrAbove('0.7.0-alpha10')).toBe(true);
+    });
+
+    it('returns true for minor versions above 0.7 on major 0', () => {
+      expect(isUntpV070OrAbove('0.8.0')).toBe(true);
+      expect(isUntpV070OrAbove('0.10.0')).toBe(true);
+    });
+
+    it('returns true for any major version above 0', () => {
+      expect(isUntpV070OrAbove('1.0.0')).toBe(true);
+      expect(isUntpV070OrAbove('2.3.4')).toBe(true);
+    });
+
+    it('returns false for v0.6.0 and below', () => {
+      expect(isUntpV070OrAbove('0.6.0')).toBe(false);
+      expect(isUntpV070OrAbove('0.6.0-alpha2')).toBe(false);
+      expect(isUntpV070OrAbove('0.5.0')).toBe(false);
+      expect(isUntpV070OrAbove('0.4.0')).toBe(false);
+    });
+
+    it('returns false for unparseable version strings', () => {
+      expect(isUntpV070OrAbove('unknown')).toBe(false);
+      expect(isUntpV070OrAbove('')).toBe(false);
+      expect(isUntpV070OrAbove('v0.7.0')).toBe(false);
     });
   });
 
