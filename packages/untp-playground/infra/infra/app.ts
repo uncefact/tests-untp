@@ -173,6 +173,14 @@ export function deployApp() {
               targetGroup: targetGroup,
             },
           ],
+          environment: [
+            ...(process.env.VERIFICATION_SERVICE_URL
+              ? [{ name: 'VERIFICATION_SERVICE_URL', value: process.env.VERIFICATION_SERVICE_URL }]
+              : []),
+            ...(process.env.VERIFICATION_SERVICE_TOKEN
+              ? [{ name: 'VERIFICATION_SERVICE_TOKEN', value: process.env.VERIFICATION_SERVICE_TOKEN }]
+              : []),
+          ],
         },
       },
       networkConfiguration: {
