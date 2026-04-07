@@ -25,22 +25,26 @@ The UNTP Playground has two environments:
 When code is pushed to the `next` or `cd/**` branch:
 
 1. GitHub Actions workflow triggers automatically
-2. Deploys with these environment variables (static - defined in [workflow file](../../../.github/workflows/ci_cd-untp-playground.yml)):
+2. Deploys with these environment variables (defined in [workflow file](../../../.github/workflows/ci_cd-untp-playground.yml)):
    - NEXT_PUBLIC_BASE_PATH = /test-untp-playground
    - NEXT_PUBLIC_ASSET_PREFIX = /test-untp-playground
    - NEXT_PUBLIC_IMAGE_PATH = /test-untp-playground/\_next/image
    - NEXT_PUBLIC_REPORT_NAME= AATP <!-- Abbreviated UNTP extension name (optional). Defaults to "UNTP". -->
+   - VERIFICATION_SERVICE_URL= ${{env.PLAYGROUND_VERIFICATION_SERVICE_URL}} <!-- The endpoint of the verification service used to verify the uploaded VC.-->
+   - VERIFICATION_SERVICE_TOKEN= ${{secrets.PLAYGROUND_VERIFICATION_SERVICE_TOKEN}} <!-- The API key used to authenticate with the verifiable credential service. -->
 
 ### Production Deployment
 
 When a tag is created, associated with the next branch and the workflow is [triggered manually](https://github.com/uncefact/tests-untp/actions/workflows/ci_cd-untp-playground.yml):
 
 1. GitHub Actions workflow triggers
-2. Deploys with these environment variables (static - defined in [workflow file](../../../.github/workflows/ci_cd-untp-playground.yml)):
+2. Deploys with these environment variables (defined in [workflow file](../../../.github/workflows/ci_cd-untp-playground.yml)):
    - NEXT_PUBLIC_BASE_PATH = /untp-playground
    - NEXT_PUBLIC_ASSET_PREFIX = /untp-playground
    - NEXT_PUBLIC_IMAGE_PATH = /untp-playground/\_next/image
-   - NEXT_PUBLIC_REPORT_NAME = AATP <!-- Abbreviated UNTP extension name (optional). Defaults to "UNTP". -->
+   - NEXT_PUBLIC_REPORT_NAME = AATP
+   - VERIFICATION_SERVICE_URL= ${{env.PLAYGROUND_VERIFICATION_SERVICE_URL}}
+   - VERIFICATION_SERVICE_TOKEN= ${{secrets.PLAYGROUND_VERIFICATION_SERVICE_TOKEN}}
 
 ## Infrastructure Details
 
