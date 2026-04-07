@@ -30,7 +30,7 @@ When code is pushed to the `next` or `cd/**` branch:
    - NEXT_PUBLIC_ASSET_PREFIX = /test-untp-playground
    - NEXT_PUBLIC_IMAGE_PATH = /test-untp-playground/\_next/image
    - NEXT_PUBLIC_REPORT_NAME= AATP <!-- Abbreviated UNTP extension name (optional). Defaults to "UNTP". -->
-   - VERIFICATION_SERVICE_URL= ${{env.PLAYGROUND_VERIFICATION_SERVICE_URL}} <!-- The endpoint of the verification service used to verify the uploaded VC.-->
+   - VERIFICATION_SERVICE_URL= ${{vars.PLAYGROUND_VERIFICATION_SERVICE_URL}} <!-- The endpoint of the verification service used to verify the uploaded VC.-->
    - VERIFICATION_SERVICE_TOKEN= ${{secrets.PLAYGROUND_VERIFICATION_SERVICE_TOKEN}} <!-- The API key used to authenticate with the verifiable credential service. -->
 
 ### Production Deployment
@@ -43,7 +43,7 @@ When a tag is created, associated with the next branch and the workflow is [trig
    - NEXT_PUBLIC_ASSET_PREFIX = /untp-playground
    - NEXT_PUBLIC_IMAGE_PATH = /untp-playground/\_next/image
    - NEXT_PUBLIC_REPORT_NAME = AATP
-   - VERIFICATION_SERVICE_URL= ${{env.PLAYGROUND_VERIFICATION_SERVICE_URL}}
+   - VERIFICATION_SERVICE_URL= ${{vars.PLAYGROUND_VERIFICATION_SERVICE_URL}}
    - VERIFICATION_SERVICE_TOKEN= ${{secrets.PLAYGROUND_VERIFICATION_SERVICE_TOKEN}}
 
 ## Infrastructure Details
