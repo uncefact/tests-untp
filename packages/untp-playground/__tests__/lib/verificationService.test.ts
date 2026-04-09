@@ -43,10 +43,11 @@ describe('verifyCredential', () => {
     const { verifyCredential } = await import('@/lib/verificationService');
     await verifyCredential({ type: 'VerifiableCredential' });
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/test-untp-playground/api/verify',
-      expect.objectContaining({ method: 'POST' }),
-    );
+    expect(global.fetch).toHaveBeenCalledWith('/test-untp-playground/api/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: { type: 'VerifiableCredential' } }),
+    });
   });
 
   it('throws on non-ok response', async () => {
