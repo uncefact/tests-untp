@@ -1,6 +1,7 @@
 export async function verifyCredential(credential: any) {
   try {
-    const response = await fetch('/api/verify', {
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    const response = await fetch(`${basePath}/api/verify`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
