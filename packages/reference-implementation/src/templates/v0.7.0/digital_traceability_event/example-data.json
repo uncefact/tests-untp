@@ -1,31 +1,19 @@
 {
-  "type": [
-    "DigitalTraceabilityEvent",
-    "VerifiableCredential"
-  ],
-  "@context": [
-    "https://www.w3.org/ns/credentials/v2",
-    "https://vocabulary.uncefact.org/untp/0.7.0/context/"
-  ],
+  "type": ["DigitalTraceabilityEvent", "VerifiableCredential"],
+  "@context": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/0.7.0/context/"],
   "id": "https://credentials.sample-mine.example.com/dte/move-conc-2025-0301",
   "issuer": {
-    "type": [
-      "CredentialIssuer"
-    ],
+    "type": ["CredentialIssuer"],
     "id": "did:web:sample-mine.example.com",
     "name": "Sample Copper Mine Pty Ltd",
     "issuerAlsoKnownAs": [
       {
-        "type": [
-          "Party"
-        ],
+        "type": ["Party"],
         "id": "https://sample-register.example.com/companies/MINE-001",
         "name": "Sample Copper Mine Pty Ltd",
         "registeredId": "MINE-001",
         "idScheme": {
-          "type": [
-            "IdentifierScheme"
-          ],
+          "type": ["IdentifierScheme"],
           "id": "https://sample-register.example.com",
           "name": "Patents and Companies Registration Agency (Zambia)"
         }
@@ -37,10 +25,7 @@
   "name": "Shipment of Copper Concentrate — Sample Mine to Sample Smelter",
   "credentialSubject": [
     {
-      "type": [
-        "MoveEvent",
-        "LifecycleEvent"
-      ],
+      "type": ["MoveEvent", "LifecycleEvent"],
       "id": "https://sample-mine.example.com/events/move-conc-2025-0301",
       "name": "Copper concentrate shipment to Sample",
       "description": "Shipment of 100 tonnes of copper concentrate (Cu 30%) from Sample Copper Mine to Sample Copper Refinery via sea freight.",
@@ -56,16 +41,12 @@
         {
           "role": "consignor",
           "party": {
-            "type": [
-              "Party"
-            ],
+            "type": ["Party"],
             "id": "did:web:sample-mine.example.com",
             "name": "Sample Copper Mine Pty Ltd",
             "registeredId": "MINE-001",
             "idScheme": {
-              "type": [
-                "IdentifierScheme"
-              ],
+              "type": ["IdentifierScheme"],
               "id": "https://sample-register.example.com",
               "name": "Patents and Companies Registration Agency (Zambia)"
             }
@@ -74,16 +55,12 @@
         {
           "role": "consignee",
           "party": {
-            "type": [
-              "Party"
-            ],
+            "type": ["Party"],
             "id": "did:web:sample-refinery.example.com",
             "name": "Sample Copper Refinery Co. Ltd",
             "registeredId": "REF-001",
             "idScheme": {
-              "type": [
-                "IdentifierScheme"
-              ],
+              "type": ["IdentifierScheme"],
               "id": "https://www.sample-register.example.com",
               "name": "Japan Corporate Number (Houjin Bangou)"
             }
@@ -93,9 +70,7 @@
       "movedProduct": [
         {
           "product": {
-            "type": [
-              "Product"
-            ],
+            "type": ["Product"],
             "id": "https://id.sample-mine.example.com/product/cu-conc-2025",
             "name": "Copper Concentrate (Cu 30%)",
             "modelNumber": "SM-CU-CONC-30",
@@ -110,17 +85,13 @@
         }
       ],
       "fromFacility": {
-        "type": [
-          "Facility"
-        ],
+        "type": ["Facility"],
         "id": "https://facility-register.example.com/fac-001",
         "name": "Sample Copper Mine",
         "registeredId": "fac-001"
       },
       "toFacility": {
-        "type": [
-          "Facility"
-        ],
+        "type": ["Facility"],
         "id": "https://facility-register.example.com/fac-002",
         "name": "Sample Copper Refinery",
         "registeredId": "fac-002"

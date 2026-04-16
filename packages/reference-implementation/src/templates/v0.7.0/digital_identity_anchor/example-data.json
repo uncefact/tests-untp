@@ -1,46 +1,30 @@
 {
-  "type": [
-    "DigitalIdentityAnchor",
-    "VerifiableCredential"
-  ],
-  "@context": [
-    "https://www.w3.org/ns/credentials/v2",
-    "https://vocabulary.uncefact.org/untp/0.7.0/context/"
-  ],
+  "type": ["DigitalIdentityAnchor", "VerifiableCredential"],
+  "@context": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/0.7.0/context/"],
   "id": "https://example-company.com/credentials/2a423366-a0d6-4855-ba65-2e0c926d09b0",
   "issuer": {
-    "type": [
-      "CredentialIssuer"
-    ],
+    "type": ["CredentialIssuer"],
     "id": "did:web:identifiers.example-company.com:12345",
     "name": "Example Company Pty Ltd",
     "issuerAlsoKnownAs": [
       {
-        "type": [
-          "Party"
-        ],
+        "type": ["Party"],
         "id": "https://sample-business-register.gov/123456789",
         "name": "Sample Company Ltd",
         "registeredId": "90664869327",
         "idScheme": {
-          "type": [
-            "IdentifierScheme"
-          ],
+          "type": ["IdentifierScheme"],
           "id": "https://jargon.sh",
           "name": "Global Identifier Scheme Name"
         }
       },
       {
-        "type": [
-          "Party"
-        ],
+        "type": ["Party"],
         "id": "https://sample-business-register.gov/123456789",
         "name": "Sample Company Ltd",
         "registeredId": "90664869327",
         "idScheme": {
-          "type": [
-            "IdentifierScheme"
-          ],
+          "type": ["IdentifierScheme"],
           "id": "https://jargon.sh",
           "name": "Global Identifier Scheme Name"
         }
@@ -66,32 +50,23 @@
     "digestMultibase": "The quick brown fox jumps over the lazy dog."
   },
   "credentialSubject": {
-    "type": [
-      "RegisteredIdentity"
-    ],
+    "type": ["RegisteredIdentity"],
     "id": "did:web:samplecompany.com/123456789",
     "registeredName": "Sample business Ltd",
     "registeredId": "123456789",
     "registeredDate": "1970-01-01",
     "publicInformation": "https://jargon.sh",
     "idScheme": {
-      "type": [
-        "IdentifierScheme"
-      ],
+      "type": ["IdentifierScheme"],
       "id": "https://jargon.sh",
       "name": "Global Identifier Scheme Name"
     },
     "registrar": {
-      "type": [
-        "Party"
-      ],
+      "type": ["Party"],
       "id": "https://sample-business-register.gov/123456789",
       "name": "Sample Company Ltd"
     },
     "registerType": "business",
-    "registrationScope": [
-      "https://jargon.sh",
-      "https://jargon.sh"
-    ]
+    "registrationScope": ["https://jargon.sh", "https://jargon.sh"]
   }
 }

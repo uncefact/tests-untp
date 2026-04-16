@@ -1,31 +1,19 @@
 {
-  "type": [
-    "DigitalConformityCredential",
-    "VerifiableCredential"
-  ],
-  "@context": [
-    "https://www.w3.org/ns/credentials/v2",
-    "https://vocabulary.uncefact.org/untp/0.7.0/context/"
-  ],
+  "type": ["DigitalConformityCredential", "VerifiableCredential"],
+  "@context": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/0.7.0/context/"],
   "id": "https://credentials.sample-cab.example.com/dcc/mine-001",
   "issuer": {
-    "type": [
-      "CredentialIssuer"
-    ],
+    "type": ["CredentialIssuer"],
     "id": "did:web:sample-cab.example.com",
     "name": "Sample Conformity Assessment Body",
     "issuerAlsoKnownAs": [
       {
-        "type": [
-          "Party"
-        ],
+        "type": ["Party"],
         "id": "https://sample-register.example.com/companies/CAB-001",
         "name": "Sample Conformity Assessment Services Pty Ltd",
         "registeredId": "CAB-001",
         "idScheme": {
-          "type": [
-            "IdentifierScheme"
-          ],
+          "type": ["IdentifierScheme"],
           "id": "https://sample-register.example.com",
           "name": "Swiss Central Business Name Index (ZEFIX)"
         }
@@ -36,9 +24,7 @@
   "validUntil": "2028-01-15T00:00:00Z",
   "name": "Coppermark Certification — Sample Copper Mine",
   "credentialSubject": {
-    "type": [
-      "ConformityAttestation"
-    ],
+    "type": ["ConformityAttestation"],
     "id": "https://coppermark-cab.example.com/attestation/CM-KM-2025-001",
     "name": "Coppermark Responsible Production Certificate — Sample Mine",
     "description": "Third-party conformity assessment of Sample Copper Mine against Coppermark Responsible Risk Assessment (RRA) v3.0, covering environmental, social, and governance criteria for responsible copper production.",
@@ -46,16 +32,12 @@
     "assessmentLevel": "authority-benchmark",
     "attestationType": "certification",
     "issuedToParty": {
-      "type": [
-        "Party"
-      ],
+      "type": ["Party"],
       "id": "did:web:sample-mine.example.com",
       "name": "Sample Copper Mine Pty Ltd",
       "registeredId": "MINE-001",
       "idScheme": {
-        "type": [
-          "IdentifierScheme"
-        ],
+        "type": ["IdentifierScheme"],
         "id": "https://sample-register.example.com",
         "name": "Patents and Companies Registration Agency (Zambia)"
       }
@@ -70,16 +52,12 @@
           "mediaType": "image/png"
         },
         "issuingAuthority": {
-          "type": [
-            "Party"
-          ],
+          "type": ["Party"],
           "id": "https://coppermark.org",
           "name": "The Copper Mark Company",
           "registeredId": "CM-AUTH-001",
           "idScheme": {
-            "type": [
-              "IdentifierScheme"
-            ],
+            "type": ["IdentifierScheme"],
             "id": "https://coppermark.org",
             "name": "Coppermark Registry"
           }
@@ -93,16 +71,12 @@
       }
     ],
     "referenceScheme": {
-      "type": [
-        "ConformityScheme"
-      ],
+      "type": ["ConformityScheme"],
       "id": "https://coppermark.org",
       "name": "Coppermark"
     },
     "referenceProfile": {
-      "type": [
-        "ConformityProfile"
-      ],
+      "type": ["ConformityProfile"],
       "id": "https://coppermark.org/rra/v3.0",
       "name": "Coppermark Responsible Risk Assessment (RRA) v3.0"
     },
@@ -131,24 +105,18 @@
     },
     "conformityAssessment": [
       {
-        "type": [
-          "ConformityAssessment"
-        ],
+        "type": ["ConformityAssessment"],
         "id": "https://coppermark-cab.example.com/assessment/CM-KM-2025-001-GHG",
         "name": "GHG Emissions Assessment (Criteria 26, 27)",
         "description": "Assessment of greenhouse gas emissions management, measurement, and reduction initiatives at Sample Copper Mine against Coppermark criteria 26 (GHG Emissions) and 27 (Energy Use and Efficiency).",
         "assessmentCriteria": [
           {
-            "type": [
-              "Criterion"
-            ],
+            "type": ["Criterion"],
             "id": "https://coppermark.org/rra/v3.0/criterion/26",
             "name": "GHG Emissions — Coppermark Criterion 26",
             "conformityTopic": [
               {
-                "type": [
-                  "ConformityTopic"
-                ],
+                "type": ["ConformityTopic"],
                 "id": "https://vocabulary.uncefact.org/conformity-topic/greenhouse-gas-emissions",
                 "name": "Greenhouse Gas Emissions",
                 "definition": "Assessment of direct and indirect greenhouse gas emissions across scopes 1, 2, and 3, including measurement, reporting, and reduction targets aligned with climate science."
@@ -156,16 +124,12 @@
             ]
           },
           {
-            "type": [
-              "Criterion"
-            ],
+            "type": ["Criterion"],
             "id": "https://coppermark.org/rra/v3.0/criterion/27",
             "name": "Energy Use and Efficiency — Coppermark Criterion 27",
             "conformityTopic": [
               {
-                "type": [
-                  "ConformityTopic"
-                ],
+                "type": ["ConformityTopic"],
                 "id": "https://vocabulary.uncefact.org/conformity-topic/renewable-energy-use",
                 "name": "Renewable Energy Use",
                 "definition": "Adoption and integration of renewable energy sources to reduce reliance on fossil fuels and lower the carbon footprint of operations and products."
@@ -177,9 +141,7 @@
         "assessedPerformance": [
           {
             "metric": {
-              "type": [
-                "PerformanceMetric"
-              ],
+              "type": ["PerformanceMetric"],
               "id": "https://vocabulary.uncefact.org/performance-metric/scope-1-ghg-emissions",
               "name": "Scope 1 GHG Emissions"
             },
@@ -192,9 +154,7 @@
         "assessedFacility": [
           {
             "facility": {
-              "type": [
-                "Facility"
-              ],
+              "type": ["Facility"],
               "id": "https://facility-register.example.com/fac-001",
               "name": "Sample Copper Mine",
               "registeredId": "fac-001"
@@ -203,17 +163,13 @@
           }
         ],
         "assessedOrganisation": {
-          "type": [
-            "Party"
-          ],
+          "type": ["Party"],
           "id": "did:web:sample-mine.example.com",
           "name": "Sample Copper Mine Pty Ltd"
         },
         "conformityTopic": [
           {
-            "type": [
-              "ConformityTopic"
-            ],
+            "type": ["ConformityTopic"],
             "id": "https://vocabulary.uncefact.org/conformity-topic/greenhouse-gas-emissions",
             "name": "Greenhouse Gas Emissions"
           }
@@ -221,24 +177,18 @@
         "conformance": true
       },
       {
-        "type": [
-          "ConformityAssessment"
-        ],
+        "type": ["ConformityAssessment"],
         "id": "https://coppermark-cab.example.com/assessment/CM-KM-2025-001-FL",
         "name": "No Forced Labor Assessment (Criterion 12)",
         "description": "Assessment of forced labor elimination practices at Sample Copper Mine against Coppermark criterion 12 (Forced Labour).",
         "assessmentCriteria": [
           {
-            "type": [
-              "Criterion"
-            ],
+            "type": ["Criterion"],
             "id": "https://coppermark.org/rra/v3.0/criterion/12",
             "name": "Forced Labour — Coppermark Criterion 12",
             "conformityTopic": [
               {
-                "type": [
-                  "ConformityTopic"
-                ],
+                "type": ["ConformityTopic"],
                 "id": "https://vocabulary.uncefact.org/conformity-topic/forced-labor-elimination",
                 "name": "Forced Labor Elimination",
                 "definition": "Policies and practices to identify, prevent, and remediate forced labor, including debt bondage, trafficking, and involuntary work, throughout the supply chain."
@@ -250,9 +200,7 @@
         "assessedPerformance": [
           {
             "metric": {
-              "type": [
-                "PerformanceMetric"
-              ],
+              "type": ["PerformanceMetric"],
               "id": "https://vocabulary.uncefact.org/performance-metric/forced-labor-incidents",
               "name": "Forced Labor Incidents"
             },
@@ -265,9 +213,7 @@
         "assessedFacility": [
           {
             "facility": {
-              "type": [
-                "Facility"
-              ],
+              "type": ["Facility"],
               "id": "https://facility-register.example.com/fac-001",
               "name": "Sample Copper Mine",
               "registeredId": "fac-001"
@@ -276,17 +222,13 @@
           }
         ],
         "assessedOrganisation": {
-          "type": [
-            "Party"
-          ],
+          "type": ["Party"],
           "id": "did:web:sample-mine.example.com",
           "name": "Sample Copper Mine Pty Ltd"
         },
         "conformityTopic": [
           {
-            "type": [
-              "ConformityTopic"
-            ],
+            "type": ["ConformityTopic"],
             "id": "https://vocabulary.uncefact.org/conformity-topic/forced-labor-elimination",
             "name": "Forced Labor Elimination"
           }
@@ -294,24 +236,18 @@
         "conformance": true
       },
       {
-        "type": [
-          "ConformityAssessment"
-        ],
+        "type": ["ConformityAssessment"],
         "id": "https://coppermark-cab.example.com/assessment/CM-KM-2025-001-WS",
         "name": "Water Stewardship Assessment (Criterion 28)",
         "description": "Assessment of water stewardship practices at Sample Copper Mine against Coppermark criterion 28 (Water Stewardship).",
         "assessmentCriteria": [
           {
-            "type": [
-              "Criterion"
-            ],
+            "type": ["Criterion"],
             "id": "https://coppermark.org/rra/v3.0/criterion/28",
             "name": "Water Stewardship — Coppermark Criterion 28",
             "conformityTopic": [
               {
-                "type": [
-                  "ConformityTopic"
-                ],
+                "type": ["ConformityTopic"],
                 "id": "https://vocabulary.uncefact.org/conformity-topic/water-conservation",
                 "name": "Water Conservation",
                 "definition": "Efficient and responsible management of water resources, including reduction of water consumption, recycling, and protection of water quality in operations and supply chains."
@@ -323,9 +259,7 @@
         "assessedPerformance": [
           {
             "metric": {
-              "type": [
-                "PerformanceMetric"
-              ],
+              "type": ["PerformanceMetric"],
               "id": "https://vocabulary.uncefact.org/performance-metric/water-intensity",
               "name": "Water Intensity"
             },
@@ -338,9 +272,7 @@
         "assessedFacility": [
           {
             "facility": {
-              "type": [
-                "Facility"
-              ],
+              "type": ["Facility"],
               "id": "https://facility-register.example.com/fac-001",
               "name": "Sample Copper Mine",
               "registeredId": "fac-001"
@@ -349,17 +281,13 @@
           }
         ],
         "assessedOrganisation": {
-          "type": [
-            "Party"
-          ],
+          "type": ["Party"],
           "id": "did:web:sample-mine.example.com",
           "name": "Sample Copper Mine Pty Ltd"
         },
         "conformityTopic": [
           {
-            "type": [
-              "ConformityTopic"
-            ],
+            "type": ["ConformityTopic"],
             "id": "https://vocabulary.uncefact.org/conformity-topic/water-conservation",
             "name": "Water Conservation"
           }

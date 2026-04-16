@@ -1,31 +1,19 @@
 {
-  "type": [
-    "DigitalProductPassport",
-    "VerifiableCredential"
-  ],
-  "@context": [
-    "https://www.w3.org/ns/credentials/v2",
-    "https://vocabulary.uncefact.org/untp/0.7.0/context/"
-  ],
+  "type": ["DigitalProductPassport", "VerifiableCredential"],
+  "@context": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/0.7.0/context/"],
   "id": "https://credentials.sample-mine.example.com/dpp/cu-conc-2025",
   "issuer": {
-    "type": [
-      "CredentialIssuer"
-    ],
+    "type": ["CredentialIssuer"],
     "id": "did:web:sample-mine.example.com",
     "name": "Sample Copper Mine Pty Ltd",
     "issuerAlsoKnownAs": [
       {
-        "type": [
-          "Party"
-        ],
+        "type": ["Party"],
         "id": "https://sample-register.example.com/companies/MINE-001",
         "name": "Sample Copper Mine Pty Ltd",
         "registeredId": "MINE-001",
         "idScheme": {
-          "type": [
-            "IdentifierScheme"
-          ],
+          "type": ["IdentifierScheme"],
           "id": "https://sample-register.example.com",
           "name": "Patents and Companies Registration Agency (Zambia)"
         }
@@ -36,16 +24,12 @@
   "validUntil": "2026-03-01T00:00:00Z",
   "name": "Digital Product Passport — Copper Concentrate (Cu 30%)",
   "credentialSubject": {
-    "type": [
-      "Product"
-    ],
+    "type": ["Product"],
     "id": "https://id.sample-mine.example.com/product/cu-conc-2025",
     "name": "Copper Concentrate (Cu 30%)",
     "description": "Copper sulphide flotation concentrate with approximately 30% copper content, produced at Sample Copper Mine. Suitable for smelting to produce refined copper cathode.",
     "idScheme": {
-      "type": [
-        "IdentifierScheme"
-      ],
+      "type": ["IdentifierScheme"],
       "id": "https://id.sample-mine.example.com",
       "name": "Sample Product Identifier Scheme"
     },
@@ -73,16 +57,12 @@
       {
         "role": "manufacturer",
         "party": {
-          "type": [
-            "Party"
-          ],
+          "type": ["Party"],
           "id": "did:web:sample-mine.example.com",
           "name": "Sample Copper Mine Pty Ltd",
           "registeredId": "MINE-001",
           "idScheme": {
-            "type": [
-              "IdentifierScheme"
-            ],
+            "type": ["IdentifierScheme"],
             "id": "https://sample-register.example.com",
             "name": "Patents and Companies Registration Agency (Zambia)"
           },
@@ -94,16 +74,12 @@
       }
     ],
     "producedAtFacility": {
-      "type": [
-        "Facility"
-      ],
+      "type": ["Facility"],
       "id": "https://facility-register.example.com/fac-001",
       "name": "Sample Copper Mine",
       "registeredId": "fac-001",
       "idScheme": {
-        "type": [
-          "IdentifierScheme"
-        ],
+        "type": ["IdentifierScheme"],
         "id": "https://facility-register.example.com",
         "name": "UNTP Sample Facility Register"
       }
@@ -144,24 +120,18 @@
     ],
     "performanceClaim": [
       {
-        "type": [
-          "Claim"
-        ],
+        "type": ["Claim"],
         "id": "https://sample-mine.example.com/claims/product-carbon-2025",
         "name": "Product Carbon Footprint — Copper Concentrate",
         "description": "Cradle-to-gate carbon footprint of copper concentrate per tonne produced at Sample mine.",
         "referenceCriteria": [
           {
-            "type": [
-              "Criterion"
-            ],
+            "type": ["Criterion"],
             "id": "https://sample-scheme.coppermark.org/criteria/ghg-management/v3",
             "name": "GHG Emissions Management (Coppermark RRA Criterion 26)",
             "conformityTopic": [
               {
-                "type": [
-                  "ConformityTopic"
-                ],
+                "type": ["ConformityTopic"],
                 "id": "https://vocabulary.uncefact.org/conformity-topic/greenhouse-gas-emissions",
                 "name": "Greenhouse Gas Emissions",
                 "definition": "Assessment of direct and indirect greenhouse gas emissions across scopes 1, 2, and 3, including measurement, reporting, and reduction targets aligned with climate science."
@@ -173,9 +143,7 @@
         "claimedPerformance": [
           {
             "metric": {
-              "type": [
-                "PerformanceMetric"
-              ],
+              "type": ["PerformanceMetric"],
               "id": "https://vocabulary.uncefact.org/performance-metric/product-carbon-footprint",
               "name": "Product Carbon Footprint"
             },
@@ -187,9 +155,7 @@
         ],
         "conformityTopic": [
           {
-            "type": [
-              "ConformityTopic"
-            ],
+            "type": ["ConformityTopic"],
             "id": "https://vocabulary.uncefact.org/conformity-topic/greenhouse-gas-emissions",
             "name": "Greenhouse Gas Emissions",
             "definition": "Assessment of direct and indirect greenhouse gas emissions across scopes 1, 2, and 3, including measurement, reporting, and reduction targets aligned with climate science."
@@ -197,24 +163,18 @@
         ]
       },
       {
-        "type": [
-          "Claim"
-        ],
+        "type": ["Claim"],
         "id": "https://sample-mine.example.com/claims/product-water-2025",
         "name": "Water Intensity — Copper Concentrate",
         "description": "Water consumption per tonne of copper concentrate produced at Sample mine.",
         "referenceCriteria": [
           {
-            "type": [
-              "Criterion"
-            ],
+            "type": ["Criterion"],
             "id": "https://sample-scheme.coppermark.org/criteria/water-stewardship/v3",
             "name": "Water Stewardship (Coppermark RRA Criterion 27)",
             "conformityTopic": [
               {
-                "type": [
-                  "ConformityTopic"
-                ],
+                "type": ["ConformityTopic"],
                 "id": "https://vocabulary.uncefact.org/conformity-topic/water-conservation",
                 "name": "Water Conservation",
                 "definition": "Efficient and responsible management of water resources, including reduction of water consumption, recycling, and protection of water quality in operations and supply chains."
@@ -226,9 +186,7 @@
         "claimedPerformance": [
           {
             "metric": {
-              "type": [
-                "PerformanceMetric"
-              ],
+              "type": ["PerformanceMetric"],
               "id": "https://vocabulary.uncefact.org/performance-metric/water-intensity",
               "name": "Water Intensity"
             },
@@ -240,9 +198,7 @@
         ],
         "conformityTopic": [
           {
-            "type": [
-              "ConformityTopic"
-            ],
+            "type": ["ConformityTopic"],
             "id": "https://vocabulary.uncefact.org/conformity-topic/water-conservation",
             "name": "Water Conservation",
             "definition": "Efficient and responsible management of water resources, including reduction of water consumption, recycling, and protection of water quality in operations and supply chains."

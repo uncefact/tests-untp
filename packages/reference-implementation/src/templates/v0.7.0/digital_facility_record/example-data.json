@@ -1,31 +1,19 @@
 {
-  "type": [
-    "DigitalFacilityRecord",
-    "VerifiableCredential"
-  ],
-  "@context": [
-    "https://www.w3.org/ns/credentials/v2",
-    "https://vocabulary.uncefact.org/untp/0.7.0/context/"
-  ],
+  "type": ["DigitalFacilityRecord", "VerifiableCredential"],
+  "@context": ["https://www.w3.org/ns/credentials/v2", "https://vocabulary.uncefact.org/untp/0.7.0/context/"],
   "id": "https://credentials.sample-mine.example.com/dfr/mine-001",
   "issuer": {
-    "type": [
-      "CredentialIssuer"
-    ],
+    "type": ["CredentialIssuer"],
     "id": "did:web:sample-mine.example.com",
     "name": "Sample Copper Mine Pty Ltd",
     "issuerAlsoKnownAs": [
       {
-        "type": [
-          "Party"
-        ],
+        "type": ["Party"],
         "id": "https://sample-register.example.com/companies/MINE-001",
         "name": "Sample Copper Mine Pty Ltd",
         "registeredId": "MINE-001",
         "idScheme": {
-          "type": [
-            "IdentifierScheme"
-          ],
+          "type": ["IdentifierScheme"],
           "id": "https://sample-register.example.com",
           "name": "Patents and Companies Registration Agency (Zambia)"
         }
@@ -36,17 +24,13 @@
   "validUntil": "2028-01-15T00:00:00Z",
   "name": "Digital Facility Record — Sample Copper Mine",
   "credentialSubject": {
-    "type": [
-      "Facility"
-    ],
+    "type": ["Facility"],
     "id": "https://facility-register.example.com/fac-001",
     "name": "Sample Copper Mine",
     "description": "Open-pit and underground copper-gold mine located in Solwezi, North-Western Province, Zambia. Annual production capacity of approximately 250,000 tonnes of copper in concentrate.",
     "registeredId": "fac-001",
     "idScheme": {
-      "type": [
-        "IdentifierScheme"
-      ],
+      "type": ["IdentifierScheme"],
       "id": "https://facility-register.example.com",
       "name": "UNTP Sample Facility Register"
     },
@@ -67,17 +51,13 @@
       {
         "role": "owner",
         "party": {
-          "type": [
-            "Party"
-          ],
+          "type": ["Party"],
           "id": "did:web:sample-mine.example.com",
           "name": "Sample Copper Mine Pty Ltd",
           "description": "Zambian copper mining company operating the Sample mine, one of the largest copper mines in Africa.",
           "registeredId": "MINE-001",
           "idScheme": {
-            "type": [
-              "IdentifierScheme"
-            ],
+            "type": ["IdentifierScheme"],
             "id": "https://sample-register.example.com",
             "name": "Patents and Companies Registration Agency (Zambia)"
           },
@@ -118,16 +98,12 @@
     ],
     "facilityAlsoKnownAs": [
       {
-        "type": [
-          "Facility"
-        ],
+        "type": ["Facility"],
         "id": "https://mining-register.gov.zm/facilities/ZM-NW-CU-0012",
         "name": "Sample Copper Mine",
         "registeredId": "ZM-NW-CU-0012",
         "idScheme": {
-          "type": [
-            "IdentifierScheme"
-          ],
+          "type": ["IdentifierScheme"],
           "id": "https://mining-register.gov.zm",
           "name": "Zambia Mining Cadastre"
         }
@@ -234,24 +210,18 @@
     },
     "performanceClaim": [
       {
-        "type": [
-          "Claim"
-        ],
+        "type": ["Claim"],
         "id": "https://sample-mine.example.com/claims/ghg-2024",
         "name": "GHG Emissions — Scope 1",
         "description": "Annual Scope 1 greenhouse gas emissions from the Sample Copper Mine for the 2024 reporting year.",
         "referenceCriteria": [
           {
-            "type": [
-              "Criterion"
-            ],
+            "type": ["Criterion"],
             "id": "https://sample-scheme.coppermark.org/criteria/ghg-management/v3",
             "name": "GHG Emissions Management (Coppermark RRA Criterion 26)",
             "conformityTopic": [
               {
-                "type": [
-                  "ConformityTopic"
-                ],
+                "type": ["ConformityTopic"],
                 "id": "https://vocabulary.uncefact.org/conformity-topic/greenhouse-gas-emissions",
                 "name": "Greenhouse Gas Emissions",
                 "definition": "Assessment of direct and indirect greenhouse gas emissions across scopes 1, 2, and 3, including measurement, reporting, and reduction targets aligned with climate science."
@@ -268,9 +238,7 @@
         "claimedPerformance": [
           {
             "metric": {
-              "type": [
-                "PerformanceMetric"
-              ],
+              "type": ["PerformanceMetric"],
               "id": "https://vocabulary.uncefact.org/performance-metric/scope-1-ghg-emissions",
               "name": "Scope 1 GHG Emissions"
             },
@@ -282,9 +250,7 @@
         ],
         "conformityTopic": [
           {
-            "type": [
-              "ConformityTopic"
-            ],
+            "type": ["ConformityTopic"],
             "id": "https://vocabulary.uncefact.org/conformity-topic/greenhouse-gas-emissions",
             "name": "Greenhouse Gas Emissions",
             "definition": "Assessment of direct and indirect greenhouse gas emissions across scopes 1, 2, and 3, including measurement, reporting, and reduction targets aligned with climate science."
@@ -292,24 +258,18 @@
         ]
       },
       {
-        "type": [
-          "Claim"
-        ],
+        "type": ["Claim"],
         "id": "https://sample-mine.example.com/claims/water-2024",
         "name": "Water Withdrawal Intensity",
         "description": "Water withdrawal intensity per tonne of copper produced at Sample mine for 2024.",
         "referenceCriteria": [
           {
-            "type": [
-              "Criterion"
-            ],
+            "type": ["Criterion"],
             "id": "https://sample-scheme.coppermark.org/criteria/water-stewardship/v3",
             "name": "Water Stewardship (Coppermark RRA Criterion 27)",
             "conformityTopic": [
               {
-                "type": [
-                  "ConformityTopic"
-                ],
+                "type": ["ConformityTopic"],
                 "id": "https://vocabulary.uncefact.org/conformity-topic/water-conservation",
                 "name": "Water Conservation",
                 "definition": "Efficient and responsible management of water resources, including reduction of water consumption, recycling, and protection of water quality in operations and supply chains."
@@ -326,9 +286,7 @@
         "claimedPerformance": [
           {
             "metric": {
-              "type": [
-                "PerformanceMetric"
-              ],
+              "type": ["PerformanceMetric"],
               "id": "https://vocabulary.uncefact.org/performance-metric/water-intensity",
               "name": "Water Intensity"
             },
@@ -340,9 +298,7 @@
         ],
         "conformityTopic": [
           {
-            "type": [
-              "ConformityTopic"
-            ],
+            "type": ["ConformityTopic"],
             "id": "https://vocabulary.uncefact.org/conformity-topic/water-conservation",
             "name": "Water Conservation",
             "definition": "Efficient and responsible management of water resources, including reduction of water consumption, recycling, and protection of water quality in operations and supply chains."
