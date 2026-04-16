@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap" rel="stylesheet">
+  <title>Digital Identity Anchor</title>
+  <style>
+    :root {
+      --color-primary: rgba(35, 46, 61, 1);
+      --color-white: rgba(255, 255, 255, 1);
+      --color-black: rgba(0, 0, 0, 1);
+      --color-gray-700: rgba(35, 46, 61, 1);
+      --color-gray-600: rgba(85, 96, 110, 1);
+      --color-gray-500: rgba(169, 177, 183, 1);
+      --color-gray-400: rgba(212, 214, 216, 1);
+      --color-gray-300: rgba(237, 239, 240, 1);
+      --color-link-underline-dark: rgba(79, 149, 221, 1);
+      --color-link-underline-light: rgba(148, 196, 245, 1);
+      --font-family: "Lato", sans-serif;
+      --font-weight-regular: 400;
+      --font-weight-medium: 500;
+      --font-weight-bold: 700;
+      --font-weight-black: 900;
+    }
+
+    * { margin: 0; box-sizing: border-box; }
+    body { font-family: var(--font-family); }
+    section { padding: 0 16px; }
+    a { text-decoration: none; }
+
+    .identity-anchor {
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .identity-anchor-header {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      align-items: center;
+    }
+
+    .identity-header {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 32px 16px 20px;
+      background-color: var(--color-primary);
+    }
+
+    .identity-anchor .identity-title {
+      width: 100%;
+      font-weight: var(--font-weight-medium);
+      color: var(--color-white);
+      font-size: 16px;
+      line-height: 22px;
+      text-transform: uppercase;
+    }
+
+    .identity-anchor .name-description {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .identity-anchor .name-description h1 {
+      font-weight: var(--font-weight-black);
+      color: var(--color-white);
+      font-size: 30px;
+      line-height: 32.5px;
+    }
+
+    .identity-anchor .name-description p {
+      font-weight: var(--font-weight-medium);
+      color: var(--color-white);
+      font-size: 16px;
+      line-height: 17.4px;
+      word-break: break-all;
+    }
+
+    .identity-anchor .identity-details-section {
+      padding: 0 16px 16px;
+      align-self: stretch;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      background-color: var(--color-gray-600);
+    }
+
+    .identity-anchor .grid-row {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 16px;
+      padding: 10px 0 12px;
+      width: 100%;
+      border-bottom: 1px solid;
+    }
+
+    .identity-anchor .grid-row:last-child { border-bottom: none; }
+    .identity-anchor .border-bottom-gray-500 { border-color: var(--color-gray-500); }
+
+    .identity-anchor .label {
+      font-weight: var(--font-weight-regular);
+      color: var(--color-gray-300);
+      font-size: 16px;
+      line-height: 22px;
+    }
+
+    .identity-anchor .grid-value {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      align-self: stretch;
+      flex: 1;
+    }
+
+    .identity-anchor .grid-value-text {
+      font-weight: var(--font-weight-medium);
+      color: var(--color-white);
+      font-size: 16px;
+      line-height: 17.4px;
+      flex: 1;
+      word-break: break-all;
+    }
+
+    .blue-bottom-line-2,
+    .blue-bottom-line-2:link {
+      width: fit-content;
+      color: var(--color-white);
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-decoration-color: var(--color-link-underline-light);
+      text-underline-offset: 3px;
+    }
+
+    /* Registration scope tags */
+    .scope-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .scope-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      background-color: rgba(255,255,255,0.15);
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--color-white);
+      word-break: break-all;
+    }
+
+    /* Issuing details */
+    .identity-anchor .issuing-details {
+      width: 100%;
+      padding: 24px 16px 36px;
+      background-color: var(--color-white);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .identity-anchor .typography-heading {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .identity-anchor .issuing-title {
+      font-weight: var(--font-weight-bold);
+      color: var(--color-black);
+      font-size: 20px;
+      line-height: 21.8px;
+    }
+
+    .identity-anchor .identity-details {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      width: 100%;
+    }
+
+    .identity-anchor .grid-row-alt {
+      display: grid;
+      grid-template-columns: 1.4fr 3fr;
+      gap: 16px;
+      padding: 10px 0 12px;
+      width: 100%;
+      border-bottom: 1px solid;
+    }
+
+    .identity-anchor .border-bottom-gray-400 { border-color: var(--color-gray-400); }
+
+    .identity-anchor .label-alt {
+      font-weight: var(--font-weight-regular);
+      color: var(--color-gray-600);
+      font-size: 16px;
+      line-height: 22px;
+    }
+
+    .identity-anchor .grid-value-link {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      align-self: stretch;
+      display: flex;
+      flex: 1;
+    }
+
+    .identity-anchor .div-wrapper {
+      gap: 10px;
+      display: inline-flex;
+      align-items: flex-start;
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-decoration-color: var(--color-link-underline-dark);
+      text-underline-offset: 3px;
+    }
+
+    .identity-anchor .issuer-link {
+      font-weight: var(--font-weight-medium);
+      color: var(--color-gray-700);
+      font-size: 16px;
+      line-height: 22px;
+    }
+
+    .identity-anchor .grid-value-text-alt {
+      font-weight: var(--font-weight-medium);
+      color: var(--color-gray-700);
+      font-size: 16px;
+      line-height: 17.4px;
+      flex: 1;
+      word-break: break-all;
+    }
+
+    @media (min-width: 1200px) {
+      .identity-anchor { max-width: 1200px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="identity-anchor">
+    <div class="identity-anchor-header">
+      <header class="identity-header">
+        <div class="identity-title">DIGITAL IDENTITY ANCHOR</div>
+        <div class="name-description">
+          <h1>{{credentialSubject.registeredName}}</h1>
+          <p>{{credentialSubject.id}}</p>
+        </div>
+      </header>
+      <section class="identity-details-section">
+        <div class="identity-details">
+          {{#if credentialSubject.idScheme.name}}
+          <div class="grid-row border-bottom-gray-500">
+            <div class="label">Identifier Scheme</div>
+            <div class="grid-value">
+              {{#if credentialSubject.idScheme.id}}
+              <a href="{{credentialSubject.idScheme.id}}" class="blue-bottom-line-2" target="_blank">{{credentialSubject.idScheme.name}}</a>
+              {{else}}
+              <div class="grid-value-text">{{credentialSubject.idScheme.name}}</div>
+              {{/if}}
+            </div>
+          </div>
+          {{/if}}
+          {{#if credentialSubject.registeredId}}
+          <div class="grid-row border-bottom-gray-500">
+            <div class="label">Registered ID</div>
+            <div class="grid-value">
+              <div class="grid-value-text">{{credentialSubject.registeredId}}</div>
+            </div>
+          </div>
+          {{/if}}
+          {{#if credentialSubject.registeredDate}}
+          <div class="grid-row border-bottom-gray-500">
+            <div class="label">Registered Date</div>
+            <div class="grid-value">
+              <div class="grid-value-text">{{credentialSubject.registeredDate}}</div>
+            </div>
+          </div>
+          {{/if}}
+          {{#if credentialSubject.registerType}}
+          <div class="grid-row border-bottom-gray-500">
+            <div class="label">Register Type</div>
+            <div class="grid-value">
+              <div class="grid-value-text">{{credentialSubject.registerType}}</div>
+            </div>
+          </div>
+          {{/if}}
+          {{#if credentialSubject.registrar}}
+          <div class="grid-row border-bottom-gray-500">
+            <div class="label">Registrar</div>
+            <div class="grid-value">
+              {{#if credentialSubject.registrar.id}}
+              <a href="{{credentialSubject.registrar.id}}" class="blue-bottom-line-2" target="_blank">{{credentialSubject.registrar.name}}</a>
+              {{else}}
+              <div class="grid-value-text">{{credentialSubject.registrar.name}}</div>
+              {{/if}}
+            </div>
+          </div>
+          {{/if}}
+          {{#if credentialSubject.publicInformation}}
+          <div class="grid-row border-bottom-gray-500">
+            <div class="label">Public Info</div>
+            <div class="grid-value">
+              <a href="{{credentialSubject.publicInformation}}" class="blue-bottom-line-2" target="_blank">{{credentialSubject.publicInformation}}</a>
+            </div>
+          </div>
+          {{/if}}
+          {{#if credentialSubject.registrationScope}}
+          <div class="grid-row border-bottom-gray-500">
+            <div class="label">Registration Scope</div>
+            <div class="grid-value">
+              <div class="scope-tags">
+                {{#each credentialSubject.registrationScope}}
+                <a href="{{this}}" class="scope-tag" target="_blank">{{this}}</a>
+                {{/each}}
+              </div>
+            </div>
+          </div>
+          {{/if}}
+        </div>
+      </section>
+    </div>
+
+    <section class="issuing-details">
+      <div class="typography-heading">
+        <h2 class="issuing-title">Issuing Details</h2>
+      </div>
+      <div class="identity-details">
+        <div class="grid-row-alt border-bottom-gray-400">
+          <div class="label-alt">Issued by</div>
+          <div class="grid-value-link">
+            <div class="div-wrapper">
+              <a href="{{issuer.id}}" class="issuer-link" target="_blank">{{issuer.name}}</a>
+            </div>
+          </div>
+        </div>
+        {{#if issuer.issuerAlsoKnownAs}}
+        {{#each issuer.issuerAlsoKnownAs}}
+        {{#if idScheme.name}}
+        <div class="grid-row-alt border-bottom-gray-400">
+          <div class="label-alt">Issuer Registry</div>
+          <div class="grid-value">
+            <div class="grid-value-text-alt">
+              <a href="{{idScheme.id}}" style="text-decoration:underline;color:var(--color-gray-700);" target="_blank">{{idScheme.name}}</a>
+              {{#if registeredId}} · {{registeredId}}{{/if}}
+            </div>
+          </div>
+        </div>
+        {{/if}}
+        {{/each}}
+        {{/if}}
+        {{#if validFrom}}
+        <div class="grid-row-alt border-bottom-gray-400">
+          <div class="label-alt">Valid from</div>
+          <div class="grid-value">
+            <div class="grid-value-text-alt">{{validFrom}}</div>
+          </div>
+        </div>
+        {{/if}}
+        {{#if validUntil}}
+        <div class="grid-row-alt border-bottom-gray-400">
+          <div class="label-alt">Valid until</div>
+          <div class="grid-value">
+            <div class="grid-value-text-alt">{{validUntil}}</div>
+          </div>
+        </div>
+        {{/if}}
+      </div>
+    </section>
+  </div>
+</body>
+
+</html>
