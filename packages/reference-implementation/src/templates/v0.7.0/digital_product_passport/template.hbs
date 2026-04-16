@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap"
+      rel="stylesheet"
+    />
+    <title>Digital Product Passport</title>
+    <style>
+      :root {
+        /* Brand Colors */
+        --color-primary: rgba(31, 90, 149, 1);
+
+        /* Neutrals */
+        --color-white: rgba(255, 255, 255, 1);
+        --color-black: rgba(0, 0, 0, 1);
+        --color-gray-700: rgba(35, 46, 61, 1);
+        --color-gray-600: rgba(85, 96, 110, 1);
+        --color-gray-400: rgba(212, 214, 216, 1);
+        --color-gray-100: rgba(247, 250, 253, 1);
+
+        /* Semantic Colors */
+        --color-link-underline-dark: rgba(79, 149, 221, 1);
+        --color-accent-success: rgba(184, 236, 182, 1);
+        --color-accent-error: rgba(255, 188, 183, 1);
+        --color-icon: rgba(31, 90, 149, 1);
+
+        /* Font Variables */
+        --font-family: "Lato", sans-serif;
+        --font-weight-light: 300;
+        --font-weight-regular: 400;
+        --font-weight-medium: 500;
+        --font-weight-bold: 600;
+        --font-weight-black: 900;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-family);
+        color: var(--color-gray-600);
+        font-weight: var(--font-weight-regular);
+      }
+
+      .container {
+        min-width: 150px;
+        width: 100%;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+        word-break: break-word;
+        background-color: var(--color-white);
+      }
+
+      section,
+      header,
+      footer {
+        padding: 0 16px;
+      }
+
+      section header {
+        margin: 0;
+      }
+
+      .header-image {
+        background-color: var(--color-gray-600);
+        height: 232px;
+        position: relative;
+      }
+
+      .header-image-top-left {
+        position: absolute;
+        top: 25px;
+        left: 15px;
+        font-weight: var(--font-weight-medium);
+        font-size: 16px;
+        line-height: 22px;
+        color: var(--color-white);
+      }
+
+      .header-image-bottom-left {
+        position: absolute;
+        bottom: 18px;
+        left: 15px;
+        color: var(--color-white);
+      }
+
+      .header-image-bottom-left h1 {
+        font-size: 30px;
+        font-weight: var(--font-weight-black);
+        line-height: 32.5px;
+      }
+
+      .header-batch {
+        padding: 12px 16px;
+        background-color: var(--color-gray-100);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .header-batch-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-grow: 1;
+        min-width: 0;
+      }
+
+      .header-batch-item a {
+        color: var(--color-gray-700);
+        font-size: 14px;
+        font-weight: var(--font-weight-medium);
+      }
+
+      .header-batch-item svg {
+        fill: var(--color-icon);
+        stroke: var(--color-icon);
+      }
+
+      .section-title {
+        font-size: 18px;
+        font-weight: var(--font-weight-bold);
+        line-height: 19.62px;
+        color: var(--color-gray-700);
+      }
+
+      .section-description {
+        margin-top: 12px;
+        font-size: 16px;
+        line-height: 18.88px;
+        color: var(--color-black);
+        font-weight: var(--font-weight-regular);
+      }
+
+      .table {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .table-item {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        column-gap: 16px;
+        align-items: center;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--color-gray-400);
+      }
+
+      .table-item span {
+        font-size: 16px;
+        font-weight: var(--font-weight-regular);
+        color: var(--color-gray-600);
+      }
+
+      .table-item p,
+      .table-item a {
+        font-size: 16px;
+        font-weight: var(--font-weight-medium);
+        color: var(--color-gray-700);
+      }
+
+      .item-value {
+        display: flex;
+        flex-direction: column;
+        font-size: 16px;
+        font-weight: var(--font-weight-medium);
+        color: var(--color-gray-600);
+      }
+
+      .item-value span {
+        color: var(--color-gray-700);
+      }
+
+      .information-text {
+        font-size: 19px;
+        padding-bottom: 8px;
+        font-weight: var(--font-weight-light);
+        color: var(--color-black);
+        line-height: 22.42px;
+      }
+
+      .information-show-more {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        font-size: 14px;
+        font-weight: var(--font-weight-medium);
+      }
+
+      .production {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      /* Claims / Performance Section */
+      .declarations {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .cards-conformities {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .cards-conformity {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 16px;
+        background-color: var(--color-white);
+        border: 1px solid var(--color-gray-400);
+        border-radius: 4px;
+      }
+
+      .claim-name {
+        font-size: 18px;
+        font-weight: var(--font-weight-regular);
+        color: var(--color-primary);
+      }
+
+      .conformity-info {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .conformity-info p {
+        font-size: 14px;
+        font-weight: var(--font-weight-regular);
+        color: var(--color-gray-600);
+      }
+
+      .conformity-topic-tag {
+        display: inline-block;
+        padding: 2px 8px;
+        background-color: var(--color-gray-100);
+        border-radius: 4px;
+        font-size: 13px;
+        color: var(--color-primary);
+        margin-right: 4px;
+        margin-bottom: 4px;
+      }
+
+      .performance-item {
+        font-size: 16px;
+        font-weight: var(--font-weight-regular);
+        color: var(--color-gray-700);
+      }
+
+      /* Composition */
+      .composition-box {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .composition-box-item {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        border: 1px solid var(--color-gray-400);
+        border-radius: 4px;
+        padding: 16px;
+      }
+
+      .composition-first-column {
+        display: grid;
+        grid-template-columns: 40px 1fr;
+        gap: 12px;
+      }
+
+      .composition-percent {
+        font-size: 16px;
+        font-weight: var(--font-weight-medium);
+        color: var(--color-black);
+      }
+
+      .composition-title {
+        font-size: 16px;
+        font-weight: var(--font-weight-bold);
+        color: var(--color-black);
+      }
+
+      .composition-tag {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+
+      .composition-tag-item {
+        font-size: 14px;
+        font-weight: var(--font-weight-regular);
+        color: var(--color-black);
+        background-color: var(--color-gray-100);
+        padding: 2px 4px;
+      }
+
+      .country-code {
+        font-size: 14px;
+        font-weight: var(--font-weight-regular);
+        color: var(--color-gray-600);
+      }
+
+      /* Related documents / links */
+      .traceability-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .traceability-card {
+        display: grid;
+        grid-template-columns: 3fr 1fr;
+        align-items: center;
+        text-decoration: none;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--color-gray-400);
+      }
+
+      .traceability-card-text {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 16px;
+        font-weight: var(--font-weight-regular);
+        color: var(--color-black);
+      }
+
+      .traceability-card-view-details {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      /* Issued By */
+      .issued-by {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      /* Footer */
+      footer {
+        padding: 16px 16px 32px;
+        background-color: var(--color-gray-100);
+      }
+
+      footer p {
+        font-size: 14px;
+        font-weight: var(--font-weight-regular);
+        color: var(--color-gray-600);
+      }
+
+      /* Links */
+      .blue-bottom-line-thick {
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-decoration-color: var(--color-link-underline-dark);
+        text-underline-offset: 3px;
+        color: var(--color-gray-700);
+      }
+
+      .gray-bottom-line {
+        border-bottom: 1px solid var(--color-gray-600);
+        text-decoration: none;
+        color: var(--color-gray-600);
+      }
+
+      @media (min-width: 1200px) {
+        .container {
+          max-width: 1200px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <div class="header-image">
+          <p class="header-image-top-left">PRODUCT PASSPORT</p>
+          <div class="header-image-bottom-left">
+            <h1>{{credentialSubject.name}}</h1>
+          </div>
+        </div>
+        <div class="header-batch">
+          {{#if credentialSubject.registeredId}}
+          <div class="header-batch-item">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z" fill="var(--color-icon)" stroke="var(--color-icon)" />
+            </svg>
+            <a href="{{credentialSubject.id}}" class="blue-bottom-line-thick" target="_blank">ID: {{credentialSubject.registeredId}}</a>
+          </div>
+          {{/if}}
+          {{#if credentialSubject.batchNumber}}
+          <div class="header-batch-item">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z" fill="var(--color-icon)" stroke="var(--color-icon)" />
+            </svg>
+            <a>Batch: {{credentialSubject.batchNumber}}</a>
+          </div>
+          {{/if}}
+          {{#if credentialSubject.itemNumber}}
+          <div class="header-batch-item">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z" fill="var(--color-icon)" stroke="var(--color-icon)" />
+            </svg>
+            <a>Item: {{credentialSubject.itemNumber}}</a>
+          </div>
+          {{/if}}
+          {{#if credentialSubject.modelNumber}}
+          <div class="header-batch-item">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2.45 3.5C2.17152 3.5 1.90445 3.38938 1.70754 3.19246C1.51062 2.99555 1.4 2.72848 1.4 2.45C1.4 2.17152 1.51062 1.90445 1.70754 1.70754C1.90445 1.51062 2.17152 1.4 2.45 1.4C2.72848 1.4 2.99555 1.51062 3.19246 1.70754C3.38938 1.90445 3.5 2.17152 3.5 2.45C3.5 2.72848 3.38938 2.99555 3.19246 3.19246C2.99555 3.38938 2.72848 3.5 2.45 3.5ZM13.587 6.706L7.287 0.406C7.035 0.154 6.685 0 6.3 0H1.4C0.623 0 0 0.623 0 1.4V6.3C0 6.685 0.154 7.035 0.413 7.287L6.706 13.587C6.965 13.839 7.315 14 7.7 14C8.085 14 8.435 13.839 8.687 13.587L13.587 8.687C13.846 8.435 14 8.085 14 7.7C14 7.308 13.839 6.958 13.587 6.706Z" fill="var(--color-icon)" stroke="var(--color-icon)" />
+            </svg>
+            <a>Model: {{credentialSubject.modelNumber}}</a>
+          </div>
+          {{/if}}
+        </div>
+      </header>
+
+      <section>
+        {{#if credentialSubject.description}}
+        <div class="information-text">{{credentialSubject.description}}</div>
+        {{/if}}
+        {{#if credentialSubject.relatedDocument}}
+        <div class="information-show-more">
+          {{#each credentialSubject.relatedDocument}}
+          {{#if linkURL}}
+          {{#if linkName}}
+          <a href="{{linkURL}}" class="blue-bottom-line-thick" target="_blank">{{linkName}}</a>
+          {{/if}}
+          {{/if}}
+          {{/each}}
+        </div>
+        {{/if}}
+      </section>
+
+      <section class="production">
+        <div class="section-title">Production</div>
+        <div class="table">
+          {{#if credentialSubject.productCategory}}
+          <div class="table-item">
+            <span>Product category</span>
+            <p class="item-value">
+              {{#each credentialSubject.productCategory}}{{name}}{{#unless @last}}, {{/unless}}{{/each}}
+            </p>
+          </div>
+          {{/if}}
+          {{#each credentialSubject.relatedParty}}
+          {{#if party}}
+          <div class="table-item">
+            <span>{{role}}</span>
+            <a href="{{party.id}}" class="blue-bottom-line-thick" target="_blank">{{party.name}}</a>
+          </div>
+          {{/if}}
+          {{/each}}
+          {{#if credentialSubject.producedAtFacility}}
+          <div class="table-item">
+            <span>Produced at</span>
+            <p class="item-value">
+              <a href="{{credentialSubject.producedAtFacility.id}}" class="blue-bottom-line-thick" target="_blank">{{credentialSubject.producedAtFacility.name}}</a>
+            </p>
+          </div>
+          {{/if}}
+          {{#if credentialSubject.productionDate}}
+          <div class="table-item">
+            <span>Date produced</span>
+            <p class="item-value">{{credentialSubject.productionDate}}</p>
+          </div>
+          {{/if}}
+          {{#if credentialSubject.countryOfProduction}}
+          <div class="table-item">
+            <span>Country</span>
+            <p class="item-value">
+              {{#if credentialSubject.countryOfProduction.countryName}}
+                {{credentialSubject.countryOfProduction.countryName}}
+                {{#if credentialSubject.countryOfProduction.countryCode}}
+                  ({{credentialSubject.countryOfProduction.countryCode}})
+                {{/if}}
+              {{else}}
+                {{credentialSubject.countryOfProduction}}
+              {{/if}}
+            </p>
+          </div>
+          {{/if}}
+          {{#if credentialSubject.idScheme}}
+          <div class="table-item">
+            <span>ID scheme</span>
+            <p class="item-value">
+              <a href="{{credentialSubject.idScheme.id}}" class="blue-bottom-line-thick" target="_blank">{{credentialSubject.idScheme.name}}</a>
+            </p>
+          </div>
+          {{/if}}
+          {{#if credentialSubject.idGranularity}}
+          <div class="table-item">
+            <span>ID granularity</span>
+            <p class="item-value">{{credentialSubject.idGranularity}}</p>
+          </div>
+          {{/if}}
+          {{#if credentialSubject.dimensions}}
+          <div class="table-item">
+            <span>Dimensions</span>
+            <p class="item-value">
+              {{#if credentialSubject.dimensions.weight}}
+              <span>Weight: {{credentialSubject.dimensions.weight.value}} {{credentialSubject.dimensions.weight.unit}}</span>
+              {{/if}}
+              {{#if credentialSubject.dimensions.length}}
+              <span>Length: {{credentialSubject.dimensions.length.value}} {{credentialSubject.dimensions.length.unit}}</span>
+              {{/if}}
+              {{#if credentialSubject.dimensions.width}}
+              <span>Width: {{credentialSubject.dimensions.width.value}} {{credentialSubject.dimensions.width.unit}}</span>
+              {{/if}}
+              {{#if credentialSubject.dimensions.height}}
+              <span>Height: {{credentialSubject.dimensions.height.value}} {{credentialSubject.dimensions.height.unit}}</span>
+              {{/if}}
+              {{#if credentialSubject.dimensions.volume}}
+              <span>Volume: {{credentialSubject.dimensions.volume.value}} {{credentialSubject.dimensions.volume.unit}}</span>
+              {{/if}}
+            </p>
+          </div>
+          {{/if}}
+        </div>
+      </section>
+
+      {{#if credentialSubject.performanceClaim}}
+      <section class="declarations">
+        <div>
+          <h3 class="section-title">Performance Claims</h3>
+        </div>
+        <div class="cards-conformities">
+          {{#each credentialSubject.performanceClaim}}
+          <article class="cards-conformity">
+            <div class="claim-name">{{name}}</div>
+            {{#if description}}
+            <div class="conformity-info">
+              <p>{{description}}</p>
+            </div>
+            {{/if}}
+            {{#if conformityTopic}}
+            <div>
+              {{#each conformityTopic}}
+              <span class="conformity-topic-tag">{{name}}</span>
+              {{/each}}
+            </div>
+            {{/if}}
+            {{#if claimedPerformance}}
+            <div class="conformity-info">
+              {{#each claimedPerformance}}
+              {{#if metric}}
+              <p class="performance-item">
+                {{metric.name}}:
+                {{#if measure}}
+                  {{measure.value}} {{measure.unit}}
+                {{/if}}
+              </p>
+              {{/if}}
+              {{/each}}
+            </div>
+            {{/if}}
+            {{#if referenceCriteria}}
+            <div class="conformity-info">
+              {{#each referenceCriteria}}
+              <p>
+                <a href="{{id}}" class="gray-bottom-line" target="_blank">{{name}}</a>
+              </p>
+              {{/each}}
+            </div>
+            {{/if}}
+            {{#if claimDate}}
+            <div class="conformity-info">
+              <p>Claim date: {{claimDate}}</p>
+            </div>
+            {{/if}}
+          </article>
+          {{/each}}
+        </div>
+      </section>
+      {{/if}}
+
+      {{#if credentialSubject.materialProvenance}}
+      {{#if credentialSubject.materialProvenance.0.name}}
+      <section class="composition">
+        <div>
+          <h3 class="section-title">Material Provenance</h3>
+          <p class="section-description">Origin and composition of materials used in this product.</p>
+        </div>
+        <div class="composition-box">
+          {{#each credentialSubject.materialProvenance}}
+          <article class="composition-box-item">
+            <div class="composition-first-column">
+              {{#if massFraction}}
+              <p class="composition-percent">{{massFraction}}</p>
+              {{else}}
+              <p class="composition-percent">—</p>
+              {{/if}}
+              <div>
+                <p class="composition-title">
+                  {{#if mass}}{{mass.value}} {{mass.unit}} {{/if}}{{name}}
+                </p>
+                {{#if materialType}}
+                <p style="font-size:13px;color:var(--color-gray-600);">{{materialType.name}}</p>
+                {{/if}}
+                <div class="composition-tag">
+                  {{#if recycledMassFraction}}
+                  <p class="composition-tag-item">Recycled {{recycledMassFraction}}</p>
+                  {{/if}}
+                  <p class="composition-tag-item">Hazard {{#if hazardous}}Yes{{else}}No{{/if}}</p>
+                </div>
+              </div>
+            </div>
+            {{#if originCountry}}
+            <div class="country-code">
+              {{#if originCountry.countryCode}}{{originCountry.countryCode}}{{else}}{{originCountry}}{{/if}}
+            </div>
+            {{/if}}
+          </article>
+          {{/each}}
+        </div>
+      </section>
+      {{/if}}
+      {{/if}}
+
+      {{#if credentialSubject.characteristics}}
+      <section class="production">
+        <div>
+          <h3 class="section-title">Characteristics</h3>
+        </div>
+        <div class="table">
+          {{#each credentialSubject.characteristics}}
+          <div class="table-item">
+            <span>{{@key}}</span>
+            <p class="item-value">{{this}}</p>
+          </div>
+          {{/each}}
+        </div>
+      </section>
+      {{/if}}
+
+      <section class="issued-by">
+        <div>
+          <h3 class="section-title">Passport Issued By</h3>
+        </div>
+        <div class="table">
+          <div class="table-item">
+            <span>Organisation</span>
+            <p class="item-value">{{issuer.name}}</p>
+          </div>
+          <div class="table-item">
+            <span>Registered ID</span>
+            <a href="{{issuer.id}}" class="blue-bottom-line-thick" target="_blank">{{issuer.id}}</a>
+          </div>
+          {{#if issuer.issuerAlsoKnownAs}}
+          {{#each issuer.issuerAlsoKnownAs}}
+          {{#if idScheme.name}}
+          <div class="table-item">
+            <span>Registry</span>
+            <p class="item-value">
+              <a href="{{idScheme.id}}" class="blue-bottom-line-thick" target="_blank">{{idScheme.name}}</a>
+            </p>
+          </div>
+          {{/if}}
+          {{/each}}
+          {{/if}}
+          {{#if validFrom}}
+          <div class="table-item">
+            <span>Valid from</span>
+            <p class="item-value">{{validFrom}}</p>
+          </div>
+          {{/if}}
+          {{#if validUntil}}
+          <div class="table-item">
+            <span>Valid to</span>
+            <p class="item-value">{{validUntil}}</p>
+          </div>
+          {{/if}}
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          This Digital Product Passport (DPP) is a digital record of the product's sustainability and environmental performance, ensuring transparency and accountability in line with UNTP standards. For more information visit
+          <a href="https://uncefact.github.io/spec-untp/" class="gray-bottom-line" target="_blank">uncefact.github.io/spec-untp/</a>.
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>
