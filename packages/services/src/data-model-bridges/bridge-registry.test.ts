@@ -22,6 +22,16 @@ describe('bridge-registry', () => {
       expect(getBridge(dataModelType, '0.6.1')).toBeDefined();
     });
 
+    it.each([
+      'DigitalProductPassport',
+      'DigitalConformityCredential',
+      'DigitalFacilityRecord',
+      'DigitalIdentityAnchor',
+      'DigitalTraceabilityEvent',
+    ])('returns a bridge for %s at version 0.7.0', (dataModelType) => {
+      expect(getBridge(dataModelType, '0.7.0')).toBeDefined();
+    });
+
     it('returns undefined for an unknown type', () => {
       expect(getBridge('UnknownType', '0.6.0')).toBeUndefined();
     });
@@ -39,6 +49,7 @@ describe('bridge-registry', () => {
     ])('each bridge for %s has buildSubject and extractRefs methods', (dataModelType) => {
       const bridge060 = getBridge(dataModelType, '0.6.0');
       const bridge061 = getBridge(dataModelType, '0.6.1');
+      const bridge070 = getBridge(dataModelType, '0.7.0');
 
       expect(bridge060).toHaveProperty('buildSubject');
       expect(bridge060).toHaveProperty('extractRefs');
@@ -49,6 +60,11 @@ describe('bridge-registry', () => {
       expect(bridge061).toHaveProperty('extractRefs');
       expect(typeof bridge061!.buildSubject).toBe('function');
       expect(typeof bridge061!.extractRefs).toBe('function');
+
+      expect(bridge070).toHaveProperty('buildSubject');
+      expect(bridge070).toHaveProperty('extractRefs');
+      expect(typeof bridge070!.buildSubject).toBe('function');
+      expect(typeof bridge070!.extractRefs).toBe('function');
     });
   });
 });
