@@ -30,6 +30,10 @@
     section { padding: 0 16px; }
     a { text-decoration: none; }
 
+    .capitalize-first {
+      text-transform: capitalize;
+    }
+
     .identity-anchor {
       width: 100%;
       margin: 0 auto;
@@ -292,7 +296,7 @@
           <div class="grid-row border-bottom-gray-500">
             <div class="label">Register Type</div>
             <div class="grid-value">
-              <div class="grid-value-text">{{credentialSubject.registerType}}</div>
+              <div class="grid-value-text capitalize-first">{{credentialSubject.registerType}}</div>
             </div>
           </div>
           {{/if}}
@@ -345,21 +349,6 @@
             </div>
           </div>
         </div>
-        {{#if issuer.issuerAlsoKnownAs}}
-        {{#each issuer.issuerAlsoKnownAs}}
-        {{#if idScheme.name}}
-        <div class="grid-row-alt border-bottom-gray-400">
-          <div class="label-alt">Issuer Registry</div>
-          <div class="grid-value">
-            <div class="grid-value-text-alt">
-              <a href="{{idScheme.id}}" style="text-decoration:underline;color:var(--color-gray-700);" target="_blank">{{idScheme.name}}</a>
-              {{#if registeredId}} · {{registeredId}}{{/if}}
-            </div>
-          </div>
-        </div>
-        {{/if}}
-        {{/each}}
-        {{/if}}
         {{#if validFrom}}
         <div class="grid-row-alt border-bottom-gray-400">
           <div class="label-alt">Valid from</div>
