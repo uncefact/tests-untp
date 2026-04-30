@@ -42,6 +42,10 @@
         box-sizing: border-box;
       }
 
+      .capitalize-first {
+        text-transform: capitalize;
+      }
+
       body {
         font-family: var(--font-family);
         color: var(--color-gray-600);
@@ -436,17 +440,6 @@
         {{#if credentialSubject.description}}
         <div class="information-text">{{credentialSubject.description}}</div>
         {{/if}}
-        {{#if credentialSubject.relatedDocument}}
-        <div class="information-show-more">
-          {{#each credentialSubject.relatedDocument}}
-          {{#if linkURL}}
-          {{#if linkName}}
-          <a href="{{linkURL}}" class="blue-bottom-line-thick" target="_blank">{{linkName}}</a>
-          {{/if}}
-          {{/if}}
-          {{/each}}
-        </div>
-        {{/if}}
       </section>
 
       <section class="production">
@@ -463,7 +456,7 @@
           {{#each credentialSubject.relatedParty}}
           {{#if party}}
           <div class="table-item">
-            <span>{{role}}</span>
+            <span class="capitalize-first">{{role}}</span>
             <a href="{{party.id}}" class="blue-bottom-line-thick" target="_blank">{{party.name}}</a>
           </div>
           {{/if}}
@@ -495,20 +488,6 @@
                 {{credentialSubject.countryOfProduction}}
               {{/if}}
             </p>
-          </div>
-          {{/if}}
-          {{#if credentialSubject.idScheme}}
-          <div class="table-item">
-            <span>ID scheme</span>
-            <p class="item-value">
-              <a href="{{credentialSubject.idScheme.id}}" class="blue-bottom-line-thick" target="_blank">{{credentialSubject.idScheme.name}}</a>
-            </p>
-          </div>
-          {{/if}}
-          {{#if credentialSubject.idGranularity}}
-          <div class="table-item">
-            <span>ID granularity</span>
-            <p class="item-value">{{credentialSubject.idGranularity}}</p>
           </div>
           {{/if}}
           {{#if credentialSubject.dimensions}}
@@ -663,18 +642,6 @@
             <span>Registered ID</span>
             <a href="{{issuer.id}}" class="blue-bottom-line-thick" target="_blank">{{issuer.id}}</a>
           </div>
-          {{#if issuer.issuerAlsoKnownAs}}
-          {{#each issuer.issuerAlsoKnownAs}}
-          {{#if idScheme.name}}
-          <div class="table-item">
-            <span>Registry</span>
-            <p class="item-value">
-              <a href="{{idScheme.id}}" class="blue-bottom-line-thick" target="_blank">{{idScheme.name}}</a>
-            </p>
-          </div>
-          {{/if}}
-          {{/each}}
-          {{/if}}
           {{#if validFrom}}
           <div class="table-item">
             <span>Valid from</span>
@@ -693,7 +660,7 @@
       <footer>
         <p>
           This Digital Product Passport (DPP) is a digital record of the product's sustainability and environmental performance, ensuring transparency and accountability in line with UNTP standards. For more information visit
-          <a href="https://uncefact.github.io/spec-untp/" class="gray-bottom-line" target="_blank">uncefact.github.io/spec-untp/</a>.
+          <a href="https://untp.unece.org" class="gray-bottom-line" target="_blank">untp.unece.org</a>.
         </p>
       </footer>
     </div>
