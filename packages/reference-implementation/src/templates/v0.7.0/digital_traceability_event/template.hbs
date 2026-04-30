@@ -641,21 +641,6 @@
               </a>
             </div>
           </div>
-          {{#if issuer.issuerAlsoKnownAs}}
-          {{#each issuer.issuerAlsoKnownAs}}
-          {{#if idScheme.name}}
-          <div class="data-row-standard">
-            <div class="data-label">Issuer registry</div>
-            <div class="data-value">
-              <a href="{{idScheme.id}}" class="link-highlight" target="_blank">
-                <span class="link-text">{{idScheme.name}}</span>
-              </a>
-              {{#if registeredId}} · {{registeredId}}{{/if}}
-            </div>
-          </div>
-          {{/if}}
-          {{/each}}
-          {{/if}}
           {{#if validFrom}}
           <div class="data-row-standard">
             <div class="data-label">Valid from</div>
