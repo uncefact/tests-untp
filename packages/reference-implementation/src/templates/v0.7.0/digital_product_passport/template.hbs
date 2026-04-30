@@ -522,61 +522,6 @@
         </div>
       </section>
 
-      {{#if credentialSubject.performanceClaim}}
-      <section class="declarations">
-        <div>
-          <h3 class="section-title">Performance Claims</h3>
-        </div>
-        <div class="cards-conformities">
-          {{#each credentialSubject.performanceClaim}}
-          <article class="cards-conformity">
-            <div class="claim-name">{{name}}</div>
-            {{#if description}}
-            <div class="conformity-info">
-              <p>{{description}}</p>
-            </div>
-            {{/if}}
-            {{#if conformityTopic}}
-            <div>
-              {{#each conformityTopic}}
-              <span class="conformity-topic-tag">{{name}}</span>
-              {{/each}}
-            </div>
-            {{/if}}
-            {{#if claimedPerformance}}
-            <div class="conformity-info">
-              {{#each claimedPerformance}}
-              {{#if metric}}
-              <p class="performance-item">
-                {{metric.name}}:
-                {{#if measure}}
-                  {{measure.value}} {{measure.unit}}
-                {{/if}}
-              </p>
-              {{/if}}
-              {{/each}}
-            </div>
-            {{/if}}
-            {{#if referenceCriteria}}
-            <div class="conformity-info">
-              {{#each referenceCriteria}}
-              <p>
-                <a href="{{id}}" class="gray-bottom-line" target="_blank">{{name}}</a>
-              </p>
-              {{/each}}
-            </div>
-            {{/if}}
-            {{#if claimDate}}
-            <div class="conformity-info">
-              <p>Claim date: {{claimDate}}</p>
-            </div>
-            {{/if}}
-          </article>
-          {{/each}}
-        </div>
-      </section>
-      {{/if}}
-
       {{#if credentialSubject.materialProvenance}}
       {{#if credentialSubject.materialProvenance.0.name}}
       <section class="composition">
