@@ -34,6 +34,9 @@
         --font-weight-medium: 500;
         --font-weight-bold: 600;
         --font-weight-black: 900;
+
+        --image-src: url("{{credentialSubject.productImage.linkURL}}");
+        /* Background image for header image; Default: url("{{credentialSubject.product.productImage.linkURL}}") */
       }
 
       * {
@@ -75,6 +78,10 @@
 
       .header-image {
         background-color: var(--color-gray-600);
+        background-image: var(--image-src, none), linear-gradient(248.36deg, rgba(0, 0, 0, 0.18) 7.6%, rgba(0, 0, 0, 0.6) 70.52%);
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
         height: 232px;
         position: relative;
       }
