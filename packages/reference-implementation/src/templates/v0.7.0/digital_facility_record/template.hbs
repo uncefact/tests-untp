@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap"
+      rel="stylesheet" />
+    <title>Digital Facility Record</title>
+    <style>
+      :root {
+        --color-primary: rgba(35, 46, 61, 1);
+        --color-secondary: rgba(31, 90, 149, 1);
+        --color-white: rgba(255, 255, 255, 1);
+        --color-black: rgba(0, 0, 0, 1);
+        --color-gray-700: rgba(35, 46, 61, 1);
+        --color-gray-600: rgba(85, 96, 110, 1);
+        --color-gray-500: rgba(169, 177, 183, 1);
+        --color-gray-400: rgba(212, 214, 216, 1);
+        --color-gray-300: rgba(237, 239, 240, 1);
+        --color-success-bg: rgba(184, 236, 182, 1);
+        --color-success-text: rgba(8, 50, 0, 1);
+        --color-error-bg: rgba(255, 188, 183, 1);
+        --color-error-text: rgba(50, 0, 0, 1);
+        --color-link-underline-dark: rgba(79, 149, 221, 1);
+        --color-link-underline-light: rgba(148, 196, 245, 1);
+        --color-icon: #1f5a95;
+        --font-family: 'Lato', sans-serif;
+        --font-weight-regular: 400;
+        --font-weight-medium: 500;
+        --font-weight-semi-bold: 600;
+        --font-weight-bold: 700;
+        --font-weight-black: 900;
+      }
+
+      * { margin: 0; box-sizing: border-box; }
+      body { font-family: var(--font-family); }
+      section { padding: 0 16px; }
+      a { text-decoration: none; }
+
+      .capitalize-first {
+        text-transform: capitalize;
+      }
+
+      .facility-record {
+        width: 100%;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+      }
+
+      .facility-record-header {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        align-items: center;
+      }
+
+      .facility-header {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 32px 16px 20px 16px;
+        background-color: var(--color-primary);
+      }
+
+      .facility-record .facility-title {
+        width: 100%;
+        font-weight: var(--font-weight-medium);
+        color: var(--color-white);
+        font-size: 16px;
+        line-height: 22px;
+        text-transform: uppercase;
+      }
+
+      .facility-record .name-description {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .facility-record .name-description h1 {
+        font-weight: var(--font-weight-black);
+        color: var(--color-white);
+        font-size: 30px;
+        line-height: 32.5px;
+      }
+
+      .facility-record .name-description p {
+        font-weight: var(--font-weight-medium);
+        color: var(--color-white);
+        font-size: 16px;
+        line-height: 17.4px;
+      }
+
+      .facility-record .facility-details-section {
+        padding: 0 16px 16px;
+        align-self: stretch;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        background-color: var(--color-gray-600);
+      }
+
+      .facility-record .grid-row {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 16px;
+        padding: 10px 0 12px;
+        width: 100%;
+        border-bottom: 1px solid;
+      }
+
+      .facility-record .grid-row:last-child { border-bottom: none; }
+
+      .facility-record .border-bottom-gray-500 { border-color: var(--color-gray-500); }
+
+      .facility-record .label {
+        font-weight: var(--font-weight-regular);
+        color: var(--color-gray-300);
+        font-size: 16px;
+        line-height: 22px;
+      }
+
+      .facility-record .grid-value {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        align-self: stretch;
+        flex: 1;
+      }
+
+      .facility-record .grid-value-text {
+        font-weight: var(--font-weight-medium);
+        color: var(--color-white);
+        font-size: 16px;
+        line-height: 17.4px;
+        flex: 1;
+      }
+
+      .facility-record .grid-value-list {
+        display: flex;
+        flex-wrap: wrap;
+        row-gap: 4px;
+        max-width: 100%;
+      }
+
+      .facility-record .grid-value-list a { margin-right: 10px; }
+
+      .blue-bottom-line-2,
+      .blue-bottom-line-2:link {
+        width: fit-content;
+        color: var(--color-white);
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-decoration-color: var(--color-link-underline-light);
+        text-underline-offset: 3px;
+      }
+
+      .white-text { color: var(--color-white); }
+
+      /* Declarations / Performance Claims */
+      .facility-record .declarations {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 0 16px;
+        width: 100%;
+      }
+
+      .facility-record .declaration-title {
+        font-size: 20px;
+        font-weight: var(--font-weight-bold);
+        line-height: 21.8px;
+        color: var(--color-gray-700);
+      }
+
+      .facility-record .conformities-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .facility-record .conformity-card {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 16px 18px 16px 16px;
+        background-color: var(--color-white);
+        border-radius: 4px;
+        border: 1px solid var(--color-gray-400);
+      }
+
+      .facility-record .claim-name {
+        position: relative;
+        align-self: stretch;
+        font-weight: var(--font-weight-regular);
+        color: var(--color-secondary);
+        font-size: 18px;
+        line-height: 21.2px;
+      }
+
+      .facility-record .regulation-details {
+        color: var(--color-gray-600);
+        font-size: 14px;
+        line-height: 19.2px;
+        align-self: stretch;
+        font-weight: var(--font-weight-regular);
+      }
+
+      .facility-record .metric-value {
+        flex: 1;
+        color: var(--color-gray-700);
+        font-size: 16px;
+        font-weight: var(--font-weight-regular);
+        line-height: 17.44px;
+      }
+
+      .facility-record .conformity-topic-tag {
+        display: inline-block;
+        padding: 2px 8px;
+        background-color: rgba(31, 90, 149, 0.1);
+        border-radius: 4px;
+        font-size: 13px;
+        color: var(--color-secondary);
+        margin-right: 4px;
+        margin-bottom: 4px;
+      }
+
+      .facility-record .period-info {
+        font-size: 13px;
+        color: var(--color-gray-600);
+      }
+
+      /* Material Usage section */
+      .facility-record .material-usage {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 0 16px;
+        width: 100%;
+      }
+
+      .facility-record .material-table {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .facility-record .material-item {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        border: 1px solid var(--color-gray-400);
+        border-radius: 4px;
+        padding: 12px 16px;
+        gap: 12px;
+        align-items: start;
+      }
+
+      .facility-record .material-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .facility-record .material-name {
+        font-size: 16px;
+        font-weight: var(--font-weight-semi-bold);
+        color: var(--color-black);
+      }
+
+      .facility-record .material-type {
+        font-size: 13px;
+        color: var(--color-gray-600);
+      }
+
+      .facility-record .material-tags {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+      }
+
+      .facility-record .material-tag {
+        font-size: 12px;
+        background-color: rgba(247, 250, 253, 1);
+        color: var(--color-gray-600);
+        padding: 2px 6px;
+        border-radius: 3px;
+      }
+
+      .facility-record .material-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+      }
+
+      .facility-record .material-mass {
+        font-size: 16px;
+        font-weight: var(--font-weight-medium);
+        color: var(--color-gray-700);
+      }
+
+      .facility-record .material-country {
+        font-size: 13px;
+        color: var(--color-gray-600);
+      }
+
+      /* Related documents */
+      .facility-record .related-docs {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 0 16px;
+        width: 100%;
+      }
+
+      .facility-record .doc-link {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--color-gray-400);
+        text-decoration: none;
+        color: var(--color-gray-700);
+        font-size: 16px;
+        font-weight: var(--font-weight-regular);
+      }
+
+      /* Issuing details */
+      .facility-record .issuing-details {
+        width: 100%;
+        padding: 24px 16px 36px;
+        background-color: var(--color-gray-300);
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+
+      .facility-record .issuing-title {
+        font-weight: var(--font-weight-bold);
+        color: var(--color-black);
+        font-size: 20px;
+        line-height: 21.8px;
+      }
+
+      .facility-record .facility-details {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+      }
+
+      .facility-record .grid-row-alt {
+        display: grid;
+        grid-template-columns: 1.4fr 3fr;
+        gap: 16px;
+        padding: 10px 0 12px;
+        width: 100%;
+        border-bottom: 1px solid;
+      }
+
+      .facility-record .border-bottom-gray-400 { border-color: var(--color-gray-400); }
+
+      .facility-record .label-alt {
+        font-weight: var(--font-weight-regular);
+        color: var(--color-gray-600);
+        font-size: 16px;
+        line-height: 22px;
+      }
+
+      .facility-record .grid-value-link {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        align-self: stretch;
+        display: flex;
+        flex: 1;
+      }
+
+      .facility-record .div-wrapper {
+        gap: 10px;
+        display: inline-flex;
+        align-items: flex-start;
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-decoration-color: var(--color-link-underline-dark);
+        text-underline-offset: 3px;
+      }
+
+      .facility-record .issuer-link {
+        font-weight: var(--font-weight-medium);
+        color: var(--color-gray-700);
+        font-size: 16px;
+        line-height: 22px;
+      }
+
+      .facility-record .grid-value-text-alt {
+        font-weight: var(--font-weight-medium);
+        color: var(--color-gray-700);
+        font-size: 16px;
+        line-height: 17.4px;
+        flex: 1;
+      }
+
+      @media (min-width: 1200px) {
+        .facility-record { max-width: 1200px; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="facility-record">
+      <div class="facility-record-header">
+        <header class="facility-header">
+          <div class="facility-title">FACILITY RECORD</div>
+          <div class="name-description">
+            <h1>{{credentialSubject.name}}</h1>
+            {{#if credentialSubject.description}}
+            <p>{{credentialSubject.description}}</p>
+            {{/if}}
+          </div>
+        </header>
+        <section class="facility-details-section">
+          <div class="facility-details">
+            {{#each credentialSubject.relatedParty}}
+            {{#if party}}
+            <div class="grid-row border-bottom-gray-500">
+              <div class="label capitalize-first">{{role}}</div>
+              <div class="grid-value">
+                <a href="{{party.id}}" class="blue-bottom-line-2" aria-label="Visit {{party.name}}" target="_blank">{{party.name}}</a>
+              </div>
+            </div>
+            {{/if}}
+            {{/each}}
+                        {{#if credentialSubject.registeredId}}
+            <div class="grid-row border-bottom-gray-500">
+              <div class="label">Registered ID</div>
+              <div class="grid-value">
+                <div class="grid-value-text">{{credentialSubject.registeredId}}</div>
+              </div>
+            </div>
+            {{/if}}
+            {{#if credentialSubject.countryOfOperation}}
+            <div class="grid-row border-bottom-gray-500">
+              <div class="label">Country</div>
+              <div class="grid-value">
+                <div class="grid-value-text">
+                  {{#if credentialSubject.countryOfOperation.countryName}}
+                    {{credentialSubject.countryOfOperation.countryName}}
+                    {{#if credentialSubject.countryOfOperation.countryCode}}({{credentialSubject.countryOfOperation.countryCode}}){{/if}}
+                  {{else}}
+                    {{credentialSubject.countryOfOperation}}
+                  {{/if}}
+                </div>
+              </div>
+            </div>
+            {{/if}}
+            {{#if credentialSubject.address}}
+            <div class="grid-row border-bottom-gray-500">
+              <div class="label">Address</div>
+              <div class="grid-value">
+                {{#if credentialSubject.locationInformation.plusCode}}
+                <a href="{{credentialSubject.locationInformation.plusCode}}" class="blue-bottom-line-2" target="_blank">
+                  {{#if credentialSubject.address.streetAddress}}{{credentialSubject.address.streetAddress}}, {{/if}}
+                  {{#if credentialSubject.address.addressLocality}}{{credentialSubject.address.addressLocality}}, {{/if}}
+                  {{#if credentialSubject.address.addressRegion}}{{credentialSubject.address.addressRegion}} {{/if}}
+                  {{#if credentialSubject.address.postalCode}}{{credentialSubject.address.postalCode}}{{/if}}
+                </a>
+                {{else}}
+                <span class="white-text">
+                  {{#if credentialSubject.address.streetAddress}}{{credentialSubject.address.streetAddress}}, {{/if}}
+                  {{#if credentialSubject.address.addressLocality}}{{credentialSubject.address.addressLocality}}, {{/if}}
+                  {{#if credentialSubject.address.addressRegion}}{{credentialSubject.address.addressRegion}} {{/if}}
+                  {{#if credentialSubject.address.postalCode}}{{credentialSubject.address.postalCode}}{{/if}}
+                </span>
+                {{/if}}
+              </div>
+            </div>
+            {{/if}}
+            {{#if credentialSubject.locationInformation.geoLocation}}
+            <div class="grid-row border-bottom-gray-500">
+              <div class="label">Geolocation</div>
+              <div class="grid-value">
+                {{#if credentialSubject.locationInformation.geoLocation.latitude}}
+                <a
+                  href="https://www.google.com/maps?q={{credentialSubject.locationInformation.geoLocation.latitude}},{{credentialSubject.locationInformation.geoLocation.longitude}}"
+                  class="blue-bottom-line-2"
+                  target="_blank">Show on map</a>
+                {{/if}}
+              </div>
+            </div>
+            {{/if}}
+            {{#if credentialSubject.processCategory}}
+            <div class="grid-row border-bottom-gray-500">
+              <div class="label">Processes</div>
+              <div class="grid-value">
+                <div class="grid-value-list">
+                  {{#each credentialSubject.processCategory}}
+                  <a href="{{schemeId}}" class="blue-bottom-line-2" target="_blank">{{name}}</a>
+                  {{/each}}
+                </div>
+              </div>
+            </div>
+            {{/if}}
+          </div>
+        </section>
+      </div>
+
+      {{#if credentialSubject.materialUsage}}
+      <section class="material-usage">
+        <h2 class="declaration-title">Material Usage</h2>
+        {{#if credentialSubject.materialUsage.applicablePeriod}}
+        <p class="period-info">
+          Period: {{credentialSubject.materialUsage.applicablePeriod.startDate}} — {{credentialSubject.materialUsage.applicablePeriod.endDate}}
+          {{#if credentialSubject.materialUsage.applicablePeriod.periodInformation}}
+            · {{credentialSubject.materialUsage.applicablePeriod.periodInformation}}
+          {{/if}}
+        </p>
+        {{/if}}
+        {{#if credentialSubject.materialUsage.materialConsumed}}
+        <div class="material-table">
+          {{#each credentialSubject.materialUsage.materialConsumed}}
+          <div class="material-item">
+            <div class="material-left">
+              <div class="material-name">{{name}}</div>
+              {{#if materialType}}
+              <div class="material-type">{{materialType.name}}</div>
+              {{/if}}
+              <div class="material-tags">
+                {{#if recycledMassFraction}}
+                <span class="material-tag">Recycled {{recycledMassFraction}}</span>
+                {{/if}}
+                <span class="material-tag">Hazard {{#if hazardous}}Yes{{else}}No{{/if}}</span>
+              </div>
+            </div>
+            <div class="material-right">
+              {{#if mass}}
+              <div class="material-mass">{{mass.value}} {{mass.unit}}</div>
+              {{/if}}
+              {{#if originCountry}}
+              <div class="material-country">
+                {{#if originCountry.countryCode}}{{originCountry.countryCode}}{{else}}{{originCountry}}{{/if}}
+              </div>
+              {{/if}}
+            </div>
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
+      </section>
+      {{/if}}
+
+      {{#if credentialSubject.performanceClaim}}
+      <section class="declarations">
+        <h2 class="declaration-title">Performance Claims</h2>
+        <div class="conformities-list">
+          {{#each credentialSubject.performanceClaim}}
+          <article class="conformity-card">
+            <div class="claim-name">{{name}}</div>
+            {{#if description}}
+            <p class="regulation-details">{{description}}</p>
+            {{/if}}
+            {{#if conformityTopic}}
+            <div>
+              {{#each conformityTopic}}
+              <span class="conformity-topic-tag">{{name}}</span>
+              {{/each}}
+            </div>
+            {{/if}}
+            {{#if claimedPerformance}}
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              {{#each claimedPerformance}}
+              {{#if metric}}
+              <p class="metric-value">{{metric.name}}: {{#if measure}}{{measure.value}} {{measure.unit}}{{/if}}</p>
+              {{/if}}
+              {{/each}}
+            </div>
+            {{/if}}
+            {{#if applicablePeriod}}
+            <p class="period-info">Period: {{applicablePeriod.startDate}} — {{applicablePeriod.endDate}}</p>
+            {{/if}}
+            {{#if claimDate}}
+            <p class="regulation-details">Claim date: {{claimDate}}</p>
+            {{/if}}
+            {{#if referenceCriteria}}
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              {{#each referenceCriteria}}
+              <a href="{{id}}" target="_blank" style="font-size:13px;color:var(--color-secondary);text-decoration:underline;">{{name}}</a>
+              {{/each}}
+            </div>
+            {{/if}}
+          </article>
+          {{/each}}
+        </div>
+      </section>
+      {{/if}}
+
+      {{#if credentialSubject.relatedDocument}}
+      <section class="related-docs">
+        <h2 class="declaration-title">Related Documents</h2>
+        {{#each credentialSubject.relatedDocument}}
+        {{#if linkURL}}
+        <a href="{{linkURL}}" class="doc-link" target="_blank">
+          <span>{{#if linkName}}{{linkName}}{{else}}{{linkURL}}{{/if}}</span>
+          <svg width="9" height="16" viewBox="0 0 9 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 1L8 8L1 15" stroke="var(--color-icon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </a>
+        {{/if}}
+        {{/each}}
+      </section>
+      {{/if}}
+
+      <section class="issuing-details">
+        <div class="typography-heading">
+          <h2 class="issuing-title">Issuing details</h2>
+        </div>
+        <div class="facility-details">
+          <div class="grid-row-alt border-bottom-gray-400">
+            <div class="label-alt">Issued by</div>
+            <div class="grid-value-link">
+              <div class="div-wrapper">
+                <a href="{{issuer.id}}" class="issuer-link" target="_blank">{{issuer.name}}</a>
+              </div>
+            </div>
+          </div>
+          {{#if validFrom}}
+          <div class="grid-row-alt border-bottom-gray-400">
+            <div class="label-alt">Valid from</div>
+            <div class="grid-value">
+              <div class="grid-value-text-alt">{{validFrom}}</div>
+            </div>
+          </div>
+          {{/if}}
+          {{#if validUntil}}
+          <div class="grid-row-alt border-bottom-gray-400">
+            <div class="label-alt">Valid until</div>
+            <div class="grid-value">
+              <div class="grid-value-text-alt">{{validUntil}}</div>
+            </div>
+          </div>
+          {{/if}}
+        </div>
+      </section>
+    </div>
+  </body>
+</html>
