@@ -38,6 +38,10 @@
       section { padding: 0 16px; }
       a { text-decoration: none; }
 
+      .capitalize-first {
+        text-transform: capitalize;
+      }
+
       .facility-record {
         width: 100%;
         margin: 0 auto;
@@ -430,13 +434,21 @@
             {{#each credentialSubject.relatedParty}}
             {{#if party}}
             <div class="grid-row border-bottom-gray-500">
-              <div class="label">{{role}}</div>
+              <div class="label capitalize-first">{{role}}</div>
               <div class="grid-value">
                 <a href="{{party.id}}" class="blue-bottom-line-2" aria-label="Visit {{party.name}}" target="_blank">{{party.name}}</a>
               </div>
             </div>
             {{/if}}
             {{/each}}
+                        {{#if credentialSubject.registeredId}}
+            <div class="grid-row border-bottom-gray-500">
+              <div class="label">Registered ID</div>
+              <div class="grid-value">
+                <div class="grid-value-text">{{credentialSubject.registeredId}}</div>
+              </div>
+            </div>
+            {{/if}}
             {{#if credentialSubject.countryOfOperation}}
             <div class="grid-row border-bottom-gray-500">
               <div class="label">Country</div>
@@ -474,18 +486,6 @@
               </div>
             </div>
             {{/if}}
-            {{#if credentialSubject.processCategory}}
-            <div class="grid-row border-bottom-gray-500">
-              <div class="label">Processes</div>
-              <div class="grid-value">
-                <div class="grid-value-list">
-                  {{#each credentialSubject.processCategory}}
-                  <a href="{{schemeId}}" class="blue-bottom-line-2" target="_blank">{{name}}</a>
-                  {{/each}}
-                </div>
-              </div>
-            </div>
-            {{/if}}
             {{#if credentialSubject.locationInformation.geoLocation}}
             <div class="grid-row border-bottom-gray-500">
               <div class="label">Geolocation</div>
@@ -499,39 +499,17 @@
               </div>
             </div>
             {{/if}}
-            {{#if credentialSubject.registeredId}}
+            {{#if credentialSubject.processCategory}}
             <div class="grid-row border-bottom-gray-500">
-              <div class="label">Registered ID</div>
+              <div class="label">Processes</div>
               <div class="grid-value">
-                <div class="grid-value-text">{{credentialSubject.registeredId}}</div>
-              </div>
-            </div>
-            {{/if}}
-            {{#if credentialSubject.idScheme}}
-            <div class="grid-row border-bottom-gray-500">
-              <div class="label">ID Scheme</div>
-              <div class="grid-value">
-                <a href="{{credentialSubject.idScheme.id}}" class="blue-bottom-line-2" target="_blank">{{credentialSubject.idScheme.name}}</a>
-              </div>
-            </div>
-            {{/if}}
-            {{#if credentialSubject.facilityAlsoKnownAs}}
-            {{#each credentialSubject.facilityAlsoKnownAs}}
-            <div class="grid-row border-bottom-gray-500">
-              <div class="label">Also known as</div>
-              <div class="grid-value">
-                {{#if idScheme.name}}
-                <div class="grid-value-text">
-                  <a href="{{id}}" class="blue-bottom-line-2" target="_blank">{{name}}</a>
-                  {{#if registeredId}} · {{registeredId}}{{/if}}
-                  {{#if idScheme.name}} ({{idScheme.name}}){{/if}}
+                <div class="grid-value-list">
+                  {{#each credentialSubject.processCategory}}
+                  <a href="{{schemeId}}" class="blue-bottom-line-2" target="_blank">{{name}}</a>
+                  {{/each}}
                 </div>
-                {{else}}
-                <a href="{{id}}" class="blue-bottom-line-2" target="_blank">{{name}}</a>
-                {{/if}}
               </div>
             </div>
-            {{/each}}
             {{/if}}
           </div>
         </section>
@@ -655,21 +633,6 @@
               </div>
             </div>
           </div>
-          {{#if issuer.issuerAlsoKnownAs}}
-          {{#each issuer.issuerAlsoKnownAs}}
-          {{#if idScheme.name}}
-          <div class="grid-row-alt border-bottom-gray-400">
-            <div class="label-alt">Issuer registry</div>
-            <div class="grid-value">
-              <div class="grid-value-text-alt">
-                <a href="{{idScheme.id}}" style="text-decoration:underline;color:var(--color-gray-700);" target="_blank">{{idScheme.name}}</a>
-                {{#if registeredId}} · {{registeredId}}{{/if}}
-              </div>
-            </div>
-          </div>
-          {{/if}}
-          {{/each}}
-          {{/if}}
           {{#if validFrom}}
           <div class="grid-row-alt border-bottom-gray-400">
             <div class="label-alt">Valid from</div>
