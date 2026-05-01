@@ -36,6 +36,10 @@
     "modelNumber": "SM-CU-CONC-30",
     "batchNumber": "2025-Q1-4501",
     "idGranularity": "model",
+    "productImage": {
+      "linkURL": "https://c.animaapp.com/b3vf2M20/img/pp-header@2x.png",
+      "linkName": "Copper Concentrate"
+    },
     "productCategory": [
       {
         "code": "14110",
