@@ -21,10 +21,69 @@ const getReadableKeyword = (keyword: string) => {
     maxLength: 'too long',
     additionalProperties: 'unexpected field',
     missingValue: 'missing value',
-    minItems: 'to few items',
+    minItems: 'too few items',
     conflictingProperties: 'conflicting field',
+    jsonldUrl: 'JSON-LD context URL',
+    jsonldSyntax: 'JSON-LD syntax',
+    jsonldValidation: 'JSON-LD validation',
+    unknown: 'unknown error',
   };
   return keywords[keyword] || keyword;
+};
+
+const isJsonLdKeyword = (keyword: string) =>
+  keyword === 'jsonldUrl' || keyword === 'jsonldSyntax' || keyword === 'jsonldValidation';
+
+const jsType = (value: unknown): string => {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+};
+
+// `data` may contain BigInts or circular references (verbose AJV forwards the raw value), so
+// JSON.stringify can throw. Wrap it so a malformed credential never crashes the dialog.
+const safeStringify = (value: unknown, pretty = false): string => {
+  try {
+    return JSON.stringify(value, null, pretty ? 2 : undefined) ?? String(value);
+  } catch {
+    return String(value);
+  }
+};
+
+// Build a small "did you mean this?" snippet for AJV type errors based on the actual received value.
+// Only handles the common JSON-LD fix-up: wrapping a scalar in an array.
+const correctiveExample = (mainError: { params?: Record<string, any>; data?: unknown }): string | null => {
+  const expected = mainError.params?.type;
+  const received = mainError.data;
+  if (received === undefined) return null;
+  if (expected === 'array' && !Array.isArray(received)) {
+    return safeStringify([received], true);
+  }
+  if (expected === 'string' && typeof received !== 'string') {
+    return safeStringify(String(received));
+  }
+  return null;
+};
+
+const jsonLdHeaderText = (mainError: { keyword: string; params?: Record<string, any> }) => {
+  if (mainError.keyword === 'jsonldUrl') return 'Fix the @context URL';
+  if (mainError.keyword === 'jsonldSyntax') return 'Fix the @context';
+  switch (mainError.params?.code) {
+    case 'invalid property':
+      return 'Property not defined in @context';
+    case 'relative @id reference':
+    case 'relative @type reference':
+    case 'relative @vocab reference':
+      return 'Use an absolute IRI';
+    case 'reserved term':
+    case 'reserved @id value':
+    case 'reserved @reverse value':
+      return 'Reserved JSON-LD term';
+    case 'invalid @language value':
+      return 'Invalid language tag';
+    default:
+      return 'Fix JSON-LD issue';
+  }
 };
 
 const getFriendlyPath = (path: string) => {
@@ -66,10 +125,46 @@ const getTipMessage = (mainError: ValidationError) => {
       return 'Choose one of the values shown above.';
     case 'required':
       return `Add the missing "${mainError?.params?.missingProperty ?? 'property'}" field.`;
-    case 'type':
-      return `Change the value to match the expected type: ${mainError?.params?.type ?? 'type'}.`;
+    case 'type': {
+      const expected = mainError?.params?.type;
+      const received = mainError?.data;
+      if (expected === 'array' && received !== undefined && !Array.isArray(received)) {
+        return 'Wrap the existing value in an array, as shown above.';
+      }
+      if (expected === 'array') {
+        return 'This field expects an array. Use square brackets, even if there is only one entry: ["value"].';
+      }
+      return `Change the value to match the expected type: ${expected ?? 'type'}.`;
+    }
     case 'conflictingProperties':
       return 'Resolve the conflict by removing the conflicting field or updating it to a unique one.';
+    case 'jsonldUrl':
+      return 'Open the URL in a browser. If it does not return JSON-LD, or it requires login, the playground cannot use it as a context.';
+    case 'jsonldSyntax':
+      return mainError.params?.term
+        ? `Find "${mainError.params.term}" in your @context and either rename it or remove the redefinition.`
+        : 'Review your @context against the JSON-LD specification.';
+    case 'jsonldValidation':
+      switch (mainError.params?.code) {
+        case 'invalid property':
+          return mainError.params?.property
+            ? `Add "${mainError.params.property}" to a @context, or remove it from the credential.`
+            : 'Add the property to a @context, or remove it from the credential.';
+        case 'relative @id reference':
+        case 'relative @type reference':
+        case 'relative @vocab reference':
+          return 'Replace the value with an absolute IRI such as "https://...", "did:...", or "urn:...".';
+        case 'reserved term':
+        case 'reserved @id value':
+        case 'reserved @reverse value':
+          return 'Choose a name that doesn\'t begin with "@" and doesn\'t collide with a JSON-LD keyword.';
+        case 'invalid @language value':
+          return 'Use a BCP-47 language tag, for example "en", "en-AU", or "fr-CA".';
+        default:
+          return 'Fix the value the message points to, or update the @context to allow it.';
+      }
+    case 'unknown':
+      return 'The JSON-LD library returned an error without a recognised category. The message above is the raw output.';
     default:
       return 'Make sure your input matches the required format.';
   }
@@ -112,7 +207,7 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
               const isExpanded = expandedError === index;
               const isAdditionalProp = mainError.keyword === 'additionalProperties';
               const value = mainError.params?.allowedValue || mainError.params?.allowedValues;
-              const fixExample = value ? JSON.stringify(value, null, 2) : null;
+              const fixExample = value ? safeStringify(value, true) : null;
 
               return (
                 <div key={index} className='rounded-lg border bg-white'>
@@ -142,7 +237,9 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                                 ? 'Use the correct value'
                                 : mainError.keyword === 'enum'
                                   ? 'Choose from allowed values'
-                                  : 'Fix validation error'}
+                                  : isJsonLdKeyword(mainError.keyword)
+                                    ? jsonLdHeaderText(mainError)
+                                    : 'Fix validation error'}
                             </span>
                             <span
                               className={`ml-2 text-xs px-2 py-1 rounded ${
@@ -154,9 +251,11 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                               {getReadableKeyword(mainError.keyword || 'unknown')}
                             </span>
                           </div>
-                          <p className='text-sm text-gray-600 mt-1'>
-                            Location: {getFriendlyPath(mainError.instancePath)}
-                          </p>
+                          {!isJsonLdKeyword(mainError.keyword) && (
+                            <p className='text-sm text-gray-600 mt-1'>
+                              Location: {getFriendlyPath(mainError.instancePath)}
+                            </p>
+                          )}
                         </div>
                         <ChevronRight
                           className={`h-5 w-5 text-gray-400 transform transition-transform ${
@@ -170,17 +269,26 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                           <div className='mb-3 text-sm overflow-y-scroll'>
                             {mainError?.message && <p>Issue: {mainError.message}</p>}
                             <br />
-                            {mainError.params?.receivedValue && (
-                              <>
-                                <p>Receive value:</p>
-                                <br />
-                                <pre className='bg-white p-3 rounded border text-sm overflow-x-auto'>
-                                  <code className='text-green-600 block py-4'>
-                                    {JSON.stringify(mainError.params?.receivedValue, null, 2)}
-                                  </code>
-                                </pre>
-                              </>
-                            )}
+                            {(() => {
+                              // For `required` errors AJV's `data` is the parent object, not the
+                              // missing field itself, so dumping it is noisy. The "Missing field" line
+                              // below already names the offending property.
+                              if (mainError.keyword === 'required') return null;
+                              const received =
+                                mainError.params?.receivedValue !== undefined
+                                  ? mainError.params.receivedValue
+                                  : mainError.data;
+                              if (received === undefined) return null;
+                              return (
+                                <>
+                                  <p>Received value ({jsType(received)}):</p>
+                                  <br />
+                                  <pre className='bg-white p-3 rounded border text-sm overflow-x-auto'>
+                                    <code className='text-green-600 block py-4'>{safeStringify(received, true)}</code>
+                                  </pre>
+                                </>
+                              );
+                            })()}
                             <br />
                             {mainError.keyword === 'const' && (
                               <div className='flex flex-col gap-2'>
@@ -207,10 +315,23 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                               </p>
                             )}
                             {mainError.keyword === 'type' && (
-                              <p>
-                                <b>Expected type: </b>
-                                <code className='px-1 py-0.5 bg-gray-100 rounded'>{mainError.params.type}</code>
-                              </p>
+                              <>
+                                <p>
+                                  <b>Expected type: </b>
+                                  <code className='px-1 py-0.5 bg-gray-100 rounded'>{mainError.params.type}</code>
+                                </p>
+                                {(() => {
+                                  const example = correctiveExample(mainError);
+                                  return example ? (
+                                    <div className='mt-2'>
+                                      <p>Try this instead:</p>
+                                      <pre className='bg-white p-3 rounded border text-sm overflow-x-auto mt-1'>
+                                        <code className='text-blue-700 block py-2'>{example}</code>
+                                      </pre>
+                                    </div>
+                                  ) : null;
+                                })()}
+                              </>
                             )}
                             {mainError.keyword === 'missingValue' && <p>{mainError?.message}</p>}
                             {mainError.keyword === 'minItems' && (
@@ -238,6 +359,12 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                                   </code>
                                 </p>
                               </div>
+                            )}
+                            {isJsonLdKeyword(mainError.keyword) && mainError.params?.code && (
+                              <p className='text-xs text-gray-500 mt-2'>
+                                JSON-LD code:{' '}
+                                <code className='px-1 py-0.5 bg-gray-100 rounded'>{mainError.params.code}</code>
+                              </p>
                             )}
                           </div>
 

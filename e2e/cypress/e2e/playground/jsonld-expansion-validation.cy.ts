@@ -56,12 +56,11 @@ describe('JSON-LD Expansion and Validation', () => {
     cy.checkValidationStatus('JSON-LD Document Expansion and Context Validation', 'failure');
 
     cy.openErrorDetailsByStepName('JSON-LD Document Expansion and Context Validation');
-    cy.openValidationDetails('Use the correct value');
+    cy.openValidationDetails('Fix the @context');
 
     cy.checkValidationErrorMessages([
-      'Incorrect value: @context',
-      'Invalid JSON-LD syntax; a term cannot be an empty string. Context: {"":""}',
-      'Update the value(s) to the correct one(s) or remove the field(s).',
+      'Invalid JSON-LD syntax; a term cannot be an empty string.',
+      'Review your @context against the JSON-LD specification.',
     ]);
   });
 
@@ -71,12 +70,11 @@ describe('JSON-LD Expansion and Validation', () => {
     cy.checkValidationStatus('JSON-LD Document Expansion and Context Validation', 'failure');
 
     cy.openErrorDetailsByStepName('JSON-LD Document Expansion and Context Validation');
-    cy.openValidationDetails('Use the correct value');
+    cy.openValidationDetails('Fix the @context URL');
 
     cy.checkValidationErrorMessages([
-      'Incorrect value: @context',
-      'Invalid URL: "https://unresolvable-context.invalid". Failed to resolve context url.',
-      'Update the value(s) to the correct one(s) or remove the field(s).',
+      'https://unresolvable-context.invalid',
+      'Open the URL in a browser. If it does not return JSON-LD, or it requires login, the playground cannot use it as a context.',
     ]);
   });
 
@@ -86,12 +84,11 @@ describe('JSON-LD Expansion and Validation', () => {
     cy.checkValidationStatus('JSON-LD Document Expansion and Context Validation', 'failure');
 
     cy.openErrorDetailsByStepName('JSON-LD Document Expansion and Context Validation');
-    cy.openValidationDetails('Use the correct value');
+    cy.openValidationDetails('Property not defined in @context');
 
     cy.checkValidationErrorMessages([
-      'Incorrect value: credentialSubject/invalid',
-      'Properties "credentialSubject/invalid" are defined in the credential but missing from the context.',
-      'Update the value(s) to the correct one(s) or remove the field(s).',
+      'Property "invalid" appears in the credential but isn\'t defined by any @context.',
+      'Add "invalid" to a @context, or remove it from the credential.',
     ]);
   });
 });
