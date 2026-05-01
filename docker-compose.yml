@@ -62,7 +62,7 @@ services:
       - VERIFICATION_SERVICE_TOKEN=${VERIFICATION_SERVICE_TOKEN:-test123}
 
   vckit-api:
-    image: ghcr.io/uncefact/project-vckit:sha-325b7e3@sha256:3623cd45cdb971ba16c6016a1e3ba153fe6920c2053275cd430e76ab75d5a563
+    image: ghcr.io/uncefact/project-vckit:1.2.1@sha256:9c6f305ee7834e311dbcc7d6fec98bdf350d6064bfbc71781b11088020fc0ae0
     env_file:
       - local.env
     ports:

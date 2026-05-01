@@ -27,11 +27,11 @@ export function convertBase64ToString(base64: string) {
 // TODO: These utilities hardcode base58btc encoding and sha2-256 hashing
 // rather than reading the multibase prefix and multihash header to determine
 // the encoding and algorithm dynamically. This is because vckit-renderer
-// does a naive string comparison (hashedTemplate !== digestMultibase) rather
-// than decoding the multibase/multihash. Once vckit-renderer is updated to
-// properly decode and compare multibase/multihash values, these utilities
-// should be refactored to support arbitrary encodings and hash algorithms
-// as the multibase/multihash specs intend.
+// performs naive string equality on the encoded digest rather than decoding
+// the multibase/multihash, so the producer and consumer must agree on a
+// single encoding. Once vckit-renderer is updated to properly decode and
+// compare multibase/multihash values, these utilities should be refactored
+// to support arbitrary encodings and hash algorithms as the specs intend.
 // ---------------------------------------------------------------------------
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
