@@ -9,7 +9,7 @@ describe('Display Error Messages', () => {
     cy.uploadCredential([]);
     cy.contains('Fix validation error').click();
     cy.contains('Expected type: object').should('be.visible');
-    cy.contains('Receive value:').should('be.visible');
+    cy.contains('Received value').should('be.visible');
     cy.contains('[]').should('be.visible');
     cy.contains('Issue:').should('be.visible');
   });
@@ -44,7 +44,7 @@ describe('Display Error Messages', () => {
     cy.contains('View Upload Detail').click();
     cy.contains('Fix validation error').click();
     cy.contains('Expected type: object').should('be.visible');
-    cy.contains('Receive value:').should('be.visible');
+    cy.contains('Received value').should('be.visible');
     cy.contains('[]').should('be.visible');
     cy.contains('Issue:').should('be.visible');
   });

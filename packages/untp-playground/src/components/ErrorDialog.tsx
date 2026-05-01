@@ -270,6 +270,10 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                             {mainError?.message && <p>Issue: {mainError.message}</p>}
                             <br />
                             {(() => {
+                              // For `required` errors AJV's `data` is the parent object, not the
+                              // missing field itself, so dumping it is noisy. The "Missing field" line
+                              // below already names the offending property.
+                              if (mainError.keyword === 'required') return null;
                               const received =
                                 mainError.params?.receivedValue !== undefined
                                   ? mainError.params.receivedValue
