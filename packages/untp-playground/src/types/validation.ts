@@ -3,6 +3,8 @@ export interface ValidationError {
   instancePath: string;
   message: string;
   params?: Record<string, any>;
+  // AJV verbose mode populates `data` with the actual value at instancePath.
+  data?: unknown;
 }
 
 export interface CombinedValidationRule<T = any> {

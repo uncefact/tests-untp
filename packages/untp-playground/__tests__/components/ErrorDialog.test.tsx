@@ -250,6 +250,130 @@ describe('ErrorDialog', () => {
     expect(screen.getByText(/expected minimum number of items:/i)).toBeInTheDocument();
     expect(screen.getByText('1')).toBeInTheDocument();
 
-    expect(screen.getByText(/to few items/i)).toBeInTheDocument();
+    expect(screen.getByText(/too few items/i)).toBeInTheDocument();
+  });
+
+  describe('JSON-LD validation errors', () => {
+    it('shows the dedicated header for an unmapped property', () => {
+      const errors = [
+        {
+          keyword: 'jsonldValidation',
+          instancePath: '',
+          message: 'Property "mediaQuery" appears in the credential but isn\'t defined by any @context.',
+          params: { code: 'invalid property', property: 'mediaQuery' },
+        },
+      ] as any;
+
+      render(<ErrorDialog errors={errors} />);
+
+      expect(screen.getByRole('button', { name: /property not defined in @context/i })).toBeInTheDocument();
+      expect(screen.queryByText(/Location:/i)).not.toBeInTheDocument();
+    });
+
+    it('renders the JSON-LD code as a small caption', () => {
+      const errors = [
+        {
+          keyword: 'jsonldValidation',
+          instancePath: '',
+          message: 'something',
+          params: { code: 'relative @id reference', id: 'foo' },
+        },
+      ] as any;
+
+      render(<ErrorDialog errors={errors} />);
+      fireEvent.click(screen.getByRole('button', { name: /use an absolute iri/i }));
+
+      expect(screen.getByText(/JSON-LD code:/i)).toBeInTheDocument();
+      expect(screen.getByText('relative @id reference')).toBeInTheDocument();
+    });
+
+    it('shows a property-specific tip for invalid property errors', () => {
+      const errors = [
+        {
+          keyword: 'jsonldValidation',
+          instancePath: '',
+          message: 'msg',
+          params: { code: 'invalid property', property: 'mediaQuery' },
+        },
+      ] as any;
+
+      render(<ErrorDialog errors={errors} />);
+      fireEvent.click(screen.getByRole('button', { name: /property not defined in @context/i }));
+
+      expect(screen.getByText(/Add "mediaQuery" to a @context, or remove it from the credential/i)).toBeInTheDocument();
+    });
+
+    it('shows the URL-specific header and tip for invalid context URL errors', () => {
+      const errors = [
+        {
+          keyword: 'jsonldUrl',
+          instancePath: '@context',
+          message: 'Couldn\'t load the @context at "https://example.invalid/ctx".',
+          params: { code: 'loading remote context failed', url: 'https://example.invalid/ctx' },
+        },
+      ] as any;
+
+      render(<ErrorDialog errors={errors} />);
+      fireEvent.click(screen.getByRole('button', { name: /fix the @context url/i }));
+
+      expect(screen.getByText(/Open the URL in a browser/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('AJV verbose data', () => {
+    it('shows the received value and a "Try this instead" snippet for type=array errors', () => {
+      const errors = [
+        {
+          keyword: 'type',
+          instancePath: '/renderMethod/0/type',
+          message: 'must be array',
+          params: { type: 'array' },
+          data: 'WebRenderingTemplate2022',
+        },
+      ] as any;
+
+      render(<ErrorDialog errors={errors} />);
+      fireEvent.click(screen.getByRole('button'));
+
+      expect(screen.getByText(/Received value \(string\):/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/WebRenderingTemplate2022/).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText(/Try this instead:/i)).toBeInTheDocument();
+      expect(screen.getByText(/Wrap the existing value in an array/i)).toBeInTheDocument();
+    });
+
+    it('does not render "Try this instead" when the value is already an array', () => {
+      const errors = [
+        {
+          keyword: 'type',
+          instancePath: '/renderMethod',
+          message: 'must be array',
+          params: { type: 'array' },
+          data: ['already', 'an', 'array'],
+        },
+      ] as any;
+
+      render(<ErrorDialog errors={errors} />);
+      fireEvent.click(screen.getByRole('button'));
+
+      expect(screen.queryByText(/Try this instead:/i)).not.toBeInTheDocument();
+    });
+
+    it('renders the received value when only error.data is present (no params.receivedValue)', () => {
+      const errors = [
+        {
+          keyword: 'type',
+          instancePath: '/age',
+          message: 'must be number',
+          params: { type: 'number' },
+          data: 'forty-two',
+        },
+      ] as any;
+
+      render(<ErrorDialog errors={errors} />);
+      fireEvent.click(screen.getByRole('button'));
+
+      expect(screen.getByText(/Received value \(string\):/i)).toBeInTheDocument();
+      expect(screen.getByText(/"forty-two"/)).toBeInTheDocument();
+    });
   });
 });
