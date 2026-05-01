@@ -7,44 +7,52 @@ import { Box, CircularProgress } from '@mui/material';
 import { convertBase64ToString, computeDigestMultibase } from '../../utils';
 
 // ---------------------------------------------------------------------------
-// TODO: Move to @uncefact/vckit-renderer upstream
+// TODO: Move to @uncefact/vckit-renderer upstream.
 //
 // Everything below (IRI aliases, findValue, LenientRenderTemplate2024) works
 // around limitations in vckit-renderer that should be fixed at source:
 //
-// 1. IRI alias handling — the renderer only checks the
-//    https://w3id.org/vc/render-method# namespace for template/url/mediaType,
-//    but the W3C v2 credentials context and UNTP contexts expand these fields
-//    to different IRIs. The renderer should check all known aliases.
+// 1. IRI alias handling. The renderer only checks the
+//    https://w3id.org/vc/render-method# namespace for template, url,
+//    mediaType, and mediaQuery, but the W3C v2 credentials context and UNTP
+//    contexts expand these fields to different IRIs. The renderer should
+//    check all known aliases.
 //
-// 2. Browser-native digestMultibase verification — the renderer delegates hash
-//    verification to context.agent.computeHash (a VCKit agent pattern) which
-//    doesn't exist when using the renderer standalone in the browser. The
-//    renderer should use Web Crypto internally as a fallback.
+// 2. Browser-native digestMultibase verification. The renderer delegates
+//    hash verification to context.agent.computeHash (a VCKit agent pattern)
+//    which is not present when the renderer runs standalone in the browser.
+//    The renderer should fall back to Web Crypto internally.
 //
-// Once vckit-renderer handles these, this entire block can be removed and the
-// component can use RenderTemplate2024 directly.
+// Once vckit-renderer handles these, this entire block can be removed and
+// the component can use RenderTemplate2024 directly.
 // ---------------------------------------------------------------------------
 
-const TEMPLATE_IRI_ALIASES = [
+export const TEMPLATE_IRI_ALIASES = [
   'https://w3id.org/vc/render-method#template',
   'https://www.w3.org/ns/credentials/issuer-dependent#template',
   'https://www.w3.org/2018/credentials#renderMethod#template',
+  'https://vocabulary.uncefact.org/untp/template',
 ];
 
-const URL_IRI_ALIASES = [
+export const URL_IRI_ALIASES = [
   'https://w3id.org/vc/render-method#url',
   'https://www.w3.org/ns/credentials/issuer-dependent#url',
   'https://www.w3.org/2018/credentials#renderMethod#url',
+  'https://vocabulary.uncefact.org/untp/url',
 ];
 
-const MEDIA_TYPE_IRI_ALIASES = [
+export const MEDIA_TYPE_IRI_ALIASES = [
   'https://schema.org/encodingFormat',
   'https://www.w3.org/ns/credentials/issuer-dependent#mediaType',
 ];
 
+export const MEDIA_QUERY_IRI_ALIASES = [
+  'https://www.w3.org/2018/credentials#renderMethod#mediaQuery',
+  'https://vocabulary.uncefact.org/untp/mediaQuery',
+];
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- JSON-LD expanded data has dynamic IRI keys
-function findValue(data: Record<string, any>, iris: string[]): string | undefined {
+export function findValue(data: Record<string, any>, iris: string[]): string | undefined {
   for (const iri of iris) {
     if (data[iri]?.[0]?.['@value']) {
       return data[iri][0]['@value'];
@@ -53,7 +61,7 @@ function findValue(data: Record<string, any>, iris: string[]): string | undefine
   return undefined;
 }
 
-class LenientRenderTemplate2024 extends RenderTemplate2024 {
+export class LenientRenderTemplate2024 extends RenderTemplate2024 {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches parent class signature
   extractData(data: Record<string, any>) {
     const result = super.extractData(data);
@@ -66,6 +74,9 @@ class LenientRenderTemplate2024 extends RenderTemplate2024 {
     }
     if (!result.mediaType) {
       result.mediaType = findValue(data, MEDIA_TYPE_IRI_ALIASES) ?? 'text/html';
+    }
+    if (!result.mediaQuery) {
+      result.mediaQuery = findValue(data, MEDIA_QUERY_IRI_ALIASES);
     }
 
     return result;
@@ -128,6 +139,8 @@ const CredentialRender = ({ credential }: { credential: VerifiableCredential | U
           // UNTP contexts expand RenderTemplate2024 to a path-based IRI (not fragment-based),
           // so the renderer's type extraction returns the full IRI instead of just the local name.
           'https://test.uncefact.org/vocabulary/untp/core/0/RenderTemplate2024': rt2024,
+          // UNTP v0.7.0 (and later 0.x) expand RenderTemplate2024 against the published vocabulary.
+          'https://vocabulary.uncefact.org/untp/RenderTemplate2024': rt2024,
         },
         defaultProvider: 'RenderTemplate2024',
       });
