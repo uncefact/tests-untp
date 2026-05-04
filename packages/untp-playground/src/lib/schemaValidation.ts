@@ -38,7 +38,7 @@ async function fetchSchema(schemaUrl: string): Promise<any> {
     try {
       const response = await fetch(proxyUrl);
       if (!response.ok) {
-        throw new Error(`Failed to fetch schema: ${response.statusText}`);
+        throw new Error(`Failed to fetch schema: ${response.status} ${response.statusText}`);
       }
       const schema = await response.json();
       schemaCache.set(schemaUrl, schema);
@@ -183,7 +183,13 @@ async function validateCredentialOnSchemaUrl(credential: any, schemaUrl: string,
   try {
     let schema = await fetchSchema(schemaUrl);
     if (relaxFunction) {
-      schema = relaxFunction(schema);
+      // Clone before relaxing so we never mutate the cached schema, and drop $id so
+      // AJV compiles a fresh validator rather than returning the strict one it cached
+      // by $id from an earlier non-relaxed call. JSON.parse/stringify is sufficient
+      // because JSON Schema documents are by definition JSON-serialisable.
+      const clone = JSON.parse(JSON.stringify(schema));
+      delete clone.$id;
+      schema = relaxFunction(clone);
     }
 
     const validate = ajv.compile(schema);

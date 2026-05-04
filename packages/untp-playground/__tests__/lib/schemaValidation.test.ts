@@ -428,6 +428,7 @@ describe('schemaValidation', () => {
     it('should handle schema fetch failures', async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
+        status: 404,
         statusText: 'Not Found',
       });
 
@@ -437,7 +438,7 @@ describe('schemaValidation', () => {
       };
 
       await expect(validateVcAgainstSchema(credential, VCDMVersion.V2)).rejects.toThrow(
-        'Failed to fetch schema: Not Found',
+        'Failed to fetch schema: 404 Not Found',
       );
     });
 
@@ -515,7 +516,7 @@ describe('schemaValidation', () => {
 
     it('does not poison the cache when the first fetch fails', async () => {
       (global.fetch as jest.Mock)
-        .mockResolvedValueOnce({ ok: false, statusText: 'Too Many Requests' })
+        .mockResolvedValueOnce({ ok: false, status: 429, statusText: 'Too Many Requests' })
         .mockResolvedValueOnce({
           ok: true,
           json: () =>
@@ -540,6 +541,48 @@ describe('schemaValidation', () => {
       const result = await validateCredentialSchema(credential);
       expect(result.valid).toBe(true);
       expect((global.fetch as jest.Mock).mock.calls.length).toBe(2);
+    });
+
+    it('does not mutate the cached schema when a relaxed validation runs', async () => {
+      // The DPP 0.5.0 path (used when validating a DLP 0.4.0 extension) applies a
+      // relaxFunction that strips `properties.type.const` etc. Prior to the cache-clone
+      // fix, that mutation poisoned the cached schema for any later non-relaxed call
+      // against the same URL.
+      const strictSchema = {
+        $id: 'https://example.com/dpp-0.5.0.json',
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        properties: {
+          type: { type: 'array', const: ['DigitalProductPassport', 'VerifiableCredential'] },
+          '@context': { type: 'array' },
+        },
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(strictSchema),
+      });
+
+      const dlpCredential = {
+        type: ['DigitalLivestockPassport', 'VerifiableCredential'],
+        '@context': [
+          'https://www.w3.org/ns/credentials/v2',
+          'https://aatp.foodagility.com/schema/aatp-dlp-schema-0.4.0-9c0ad2b1ca6a9e497dedcfd8b87f35f1.json',
+        ],
+      };
+
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
+      (detectVersion as jest.Mock).mockImplementation((_credential: any, domain?: string) =>
+        domain === 'aatp.foodagility.com' ? '0.4.0' : '0.5.0',
+      );
+
+      // First call drives the relax path (DPP 0.5.0 via the DLP 0.4.0 extension).
+      await validateCredentialSchema(dlpCredential);
+
+      // The cached schema must be untouched: const + items.enum still present.
+      const cached = schemaCache.get('https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.5.0.json');
+      expect(cached).toBeDefined();
+      expect(cached.properties.type.const).toEqual(['DigitalProductPassport', 'VerifiableCredential']);
+      expect(cached.$id).toBe('https://example.com/dpp-0.5.0.json');
     });
   });
 });
