@@ -472,4 +472,74 @@ describe('schemaValidation', () => {
       );
     });
   });
+
+  describe('schema fetch deduplication', () => {
+    it('issues a single fetch when several validations request the same schema concurrently', async () => {
+      const mockSchema = {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        properties: {
+          '@context': { type: 'array' },
+          type: { type: 'string' },
+        },
+      };
+
+      // Resolve fetch only after both callers are awaiting, to guarantee the second one
+      // hits an in-flight promise rather than a populated cache.
+      let resolveFetch: (value: any) => void = () => undefined;
+      const fetchPromise = new Promise((resolve) => {
+        resolveFetch = resolve;
+      });
+      (global.fetch as jest.Mock).mockReturnValueOnce(fetchPromise);
+
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+      (detectVersion as jest.Mock).mockReturnValue('0.5.0');
+
+      const credential = {
+        type: 'DigitalProductPassport',
+        '@context': ['https://test.uncefact.org/vocabulary/untp/dpp/0.5.0'],
+        version: '0.5.0',
+      };
+
+      const first = validateCredentialSchema(credential);
+      const second = validateCredentialSchema(credential);
+
+      // Allow the in-flight promise lookup to wire up before resolving the fetch.
+      await Promise.resolve();
+      resolveFetch({ ok: true, json: () => Promise.resolve(mockSchema) });
+
+      const [firstResult, secondResult] = await Promise.all([first, second]);
+      expect(firstResult.valid).toBe(true);
+      expect(secondResult.valid).toBe(true);
+      expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
+    });
+
+    it('does not poison the cache when the first fetch fails', async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({ ok: false, statusText: 'Too Many Requests' })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              $schema: 'https://json-schema.org/draft/2020-12/schema',
+              properties: { '@context': { type: 'array' } },
+            }),
+        });
+
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+      (detectVersion as jest.Mock).mockReturnValue('0.5.0');
+
+      const credential = {
+        type: 'DigitalProductPassport',
+        '@context': ['https://test.uncefact.org/vocabulary/untp/dpp/0.5.0'],
+        version: '0.5.0',
+      };
+
+      await expect(validateCredentialSchema(credential)).rejects.toThrow('Failed to fetch schema');
+
+      // Second attempt should re-fetch (the failed promise was evicted), not throw the cached error.
+      const result = await validateCredentialSchema(credential);
+      expect(result.valid).toBe(true);
+      expect((global.fetch as jest.Mock).mock.calls.length).toBe(2);
+    });
+  });
 });
