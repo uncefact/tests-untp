@@ -22,7 +22,7 @@ COPY --from=deps /app/packages/reference-implementation/node_modules ./packages/
 COPY --from=deps /app/packages/components/node_modules ./packages/components/node_modules
 COPY --from=deps /app/packages/services/node_modules ./packages/services/node_modules
 
-COPY package.json ./
+COPY package.json yarn.lock ./
 COPY packages/reference-implementation/. ./packages/reference-implementation/
 COPY packages/components/. ./packages/components/
 COPY packages/services/. ./packages/services/
