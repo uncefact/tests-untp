@@ -139,12 +139,23 @@ jobs:
 
       - name: Wait for app container and dump logs
         run: |
-          echo "--- Waiting 30s for containers to initialise ---"
-          sleep 30
+          echo "--- Waiting up to 180s for app to respond on http://localhost:3003 ---"
+          deadline=$(($(date +%s) + 180))
+          while [ $(date +%s) -lt $deadline ]; do
+            if curl -sS -o /dev/null -m 2 http://localhost:3003 2>/dev/null; then
+              echo "--- App is responding ---"
+              break
+            fi
+            sleep 2
+          done
           echo "--- App container logs ---"
           docker compose -f docker-compose.e2e.yml logs app
           echo "--- Container status ---"
           docker compose -f docker-compose.e2e.yml ps
+          if ! curl -sS -o /dev/null -m 2 http://localhost:3003 2>/dev/null; then
+            echo "::error::App did not respond on :3003 within 180s"
+            exit 1
+          fi
 
       - name: Run E2E tests (open mode)
         run: yarn test:e2e:open
@@ -164,12 +175,23 @@ jobs:
 
       - name: Wait for closed mode app container
         run: |
-          echo "--- Waiting 30s for containers to initialise ---"
-          sleep 30
+          echo "--- Waiting up to 180s for app to respond on http://localhost:3003 ---"
+          deadline=$(($(date +%s) + 180))
+          while [ $(date +%s) -lt $deadline ]; do
+            if curl -sS -o /dev/null -m 2 http://localhost:3003 2>/dev/null; then
+              echo "--- App is responding ---"
+              break
+            fi
+            sleep 2
+          done
           echo "--- App container logs ---"
           docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml logs app
           echo "--- Container status ---"
           docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml ps
+          if ! curl -sS -o /dev/null -m 2 http://localhost:3003 2>/dev/null; then
+            echo "::error::App did not respond on :3003 within 180s (closed mode)"
+            exit 1
+          fi
 
       - name: Run closed mode E2E tests
         run: yarn test:e2e:closed
