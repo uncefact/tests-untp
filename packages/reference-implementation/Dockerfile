@@ -48,11 +48,12 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/packages/reference-implementation/public ./public
+COPY --from=builder /app/packages/reference-implementation/public ./packages/reference-implementation/public
 
-# Copy standalone output from Next.js build
+# Copy standalone output from Next.js build. With outputFileTracingRoot pinned
+# to the monorepo root, server.js is emitted at packages/reference-implementation/.
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/.next/static ./packages/reference-implementation/.next/static
 
 # Copy prisma files and node_modules for running migrations and seeding at runtime
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/prisma ./prisma
@@ -80,7 +81,7 @@ ENV PORT=3003
 ENV HOSTNAME="0.0.0.0"
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["node", "server.js"]
+CMD ["node", "packages/reference-implementation/server.js"]
 
 # ---- E2E target (same image, kept as a named stage for docker-compose.e2e.yml) ----
 FROM build AS development

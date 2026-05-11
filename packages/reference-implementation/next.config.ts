@@ -40,6 +40,10 @@ const nextConfig = (phase: string): NextConfig => {
 
   return {
     output: 'standalone',
+    // Pin the standalone tracing root to the monorepo root. Without this,
+    // Next.js infers the root from lockfile location, which silently moves
+    // where `server.js` is emitted depending on the build environment.
+    outputFileTracingRoot: path.resolve(__dirname, '../..'),
     reactStrictMode: false,
     eslint: { ignoreDuringBuilds: true },
     transpilePackages: ['@reference-implementation/components'],
