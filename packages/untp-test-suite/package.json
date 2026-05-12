@@ -9,7 +9,8 @@
   },
   "files": [
     "dist/**/*",
-    "example-credentials/**/*"
+    "example-credentials/**/*",
+    "untp-tests/**/*"
   ],
   "scripts": {
     "build": "node scripts/generate-test-list.js && node scripts/generate-inference-bundle.js && tsc",
