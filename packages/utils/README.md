@@ -30,7 +30,7 @@ parsed.algorithm; // "sha2-256"
 parsed.base; // "base58btc"
 
 // Verify against original data.
-await parsed.verify(originalBytes); // true | false
+await parsed.verify(new TextEncoder().encode('hello')); // true | false
 ```
 
 Supported algorithms: `sha2-256`, `sha2-512`.
