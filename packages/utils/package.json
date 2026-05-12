@@ -1,0 +1,49 @@
+{
+  "name": "@uncefact/untp-utils",
+  "version": "0.1.0-dev.0",
+  "description": "Shared utility primitives for UNTP packages and consumers.",
+  "main": "./build/index.js",
+  "types": "./build/index.d.ts",
+  "_exports_note": "Exports use flat types/default conditions, not nested import/require. The require conditions (.cjs/.d.cts) are only built during npm publish and do not exist in the workspace. A publish pipeline should add import/require conditions before publishing.",
+  "exports": {
+    ".": {
+      "types": "./build/index.d.ts",
+      "default": "./build/index.js"
+    },
+    "./multibase-digest": {
+      "types": "./build/multibase-digest/index.d.ts",
+      "default": "./build/multibase-digest/index.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "multibase-digest": [
+        "./build/multibase-digest/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "build"
+  ],
+  "scripts": {
+    "build": "tsc --build --clean && tsc",
+    "watch": "tsc -b --watch",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  },
+  "type": "module",
+  "keywords": [
+    "untp",
+    "multibase",
+    "multihash",
+    "digest"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "multiformats": "^13.3.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
