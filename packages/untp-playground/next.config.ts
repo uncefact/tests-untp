@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   trailingSlash: false,
   output: 'standalone',
   eslint: {
-    // Linting is handled by the root `yarn lint` step; skip during `next build`
+    // Linting is handled by the root `yarn lint:check` step; skip during `next build`
     // to avoid path resolution issues in the monorepo workspace.
     ignoreDuringBuilds: true,
   },
