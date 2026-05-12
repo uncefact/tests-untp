@@ -28,6 +28,10 @@ Conventions:
 
 We chose this because the `:check` / `:fix` suffix pair makes the intent of every script invocation explicit and uses a single uniform suffix for the modifying variant regardless of which underlying tool flag (`--write` for Prettier, `--fix` for ESLint) the script wraps. The simpler decision rule ("`:check` to verify, `:fix` to modify") is easier to internalise than a split where Prettier scripts use `:write` and ESLint scripts use `:fix`.
 
+## Adoption notes
+
+This ADR records the target convention across the workspace. The initial implementation ships as part of the "Bundle B" CI restructure and applies the convention at the **root** `package.json` level only: `format:check` and `format:fix` already existed; `lint:check` (renamed from `lint`) and `lint:fix` are added. Per-package script standardisation is deferred to a follow-up so the matrix can ship without bundling eslint configuration work for packages that do not currently have it (`untp-test-suite-mocha`, `@test-untp/vc-test-suite`). The CI quality job uses the root-level scripts, which is sufficient to enforce the convention at the gate.
+
 ## Consequences
 
 **What becomes easier:**
