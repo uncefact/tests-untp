@@ -85,7 +85,7 @@ yarn prisma migrate dev       # Create/apply migrations
 
 ### Code Quality
 ```bash
-yarn lint                     # ESLint across packages
+yarn lint:check               # ESLint across packages
 ```
 
 ### Other

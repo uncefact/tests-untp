@@ -93,3 +93,7 @@ CONTEXT.md
 
 # Git worktrees
 .worktrees/
+
+# Turborepo local cache
+.turbo/
+**/.turbo/

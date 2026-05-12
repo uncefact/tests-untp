@@ -108,7 +108,7 @@ yarn start
 yarn build                    # Full build (services + components + test-suite)
 yarn start                    # Start Reference Implementation dev server
 yarn test                     # Run all tests
-yarn lint                     # ESLint across packages
+yarn lint:check               # ESLint across packages
 ```
 
 ## End-to-End Testing

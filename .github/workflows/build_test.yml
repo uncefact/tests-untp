@@ -62,14 +62,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # untp-test-suite-mocha (no test script) and @test-untp/vc-test-suite
+        # (test runs heavy mocha conformance, not unit tests) are deliberately
+        # omitted; see ADR 006 adoption notes.
         package:
           - '@uncefact/untp-ri-services'
           - '@reference-implementation/components'
           - '@reference-implementation/core'
           - 'untp-playground'
           - 'untp-test-suite'
-          - 'untp-test-suite-mocha'
-          - '@test-untp/vc-test-suite'
           - '@uncefact/untp-utils'
     steps:
       - name: Checkout repository
@@ -153,16 +154,42 @@ jobs:
             ~/.cache/Cypress
           key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
-      - name: Check whether reference-implementation is affected
+      - name: Check whether E2E should run
         id: affected
+        shell: bash
         run: |
-          task_count=$(yarn --silent turbo run build --filter='@reference-implementation/core...[origin/next]' --dry-run=json 2>/dev/null | jq '.tasks | length')
-          if [ "$task_count" -gt 0 ]; then
+          set -euo pipefail
+
+          # Check turbo's dep graph for @reference-implementation/core.
+          # If turbo or jq fail, surface the error rather than silently skipping E2E.
+          affected_json=$(yarn --silent turbo run build --filter='@reference-implementation/core...[origin/next]' --dry-run=json)
+          if [ -z "$affected_json" ]; then
+            echo "::error::turbo dry-run produced empty output"
+            exit 1
+          fi
+          task_count=$(echo "$affected_json" | jq '.tasks | length')
+          if ! [[ "$task_count" =~ ^[0-9]+$ ]]; then
+            echo "::error::Could not parse turbo task count: '$task_count'"
+            echo "--- Raw output ---"
+            echo "$affected_json"
+            exit 1
+          fi
+
+          # Also trigger E2E when files outside turbo's package graph change:
+          # the cypress workspace, docker compose files, and the workflow itself.
+          extra_changed=$(git diff --name-only origin/next...HEAD -- \
+            'e2e/**' \
+            'docker-compose.e2e.yml' \
+            'docker-compose.e2e-closed.yml' \
+            '.github/workflows/build_test.yml' \
+            | wc -l | tr -d ' ')
+
+          if [ "$task_count" -gt 0 ] || [ "$extra_changed" -gt 0 ]; then
             echo "result=true" >> "$GITHUB_OUTPUT"
-            echo "Reference-implementation (or a dependency) is affected; running E2E."
+            echo "E2E will run. turbo task_count=$task_count, extra_changed=$extra_changed."
           else
             echo "result=false" >> "$GITHUB_OUTPUT"
-            echo "Reference-implementation not affected by this PR; skipping E2E."
+            echo "E2E skipped. Reference-implementation dep graph unaffected and no e2e/docker-compose/workflow files changed."
           fi
 
       # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
