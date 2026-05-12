@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 This is a monorepo for the UNTP (UN Transparency Protocol) test suite and reference implementation. It includes:
-- **Reference Implementation (mock-app)**: Web UI for issuing/verifying UNTP credentials
+- **Reference Implementation**: Web UI for issuing/verifying UNTP credentials (`packages/reference-implementation/`)
 - **Services Package**: Core business logic, credential processing, EPCIS events, DID management, and external service adapters
 - **Components Package**: Shared React component library
 - **UNTP Playground**: Credential validation tool
@@ -47,38 +47,48 @@ yarn build
 yarn start
 ```
 
-Access mock-app at http://localhost:3003 (admin@example.com / changeme)
+Access the reference implementation at http://localhost:3003 (admin@example.com / changeme)
 
 ### Daily Development
 ```bash
-yarn start                    # Start mock-app dev server (hot reload)
-yarn start:untp-playground    # Start playground on port 4001
-yarn build:services           # Rebuild services after changes
-yarn build:components         # Rebuild components after changes
-yarn build                    # Full build (services + components + test-suite)
+yarn start                          # Start RI dev server (hot reload)
+yarn start:untp-playground          # Start playground on port 4001
+yarn build:services                 # Rebuild services after changes
+yarn build:components               # Rebuild components after changes
+yarn build                          # Full build (services + components + test-suite)
 ```
 
 ### Testing
 ```bash
-yarn test                     # All tests across all packages
-yarn test:coverage            # Merged coverage report
-yarn test:services            # Services package only
-yarn test:mock-app            # Mock-app only
-yarn test:components          # Components only
+yarn test                           # All tests across all packages
+yarn test:coverage                  # Merged coverage report
+yarn test:services                  # Services package only
+yarn test:reference-implementation  # Reference implementation only
+yarn test:components                # Components only
 
-# E2E Testing (separate Docker setup — see e2e/README.md)
-docker compose -f docker-compose.e2e.yml up -d --build
-yarn test:e2e                 # All tests (open mode by default)
-yarn test:e2e:open            # Explicit open mode
-yarn test:e2e:closed          # Closed mode
-yarn test:e2e:playground      # Playground tests only
-yarn test:e2e:open-ui         # Interactive UI
-docker compose -f docker-compose.e2e.yml down -v  # Cleanup (use -v for clean DB)
+# E2E Testing (per-app suites; see packages/<app>/e2e/README.md for details)
+
+# RI open mode
+docker compose -f docker-compose.e2e.yml --profile ri up -d --build
+yarn test:e2e:ri:open                                                          # or yarn test:e2e:ri (default)
+yarn test:e2e:ri:open-ui                                                       # Interactive UI
+docker compose -f docker-compose.e2e.yml --profile ri down -v
+
+# RI closed mode — the closed-mode override MUST be passed to every compose verb
+docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri up -d --build
+yarn test:e2e:ri:closed
+docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri down -v
+
+# Playground
+docker compose -f docker-compose.e2e.yml --profile playground up -d --build
+yarn test:e2e:playground
+yarn test:e2e:playground:open-ui
+docker compose -f docker-compose.e2e.yml --profile playground down -v
 ```
 
 ### Database
 ```bash
-cd packages/mock-app
+cd packages/reference-implementation
 yarn prisma studio            # Visual DB editor (localhost:5555)
 yarn prisma migrate dev       # Create/apply migrations
 ```
@@ -90,9 +100,9 @@ yarn lint:check               # ESLint across packages
 
 ### Other
 ```bash
-yarn storybook:components     # Component library docs
-yarn storybook:mock-app       # Mock-app component docs
-yarn build-clean              # Remove all artifacts and node_modules
+yarn storybook:components                  # Component library docs
+yarn storybook:reference-implementation    # RI component docs
+yarn build-clean                           # Remove all artifacts and node_modules
 ```
 
 ## Architecture Patterns
@@ -101,13 +111,12 @@ yarn build-clean              # Remove all artifacts and node_modules
 ```
 tests-untp/
 ├── packages/
-│   ├── services/          # Core logic (TypeScript library)
-│   ├── components/        # React component library
-│   ├── mock-app/          # Next.js reference implementation
-│   ├── untp-playground/   # Validation tool
-│   └── untp-test-suite/   # CLI test suite
-├── e2e/                   # Cypress tests
-└── documentation/         # Docusaurus site
+│   ├── services/                       # Core logic (TypeScript library)
+│   ├── components/                     # React component library
+│   ├── reference-implementation/       # Next.js reference implementation (and e2e/)
+│   ├── untp-playground/                # Validation tool (and e2e/)
+│   └── untp-test-suite/                # CLI test suite
+└── documentation/                      # Docusaurus site
 ```
 
 ### Service Registry Pattern
@@ -135,7 +144,7 @@ External integrations use interfaces + implementations:
 - Encryption/decryption (AES-GCM)
 - Identity scheme handling (GS1)
 
-### Mock-App Architecture
+### Reference Implementation Architecture
 - **Database**: Prisma ORM with entities: User, Organization, Did, Credential, ServiceInstance, Service, Adapter
 - **API Routes**: `/src/app/api/v1/` - `/dids`, `/credentials`, `/auth`
 - **Auth**: Keycloak via NextAuth.js with organization-level branding
@@ -146,17 +155,17 @@ External integrations use interfaces + implementations:
 ### Making Changes to Services
 1. Edit code in `packages/services/src/`
 2. Run `yarn build:services`
-3. Changes auto-imported into mock-app (hot reload)
+3. Changes auto-imported into the reference implementation (hot reload)
 
 ### Making Changes to Components
 1. Edit code in `packages/components/src/`
 2. Run `yarn build:components`
-3. Consumed by mock-app (hot reload)
+3. Consumed by the reference implementation (hot reload)
 
 ### Database Changes
-1. Edit `packages/mock-app/prisma/schema.prisma`
-2. Run `cd packages/mock-app && yarn prisma migrate dev`
-3. Restart mock-app
+1. Edit `packages/reference-implementation/prisma/schema.prisma`
+2. Run `cd packages/reference-implementation && yarn prisma migrate dev`
+3. Restart the reference implementation
 
 ### Configuration Changes
 - Tenant configuration is managed via the database

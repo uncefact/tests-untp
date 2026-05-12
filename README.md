@@ -113,7 +113,12 @@ yarn lint:check               # ESLint across packages
 
 ## End-to-End Testing
 
-E2E tests use Cypress and support both local Docker Compose and deployed instances. See [`e2e/README.md`](e2e/README.md) for full setup instructions, including local testing, deployed instance prerequisites, and tenant mode configuration.
+E2E tests use Cypress and support both local Docker Compose and deployed instances. Each app owns its own E2E suite:
+
+- [`packages/reference-implementation/e2e/`](packages/reference-implementation/e2e/README.md) for the reference implementation.
+- [`packages/untp-playground/e2e/`](packages/untp-playground/e2e/README.md) for the playground.
+
+See each suite's README for setup, local testing, deployed instance prerequisites, and tenant mode configuration.
 
 ## Release Management
 
