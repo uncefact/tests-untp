@@ -425,7 +425,7 @@ jobs:
 
       - name: Run playground E2E tests
         if: steps.affected.outputs.result == 'true'
-        run: yarn workspace untp-playground test:e2e
+        run: yarn workspace untp-playground-e2e test:e2e
         env:
           NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module' # See issue https://github.com/cypress-io/github-action/issues/1408
           E2E_PLAYGROUND_BASE_URL: 'http://localhost:4000'
