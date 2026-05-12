@@ -5,12 +5,13 @@
   "workspaces": {
     "packages": [
       "packages/*",
-      "packages/*/e2e",
-      "e2e"
+      "packages/*/e2e"
     ],
     "nohoist": [
       "**/@storybook/**",
-      "**/storybook"
+      "**/storybook",
+      "reference-implementation-e2e/cypress",
+      "reference-implementation-e2e/cypress/**"
     ]
   },
   "scripts": {
@@ -37,13 +38,12 @@
     "test:vc-test-suite": "cd packages/vc-test-suite && yarn run test",
     "test:untp-playground": "cd packages/untp-playground && yarn run test",
     "test:integration:untp-test-suite": "cd packages/untp-test-suite && yarn run test:integration",
-    "test:e2e": "cd e2e && npx cypress run",
-    "test:e2e:open": "cd e2e && E2E_TENANT_MODE=open npx cypress run",
-    "test:e2e:closed": "cd e2e && E2E_TENANT_MODE=closed npx cypress run",
+    "test:e2e:ri": "yarn workspace reference-implementation-e2e test:e2e",
+    "test:e2e:ri:open": "yarn workspace reference-implementation-e2e test:e2e:open",
+    "test:e2e:ri:closed": "yarn workspace reference-implementation-e2e test:e2e:closed",
+    "test:e2e:ri:open-ui": "yarn workspace reference-implementation-e2e cypress:open",
     "test:e2e:playground": "yarn workspace untp-playground-e2e test:e2e",
-    "test:e2e:open-ui": "cd e2e && npx cypress open",
-    "test:run-cypress": "cd e2e && npx cypress run",
-    "test:open-cypress": "cd e2e && npx cypress open",
+    "test:e2e:playground:open-ui": "yarn workspace untp-playground-e2e cypress:open",
     "storybook:components": "cd packages/components && yarn run storybook",
     "storybook:reference-implementation": "cd packages/reference-implementation && yarn run storybook",
     "untp": "node ./packages/untp-test-suite/build/interfaces/cli/cli.js",
