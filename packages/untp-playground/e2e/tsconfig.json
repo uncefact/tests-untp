@@ -1,17 +1,15 @@
 {
   "compilerOptions": {
+    "baseUrl": "./",
     "target": "ESNext",
-    "lib": ["dom", "esnext"],
     "module": "ESNext",
+    "lib": ["es6", "dom"],
     "moduleResolution": "node",
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
     "strict": true,
-    "skipLibCheck": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "types": ["cypress", "node"]
+    "esModuleInterop": true,
+    "types": ["cypress", "node"],
+    "allowSyntheticDefaultImports": true
   },
-  "include": ["cypress/**/*.ts", "cypress.config.ts"]
+  "include": ["**/*.ts", "cypress/**/*.ts"],
+  "exclude": ["node_modules"]
 }
