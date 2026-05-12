@@ -437,25 +437,3 @@ jobs:
       - name: Stop playground stack
         if: steps.affected.outputs.result == 'true'
         run: docker compose -f docker-compose.e2e.yml --profile playground down -v
-
-  build_docs:
-    name: Docs build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-          cache: yarn
-
-      - name: Install and build documentation
-        run: |
-          cd documentation
-          yarn install --frozen-lockfile
-          yarn build
-        env:
-          DOCS_BASE_URL: ${{ vars.DOCS_BASE_URL }}
-          DOCS_URL: ${{ vars.DOCS_URL }}

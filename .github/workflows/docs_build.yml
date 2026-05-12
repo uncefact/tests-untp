@@ -1,0 +1,44 @@
+name: Docs build
+
+# Only fires when files relevant to the Docusaurus build change. PRs that do
+# not touch any of these paths will not run this workflow and the "Docs build"
+# check will not appear on the PR; branch protection's run-and-pass rule
+# treats an absent check as non-blocking.
+on:
+  pull_request:
+    branches:
+      - next
+    paths:
+      - 'documentation/**'
+      - '.github/workflows/docs_build.yml'
+      - '.nvmrc'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-build-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build_docs:
+    name: Docs build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: yarn
+
+      - name: Install and build documentation
+        run: |
+          cd documentation
+          yarn install --frozen-lockfile
+          yarn build
+        env:
+          DOCS_BASE_URL: ${{ vars.DOCS_BASE_URL }}
+          DOCS_URL: ${{ vars.DOCS_URL }}
