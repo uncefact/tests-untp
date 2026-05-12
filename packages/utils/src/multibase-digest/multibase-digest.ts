@@ -80,12 +80,18 @@ function assertSupportedBase(base: MultibaseEncoding): void {
 /**
  * Immutable value object representing a multibase-encoded multihash: a hash
  * digest wrapped with its algorithm code (multihash) and paired with a chosen
- * text encoding (multibase). Instances are only obtainable through the static
+ * text encoding (multibase). Multihash and multibase are two separate
+ * specifications: multihash self-describes which hash algorithm produced the
+ * bytes; multibase self-describes which text encoding was used to render those
+ * bytes as a string. Instances are only obtainable through the static
  * constructors, which validate inputs against the allow-lists.
  *
  * Two instances are equal when their underlying multihash bytes match. The
  * chosen `base` is presentational and does not affect identity, so the same
  * digest re-encoded under a different base compares equal.
+ *
+ * @see https://github.com/multiformats/multihash Multihash specification
+ * @see https://github.com/multiformats/multibase Multibase specification
  */
 export class MultibaseDigest {
   /** Hash algorithm used to produce {@link digest}. */
