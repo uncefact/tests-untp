@@ -4,7 +4,6 @@
   "description": "Shared utility primitives for UNTP packages and consumers.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
-  "_exports_note": "Exports use flat types/default conditions, not nested import/require. The require conditions (.cjs/.d.cts) are only built during npm publish and do not exist in the workspace. A publish pipeline should add import/require conditions before publishing.",
   "exports": {
     ".": {
       "types": "./build/index.d.ts",

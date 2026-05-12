@@ -9,12 +9,7 @@ export type HashAlgorithm = 'sha2-256' | 'sha2-512';
 
 export type MultibaseEncoding = 'base58btc' | 'base64';
 
-export interface FromDataOptions {
-  algorithm: HashAlgorithm;
-  base: MultibaseEncoding;
-}
-
-export interface FromDigestOptions {
+export interface MultibaseDigestOptions {
   algorithm: HashAlgorithm;
   base: MultibaseEncoding;
 }
@@ -27,6 +22,11 @@ const HASHERS: Record<HashAlgorithm, MultihashHasher<number>> = {
 const HASH_CODE_TO_ALGORITHM: Record<number, HashAlgorithm> = {
   [sha256.code]: 'sha2-256',
   [sha512.code]: 'sha2-512',
+};
+
+const DIGEST_LENGTHS: Record<HashAlgorithm, number> = {
+  'sha2-256': 32,
+  'sha2-512': 64,
 };
 
 const BASES: Record<MultibaseEncoding, MultibaseCodec<string>> = {
@@ -45,6 +45,10 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
     if (a[i] !== b[i]) return false;
   }
   return true;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 function assertSupportedAlgorithm(algorithm: HashAlgorithm): void {
@@ -72,7 +76,7 @@ export class MultibaseDigest {
     this.multihash = multihash;
   }
 
-  static async fromData(data: Uint8Array, opts: FromDataOptions): Promise<MultibaseDigest> {
+  static async fromData(data: Uint8Array, opts: MultibaseDigestOptions): Promise<MultibaseDigest> {
     assertSupportedAlgorithm(opts.algorithm);
     assertSupportedBase(opts.base);
     const hasher = HASHERS[opts.algorithm];
@@ -80,9 +84,13 @@ export class MultibaseDigest {
     return new MultibaseDigest(opts.algorithm, opts.base, mh.digest, mh.bytes);
   }
 
-  static fromDigest(digest: Uint8Array, opts: FromDigestOptions): MultibaseDigest {
+  static fromDigest(digest: Uint8Array, opts: MultibaseDigestOptions): MultibaseDigest {
     assertSupportedAlgorithm(opts.algorithm);
     assertSupportedBase(opts.base);
+    const expectedLength = DIGEST_LENGTHS[opts.algorithm];
+    if (digest.length !== expectedLength) {
+      throw new Error(`Digest length ${digest.length} does not match "${opts.algorithm}" (expected ${expectedLength})`);
+    }
     const hasher = HASHERS[opts.algorithm];
     const mh = Digest.create(hasher.code, digest);
     return new MultibaseDigest(opts.algorithm, opts.base, mh.digest, mh.bytes);
@@ -103,14 +111,14 @@ export class MultibaseDigest {
     try {
       mhBytes = codec.decoder.decode(encoded);
     } catch (err) {
-      throw new Error(`Failed to decode multibase string: ${(err as Error).message}`);
+      throw new Error(`Failed to decode multibase string: ${errorMessage(err)}`, { cause: err });
     }
 
     let mh: MultihashDigest<number>;
     try {
       mh = Digest.decode(mhBytes);
     } catch (err) {
-      throw new Error(`Failed to parse multihash: ${(err as Error).message}`);
+      throw new Error(`Failed to parse multihash: ${errorMessage(err)}`, { cause: err });
     }
 
     const algorithm = HASH_CODE_TO_ALGORITHM[mh.code];
@@ -131,6 +139,12 @@ export class MultibaseDigest {
     return this.algorithm === other.algorithm && bytesEqual(this.multihash, other.multihash);
   }
 
+  /**
+   * Re-hashes `data` with this digest's own algorithm and compares against the
+   * stored digest. Returns `false` only on a genuine digest mismatch; throws if
+   * `data` cannot be hashed (e.g. invalid input type). Callers must not wrap
+   * this in `.catch(() => false)`, which would mask real failures as mismatches.
+   */
   async verify(data: Uint8Array): Promise<boolean> {
     const recomputed = await MultibaseDigest.fromData(data, {
       algorithm: this.algorithm,

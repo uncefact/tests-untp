@@ -55,7 +55,7 @@ Rejected for now. Single-purpose packages are clean but multiply the per-package
 
 ### Use the existing `@reference-implementation/` scope rather than `@uncefact/`
 
-Rejected. The `@reference-implementation/` scope is for packages internal to the RI workspace. Utils is intended for external consumption by multiple products outside this repository, so it matches the externally-published convention used by `@uncefact/untp-ri-services`.
+Rejected. Utils is intended for external consumption by multiple products outside this repository, so it matches the externally-published `@uncefact/` convention used by `@uncefact/untp-ri-services` rather than the `@reference-implementation/` scope used elsewhere in this monorepo for RI-aligned packages.
 
 ## References
 

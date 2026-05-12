@@ -21,11 +21,11 @@ const digest = await MultibaseDigest.fromData(new TextEncoder().encode('hello'),
   base: 'base58btc',
 });
 
-digest.toString(); // "zQm..."   (base58btc)
-digest.toString('base16'); // "f1220..." (re-encoded, no rehash)
+digest.toString(); // e.g. "zQmYwAPJzv5..." (base58btc)
+digest.toString('base64'); // e.g. "mEiBL..."        (re-encoded, no rehash)
 
 // Parse a multibase string. Algorithm and encoding are read from the string.
-const parsed = MultibaseDigest.fromString('zQm...');
+const parsed = MultibaseDigest.fromString(digest.toString());
 parsed.algorithm; // "sha2-256"
 parsed.base; // "base58btc"
 

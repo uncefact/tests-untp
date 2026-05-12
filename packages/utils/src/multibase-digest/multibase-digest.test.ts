@@ -1,11 +1,12 @@
 import { base58btc } from 'multiformats/bases/base58';
-import { MultibaseDigest, type MultibaseEncoding } from './multibase-digest.js';
+import { MultibaseDigest, type HashAlgorithm, type MultibaseEncoding } from './multibase-digest.js';
 
 const encoder = new TextEncoder();
 const helloBytes = encoder.encode('hello');
 const worldBytes = encoder.encode('world');
 
 const SHA256_HELLO_HEX = '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824';
+const SHA256_EMPTY_HEX = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
 
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes)
@@ -24,6 +25,14 @@ describe('MultibaseDigest', () => {
       expect(digest.base).toBe('base58btc');
       expect(digest.digest).toHaveLength(32);
       expect(toHex(digest.digest)).toBe(SHA256_HELLO_HEX);
+    });
+
+    it('produces the expected SHA-256 digest of empty input', async () => {
+      const digest = await MultibaseDigest.fromData(new Uint8Array(0), {
+        algorithm: 'sha2-256',
+        base: 'base58btc',
+      });
+      expect(toHex(digest.digest)).toBe(SHA256_EMPTY_HEX);
     });
 
     it('encodes as base58btc with a leading "z"', async () => {
@@ -101,24 +110,43 @@ describe('MultibaseDigest', () => {
         }),
       ).toThrow('Unsupported multibase encoding');
     });
+
+    it('rejects a digest whose length does not match the algorithm', () => {
+      // sha2-256 expects 32 bytes; a 16-byte digest is invalid.
+      expect(() =>
+        MultibaseDigest.fromDigest(new Uint8Array(16), {
+          algorithm: 'sha2-256',
+          base: 'base58btc',
+        }),
+      ).toThrow('Digest length 16 does not match "sha2-256" (expected 32)');
+
+      // sha2-512 expects 64 bytes; a 32-byte digest is invalid.
+      expect(() =>
+        MultibaseDigest.fromDigest(new Uint8Array(32), {
+          algorithm: 'sha2-512',
+          base: 'base58btc',
+        }),
+      ).toThrow('Digest length 32 does not match "sha2-512" (expected 64)');
+    });
   });
 
   describe('fromString', () => {
     const supportedBases: MultibaseEncoding[] = ['base58btc', 'base64'];
+    const algorithms: HashAlgorithm[] = ['sha2-256', 'sha2-512'];
 
-    it.each(supportedBases)('round-trips through %s', async (base) => {
-      const original = await MultibaseDigest.fromData(helloBytes, {
-        algorithm: 'sha2-256',
-        base,
-      });
-      const encoded = original.toString();
-      const parsed = MultibaseDigest.fromString(encoded);
+    it.each(supportedBases.flatMap((b) => algorithms.map((a) => [a, b] as const)))(
+      'round-trips %s through %s',
+      async (algorithm, base) => {
+        const original = await MultibaseDigest.fromData(helloBytes, { algorithm, base });
+        const encoded = original.toString();
+        const parsed = MultibaseDigest.fromString(encoded);
 
-      expect(parsed.algorithm).toBe('sha2-256');
-      expect(parsed.base).toBe(base);
-      expect(parsed.equals(original)).toBe(true);
-      expect(parsed.toString()).toBe(encoded);
-    });
+        expect(parsed.algorithm).toBe(algorithm);
+        expect(parsed.base).toBe(base);
+        expect(parsed.equals(original)).toBe(true);
+        expect(parsed.toString()).toBe(encoded);
+      },
+    );
 
     it('throws on an empty string', () => {
       expect(() => MultibaseDigest.fromString('')).toThrow('non-empty');
@@ -127,6 +155,11 @@ describe('MultibaseDigest', () => {
     it('throws on an unknown multibase prefix', () => {
       // 'f' is the base16 prefix, which is not in our allow-list.
       expect(() => MultibaseDigest.fromString('f1220')).toThrow('Unsupported multibase prefix');
+    });
+
+    it('throws with a decode error when the base58btc body contains non-alphabet characters', () => {
+      // 'z' selects base58btc; '0', 'O', 'I', 'l' are explicitly outside its alphabet.
+      expect(() => MultibaseDigest.fromString('z0OIl')).toThrow('Failed to decode multibase string');
     });
 
     it('throws on an unsupported multihash algorithm code', () => {
@@ -190,6 +223,15 @@ describe('MultibaseDigest', () => {
       expect(a.equals(b)).toBe(false);
     });
 
+    it('returns false for a single-byte difference at the same length', () => {
+      const base = new Uint8Array(32);
+      const variant = new Uint8Array(32);
+      variant[7] = 0x01;
+      const a = MultibaseDigest.fromDigest(base, { algorithm: 'sha2-256', base: 'base58btc' });
+      const b = MultibaseDigest.fromDigest(variant, { algorithm: 'sha2-256', base: 'base58btc' });
+      expect(a.equals(b)).toBe(false);
+    });
+
     it('returns false for different algorithms over the same data', async () => {
       const a = await MultibaseDigest.fromData(helloBytes, {
         algorithm: 'sha2-256',
@@ -220,7 +262,7 @@ describe('MultibaseDigest', () => {
       expect(await digest.verify(worldBytes)).toBe(false);
     });
 
-    it('uses the digest’s own algorithm, not the caller’s', async () => {
+    it("uses the digest's own algorithm, not the caller's", async () => {
       const digest512 = await MultibaseDigest.fromData(helloBytes, {
         algorithm: 'sha2-512',
         base: 'base58btc',
