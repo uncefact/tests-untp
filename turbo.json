@@ -6,8 +6,7 @@
       "outputs": ["build/**", ".next/**", "!.next/cache/**"]
     },
     "test": {
-      "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "dependsOn": ["^build"]
     }
   }
 }

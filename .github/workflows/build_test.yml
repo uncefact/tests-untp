@@ -59,6 +59,7 @@ jobs:
   qa:
     name: QA (${{ matrix.package }})
     runs-on: ubuntu-latest
+    needs: quality
     strategy:
       fail-fast: false
       matrix:
@@ -87,6 +88,9 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # `quality` is the upstream installer (`needs: quality`), so this restore
+      # should hit. The fallback install handles rare cache misses (e.g. cache
+      # eviction) without failing the job.
       - name: Restore node_modules cache
         id: cache-modules
         uses: actions/cache/restore@v4
@@ -96,25 +100,25 @@ jobs:
             packages/*/node_modules
           key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
-      - name: Install dependencies
+      - name: Install dependencies (fallback if cache restore missed)
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
-      - name: Save node_modules cache
-        if: steps.cache-modules.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            node_modules
-            packages/*/node_modules
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+      - name: Build ${{ matrix.package }} (and affected deps)
+        run: yarn turbo run build --filter='${{ matrix.package }}...[origin/next]'
 
-      - name: Run build and test for ${{ matrix.package }} (and affected deps)
-        run: yarn turbo run build test --filter='${{ matrix.package }}...[origin/next]'
+      # `--changedSince=origin/next` is passed through to jest so file-level
+      # affected filtering still applies inside each package, matching the
+      # scope of the previous `lerna exec -- yarn jest --changedSince` step.
+      # Calls turbo's binary directly because `yarn turbo` consumes the `--`
+      # separator before it reaches turbo.
+      - name: Test ${{ matrix.package }} (changed files only)
+        run: ./node_modules/.bin/turbo run test --filter='${{ matrix.package }}...[origin/next]' -- --changedSince=origin/next
 
   e2e:
     name: E2E (reference-implementation)
     runs-on: ubuntu-latest
+    needs: [quality, qa]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -130,6 +134,8 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # `quality` is the upstream installer (`needs: quality` via the qa chain),
+      # so this restore should hit. The fallback install covers rare cache misses.
       - name: Restore node_modules cache
         id: cache-modules
         uses: actions/cache/restore@v4
@@ -140,19 +146,9 @@ jobs:
             ~/.cache/Cypress
           key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
-      - name: Install dependencies
+      - name: Install dependencies (fallback if cache restore missed)
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
-
-      - name: Save node_modules cache
-        if: steps.cache-modules.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            node_modules
-            packages/*/node_modules
-            ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
       - name: Check whether E2E should run
         id: affected
