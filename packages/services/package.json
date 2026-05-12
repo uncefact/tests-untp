@@ -1,6 +1,6 @@
 {
   "name": "@uncefact/untp-ri-services",
-  "version": "0.1.0-dev.8",
+  "version": "0.0.1",
   "description": "Services for the UNTP reference implementation",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",

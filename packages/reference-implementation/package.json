@@ -9,7 +9,7 @@
     "@prisma/client": "6.19.2",
     "@reference-implementation/components": "0.2.0",
     "@tailwindcss/postcss": "^4.1.16",
-    "@uncefact/untp-ri-services": "0.1.0-dev.8",
+    "@uncefact/untp-ri-services": "0.0.1",
     "@uncefact/vckit-renderer": "1.0.0-next.61",
     "clsx": "^2.1.1",
     "html5-qrcode": "^2.3.8",

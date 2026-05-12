@@ -53,6 +53,7 @@
     "generate-version-mapping": "node documentation/version-mapping/script.js"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@jest/globals": "^29.7.0",
     "@types/fs-extra": "11.0.4",
     "@types/jest": "29.5.11",

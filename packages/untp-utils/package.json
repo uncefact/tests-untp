@@ -1,6 +1,6 @@
 {
   "name": "@uncefact/untp-utils",
-  "version": "0.1.0-dev.0",
+  "version": "0.0.1",
   "description": "Shared utility primitives for UNTP packages and consumers.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
