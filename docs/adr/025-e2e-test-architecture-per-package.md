@@ -49,6 +49,17 @@ Same tests run against:
 
 We chose this design because per-app E2E maps cleanly to the per-package matrix in PR checks (separate ADR), tests are parameterizable so the same suite covers all four stages, and the deferred cross-package tests avoid premature complexity.
 
+## Adoption notes
+
+The walking-skeleton implementation of this ADR ships under #579 and migrates **`untp-playground` only**:
+
+- 5 Cypress specs and the playground-specific support commands moved from the root `e2e/` workspace to `packages/untp-playground/e2e/`.
+- `packages/untp-playground/e2e/cypress.config.ts` is a minimal config that takes a target-URL parameter (`E2E_PLAYGROUND_BASE_URL`).
+- The CI `e2e-playground` job invokes Cypress against the playground stack started via `docker compose --profile playground`.
+- Reference-implementation's 22 specs and its heavier `cypress.config.ts` (DB seed and cleanup, IDR clearing, UNTP conformance runner) remain in the root `e2e/` workspace and continue to run under the existing `e2e-ri` job. Their migration is tracked by #582 and includes the matching CI workflow update (parallelising open and closed mode, sharing a single Docker image build via buildx + GHA cache).
+
+The decision recorded in this ADR is unchanged; this adoption note documents the staged rollout.
+
 ## Consequences
 
 **What becomes easier:**
