@@ -5,10 +5,24 @@ import { base64 } from 'multiformats/bases/base64';
 import type { MultihashHasher, MultihashDigest } from 'multiformats/hashes/interface';
 import type { MultibaseCodec } from 'multiformats/bases/interface';
 
+/**
+ * Hash algorithms accepted by {@link MultibaseDigest}. Recovered from the
+ * multihash prefix on decode, supplied by the caller on encode.
+ */
 export type HashAlgorithm = 'sha2-256' | 'sha2-512';
 
+/**
+ * Multibase encodings accepted by {@link MultibaseDigest}. Recovered from the
+ * single-character prefix on a multibase string (`z` for base58btc, `m` for
+ * base64), supplied by the caller on encode.
+ */
 export type MultibaseEncoding = 'base58btc' | 'base64';
 
+/**
+ * Algorithm and base selection for the encode-side {@link MultibaseDigest}
+ * constructors ({@link MultibaseDigest.fromData}, {@link MultibaseDigest.fromDigest}).
+ * Decode-side construction reads both from the input string and takes no options.
+ */
 export interface MultibaseDigestOptions {
   algorithm: HashAlgorithm;
   base: MultibaseEncoding;
@@ -63,10 +77,24 @@ function assertSupportedBase(base: MultibaseEncoding): void {
   }
 }
 
+/**
+ * Immutable value object representing a multibase-encoded multihash: a hash
+ * digest wrapped with its algorithm code (multihash) and paired with a chosen
+ * text encoding (multibase). Instances are only obtainable through the static
+ * constructors, which validate inputs against the allow-lists.
+ *
+ * Two instances are equal when their underlying multihash bytes match. The
+ * chosen `base` is presentational and does not affect identity, so the same
+ * digest re-encoded under a different base compares equal.
+ */
 export class MultibaseDigest {
+  /** Hash algorithm used to produce {@link digest}. */
   readonly algorithm: HashAlgorithm;
+  /** Multibase encoding used by {@link toString} when no override is supplied. */
   readonly base: MultibaseEncoding;
+  /** Raw hash bytes (no multihash prefix). Length matches {@link algorithm}. */
   readonly digest: Uint8Array;
+  /** Multihash bytes (varint code + varint length + {@link digest}). */
   readonly multihash: Uint8Array;
 
   private constructor(algorithm: HashAlgorithm, base: MultibaseEncoding, digest: Uint8Array, multihash: Uint8Array) {
@@ -76,6 +104,12 @@ export class MultibaseDigest {
     this.multihash = multihash;
   }
 
+  /**
+   * Hashes `data` with the requested algorithm, wraps it as a multihash, and
+   * tags it with the requested multibase encoding for serialisation.
+   *
+   * @throws If `algorithm` or `base` is not in the allow-list.
+   */
   static async fromData(data: Uint8Array, opts: MultibaseDigestOptions): Promise<MultibaseDigest> {
     assertSupportedAlgorithm(opts.algorithm);
     assertSupportedBase(opts.base);
@@ -84,6 +118,15 @@ export class MultibaseDigest {
     return new MultibaseDigest(opts.algorithm, opts.base, mh.digest, mh.bytes);
   }
 
+  /**
+   * Wraps an already-computed raw `digest` (the bytes a hash function produces,
+   * no multihash prefix) and tags it with the requested multibase encoding. The
+   * caller asserts the algorithm; the byte length must match its expected
+   * digest size.
+   *
+   * @throws If `algorithm` or `base` is not in the allow-list, or if `digest.length`
+   *   does not match the expected size for `algorithm`.
+   */
   static fromDigest(digest: Uint8Array, opts: MultibaseDigestOptions): MultibaseDigest {
     assertSupportedAlgorithm(opts.algorithm);
     assertSupportedBase(opts.base);
@@ -96,6 +139,19 @@ export class MultibaseDigest {
     return new MultibaseDigest(opts.algorithm, opts.base, mh.digest, mh.bytes);
   }
 
+  /**
+   * Parses a multibase string into a {@link MultibaseDigest}. The algorithm and
+   * multibase encoding are both recovered from the string itself: the leading
+   * character names the multibase, and the multihash prefix bytes name the
+   * algorithm.
+   *
+   * Decode and multihash-parse errors are rethrown with `{ cause }` so the
+   * underlying multiformats error is preserved for debugging.
+   *
+   * @throws If `encoded` is empty, the multibase prefix is unknown, the body
+   *   cannot be decoded, the multihash bytes are malformed, or the multihash
+   *   algorithm code is not in the allow-list.
+   */
   static fromString(encoded: string): MultibaseDigest {
     if (typeof encoded !== 'string' || encoded.length === 0) {
       throw new Error('Multibase string must be a non-empty string');
@@ -129,12 +185,24 @@ export class MultibaseDigest {
     return new MultibaseDigest(algorithm, base, mh.digest, mh.bytes);
   }
 
+  /**
+   * Returns the multibase-encoded multihash as a string. When called without
+   * arguments, uses {@link base}; pass a supported encoding to re-encode without
+   * rehashing.
+   *
+   * @throws If `base` is not in the allow-list.
+   */
   toString(base?: MultibaseEncoding): string {
     const target = base ?? this.base;
     assertSupportedBase(target);
     return BASES[target].encoder.encode(this.multihash);
   }
 
+  /**
+   * Returns `true` when `other` has the same algorithm and identical multihash
+   * bytes. The base is presentational and does not participate in equality, so
+   * the same digest encoded under different bases compares equal.
+   */
   equals(other: MultibaseDigest): boolean {
     return this.algorithm === other.algorithm && bytesEqual(this.multihash, other.multihash);
   }
