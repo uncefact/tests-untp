@@ -95,8 +95,8 @@ Considered as the target state but deferred. Turbo's filter-by-package mechanism
 
 ## References
 
-- ADR 004: Turborepo for build orchestration and caching
-- ADR 005: Script naming convention
-- Planned: pnpm workspaces migration (will update filter base and commands)
-- Planned: per-package E2E architecture (will split the single `e2e` job into per-app matrix entries)
+- ADR 007: Turborepo for build orchestration and caching
+- ADR 008: Script naming convention
+- ADR 025: E2E test architecture per package (will split the single `e2e` job into per-app matrix entries)
+- ADR 030: pnpm workspaces as the package manager (will update commands to `pnpm turbo`)
 - Planned: trunk-based development on `main` (will change filter base to `[origin/main]`)

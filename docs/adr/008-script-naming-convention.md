@@ -9,7 +9,7 @@ Across the repository's packages, scripts that verify code quality (format, lint
 
 - CI workflows hardcoding the wrong script name and either checking when they should write or writing when they should check.
 - Contributors running `yarn format` locally and accidentally modifying files when they expected a check, or vice versa.
-- The PR checks matrix (ADR 006) cannot invoke a uniform task across packages without first standardising names.
+- The PR checks matrix (ADR 014) cannot invoke a uniform task across packages without first standardising names.
 
 ## Decision
 
@@ -30,7 +30,13 @@ We chose this because the `:check` / `:fix` suffix pair makes the intent of ever
 
 ## Adoption notes
 
-This ADR records the target convention across the workspace. The initial implementation ships as part of the "Bundle B" CI restructure and applies the convention at the **root** `package.json` level only: `format:check` and `format:fix` already existed; `lint:check` (renamed from `lint`) and `lint:fix` are added. Per-package script standardisation is deferred to a follow-up so the matrix can ship without bundling eslint configuration work for packages that do not currently have it (`untp-test-suite-mocha`, `@test-untp/vc-test-suite`). The CI quality job uses the root-level scripts, which is sufficient to enforce the convention at the gate.
+This ADR records the target convention across the workspace. The initial implementation ships as part of the "Bundle B" CI restructure and applies the convention at the **root** `package.json` level only:
+
+- `format:check` and `format:fix` already existed and run Prettier scoped to a `packages/**/*.{js,jsx,ts,tsx,json,css,scss,md}` glob, not a bare `.`. They are unchanged in this chunk.
+- `lint:check` (renamed from `lint`) is a composite that runs root-level ESLint over `packages/` plus delegates to the reference implementation's own `lint` (which runs `prisma generate && tsc && eslint .` to cover Prisma-generated types). It is not a pure `eslint .` invocation as described in the Decision section above; the Decision section describes the target convention for new per-package scripts.
+- `lint:fix` is new and runs root-level ESLint with `--fix`. It does not yet delegate into the reference implementation; that is a follow-up.
+
+Per-package script standardisation is deferred to a follow-up so the matrix can ship without bundling ESLint configuration work for packages that do not currently have it (`untp-test-suite-mocha`, `@test-untp/vc-test-suite`). The CI quality job uses the root-level scripts, which is sufficient to enforce the convention at the gate.
 
 ## Consequences
 
@@ -61,5 +67,5 @@ Rejected because magic-context detection is brittle and hides intent. Explicit n
 
 ## References
 
-- ADR 004: Turborepo for build orchestration and caching
-- ADR 006: PR checks workflow with static matrix and combined filter
+- ADR 007: Turborepo for build orchestration and caching
+- ADR 014: PR checks workflow with static matrix and combined filter

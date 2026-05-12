@@ -21,8 +21,8 @@ We need:
 We adopt Turborepo for build orchestration and caching.
 
 - A `turbo.json` at the repository root declares task pipelines, dep graphs (`dependsOn: ["^build"]`), and outputs per task.
-- CI commands use `yarn turbo run <task>` instead of `lerna exec -- yarn <task>`.
-- The combined filter syntax `--filter=${{ matrix.package }}...[origin/next]` is used in the PR-check workflow (see ADR 006): each matrix job runs tasks for its package only if that package or something it depends on changed since `next`. Unaffected packages exit in seconds.
+- The PR check workflow uses `yarn turbo run <task>` in place of the previous single-job `yarn build` plus `lerna exec -- yarn jest`. Root scripts that still rely on `lerna exec` (`test`, `test:coverage`) and `lerna version` are unchanged in this chunk; converting them to Turbo is a follow-up.
+- The combined filter syntax `--filter=${{ matrix.package }}...[origin/next]` is used in the PR-check workflow (see ADR 014): each matrix job runs tasks for its package only if that package or something it depends on changed since `next`. Unaffected packages exit in seconds.
 - Local cache only for the initial adoption. Remote caching (Vercel free tier or self-hosted) is planned as a follow-up once the matrix is proven; the marginal value of remote cache is small until contributor coordination patterns warrant it.
 
 We chose this because the affected-package filtering directly addresses the CI time problem, the dep-graph awareness reduces build ordering bugs, and Turborepo is the standard tool for this shape of monorepo with minimal cognitive overhead.
@@ -67,9 +67,9 @@ Rejected. The CI pain is real today, the pnpm migration is its own substantial c
 
 ## References
 
-- ADR 005: Script naming convention
-- ADR 006: PR checks workflow with static matrix and combined filter
-- Planned: pnpm workspaces migration (will update commands to `pnpm turbo`)
+- ADR 008: Script naming convention
+- ADR 014: PR checks workflow with static matrix and combined filter
+- ADR 025: E2E test architecture per package (will populate per-app `test:e2e` tasks)
+- ADR 030: pnpm workspaces as the package manager (will update commands to `pnpm turbo`)
 - Planned: trunk-based development on `main` (will update filter base to `[origin/main]`)
-- Planned: per-package E2E architecture (will populate per-app `test:e2e` tasks)
 - @see https://turborepo.com/docs Turborepo documentation
