@@ -3,10 +3,14 @@ Cypress.Commands.add('uploadCredential', (credential: object | string) => {
   cy.get('[data-testid="credential-upload"]').should('be.visible');
 
   if (Array.isArray(credential) && credential.length > 0) {
-    const credentials: Cypress.FileReference | Cypress.FileReference[] | {
-      contents: Buffer; fileName: string; // default file name; customize if needed
-      mimeType: string;
-    }[] = [];
+    const credentials:
+      | Cypress.FileReference
+      | Cypress.FileReference[]
+      | {
+          contents: Buffer;
+          fileName: string; // default file name; customize if needed
+          mimeType: string;
+        }[] = [];
     credential.map((cred) => {
       const fileObject = {
         contents: Buffer.from(JSON.stringify(cred)),

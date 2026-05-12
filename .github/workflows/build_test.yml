@@ -40,6 +40,7 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
+            ~/.cache/Cypress
           key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
       - name: Install dependencies
@@ -53,6 +54,7 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
+            ~/.cache/Cypress
           key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
       - name: Check formatting
@@ -103,6 +105,7 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
+            ~/.cache/Cypress
           key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
       - name: Install dependencies (fallback if cache restore missed)
@@ -120,7 +123,7 @@ jobs:
       - name: Test ${{ matrix.package }} (changed files only)
         run: ./node_modules/.bin/turbo run test --filter='${{ matrix.package }}...[origin/next]' -- --changedSince=origin/next
 
-  e2e:
+  e2e-ri:
     name: E2E (reference-implementation)
     runs-on: ubuntu-latest
     needs: [quality, qa]
@@ -216,11 +219,11 @@ jobs:
 
       - name: Build E2E images
         if: steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml build
+        run: docker compose -f docker-compose.e2e.yml --profile ri build
 
       - name: Start E2E docker compose
         if: steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml up -d --no-build
+        run: docker compose -f docker-compose.e2e.yml --profile ri up -d --no-build
 
       - name: Wait for app container and dump logs
         if: steps.affected.outputs.result == 'true'
@@ -235,9 +238,9 @@ jobs:
             sleep 2
           done
           echo "--- App container logs ---"
-          docker compose -f docker-compose.e2e.yml logs app
+          docker compose -f docker-compose.e2e.yml --profile ri logs app
           echo "--- Container status ---"
-          docker compose -f docker-compose.e2e.yml ps
+          docker compose -f docker-compose.e2e.yml --profile ri ps
           if ! curl -sS -o /dev/null -m 2 http://localhost:3003 2>/dev/null; then
             echo "::error::App did not respond on :3003 within 180s"
             exit 1
@@ -252,15 +255,15 @@ jobs:
 
       - name: Dump E2E container logs on failure
         if: failure() && steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml logs app
+        run: docker compose -f docker-compose.e2e.yml --profile ri logs app
 
       - name: Stop docker compose (with volumes for clean closed mode DB)
         if: steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml down -v
+        run: docker compose -f docker-compose.e2e.yml --profile ri down -v
 
       - name: Start closed mode E2E docker compose
         if: steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml up -d --no-build
+        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri up -d --no-build
 
       - name: Wait for closed mode app container
         if: steps.affected.outputs.result == 'true'
@@ -275,9 +278,9 @@ jobs:
             sleep 2
           done
           echo "--- App container logs ---"
-          docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml logs app
+          docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri logs app
           echo "--- Container status ---"
-          docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml ps
+          docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri ps
           if ! curl -sS -o /dev/null -m 2 http://localhost:3003 2>/dev/null; then
             echo "::error::App did not respond on :3003 within 180s (closed mode)"
             exit 1
@@ -292,11 +295,148 @@ jobs:
 
       - name: Dump closed mode container logs on failure
         if: failure() && steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml logs app
+        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri logs app
 
       - name: Stop closed mode docker compose
         if: steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml down -v
+        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri down -v
+
+  e2e-playground:
+    name: E2E (untp-playground)
+    runs-on: ubuntu-latest
+    needs: [quality, qa]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      # `quality` is the upstream installer (`needs: quality` via the qa chain),
+      # so this restore should hit. The fallback install covers rare cache misses.
+      - name: Restore node_modules cache
+        id: cache-modules
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+            ~/.cache/Cypress
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+
+      - name: Install dependencies (fallback if cache restore missed)
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+
+      - name: Check whether playground E2E should run
+        id: affected
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Turbo dep graph for untp-playground.
+          affected_json=$(yarn --silent turbo run build --filter='untp-playground...[origin/next]' --dry-run=json)
+          if [ -z "$affected_json" ]; then
+            echo "::error::turbo dry-run produced empty output"
+            exit 1
+          fi
+          task_count=$(echo "$affected_json" | jq '.tasks | length')
+          if ! [[ "$task_count" =~ ^[0-9]+$ ]]; then
+            echo "::error::Could not parse turbo task count: '$task_count'"
+            echo "--- Raw output ---"
+            echo "$affected_json"
+            exit 1
+          fi
+
+          # Also trigger when files outside turbo's package graph change:
+          # the playground e2e tree, docker-compose, the workflow itself.
+          extra_changed=$(git diff --name-only origin/next...HEAD -- \
+            'packages/untp-playground/e2e/**' \
+            'docker-compose.e2e.yml' \
+            '.github/workflows/build_test.yml' \
+            | wc -l | tr -d ' ')
+
+          if [ "$task_count" -gt 0 ] || [ "$extra_changed" -gt 0 ]; then
+            echo "result=true" >> "$GITHUB_OUTPUT"
+            echo "Playground E2E will run. turbo task_count=$task_count, extra_changed=$extra_changed."
+          else
+            echo "result=false" >> "$GITHUB_OUTPUT"
+            echo "Playground E2E skipped. Dep graph unaffected and no playground e2e, docker-compose, or workflow files changed."
+          fi
+
+      # Mirrors the cleanup in e2e-ri; cheap insurance even though the
+      # playground stack is lighter (3 services vs 8).
+      # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
+      # https://github.com/uncefact/tests-untp/issues/344
+      - name: Free up space on ubuntu runner for E2E tests
+        if: steps.affected.outputs.result == 'true'
+        run: |
+          sudo rm -rf \
+            "$AGENT_TOOLSDIRECTORY" \
+            /opt/microsoft \
+            /opt/pipx \
+            /usr/local/.ghcup \
+            /usr/local/graalvm* \
+            /usr/local/julia* \
+            /usr/local/lib/android \
+            /usr/local/share/chromium \
+            /usr/local/share/powershell \
+            /usr/local/share/vcpkg \
+            /usr/share/dotnet \
+            /usr/share/miniconda \
+            /usr/share/swift
+          docker image prune -af
+
+      - name: Build playground E2E image
+        if: steps.affected.outputs.result == 'true'
+        run: docker compose -f docker-compose.e2e.yml --profile playground build
+
+      - name: Start playground stack
+        if: steps.affected.outputs.result == 'true'
+        run: docker compose -f docker-compose.e2e.yml --profile playground up -d --no-build
+
+      - name: Wait for playground container
+        if: steps.affected.outputs.result == 'true'
+        run: |
+          echo "--- Waiting up to 120s for playground to respond on http://localhost:4000 ---"
+          deadline=$(($(date +%s) + 120))
+          while [ $(date +%s) -lt $deadline ]; do
+            if curl -sS -o /dev/null -m 2 http://localhost:4000 2>/dev/null; then
+              echo "--- Playground is responding ---"
+              break
+            fi
+            sleep 2
+          done
+          echo "--- Container status ---"
+          docker compose -f docker-compose.e2e.yml --profile playground ps
+          if ! curl -sS -o /dev/null -m 2 http://localhost:4000 2>/dev/null; then
+            echo "::error::Playground did not respond on :4000 within 120s"
+            docker compose -f docker-compose.e2e.yml --profile playground logs untp-playground
+            exit 1
+          fi
+
+      - name: Run playground E2E tests
+        if: steps.affected.outputs.result == 'true'
+        run: yarn workspace untp-playground-e2e test:e2e
+        env:
+          NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module' # See issue https://github.com/cypress-io/github-action/issues/1408
+          E2E_PLAYGROUND_BASE_URL: 'http://localhost:4000'
+
+      - name: Dump playground container logs on failure
+        if: failure() && steps.affected.outputs.result == 'true'
+        run: docker compose -f docker-compose.e2e.yml --profile playground logs untp-playground
+
+      - name: Stop playground stack
+        if: steps.affected.outputs.result == 'true'
+        run: docker compose -f docker-compose.e2e.yml --profile playground down -v
 
   build_docs:
     name: Docs build

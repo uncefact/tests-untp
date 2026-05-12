@@ -22,11 +22,7 @@ By default (`E2E_TENANT_MODE=open`), the suite runs API tests + open mode tests.
 
 ### UNTP Playground
 
-| Category | Directory | Runs when |
-|----------|-----------|-----------|
-| **Playground tests** | `cypress/e2e/playground/` | Always |
-
-Playground tests validate credential upload, schema validation (VCDM, JSON-LD), and report generation. These are independent of tenant mode and do not require database access or authentication.
+Playground E2E lives in its own package: `packages/untp-playground/e2e/`. See that directory for invocation details.
 
 ## Local Testing (Docker Compose)
 
@@ -96,7 +92,7 @@ To run E2E tests against deployed instances of the RI and Playground (e.g. stagi
    yarn test:e2e                # Uses E2E_TENANT_MODE from .env.e2e
    yarn test:e2e:open           # Explicit open mode
    yarn test:e2e:closed         # Explicit closed mode
-   yarn test:e2e:playground     # Playground tests only
+   yarn test:e2e:playground     # Playground E2E (runs from packages/untp-playground/e2e/)
    ```
 
 ### Test Data Safety

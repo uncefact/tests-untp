@@ -1,0 +1,15 @@
+{
+  "name": "untp-playground-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cypress E2E test suite for the untp-playground app.",
+  "scripts": {
+    "cypress:open": "cypress open",
+    "test:e2e": "cypress run"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "cypress": "^14.0.2",
+    "typescript": "^5"
+  }
+}

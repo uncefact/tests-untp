@@ -1,5 +1,5 @@
-import { TestCaseStatus } from '../../../../packages/untp-playground/constants';
-import { config } from '../../support/config';
+import { TestCaseStatus } from '../../../constants';
+import { config } from '../support/config';
 
 describe('Report Generation', () => {
   beforeEach(() => {

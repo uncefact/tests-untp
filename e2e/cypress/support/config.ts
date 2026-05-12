@@ -45,9 +45,6 @@ export const config = {
       privateBucket: Cypress.env('STORAGE_PRIVATE_BUCKET') as string,
     },
   },
-  playground: {
-    baseUrl: (Cypress.env('PLAYGROUND_BASE_URL') || 'http://localhost:4000') as string,
-  },
   tenantMode: (Cypress.env('TENANT_MODE') || 'open') as 'open' | 'closed',
   testOrg: {
     id: Cypress.env('TEST_ORG_ID') as string,

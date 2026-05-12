@@ -1,6 +1,7 @@
 services:
   untp-playground:
     image: untp-playground:e2e
+    profiles: ['playground']
     build:
       context: .
       dockerfile: packages/untp-playground/Dockerfile
@@ -16,6 +17,7 @@ services:
 
   vckit-api:
     image: ghcr.io/uncefact/project-vckit:sha-325b7e3@sha256:3623cd45cdb971ba16c6016a1e3ba153fe6920c2053275cd430e76ab75d5a563
+    profiles: ['ri', 'playground']
     env_file:
       - local.env
     ports:
@@ -31,6 +33,7 @@ services:
 
   db:
     image: postgres:16-alpine
+    profiles: ['ri', 'playground']
     ports:
       - 5432:5432
     environment:
@@ -43,6 +46,7 @@ services:
 
   storage-service:
     image: ghcr.io/uncefact/project-storage-service:3.2.1
+    profiles: ['ri']
     ports:
       - 3334:3334
     environment:
@@ -57,6 +61,7 @@ services:
 
   identity-resolver-service:
     image: ghcr.io/pyx-industries/pyx-identity-resolver:3.0.0
+    profiles: ['ri']
     ports:
       - '3000:3000'
     environment:
@@ -79,6 +84,7 @@ services:
 
   identity-resolver-service-object-store:
     image: quay.io/minio/minio:RELEASE.2024-08-17T01-24-54Z-cpuv1
+    profiles: ['ri']
     command: server /data --console-address ":9090"
     ports:
       - '9000:9000'
@@ -91,6 +97,7 @@ services:
 
   app:
     image: app:e2e
+    profiles: ['ri']
     build:
       context: .
       dockerfile: packages/reference-implementation/Dockerfile
@@ -157,8 +164,6 @@ services:
     extra_hosts:
       - 'localhost:host-gateway'
     depends_on:
-      untp-playground:
-        condition: service_started
       vckit-api:
         condition: service_healthy
       storage-service:
@@ -170,6 +175,7 @@ services:
 
   e2e-ri-db:
     image: postgres:17-alpine
+    profiles: ['ri']
     ports:
       - 5433:5432
     environment:
@@ -187,6 +193,7 @@ services:
 
   e2e-keycloak:
     image: quay.io/keycloak/keycloak:26.4.2
+    profiles: ['ri']
     command:
       - start-dev
       - --import-realm

@@ -1,5 +1,5 @@
-import { allowedContextValue } from '../../../../packages/untp-playground/constants';
-import { config } from '../../support/config';
+import { allowedContextValue } from '../../../constants';
+import { config } from '../support/config';
 
 describe('JSON-LD Expansion and Validation', () => {
   beforeEach(() => {

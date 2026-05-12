@@ -203,9 +203,6 @@ export default defineConfig({
     // Closed-mode groups
     GROUP_ALPHA: process.env.E2E_GROUP_ALPHA || '/e2e-org-alpha',
     GROUP_BETA: process.env.E2E_GROUP_BETA || '/e2e-org-beta',
-
-    // Playground (optional)
-    PLAYGROUND_BASE_URL: process.env.E2E_PLAYGROUND_BASE_URL || '',
   },
   e2e: {
     baseUrl: process.env.CYPRESS_BASE_URL || 'http://localhost:3003',

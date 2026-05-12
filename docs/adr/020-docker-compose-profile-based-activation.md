@@ -56,6 +56,18 @@ docker compose --profile observability up -d
 
 We chose this design because it eliminates drift between local and production setups, gives devs a clear UX (one flag picks the mode), and keeps the observability concern explicitly opt-in rather than always-on locally.
 
+## Adoption notes
+
+The walking-skeleton implementation of this ADR ships with the per-package E2E split (#579) and applies the profile pattern to `docker-compose.e2e.yml` only:
+
+- `ri` profile: `app`, `vckit-api`, `db`, `storage-service`, `identity-resolver-service`, `identity-resolver-service-object-store`, `e2e-ri-db`, `e2e-keycloak`.
+- `playground` profile: `untp-playground`, `vckit-api`, `db`.
+- `vckit-api` (and its `db` dependency) are tagged with both profiles since the playground calls `vckit-api` for credential verification.
+
+The broader vision (a single `docker-compose.yml` at repo root covering local dev, observability sidecars, and the local LGTM stack) is deferred. The current root compose / E2E compose split is unchanged in this chunk.
+
+Note: when every service in a compose file is tagged with a profile, `docker compose up` with no profile flag starts nothing. CI invocations always pass `--profile ri` or `--profile playground`; local devs running the E2E stack must do the same.
+
 ## Consequences
 
 **What becomes easier:**
