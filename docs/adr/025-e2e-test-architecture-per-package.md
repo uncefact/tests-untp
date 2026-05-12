@@ -2,7 +2,7 @@
 
 ## Status
 
-proposed
+accepted
 
 ## Context
 
@@ -51,12 +51,20 @@ We chose this design because per-app E2E maps cleanly to the per-package matrix 
 
 ## Adoption notes
 
-The walking-skeleton implementation of this ADR ships under #579 and migrates **`untp-playground` only**:
+The walking-skeleton implementation of this ADR ships in two stages, both retaining the same per-app E2E layout.
+
+**Stage 1, playground (#579):**
 
 - The playground Cypress specs and the playground-specific support commands moved from the root `e2e/` workspace to `packages/untp-playground/e2e/`.
 - `packages/untp-playground/e2e/cypress.config.ts` is a minimal config. It accepts `E2E_PLAYGROUND_BASE_URL` (process env, set by CI) and exposes it as `PLAYGROUND_BASE_URL` for spec consumption via `Cypress.env('PLAYGROUND_BASE_URL')`.
 - The CI `e2e-playground` job invokes Cypress against the playground stack started via `docker compose --profile playground`.
-- Reference-implementation specs and the heavier `cypress.config.ts` (DB seed and cleanup, IDR clearing, UNTP conformance runner) remain in the root `e2e/` workspace and continue to run under the existing `e2e-ri` job. Their migration is tracked by #582 and includes the matching CI workflow update (parallelising open and closed mode, sharing a single Docker image build via buildx + GHA cache).
+
+**Stage 2, reference implementation (#582):**
+
+- The reference-implementation Cypress specs, fixtures, support helpers, and the heavier `cypress.config.ts` (DB seed and cleanup, IDR clearing, UNTP conformance runner) moved from the root `e2e/` workspace to `packages/reference-implementation/e2e/`.
+- The root `e2e/` workspace is removed; both apps now own their tests under `packages/<app>/e2e/`.
+- The `e2e-ri` CI job becomes a matrix over `[open, closed]` tenant modes, with each entry consuming the `e2e:open` / `e2e:closed` workspace scripts in `packages/reference-implementation/e2e/`.
+- A new `build-e2e-images` upstream CI job pre-builds both `app:e2e` and `untp-playground:e2e` images using `docker buildx` with the GHA cache backend (`cache_to: type=gha,mode=max`). Downstream E2E jobs (`e2e-ri` open, `e2e-ri` closed, `e2e-playground`) pull from the same cache via `cache_from: type=gha`, so the matrix sees a cache hit instead of three independent rebuilds.
 
 ## Consequences
 
