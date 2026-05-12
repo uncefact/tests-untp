@@ -89,7 +89,7 @@ jobs:
           - '@uncefact/untp-ri-services'
           - '@reference-implementation/components'
           - '@reference-implementation/core'
-          - 'untp-playground'
+          - '@uncefact/untp-playground'
           - '@uncefact/untp-utils'
     steps:
       - name: Checkout repository
@@ -258,7 +258,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          json=$(yarn --silent turbo run build --filter='untp-playground...[origin/next]' --dry-run=json)
+          json=$(yarn --silent turbo run build --filter='@uncefact/untp-playground...[origin/next]' --dry-run=json)
           if [ -z "$json" ]; then
             echo "::error::turbo dry-run produced empty output"
             exit 1
@@ -483,8 +483,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Turbo dep graph for untp-playground.
-          affected_json=$(yarn --silent turbo run build --filter='untp-playground...[origin/next]' --dry-run=json)
+          # Turbo dep graph for @uncefact/untp-playground.
+          affected_json=$(yarn --silent turbo run build --filter='@uncefact/untp-playground...[origin/next]' --dry-run=json)
           if [ -z "$affected_json" ]; then
             echo "::error::turbo dry-run produced empty output"
             exit 1

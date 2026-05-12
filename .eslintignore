@@ -12,5 +12,5 @@ integration
 node_modules
 .next
 packages/untp-playground/infra
-packages/untp-test-suite-mocha/untp-tests
+packages/untp-test-suite/untp-tests
 packages/reference-implementation/src/lib/prisma/generated

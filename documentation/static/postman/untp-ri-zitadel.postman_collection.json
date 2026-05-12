@@ -1,0 +1,480 @@
+{
+  "info": {
+    "name": "UNTP RI — Zitadel Integration",
+    "description": "# UNTP RI — Zitadel Integration\n\nThis collection helps you connect to the UNTP Reference Implementation (RI) using Zitadel for authentication.\n\n## How it works (the big picture)\n\nThink of the RI like a building with locked rooms (tenants). To get in, you need:\n1. **A key** (service account credentials) — your client_id and client_secret\n2. **A badge** (access token) — you swap your key for a temporary badge at the Zitadel front desk\n3. **A room assignment** (tenant) — your badge says which room you belong to\n\nWithout all three, you can't get in. This collection automates the whole process.\n\n## Getting started\n\n1. **Import** this collection into Postman (File → Import)\n2. **Click the collection name** → go to the **Variables** tab\n3. **Fill in your values** (see table below)\n4. **If you're an integrator** (you received credentials from an admin): skip to the \"Integrator\" folder and run \"Get Access Token\" first\n5. **If you're an admin** (you manage Zitadel): use the \"Admin\" folder to create tenants and service accounts\n\n## Variables you need to set\n\n| Variable | What is it? | Who sets it? | Example |\n|----------|-------------|-------------|--------|\n| `zitadel_url` | The URL of your Zitadel instance | Admin gives you this | `https://auth.labs.pyx.io` |\n| `project_id` | The Zitadel project ID (acts as the \"audience\" for tokens) | Admin gives you this | `362233591867899919` |\n| `client_id` | Your service account username | Admin gives you this | `ri-service-account` |\n| `client_secret` | Your service account password | Admin gives you this (one-time!) | `G3n3r4t3d...` |\n| `ri_url` | The URL of the Reference Implementation | Admin gives you this | `https://ri.labs.pyx.io` |\n| `zitadel_pat` | Admin-only: personal access token for managing Zitadel | Only admins need this | `eyJ...` |\n| `access_token` | You don't set this — it's auto-filled when you run \"Get Access Token\" | Auto | — |\n| `sa_user_id` | You don't set this — it's auto-filled when an admin creates a service account | Auto | — |",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "zitadel_url",
+      "value": "https://auth.labs.pyx.io",
+      "type": "string"
+    },
+    {
+      "key": "project_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "zitadel_pat",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "client_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "client_secret",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ri_url",
+      "value": "https://ri.labs.pyx.io",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sa_user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tenant",
+      "value": "org-acme",
+      "type": "string"
+    },
+    {
+      "key": "tenant_name",
+      "value": "ACME Organisation",
+      "type": "string"
+    },
+    {
+      "key": "sa_username",
+      "value": "acme-service-account",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Admin — Tenant & SA Provisioning",
+      "description": "# Admin — Setting up tenants and service accounts\n\nThis folder is for **Zitadel administrators only** (the people who manage the identity provider).\n\nYou need to set these variables first:\n- `zitadel_pat` — your admin access token for Zitadel\n- `project_id` — the Zitadel project ID\n\n## When do I use this?\n\nEvery time a new organisation needs API access to the RI, you run these 4 requests **in order**:\n\n1. **Create Tenant** — makes a new \"room\" (tenant) in the system. The `tenant` value you set ends up in the `groups` claim of the JWT.\n2. **Create Service Account** — makes a new \"user\" (machine account) that can log in\n3. **Generate Client Credentials** — creates the username/password for that account\n4. **Assign Tenant to SA** — assigns the account to the room. This is what puts the tenant into the token's `groups` claim.\n\nThen you hand the `client_id`, `client_secret`, `project_id`, and URLs to the integrator. They use the \"Integrator\" folder from there.",
+      "item": [
+        {
+          "name": "1. Create Tenant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zitadel_pat}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleKey\": \"{{tenant}}\",\n  \"displayName\": \"{{tenant_name}}\",\n  \"group\": \"tenants\"\n}"
+            },
+            "url": {
+              "raw": "{{zitadel_url}}/management/v1/projects/{{project_id}}/roles",
+              "host": ["{{zitadel_url}}"],
+              "path": ["management", "v1", "projects", "{{project_id}}", "roles"]
+            },
+            "description": "# Create a Tenant\n\nThis creates a new tenant in the system. The `tenant` value you set (e.g., `org-acme`) is the identifier that flows through the entire chain:\n\n**`tenant` variable → `groups` claim in the JWT → tenant in the RI**\n\nIt's the same value all the way through. When an integrator decodes their token and sees `groups: [\"org-acme\"]`, that `org-acme` is this tenant value.\n\n## Before you run this\n\nSet these two variables:\n- `tenant` — the tenant identifier, e.g., `org-acme-corp` (this is exactly what appears in the JWT `groups` claim)\n- `tenant_name` — a human-friendly name, e.g., `ACME Corporation`\n\n## What happens\n\nA project role is created in Zitadel with your tenant value. On its own, this does nothing — you still need to create a service account and assign this tenant to it (steps 2-4).\n\n## Under the hood\n\nZitadel calls this a \"project role\", and the `flatRoles` action transforms it into the `groups` JWT claim. You don't need to worry about that plumbing — just know that the `tenant` variable you set here is the same value the integrator will see in their token's `groups` array."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Tenant created', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    console.log('Tenant created: ' + pm.collectionVariables.get('tenant'));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Create Service Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zitadel_pat}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userName\": \"{{sa_username}}\",\n  \"name\": \"{{tenant_name}} Service Account\",\n  \"description\": \"Service account for {{tenant_name}} RI API access\",\n  \"accessTokenType\": \"ACCESS_TOKEN_TYPE_JWT\"\n}"
+            },
+            "url": {
+              "raw": "{{zitadel_url}}/management/v1/users/machine",
+              "host": ["{{zitadel_url}}"],
+              "path": ["management", "v1", "users", "machine"]
+            },
+            "description": "# Create a Service Account\n\nThis creates a \"machine user\" in Zitadel — basically a robot account that can authenticate via API (no browser login needed).\n\n## Before you run this\n\nSet these variables:\n- `sa_username` — a unique name for the account, e.g., `acme-service-account`\n- `tenant_name` — the organisation name (used in the description)\n\n## What happens\n\n- A new machine user is created in Zitadel\n- The `sa_user_id` variable is **automatically saved** from the response — you'll need it for steps 3 and 4\n- The account can't do anything yet — it still needs credentials (step 3) and a tenant assignment (step 4)"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Service account created', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.userId) {",
+                  "    pm.collectionVariables.set('sa_user_id', jsonData.userId);",
+                  "    console.log('Service account created — user ID saved: ' + jsonData.userId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Generate Client Credentials",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zitadel_pat}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{zitadel_url}}/management/v1/users/{{sa_user_id}}/secret",
+              "host": ["{{zitadel_url}}"],
+              "path": ["management", "v1", "users", "{{sa_user_id}}", "secret"]
+            },
+            "description": "# Generate Client Credentials\n\nThis creates the username and password (client_id + client_secret) for the service account you just created.\n\n## IMPORTANT — Read this!\n\nThe `client_secret` is shown **only once**. If you lose it, you have to run this request again, which **revokes the old secret** (breaking any integrations using it).\n\n## What happens\n\n- `client_id` and `client_secret` are **automatically saved** to your collection variables\n- These are the credentials you hand to the integrator\n- The integrator uses these to get access tokens from Zitadel\n\n## After running\n\nCopy the `client_id` and `client_secret` from the response and save them somewhere safe. Then share them securely with the integrator."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Client credentials generated', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.clientId) {",
+                  "    pm.collectionVariables.set('client_id', jsonData.clientId);",
+                  "    console.log('Client ID: ' + jsonData.clientId);",
+                  "}",
+                  "if (jsonData.clientSecret) {",
+                  "    pm.collectionVariables.set('client_secret', jsonData.clientSecret);",
+                  "    console.log('Client secret saved to variables (copy it now — shown only once)');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Assign Tenant to SA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{zitadel_pat}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projectId\": \"{{project_id}}\",\n  \"roleKeys\": [\"{{tenant}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{zitadel_url}}/management/v1/users/{{sa_user_id}}/grants",
+              "host": ["{{zitadel_url}}"],
+              "path": ["management", "v1", "users", "{{sa_user_id}}", "grants"]
+            },
+            "description": "# Assign Tenant to Service Account\n\nThis is the step that connects the dots. You're telling Zitadel: \"This service account belongs to this tenant.\"\n\nWhen the service account gets a token, the `tenant` value (e.g., `org-acme`) will appear in the `groups` claim of the JWT. The RI reads `groups[0]` to determine the tenant.\n\nSo the chain is: **`tenant` variable → `groups` JWT claim → RI tenant**. Same value, end to end.\n\n## The golden rule\n\n**One service account = one tenant. Always.**\n\nIf you assign multiple tenants, the RI just picks the first one, which may not be what you want.\n\nIf an integrator needs access to multiple tenants, create a separate service account for each.\n\n## After running\n\nYou're done! The integrator now has everything they need:\n- `client_id` and `client_secret` (from step 3)\n- `project_id` (the Zitadel project ID)\n- `zitadel_url` and `ri_url`\n\nSend them these values and point them to the \"Integrator\" folder."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Tenant assigned', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    console.log('Assigned tenant ' + pm.collectionVariables.get('tenant') + ' to SA ' + pm.collectionVariables.get('sa_user_id'));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Integrator — Authentication & API",
+      "description": "# Integrator — Authentication & API\n\nThis folder is for **integrators** — people who have received service account credentials from an admin and want to call the RI API.\n\n## What you need from your admin\n\nBefore you can do anything, you need these four values (set them in the Variables tab):\n- `client_id` — your service account username\n- `client_secret` — your service account password\n- `project_id` — the Zitadel project ID\n- `ri_url` — the URL of the Reference Implementation (e.g., `https://ri.labs.pyx.io`)\n- `zitadel_url` — the URL of the Zitadel instance (e.g., `https://auth.labs.pyx.io`)\n\n## How to use this folder\n\n1. **Run \"Health Check\" first** — makes sure the RI is reachable (no auth needed)\n2. **Run \"Get Access Token\"** — swaps your credentials for a temporary token (auto-saved for all other requests)\n3. **Run any API request** — List DIDs, List Credentials, etc. They all use the saved token automatically\n\nTokens last about 12 hours. When yours expires, just run \"Get Access Token\" again.\n\n## If something goes wrong\n\n- **401 error**: Your token is invalid or expired. Run \"Get Access Token\" again.\n- **403 error**: Your token is valid but has no tenant. Re-run \"Get Access Token\" and check the Postman Console — if `groups` is null, your admin hasn't assigned a tenant to your service account yet.\n- **Can't get a token at all**: Double-check your `client_id`, `client_secret`, and `zitadel_url`.",
+      "item": [
+        {
+          "name": "Get Access Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{client_secret}}"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid urn:zitadel:iam:org:project:id:{{project_id}}:aud urn:zitadel:iam:org:projects:roles"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{zitadel_url}}/oauth/v2/token",
+              "host": ["{{zitadel_url}}"],
+              "path": ["oauth", "v2", "token"]
+            },
+            "description": "# Get Access Token\n\n**Run this first!** This is your \"log in\" step. It takes your client_id and client_secret and swaps them for an access token — a temporary pass that lets you call the RI API.\n\n## What happens when you click Send\n\n1. Your credentials are sent to Zitadel\n2. Zitadel checks them and returns a JWT (a long encoded string)\n3. The token is **automatically saved** to `access_token` — all other requests in this folder use it\n4. The console shows you what's inside the token (audience, groups, expiry) so you can verify it looks right\n\n## The three scopes (why they matter)\n\nThe request includes three scopes. All three are required — missing any one will break things:\n\n- `openid` — standard login scope, required for all OIDC flows\n- `urn:zitadel:iam:org:project:id:{project_id}:aud` — tells Zitadel to put the project ID in the token's `aud` (audience) field. Without this, the RI rejects the token with 401.\n- `urn:zitadel:iam:org:projects:roles` — tells Zitadel to include your role grants in the token. Without this, the `groups` claim is missing and the RI can't figure out your tenant (403 error).\n\n## Token lifetime\n\nTokens last about 12 hours. When yours expires, just run this request again. There's no refresh token for service accounts — you just get a new one."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Token received', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "    pm.expect(pm.response.json().access_token).to.be.a('string');",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.access_token) {",
+                  "    pm.collectionVariables.set('access_token', jsonData.access_token);",
+                  "    console.log('Access token saved (expires in ' + jsonData.expires_in + 's)');",
+                  "",
+                  "    // Decode and display claims for verification",
+                  "    try {",
+                  "        var payload = JSON.parse(atob(jsonData.access_token.split('.')[1]));",
+                  "        console.log('Token claims:');",
+                  "        console.log('  aud: ' + JSON.stringify(payload.aud));",
+                  "        console.log('  groups: ' + JSON.stringify(payload.groups));",
+                  "        console.log('  sub: ' + payload.sub);",
+                  "        console.log('  exp: ' + new Date(payload.exp * 1000).toISOString());",
+                  "",
+                  "        if (!payload.groups || payload.groups.length === 0) {",
+                  "            console.warn('WARNING: Token has no groups claim — API calls will fail with 403.');",
+                  "            console.warn('Check: role grant, scopes, and flatRoles action.');",
+                  "        }",
+                  "    } catch (e) {",
+                  "        console.log('Could not decode token payload');",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "List DIDs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{ri_url}}/api/v1/dids",
+              "host": ["{{ri_url}}"],
+              "path": ["api", "v1", "dids"]
+            },
+            "description": "# List DIDs\n\nFetches all DIDs (Decentralised Identifiers) that belong to your tenant.\n\nThis is a good \"smoke test\" to confirm the whole authentication chain is working. If you get a 200 response (even with an empty list), everything is set up correctly.\n\n## Expected responses\n\n- **200** — success! Returns `{ data: [...], pagination: {...} }`. An empty `data` array is normal for a new tenant.\n- **401** — token is invalid or expired. Run \"Get Access Token\" again.\n- **403** — token is valid but your tenant can't be resolved. Re-run \"Get Access Token\" and check the `groups` claim in the Postman Console output."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 401) {",
+                  "    console.warn('401 — Token invalid or expired. Run \"Get Access Token\" again.');",
+                  "} else if (pm.response.code === 403) {",
+                  "    console.warn('403 — Token missing groups claim. Check the Postman Console output from \"Get Access Token\" to diagnose.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Credentials",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{ri_url}}/api/v1/credentials",
+              "host": ["{{ri_url}}"],
+              "path": ["api", "v1", "credentials"]
+            },
+            "description": "# List Credentials\n\nFetches all verifiable credentials that belong to your tenant. These are the UNTP credentials (DPP, DIA, DFR, DCC, etc.) that have been issued.\n\nAn empty list is normal for a new tenant — credentials appear after you start issuing them through the RI."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 401) {",
+                  "    console.warn('401 — Token invalid or expired. Run \"Get Access Token\" again.');",
+                  "} else if (pm.response.code === 403) {",
+                  "    console.warn('403 — Token missing groups claim. Check the Postman Console output from \"Get Access Token\" to diagnose.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Services",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{ri_url}}/api/v1/services",
+              "host": ["{{ri_url}}"],
+              "path": ["api", "v1", "services"]
+            },
+            "description": "# List Services\n\nFetches all configured services for your tenant — things like VCKit (credential issuing), storage backends, and identity resolvers.\n\nThese are the external services that the RI connects to on behalf of your tenant."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 401) {",
+                  "    console.warn('401 — Token invalid or expired. Run \"Get Access Token\" again.');",
+                  "} else if (pm.response.code === 403) {",
+                  "    console.warn('403 — Token missing groups claim. Check the Postman Console output from \"Get Access Token\" to diagnose.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ri_url}}/api/health",
+              "host": ["{{ri_url}}"],
+              "path": ["api", "health"]
+            },
+            "description": "# Health Check\n\nA simple \"is it alive?\" check. No authentication needed.\n\n**Run this first** before trying anything else. If this fails, the RI isn't reachable — check the `ri_url` variable and make sure the service is running.\n\nIf this succeeds but other requests fail, the problem is with authentication, not connectivity."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('RI is reachable', function () {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
