@@ -2,9 +2,9 @@
 
 ## Status
 
-accepted
+proposed
 
-Supersedes: ADR 006 (Yarn workspaces as the package manager).
+When implemented, this ADR will supersede ADR 006 (Yarn workspaces as the package manager). Until then, ADR 006's decision (yarn) remains in effect.
 
 ## Context
 
