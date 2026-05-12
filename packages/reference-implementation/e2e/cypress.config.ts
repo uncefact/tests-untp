@@ -248,12 +248,6 @@ export default defineConfig({
             return { success: false, message: error?.message ?? 'Unknown error' };
           }
         },
-        async runUntpTest({ type, version, testData }) {
-          const { testCredentialHandler } = await import('untp-test-suite/src/interfaces/lib/testSuiteHandler');
-          const result = await testCredentialHandler({ type, version }, testData);
-
-          return result;
-        },
         deleteFile(filePath) {
           return new Promise((resolve, reject) => {
             fs.unlink(filePath, (err) => {
