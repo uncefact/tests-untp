@@ -1,11 +1,13 @@
 import { defineConfig } from 'cypress';
 
+const baseUrl = process.env.E2E_PLAYGROUND_BASE_URL || 'http://localhost:4000';
+
 export default defineConfig({
   env: {
-    PLAYGROUND_BASE_URL: process.env.E2E_PLAYGROUND_BASE_URL || 'http://localhost:4000',
+    PLAYGROUND_BASE_URL: baseUrl,
   },
   e2e: {
-    baseUrl: process.env.E2E_PLAYGROUND_BASE_URL || 'http://localhost:4000',
+    baseUrl,
     supportFile: 'cypress/support/e2e.ts',
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
     video: false,
