@@ -1,7 +1,7 @@
 # ADR: Introduce @uncefact/untp-utils as a separate package for shared utility primitives
 
 - **Date:** 2026-05-12
-- **Status:** proposed
+- **Status:** accepted
 
 ## Context
 
