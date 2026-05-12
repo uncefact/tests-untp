@@ -1,9 +1,10 @@
 name: Build and Test
 
 on:
-  pull_request:
-    branches:
-      - next
+  # Trigger on every pull request regardless of base branch. Stacked PRs
+  # (which target an in-flight feature branch instead of `next`) need CI
+  # too; the previous `branches: [next]` filter skipped them silently.
+  pull_request: {}
   # Running on push to `next` (post-merge) is intentional: it lets the
   # `quality` job populate the `node_modules` cache from `refs/heads/next`,
   # which subsequent PRs can then restore from. GitHub Actions caches
