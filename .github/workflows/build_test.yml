@@ -5,12 +5,17 @@ on:
     branches:
       - next
 
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
-  test_and_build:
+  quality:
+    name: Quality
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
@@ -19,7 +24,108 @@ jobs:
         run: corepack enable
 
       - name: Install Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.12.2'
+
+      - name: Restore node_modules cache
+        id: cache-modules
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+
+      - name: Install dependencies
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+
+      - name: Save node_modules cache
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+
+      - name: Check formatting
+        run: yarn format:check
+
+      - name: Check linting
+        run: yarn lint:check
+
+  qa:
+    name: QA (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - '@uncefact/untp-ri-services'
+          - '@reference-implementation/components'
+          - '@reference-implementation/core'
+          - 'untp-playground'
+          - 'untp-test-suite'
+          - 'untp-test-suite-mocha'
+          - '@test-untp/vc-test-suite'
+          - '@uncefact/untp-utils'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.12.2'
+
+      - name: Restore node_modules cache
+        id: cache-modules
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+
+      - name: Install dependencies
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+
+      - name: Save node_modules cache
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+
+      - name: Run build and test for ${{ matrix.package }} (and affected deps)
+        run: yarn turbo run build test --filter='${{ matrix.package }}...[origin/next]'
+
+  e2e:
+    name: E2E (reference-implementation)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20.12.2'
 
@@ -31,7 +137,7 @@ jobs:
             node_modules
             packages/*/node_modules
             ~/.cache/Cypress
-          key: node-modules-v2-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
       - name: Install dependencies
         if: steps.cache-modules.outputs.cache-hit != 'true'
@@ -45,77 +151,24 @@ jobs:
             node_modules
             packages/*/node_modules
             ~/.cache/Cypress
-          key: node-modules-v2-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
-      - name: Restore RI build cache
-        id: cache-ri
-        uses: actions/cache/restore@v4
-        with:
-          path: packages/reference-implementation/.next/cache
-          key: ri-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/reference-implementation/src/**', 'packages/components/src/**', 'packages/services/src/**') }}
-          restore-keys: |
-            ri-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-
-
-      - name: Restore Playground build cache
-        id: cache-playground
-        uses: actions/cache/restore@v4
-        with:
-          path: packages/untp-playground/.next/cache
-          key: playground-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/untp-playground/src/**') }}
-          restore-keys: |
-            playground-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-
-
-      - name: Build
-        run: yarn build
-
-      - name: Save RI build cache
-        if: steps.cache-ri.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: packages/reference-implementation/.next/cache
-          key: ri-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/reference-implementation/src/**', 'packages/components/src/**', 'packages/services/src/**') }}
-
-      - name: Save Playground build cache
-        if: steps.cache-playground.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: packages/untp-playground/.next/cache
-          key: playground-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/untp-playground/src/**') }}
-
-      - name: Check formatting
-        run: yarn format:check
-
-      - name: Check linting
-        run: yarn lint
-
-      - name: Run tests
-        env:
-          NODE_OPTIONS: '--experimental-vm-modules'
+      - name: Check whether reference-implementation is affected
+        id: affected
         run: |
-          export PATH="$PWD/node_modules/.bin:$PATH"
-          lerna exec -- yarn jest --coverage --changedSince=origin/next
-          rm -rf coverage
-          if ls packages/*/coverage/coverage-final.json 1>/dev/null 2>&1; then
-            istanbul-merge --out coverage/coverage-final.json packages/*/coverage/coverage-final.json
-            nyc report --temp-dir=./coverage --reporter=html --reporter=json-summary
+          task_count=$(yarn --silent turbo run build --filter='@reference-implementation/core...[origin/next]' --dry-run=json 2>/dev/null | jq '.tasks | length')
+          if [ "$task_count" -gt 0 ]; then
+            echo "result=true" >> "$GITHUB_OUTPUT"
+            echo "Reference-implementation (or a dependency) is affected; running E2E."
+          else
+            echo "result=false" >> "$GITHUB_OUTPUT"
+            echo "Reference-implementation not affected by this PR; skipping E2E."
           fi
-
-      - name: Jest Coverage Comment
-        uses: MishaKav/jest-coverage-comment@main
-        with:
-          title: Code Coverage Report
-          multiple-files: |
-            All packages, ./coverage/coverage-summary.json
-            Components, ./packages/components/coverage/coverage-summary.json
-            Reference Implementation, ./packages/reference-implementation/coverage/coverage-summary.json
-            Services, ./packages/services/coverage/coverage-summary.json
-            UNTP test suite, ./packages/untp-test-suite/coverage/coverage-summary.json
-            VC test suite, ./packages/vc-test-suite/coverage/coverage-summary.json
-            UNTP Playground, ./packages/untp-playground/coverage/coverage-summary.json
 
       # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
       # https://github.com/uncefact/tests-untp/issues/344
       - name: Free up space on ubuntu runner for E2E tests
+        if: steps.affected.outputs.result == 'true'
         run: |
           sudo rm -rf \
             "$AGENT_TOOLSDIRECTORY" \
@@ -134,12 +187,15 @@ jobs:
           docker image prune -af
 
       - name: Build E2E images
+        if: steps.affected.outputs.result == 'true'
         run: docker compose -f docker-compose.e2e.yml build
 
       - name: Start E2E docker compose
+        if: steps.affected.outputs.result == 'true'
         run: docker compose -f docker-compose.e2e.yml up -d --no-build
 
       - name: Wait for app container and dump logs
+        if: steps.affected.outputs.result == 'true'
         run: |
           echo "--- Waiting up to 180s for app to respond on http://localhost:3003 ---"
           deadline=$(($(date +%s) + 180))
@@ -160,22 +216,26 @@ jobs:
           fi
 
       - name: Run E2E tests (open mode)
+        if: steps.affected.outputs.result == 'true'
         run: yarn test:e2e:open
         env:
           NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module' # See issue https://github.com/cypress-io/github-action/issues/1408
-          VERIFY_ALLOW_PRIVATE_URLS: 'true' # Skip SSRF E2E tests — Docker services use internal addresses
+          VERIFY_ALLOW_PRIVATE_URLS: 'true' # Skip SSRF E2E tests, Docker services use internal addresses
 
       - name: Dump E2E container logs on failure
-        if: failure()
+        if: failure() && steps.affected.outputs.result == 'true'
         run: docker compose -f docker-compose.e2e.yml logs app
 
       - name: Stop docker compose (with volumes for clean closed mode DB)
+        if: steps.affected.outputs.result == 'true'
         run: docker compose -f docker-compose.e2e.yml down -v
 
       - name: Start closed mode E2E docker compose
+        if: steps.affected.outputs.result == 'true'
         run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml up -d --no-build
 
       - name: Wait for closed mode app container
+        if: steps.affected.outputs.result == 'true'
         run: |
           echo "--- Waiting up to 180s for app to respond on http://localhost:3003 ---"
           deadline=$(($(date +%s) + 180))
@@ -196,26 +256,29 @@ jobs:
           fi
 
       - name: Run closed mode E2E tests
+        if: steps.affected.outputs.result == 'true'
         run: yarn test:e2e:closed
         env:
           NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module'
           VERIFY_ALLOW_PRIVATE_URLS: 'true'
 
       - name: Dump closed mode container logs on failure
-        if: failure()
+        if: failure() && steps.affected.outputs.result == 'true'
         run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml logs app
 
       - name: Stop closed mode docker compose
+        if: steps.affected.outputs.result == 'true'
         run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml down -v
 
   build_docs:
+    name: Docs build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: yarn
