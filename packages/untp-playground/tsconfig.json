@@ -31,5 +31,5 @@
     "__tests__/**/*.tsx",
     "jest.config.js"
   ],
-  "exclude": ["node_modules", ".next", "infra"]
+  "exclude": ["node_modules", ".next", "infra", "e2e"]
 }
