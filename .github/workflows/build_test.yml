@@ -40,6 +40,7 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
+            ~/.cache/Cypress
           key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
       - name: Install dependencies
@@ -53,6 +54,7 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
+            ~/.cache/Cypress
           key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
       - name: Check formatting
@@ -103,6 +105,7 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
+            ~/.cache/Cypress
           key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
 
       - name: Install dependencies (fallback if cache restore missed)
