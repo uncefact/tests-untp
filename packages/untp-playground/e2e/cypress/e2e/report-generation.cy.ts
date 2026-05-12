@@ -1,4 +1,4 @@
-import { TestCaseStatus } from '../../../../packages/untp-playground/constants';
+import { TestCaseStatus } from '../../../constants';
 import { config } from '../../support/config';
 
 describe('Report Generation', () => {

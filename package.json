@@ -39,7 +39,7 @@
     "test:e2e": "cd e2e && npx cypress run",
     "test:e2e:open": "cd e2e && E2E_TENANT_MODE=open npx cypress run",
     "test:e2e:closed": "cd e2e && E2E_TENANT_MODE=closed npx cypress run",
-    "test:e2e:playground": "cd e2e && npx cypress run --spec 'cypress/e2e/playground/**/*.cy.ts'",
+    "test:e2e:playground": "yarn workspace untp-playground test:e2e",
     "test:e2e:open-ui": "cd e2e && npx cypress open",
     "test:run-cypress": "cd e2e && npx cypress run",
     "test:open-cypress": "cd e2e && npx cypress open",

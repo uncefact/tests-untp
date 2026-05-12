@@ -1,4 +1,4 @@
-import { VCDM_CONTEXT_URLS } from '../../../../packages/untp-playground/constants';
+import { VCDM_CONTEXT_URLS } from '../../../constants';
 import { config } from '../../support/config';
 
 describe('VCDM Schema Validation', () => {
