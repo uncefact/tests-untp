@@ -81,15 +81,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # untp-test-suite-mocha (no test script) and @test-untp/vc-test-suite
-        # (test runs heavy mocha conformance, not unit tests) are deliberately
-        # omitted; see ADR 006 adoption notes.
+        # untp-test-suite-mocha is deliberately omitted: it has no test script
+        # and runs heavy Mocha conformance tests, not unit tests. See ADR 006
+        # adoption notes.
         package:
           - '@uncefact/untp-ri-services'
           - '@reference-implementation/components'
           - '@reference-implementation/core'
           - 'untp-playground'
-          - 'untp-test-suite'
           - '@uncefact/untp-utils'
     steps:
       - name: Checkout repository
