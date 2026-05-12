@@ -27,8 +27,8 @@
   "scripts": {
     "build": "tsc --build --clean && tsc",
     "watch": "tsc -b --watch",
-    "test": "jest",
-    "test:coverage": "jest --coverage"
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage"
   },
   "type": "module",
   "keywords": [

@@ -89,6 +89,8 @@ jobs:
         run: yarn lint
 
       - name: Run tests
+        env:
+          NODE_OPTIONS: '--experimental-vm-modules'
         run: |
           export PATH="$PWD/node_modules/.bin:$PATH"
           lerna exec -- yarn jest --coverage --changedSince=origin/next
