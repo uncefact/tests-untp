@@ -4,6 +4,14 @@ on:
   pull_request:
     branches:
       - next
+  # Running on push to `next` (post-merge) is intentional: it lets the
+  # `quality` job populate the `node_modules` cache from `refs/heads/next`,
+  # which subsequent PRs can then restore from. GitHub Actions caches
+  # written from a PR ref are scoped to that PR; only caches written from
+  # the base branch are shared across PRs targeting it.
+  push:
+    branches:
+      - next
 
 # Default permissions: read-only access to repo contents. Individual jobs can
 # request additional permissions if they need to write (none currently do).
@@ -11,7 +19,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: pr-${{ github.event.pull_request.number }}
+  # PRs key on the PR number so updating a PR cancels its in-flight run.
+  # Push events on `next` key on the branch ref so back-to-back merges
+  # supersede each other (older runs are cancelled in favour of the latest).
+  group: ${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('push-{0}', github.ref) }}
   cancel-in-progress: true
 
 jobs:
