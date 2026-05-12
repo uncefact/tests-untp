@@ -317,6 +317,8 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # `quality` is the upstream installer (`needs: quality` via the qa chain),
+      # so this restore should hit. The fallback install covers rare cache misses.
       - name: Restore node_modules cache
         id: cache-modules
         uses: actions/cache/restore@v4
@@ -364,8 +366,31 @@ jobs:
             echo "Playground E2E will run. turbo task_count=$task_count, extra_changed=$extra_changed."
           else
             echo "result=false" >> "$GITHUB_OUTPUT"
-            echo "Playground E2E skipped. Dep graph unaffected and no e2e/docker-compose/workflow files changed."
+            echo "Playground E2E skipped. Dep graph unaffected and no playground e2e, docker-compose, or workflow files changed."
           fi
+
+      # Mirrors the cleanup in e2e-ri; cheap insurance even though the
+      # playground stack is lighter (3 services vs 8).
+      # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
+      # https://github.com/uncefact/tests-untp/issues/344
+      - name: Free up space on ubuntu runner for E2E tests
+        if: steps.affected.outputs.result == 'true'
+        run: |
+          sudo rm -rf \
+            "$AGENT_TOOLSDIRECTORY" \
+            /opt/microsoft \
+            /opt/pipx \
+            /usr/local/.ghcup \
+            /usr/local/graalvm* \
+            /usr/local/julia* \
+            /usr/local/lib/android \
+            /usr/local/share/chromium \
+            /usr/local/share/powershell \
+            /usr/local/share/vcpkg \
+            /usr/share/dotnet \
+            /usr/share/miniconda \
+            /usr/share/swift
+          docker image prune -af
 
       - name: Build playground E2E image
         if: steps.affected.outputs.result == 'true'

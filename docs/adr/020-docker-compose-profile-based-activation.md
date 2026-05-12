@@ -62,7 +62,7 @@ The walking-skeleton implementation of this ADR ships with the per-package E2E s
 
 - `ri` profile: `app`, `vckit-api`, `db`, `storage-service`, `identity-resolver-service`, `identity-resolver-service-object-store`, `e2e-ri-db`, `e2e-keycloak`.
 - `playground` profile: `untp-playground`, `vckit-api`, `db`.
-- `vckit-api` and `db` are tagged with both profiles since they back the credential verification path used by both apps.
+- `vckit-api` (and its `db` dependency) are tagged with both profiles since the playground calls `vckit-api` for credential verification.
 
 The broader vision (a single `docker-compose.yml` at repo root covering local dev, observability sidecars, and the local LGTM stack) is deferred. The current root compose / E2E compose split is unchanged in this chunk.
 
