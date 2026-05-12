@@ -134,8 +134,12 @@ jobs:
       - name: Test ${{ matrix.package }} (changed files only)
         run: ./node_modules/.bin/turbo run test --filter='${{ matrix.package }}...[origin/next]' -- --changedSince=origin/next
 
-  build-e2e-images:
-    name: Build E2E images
+  # Per-app image build jobs run in parallel after qa. Each downstream E2E
+  # job depends only on its own image-build job so the playground E2E starts
+  # as soon as the playground image is ready (not blocked on the RI image),
+  # and the RI E2E matrix starts as soon as the RI image is ready.
+  build-e2e-image-ri:
+    name: Build E2E image (RI)
     runs-on: ubuntu-latest
     needs: [quality, qa]
     steps:
@@ -167,86 +171,132 @@ jobs:
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
-      - name: Check which E2E images need building
+      - name: Check whether RI image needs building
         id: affected
         shell: bash
         run: |
           set -euo pipefail
 
-          # Helper: capture turbo dry-run output, fail loudly if turbo errored
-          # or jq cannot parse the task count. Matches the validation pattern
-          # used in the per-app `e2e-ri` / `e2e-playground` affected steps.
-          turbo_task_count() {
-            local filter="$1"
-            local json
-            json=$(yarn --silent turbo run build --filter="$filter" --dry-run=json)
-            if [ -z "$json" ]; then
-              echo "::error::turbo dry-run produced empty output for filter $filter"
-              exit 1
-            fi
-            local count
-            count=$(echo "$json" | jq '.tasks | length')
-            if ! [[ "$count" =~ ^[0-9]+$ ]]; then
-              echo "::error::Could not parse turbo task count for filter $filter: '$count'"
-              echo "--- Raw output ---"
-              echo "$json"
-              exit 1
-            fi
-            echo "$count"
-          }
+          json=$(yarn --silent turbo run build --filter='@reference-implementation/core...[origin/next]' --dry-run=json)
+          if [ -z "$json" ]; then
+            echo "::error::turbo dry-run produced empty output"
+            exit 1
+          fi
+          count=$(echo "$json" | jq '.tasks | length')
+          if ! [[ "$count" =~ ^[0-9]+$ ]]; then
+            echo "::error::Could not parse turbo task count: '$count'"
+            echo "--- Raw output ---"
+            echo "$json"
+            exit 1
+          fi
 
-          ri_count=$(turbo_task_count '@reference-implementation/core...[origin/next]')
-          playground_count=$(turbo_task_count 'untp-playground...[origin/next]')
-
-          # E2E-only artefact changes — split per app so each image build is gated independently.
-          # Workflow / shared compose changes invalidate both (conservative; they could affect either).
-          # Note: changes to `.github/workflows/build_test.yml` count as `shared_extra`, so any workflow
-          # edit forces a rebuild of both images even when the workflow logic itself does not change image contents.
-          ri_extra=$(git diff --name-only origin/next...HEAD -- \
+          # Note: `.github/workflows/build_test.yml` is treated as shared and
+          # invalidates both image builds; any workflow edit forces a rebuild.
+          extra=$(git diff --name-only origin/next...HEAD -- \
             'packages/reference-implementation/e2e/**' \
-            | wc -l | tr -d ' ')
-          playground_extra=$(git diff --name-only origin/next...HEAD -- \
-            'packages/untp-playground/e2e/**' \
-            | wc -l | tr -d ' ')
-          shared_extra=$(git diff --name-only origin/next...HEAD -- \
             'docker-compose.e2e.yml' \
             'docker-compose.e2e-closed.yml' \
             '.github/workflows/build_test.yml' \
             | wc -l | tr -d ' ')
 
-          ri_build=false
-          playground_build=false
-          if [ "$ri_count" -gt 0 ] || [ "$ri_extra" -gt 0 ] || [ "$shared_extra" -gt 0 ]; then
-            ri_build=true
+          if [ "$count" -gt 0 ] || [ "$extra" -gt 0 ]; then
+            echo "result=true" >> "$GITHUB_OUTPUT"
+            echo "RI image will be built. turbo task_count=$count, extra=$extra."
+          else
+            echo "result=false" >> "$GITHUB_OUTPUT"
+            echo "RI image skipped."
           fi
-          if [ "$playground_count" -gt 0 ] || [ "$playground_extra" -gt 0 ] || [ "$shared_extra" -gt 0 ]; then
-            playground_build=true
-          fi
-
-          echo "ri=$ri_build" >> "$GITHUB_OUTPUT"
-          echo "playground=$playground_build" >> "$GITHUB_OUTPUT"
-          echo "Build plan: ri=$ri_build playground=$playground_build (ri_count=$ri_count playground_count=$playground_count ri_extra=$ri_extra playground_extra=$playground_extra shared_extra=$shared_extra)"
 
       - name: Set up Docker Buildx
-        if: steps.affected.outputs.ri == 'true' || steps.affected.outputs.playground == 'true'
+        if: steps.affected.outputs.result == 'true'
         uses: docker/setup-buildx-action@v3
 
-      # Builds the affected image(s) via buildx's GHA cache backend
+      # Builds the RI image via buildx's GHA cache backend
       # (`cache_to: type=gha,mode=max` is configured per service in
-      # `docker-compose.e2e.yml`). Downstream E2E jobs pull from the same
-      # cache scope and skip the actual build work on a cache hit.
+      # `docker-compose.e2e.yml`). The downstream `e2e-ri` matrix pulls
+      # from the same cache scope and skips the actual build work on a hit.
       - name: Build RI image
-        if: steps.affected.outputs.ri == 'true'
+        if: steps.affected.outputs.result == 'true'
         run: docker compose -f docker-compose.e2e.yml --profile ri build
 
+  build-e2e-image-playground:
+    name: Build E2E image (playground)
+    runs-on: ubuntu-latest
+    needs: [quality, qa]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Restore node_modules cache
+        id: cache-modules
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+            ~/.cache/Cypress
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+
+      - name: Install dependencies (fallback if cache restore missed)
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+
+      - name: Check whether playground image needs building
+        id: affected
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          json=$(yarn --silent turbo run build --filter='untp-playground...[origin/next]' --dry-run=json)
+          if [ -z "$json" ]; then
+            echo "::error::turbo dry-run produced empty output"
+            exit 1
+          fi
+          count=$(echo "$json" | jq '.tasks | length')
+          if ! [[ "$count" =~ ^[0-9]+$ ]]; then
+            echo "::error::Could not parse turbo task count: '$count'"
+            echo "--- Raw output ---"
+            echo "$json"
+            exit 1
+          fi
+
+          extra=$(git diff --name-only origin/next...HEAD -- \
+            'packages/untp-playground/e2e/**' \
+            'docker-compose.e2e.yml' \
+            '.github/workflows/build_test.yml' \
+            | wc -l | tr -d ' ')
+
+          if [ "$count" -gt 0 ] || [ "$extra" -gt 0 ]; then
+            echo "result=true" >> "$GITHUB_OUTPUT"
+            echo "Playground image will be built. turbo task_count=$count, extra=$extra."
+          else
+            echo "result=false" >> "$GITHUB_OUTPUT"
+            echo "Playground image skipped."
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.affected.outputs.result == 'true'
+        uses: docker/setup-buildx-action@v3
+
       - name: Build playground image
-        if: steps.affected.outputs.playground == 'true'
+        if: steps.affected.outputs.result == 'true'
         run: docker compose -f docker-compose.e2e.yml --profile playground build
 
   e2e-ri:
     name: E2E RI (${{ matrix.mode }})
     runs-on: ubuntu-latest
-    needs: [quality, qa, build-e2e-images]
+    needs: [quality, qa, build-e2e-image-ri]
     strategy:
       fail-fast: false
       matrix:
@@ -344,7 +394,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       # Re-runs `docker compose build` for the RI image. The buildx GHA cache
-      # populated by `build-e2e-images` (`cache_from: type=gha,...` in
+      # populated by `build-e2e-image-ri` (`cache_from: type=gha,...` in
       # `docker-compose.e2e.yml`) typically turns this into a cache hit and an
       # image load. On a cache miss (eviction, skipped upstream job) it falls
       # back to a full build with no functional difference.
@@ -395,7 +445,7 @@ jobs:
   e2e-playground:
     name: E2E (untp-playground)
     runs-on: ubuntu-latest
-    needs: [quality, qa, build-e2e-images]
+    needs: [quality, qa, build-e2e-image-playground]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -491,10 +541,10 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       # Re-runs `docker compose build` for the playground image. The buildx
-      # GHA cache populated by `build-e2e-images` (`cache_from: type=gha,...`
-      # in `docker-compose.e2e.yml`) typically turns this into a cache hit
-      # and an image load. On a cache miss (eviction, skipped upstream job)
-      # it falls back to a full build with no functional difference.
+      # GHA cache populated by `build-e2e-image-playground` (`cache_from:
+      # type=gha,...` in `docker-compose.e2e.yml`) typically turns this into
+      # a cache hit and an image load. On a cache miss (eviction, skipped
+      # upstream job) it falls back to a full build with no functional difference.
       - name: Build playground image (with cache)
         if: steps.affected.outputs.result == 'true'
         run: docker compose -f docker-compose.e2e.yml --profile playground build
