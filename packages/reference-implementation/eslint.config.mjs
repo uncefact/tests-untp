@@ -18,7 +18,10 @@ const eslintConfig = [
       'out/**',
       'build/**',
       'next-env.d.ts',
-      'src/lib/prisma/generated'
+      'src/lib/prisma/generated',
+      // e2e/ is a sibling workspace with its own tsconfig and Cypress-flavoured
+      // conventions. It is not part of the RI's Next-flavoured lint surface.
+      'e2e/**',
     ],
   },
 ];

@@ -1,0 +1,23 @@
+{
+  "name": "reference-implementation-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cypress E2E test suite for the reference implementation.",
+  "scripts": {
+    "cypress:open": "cypress open",
+    "test:e2e": "cypress run",
+    "test:e2e:open": "E2E_TENANT_MODE=open cypress run",
+    "test:e2e:closed": "E2E_TENANT_MODE=closed cypress run"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^22.13.1",
+    "@types/pg": "^8.11.0",
+    "cypress": "^14.0.2",
+    "minio": "^8.0.4",
+    "pg": "^8.13.0",
+    "ts-node": "10.9.2",
+    "typescript": "^5.7.3"
+  }
+}

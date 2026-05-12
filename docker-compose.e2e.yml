@@ -5,6 +5,10 @@ services:
     build:
       context: .
       dockerfile: packages/untp-playground/Dockerfile
+      cache_from:
+        - type=gha,scope=untp-playground-e2e
+      cache_to:
+        - type=gha,scope=untp-playground-e2e,mode=max
     ports:
       - '4000:3000'
     volumes:
@@ -102,6 +106,10 @@ services:
       context: .
       dockerfile: packages/reference-implementation/Dockerfile
       target: development
+      cache_from:
+        - type=gha,scope=reference-implementation-e2e
+      cache_to:
+        - type=gha,scope=reference-implementation-e2e,mode=max
     ports:
       - '3003:3003'
     environment:
@@ -205,7 +213,7 @@ services:
       - '8081:8080'
       - '9991:9000'
     volumes:
-      - ./e2e/cypress/fixtures/keycloak-realm-e2e.json:/opt/keycloak/data/import/ri-e2e.json:ro
+      - ./packages/reference-implementation/e2e/cypress/fixtures/keycloak-realm-e2e.json:/opt/keycloak/data/import/ri-e2e.json:ro
     healthcheck:
       test:
         - CMD-SHELL

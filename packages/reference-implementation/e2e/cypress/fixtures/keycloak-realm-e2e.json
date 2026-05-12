@@ -1,0 +1,176 @@
+{
+  "realm": "ri-e2e",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "groups": [
+    { "name": "e2e-org-alpha", "path": "/e2e-org-alpha" },
+    { "name": "e2e-org-beta", "path": "/e2e-org-beta" }
+  ],
+  "users": [
+    {
+      "username": "e2e-admin@test.local",
+      "email": "e2e-admin@test.local",
+      "firstName": "E2E",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "E2eTest123!",
+          "temporary": false
+        }
+      ],
+      "groups": ["/e2e-org-alpha"]
+    },
+    {
+      "username": "e2e-user@test.local",
+      "email": "e2e-user@test.local",
+      "firstName": "E2E",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "E2eTest123!",
+          "temporary": false
+        }
+      ],
+      "groups": ["/e2e-org-alpha"]
+    },
+    {
+      "username": "service-account-ri-service-account-e2e",
+      "enabled": true,
+      "serviceAccountClientId": "ri-service-account-e2e",
+      "groups": ["/e2e-org-alpha"]
+    },
+    {
+      "username": "service-account-ri-service-account-e2e-2",
+      "enabled": true,
+      "serviceAccountClientId": "ri-service-account-e2e-2",
+      "groups": ["/e2e-org-beta"]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "ri-app-e2e",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "e2e-test-secret",
+      "redirectUris": ["http://localhost:3003/api/auth/callback/keycloak"],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:3003/signin"
+      },
+      "webOrigins": ["http://localhost:3003"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "consentRequired": false,
+      "defaultClientScopes": ["profile", "email", "roles"],
+      "protocolMappers": [
+        {
+          "name": "group-membership",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "ri-service-account-e2e",
+      "name": "E2E Service Account",
+      "description": "Service account client for E2E API testing",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "e2e-service-account-secret",
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "consentRequired": false,
+      "defaultClientScopes": ["profile", "email", "roles"],
+      "protocolMappers": [
+        {
+          "name": "group-membership",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience-ri-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "ri-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "ri-service-account-e2e-2",
+      "name": "E2E Service Account 2",
+      "description": "Second service account client for E2E tenant isolation testing",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "e2e-service-account-secret-2",
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "consentRequired": false,
+      "defaultClientScopes": ["profile", "email", "roles"],
+      "protocolMappers": [
+        {
+          "name": "group-membership",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience-ri-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "ri-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}
