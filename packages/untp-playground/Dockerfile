@@ -16,9 +16,19 @@ ENV NEXT_PUBLIC_ASSET_PREFIX=/
 # the GHA cache backend configured on the build job. Sharing the
 # `target=/yarn-cache` path with the RI Dockerfile means common deps
 # (Next.js, React, etc.) are reused across both image builds.
+#
+# `--frozen-lockfile` is intentionally NOT used here: this Dockerfile
+# copies only the playground's package.json plus the monorepo's root
+# yarn.lock, without the other workspaces' package.json files. yarn 1
+# with `--frozen-lockfile` then sees workspace entries it can't resolve
+# and aborts ("Your lockfile needs to be updated"). Restructuring this
+# Dockerfile as a proper workspace-aware install (like the RI's deps
+# stage) is the right long-term fix; for now we let yarn install with
+# the lockfile as a guide and accept that drift only manifests in the
+# image, never in the workspace.
 COPY packages/untp-playground/package.json yarn.lock ./
 RUN --mount=type=cache,target=/yarn-cache,sharing=locked \
-    yarn install --frozen-lockfile --network-timeout 600000 --cache-folder /yarn-cache
+    yarn install --network-timeout 600000 --cache-folder /yarn-cache
 
 
 # Rebuild the source code only when needed
