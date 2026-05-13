@@ -111,6 +111,10 @@ pnpm test                     # Run all tests
 pnpm lint:check               # ESLint across packages
 ```
 
+## Observability
+
+The reference implementation is instrumented with OpenTelemetry. To run the local trace stack (Tempo + OTel agent + Grafana) alongside the app, use `docker compose --profile local-observability up -d --build`. See [`docs/observability.md`](docs/observability.md) for the full guide.
+
 ## End-to-End Testing
 
 E2E tests use Cypress and support both local Docker Compose and deployed instances. Each app owns its own E2E suite:

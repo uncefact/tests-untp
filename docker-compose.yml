@@ -139,6 +139,9 @@ services:
       SYSTEM_DID: ${SYSTEM_DID:-did:web:uncefact.github.io:project-vckit:test-and-development}
       SYSTEM_DID_NAME: ${SYSTEM_DID_NAME:-System Default DID}
       SYSTEM_DID_DESCRIPTION: ${SYSTEM_DID_DESCRIPTION:-System-wide default DID for the UNTP reference implementation}
+      # OpenTelemetry - see docs/observability.md
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-agent:4317}
+      DEPLOYMENT_ENVIRONMENT: ${DEPLOYMENT_ENVIRONMENT:-local}
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:3003/api/health"]
       interval: 30s
@@ -218,8 +221,40 @@ services:
     volumes:
       - ./minio_data/identity-resolver-service-object-store:/data
 
+  # Observability stack - see docs/observability.md
+  otel-agent:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    profiles: ['observability', 'local-observability']
+    command: ['--config=/etc/otel-collector.yaml']
+    volumes:
+      - ./deploy/observability-local/otel-collector.yaml:/etc/otel-collector.yaml:ro
+    ports:
+      - '4317:4317'
+      - '4318:4318'
+
+  tempo:
+    image: grafana/tempo:2.10.5
+    profiles: ['local-observability']
+    command: ['-config.file=/etc/tempo/tempo.yaml']
+    volumes:
+      - ./deploy/observability-local/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    profiles: ['local-observability']
+    ports:
+      - '3030:3000'
+    environment:
+      GF_FEATURE_TOGGLES_ENABLE: 'traceqlEditor'
+    volumes:
+      - ./deploy/observability-local/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+
 volumes:
   ri-db-data:
   vckit-data:
   storage_service_data:
   keycloak-data:
+  tempo-data:
+  grafana-data:

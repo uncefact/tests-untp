@@ -3,6 +3,13 @@
   "version": "0.2.0",
   "private": true,
   "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.75.0",
+    "@opentelemetry/core": "^2.7.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "^0.217.0",
+    "@opentelemetry/resources": "^2.7.0",
+    "@opentelemetry/sdk-node": "^0.217.0",
+    "@opentelemetry/semantic-conventions": "^1.41.0",
     "@prisma/client": "6.19.2",
     "@reference-implementation/components": "workspace:*",
     "@uncefact/untp-ri-services": "workspace:*",

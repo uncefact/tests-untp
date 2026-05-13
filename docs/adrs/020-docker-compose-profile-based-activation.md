@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** accepted
+- **Update (2026-05-13):** Walking skeleton for OpenTelemetry (#592) introduced the `observability` and `local-observability` profiles on the root `docker-compose.yml`, with `otel-agent` (sidecar, both profiles), `tempo` and `grafana` (local LGTM, `local-observability` only). Apps and shared services remain untagged so default-profile runs are unaffected. The Adoption notes below describe the prior state at the time of the decision.
 
 ## Context
 
