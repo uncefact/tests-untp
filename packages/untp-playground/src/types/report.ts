@@ -17,6 +17,7 @@ export interface TestReport {
   pass: boolean;
   results: TestReportResult[];
   schemeResults?: TestReportSchemeResult[];
+  playgroundUrl?: string;
 }
 
 export type TestReportStatus = Extract<
@@ -30,6 +31,7 @@ export interface TestReportStep extends Omit<TestStep, 'status'> {
 
 export interface TestReportResult {
   status: TestReportStatus;
+  overallStatus: TestReportStatus;
   credential: Credential;
   source?: ArtefactSource;
   core: {
@@ -46,6 +48,7 @@ export interface TestReportResult {
 
 export interface TestReportSchemeResult {
   status: TestReportStatus;
+  overallStatus: TestReportStatus;
   type: SchemeType;
   version: string;
   name?: string;

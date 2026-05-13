@@ -5,6 +5,8 @@ import { twMerge } from 'tailwind-merge';
 import templateContent from '@/lib/templates/untp-comformance-report-template.hbs';
 import { CredentialType, permittedCredentialTypes, VCDM_CONTEXT_URLS, VCDMVersion } from '../../constants';
 
+handlebars.registerHelper('eq', (a: unknown, b: unknown) => a === b);
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

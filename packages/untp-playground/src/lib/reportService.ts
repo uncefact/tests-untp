@@ -42,10 +42,12 @@ export const generateReport = async ({
     const coreSteps = steps.filter((step) => step.id !== TestCaseStepId.EXTENSION_SCHEMA_VALIDATION);
     const extensionStep = steps.find((step) => step.id === TestCaseStepId.EXTENSION_SCHEMA_VALIDATION);
 
+    const status = steps.every((step) => passStatuses.includes(step.status))
+      ? TestCaseStatus.SUCCESS
+      : TestCaseStatus.FAILURE;
     const result: TestReportResult = {
-      status: steps.every((step) => passStatuses.includes(step.status))
-        ? TestCaseStatus.SUCCESS
-        : TestCaseStatus.FAILURE,
+      status,
+      overallStatus: status,
       credential: credential.original,
       ...(credential.source && { source: credential.source }),
       core: {
@@ -77,10 +79,12 @@ export const generateReport = async ({
     const name = typeof decoded?.name === 'string' ? decoded.name : undefined;
     const id = typeof decoded?.id === 'string' ? decoded.id : undefined;
 
+    const status = steps.every((step) => passStatuses.includes(step.status))
+      ? TestCaseStatus.SUCCESS
+      : TestCaseStatus.FAILURE;
     return {
-      status: steps.every((step) => passStatuses.includes(step.status))
-        ? TestCaseStatus.SUCCESS
-        : TestCaseStatus.FAILURE,
+      status,
+      overallStatus: status,
       type,
       version,
       ...(name && { name }),
@@ -99,6 +103,8 @@ export const generateReport = async ({
     results.every((result) => passStatuses.includes(result.status)) &&
     schemeResults.every((result) => passStatuses.includes(result.status));
 
+  const playgroundUrl = process.env.NEXT_PUBLIC_PLAYGROUND_URL;
+
   return {
     date: new Date().toISOString(),
     reportName: reportName,
@@ -112,5 +118,6 @@ export const generateReport = async ({
     pass: allPass,
     results,
     ...(schemeResults.length > 0 && { schemeResults }),
+    ...(playgroundUrl && { playgroundUrl }),
   };
 };

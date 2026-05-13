@@ -112,6 +112,7 @@ describe('generateReport', () => {
       results: [
         {
           status: 'success',
+          overallStatus: 'success',
           credential: {
             '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
             type: 'EnvelopedVerifiableCredential',
