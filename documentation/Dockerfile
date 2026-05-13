@@ -1,5 +1,6 @@
 # Setup the environment
 FROM node:20-alpine
+RUN corepack enable
 
 WORKDIR /app
 
@@ -8,10 +9,14 @@ ENV DOCS_PORT=3002 \
     DOCS_URL=http://0.0.0.0 \
     DOCS_BASE_URL=/
 
-# Install the dependencies
-COPY package.json yarn.lock ./
+# Install the dependencies. --ignore-workspace prevents pnpm from walking
+# up to the monorepo root's pnpm-workspace.yaml; the docs site is a
+# self-contained Docusaurus project, not a workspace member.
+COPY package.json pnpm-lock.yaml ./
 
-RUN yarn install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm-store-docs,target=/pnpm-store,sharing=locked \
+    pnpm config set store-dir /pnpm-store && \
+    pnpm install --ignore-workspace --frozen-lockfile
 
 # Copy the documentation site files
 COPY . .
@@ -20,6 +25,4 @@ COPY . .
 EXPOSE ${DOCS_PORT}
 
 # Start the documentation site
-CMD yarn start --port ${DOCS_PORT} --host 0.0.0.0
-
-
+CMD pnpm start --port ${DOCS_PORT} --host 0.0.0.0

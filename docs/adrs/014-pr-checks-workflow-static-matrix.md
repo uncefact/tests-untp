@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** accepted
+- **Update (2026-05-13):** "Yarn workspaces, not pnpm" caveat in the body no longer applies. The pnpm migration landed and workflow commands now use `pnpm`. See ADR 030.
 
 ## Context
 

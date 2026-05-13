@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** accepted
+- **Update (2026-05-13):** The "planned pnpm migration" referenced in this ADR's body landed on `chore/pnpm-migration-local`; `turbo.json` script references and workflow commands have been updated from `yarn turbo` to `pnpm turbo`. See ADR 030 for the migration record.
 
 ## Context
 
@@ -63,7 +64,7 @@ Rejected. Building a custom affected-package detection plus parallel task execut
 
 ### Defer Turborepo until the planned pnpm migration completes
 
-Rejected. The CI pain is real today, the pnpm migration is its own substantial chunk that is not yet scheduled, and the cost of adopting Turbo on yarn now and updating to pnpm later is bounded (a handful of workflow file lines).
+Rejected. The CI pain is real today, the pnpm migration is its own substantial chunk that is not yet scheduled, and the cost of adopting Turbo on yarn now and updating commands to pnpm later is bounded (a handful of workflow file lines).
 
 ## References
 

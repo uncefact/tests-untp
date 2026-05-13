@@ -12,15 +12,15 @@ A comprehensive suite of tools for implementing and demonstrating the [UN Transp
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) with Compose (latest version recommended)
-- Node.js >= 20.12.2 and Yarn 1.22.22
+- Node.js >= 20.12.2; pnpm 9.15.4 (managed via Corepack)
 
 We recommend using [Node Version Manager (NVM)](https://github.com/nvm-sh/nvm) to manage Node.js versions:
 
 ```bash
 nvm install 20.12.2
 nvm use 20.12.2
-npm install -g yarn@1.22.22
-yarn install
+corepack enable
+pnpm install
 ```
 
 ### Start with Docker Compose
@@ -60,8 +60,8 @@ For development with hot reloading, stop the Reference Implementation container 
 
 ```bash
 docker compose stop ri
-yarn build
-yarn start
+pnpm build
+pnpm start
 ```
 
 > **Note**: Ensure you have completed the [Prerequisites](#prerequisites) before running locally.
@@ -98,17 +98,17 @@ To run the documentation site outside Docker:
 
 ```bash
 cd documentation
-yarn install
-yarn start
+pnpm install
+pnpm start
 ```
 
 ## Development
 
 ```bash
-yarn build                    # Full build (services + components + test-suite)
-yarn start                    # Start Reference Implementation dev server
-yarn test                     # Run all tests
-yarn lint:check               # ESLint across packages
+pnpm build                    # Full build (services + components + test-suite)
+pnpm start                    # Start Reference Implementation dev server
+pnpm test                     # Run all tests
+pnpm lint:check               # ESLint across packages
 ```
 
 ## End-to-End Testing

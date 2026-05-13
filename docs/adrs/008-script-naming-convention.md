@@ -8,7 +8,7 @@
 Across the repository's packages, scripts that verify code quality (format, lint) have inconsistent names. The root `lint` script does double duty across packages; some packages have a `format` that writes, some have a `format:check`, and behaviour varies. This inconsistency causes:
 
 - CI workflows hardcoding the wrong script name and either checking when they should write or writing when they should check.
-- Contributors running `yarn format` locally and accidentally modifying files when they expected a check, or vice versa.
+- Contributors running `pnpm format` locally and accidentally modifying files when they expected a check, or vice versa.
 - The PR checks matrix (ADR 014) cannot invoke a uniform task across packages without first standardising names.
 
 ## Decision
@@ -43,13 +43,13 @@ Per-package script standardisation is deferred to a follow-up so the matrix can 
 **What becomes easier:**
 
 - CI scripts cannot accidentally modify files because they use `:check` variants exclusively.
-- Local developer intent is explicit. `yarn format:fix` is unambiguous.
+- Local developer intent is explicit. `pnpm format:fix` is unambiguous.
 - The PR checks matrix can invoke a uniform task across packages.
 
 **What becomes harder:**
 
 - One-time migration cost: every package's `package.json` needs script renames, and any existing CI workflows or contributor habits need updating.
-- Slightly longer script names than `yarn format` alone.
+- Slightly longer script names than `pnpm format` alone.
 
 ## Alternatives Considered
 
@@ -59,7 +59,7 @@ Rejected because it is confusing: the unmodified name doing one thing and the su
 
 ### Use `format` for write and `format:check` for check (current state in some packages)
 
-Rejected because the dangerous variant (write) is the default invocation. A contributor typing `yarn format` to check formatting will accidentally modify files. The safer variant should not require a suffix.
+Rejected because the dangerous variant (write) is the default invocation. A contributor typing `pnpm format` to check formatting will accidentally modify files. The safer variant should not require a suffix.
 
 ### Single `format` script that detects context (CI vs local) and behaves accordingly
 

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { UserProfile } from './UserProfile';
-import { UserRole, type User } from '@/types';
+import { UserRole, type User } from '../../../types';
 
 const mockUser: User = {
   name: 'John Doe',

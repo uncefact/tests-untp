@@ -45,7 +45,7 @@ To test your QR Link / Encryption implementation, follow these steps:
 3. **Run the Test**:
 
    - Navigate to `packages/vc-test-suite`
-   - In your terminal, run the command: `yarn test`
+   - In your terminal, run the command: `pnpm test`
 
 4. **View Test Results**:
    - Navigate to `packages/vc-test-suite/reports/index.html`

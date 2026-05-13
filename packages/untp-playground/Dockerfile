@@ -1,78 +1,67 @@
 # syntax=docker.io/docker/dockerfile:1
 
 FROM node:20.12.2-alpine AS base
-
-# Install dependencies only when needed
-FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
 RUN apk add --no-cache libc6-compat
+RUN corepack enable
+
+# ---- Fetch + install (deps stage) ----
+# Workspace-aware install scoped to the playground via pnpm filter. The
+# playground has no workspace cross-deps, so the filter effectively
+# resolves only its own dependency tree.
+FROM base AS deps
 WORKDIR /app
 
-ENV NEXT_PUBLIC_BASE_PATH=/
-ENV NEXT_PUBLIC_ASSET_PREFIX=/
+COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc package.json ./
+COPY packages/untp-playground/package.json ./packages/untp-playground/
 
-# Install dependencies based on the preferred package manager.
-# BuildKit cache mount persists yarn's tarball cache across CI runs via
-# the GHA cache backend configured on the build job. Sharing the
-# `target=/yarn-cache` path with the RI Dockerfile means common deps
-# (Next.js, React, etc.) are reused across both image builds.
+# Install the playground's tree only. The filter keeps the rest of the
+# workspace (RI, services, components, cypress, turbo, storybook, etc.)
+# out of the image. The BuildKit cache mount on the pnpm store keeps
+# downloads warm across rebuilds.
 #
-# `--frozen-lockfile` is intentionally NOT used here: this Dockerfile
-# copies only the playground's package.json plus the monorepo's root
-# yarn.lock, without the other workspaces' package.json files. yarn 1
-# with `--frozen-lockfile` then sees workspace entries it can't resolve
-# and aborts ("Your lockfile needs to be updated"). Restructuring this
-# Dockerfile as a proper workspace-aware install (like the RI's deps
-# stage) is the right long-term fix; for now we let yarn install with
-# the lockfile as a guide and accept that drift only manifests in the
-# image, never in the workspace.
-COPY packages/untp-playground/package.json yarn.lock ./
-RUN --mount=type=cache,target=/yarn-cache,sharing=locked \
-    yarn install --network-timeout 600000 --cache-folder /yarn-cache
+# A previous version used `pnpm fetch` ahead of install. Removed because
+# pnpm 9's fetch ignores --filter (pnpm#4407, fixed in pnpm 10) and was
+# pulling cypress and the rest of the lockfile into the image.
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm-store,sharing=locked \
+    pnpm config set store-dir /pnpm-store && \
+    pnpm install --frozen-lockfile --filter "untp-playground..."
 
-
-# Rebuild the source code only when needed
-FROM base AS builder
+# ---- Builder ----
+FROM deps AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY packages/untp-playground/. .
 
-# Add build args without defaults
+COPY packages/untp-playground/. ./packages/untp-playground/
+
 ARG NEXT_PUBLIC_BASE_PATH
 ARG NEXT_PUBLIC_ASSET_PREFIX
 ARG NEXT_PUBLIC_IMAGE_PATH
-
 ENV NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
 ENV NEXT_PUBLIC_ASSET_PREFIX=${NEXT_PUBLIC_ASSET_PREFIX}
 ENV NEXT_PUBLIC_IMAGE_PATH=${NEXT_PUBLIC_IMAGE_PATH}
 
-RUN yarn run build
+RUN pnpm --filter untp-playground run build
 
-# Production image, copy all the files and run next
+# ---- Runtime image ----
+# Next.js standalone output is fully self-contained for the playground:
+# no prisma, no seed.ts, no runtime entrypoint scripts. So we copy only
+# the standalone output and skip a separate runtime node_modules entirely.
 FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-# Uncomment the following line in case you want to disable telemetry during runtime.
-# ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
-
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/packages/untp-playground/public ./packages/untp-playground/public
+COPY --from=builder --chown=nextjs:nodejs /app/packages/untp-playground/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/packages/untp-playground/.next/static ./packages/untp-playground/.next/static
 
 USER nextjs
 
 EXPOSE 3000
 
 ENV PORT=3000
-
-# server.js is created by next build from the standalone output
-# https://nextjs.org/docs/pages/api-reference/next-config-js/output
 ENV HOSTNAME="0.0.0.0"
-CMD ["node", "server.js"]
+
+CMD ["node", "packages/untp-playground/server.js"]

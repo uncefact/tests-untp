@@ -1,3 +1,4 @@
+import { Prisma } from '@/lib/prisma/generated';
 import { prisma } from '@/lib/prisma/prisma';
 import { createLogger } from '@uncefact/untp-ri-services/logging';
 
@@ -14,7 +15,7 @@ export async function resolveClosedModeTenant(
   claims?: { name?: string; email?: string },
 ): Promise<ResolvedClosedModeTenant | null> {
   try {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       return await resolveWithinTransaction(tx, groupClaimValue, sub, claims);
     });
   } catch (error: unknown) {
@@ -29,7 +30,7 @@ export async function resolveClosedModeTenant(
 }
 
 async function resolveWithinTransaction(
-  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  tx: Prisma.TransactionClient,
   groupClaimValue: string,
   sub: string,
   claims?: { name?: string; email?: string },
@@ -104,7 +105,7 @@ async function retryResolution(
   claims?: { name?: string; email?: string },
 ): Promise<ResolvedClosedModeTenant | null> {
   try {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       return await resolveWithinTransaction(tx, groupClaimValue, sub, claims);
     });
   } catch (error) {

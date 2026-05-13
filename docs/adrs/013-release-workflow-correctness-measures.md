@@ -1,7 +1,8 @@
 # ADR: Release workflow correctness measures
 
 - **Date:** 2026-05-12
-- **Status:** proposed
+- **Status:** accepted
+- **Update (2026-05-13):** `release.yml` currently triggers on `push: branches: main`. PR #611 proposes switching it to `push: next` with Changesets-driven OIDC publishing, but is not yet merged. The pnpm migration on this branch converted the workflow's install step from yarn to pnpm without touching the trigger or the correctness measures (idempotency, single concurrency group, etc.), which are unchanged.
 
 ## Context
 

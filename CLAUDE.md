@@ -13,7 +13,7 @@ This is a monorepo for the UNTP (UN Transparency Protocol) test suite and refere
 
 ## Tech Stack
 
-- **Monorepo**: Yarn Workspaces with Lerna
+- **Monorepo**: pnpm Workspaces
 - **Language**: TypeScript (ESNext)
 - **Frontend**: Next.js 15 (App Router), React 19, Material-UI, Tailwind CSS
 - **Backend**: Next.js API routes, Prisma ORM, PostgreSQL
@@ -24,16 +24,16 @@ This is a monorepo for the UNTP (UN Transparency Protocol) test suite and refere
 ## Required Environment
 
 - **Node**: >= 20.12.2
-- **Yarn**: 1.22.22
+- **pnpm**: 9.15.4 (via Corepack)
 - **Docker**: Latest with Compose
 
 ## Essential Commands
 
 ### Initial Setup
 ```bash
-# Install Node/Yarn via NVM
+# Install Node via NVM; pnpm via Corepack
 nvm install 20.12.2 && nvm use 20.12.2
-npm install -g yarn@1.22.22
+corepack enable
 
 # Environment file
 cp .env.example .env  # All defaults work for local dev
@@ -42,67 +42,67 @@ cp .env.example .env  # All defaults work for local dev
 docker compose up -d
 
 # Install, build, and start
-yarn install
-yarn build
-yarn start
+pnpm install
+pnpm build
+pnpm start
 ```
 
 Access the reference implementation at http://localhost:3003 (admin@example.com / changeme)
 
 ### Daily Development
 ```bash
-yarn start                          # Start RI dev server (hot reload)
-yarn start:untp-playground          # Start playground on port 4001
-yarn build:services                 # Rebuild services after changes
-yarn build:components               # Rebuild components after changes
-yarn build                          # Full build (services + components + test-suite)
+pnpm start                          # Start RI dev server (hot reload)
+pnpm start:untp-playground          # Start playground on port 4001
+pnpm build:services                 # Rebuild services after changes
+pnpm build:components               # Rebuild components after changes
+pnpm build                          # Full build (services + components + test-suite)
 ```
 
 ### Testing
 ```bash
-yarn test                           # All tests across all packages
-yarn test:coverage                  # Merged coverage report
-yarn test:services                  # Services package only
-yarn test:reference-implementation  # Reference implementation only
-yarn test:components                # Components only
+pnpm test                           # All tests across all packages
+pnpm test:coverage                  # Merged coverage report
+pnpm test:services                  # Services package only
+pnpm test:reference-implementation  # Reference implementation only
+pnpm test:components                # Components only
 
 # E2E Testing (per-app suites; see packages/<app>/e2e/README.md for details)
 
 # RI open mode
 docker compose -f docker-compose.e2e.yml --profile ri up -d --build
-yarn test:e2e:ri:open                                                          # or yarn test:e2e:ri (default)
-yarn test:e2e:ri:open-ui                                                       # Interactive UI
+pnpm test:e2e:ri:open                                                          # or pnpm test:e2e:ri (default)
+pnpm test:e2e:ri:open-ui                                                       # Interactive UI
 docker compose -f docker-compose.e2e.yml --profile ri down -v
 
 # RI closed mode — the closed-mode override MUST be passed to every compose verb
 docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri up -d --build
-yarn test:e2e:ri:closed
+pnpm test:e2e:ri:closed
 docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri down -v
 
 # Playground
 docker compose -f docker-compose.e2e.yml --profile playground up -d --build
-yarn test:e2e:playground
-yarn test:e2e:playground:open-ui
+pnpm test:e2e:playground
+pnpm test:e2e:playground:open-ui
 docker compose -f docker-compose.e2e.yml --profile playground down -v
 ```
 
 ### Database
 ```bash
 cd packages/reference-implementation
-yarn prisma studio            # Visual DB editor (localhost:5555)
-yarn prisma migrate dev       # Create/apply migrations
+pnpm prisma studio            # Visual DB editor (localhost:5555)
+pnpm prisma migrate dev       # Create/apply migrations
 ```
 
 ### Code Quality
 ```bash
-yarn lint:check               # ESLint across packages
+pnpm lint:check               # ESLint across packages
 ```
 
 ### Other
 ```bash
-yarn storybook:components                  # Component library docs
-yarn storybook:reference-implementation    # RI component docs
-yarn build-clean                           # Remove all artifacts and node_modules
+pnpm storybook:components                  # Component library docs
+pnpm storybook:reference-implementation    # RI component docs
+pnpm build-clean                           # Remove all artifacts and node_modules
 ```
 
 ## Architecture Patterns
@@ -154,17 +154,17 @@ External integrations use interfaces + implementations:
 
 ### Making Changes to Services
 1. Edit code in `packages/services/src/`
-2. Run `yarn build:services`
+2. Run `pnpm build:services`
 3. Changes auto-imported into the reference implementation (hot reload)
 
 ### Making Changes to Components
 1. Edit code in `packages/components/src/`
-2. Run `yarn build:components`
+2. Run `pnpm build:components`
 3. Consumed by the reference implementation (hot reload)
 
 ### Database Changes
 1. Edit `packages/reference-implementation/prisma/schema.prisma`
-2. Run `cd packages/reference-implementation && yarn prisma migrate dev`
+2. Run `cd packages/reference-implementation && pnpm prisma migrate dev`
 3. Restart the reference implementation
 
 ### Configuration Changes
@@ -173,9 +173,21 @@ External integrations use interfaces + implementations:
 ## Testing Requirements
 
 - Write tests for all new features
-- Run `yarn test` before committing
+- Run `pnpm test` before committing
 - Ensure 100% coverage for services package
 - E2E tests must pass before merging
+
+## Keep ADRs in sync with the code
+
+Before opening a PR, audit whether any change in the PR touches behaviour, conventions, or topology already recorded in an ADR under `docs/adrs/`. The `creating-adrs` skill gate enforces *evaluation* (was an architectural decision made?); this rule covers *synchronisation* (does the existing ADR text still match reality?).
+
+Three outcomes, three responses:
+
+- **Implementation changed, decision unchanged** (e.g. command examples in an ADR body now use `pnpm` instead of `yarn` after a package-manager migration, or workflow filenames moved): add a dated `Update (YYYY-MM-DD)` line to the ADR header (under `Status:`) pointing at the new state and any relevant PRs / superseding ADRs. **Do not rewrite the body.** The body is historical record — what was true at the time of the decision. Editing it silently rewrites history.
+- **Decision changed**: open or update an ADR via the `creating-adrs` skill. If the change supersedes a prior decision, mark the prior ADR's status `superseded` with a forward link, and reference the prior ADR from the new one's `References` section.
+- **Decision retired entirely**: mark `superseded` or `deprecated` in the status with a one-line explanation.
+
+ADRs that go stale silently are worse than no ADRs at all — they lock in misleading history and re-litigate settled decisions. When in doubt about which outcome applies, ask before editing the body.
 
 ## Critical Dependencies
 

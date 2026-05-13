@@ -1,7 +1,8 @@
 # ADR: Docker image tagging strategy
 
 - **Date:** 2026-05-12
-- **Status:** proposed
+- **Status:** accepted
+- **Update (2026-05-13):** `docker-ri.yml` and `docker-playground.yml` currently trigger on `push: branches: next` with path filters, not on semver tags. The semver-tag-trigger design described in PR #611 is proposed but not yet merged. The pnpm migration on this branch rewrote both Dockerfiles internally without changing image names or tag formats; the decisions in this ADR are unchanged.
 
 ## Context
 

@@ -1,7 +1,8 @@
 # ADR: pnpm workspaces as the package manager
 
 - **Date:** 2026-05-12
-- **Status:** proposed
+- **Status:** accepted
+- **Adoption notes:** Migration executed on branch `chore/pnpm-migration-local` (2026-05-13). `pnpm-workspace.yaml` declares the workspace globs; `.npmrc` pins `node-linker=isolated` with `auto-install-peers=true`. `pnpm-lock.yaml` replaces `yarn.lock`. The two private apps (`untp-reference-implementation`, `untp-playground`) were renamed off scoped names to unscoped, since they are not published. RI and playground Dockerfiles rewritten around `pnpm fetch + install --filter <app>...` and `pnpm deploy --prod`. Several phantom dependencies surfaced and were declared explicitly: `lucide-react` in RI `dependencies` (used in runtime app code); `react-router-dom` and `@testing-library/user-event` in RI `devDependencies` (used only in stories and tests); `dotenv` in the RI e2e workspace's `devDependencies`. The original `resolutions` block was discarded entirely; pnpm's isolated layout makes the yarn-1 hoisting workarounds unnecessary.
 
 ## Context
 

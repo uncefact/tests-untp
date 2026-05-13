@@ -21,7 +21,7 @@ Before you begin installing the Tier 1 test suite, ensure that you have the [dep
 
 3. Yarn version 1.22.22: Ensure that you have Yarn version 1.22.22 installed. You can install it by running the following command:
    ```
-   npm install -g yarn@1.22.22
+   corepack enable
    ```
 
 ### Installation Steps
@@ -37,7 +37,7 @@ Once you have met the prerequisites, follow these steps to install the test suit
 2. Install the dependencies using Yarn:
 
    ```
-   yarn install
+   pnpm install
    ```
 
 3. Create a folder named reports:

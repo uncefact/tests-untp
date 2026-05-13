@@ -1,3 +1,4 @@
+import { Prisma } from '@/lib/prisma/generated';
 import { prisma } from '@/lib/prisma/prisma';
 import { createLogger } from '@uncefact/untp-ri-services/logging';
 
@@ -44,7 +45,7 @@ export async function resolveServiceAccountUser(claims: ServiceAccountClaims): P
 
   // Step 2: Auto-provision within a transaction
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const baseName = claims.name || claims.email?.split('@')[0] || 'My';
       const tenantName = `${baseName} Organisation`;
 

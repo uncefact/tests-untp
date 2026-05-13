@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { ToastContainer, toast } from 'react-toastify';
 import { materialRenderers, materialCells } from '@jsonforms/material-renderers';

@@ -35,8 +35,8 @@ For local development, the Prisma CLI provides useful tools:
 cd packages/reference-implementation
 
 # Visual database editor
-yarn prisma studio
+pnpm prisma studio
 
 # Create and apply a new migration
-yarn prisma migrate dev
+pnpm prisma migrate dev
 ```

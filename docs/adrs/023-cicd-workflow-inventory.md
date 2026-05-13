@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** proposed
+- **Update (2026-05-13):** The current workflow shape on `next` is interim and only partially matches the inventory described below: `build_test.yml` covers PR checks; `release.yml` covers npm publishing (triggered on `push: main`); `docker-ri.yml` and `docker-playground.yml` cover per-app Docker image builds (triggered on `push: next` with path filters, not semver tags). The Changesets-driven release flow, semver Docker tagging, and the deployment-tier / observability / rollback workflows described in this ADR are still future work tracked in PR #611 and the #553-series epics.
 
 ## Context
 

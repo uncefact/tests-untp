@@ -19,14 +19,14 @@ const jestConfig = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^jose$': '<rootDir>/src/__mocks__/jose.ts',
     '^next-auth/react$': '<rootDir>/src/__mocks__/next-auth/react.ts',
-    '^react($|/.+)': '<rootDir>/../../node_modules/react$1',
-    '^react-dom($|/.+)': '<rootDir>/../../node_modules/react-dom$1',
+    '^react($|/.+)': '<rootDir>/node_modules/react$1',
+    '^react-dom($|/.+)': '<rootDir>/node_modules/react-dom$1',
     '^@uncefact/untp-ri-services/server$': '<rootDir>/../services/build/server.js',
     '^@uncefact/untp-ri-services/logging$': '<rootDir>/../services/build/logging/index.js',
     '^@uncefact/untp-ri-services/encryption$': '<rootDir>/../services/build/encryption/index.js',
     '^@uncefact/untp-ri-services/key-provider$': '<rootDir>/../services/build/key-provider/index.js',
     '^@uncefact/untp-ri-services$': '<rootDir>/../services/build/index.js',
-    '^@reference-implementation/components$': '<rootDir>/../../node_modules/@reference-implementation/components/src/index.ts',
+    '^@reference-implementation/components$': '<rootDir>/node_modules/@reference-implementation/components/build/index.js',
   },
   transform: {
     '^.+\\.m?[tj]sx?$': [

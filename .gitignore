@@ -63,8 +63,6 @@ minio_data/*
 **/uploads/
 
 
-.npmrc
-
 npm-debug.log
 npm-debug.log*
 lerna-debug.log
