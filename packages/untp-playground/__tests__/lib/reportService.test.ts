@@ -102,16 +102,18 @@ describe('generateReport', () => {
       date: expect.any(String),
       reportName: 'UNTP',
       testSuite: {
-        runner: 'untp-playground',
+        runner: 'untp-test-suite',
         version: '0.2.2',
+        url: 'https://github.com/uncefact/tests-untp',
       },
       implementation: {
         name: 'Test Implementation',
       },
       pass: true,
-      results: [
+      verifiableCredentials: [
         {
           status: 'success',
+          overallStatus: 'success',
           credential: {
             '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
             type: 'EnvelopedVerifiableCredential',
@@ -178,7 +180,7 @@ describe('generateReport', () => {
         testResults: {},
         passStatuses: mockPassStatuses,
       }),
-    ).rejects.toThrow('No valid credentials to generate report');
+    ).rejects.toThrow('No valid credentials or schemes to generate report');
   });
 
   it('should generate a report with the extension', async () => {
@@ -228,7 +230,7 @@ describe('generateReport', () => {
     });
 
     expect(report.reportName).toBe('AATP');
-    expect(report.results[0].extension).toEqual({
+    expect(report.verifiableCredentials[0].extension).toEqual({
       type: 'extensionType',
       version: '1.0.0',
       steps: [
@@ -243,5 +245,79 @@ describe('generateReport', () => {
         },
       ],
     });
+  });
+
+  it('includes scheme results, top-level metadata, and source when a scheme is provided', async () => {
+    const schemes = {
+      ConformityScheme: {
+        original: {},
+        decoded: {
+          '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+          type: ['ConformityScheme'],
+          id: 'https://example.com/scheme/1',
+          name: 'Sample Scheme',
+        },
+        source: { kind: 'url' as const, url: 'https://example.com/scheme/1.json' },
+      },
+    };
+    const schemeTestResults = {
+      ConformityScheme: [
+        { id: 'scheme-version-detection', name: 'Version Detection', status: TestCaseStatus.SUCCESS },
+        { id: 'scheme-schema-validation', name: 'Schema Validation', status: TestCaseStatus.SUCCESS },
+        { id: 'context', name: 'Context Validation', status: TestCaseStatus.SUCCESS },
+      ],
+    };
+
+    const report = await generateReport({
+      implementationName: mockImplementationName,
+      credentials: {},
+      testResults: {},
+      schemes,
+      schemeTestResults,
+      passStatuses: mockPassStatuses,
+    });
+
+    expect(report.pass).toBe(true);
+    expect(report.verifiableCredentials).toEqual([]);
+    expect(report.conformitySchemeResults).toHaveLength(1);
+    expect(report.conformitySchemeResults?.[0]).toMatchObject({
+      status: TestCaseStatus.SUCCESS,
+      type: 'ConformityScheme',
+      version: '0.7.0',
+      name: 'Sample Scheme',
+      id: 'https://example.com/scheme/1',
+      source: { kind: 'url', url: 'https://example.com/scheme/1.json' },
+    });
+  });
+
+  it('marks the report as failed when any scheme step fails', async () => {
+    const schemes = {
+      ConformityScheme: {
+        original: {},
+        decoded: {
+          '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+          type: ['ConformityScheme'],
+        },
+      },
+    };
+    const schemeTestResults = {
+      ConformityScheme: [
+        { id: 'scheme-version-detection', name: 'Version Detection', status: TestCaseStatus.SUCCESS },
+        { id: 'scheme-schema-validation', name: 'Schema Validation', status: TestCaseStatus.FAILURE },
+        { id: 'context', name: 'Context Validation', status: TestCaseStatus.SUCCESS },
+      ],
+    };
+
+    const report = await generateReport({
+      implementationName: mockImplementationName,
+      credentials: {},
+      testResults: {},
+      schemes,
+      schemeTestResults,
+      passStatuses: mockPassStatuses,
+    });
+
+    expect(report.pass).toBe(false);
+    expect(report.conformitySchemeResults?.[0].status).toBe(TestCaseStatus.FAILURE);
   });
 });

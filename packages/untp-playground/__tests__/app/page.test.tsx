@@ -7,7 +7,7 @@ import {
   detectVersion,
 } from '@/lib/credentialService';
 import { detectExtension, validateCredentialSchema } from '@/lib/schemaValidation';
-import { CredentialUploader } from '@/components/CredentialUploader';
+import { ArtefactUploader } from '@/components/ArtefactUploader';
 import Home from '@/app/page';
 import { mockCredential } from '../mocks/vc';
 import { permittedCredentialTypes } from '../../constants';
@@ -22,6 +22,7 @@ jest.mock('sonner', () => ({
 jest.mock('@/lib/credentialService', () => ({
   isEnvelopedProof: jest.fn(),
   decodeEnvelopedCredential: jest.fn(),
+  detectArtefact: jest.fn(),
   detectCredentialType: jest.fn(),
   detectVersion: jest.fn(),
 }));
@@ -52,12 +53,16 @@ jest.mock('@/components/TestResults', () => ({
   TestResults: () => <div data-testid='mock-test-results'>Test Results</div>,
 }));
 
-jest.mock('@/components/CredentialUploader', () => ({
-  CredentialUploader: jest.fn(({ onCredentialUpload }: { onCredentialUpload: (credential: any) => void }) => (
+jest.mock('@/components/SchemeTestResults', () => ({
+  SchemeTestResults: () => <div data-testid='mock-scheme-test-results'>Scheme Test Results</div>,
+}));
+
+jest.mock('@/components/ArtefactUploader', () => ({
+  ArtefactUploader: jest.fn(({ onArtefactUpload }: { onArtefactUpload: (credential: any) => void }) => (
     <button
       data-testid='mock-uploader'
       onClick={() =>
-        onCredentialUpload({
+        onArtefactUpload({
           verifiableCredential: {
             type: ['VerifiableCredential', 'DigitalProductPassport'],
           },
@@ -106,9 +111,9 @@ describe('Home Component', () => {
   });
 
   it('handles invalid credential format', async () => {
-    (CredentialUploader as jest.Mock).mockImplementation(
-      ({ onCredentialUpload }: { onCredentialUpload: (credential: any) => void }) => (
-        <button data-testid='mock-uploader' onClick={() => onCredentialUpload([])}>
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (credential: any) => void }) => (
+        <button data-testid='mock-uploader' onClick={() => onArtefactUpload([])}>
           Upload
         </button>
       ),
@@ -136,9 +141,9 @@ describe('Home Component', () => {
   });
 
   it('handles unknown credential type', async () => {
-    (CredentialUploader as jest.Mock).mockImplementation(
-      ({ onCredentialUpload }: { onCredentialUpload: (credential: { verifiableCredential: any }) => void }) => (
-        <button data-testid='mock-uploader' onClick={() => onCredentialUpload(mockCredential)}>
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (credential: { verifiableCredential: any }) => void }) => (
+        <button data-testid='mock-uploader' onClick={() => onArtefactUpload(mockCredential)}>
           Upload
         </button>
       ),
@@ -205,7 +210,7 @@ describe('Home Component', () => {
     fireEvent.click(uploader);
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Failed to process credential');
+      expect(toast.error).toHaveBeenCalledWith('Failed to process artefact');
     });
   });
 });

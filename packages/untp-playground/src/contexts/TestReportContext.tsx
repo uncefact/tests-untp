@@ -2,10 +2,10 @@
 
 import { generateReport } from '@/lib/reportService';
 import { downloadHtml, downloadJson } from '@/lib/utils';
-import { DownloadReportFormat, StoredCredential, TestReport, TestStep } from '@/types';
+import { DownloadReportFormat, StoredCredential, StoredScheme, TestReport, TestStep } from '@/types';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { CredentialType, TestCaseStatus } from '../../constants';
+import { CredentialType, SchemeType, TestCaseStatus } from '../../constants';
 
 interface TestReportContextType {
   canGenerateReport: boolean;
@@ -21,38 +21,58 @@ interface TestReportProviderProps {
   children: React.ReactNode;
   testResults: Partial<Record<CredentialType, TestStep[]>>;
   credentials: Partial<Record<CredentialType, StoredCredential>>;
+  schemes?: Partial<Record<SchemeType, StoredScheme>>;
+  schemeTestResults?: Partial<Record<SchemeType, TestStep[]>>;
 }
 
-export function TestReportProvider({ children, testResults, credentials }: TestReportProviderProps) {
+export function TestReportProvider({
+  children,
+  testResults,
+  credentials,
+  schemes,
+  schemeTestResults,
+}: TestReportProviderProps) {
   const [report, setReport] = useState<TestReport | null>(null);
 
   const allowedStatuses = [TestCaseStatus.SUCCESS, TestCaseStatus.FAILURE, TestCaseStatus.WARNING];
   const passStatuses = [TestCaseStatus.SUCCESS, TestCaseStatus.WARNING];
 
-  // Reset report when credentials change
+  // Reset report when the uploaded artefacts change
   useEffect(() => {
-    const credentialValues = Object.values(credentials);
-    const hasAnyCredential = credentialValues.some((cred) => cred && cred.decoded);
-    if (hasAnyCredential) {
+    const hasAnyCredential = Object.values(credentials).some((cred) => cred && cred.decoded);
+    const hasAnyScheme = Object.values(schemes ?? {}).some((scheme) => scheme && scheme.decoded);
+    if (hasAnyCredential || hasAnyScheme) {
       setReport(null);
     }
-  }, [credentials]);
+  }, [credentials, schemes]);
 
-  // Allow report generation if there are any credentials with allowed statuses
-  const canGenerateReport =
-    testResults &&
+  const credentialReportable =
     Object.entries(testResults).every(([type, steps]) => {
       if (!steps) return true;
       const credential = credentials[type as CredentialType];
-
       if (!credential || !credential.decoded) return true;
-
       return steps.every((step) => allowedStatuses.includes(step.status));
     }) &&
     Object.entries(testResults).some(([type, steps]) => {
       const credential = credentials[type as CredentialType];
       return credential && credential.decoded && steps && steps.every((step) => allowedStatuses.includes(step.status));
     });
+
+  const schemeReportable =
+    schemes !== undefined &&
+    schemeTestResults !== undefined &&
+    Object.entries(schemeTestResults).every(([type, steps]) => {
+      if (!steps) return true;
+      const scheme = schemes[type as SchemeType];
+      if (!scheme || !scheme.decoded) return true;
+      return steps.every((step) => allowedStatuses.includes(step.status));
+    }) &&
+    Object.entries(schemeTestResults).some(([type, steps]) => {
+      const scheme = schemes[type as SchemeType];
+      return scheme && scheme.decoded && steps && steps.every((step) => allowedStatuses.includes(step.status));
+    });
+
+  const canGenerateReport = credentialReportable || schemeReportable;
 
   const canDownloadReport = report !== null;
 
@@ -62,6 +82,8 @@ export function TestReportProvider({ children, testResults, credentials }: TestR
         implementationName,
         credentials,
         testResults,
+        schemes,
+        schemeTestResults,
         passStatuses,
       });
 

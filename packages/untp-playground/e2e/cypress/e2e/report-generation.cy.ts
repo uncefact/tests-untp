@@ -26,7 +26,7 @@ describe('Report Generation', () => {
 
     cy.generateReport('Failed Implementation');
     cy.downloadAndVerifyReport('Failed Implementation', false).then((report) => {
-      const result = report.results[0];
+      const result = report.verifiableCredentials[0];
       expect(result.status).to.equal(TestCaseStatus.FAILURE);
       expect(result.core.steps).to.be.an('array');
       expect(result.core.steps.some((step: any) => step.status === TestCaseStatus.FAILURE)).to.be.true;
@@ -55,7 +55,7 @@ describe('Report Generation', () => {
     cy.performSuccessfulValidation();
     cy.generateReport('Core Test Implementation');
     cy.downloadAndVerifyReport('Core Test Implementation', true).then((report) => {
-      const result = report.results[0];
+      const result = report.verifiableCredentials[0];
 
       expect(result.core).to.exist;
       expect(result.core.type).to.equal('DigitalProductPassport');
@@ -87,7 +87,7 @@ describe('Report Generation', () => {
 
     cy.generateReport('Extension Test Implementation');
     cy.downloadAndVerifyReport('Extension Test Implementation', false).then((report) => {
-      const result = report.results[0];
+      const result = report.verifiableCredentials[0];
 
       expect(result.core).to.exist;
       expect(result.core.type).to.equal('DigitalProductPassport');
@@ -113,7 +113,7 @@ describe('Report Generation', () => {
 
     cy.generateReport('Failed Validation Implementation');
     cy.downloadAndVerifyReport('Failed Validation Implementation', false).then((report) => {
-      const result = report.results[0];
+      const result = report.verifiableCredentials[0];
 
       expect(result.core).to.exist;
       expect(result.core.steps).to.be.an('array');

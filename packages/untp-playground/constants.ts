@@ -1,3 +1,12 @@
+export enum ArtefactKind {
+  CREDENTIAL = 'credential',
+  SCHEME = 'scheme',
+}
+
+export enum SchemeType {
+  CONFORMITY_SCHEME = 'ConformityScheme',
+}
+
 export enum CredentialType {
   DIGITAL_PRODUCT_PASSPORT = 'DigitalProductPassport',
   DIGITAL_CONFORMITY_CREDENTIAL = 'DigitalConformityCredential',
@@ -52,6 +61,7 @@ export const UNTP_SHORT_CREDENTIAL_TYPES: Record<string, string> = {
   DigitalTraceabilityEvent: 'dte',
   DigitalFacilityRecord: 'dfr',
   DigitalIdentityAnchor: 'dia',
+  ConformityScheme: 'cvc',
 };
 
 // Schema filename (without `.json`) for each UNTP core credential type. Applies
@@ -63,6 +73,7 @@ export const UNTP_CORE_SCHEMA_FILENAMES: Record<string, string> = {
   DigitalTraceabilityEvent: 'DigitalTraceabilityEvent',
   DigitalFacilityRecord: 'DigitalFacilityRecord',
   DigitalIdentityAnchor: 'DigitalIdentityAnchor',
+  ConformityScheme: 'ConformityScheme',
 };
 
 export enum TestCaseStatus {
@@ -81,6 +92,8 @@ export enum TestCaseStepId {
   UNTP_SCHEMA_VALIDATION = 'untp-schema-validation',
   EXTENSION_SCHEMA_VALIDATION = 'extension-schema-validation',
   CONTEXT_VALIDATION = 'context',
+  SCHEME_VERSION_DETECTION = 'scheme-version-detection',
+  SCHEME_SCHEMA_VALIDATION = 'scheme-schema-validation',
 }
 
 const commonContextUrls = [

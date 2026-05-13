@@ -1,13 +1,24 @@
 import { detectVersion } from '@/lib/credentialService';
 import { detectExtension } from '@/lib/schemaValidation';
-import { StoredCredential, TestReport, TestReportResult, TestReportStep, TestStep } from '@/types';
-import { reportName, testSuiteRunner, testSuiteVersion } from '../../config';
-import { CredentialType, TestCaseStatus, TestCaseStepId } from '../../constants';
+import { detectSchemeVersion } from '@/lib/schemeValidation';
+import {
+  StoredCredential,
+  StoredScheme,
+  TestReport,
+  TestReportResult,
+  TestReportSchemeResult,
+  TestReportStep,
+  TestStep,
+} from '@/types';
+import { reportName, testSuiteRunner, testSuiteUrl, testSuiteVersion } from '../../config';
+import { CredentialType, SchemeType, TestCaseStatus, TestCaseStepId } from '../../constants';
 
 interface GenerateReportParams {
   implementationName: string;
   credentials: Partial<Record<CredentialType, StoredCredential>>;
   testResults: Partial<Record<CredentialType, TestStep[]>>;
+  schemes?: Partial<Record<SchemeType, StoredScheme>>;
+  schemeTestResults?: Partial<Record<SchemeType, TestStep[]>>;
   passStatuses: TestCaseStatus[];
 }
 
@@ -15,6 +26,8 @@ export const generateReport = async ({
   implementationName,
   credentials,
   testResults,
+  schemes,
+  schemeTestResults,
   passStatuses,
 }: GenerateReportParams): Promise<TestReport> => {
   const validCredentials = Object.entries(credentials).map(
@@ -24,20 +37,19 @@ export const generateReport = async ({
   const results: TestReportResult[] = validCredentials.map(([type, credential]) => {
     const steps = testResults[type] || [];
     const extension = detectExtension(credential.decoded);
-    // Get version from extension core if it exists, otherwise detect from credential
     const version = extension ? extension.core.version : detectVersion(credential.decoded);
 
-    // Filter core steps (non-extension steps)
     const coreSteps = steps.filter((step) => step.id !== TestCaseStepId.EXTENSION_SCHEMA_VALIDATION);
-
-    // Get extension step if it exists
     const extensionStep = steps.find((step) => step.id === TestCaseStepId.EXTENSION_SCHEMA_VALIDATION);
 
+    const status = steps.every((step) => passStatuses.includes(step.status))
+      ? TestCaseStatus.SUCCESS
+      : TestCaseStatus.FAILURE;
     const result: TestReportResult = {
-      status: steps.every((step) => passStatuses.includes(step.status))
-        ? TestCaseStatus.SUCCESS
-        : TestCaseStatus.FAILURE,
+      status,
+      overallStatus: status,
       credential: credential.original,
+      ...(credential.source && { source: credential.source }),
       core: {
         type,
         version,
@@ -45,7 +57,6 @@ export const generateReport = async ({
       },
     };
 
-    // Add extension data if it exists
     if (extension && extensionStep) {
       result.extension = {
         type: extension.extension.type,
@@ -57,9 +68,42 @@ export const generateReport = async ({
     return result;
   });
 
-  if (results.length === 0) {
-    throw new Error('No valid credentials to generate report');
+  const validSchemes = Object.entries(schemes ?? {}).map(
+    ([type, scheme]) => [type, scheme] as [SchemeType, NonNullable<typeof scheme>],
+  );
+
+  const conformitySchemeResults: TestReportSchemeResult[] = validSchemes.map(([type, scheme]) => {
+    const steps = schemeTestResults?.[type] ?? [];
+    const decoded = scheme.decoded;
+    const version = detectSchemeVersion(decoded) ?? 'unknown';
+    const name = typeof decoded?.name === 'string' ? decoded.name : undefined;
+    const id = typeof decoded?.id === 'string' ? decoded.id : undefined;
+
+    const status = steps.every((step) => passStatuses.includes(step.status))
+      ? TestCaseStatus.SUCCESS
+      : TestCaseStatus.FAILURE;
+    return {
+      status,
+      overallStatus: status,
+      type,
+      version,
+      ...(name && { name }),
+      ...(id && { id }),
+      ...(scheme.source && { source: scheme.source }),
+      conformityScheme: decoded,
+      steps: steps as TestReportStep[],
+    };
+  });
+
+  if (results.length === 0 && conformitySchemeResults.length === 0) {
+    throw new Error('No valid credentials or schemes to generate report');
   }
+
+  const allPass =
+    results.every((result) => passStatuses.includes(result.status)) &&
+    conformitySchemeResults.every((result) => passStatuses.includes(result.status));
+
+  const playgroundUrl = process.env.NEXT_PUBLIC_PLAYGROUND_URL;
 
   return {
     date: new Date().toISOString(),
@@ -67,11 +111,14 @@ export const generateReport = async ({
     testSuite: {
       runner: testSuiteRunner,
       version: testSuiteVersion,
+      ...(testSuiteUrl && { url: testSuiteUrl }),
     },
     implementation: {
       name: implementationName,
     },
-    pass: results.every((result) => passStatuses.includes(result.status)),
-    results,
+    pass: allPass,
+    verifiableCredentials: results,
+    ...(conformitySchemeResults.length > 0 && { conformitySchemeResults }),
+    ...(playgroundUrl && { playgroundUrl }),
   };
 };

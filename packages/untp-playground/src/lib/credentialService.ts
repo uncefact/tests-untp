@@ -1,6 +1,27 @@
 import type { Credential } from '@/types/credential';
 import { jwtDecode } from 'jwt-decode';
-import { CredentialType, UNTP_CONTEXT_DOMAINS } from '../../constants';
+import { ArtefactKind, CredentialType, SchemeType, UNTP_CONTEXT_DOMAINS } from '../../constants';
+
+export type DetectedArtefact =
+  | { kind: ArtefactKind.SCHEME; type: SchemeType.CONFORMITY_SCHEME }
+  | { kind: ArtefactKind.CREDENTIAL; type: CredentialType }
+  | null;
+
+export function detectArtefact(doc: unknown): DetectedArtefact {
+  if (typeof doc !== 'object' || doc === null) return null;
+  const types = (doc as { type?: unknown }).type;
+
+  if (Array.isArray(types) && types.includes(SchemeType.CONFORMITY_SCHEME)) {
+    return { kind: ArtefactKind.SCHEME, type: SchemeType.CONFORMITY_SCHEME };
+  }
+
+  const credentialType = detectCredentialType(doc as Credential);
+  if (credentialType && credentialType !== CredentialType.UNKNOWN) {
+    return { kind: ArtefactKind.CREDENTIAL, type: credentialType as CredentialType };
+  }
+
+  return null;
+}
 
 export function decodeEnvelopedCredential(credential: any): Credential {
   if (!isEnvelopedProof(credential)) {
@@ -30,7 +51,9 @@ export function detectCredentialType(credential: Credential): string {
     'DigitalTraceabilityEvent',
   ];
 
-  return (credential?.type?.find((t) => types.includes(t)) || 'Unknown') as CredentialType;
+  const credentialTypes = credential?.type;
+  if (!Array.isArray(credentialTypes)) return CredentialType.UNKNOWN;
+  return (credentialTypes.find((t) => types.includes(t)) || CredentialType.UNKNOWN) as CredentialType;
 }
 
 export function detectVersion(credential: Credential, domain?: string): string {

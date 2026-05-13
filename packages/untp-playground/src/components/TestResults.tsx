@@ -1,5 +1,6 @@
 'use client';
 
+import { StatusIcon } from '@/components/StatusIcon';
 import { TooltipWrapper } from '@/components/TooltipWrapper';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -10,7 +11,8 @@ import { detectExtension, validateCredentialSchema, validateExtension } from '@/
 import { detectVcdmVersion } from '@/lib/utils';
 import { validateVcdmRules } from '@/lib/vcdm-validation';
 import { verifyCredential } from '@/lib/verificationService';
-import { Credential, PermittedCredentialType, TestStep } from '@/types';
+import { ArtefactSource, Credential, PermittedCredentialType, StoredCredential, TestStep } from '@/types';
+import { SourceCaption } from '@/components/SourceCaption';
 import confetti from 'canvas-confetti';
 import { AlertCircle, Check, ChevronDown, ChevronRight, Loader2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -47,13 +49,13 @@ interface TestGroupProps {
   credentialType: string;
   version: string;
   steps: TestStep[];
-  proofType: VCProofType;
   vcdmVersion: VCDMVersion | undefined;
   hasCredential: boolean;
   extensionCredentialType?: string;
   extensionVersion?: string;
   isExpanded: boolean;
   onToggle: () => void;
+  source?: ArtefactSource;
 }
 
 export const confettiConfig = {
@@ -70,9 +72,9 @@ const TestGroup = ({
   steps,
   isExpanded,
   onToggle,
-  proofType,
   hasCredential,
   vcdmVersion,
+  source,
 }: TestGroupProps) => {
   const isLoading = steps.some((step) => step.status === 'in-progress');
 
@@ -106,16 +108,6 @@ const TestGroup = ({
           )}
         </div>
         <div className='flex items-center gap-4'>
-          {hasCredential && proofType !== VCProofType.UNKNOWN && (
-            <span
-              className={`text-xs px-2 py-1 rounded-full ${
-                proofType === VCProofType.ENVELOPING ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-              }`}
-              data-testid={`${credentialType}-proof-type`}
-            >
-              {proofType} proof
-            </span>
-          )}
           {hasCredential && vcdmVersion && (
             <span
               className={`text-xs px-2 py-1 rounded-full ${
@@ -131,6 +123,7 @@ const TestGroup = ({
       </div>
       {isExpanded && (
         <div className='mt-4 pl-6 space-y-2'>
+          {source && <SourceCaption source={source} />}
           {steps.map((step) => (
             <TestStepItem key={step.id} step={step} />
           ))}
@@ -183,53 +176,8 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
   );
 };
 
-const StatusIcon = ({
-  status,
-  size = 'default',
-  testId = 'unknown',
-}: {
-  status: TestCaseStatus;
-  size?: 'sm' | 'default';
-  testId?: string;
-}) => {
-  const sizeClass = size === 'sm' ? 'h-3 w-3' : 'h-4 w-4';
-
-  switch (status) {
-    case TestCaseStatus.SUCCESS:
-      return (
-        <div data-testid={`${testId}-status-icon-success`}>
-          <Check className={`${sizeClass} text-green-500`} />
-        </div>
-      );
-    case TestCaseStatus.FAILURE:
-      return (
-        <div data-testid={`${testId}-status-icon-failure`}>
-          <X className={`${sizeClass} text-red-500`} />
-        </div>
-      );
-    case TestCaseStatus.IN_PROGRESS:
-      return (
-        <div data-testid={`${testId}-status-icon-in-progress`}>
-          <Loader2 className={`${sizeClass} text-blue-500 animate-spin`} />
-        </div>
-      );
-    case TestCaseStatus.PENDING:
-      return (
-        <div data-testid={`${testId}-status-icon-pending`}>
-          <AlertCircle className={`${sizeClass} text-gray-400`} />
-        </div>
-      );
-    default:
-      return (
-        <div data-testid={`${testId}-status-icon-pending`}>
-          <AlertCircle className={`${sizeClass} text-gray-400`} />
-        </div>
-      );
-  }
-};
-
 interface TestResultsProps {
-  credentials: Partial<Record<PermittedCredentialType, { original: any; decoded: Credential }>>;
+  credentials: Partial<Record<PermittedCredentialType, StoredCredential>>;
   testResults: Partial<Record<PermittedCredentialType, TestStep[]>>;
   setTestResults: React.Dispatch<React.SetStateAction<Partial<Record<PermittedCredentialType, TestStep[]>>>>;
 }
@@ -608,8 +556,8 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
   };
 
   return (
-    <div className='space-y-4 h-full overflow-y-auto'>
-      <SectionHeader title='Your Credentials'>
+    <div className='space-y-4'>
+      <SectionHeader title='Verifiable Credentials'>
         <GenerateReportDialog />
         <TooltipWrapper
           content={
@@ -632,11 +580,6 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
           : VCDMVersion.UNKNOWN;
         const extensionCredentialType = extension?.extension?.type;
         const extensionVersion = extension?.extension?.version;
-        const proofType = credential
-          ? isEnvelopedProof(credential.original)
-            ? VCProofType.ENVELOPING
-            : VCProofType.EMBEDDED
-          : VCProofType.UNKNOWN;
         const vcdmVersion = hasCredential ? detectVcdmVersion(credential.decoded) : undefined;
 
         return (
@@ -650,8 +593,8 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
             steps={steps}
             isExpanded={expandedGroups.includes(type)}
             onToggle={() => toggleGroup(type)}
-            proofType={proofType}
             hasCredential={hasCredential}
+            source={credential?.source}
           />
         );
       })}
