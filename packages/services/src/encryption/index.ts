@@ -3,7 +3,6 @@
 export { AesGcmEncryptionAdapter } from './adapters/aes-gcm/aes-gcm.adapter.js';
 export { EncryptionAlgorithm, assertPermittedAlgorithm } from './encryption.interface.js';
 export type { EncryptedEnvelope, IEncryptionService } from './encryption.interface.js';
-export { computeHash, HashAlgorithm } from './compute-hash.js';
 export { decryptCredential } from './decrypt-credential.js';
 export type { DecryptionParams } from './decrypt-credential.js';
 export { isEncryptedEnvelope } from './is-encrypted-envelope.js';

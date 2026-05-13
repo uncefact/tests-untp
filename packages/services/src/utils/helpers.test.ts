@@ -37,14 +37,14 @@ describe('generateCurrentDatetime', () => {
 
 describe('constructVerifyURL', () => {
   it('throws when uri is missing', () => {
-    expect(() => constructVerifyURL({ baseUrl: 'https://example.com/verify', uri: '', hash: 'h' })).toThrow(
-      'URI and hash are required',
-    );
+    expect(() =>
+      constructVerifyURL({ baseUrl: 'https://example.com/verify', uri: '', digestMultibase: 'zhash' }),
+    ).toThrow('URI and digestMultibase are required');
   });
 
-  it('throws when hash is missing', () => {
-    expect(() => constructVerifyURL({ baseUrl: 'https://example.com/verify', uri: 'u', hash: '' })).toThrow(
-      'URI and hash are required',
+  it('throws when digestMultibase is missing', () => {
+    expect(() => constructVerifyURL({ baseUrl: 'https://example.com/verify', uri: 'u', digestMultibase: '' })).toThrow(
+      'URI and digestMultibase are required',
     );
   });
 
@@ -52,14 +52,14 @@ describe('constructVerifyURL', () => {
     const url = constructVerifyURL({
       baseUrl: 'https://example.com/verify',
       uri: 'https://store/cred.json',
-      hash: 'abc123',
+      digestMultibase: 'zabc123',
     });
 
     expect(url).toContain('https://example.com/verify?');
     const parsed = new URL(url);
     const q = JSON.parse(decodeURIComponent(parsed.searchParams.get('q')!));
     expect(q.payload.uri).toBe('https://store/cred.json');
-    expect(q.payload.hash).toBe('abc123');
+    expect(q.payload.digestMultibase).toBe('zabc123');
     expect(q.payload.decryptionKey).toBeUndefined();
   });
 
@@ -67,7 +67,7 @@ describe('constructVerifyURL', () => {
     const url = constructVerifyURL({
       baseUrl: 'https://example.com/verify',
       uri: 'https://store/cred.json',
-      hash: 'abc123',
+      digestMultibase: 'zabc123',
       decryptionKey: 'deadbeef',
     });
 
@@ -80,17 +80,17 @@ describe('constructVerifyURL', () => {
     const url = constructVerifyURL({
       baseUrl: 'https://example.com/verify',
       uri: 'https://store/cred.json',
-      hash: 'abc123',
+      digestMultibase: 'zabc123',
     });
 
     const parsed = new URL(url);
     const q = JSON.parse(decodeURIComponent(parsed.searchParams.get('q')!));
-    expect(Object.keys(q.payload)).toEqual(['uri', 'hash']);
+    expect(Object.keys(q.payload)).toEqual(['uri', 'digestMultibase']);
   });
 
   it('falls back to window.location with /verify path when baseUrl is not provided', () => {
     // jsdom provides window.location = http://localhost by default
-    const url = constructVerifyURL({ uri: 'https://store/cred.json', hash: 'abc123' });
+    const url = constructVerifyURL({ uri: 'https://store/cred.json', digestMultibase: 'zabc123' });
     expect(url).toContain('http://localhost/verify?');
   });
 });

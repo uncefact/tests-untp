@@ -1,3 +1,4 @@
+import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import { BaseServiceAdapter } from '../../../registry/base-adapter.js';
 import type { LoggerService } from '../../../logging/types.js';
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
@@ -6,6 +7,34 @@ import type { EnvelopedVerifiableCredential } from '../../../verifiable-credenti
 import { StorageDeleteError, StoragePayloadError, StorageStoreError } from '../../errors.js';
 import type { UncefactStorageConfig } from './uncefact-storage.schema.js';
 import { uncefactStorageConfigSchema, uncefactStorageSensitiveFields } from './uncefact-storage.schema.js';
+
+/**
+ * The Uncefact storage service currently returns a `sha-256` hex digest as
+ * the `hash` field on its response. This adapter rewraps that hex into a
+ * `base58btc`-encoded multihash so the rest of the codebase only ever sees
+ * a self-describing multibase digest. Remove this transcoding when the
+ * storage service starts publishing multibase digests natively.
+ */
+const HEX_SHA256_PATTERN = /^[a-fA-F0-9]{64}$/;
+
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i += 1) {
+    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+}
+
+function transcodeStorageHashToMultibase(hash: string): string {
+  if (!HEX_SHA256_PATTERN.test(hash)) {
+    throw new StorageStoreError(
+      502,
+      `Storage API returned hash in an unrecognised format. Expected sha-256 hex (64 chars), got "${hash}".`,
+    );
+  }
+  const digestBytes = hexToBytes(hash);
+  return MultibaseDigest.fromDigest(digestBytes, { algorithm: 'sha2-256', base: 'base58btc' }).toString();
+}
 
 export const UNCEFACT_STORAGE_ADAPTER_TYPE = 'UNCEFACT_STORAGE' as const;
 
@@ -96,11 +125,13 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "decryptionKey"');
     }
 
+    const digestMultibase = transcodeStorageHashToMultibase(hash);
+
     this.logger.info({ uri, encrypt, externalId }, 'Credential stored successfully');
 
     return {
       uri,
-      hash,
+      digestMultibase,
       decryptionKey,
       externalId,
       bucket,
@@ -188,11 +219,13 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "decryptionKey"');
     }
 
+    const digestMultibase = transcodeStorageHashToMultibase(hash);
+
     this.logger.info({ uri, encrypt, filename, externalId }, 'Binary content stored successfully');
 
     return {
       uri,
-      hash,
+      digestMultibase,
       decryptionKey,
       externalId,
       bucket,
