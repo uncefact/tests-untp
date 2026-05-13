@@ -178,7 +178,12 @@ export function ArtefactUploader({
           data-testid='artefact-url-input'
           className='flex-1'
         />
-        <Button type='submit' disabled={isFetching || urlInput.trim().length === 0} data-testid='artefact-url-fetch'>
+        <Button
+          type='submit'
+          disabled={isFetching || urlInput.trim().length === 0}
+          data-testid='artefact-url-fetch'
+          className='min-w-20'
+        >
           {isFetching ? <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' /> : 'Fetch'}
         </Button>
       </form>
