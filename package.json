@@ -44,6 +44,7 @@
     "storybook:reference-implementation": "cd packages/reference-implementation && yarn run storybook",
     "upgrade:packages": "yarn -r --stream upgrade --latest",
     "version": "lerna version",
+    "changeset": "changeset",
     "prepare": "husky install",
     "lint:check": "cross-env NODE_OPTIONS=--max-old-space-size=8192 yarn eslint packages && yarn --cwd packages/reference-implementation lint",
     "lint:fix": "cross-env NODE_OPTIONS=--max-old-space-size=8192 yarn eslint packages --fix",
@@ -53,6 +54,7 @@
     "generate-version-mapping": "node documentation/version-mapping/script.js"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@jest/globals": "^29.7.0",
     "@types/fs-extra": "11.0.4",
     "@types/jest": "29.5.11",
