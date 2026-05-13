@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import type { User } from '@/types';
+import type { User } from '../../../types';
 
 interface UserProfileProps {
   user: User;

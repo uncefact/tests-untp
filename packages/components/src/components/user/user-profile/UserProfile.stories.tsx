@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-webpack5';
 import { UserProfile } from './UserProfile';
-import { UserRole } from '@/types';
+import { UserRole } from '../../../types';
 
 const meta = {
   title: 'Components/User/UserProfile',
