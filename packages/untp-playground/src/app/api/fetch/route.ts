@@ -49,6 +49,24 @@ async function fetchWithGuards(initialUrl: string): Promise<FetchResponse> {
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
+      // SSRF mitigations applied to `url` before reaching this point, via validateUrl above:
+      //   - protocol pinned to https
+      //   - hostname rejected if it matches a literal private/loopback host
+      //     ('localhost', '*.localhost', '::1', '0.0.0.0')
+      //   - literal IPv4 hostnames rejected if they fall in RFC1918, loopback,
+      //     link-local, or "this host" ranges
+      //   - literal IPv6 hostnames rejected if they fall in ::1, ::, unique-local
+      //     (fc/fd), or link-local (fe80) ranges
+      //   - DNS-resolved hostnames have every A/AAAA record checked against
+      //     the same private-IP rules (defeats hostnames that resolve to
+      //     internal addresses)
+      // Redirects do not bypass these checks: redirect: 'manual' returns the
+      // 3xx response to us, we resolve the Location, then validateUrl runs
+      // again on the next loop iteration.
+      // Residual risk: DNS rebinding between validateUrl's lookup and fetch's
+      // own resolve. Mitigation would require pinning the resolved IP and
+      // setting Host manually; treated as acceptable for this read-only,
+      // user-initiated proxy.
       const response = await fetch(url, {
         method: 'GET',
         redirect: 'manual',
