@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** accepted
+- **Update (2026-05-13):** The "planned pnpm migration" referenced in this ADR's body landed on `chore/pnpm-migration-local`; `turbo.json` script references and workflow commands have been updated from `yarn turbo` to `pnpm turbo`. See ADR 030 for the migration record.
 
 ## Context
 
@@ -21,7 +22,7 @@ We need:
 We adopt Turborepo for build orchestration and caching.
 
 - A `turbo.json` at the repository root declares task pipelines, dep graphs (`dependsOn: ["^build"]`), and outputs per task.
-- The PR check workflow uses `yarn turbo run <task>` in place of the previous single-job `yarn build` plus `lerna exec -- yarn jest`. Root scripts that still rely on `lerna exec` (`test`, `test:coverage`) and `lerna version` are unchanged in this chunk; converting them to Turbo is a follow-up.
+- The PR check workflow uses `pnpm turbo run <task>` in place of the previous single-job `pnpm build` plus `lerna exec -- pnpm jest`. Root scripts that still rely on `lerna exec` (`test`, `test:coverage`) and `lerna version` are unchanged in this chunk; converting them to Turbo is a follow-up.
 - The combined filter syntax `--filter=${{ matrix.package }}...[origin/next]` is used in the PR-check workflow (see ADR 014): each matrix job runs tasks for its package only if that package or something it depends on changed since `next`. Unaffected packages exit in seconds.
 - Local cache only for the initial adoption. Remote caching (Vercel free tier or self-hosted) is planned as a follow-up once the matrix is proven; the marginal value of remote cache is small until contributor coordination patterns warrant it.
 
@@ -29,7 +30,7 @@ We chose this because the affected-package filtering directly addresses the CI t
 
 ## Adoption notes
 
-This ADR records the decision to adopt Turborepo. The initial implementation ships as part of the "Bundle B" CI restructure and runs on Yarn 1 workspaces against `[origin/next]`. A planned pnpm migration will update `yarn turbo` invocations to `pnpm turbo`, and a planned trunk-based migration will update the filter base from `[origin/next]` to `[origin/main]`. Remote cache adoption is similarly deferred.
+This ADR records the decision to adopt Turborepo. The initial implementation ships as part of the "Bundle B" CI restructure and runs on Yarn 1 workspaces against `[origin/next]`. A planned pnpm migration will update `pnpm turbo` invocations to `pnpm turbo`, and a planned trunk-based migration will update the filter base from `[origin/next]` to `[origin/main]`. Remote cache adoption is similarly deferred.
 
 ## Consequences
 
@@ -49,7 +50,7 @@ This ADR records the decision to adopt Turborepo. The initial implementation shi
 
 ## Alternatives Considered
 
-### No build orchestrator, keep `lerna exec -- yarn <task>`
+### No build orchestrator, keep `lerna exec -- pnpm <task>`
 
 Rejected because it does not address the CI time problem. Build times scale linearly with package count; affected-package filtering requires dep-graph awareness that Yarn workspaces does not provide.
 

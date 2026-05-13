@@ -1,7 +1,9 @@
 # ADR: Yarn workspaces as the package manager
 
 - **Date:** 2026-05-12
-- **Status:** accepted
+- **Status:** superseded
+- **Superseded by:** [030-pnpm-workspaces-as-package-manager.md](030-pnpm-workspaces-as-package-manager.md)
+- **Supersession notes:** ADR 030 reverses the conservative position taken here. Migrating during the broader restructure proved less work in aggregate than carrying yarn 1 forward, and pnpm's strict resolution caught phantom-dependency bugs during the migration itself. See ADR 030 Context for the full rationale.
 
 ## Context
 
