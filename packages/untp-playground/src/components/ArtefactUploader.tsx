@@ -99,7 +99,8 @@ export function ArtefactUploader({
     setFetchError(null);
     setIsFetching(true);
     try {
-      const response = await fetch('/api/fetch', {
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      const response = await fetch(`${basePath}/api/fetch`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ url: trimmed }),

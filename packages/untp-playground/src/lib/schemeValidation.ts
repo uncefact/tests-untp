@@ -37,7 +37,8 @@ async function fetchSchema(schemaUrl: string): Promise<any> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), SCHEMA_FETCH_TIMEOUT_MS);
     try {
-      const response = await fetch(`/api/schema?url=${encodeURIComponent(schemaUrl)}`, {
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      const response = await fetch(`${basePath}/api/schema?url=${encodeURIComponent(schemaUrl)}`, {
         signal: controller.signal,
       });
       if (response.status === 404) {
