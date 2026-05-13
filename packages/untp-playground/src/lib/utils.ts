@@ -7,6 +7,13 @@ import { CredentialType, permittedCredentialTypes, VCDM_CONTEXT_URLS, VCDMVersio
 
 handlebars.registerHelper('eq', (a: unknown, b: unknown) => a === b);
 
+handlebars.registerHelper('formatDate', (value: unknown) => {
+  if (typeof value !== 'string') return value;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+});
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

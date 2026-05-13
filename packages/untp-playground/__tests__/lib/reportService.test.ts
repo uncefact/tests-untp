@@ -102,7 +102,7 @@ describe('generateReport', () => {
       date: expect.any(String),
       reportName: 'UNTP',
       testSuite: {
-        runner: 'untp-playground',
+        runner: 'untp-test-suite',
         version: '0.2.2',
       },
       implementation: {

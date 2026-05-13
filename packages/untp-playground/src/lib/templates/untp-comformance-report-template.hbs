@@ -280,13 +280,10 @@
 
     <header>
       <p class="rh-eyebrow">{{credentialSubject.reportName}} Conformance Report</p>
-      <h1 class="rh-title">{{credentialSubject.reportName}}</h1>
+      <h1 class="rh-title">{{credentialSubject.implementation.name}}</h1>
       <dl class="rh-meta">
         <dt>Date</dt>
-        <dd>{{credentialSubject.date}}</dd>
-
-        <dt>Implementation</dt>
-        <dd>{{credentialSubject.implementation.name}}</dd>
+        <dd>{{formatDate credentialSubject.date}}</dd>
 
         <dt>Test runner</dt>
         <dd>
