@@ -52,8 +52,9 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
+            packages/*/e2e/node_modules
             ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: node-modules-v4-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
         if: steps.cache-modules.outputs.cache-hit != 'true'
@@ -66,8 +67,9 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
+            packages/*/e2e/node_modules
             ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: node-modules-v4-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Check formatting
         run: pnpm format:check
@@ -116,8 +118,9 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
+            packages/*/e2e/node_modules
             ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: node-modules-v4-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (fallback if cache restore missed)
         if: steps.cache-modules.outputs.cache-hit != 'true'
@@ -163,8 +166,9 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
+            packages/*/e2e/node_modules
             ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: node-modules-v4-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (fallback if cache restore missed)
         if: steps.cache-modules.outputs.cache-hit != 'true'
@@ -261,8 +265,9 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
+            packages/*/e2e/node_modules
             ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: node-modules-v4-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (fallback if cache restore missed)
         if: steps.cache-modules.outputs.cache-hit != 'true'
@@ -352,8 +357,9 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
+            packages/*/e2e/node_modules
             ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: node-modules-v4-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (fallback if cache restore missed)
         if: steps.cache-modules.outputs.cache-hit != 'true'
@@ -513,8 +519,9 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
+            packages/*/e2e/node_modules
             ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: node-modules-v4-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (fallback if cache restore missed)
         if: steps.cache-modules.outputs.cache-hit != 'true'
