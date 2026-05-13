@@ -1,14 +1,17 @@
 'use client';
 
 import { SectionHeader } from '@/components/SectionHeader';
+import { SourceCaption } from '@/components/SourceCaption';
 import { StatusIcon } from '@/components/StatusIcon';
 import { Card } from '@/components/ui/card';
 import { validateContext } from '@/lib/contextValidation';
 import { detectSchemeVersion, SchemaFetchError, validateSchemeSchema } from '@/lib/schemeValidation';
-import type { ArtefactSource, StoredScheme, TestStep } from '@/types';
+import type { StoredScheme, TestStep } from '@/types';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import confetti from 'canvas-confetti';
 import { SchemeType, TestCaseStatus, TestCaseStepId } from '../../constants';
+import { confettiConfig } from '@/components/TestResults';
 
 interface SchemeTestResultsProps {
   schemes: { [key in SchemeType]?: StoredScheme };
@@ -32,6 +35,7 @@ const initialSteps: TestStep[] = [
 
 export function SchemeTestResults({ schemes, testResults, setTestResults }: SchemeTestResultsProps) {
   const validatedRef = useRef<{ [key in SchemeType]?: unknown }>({});
+  const confettiShownRef = useRef<{ [key in SchemeType]?: unknown }>({});
 
   useEffect(() => {
     (Object.values(SchemeType) as SchemeType[]).forEach((type) => {
@@ -42,11 +46,25 @@ export function SchemeTestResults({ schemes, testResults, setTestResults }: Sche
       if (alreadyValidated) return;
 
       validatedRef.current[type] = stored.original;
+      confettiShownRef.current[type] = undefined;
       setTestResults((prev) => ({ ...prev, [type]: initialSteps.map((step) => ({ ...step })) }));
 
       void runPipeline(type, stored, setTestResults);
     });
   }, [schemes, setTestResults]);
+
+  useEffect(() => {
+    (Object.values(SchemeType) as SchemeType[]).forEach((type) => {
+      const stored = schemes[type];
+      const steps = testResults[type];
+      if (!stored || !steps || steps.length === 0) return;
+      const allPassed = steps.every((step) => step.status === TestCaseStatus.SUCCESS);
+      if (!allPassed) return;
+      if (confettiShownRef.current[type] === stored.original) return;
+      confettiShownRef.current[type] = stored.original;
+      confetti(confettiConfig);
+    });
+  }, [schemes, testResults]);
 
   return (
     <section className='space-y-4' data-testid='scheme-results'>
@@ -184,20 +202,6 @@ function schemeName(scheme: StoredScheme | undefined): string | undefined {
 function schemeVersion(scheme: StoredScheme | undefined): string | undefined {
   if (!scheme) return undefined;
   return detectSchemeVersion(scheme.decoded) ?? undefined;
-}
-
-function SourceCaption({ source }: { source: ArtefactSource }) {
-  if (source.kind === 'file') {
-    return <p className='text-xs text-gray-500'>Source: {source.filename}</p>;
-  }
-  return (
-    <p className='text-xs text-gray-500 break-all'>
-      Source:{' '}
-      <a href={source.url} target='_blank' rel='noopener noreferrer' className='underline'>
-        {source.url}
-      </a>
-    </p>
-  );
 }
 
 function SchemeCard({

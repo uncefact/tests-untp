@@ -11,7 +11,8 @@ import { detectExtension, validateCredentialSchema, validateExtension } from '@/
 import { detectVcdmVersion } from '@/lib/utils';
 import { validateVcdmRules } from '@/lib/vcdm-validation';
 import { verifyCredential } from '@/lib/verificationService';
-import { Credential, PermittedCredentialType, TestStep } from '@/types';
+import { ArtefactSource, Credential, PermittedCredentialType, TestStep } from '@/types';
+import { SourceCaption } from '@/components/SourceCaption';
 import confetti from 'canvas-confetti';
 import { AlertCircle, Check, ChevronDown, ChevronRight, Loader2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -54,6 +55,7 @@ interface TestGroupProps {
   extensionVersion?: string;
   isExpanded: boolean;
   onToggle: () => void;
+  source?: ArtefactSource;
 }
 
 export const confettiConfig = {
@@ -72,6 +74,7 @@ const TestGroup = ({
   onToggle,
   hasCredential,
   vcdmVersion,
+  source,
 }: TestGroupProps) => {
   const isLoading = steps.some((step) => step.status === 'in-progress');
 
@@ -120,6 +123,7 @@ const TestGroup = ({
       </div>
       {isExpanded && (
         <div className='mt-4 pl-6 space-y-2'>
+          {source && <SourceCaption source={source} />}
           {steps.map((step) => (
             <TestStepItem key={step.id} step={step} />
           ))}
@@ -590,6 +594,7 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
             isExpanded={expandedGroups.includes(type)}
             onToggle={() => toggleGroup(type)}
             hasCredential={hasCredential}
+            source={credential?.source}
           />
         );
       })}
