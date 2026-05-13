@@ -117,15 +117,25 @@ RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/packages/reference-implementation/public ./packages/reference-implementation/public
 
-# Next.js standalone output. outputFileTracingRoot is pinned to the monorepo
-# root so server.js lands at packages/reference-implementation/server.js.
+# Lay down the entrypoint-only node_modules first (from pnpm deploy). This
+# stage contributes the prisma CLI, tsx, dotenv, jose, and the other deps
+# the docker-entrypoint.sh scripts pull in (prisma migrate deploy, then
+# tsx seed.ts). Next.js standalone's tracer does not include these
+# because the server itself never imports them.
+COPY --from=runtime-deps --chown=nextjs:nodejs /deploy/node_modules ./node_modules
+
+# Next.js standalone output goes on top so that any package present in
+# both trees (react, react-dom, @prisma/client, @uncefact/untp-ri-services,
+# the workspace components package, etc.) is served from the exact files
+# the standalone tracer captured. The pnpm-deploy isolated-layout
+# symlinks would otherwise route imports back through .pnpm/, which is
+# fragile against the rm hack in the runtime-deps stage. outputFileTracingRoot
+# is pinned to the monorepo root so server.js lands at
+# packages/reference-implementation/server.js.
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/.next/static ./packages/reference-implementation/.next/static
 
-# Prisma artefacts + runtime node_modules from the deploy stage. The deploy
-# output already excludes devDependencies and unreachable runtime deps.
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/prisma ./prisma
-COPY --from=runtime-deps --chown=nextjs:nodejs /deploy/node_modules ./node_modules
 
 # Modules required by prisma/seed.ts (relative imports from ../src/lib/...)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/prisma/constants.ts ./src/lib/prisma/constants.ts
