@@ -109,6 +109,11 @@ async function runPipeline(
   }
 }
 
+function schemeName(scheme: StoredScheme | undefined): string | undefined {
+  const name = scheme?.decoded?.name;
+  return typeof name === 'string' && name.length > 0 ? name : undefined;
+}
+
 function SourceCaption({ source }: { source: ArtefactSource }) {
   if (source.kind === 'file') {
     return <p className='text-xs text-gray-500'>Source: {source.filename}</p>;
@@ -155,7 +160,10 @@ function SchemeCard({
       >
         <div className='flex items-center gap-2'>
           {isExpanded ? <ChevronDown className='h-4 w-4' /> : <ChevronRight className='h-4 w-4' />}
-          <h3 className='font-semibold'>{SCHEME_DISPLAY_LABEL[type]}</h3>
+          <div className='flex flex-col'>
+            <h3 className='font-semibold'>{schemeName(scheme) ?? SCHEME_DISPLAY_LABEL[type]}</h3>
+            {schemeName(scheme) && <span className='text-xs text-gray-500'>{SCHEME_DISPLAY_LABEL[type]}</span>}
+          </div>
         </div>
         <StatusIcon status={overallStatus} testId={type} />
       </div>
