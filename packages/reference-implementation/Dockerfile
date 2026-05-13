@@ -58,22 +58,26 @@ RUN pnpm --filter untp-reference-implementation run build
 
 # ---- Production-only install ----
 # pnpm deploy emits a flattened node_modules with only RI's production
-# dependencies (including the linked workspace packages it imports).
-# This replaces both the previous "yarn --production" pass and the manual
-# rm -rf of Next.js/UI trees: pnpm deploy already excludes anything not
-# reachable from RI's runtime entrypoints.
+# dependency closure (including the linked workspace packages it imports).
+# This replaces the previous "yarn --production" pass.
 FROM builder AS runtime-deps
 WORKDIR /app
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm-store,sharing=locked \
     pnpm config set store-dir /pnpm-store && \
     pnpm deploy --filter untp-reference-implementation --prod /deploy
 
-# Even with the devDeps reclassification, pnpm deploy still pulls UI/Next
-# trees in via the workspace `@reference-implementation/components` (which
-# legitimately declares MUI, lucide-react, etc. as its own runtime deps).
-# Next.js standalone already bundles everything reachable at runtime into
-# .next/standalone/node_modules, so these copies under /deploy/node_modules
-# are dead weight. Strip them to recover the ~700 MB win.
+# pnpm deploy alone is not enough to recover the size win from PR #618.
+# The workspace package @reference-implementation/components legitimately
+# declares MUI, lucide-react, tailwindcss, and @tailwindcss/postcss as its
+# own runtime deps, and the deploy walks them in. Next.js standalone
+# already bundles everything reachable at runtime into
+# .next/standalone/node_modules, so those copies under /deploy/node_modules
+# are dead weight at runtime; strip them. The remaining entries (next,
+# next-auth, @auth, next-swagger-doc, swagger-ui-react, @swagger-api,
+# html5-qrcode, sanitize-html, tw-animate-css, @vercel) should not be
+# present after the RI devDeps reclassification, but are listed defensively
+# in case one is re-promoted accidentally; the rm is a no-op for those
+# until/unless that happens.
 RUN rm -rf \
     /deploy/node_modules/next \
     /deploy/node_modules/@next \
