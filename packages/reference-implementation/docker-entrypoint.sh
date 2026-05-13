@@ -27,7 +27,12 @@ fi
 if [ "${SKIP_SEED:-false}" = "false" ]; then
     echo "Running database seed..."
     cd /app/prisma
-    node /app/node_modules/.bin/tsx seed.ts
+    # Run as the binary directly. Under pnpm, .bin/tsx is a shell
+    # wrapper script that delegates into the .pnpm virtual store;
+    # prefixing with `node` (as the previous yarn-1 invocation did)
+    # makes node try to parse the shell script as JavaScript and
+    # fail with "SyntaxError: missing ) after argument list".
+    /app/node_modules/.bin/tsx seed.ts
     echo "Database seed completed"
 else
     echo "Skipping database seed (SKIP_SEED is set)"
