@@ -31,6 +31,7 @@
     "storybook:components": "pnpm --filter @reference-implementation/components run storybook",
     "storybook:reference-implementation": "pnpm --filter untp-reference-implementation run storybook",
     "changeset": "changeset",
+    "release": "node scripts/release.mjs",
     "prepare": "husky install",
     "lint:check": "cross-env NODE_OPTIONS=--max-old-space-size=8192 eslint packages",
     "lint:fix": "cross-env NODE_OPTIONS=--max-old-space-size=8192 eslint packages --fix",

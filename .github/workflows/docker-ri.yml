@@ -1,5 +1,14 @@
 name: Docker — Reference Implementation
 
+# Triggers:
+#   - push to `next` rebuilds the rolling `:next` image on every merge.
+#   - pushing a `reference-implementation-v<X.Y.Z>` git tag (e.g.
+#     `reference-implementation-v0.3.0`) builds a release image tagged
+#     with the semver tag and `:latest`. The semver tag is consumed by
+#     downstream deployments to pin a specific release.
+#   - workflow_dispatch lets a maintainer rebuild a release on demand
+#     without re-tagging git.
+
 on:
   push:
     branches:
@@ -12,7 +21,14 @@ on:
       - 'package.json'
       - 'packages/reference-implementation/Dockerfile'
       - '.github/workflows/docker-ri.yml'
+    tags:
+      - 'reference-implementation-v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Semver version to tag this build with (e.g. 0.3.0). Omit to push only :next.'
+        required: false
+        type: string
 
 concurrency:
   group: docker-ri-${{ github.ref }}
@@ -49,8 +65,18 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}/reference-implementation
+          # Tag strategy:
+          #   - On branch push to `next`: `:next`.
+          #   - On git tag `reference-implementation-vX.Y.Z`: pulls X.Y.Z
+          #     and emits semver tags `:X.Y.Z`, `:X.Y`, `:X`, plus `:latest`.
+          #   - On workflow_dispatch: emits `:next`; if `version` input is
+          #     supplied, also emits `:<version>` and `:latest`.
           tags: |
-            type=raw,value=next
+            type=raw,value=next,enable=${{ github.ref == 'refs/heads/next' }}
+            type=match,pattern=reference-implementation-v(.*),group=1,enable=${{ startsWith(github.ref, 'refs/tags/reference-implementation-v') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/reference-implementation-v') }}
+            type=raw,value=${{ inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.version != '' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' && inputs.version != '' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
