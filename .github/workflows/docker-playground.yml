@@ -6,7 +6,7 @@ on:
       - next
     paths:
       - 'packages/untp-playground/**'
-      - 'yarn.lock'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/docker-playground.yml'
   workflow_dispatch:
 

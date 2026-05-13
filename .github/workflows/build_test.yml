@@ -53,11 +53,11 @@ jobs:
             node_modules
             packages/*/node_modules
             ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
         if: steps.cache-modules.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Save node_modules cache
         if: steps.cache-modules.outputs.cache-hit != 'true'
@@ -67,13 +67,13 @@ jobs:
             node_modules
             packages/*/node_modules
             ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Check formatting
-        run: yarn format:check
+        run: pnpm format:check
 
       - name: Check linting
-        run: yarn lint:check
+        run: pnpm lint:check
 
   qa:
     name: QA (${{ matrix.package }})
@@ -88,8 +88,8 @@ jobs:
         package:
           - '@uncefact/untp-ri-services'
           - '@reference-implementation/components'
-          - '@reference-implementation/core'
-          - '@uncefact/untp-playground'
+          - 'untp-reference-implementation'
+          - 'untp-playground'
           - '@uncefact/untp-utils'
     steps:
       - name: Checkout repository
@@ -117,22 +117,21 @@ jobs:
             node_modules
             packages/*/node_modules
             ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (fallback if cache restore missed)
         if: steps.cache-modules.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build ${{ matrix.package }} (and affected deps)
-        run: yarn turbo run build --filter='${{ matrix.package }}...[origin/next]'
+        run: pnpm turbo run build --filter='${{ matrix.package }}...[origin/next]'
 
       # `--changedSince=origin/next` is passed through to jest so file-level
-      # affected filtering still applies inside each package, matching the
-      # scope of the previous `lerna exec -- yarn jest --changedSince` step.
-      # Calls turbo's binary directly because `yarn turbo` consumes the `--`
-      # separator before it reaches turbo.
+      # affected filtering still applies inside each package. `pnpm exec`
+      # forwards `--` cleanly to turbo, unlike `pnpm turbo --` which gets
+      # consumed by pnpm itself.
       - name: Test ${{ matrix.package }} (changed files only)
-        run: ./node_modules/.bin/turbo run test --filter='${{ matrix.package }}...[origin/next]' -- --changedSince=origin/next
+        run: pnpm exec turbo run test --filter='${{ matrix.package }}...[origin/next]' -- --changedSince=origin/next
 
   # Per-app image build jobs run in parallel after qa. Each downstream E2E
   # job depends only on its own image-build job so the playground E2E starts
@@ -165,11 +164,11 @@ jobs:
             node_modules
             packages/*/node_modules
             ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (fallback if cache restore missed)
         if: steps.cache-modules.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Check whether RI image needs building
         id: affected
@@ -177,7 +176,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          json=$(yarn --silent turbo run build --filter='@reference-implementation/core...[origin/next]' --dry-run=json)
+          json=$(pnpm --silent turbo run build --filter='untp-reference-implementation...[origin/next]' --dry-run=json)
           if [ -z "$json" ]; then
             echo "::error::turbo dry-run produced empty output"
             exit 1
@@ -263,11 +262,11 @@ jobs:
             node_modules
             packages/*/node_modules
             ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (fallback if cache restore missed)
         if: steps.cache-modules.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Check whether playground image needs building
         id: affected
@@ -275,7 +274,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          json=$(yarn --silent turbo run build --filter='@uncefact/untp-playground...[origin/next]' --dry-run=json)
+          json=$(pnpm --silent turbo run build --filter='untp-playground...[origin/next]' --dry-run=json)
           if [ -z "$json" ]; then
             echo "::error::turbo dry-run produced empty output"
             exit 1
@@ -354,11 +353,11 @@ jobs:
             node_modules
             packages/*/node_modules
             ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (fallback if cache restore missed)
         if: steps.cache-modules.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Check whether E2E should run
         id: affected
@@ -366,7 +365,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          affected_json=$(yarn --silent turbo run build --filter='@reference-implementation/core...[origin/next]' --dry-run=json)
+          affected_json=$(pnpm --silent turbo run build --filter='untp-reference-implementation...[origin/next]' --dry-run=json)
           if [ -z "$affected_json" ]; then
             echo "::error::turbo dry-run produced empty output"
             exit 1
@@ -473,7 +472,7 @@ jobs:
 
       - name: Run RI E2E tests (${{ matrix.mode }} mode)
         if: steps.affected.outputs.result == 'true'
-        run: yarn workspace reference-implementation-e2e test:e2e:${{ matrix.mode }}
+        run: pnpm --filter reference-implementation-e2e test:e2e:${{ matrix.mode }}
         env:
           NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module' # See issue https://github.com/cypress-io/github-action/issues/1408
           VERIFY_ALLOW_PRIVATE_URLS: 'true' # Skip SSRF E2E tests, Docker services use internal addresses
@@ -515,11 +514,11 @@ jobs:
             node_modules
             packages/*/node_modules
             ~/.cache/Cypress
-          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          key: node-modules-v3-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (fallback if cache restore missed)
         if: steps.cache-modules.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Check whether playground E2E should run
         id: affected
@@ -528,7 +527,7 @@ jobs:
           set -euo pipefail
 
           # Turbo dep graph for @uncefact/untp-playground.
-          affected_json=$(yarn --silent turbo run build --filter='@uncefact/untp-playground...[origin/next]' --dry-run=json)
+          affected_json=$(pnpm --silent turbo run build --filter='untp-playground...[origin/next]' --dry-run=json)
           if [ -z "$affected_json" ]; then
             echo "::error::turbo dry-run produced empty output"
             exit 1
@@ -629,7 +628,7 @@ jobs:
 
       - name: Run playground E2E tests
         if: steps.affected.outputs.result == 'true'
-        run: yarn workspace untp-playground-e2e test:e2e
+        run: pnpm --filter untp-playground-e2e test:e2e
         env:
           NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module' # See issue https://github.com/cypress-io/github-action/issues/1408
           E2E_PLAYGROUND_BASE_URL: 'http://localhost:4000'

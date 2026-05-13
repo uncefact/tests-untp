@@ -90,11 +90,11 @@ jobs:
             node_modules
             packages/*/node_modules
             ~/.cache/Cypress
-          key: node-modules-v2-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          key: node-modules-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
         if: steps.cache-modules.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Save node_modules cache
         if: steps.cache-modules.outputs.cache-hit != 'true'
@@ -104,9 +104,9 @@ jobs:
             node_modules
             packages/*/node_modules
             ~/.cache/Cypress
-          key: node-modules-v2-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          key: node-modules-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
-      - name: After yarn install - disk usage
+      - name: After pnpm install - disk usage
         run: |
           echo "=== AFTER YARN INSTALL ==="
           df -h /
@@ -122,35 +122,35 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: packages/reference-implementation/.next/cache
-          key: ri-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/reference-implementation/src/**', 'packages/components/src/**', 'packages/services/src/**') }}
+          key: ri-nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('packages/reference-implementation/src/**', 'packages/components/src/**', 'packages/services/src/**') }}
           restore-keys: |
-            ri-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-
+            ri-nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
       - name: Restore Playground build cache
         id: cache-playground
         uses: actions/cache/restore@v4
         with:
           path: packages/untp-playground/.next/cache
-          key: playground-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/untp-playground/src/**') }}
+          key: playground-nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('packages/untp-playground/src/**') }}
           restore-keys: |
-            playground-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-
+            playground-nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
       - name: Build
-        run: yarn build
+        run: pnpm build
 
       - name: Save RI build cache
         if: steps.cache-ri.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: packages/reference-implementation/.next/cache
-          key: ri-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/reference-implementation/src/**', 'packages/components/src/**', 'packages/services/src/**') }}
+          key: ri-nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('packages/reference-implementation/src/**', 'packages/components/src/**', 'packages/services/src/**') }}
 
       - name: Save Playground build cache
         if: steps.cache-playground.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: packages/untp-playground/.next/cache
-          key: playground-nextjs-${{ runner.os }}-${{ hashFiles('yarn.lock') }}-${{ hashFiles('packages/untp-playground/src/**') }}
+          key: playground-nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('packages/untp-playground/src/**') }}
 
       - name: After build - disk usage
         run: |
@@ -166,7 +166,7 @@ jobs:
           du -sh packages/untp-playground/.next/* 2>/dev/null | sort -rh || true
 
       - name: Run tests with coverage
-        run: yarn test:coverage
+        run: pnpm test:coverage
 
       - name: After tests - disk usage
         run: |
@@ -238,7 +238,7 @@ jobs:
           echo "1. Check which 'Potential savings' directories exist and are large"
           echo "2. Add them to the cleanup step in build_test.yml"
           echo "3. Consider pruning Docker build cache before E2E: docker builder prune -af"
-          echo "4. Consider cleaning yarn cache after install: yarn cache clean"
+          echo "4. Consider pruning pnpm store after install: pnpm store prune"
           echo "5. Consider removing node_modules/.cache before Docker steps"
           echo "6. The RI Dockerfile uses multi-stage build with selective COPY layers"
           echo "   - Review packages/reference-implementation/Dockerfile if image size grows"

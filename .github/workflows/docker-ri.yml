@@ -8,7 +8,7 @@ on:
       - 'packages/reference-implementation/**'
       - 'packages/services/**'
       - 'packages/components/**'
-      - 'yarn.lock'
+      - 'pnpm-lock.yaml'
       - 'package.json'
       - 'packages/reference-implementation/Dockerfile'
       - '.github/workflows/docker-ri.yml'

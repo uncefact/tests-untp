@@ -43,10 +43,10 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: lts/*
-          cache: yarn
+          cache: pnpm
   
       - name: Installing dependencies 📦️
-        run: yarn install
+        run: pnpm install
         working-directory: ./packages/untp-playground/infra
 
       - name: Deploy Stack
@@ -96,10 +96,10 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: lts/*
-          cache: yarn
+          cache: pnpm
   
       - name: Installing dependencies 📦️
-        run: yarn install
+        run: pnpm install
         working-directory: ./packages/untp-playground/infra
 
       - name: Deploy Stack

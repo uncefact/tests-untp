@@ -26,20 +26,20 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '20.12.2'
-          cache: 'yarn'
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: |
-          yarn cache clean && yarn install --immutable
+          pnpm install --frozen-lockfile
 
       - name: Build
-        run: yarn build
+        run: pnpm build
 
       - name: Check linting
-        run: yarn lint
+        run: pnpm lint
 
       - name: Run tests
-        run: yarn test
+        run: pnpm test
 
       # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
       # https://github.com/uncefact/tests-untp/issues/410
@@ -66,7 +66,7 @@ jobs:
         run: docker compose -f docker-compose.e2e.yml up -d
 
       - name: Run E2E tests
-        run: yarn test:run-cypress
+        run: pnpm test:run-cypress
 
       - name: Stop docker compose
         run: docker compose -f docker-compose.e2e.yml down
@@ -81,13 +81,13 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 20
-          cache: yarn
+          cache: pnpm
 
       - name: Install and build documentation
         run: |
           cd documentation
-          yarn install --frozen-lockfile
-          yarn build
+          pnpm install --frozen-lockfile
+          pnpm build
         env:
           DOCS_BASE_URL: ${{ vars.DOCS_BASE_URL }}
           DOCS_URL: ${{ vars.DOCS_URL }}
