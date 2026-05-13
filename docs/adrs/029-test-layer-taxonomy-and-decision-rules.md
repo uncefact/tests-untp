@@ -1,8 +1,7 @@
 # ADR: Test layer taxonomy and decision rules
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

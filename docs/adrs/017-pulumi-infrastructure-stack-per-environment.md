@@ -1,8 +1,7 @@
 # ADR: Pulumi for infrastructure with stack-per-environment
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

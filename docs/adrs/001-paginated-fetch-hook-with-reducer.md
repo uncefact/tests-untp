@@ -1,8 +1,7 @@
 # ADR: Reusable paginated fetch hook with useReducer
 
-## Status
-
-accepted
+- **Date:** 2026-05-12
+- **Status:** accepted
 
 ## Context
 

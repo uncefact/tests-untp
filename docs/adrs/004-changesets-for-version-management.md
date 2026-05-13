@@ -1,8 +1,7 @@
 # ADR: Changesets for version management and publishing
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** accepted
 
 ## Context
 
@@ -38,6 +37,28 @@ The flow:
 Docker apps are also `private: true` so Changesets does not attempt to publish them to npm. Their version bumps and git tags still happen — Docker image building is handled separately, triggered by the same release event (see CI/CD ADR).
 
 We chose Changesets because it is the de-facto standard for TypeScript monorepos with independent versioning, it handles cross-package workspace dep rewrites correctly, and its single-long-lived-release-PR pattern fits trunk-based development with no additional branching.
+
+## Adoption notes
+
+The walking-skeleton implementation of this ADR ships across two PRs.
+
+**Stage 1 — tooling and baseline (#610):**
+
+- `@changesets/cli` added as a root devDependency.
+- `.changeset/config.json` configured with `access: "public"`, `baseBranch: "next"` (the project's release line; differs from this ADR's "main" framing — `next` is the equivalent here), `updateInternalDependencies: "patch"`, and an `ignore` list covering every workspace that should not produce npm releases: `@reference-implementation/components`, `@reference-implementation/core`, `@uncefact/untp-playground`, and both e2e suites.
+- Publishable packages aligned at `0.1.0` baseline: `@uncefact/untp-utils`, `@uncefact/untp-test-suite`, `@uncefact/untp-ri-services`. The RI's workspace dependency on `@uncefact/untp-ri-services` was bumped to match.
+- `yarn changeset` exposed in root scripts for contributor discoverability.
+
+**Stage 2 — release workflow (#611, in flight):**
+
+- `.github/workflows/release.yml` rewritten around `changesets/action@v1` and triggered on push to `next`.
+- npm publish uses OIDC Trusted Publishing rather than a long-lived `NPM_TOKEN`; the job carries `id-token: write` and pairs it with `--provenance` via `NPM_CONFIG_PROVENANCE`.
+- The Docker apps' release event is tied to the same flow via the `reference-implementation-v*` / `untp-playground-v*` git-tag triggers in their respective Docker workflows.
+
+**Deferred:**
+
+- Changeset enforcement (ADR 005) — no PR-level required-changeset check yet.
+- RC pre-mode (ADR 022) — `changeset pre enter` / `pre exit` not yet wired into release workflow.
 
 ## Consequences
 

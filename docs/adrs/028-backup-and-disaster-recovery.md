@@ -1,8 +1,7 @@
 # ADR: Backup and disaster recovery considerations
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

@@ -1,8 +1,7 @@
 # ADR: Single root Docker Compose file with profile-based activation
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** accepted
 
 ## Context
 

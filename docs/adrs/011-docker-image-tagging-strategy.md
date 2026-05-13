@@ -1,8 +1,7 @@
 # ADR: Docker image tagging strategy
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

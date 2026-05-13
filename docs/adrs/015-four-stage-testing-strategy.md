@@ -1,8 +1,7 @@
 # ADR: Four-stage testing strategy (A through D)
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

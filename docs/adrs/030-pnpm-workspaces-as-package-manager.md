@@ -1,10 +1,7 @@
 # ADR: pnpm workspaces as the package manager
 
-## Status
-
-proposed
-
-When implemented, this ADR will supersede ADR 006 (Yarn workspaces as the package manager). Until then, ADR 006's decision (yarn) remains in effect.
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

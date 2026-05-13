@@ -1,8 +1,7 @@
 # ADR: CI/CD workflow inventory
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

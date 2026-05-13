@@ -1,8 +1,7 @@
 # ADR: E2E test architecture per package with parameterizable target
 
-## Status
-
-accepted
+- **Date:** 2026-05-12
+- **Status:** accepted
 
 ## Context
 

@@ -1,8 +1,7 @@
 # ADR: Manual prod deploy with automated rollback on smoke test failure
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

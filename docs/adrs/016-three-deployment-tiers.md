@@ -1,8 +1,7 @@
 # ADR: Three deployment tiers (dev, staging, prod) with separate AWS environments
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

@@ -1,8 +1,7 @@
 # ADR: UNTP spec compatibility tracking via metadata and release manifest
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 
