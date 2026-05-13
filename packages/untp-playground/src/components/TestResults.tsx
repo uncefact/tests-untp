@@ -1,5 +1,6 @@
 'use client';
 
+import { StatusIcon } from '@/components/StatusIcon';
 import { TooltipWrapper } from '@/components/TooltipWrapper';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -181,51 +182,6 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
       </div>
     </div>
   );
-};
-
-const StatusIcon = ({
-  status,
-  size = 'default',
-  testId = 'unknown',
-}: {
-  status: TestCaseStatus;
-  size?: 'sm' | 'default';
-  testId?: string;
-}) => {
-  const sizeClass = size === 'sm' ? 'h-3 w-3' : 'h-4 w-4';
-
-  switch (status) {
-    case TestCaseStatus.SUCCESS:
-      return (
-        <div data-testid={`${testId}-status-icon-success`}>
-          <Check className={`${sizeClass} text-green-500`} />
-        </div>
-      );
-    case TestCaseStatus.FAILURE:
-      return (
-        <div data-testid={`${testId}-status-icon-failure`}>
-          <X className={`${sizeClass} text-red-500`} />
-        </div>
-      );
-    case TestCaseStatus.IN_PROGRESS:
-      return (
-        <div data-testid={`${testId}-status-icon-in-progress`}>
-          <Loader2 className={`${sizeClass} text-blue-500 animate-spin`} />
-        </div>
-      );
-    case TestCaseStatus.PENDING:
-      return (
-        <div data-testid={`${testId}-status-icon-pending`}>
-          <AlertCircle className={`${sizeClass} text-gray-400`} />
-        </div>
-      );
-    default:
-      return (
-        <div data-testid={`${testId}-status-icon-pending`}>
-          <AlertCircle className={`${sizeClass} text-gray-400`} />
-        </div>
-      );
-  }
 };
 
 interface TestResultsProps {
