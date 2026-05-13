@@ -72,7 +72,7 @@ export const generateReport = async ({
     ([type, scheme]) => [type, scheme] as [SchemeType, NonNullable<typeof scheme>],
   );
 
-  const schemeResults: TestReportSchemeResult[] = validSchemes.map(([type, scheme]) => {
+  const conformitySchemeResults: TestReportSchemeResult[] = validSchemes.map(([type, scheme]) => {
     const steps = schemeTestResults?.[type] ?? [];
     const decoded = scheme.decoded;
     const version = detectSchemeVersion(decoded) ?? 'unknown';
@@ -90,18 +90,18 @@ export const generateReport = async ({
       ...(name && { name }),
       ...(id && { id }),
       ...(scheme.source && { source: scheme.source }),
-      scheme: decoded,
+      conformityScheme: decoded,
       steps: steps as TestReportStep[],
     };
   });
 
-  if (results.length === 0 && schemeResults.length === 0) {
+  if (results.length === 0 && conformitySchemeResults.length === 0) {
     throw new Error('No valid credentials or schemes to generate report');
   }
 
   const allPass =
     results.every((result) => passStatuses.includes(result.status)) &&
-    schemeResults.every((result) => passStatuses.includes(result.status));
+    conformitySchemeResults.every((result) => passStatuses.includes(result.status));
 
   const playgroundUrl = process.env.NEXT_PUBLIC_PLAYGROUND_URL;
 
@@ -117,8 +117,8 @@ export const generateReport = async ({
       name: implementationName,
     },
     pass: allPass,
-    results,
-    ...(schemeResults.length > 0 && { schemeResults }),
+    verifiableCredentials: results,
+    ...(conformitySchemeResults.length > 0 && { conformitySchemeResults }),
     ...(playgroundUrl && { playgroundUrl }),
   };
 };

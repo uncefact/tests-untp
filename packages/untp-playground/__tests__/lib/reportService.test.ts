@@ -110,7 +110,7 @@ describe('generateReport', () => {
         name: 'Test Implementation',
       },
       pass: true,
-      results: [
+      verifiableCredentials: [
         {
           status: 'success',
           overallStatus: 'success',
@@ -230,7 +230,7 @@ describe('generateReport', () => {
     });
 
     expect(report.reportName).toBe('AATP');
-    expect(report.results[0].extension).toEqual({
+    expect(report.verifiableCredentials[0].extension).toEqual({
       type: 'extensionType',
       version: '1.0.0',
       steps: [
@@ -278,9 +278,9 @@ describe('generateReport', () => {
     });
 
     expect(report.pass).toBe(true);
-    expect(report.results).toEqual([]);
-    expect(report.schemeResults).toHaveLength(1);
-    expect(report.schemeResults?.[0]).toMatchObject({
+    expect(report.verifiableCredentials).toEqual([]);
+    expect(report.conformitySchemeResults).toHaveLength(1);
+    expect(report.conformitySchemeResults?.[0]).toMatchObject({
       status: TestCaseStatus.SUCCESS,
       type: 'ConformityScheme',
       version: '0.7.0',
@@ -318,6 +318,6 @@ describe('generateReport', () => {
     });
 
     expect(report.pass).toBe(false);
-    expect(report.schemeResults?.[0].status).toBe(TestCaseStatus.FAILURE);
+    expect(report.conformitySchemeResults?.[0].status).toBe(TestCaseStatus.FAILURE);
   });
 });

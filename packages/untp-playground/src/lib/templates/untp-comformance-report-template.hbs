@@ -293,12 +293,12 @@
       </dl>
     </header>
 
-    {{#if credentialSubject.results}}
+    {{#if credentialSubject.verifiableCredentials}}
       <h2 class="section-h">
         <span>Verifiable Credentials</span>
       </h2>
 
-      {{#each credentialSubject.results}}
+      {{#each credentialSubject.verifiableCredentials}}
         <article class="result">
           <header class="result-head">
             <div>
@@ -384,12 +384,12 @@
       {{/each}}
     {{/if}}
 
-    {{#if credentialSubject.schemeResults}}
+    {{#if credentialSubject.conformitySchemeResults}}
       <h2 class="section-h">
         <span>Conformity Schemes</span>
       </h2>
 
-      {{#each credentialSubject.schemeResults}}
+      {{#each credentialSubject.conformitySchemeResults}}
         <article class="result">
           <header class="result-head">
             <div>

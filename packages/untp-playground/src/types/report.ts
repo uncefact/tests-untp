@@ -16,8 +16,8 @@ export interface TestReport {
     name: string;
   };
   pass: boolean;
-  results: TestReportResult[];
-  schemeResults?: TestReportSchemeResult[];
+  verifiableCredentials: TestReportResult[];
+  conformitySchemeResults?: TestReportSchemeResult[];
   playgroundUrl?: string;
 }
 
@@ -55,7 +55,7 @@ export interface TestReportSchemeResult {
   name?: string;
   id?: string;
   source?: ArtefactSource;
-  scheme: Record<string, any>;
+  conformityScheme: Record<string, any>;
   steps: TestReportStep[];
 }
 
