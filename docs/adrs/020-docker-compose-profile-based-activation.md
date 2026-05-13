@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** accepted
+- **Update (2026-05-13):** Walking skeleton for OpenTelemetry (#592) introduced the `observability` and `local-observability` profiles on the root `docker-compose.yml`, with `otel-agent` (sidecar, both profiles), `tempo` and `grafana` (local LGTM, `local-observability` only). Apps and shared services remain untagged so default-profile runs are unaffected. The Adoption notes below describe the prior state at the time of the decision.
 
 ## Context
 
@@ -63,19 +64,13 @@ The walking-skeleton implementation of this ADR ships across the per-package E2E
 
 **Stage 2, reference implementation (#582):** kept the same profile shape and added the buildx GHA cache backend on the `app` and `untp-playground` services so the new upstream `build-e2e-images` CI job and the downstream matrix entries share a single image build.
 
-**Stage 3, observability walking skeleton (#592):** introduced the broader-vision profile shape on the root `docker-compose.yml`. Added an `otel-agent` sidecar tagged `['observability', 'local-observability']` and a `tempo` plus `grafana` pair tagged `['local-observability']`. The reference implementation gains `OTEL_EXPORTER_OTLP_ENDPOINT` / `DEPLOYMENT_ENVIRONMENT` env vars; the app and shared services remain untagged so default-profile runs are unaffected.
-
-The root and E2E compose files apply the same profile-activation pattern independently. They are different compose files with different concerns (local dev plus observability on the root; CI fixture composition on the E2E file), so the profile names are scoped per file rather than shared.
-
 The current profile tagging is:
 
-- `ri` profile (E2E compose): `app`, `vckit-api`, `db`, `storage-service`, `identity-resolver-service`, `identity-resolver-service-object-store`, `e2e-ri-db`, `e2e-keycloak`.
-- `playground` profile (E2E compose): `untp-playground`, `vckit-api`, `db`.
-- `vckit-api` (and its `db` dependency) are tagged with both E2E profiles since the playground calls `vckit-api` for credential verification.
-- `observability` profile (root compose): `otel-agent`.
-- `local-observability` profile (root compose): `otel-agent`, `tempo`, `grafana`. Sidecars are shared with `observability` so `local-observability` is the superset.
+- `ri` profile: `app`, `vckit-api`, `db`, `storage-service`, `identity-resolver-service`, `identity-resolver-service-object-store`, `e2e-ri-db`, `e2e-keycloak`.
+- `playground` profile: `untp-playground`, `vckit-api`, `db`.
+- `vckit-api` (and its `db` dependency) are tagged with both profiles since the playground calls `vckit-api` for credential verification.
 
-The broader vision (a single `docker-compose.yml` at repo root covering local dev, observability sidecars, and the local LGTM stack) is being adopted incrementally. Vector log shipping (#593), Prometheus (#594), and the central gateway target for the agent (#595) are the remaining pieces.
+The broader vision (a single `docker-compose.yml` at repo root covering local dev, observability sidecars, and the local LGTM stack) is deferred. The current root compose / E2E compose split is unchanged.
 
 Note: when every service in a compose file is tagged with a profile, `docker compose up` with no profile flag starts nothing. CI invocations always pass `--profile ri` or `--profile playground`; local devs running the E2E stack must do the same.
 
