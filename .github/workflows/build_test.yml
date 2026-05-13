@@ -396,23 +396,29 @@ jobs:
 
       # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
       # https://github.com/uncefact/tests-untp/issues/344
+      #
+      # Background each rm so the kernel can parallelise unlink syscalls
+      # across cores. The big paths (/usr/local/lib/android, /usr/share/dotnet,
+      # /usr/share/miniconda) dominate wall time when run sequentially;
+      # in parallel the total drops to roughly the slowest single rm.
       - name: Free up space on ubuntu runner for E2E tests
         if: steps.affected.outputs.result == 'true'
         run: |
-          sudo rm -rf \
-            "$AGENT_TOOLSDIRECTORY" \
-            /opt/microsoft \
-            /opt/pipx \
-            /usr/local/.ghcup \
-            /usr/local/graalvm* \
-            /usr/local/julia* \
-            /usr/local/lib/android \
-            /usr/local/share/chromium \
-            /usr/local/share/powershell \
-            /usr/local/share/vcpkg \
-            /usr/share/dotnet \
-            /usr/share/miniconda \
-            /usr/share/swift
+          set -e
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" &
+          sudo rm -rf /opt/microsoft &
+          sudo rm -rf /opt/pipx &
+          sudo rm -rf /usr/local/.ghcup &
+          sudo rm -rf /usr/local/graalvm* &
+          sudo rm -rf /usr/local/julia* &
+          sudo rm -rf /usr/local/lib/android &
+          sudo rm -rf /usr/local/share/chromium &
+          sudo rm -rf /usr/local/share/powershell &
+          sudo rm -rf /usr/local/share/vcpkg &
+          sudo rm -rf /usr/share/dotnet &
+          sudo rm -rf /usr/share/miniconda &
+          sudo rm -rf /usr/share/swift &
+          wait
           docker image prune -af
 
       - name: Set up Docker Buildx
@@ -555,23 +561,29 @@ jobs:
       # playground stack is lighter (3 services vs 8).
       # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
       # https://github.com/uncefact/tests-untp/issues/344
+      #
+      # Background each rm so the kernel can parallelise unlink syscalls
+      # across cores. The big paths (/usr/local/lib/android, /usr/share/dotnet,
+      # /usr/share/miniconda) dominate wall time when run sequentially;
+      # in parallel the total drops to roughly the slowest single rm.
       - name: Free up space on ubuntu runner for E2E tests
         if: steps.affected.outputs.result == 'true'
         run: |
-          sudo rm -rf \
-            "$AGENT_TOOLSDIRECTORY" \
-            /opt/microsoft \
-            /opt/pipx \
-            /usr/local/.ghcup \
-            /usr/local/graalvm* \
-            /usr/local/julia* \
-            /usr/local/lib/android \
-            /usr/local/share/chromium \
-            /usr/local/share/powershell \
-            /usr/local/share/vcpkg \
-            /usr/share/dotnet \
-            /usr/share/miniconda \
-            /usr/share/swift
+          set -e
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" &
+          sudo rm -rf /opt/microsoft &
+          sudo rm -rf /opt/pipx &
+          sudo rm -rf /usr/local/.ghcup &
+          sudo rm -rf /usr/local/graalvm* &
+          sudo rm -rf /usr/local/julia* &
+          sudo rm -rf /usr/local/lib/android &
+          sudo rm -rf /usr/local/share/chromium &
+          sudo rm -rf /usr/local/share/powershell &
+          sudo rm -rf /usr/local/share/vcpkg &
+          sudo rm -rf /usr/share/dotnet &
+          sudo rm -rf /usr/share/miniconda &
+          sudo rm -rf /usr/share/swift &
+          wait
           docker image prune -af
 
       - name: Set up Docker Buildx
