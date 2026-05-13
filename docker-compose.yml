@@ -233,7 +233,7 @@ services:
       - '4318:4318'
 
   tempo:
-    image: grafana/tempo:2.6.1
+    image: grafana/tempo:2.10.5
     profiles: ['local-observability']
     command: ['-config.file=/etc/tempo/tempo.yaml']
     volumes:

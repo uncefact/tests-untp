@@ -25,13 +25,10 @@ const sdk = new NodeSDK({
 sdk.start();
 
 const shutdown = () => {
-  sdk
-    .shutdown()
-    .catch((err: unknown) => {
-      // eslint-disable-next-line no-console
-      console.error('OpenTelemetry SDK shutdown failed', err);
-    })
-    .finally(() => process.exit(0));
+  sdk.shutdown().catch((err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.error('OpenTelemetry SDK shutdown failed', err);
+  });
 };
 
 process.on('SIGTERM', shutdown);
