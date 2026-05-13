@@ -8,34 +8,34 @@ overrides:
   '@types/eslint': ^8.4.6
   eslint: ^8.57.1
   eslint-visitor-keys: ^4.2.1
-  dompurify: ^3.4.3
-  protobufjs@<7.5.6: ^7.5.6
-  protobufjs@>=8.0.0 <8.0.2: ^8.0.2
-  undici@<6.24.0: ^6.24.0
-  serialize-javascript: ^7.0.5
-  path-to-regexp@<0.1.13: ^0.1.13
-  path-to-regexp@>=2.0.0 <3.3.0: ^3.3.0
-  node-forge: ^1.4.0
-  js-yaml@<3.14.2: ^3.14.2
-  js-yaml@>=4.0.0 <4.1.1: ^4.1.1
-  lodash-es: ^4.18.1
-  lodash: ^4.18.1
-  tar@<7.5.11: ^7.5.11
-  minimatch@<3.1.4: ^3.1.4
-  minimatch@>=9.0.0 <9.0.7: ^9.0.7
-  picomatch@<2.3.2: ^2.3.2
-  picomatch@>=3.0.0 <3.0.2: ^3.0.2
-  brace-expansion@<1.1.13: ^1.1.13
-  brace-expansion@>=2.0.0 <2.0.3: ^2.0.3
-  webpack@>=5.49.0 <5.104.1: ^5.104.1
-  axios@<1.15.2: ^1.15.2
-  handlebars: ^4.7.9
-  qs@<6.14.2: ^6.14.2
-  http-proxy-middleware@<2.0.9: ^2.0.9
-  diff@<5.2.2: ^5.2.2
-  diff@>=6.0.0 <8.0.3: ^8.0.3
-  fast-xml-parser@<4.5.4: ^4.5.4
-  fast-xml-parser@>=4.5.5 <5.0.0: ^4.5.5
+  dompurify@^3.0.0: ^3.4.3
+  protobufjs@^7.0.0: ^7.5.6
+  protobufjs@^8.0.0: ^8.0.2
+  undici@^6.0.0: ^6.24.0
+  serialize-javascript@^7.0.0: ^7.0.5
+  path-to-regexp@^0.1.0: ^0.1.13
+  path-to-regexp@^2.0.0: ^3.3.0
+  node-forge@^1.0.0: ^1.4.0
+  js-yaml@^3.0.0: ^3.14.2
+  js-yaml@^4.0.0: ^4.1.1
+  lodash-es@^4.0.0: ^4.18.1
+  lodash@^4.0.0: ^4.18.1
+  tar@^7.0.0: ^7.5.11
+  minimatch@^3.0.0: ^3.1.4
+  minimatch@^9.0.0: ^9.0.7
+  picomatch@^2.0.0: ^2.3.2
+  picomatch@^3.0.0: ^3.0.2
+  brace-expansion@^1.0.0: ^1.1.13
+  brace-expansion@^2.0.0: ^2.0.3
+  webpack@^5.0.0: ^5.104.1
+  axios@^1.0.0: ^1.15.2
+  handlebars@^4.0.0: ^4.7.9
+  qs@^6.0.0: ^6.14.2
+  http-proxy-middleware@^2.0.0: ^2.0.9
+  diff@^5.0.0: ^5.2.2
+  diff@^6.0.0: ^8.0.3
+  diff@^7.0.0: ^8.0.3
+  fast-xml-parser@^4.0.0: ^4.5.5
 
 importers:
 
@@ -2443,6 +2443,10 @@ packages:
   '@eslint/js@8.57.1':
     resolution: {integrity: sha512-d9zaMRSTIKDLhctzH12MtXvJKSSUhaHcjV+2Z+GK+EEY7XKpP5yR4x+N3TAcHTcu963nIr+TMcCb4DBCYX1z6Q==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+
+  '@fastify/busboy@2.1.1':
+    resolution: {integrity: sha512-vBZP4NlzfOlerQTnba4aqZoMhE/a9HY7HRqoOPaETQcSQuWEIyZMHGfVu6w9wGtGK5fED5qRs2DteVCjOH60sA==}
+    engines: {node: '>=14'}
 
   '@floating-ui/core@1.7.5':
     resolution: {integrity: sha512-1Ih4WTWyw0+lKyFMcBHGbb5U5FtuHJuujoyyr5zTaWS5EYMeT6Jb2AuDeftsCsEuchO+mM2ij5+q9crhydzLhQ==}
@@ -6434,8 +6438,8 @@ packages:
     resolution: {integrity: sha512-EjePK1srD3P08o2j4f0ExnylqRs5B9tJjcp9t1krH2qRi8CCdsYfwe9JgSLurFBWwq4uOlipzfk5fHNvwFKr8Q==}
     engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
 
-  diff@5.2.2:
-    resolution: {integrity: sha512-vtcDfH3TOjP8UekytvnHH1o1P4FcUdt4eQ1Y+Abap1tk/OB2MWQvcwS2ClCd1zuIhc3JKOx6p3kod8Vfys3E+A==}
+  diff@4.0.4:
+    resolution: {integrity: sha512-X07nttJQkwkfKfvTPG/KSnE2OMdcUCao6+eXF3wmnIQRn2aPAHH3VxDbDOdegkd6JbPsXqShpvEOHfAT+nCNwQ==}
     engines: {node: '>=0.3.1'}
 
   diff@8.0.4:
@@ -9618,9 +9622,8 @@ packages:
     resolution: {integrity: sha512-3NnuWfM6vBYoy5gZFvHiYsVbafvI9vZv/+jlIigFn4oP4zjNPK3LhcY0xSCgeb1a5L8jO71Mit9LlNoi2UfDDQ==}
     engines: {node: '>=10'}
 
-  serialize-javascript@7.0.5:
-    resolution: {integrity: sha512-F4LcB0UqUl1zErq+1nYEEzSHJnIwb3AF2XWB94b+afhrekOUijwooAYqFyRbjYkm2PAKBabx6oYv/xDxNi8IBw==}
-    engines: {node: '>=20.0.0'}
+  serialize-javascript@6.0.2:
+    resolution: {integrity: sha512-Saa1xPByTTq2gdeFZYLLo+RFE35NHZkAbqZeWNd3BpzppeVisAqpDjcp8dyf6uIvEqJRd46jemmyA4iFIeVk8g==}
 
   set-blocking@2.0.0:
     resolution: {integrity: sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw==}
@@ -10351,6 +10354,10 @@ packages:
 
   undici-types@7.13.0:
     resolution: {integrity: sha512-Ov2Rr9Sx+fRgagJ5AX0qvItZG/JKKoBRAVITs1zk7IqZGTJUwgUr7qoYBpWwakpWilTZFM98rG/AFRocu10iIQ==}
+
+  undici@5.29.0:
+    resolution: {integrity: sha512-raqeBD6NQK4SkWhQzeYKd1KmIG6dllBOTt55Rmkt4HtI9mwdWtJljnrXjAFUBLTSN67HWrOIZ3EPF4kjUw80Bg==}
+    engines: {node: '>=14.0'}
 
   undici@6.25.0:
     resolution: {integrity: sha512-ZgpWDC5gmNiuY9CnLVXEH8rl50xhRCuLNA97fAUnKi8RRuV4E6KG31pDTsLVUKnohJE0I3XDrTeEydAXRw47xg==}
@@ -14206,7 +14213,7 @@ snapshots:
     dependencies:
       ky: 0.33.3
       ky-universal: 0.11.0(ky@0.33.3)(web-streams-polyfill@3.3.3)
-      undici: 6.25.0
+      undici: 5.29.0
     transitivePeerDependencies:
       - web-streams-polyfill
 
@@ -14513,6 +14520,8 @@ snapshots:
       - supports-color
 
   '@eslint/js@8.57.1': {}
+
+  '@fastify/busboy@2.1.1': {}
 
   '@floating-ui/core@1.7.5':
     dependencies:
@@ -19376,7 +19385,7 @@ snapshots:
 
   diff-sequences@29.6.3: {}
 
-  diff@5.2.2: {}
+  diff@4.0.4: {}
 
   diff@8.0.4: {}
 
@@ -21919,7 +21928,7 @@ snapshots:
       minimatch: 9.0.9
       ms: 2.1.3
       picocolors: 1.1.1
-      serialize-javascript: 7.0.5
+      serialize-javascript: 6.0.2
       strip-json-comments: 3.1.1
       supports-color: 8.1.1
       workerpool: 9.3.4
@@ -23349,7 +23358,9 @@ snapshots:
     dependencies:
       type-fest: 0.20.2
 
-  serialize-javascript@7.0.5: {}
+  serialize-javascript@6.0.2:
+    dependencies:
+      randombytes: 2.1.0
 
   set-blocking@2.0.0: {}
 
@@ -24115,7 +24126,7 @@ snapshots:
       acorn-walk: 8.3.5
       arg: 4.1.3
       create-require: 1.1.1
-      diff: 5.2.2
+      diff: 4.0.4
       make-error: 1.3.6
       typescript: 5.9.3
       v8-compile-cache-lib: 3.0.1
@@ -24133,7 +24144,7 @@ snapshots:
       acorn-walk: 8.3.5
       arg: 4.1.3
       create-require: 1.1.1
-      diff: 5.2.2
+      diff: 4.0.4
       make-error: 1.3.6
       typescript: 5.9.3
       v8-compile-cache-lib: 3.0.1
@@ -24151,7 +24162,7 @@ snapshots:
       acorn-walk: 8.3.5
       arg: 4.1.3
       create-require: 1.1.1
-      diff: 5.2.2
+      diff: 4.0.4
       make-error: 1.3.6
       typescript: 5.9.3
       v8-compile-cache-lib: 3.0.1
@@ -24287,6 +24298,10 @@ snapshots:
   undici-types@6.21.0: {}
 
   undici-types@7.13.0: {}
+
+  undici@5.29.0:
+    dependencies:
+      '@fastify/busboy': 2.1.1
 
   undici@6.25.0: {}
 
