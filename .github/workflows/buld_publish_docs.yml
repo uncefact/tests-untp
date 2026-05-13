@@ -20,7 +20,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: cd documentation && pnpm install --frozen-lockfile
+        run: cd documentation && pnpm install --ignore-workspace --frozen-lockfile
 
       - name: Build website
         run: cd documentation && pnpm build
