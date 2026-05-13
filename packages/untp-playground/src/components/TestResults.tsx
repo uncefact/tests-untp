@@ -564,7 +564,7 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
   };
 
   return (
-    <div className='space-y-4 h-full overflow-y-auto'>
+    <div className='space-y-4'>
       <SectionHeader title='Your Credentials'>
         <GenerateReportDialog />
         <TooltipWrapper

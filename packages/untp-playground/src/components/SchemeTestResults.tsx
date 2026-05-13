@@ -5,7 +5,7 @@ import { StatusIcon } from '@/components/StatusIcon';
 import { Card } from '@/components/ui/card';
 import { validateContext } from '@/lib/contextValidation';
 import { detectSchemeVersion, validateSchemeSchema } from '@/lib/schemeValidation';
-import type { StoredScheme, TestStep } from '@/types';
+import type { ArtefactSource, StoredScheme, TestStep } from '@/types';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SchemeType, TestCaseStatus, TestCaseStepId } from '../../constants';
@@ -109,6 +109,20 @@ async function runPipeline(
   }
 }
 
+function SourceCaption({ source }: { source: ArtefactSource }) {
+  if (source.kind === 'file') {
+    return <p className='text-xs text-gray-500'>Source: {source.filename}</p>;
+  }
+  return (
+    <p className='text-xs text-gray-500 break-all'>
+      Source:{' '}
+      <a href={source.url} target='_blank' rel='noopener noreferrer' className='underline'>
+        {source.url}
+      </a>
+    </p>
+  );
+}
+
 function SchemeCard({
   type,
   scheme,
@@ -147,6 +161,7 @@ function SchemeCard({
       </div>
       {isExpanded && (
         <div className='mt-4 pl-6 space-y-2'>
+          {scheme?.source && <SourceCaption source={scheme.source} />}
           {steps.length > 0 ? (
             steps.map((step) => (
               <div key={step.id} className='py-2 flex items-center gap-2'>
