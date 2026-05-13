@@ -6,6 +6,12 @@ on:
       - next
       - main
 
+# peaceiris/actions-gh-pages pushes the built site to the gh-pages branch,
+# which needs contents: write. Everything else stays at the default-deny
+# baseline that CodeQL's actions/missing-workflow-permissions rule expects.
+permissions:
+  contents: write
+
 jobs:
   deploy:
     name: Deploy to GitHub Pages
