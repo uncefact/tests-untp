@@ -20,7 +20,7 @@ Before you begin installing the Tier 2 test suite CLI, ensure that you have the 
 
 3. Yarn version 1.22.17: Ensure that you have Yarn version 1.22.17 installed. You can install it by running the following command:
    ```
-   npm install -g yarn@1.22.17
+   corepack enable
    ```
 
 ### Installation Steps
@@ -34,12 +34,12 @@ Once you have met the prerequisites, follow these steps to install the dependenc
 
 2. Install the dependencies using Yarn:
    ```
-   yarn install
+   pnpm install
    ```
 
 3. Build the test suite:
    ```
-   yarn build
+   pnpm build
    ```
 
 After completing these steps, you will have all the necessary dependencies installed.

@@ -14,7 +14,7 @@ Before proceeding, we need to create the configuration file. The Tier 2 test sui
 To generate the configuration file, run the following command:
 
 ```bash
-yarn run untp config
+pnpm --filter untp-test-suite untp config
 ```
 
 This will create a base configuration file named `credentials.json` in the base directory of the Tier 2 test suite folder: `tests-untp/packages/untp-test-suite/credentials.json`.
@@ -177,7 +177,7 @@ Once your configuration file is set up, run the test suite with the following co
 
 ```bash
 cd packages/untp-test-suite
-yarn run untp test
+pnpm --filter untp-test-suite untp test
 ```
 
 ## Testing Industry-Specific Extensions of UNTP
@@ -230,8 +230,8 @@ Then reference it in your `credentials.json`:
 
 ```bash
 cd packages/untp-test-suite
-yarn build
-yarn run untp test
+pnpm build
+pnpm --filter untp-test-suite untp test
 ```
 
 #### Method 2: Remote Schema URL
@@ -253,7 +253,7 @@ Alternatively, you can reference a remotely hosted schema:
 
 ```bash
 cd packages/untp-test-suite
-yarn run untp test
+pnpm --filter untp-test-suite untp test
 ```
 
 When using a remote URL, the test suite will fetch the schema from the specified location instead of looking in the local schemas directory.
@@ -289,4 +289,4 @@ export const untpDefaultModel = [
 ];
 ```
 
-Please remove the current `credentials.json` file, run `yarn build` and run the command `yarn run untp config` to generate a new configuration file with the updated schema types.
+Please remove the current `credentials.json` file, run `pnpm build` and run the command `pnpm --filter untp-test-suite untp config` to generate a new configuration file with the updated schema types.

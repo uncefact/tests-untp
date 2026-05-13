@@ -14,13 +14,13 @@ Once you have configured the test suite, you can run it to validate your UNTP cr
 To run the test suite with the configuration defined in the [Configuration section](/docs/test-suites/semantic-interoperability/cli/configuration):
 
 ```bash
-yarn run untp test
+pnpm --filter untp-test-suite untp test
 ```
 
 To use a specific configuration file:
 
 ```bash
-yarn run untp test --config path/to/credentials.json
+pnpm --filter untp-test-suite untp test --config path/to/credentials.json
 ```
 
 ## Test Results

@@ -47,7 +47,7 @@ The walking-skeleton implementation of this ADR ships across two PRs.
 - `@changesets/cli` added as a root devDependency.
 - `.changeset/config.json` configured with `access: "public"`, `baseBranch: "next"` (the project's release line; differs from this ADR's "main" framing — `next` is the equivalent here), `updateInternalDependencies: "patch"`, and an `ignore` list covering every workspace that should not produce npm releases: `@reference-implementation/components`, `@reference-implementation/core`, `@uncefact/untp-playground`, and both e2e suites.
 - Publishable packages aligned at `0.1.0` baseline: `@uncefact/untp-utils`, `@uncefact/untp-test-suite`, `@uncefact/untp-ri-services`. The RI's workspace dependency on `@uncefact/untp-ri-services` was bumped to match.
-- `yarn changeset` exposed in root scripts for contributor discoverability.
+- `pnpm changeset` exposed in root scripts for contributor discoverability.
 
 **Stage 2 — release workflow (#611, in flight):**
 

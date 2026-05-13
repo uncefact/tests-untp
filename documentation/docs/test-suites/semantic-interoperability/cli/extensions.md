@@ -45,7 +45,7 @@ packages/
 5. Run the test suite to validate your extended credential:
 
 ```bash
-yarn run untp test
+pnpm --filter untp-test-suite untp test
 ```
 
 By following these steps, you can prototype extensions to the UNTP data model while ensuring compatibility with the core specification.

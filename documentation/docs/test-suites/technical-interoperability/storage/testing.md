@@ -38,7 +38,7 @@ To test your Storage implementation, follow these steps:
 2. **Run the Test**:
 
    - Navigate to `packages/vc-test-suite`
-   - In your terminal, run the command: `yarn test`
+   - In your terminal, run the command: `pnpm test`
 
 3. **View Test Results**:
    - Navigate to `packages/vc-test-suite/reports/index.html`
