@@ -2,7 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** accepted
-- **Update (2026-05-13):** Implementation landed across PR #611 (semver tag triggers `reference-implementation-v*` and `untp-playground-v*` on `.github/workflows/docker-{ri,playground}.yml`) and the pnpm migration (this branch). The pnpm migration rewrote both Dockerfiles internally but did not change image names or tag formats; the decisions in this ADR are unchanged.
+- **Update (2026-05-13):** `docker-ri.yml` and `docker-playground.yml` currently trigger on `push: branches: next` with path filters, not on semver tags. The semver-tag-trigger design described in PR #611 is proposed but not yet merged. The pnpm migration on this branch rewrote both Dockerfiles internally without changing image names or tag formats; the decisions in this ADR are unchanged.
 
 ## Context
 

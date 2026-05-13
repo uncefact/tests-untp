@@ -2,7 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** accepted
-- **Update (2026-05-13):** Implementation landed in PR #611. npm publishing now uses OIDC Trusted Publishers (no NPM_TOKEN), and `release.yml` runs Changesets-driven publish on `push: next`. Docker tagging is split across `docker-ri.yml` and `docker-playground.yml` keyed on semver git tags. The pnpm migration on this branch additionally converted the workflow's install step from yarn to pnpm; the correctness measures (idempotency, OIDC, single concurrency group) are unchanged.
+- **Update (2026-05-13):** `release.yml` currently triggers on `push: branches: main`. PR #611 proposes switching it to `push: next` with Changesets-driven OIDC publishing, but is not yet merged. The pnpm migration on this branch converted the workflow's install step from yarn to pnpm without touching the trigger or the correctness measures (idempotency, single concurrency group, etc.), which are unchanged.
 
 ## Context
 
