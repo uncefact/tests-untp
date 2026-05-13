@@ -12,13 +12,13 @@ A comprehensive suite of tools for implementing and demonstrating the [UN Transp
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) with Compose (latest version recommended)
-- Node.js >= 20.12.2; pnpm 9.15.4 (managed via Corepack)
+- Node.js >= 22.22.2; pnpm 9.15.4 (managed via Corepack)
 
 We recommend using [Node Version Manager (NVM)](https://github.com/nvm-sh/nvm) to manage Node.js versions:
 
 ```bash
-nvm install 20.12.2
-nvm use 20.12.2
+nvm install 22.22.2
+nvm use 22.22.2
 corepack enable
 pnpm install
 ```

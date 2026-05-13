@@ -16,7 +16,7 @@ Before you begin installing the Tier 2 test suite CLI, ensure that you have the 
    git clone https://github.com/uncefact/tests-untp.git
    ```
 
-2. Node.js version 20.12.2: Make sure you have Node.js version 20.12.2 installed on your system. You can download it from the official Node.js website: [https://nodejs.org](https://nodejs.org)
+2. Node.js version 22.22.2: Make sure you have Node.js version 22.22.2 installed on your system. You can download it from the official Node.js website: [https://nodejs.org](https://nodejs.org)
 
 3. Yarn version 1.22.17: Ensure that you have Yarn version 1.22.17 installed. You can install it by running the following command:
    ```

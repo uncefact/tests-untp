@@ -4,7 +4,7 @@ This website is built using [Docusaurus](https://docusaurus.io/), a modern stati
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/en/) version 20.12.2
+- [Node.js](https://nodejs.org/en/) version 22.22.2
 - [pnpm](https://pnpm.io/) 9.15.4 (managed via Corepack)
 
 ### Installation
