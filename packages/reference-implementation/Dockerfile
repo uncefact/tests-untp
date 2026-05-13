@@ -123,6 +123,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/prisma ./prisma
 COPY --from=runtime-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=runtime-deps --chown=nextjs:nodejs /app/packages/reference-implementation/node_modules ./packages/reference-implementation/node_modules
+# Unhoisted deps for @uncefact/untp-ri-services (notably `jose`) that yarn 1
+# resolves under the workspace rather than the root. Without this copy,
+# node module resolution from /app/packages/services/build/* falls back to
+# /app/node_modules but misses anything yarn left at the workspace level.
+COPY --from=runtime-deps --chown=nextjs:nodejs /app/packages/services/node_modules ./packages/services/node_modules
 
 # Modules required by prisma/seed.ts (relative imports from ../src/lib/...)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/prisma/constants.ts ./src/lib/prisma/constants.ts
