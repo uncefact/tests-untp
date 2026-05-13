@@ -24,15 +24,15 @@ We split PR checks into three concerns running as parallel jobs:
 
 **1. `quality` (single job, repo-wide):**
 
-- `pnpm format:check` (Prettier check mode)
-- `pnpm lint:check` (ESLint check mode)
+- `yarn format:check` (Prettier check mode)
+- `yarn lint:check` (ESLint check mode)
 - Fast, covers root config files and all package code with one Prettier/ESLint invocation each.
 
 **2. `qa` (matrix job, per-package):**
 
 - A **static matrix** lists all real workspace packages explicitly: `[services, components, reference-implementation, untp-playground, untp-test-suite, untp-test-suite-mocha, vc-test-suite, utils]`.
 - Each matrix entry runs on its own runner.
-- Each matrix job runs build and test via Turborepo with a **combined filter**: `pnpm turbo run <task> --filter=${{ matrix.package }}...[origin/next]`.
+- Each matrix job runs build and test via Turborepo with a **combined filter**: `yarn turbo run <task> --filter=${{ matrix.package }}...[origin/next]`.
 - The combined filter means each job runs full QA for its package **only if** that package or something it depends on changed since `next`. Otherwise the job exits in a couple of minutes (runner startup and dep install).
 
 **3. `e2e` (single job, conditional on reference-implementation changes):**
@@ -50,7 +50,7 @@ We chose this design because it solves the resource-pressure problem (one runner
 
 This ADR records the target design. The initial implementation lands as part of the "Bundle B" CI restructure with these scoped deviations from the broader architecture target:
 
-- **Yarn workspaces, not pnpm.** Commands use `pnpm turbo`; the planned pnpm migration will update them.
+- **Yarn workspaces, not pnpm.** Commands use `yarn turbo`; the planned pnpm migration will update them.
 - **`[origin/next]` filter base, not `[origin/main]`.** The repo uses `next` as the integration branch; the planned trunk-based migration will move this to `main`.
 - **Single root `e2e/` job instead of per-app E2E.** The planned per-package E2E architecture will split this into per-app matrix entries; today the single E2E job covers the existing root `e2e/` Cypress suite.
 - **No `changeset-check` job yet.** Changesets are not adopted in this chunk; the job is planned for the Changesets adoption work.
