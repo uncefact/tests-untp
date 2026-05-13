@@ -18,7 +18,7 @@ ENV NEXT_PUBLIC_ASSET_PREFIX=/
 # (Next.js, React, etc.) are reused across both image builds.
 COPY packages/untp-playground/package.json yarn.lock ./
 RUN --mount=type=cache,target=/yarn-cache,sharing=locked \
-    yarn install --immutable --cache-folder /yarn-cache
+    yarn install --frozen-lockfile --network-timeout 600000 --cache-folder /yarn-cache
 
 
 # Rebuild the source code only when needed
