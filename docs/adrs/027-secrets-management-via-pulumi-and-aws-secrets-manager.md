@@ -1,8 +1,7 @@
 # ADR: Secrets management via Pulumi and AWS Secrets Manager
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

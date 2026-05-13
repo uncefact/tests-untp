@@ -1,14 +1,7 @@
 # ADR: Yarn workspaces as the package manager
 
-## Status
-
-accepted
-
-Planned supersession: ADR 030 (pnpm workspaces as the package manager) will supersede this ADR once implemented. The repository currently uses Yarn 1 workspaces as recorded below; the pnpm migration is `proposed`, not yet shipped.
-
-This ADR's original recommendation was to defer pnpm migration on the grounds that "migrating package managers during a structural restructure adds unrelated risk for no functional benefit." On further consideration, the reasoning was overcautious: because the broader restructure is touching every `package.json`, CI workflow, Dockerfile, and Husky config, doing the pnpm migration alongside it is less work in aggregate than doing it later. The new direction is captured in ADR 030, but until that work ships, ADR 006's decision (yarn) remains in effect.
-
----
+- **Date:** 2026-05-12
+- **Status:** accepted
 
 ## Context
 

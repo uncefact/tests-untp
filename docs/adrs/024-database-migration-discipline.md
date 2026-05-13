@@ -1,8 +1,7 @@
 # ADR: Database migration discipline for rollback safety
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

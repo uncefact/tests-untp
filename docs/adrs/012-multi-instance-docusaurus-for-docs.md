@@ -1,8 +1,7 @@
 # ADR: Multi-instance Docusaurus for component-versioned documentation
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

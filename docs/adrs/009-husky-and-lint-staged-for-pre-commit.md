@@ -1,8 +1,7 @@
 # ADR: Husky and lint-staged for pre-commit hooks
 
-## Status
-
-accepted
+- **Date:** 2026-05-12
+- **Status:** accepted
 
 ## Context
 

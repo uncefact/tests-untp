@@ -1,8 +1,7 @@
 # ADR: Release candidate cycles via Changesets pre mode
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

@@ -1,8 +1,7 @@
 # ADR: Observability host agents and OpenTelemetry instrumentation
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

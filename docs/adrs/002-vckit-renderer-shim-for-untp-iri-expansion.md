@@ -1,8 +1,7 @@
 # ADR: Local subclass shim around vckit-renderer for UNTP IRI expansion and browser digest verification
 
-## Status
-
-proposed
+- **Date:** 2026-05-12
+- **Status:** proposed
 
 ## Context
 

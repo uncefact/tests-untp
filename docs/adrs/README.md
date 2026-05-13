@@ -8,17 +8,17 @@ This project uses ADRs to maintain a transparent, searchable history of *why* th
 
 ## Where they live
 
-All ADRs are stored in `docs/adr/` at the repository root.
+All ADRs are stored in `docs/adrs/` at the repository root.
 
 ## Naming convention
 
 ADR files follow this pattern:
 
 ```
-YYYY-MM-DD-short-slug.md
+NNN-short-slug.md
 ```
 
-For example: `2026-03-21-adopt-adapter-registry-pattern.md`
+Where `NNN` is a zero-padded sequence number assigned at creation time (next free number; do not reuse retired numbers). For example: `031-adopt-adapter-registry-pattern.md`.
 
 Use lowercase, hyphen-separated slugs. Keep them short but descriptive.
 
