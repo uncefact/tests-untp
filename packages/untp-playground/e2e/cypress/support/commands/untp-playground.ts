@@ -128,7 +128,7 @@ Cypress.Commands.add(
         expect(report).to.have.property('testSuite');
         expect(report.implementation).to.deep.equal({ name: implementationName });
         expect(report.pass).to.equal(expectedPass);
-        expect(report.results).to.be.an('array');
+        expect(report.verifiableCredentials).to.be.an('array');
         return report;
       });
     } else if (format === 'html') {
