@@ -1,5 +1,6 @@
 docker-compose.yaml
 docker-compose.e2e.yml
+docker-compose.e2e-closed.yml
 .dockerignore
 **/Dockerfile
 **/node_modules
@@ -11,6 +12,13 @@ docker-compose.e2e.yml
 **/build
 **/.next
 **/tsconfig.tsbuildinfo
+# Per-app E2E suites live at packages/<app>/e2e/. None of their
+# contents (Cypress specs, fixtures, support helpers, .env.e2e) belong
+# in any production image, and including them invalidates the builder
+# stage's COPY layer on every spec change. Exclude all e2e/ dirs;
+# the trailing slash keeps the rule directory-only so a hypothetical
+# file named `e2e` in source would not be filtered.
+**/e2e/
 .git
 .gitignore
 .github
@@ -31,16 +39,11 @@ logs
 aws
 .DS_Store
 .storybook
-e2e/package.json
-e2e/yarn.lock
-e2e/node_modules
 minio_data
 documentation
 local.env
 
-packages/untp-test-suite
 packages/untp-test-suite-mocha
-packages/vc-test-suite
 
 packages/reference-implementation/src/constants/app-config.json
 packages/components/src/constants/app-config.json
