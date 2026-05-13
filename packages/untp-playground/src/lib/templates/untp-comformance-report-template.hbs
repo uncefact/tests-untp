@@ -137,6 +137,14 @@
                     {{core.version}}
                   </h3>
                 {{/if}}
+                {{#if source}}
+                  {{#if source.url}}
+                    <p class="validation-subtitle">Source:
+                      <a href="{{source.url}}">{{source.url}}</a></p>
+                  {{else}}
+                    <p class="validation-subtitle">Source: {{source.filename}}</p>
+                  {{/if}}
+                {{/if}}
               </div>
             </h4>
 
@@ -223,6 +231,63 @@
           </div>
         </div>
       {{/each}}
+
+      {{#if credentialSubject.schemeResults}}
+        <h2 class="mt-5 mb-3">Conformity Schemes</h2>
+        {{#each credentialSubject.schemeResults}}
+          <div class="card mb-4">
+            <div class="card-body border-top">
+              <h4 class="validation-summary mb-3">
+                <div>
+                  <h3 class="validation-title">
+                    {{#if name}}{{name}}{{else}}{{type}}{{/if}}
+                    -
+                    {{version}}
+                  </h3>
+                  {{#if name}}
+                    <p class="validation-subtitle">{{type}}</p>
+                  {{/if}}
+                  {{#if id}}
+                    <p class="validation-subtitle">{{id}}</p>
+                  {{/if}}
+                  {{#if source}}
+                    {{#if source.url}}
+                      <p class="validation-subtitle">Source:
+                        <a href="{{source.url}}">{{source.url}}</a></p>
+                    {{else}}
+                      <p class="validation-subtitle">Source: {{source.filename}}</p>
+                    {{/if}}
+                  {{/if}}
+                </div>
+              </h4>
+
+              {{#each steps}}
+                <div class="test-step p-3 mb-2 rounded {{status}}">
+                  <div class="grid-container">
+                    <div>
+                      <h5>{{name}}</h5>
+                      {{#if details}}
+                        {{#if details.errors}}
+                          <ul class="mt-2">
+                            {{#each details.errors}}
+                              <li class="text-danger small">
+                                <span class="error-icon">❌ {{message}}</span>
+                              </li>
+                            {{/each}}
+                          </ul>
+                        {{/if}}
+                      {{/if}}
+                    </div>
+                    <span
+                      class="badge status-badge bg-{{status}}"
+                    >{{status}}</span>
+                  </div>
+                </div>
+              {{/each}}
+            </div>
+          </div>
+        {{/each}}
+      {{/if}}
     </div>
   </body>
 

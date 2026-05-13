@@ -108,14 +108,19 @@ export default function Home() {
       <main className='container mx-auto p-8 max-w-7xl flex-1'>
         <div className='flex flex-col md:flex-row gap-8'>
           <div className='md:w-2/3 space-y-10'>
-            <TestReportProvider testResults={testResults} credentials={credentials}>
-              <TestResults credentials={credentials} testResults={testResults} setTestResults={setTestResults} />
-            </TestReportProvider>
-            <SchemeTestResults
+            <TestReportProvider
+              testResults={testResults}
+              credentials={credentials}
               schemes={schemes}
-              testResults={schemeTestResults}
-              setTestResults={setSchemeTestResults}
-            />
+              schemeTestResults={schemeTestResults}
+            >
+              <TestResults credentials={credentials} testResults={testResults} setTestResults={setTestResults} />
+              <SchemeTestResults
+                schemes={schemes}
+                testResults={schemeTestResults}
+                setTestResults={setSchemeTestResults}
+              />
+            </TestReportProvider>
           </div>
           <div className='md:w-1/3 flex flex-col space-y-8'>
             <div>

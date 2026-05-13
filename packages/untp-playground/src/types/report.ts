@@ -1,6 +1,6 @@
-import { TestCaseStatus } from '../../constants';
+import { SchemeType, TestCaseStatus } from '../../constants';
 import { EXTENSION_VERSIONS } from '../lib/schemaValidation';
-import { Credential } from './credential';
+import { ArtefactSource, Credential } from './credential';
 import { TestStep } from './test';
 import { PermittedCredentialType } from './untp';
 
@@ -16,6 +16,7 @@ export interface TestReport {
   };
   pass: boolean;
   results: TestReportResult[];
+  schemeResults?: TestReportSchemeResult[];
 }
 
 export type TestReportStatus = Extract<
@@ -30,6 +31,7 @@ export interface TestReportStep extends Omit<TestStep, 'status'> {
 export interface TestReportResult {
   status: TestReportStatus;
   credential: Credential;
+  source?: ArtefactSource;
   core: {
     type: PermittedCredentialType;
     version: string;
@@ -40,6 +42,17 @@ export interface TestReportResult {
     version: string;
     steps: TestReportStep[];
   };
+}
+
+export interface TestReportSchemeResult {
+  status: TestReportStatus;
+  type: SchemeType;
+  version: string;
+  name?: string;
+  id?: string;
+  source?: ArtefactSource;
+  scheme: Record<string, any>;
+  steps: TestReportStep[];
 }
 
 export enum DownloadReportFormat {
