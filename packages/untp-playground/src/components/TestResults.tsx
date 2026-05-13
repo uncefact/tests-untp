@@ -11,7 +11,7 @@ import { detectExtension, validateCredentialSchema, validateExtension } from '@/
 import { detectVcdmVersion } from '@/lib/utils';
 import { validateVcdmRules } from '@/lib/vcdm-validation';
 import { verifyCredential } from '@/lib/verificationService';
-import { ArtefactSource, Credential, PermittedCredentialType, TestStep } from '@/types';
+import { ArtefactSource, Credential, PermittedCredentialType, StoredCredential, TestStep } from '@/types';
 import { SourceCaption } from '@/components/SourceCaption';
 import confetti from 'canvas-confetti';
 import { AlertCircle, Check, ChevronDown, ChevronRight, Loader2, X } from 'lucide-react';
@@ -177,7 +177,7 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
 };
 
 interface TestResultsProps {
-  credentials: Partial<Record<PermittedCredentialType, { original: any; decoded: Credential }>>;
+  credentials: Partial<Record<PermittedCredentialType, StoredCredential>>;
   testResults: Partial<Record<PermittedCredentialType, TestStep[]>>;
   setTestResults: React.Dispatch<React.SetStateAction<Partial<Record<PermittedCredentialType, TestStep[]>>>>;
 }

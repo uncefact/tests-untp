@@ -155,12 +155,12 @@ interface DisplayableError {
 function stepErrors(step: TestStep): DisplayableError[] {
   const errors = step.details?.errors;
   if (!Array.isArray(errors)) return [];
-  return errors
-    .map((e) => {
-      if (typeof e?.message !== 'string' || e.message.length === 0) return null;
-      return { message: e.message, supportable: e.supportable === true };
-    })
-    .filter((e): e is DisplayableError => e !== null);
+  const out: DisplayableError[] = [];
+  for (const e of errors) {
+    if (typeof e?.message !== 'string' || e.message.length === 0) continue;
+    out.push({ message: e.message, supportable: e.supportable === true });
+  }
+  return out;
 }
 
 function schemaFetchError(err: unknown): DisplayableError {
