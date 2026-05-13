@@ -9,6 +9,7 @@ import { Loader2, Upload } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
+import { API_BASE_PATH } from '../../constants';
 
 const MAX_FETCH_BYTES = 10 * 1_048_576;
 
@@ -99,7 +100,7 @@ export function ArtefactUploader({
     setFetchError(null);
     setIsFetching(true);
     try {
-      const response = await fetch('/api/fetch', {
+      const response = await fetch(`${API_BASE_PATH}/api/fetch`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ url: trimmed }),

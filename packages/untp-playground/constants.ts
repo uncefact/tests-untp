@@ -108,3 +108,9 @@ export const allowedContextValue = {
 export const allowedExtensionValue = {
   '@context': [...commonContextUrls, 'https://{extension.domain}/{type}/{version}/'],
 };
+
+// Next.js inlines `NEXT_PUBLIC_*` at build time, so this constant captures
+// the deploy-time base path (e.g. `/test-untp-playground`) once and lets
+// every client-side `/api/*` caller prefix it consistently. The fallback
+// empty string keeps local dev (where the var is unset) working.
+export const API_BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';

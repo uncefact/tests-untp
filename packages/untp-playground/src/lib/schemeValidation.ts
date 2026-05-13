@@ -1,6 +1,11 @@
 import addFormats from 'ajv-formats';
 import Ajv2020 from 'ajv/dist/2020';
-import { UNTP_CONTEXT_DOMAINS, UNTP_CORE_SCHEMA_FILENAMES, UNTP_SHORT_CREDENTIAL_TYPES } from '../../constants';
+import {
+  API_BASE_PATH,
+  UNTP_CONTEXT_DOMAINS,
+  UNTP_CORE_SCHEMA_FILENAMES,
+  UNTP_SHORT_CREDENTIAL_TYPES,
+} from '../../constants';
 import { schemaCache } from './schemaValidation';
 
 const ajv = new Ajv2020({
@@ -37,7 +42,7 @@ async function fetchSchema(schemaUrl: string): Promise<any> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), SCHEMA_FETCH_TIMEOUT_MS);
     try {
-      const response = await fetch(`/api/schema?url=${encodeURIComponent(schemaUrl)}`, {
+      const response = await fetch(`${API_BASE_PATH}/api/schema?url=${encodeURIComponent(schemaUrl)}`, {
         signal: controller.signal,
       });
       if (response.status === 404) {
