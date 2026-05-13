@@ -239,16 +239,11 @@
             <div class="card-body border-top">
               <h4 class="validation-summary mb-3">
                 <div>
-                  <h3 class="validation-title">
-                    {{#if name}}{{name}}{{else}}{{type}}{{/if}}
-                    -
-                    {{version}}
-                  </h3>
                   {{#if name}}
-                    <p class="validation-subtitle">{{type}}</p>
-                  {{/if}}
-                  {{#if id}}
-                    <p class="validation-subtitle">{{id}}</p>
+                    <h3 class="validation-title">{{name}}</h3>
+                    <p class="validation-subtitle">{{type}} (v{{version}})</p>
+                  {{else}}
+                    <h3 class="validation-title">{{type}} - v{{version}}</h3>
                   {{/if}}
                   {{#if source}}
                     {{#if source.url}}
