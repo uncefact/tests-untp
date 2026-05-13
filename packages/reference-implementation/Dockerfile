@@ -11,7 +11,13 @@ COPY package.json yarn.lock ./
 COPY packages/reference-implementation/package.json ./packages/reference-implementation/
 COPY packages/components/package.json ./packages/components/
 COPY packages/services/package.json ./packages/services/
-RUN yarn install --frozen-lockfile --network-timeout 600000
+# BuildKit cache mount persists yarn's tarball cache across CI runs (and
+# across the deps + builder stages within the same run) via the GHA cache
+# backend configured on the build job. When the layer above is invalidated
+# (e.g. a single package.json edit), the install step still skips re-
+# downloads and just relinks from the cache.
+RUN --mount=type=cache,target=/yarn-cache,sharing=locked \
+    yarn install --frozen-lockfile --network-timeout 600000 --cache-folder /yarn-cache
 
 # ---- Builder ----
 FROM base AS builder
@@ -26,8 +32,12 @@ COPY package.json yarn.lock ./
 COPY packages/reference-implementation/. ./packages/reference-implementation/
 COPY packages/components/. ./packages/components/
 COPY packages/services/. ./packages/services/
-# Recreate workspace symlinks after copying source files
-RUN yarn install --frozen-lockfile --network-timeout 600000
+# Recreate workspace symlinks after copying source files. Same yarn-cache
+# mount as the deps stage so any tarballs we couldn't link from the
+# already-copied node_modules are pulled from the local cache rather than
+# the network.
+RUN --mount=type=cache,target=/yarn-cache,sharing=locked \
+    yarn install --frozen-lockfile --network-timeout 600000 --cache-folder /yarn-cache
 
 # Build workspace dependencies in order: services -> components -> reference-implementation
 WORKDIR /app/packages/services

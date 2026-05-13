@@ -11,9 +11,14 @@ WORKDIR /app
 ENV NEXT_PUBLIC_BASE_PATH=/
 ENV NEXT_PUBLIC_ASSET_PREFIX=/
 
-# Install dependencies based on the preferred package manager
+# Install dependencies based on the preferred package manager.
+# BuildKit cache mount persists yarn's tarball cache across CI runs via
+# the GHA cache backend configured on the build job. Sharing the
+# `target=/yarn-cache` path with the RI Dockerfile means common deps
+# (Next.js, React, etc.) are reused across both image builds.
 COPY packages/untp-playground/package.json yarn.lock ./
-RUN yarn install --immutable
+RUN --mount=type=cache,target=/yarn-cache,sharing=locked \
+    yarn install --immutable --cache-folder /yarn-cache
 
 
 # Rebuild the source code only when needed
