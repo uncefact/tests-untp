@@ -53,9 +53,9 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/packages/untp-playground/public ./public
+COPY --from=builder /app/packages/untp-playground/public ./packages/untp-playground/public
 COPY --from=builder --chown=nextjs:nodejs /app/packages/untp-playground/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/packages/untp-playground/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/packages/untp-playground/.next/static ./packages/untp-playground/.next/static
 
 USER nextjs
 
