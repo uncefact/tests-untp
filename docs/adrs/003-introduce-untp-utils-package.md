@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** accepted
+- **Update (2026-05-13):** The `@uncefact/untp-*` scope established here applies to **publishable libraries only**. With the pnpm migration (ADR 030), private apps (`untp-reference-implementation`, `untp-playground`) were renamed to unscoped names since they are deployed Docker images, not npm packages, and the scope was misleading. Publishable libraries (`@uncefact/untp-utils`, `@uncefact/untp-ri-services`) keep the scope.
 
 ## Context
 

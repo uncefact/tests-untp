@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** proposed
+- **Update (2026-05-13):** Yarn-based command examples in the body (e.g. `pnpm changeset status --since=origin/main`) are post-migration accurate as written. The current workflow shape on `next` is interim: `build_test.yml` covers PR checks; `release.yml` covers Changesets-driven npm publish; `docker-{ri,playground}.yml` cover the Docker tag-triggered builds. The remaining deployment-tier and observability workflows described in this ADR (dev/staging/prod, Stage B/C/D E2E, rollback) are still future work tracked in #553-series epics.
 
 ## Context
 

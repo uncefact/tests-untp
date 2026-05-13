@@ -1,7 +1,8 @@
 # ADR: Release workflow correctness measures
 
 - **Date:** 2026-05-12
-- **Status:** proposed
+- **Status:** accepted
+- **Update (2026-05-13):** Implementation landed in PR #611. npm publishing now uses OIDC Trusted Publishers (no NPM_TOKEN), and `release.yml` runs Changesets-driven publish on `push: next`. Docker tagging is split across `docker-ri.yml` and `docker-playground.yml` keyed on semver git tags. The pnpm migration on this branch additionally converted the workflow's install step from yarn to pnpm; the correctness measures (idempotency, OIDC, single concurrency group) are unchanged.
 
 ## Context
 

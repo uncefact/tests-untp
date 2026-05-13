@@ -1,7 +1,8 @@
 # ADR: Docker image tagging strategy
 
 - **Date:** 2026-05-12
-- **Status:** proposed
+- **Status:** accepted
+- **Update (2026-05-13):** Implementation landed across PR #611 (semver tag triggers `reference-implementation-v*` and `untp-playground-v*` on `.github/workflows/docker-{ri,playground}.yml`) and the pnpm migration (this branch). The pnpm migration rewrote both Dockerfiles internally but did not change image names or tag formats; the decisions in this ADR are unchanged.
 
 ## Context
 
