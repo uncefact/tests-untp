@@ -23,7 +23,7 @@ This is a monorepo for the UNTP (UN Transparency Protocol) test suite and refere
 
 ## Required Environment
 
-- **Node**: >= 20.12.2
+- **Node**: >= 22.22.2
 - **pnpm**: 9.15.4 (via Corepack)
 - **Docker**: Latest with Compose
 
@@ -32,7 +32,7 @@ This is a monorepo for the UNTP (UN Transparency Protocol) test suite and refere
 ### Initial Setup
 ```bash
 # Install Node via NVM; pnpm via Corepack
-nvm install 20.12.2 && nvm use 20.12.2
+nvm install 22.22.2 && nvm use 22.22.2
 corepack enable
 
 # Environment file

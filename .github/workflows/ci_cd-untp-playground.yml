@@ -42,10 +42,10 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Setup Node LTS ✨
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: lts/*
+          node-version-file: '.nvmrc'
           cache: pnpm
   
       - name: Installing dependencies 📦️
@@ -98,10 +98,10 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Setup Node LTS ✨
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: lts/*
+          node-version-file: '.nvmrc'
           cache: pnpm
   
       - name: Installing dependencies 📦️
