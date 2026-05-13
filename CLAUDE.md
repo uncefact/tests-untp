@@ -177,6 +177,18 @@ External integrations use interfaces + implementations:
 - Ensure 100% coverage for services package
 - E2E tests must pass before merging
 
+## Keep ADRs in sync with the code
+
+Before opening a PR, audit whether any change in the PR touches behaviour, conventions, or topology already recorded in an ADR under `docs/adrs/`. The `creating-adrs` skill gate enforces *evaluation* (was an architectural decision made?); this rule covers *synchronisation* (does the existing ADR text still match reality?).
+
+Three outcomes, three responses:
+
+- **Implementation changed, decision unchanged** (e.g. command examples in an ADR body now use `pnpm` instead of `yarn` after a package-manager migration, or workflow filenames moved): add a dated `Update (YYYY-MM-DD)` line to the ADR header (under `Status:`) pointing at the new state and any relevant PRs / superseding ADRs. **Do not rewrite the body.** The body is historical record — what was true at the time of the decision. Editing it silently rewrites history.
+- **Decision changed**: open or update an ADR via the `creating-adrs` skill. If the change supersedes a prior decision, mark the prior ADR's status `superseded` with a forward link, and reference the prior ADR from the new one's `References` section.
+- **Decision retired entirely**: mark `superseded` or `deprecated` in the status with a one-line explanation.
+
+ADRs that go stale silently are worse than no ADRs at all — they lock in misleading history and re-litigate settled decisions. When in doubt about which outcome applies, ask before editing the body.
+
 ## Critical Dependencies
 
 ### Docker Services (must be running)
