@@ -2,66 +2,65 @@ import React, { act } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { DownloadCredential } from '@/components/DownloadCredential';
 
-// Mock the fetch function
 global.fetch = jest.fn();
-// Mock URL.createObjectURL and URL.revokeObjectURL
 global.URL.createObjectURL = jest.fn();
 global.URL.revokeObjectURL = jest.fn();
 
 describe('DownloadCredential', () => {
-  // Reset all mocks before each test
   beforeEach(() => {
     jest.clearAllMocks();
-    // Mock successful response
     (global.fetch as jest.Mock).mockResolvedValue({
       json: () => Promise.resolve({ test: 'data' }),
     });
     (global.URL.createObjectURL as jest.Mock).mockReturnValue('blob:test-url');
   });
 
-  it('renders download button with correct text and icon', () => {
+  it('renders one button per sample artefact', () => {
     render(<DownloadCredential />);
 
-    const button = screen.getByRole('button', { name: /download test credential/i });
-    expect(button).toBeInTheDocument();
-    expect(button.querySelector('svg')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /digital product passport/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /conformity scheme/i })).toBeInTheDocument();
   });
 
-  it('handles download click successfully', async () => {
+  it('fetches the DPP sample on click', async () => {
     render(<DownloadCredential />);
 
     await act(async () => {
-      const button = screen.getByRole('button');
-      await fireEvent.click(button);
+      fireEvent.click(screen.getByRole('button', { name: /digital product passport/i }));
     });
 
     await waitFor(() => {
-      // Check if fetch was called with correct path
-      expect(fetch).toHaveBeenCalledWith('/credentials/dpp.json');
-
-      // Verify Blob creation
+      expect(fetch).toHaveBeenCalledWith('/samples/sample-digital-product-passport-v0.7.0.json');
       expect(window.URL.createObjectURL).toHaveBeenCalled();
       const blobCall = (window.URL.createObjectURL as jest.Mock).mock.calls[0][0];
       expect(blobCall instanceof Blob).toBeTruthy();
       expect(blobCall.type).toBe('application/json');
-
-      // Verify cleanup
       expect(window.URL.revokeObjectURL).toHaveBeenCalledWith('blob:test-url');
     });
   });
 
-  it('handles download error gracefully', async () => {
-    // Mock console.log to verify error logging
-    const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+  it('fetches the ConformityScheme sample on click', async () => {
+    render(<DownloadCredential />);
 
-    // Mock fetch to reject
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /conformity scheme/i }));
+    });
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith('/samples/sample-conformity-scheme-v0.7.0.json');
+    });
+  });
+
+  it('logs the failed sample name on error', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
     (global.fetch as jest.Mock).mockRejectedValue(new Error('Download failed'));
 
     render(<DownloadCredential />);
+    await fireEvent.click(screen.getByRole('button', { name: /digital product passport/i }));
 
-    const button = screen.getByRole('button');
-    await fireEvent.click(button);
-
-    expect(consoleSpy).toHaveBeenCalledWith('Error downloading credential:', expect.any(Error));
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Error downloading sample-digital-product-passport-v0.7.0.json:',
+      expect.any(Error),
+    );
   });
 });
