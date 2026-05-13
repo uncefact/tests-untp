@@ -9,7 +9,7 @@
   },
   "devDependencies": {
     "@types/node": "^20",
-    "cypress": "^14.0.2",
+    "cypress": "^13.17.0",
     "typescript": "^5"
   }
 }
