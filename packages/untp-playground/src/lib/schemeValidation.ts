@@ -11,7 +11,20 @@ const ajv = new Ajv2020({
 });
 addFormats(ajv);
 
+const SCHEMA_FETCH_TIMEOUT_MS = 15_000;
+
 const inflightFetches = new Map<string, Promise<any>>();
+
+export class SchemaFetchError extends Error {
+  constructor(
+    public readonly schemaUrl: string,
+    public readonly reason: 'timeout' | 'not-found' | 'network' | 'parse',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'SchemaFetchError';
+  }
+}
 
 async function fetchSchema(schemaUrl: string): Promise<any> {
   if (schemaCache.has(schemaUrl)) {
@@ -21,13 +34,43 @@ async function fetchSchema(schemaUrl: string): Promise<any> {
   if (inflight) return inflight;
 
   const fetchPromise = (async () => {
-    const response = await fetch(`/api/schema?url=${encodeURIComponent(schemaUrl)}`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch schema at ${schemaUrl} (${response.status})`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), SCHEMA_FETCH_TIMEOUT_MS);
+    try {
+      const response = await fetch(`/api/schema?url=${encodeURIComponent(schemaUrl)}`, {
+        signal: controller.signal,
+      });
+      if (response.status === 404) {
+        throw new SchemaFetchError(schemaUrl, 'not-found', `No schema published at ${schemaUrl}.`);
+      }
+      if (!response.ok) {
+        throw new SchemaFetchError(
+          schemaUrl,
+          'network',
+          `Schema service returned ${response.status} for ${schemaUrl}.`,
+        );
+      }
+      let schema: unknown;
+      try {
+        schema = await response.json();
+      } catch {
+        throw new SchemaFetchError(schemaUrl, 'parse', `Schema at ${schemaUrl} is not valid JSON.`);
+      }
+      schemaCache.set(schemaUrl, schema);
+      return schema;
+    } catch (err) {
+      if (err instanceof SchemaFetchError) throw err;
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new SchemaFetchError(
+          schemaUrl,
+          'timeout',
+          `Schema fetch timed out after ${SCHEMA_FETCH_TIMEOUT_MS / 1000}s.`,
+        );
+      }
+      throw new SchemaFetchError(schemaUrl, 'network', err instanceof Error ? err.message : 'Unknown network error.');
+    } finally {
+      clearTimeout(timeout);
     }
-    const schema = await response.json();
-    schemaCache.set(schemaUrl, schema);
-    return schema;
   })();
 
   inflightFetches.set(schemaUrl, fetchPromise);

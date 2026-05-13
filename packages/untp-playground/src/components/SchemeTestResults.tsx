@@ -4,7 +4,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { StatusIcon } from '@/components/StatusIcon';
 import { Card } from '@/components/ui/card';
 import { validateContext } from '@/lib/contextValidation';
-import { detectSchemeVersion, validateSchemeSchema } from '@/lib/schemeValidation';
+import { detectSchemeVersion, SchemaFetchError, validateSchemeSchema } from '@/lib/schemeValidation';
 import type { ArtefactSource, StoredScheme, TestStep } from '@/types';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -73,9 +73,20 @@ async function runPipeline(
   setStep(TestCaseStepId.SCHEME_VERSION_DETECTION, { status: TestCaseStatus.IN_PROGRESS });
   const version = detectSchemeVersion(stored.decoded);
   if (!version) {
-    setStep(TestCaseStepId.SCHEME_VERSION_DETECTION, { status: TestCaseStatus.FAILURE });
-    setStep(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, { status: TestCaseStatus.FAILURE });
-    setStep(TestCaseStepId.CONTEXT_VALIDATION, { status: TestCaseStatus.FAILURE });
+    const message =
+      'Could not detect a UNTP version from the @context. Add a UNTP context URI (e.g. https://vocabulary.uncefact.org/untp/0.7.0/context/).';
+    setStep(TestCaseStepId.SCHEME_VERSION_DETECTION, {
+      status: TestCaseStatus.FAILURE,
+      details: { errors: [{ message }] },
+    });
+    setStep(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, {
+      status: TestCaseStatus.FAILURE,
+      details: { errors: [{ message: 'Skipped: version detection failed.' }] },
+    });
+    setStep(TestCaseStepId.CONTEXT_VALIDATION, {
+      status: TestCaseStatus.FAILURE,
+      details: { errors: [{ message: 'Skipped: version detection failed.' }] },
+    });
     return;
   }
   setStep(TestCaseStepId.SCHEME_VERSION_DETECTION, { status: TestCaseStatus.SUCCESS });
@@ -90,7 +101,7 @@ async function runPipeline(
   } catch (err) {
     setStep(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, {
       status: TestCaseStatus.FAILURE,
-      details: { errors: [{ message: err instanceof Error ? err.message : 'Failed to fetch scheme schema' }] },
+      details: { errors: [schemaFetchError(err)] },
     });
   }
 
@@ -104,9 +115,65 @@ async function runPipeline(
   } catch (err) {
     setStep(TestCaseStepId.CONTEXT_VALIDATION, {
       status: TestCaseStatus.FAILURE,
-      details: { errors: [{ message: err instanceof Error ? err.message : 'Failed to validate JSON-LD context' }] },
+      details: {
+        errors: [
+          {
+            message: err instanceof Error ? err.message : 'Failed to validate JSON-LD context.',
+            supportable: true,
+          },
+        ],
+      },
     });
   }
+}
+
+const SUPPORT_URL = process.env.NEXT_PUBLIC_SUPPORT_URL || 'https://github.com/uncefact/tests-untp/issues';
+
+interface DisplayableError {
+  message: string;
+  supportable?: boolean;
+}
+
+function stepErrors(step: TestStep): DisplayableError[] {
+  const errors = step.details?.errors;
+  if (!Array.isArray(errors)) return [];
+  return errors
+    .map((e) => {
+      if (typeof e?.message !== 'string' || e.message.length === 0) return null;
+      return { message: e.message, supportable: e.supportable === true };
+    })
+    .filter((e): e is DisplayableError => e !== null);
+}
+
+function schemaFetchError(err: unknown): DisplayableError {
+  if (err instanceof SchemaFetchError) {
+    switch (err.reason) {
+      case 'timeout':
+        return {
+          message: 'The schema service did not respond in time. Please try again.',
+          supportable: true,
+        };
+      case 'not-found':
+        return {
+          message: `No schema is published at ${err.schemaUrl}. Check that the scheme's @context references a UNTP version with a published schema.`,
+        };
+      case 'parse':
+        return {
+          message: 'The schema service returned a response that was not valid JSON. Please try again.',
+          supportable: true,
+        };
+      case 'network':
+      default:
+        return {
+          message: 'We could not reach the schema service. Please try again.',
+          supportable: true,
+        };
+    }
+  }
+  return {
+    message: err instanceof Error ? err.message : 'Schema validation failed for an unknown reason.',
+    supportable: true,
+  };
 }
 
 function schemeName(scheme: StoredScheme | undefined): string | undefined {
@@ -185,9 +252,30 @@ function SchemeCard({
           {scheme?.source && <SourceCaption source={scheme.source} />}
           {steps.length > 0 ? (
             steps.map((step) => (
-              <div key={step.id} className='py-2 flex items-center gap-2'>
-                <StatusIcon status={step.status} testId={step.id} />
-                <span>{step.name}</span>
+              <div key={step.id} className='py-2'>
+                <div className='flex items-center gap-2'>
+                  <StatusIcon status={step.status} testId={step.id} />
+                  <span>{step.name}</span>
+                </div>
+                {step.status === TestCaseStatus.FAILURE && stepErrors(step).length > 0 && (
+                  <ul className='mt-1 pl-6 list-disc text-sm text-red-600 space-y-1'>
+                    {stepErrors(step).map((error, idx) => (
+                      <li key={idx}>
+                        {error.message}
+                        {error.supportable && (
+                          <>
+                            {' '}
+                            If this keeps happening,{' '}
+                            <a href={SUPPORT_URL} target='_blank' rel='noopener noreferrer' className='underline'>
+                              report an issue
+                            </a>
+                            .
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ))
           ) : (
