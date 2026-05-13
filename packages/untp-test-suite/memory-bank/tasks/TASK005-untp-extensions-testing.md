@@ -168,7 +168,7 @@ From the project brief, the library should support extension testing by allowing
 ### Programmatic API Example
 
 ```javascript
-const { configureExtensions } = require('untp-test-suite-mocha');
+const { configureExtensions } = require('@uncefact/untp-test-suite');
 
 configureExtensions({
   customTypes: [

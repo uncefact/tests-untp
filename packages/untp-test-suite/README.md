@@ -66,7 +66,7 @@ Follow the [Prerequisites section](../../README.md#prerequisites) in the root RE
 
 2. **Build the package**:
    ```bash
-   cd packages/untp-test-suite-mocha
+   cd packages/untp-test-suite
    yarn build
    ```
 
@@ -213,7 +213,7 @@ the same tests with the same test runner, in a browser environment.
 1. Build the browser bundle:
 
 ```bash
-cd packages/untp-test-suite-mocha
+cd packages/untp-test-suite
 yarn build:browser
 yarn browser-test
 ```
@@ -296,7 +296,7 @@ See the [example browser-test](browser-test) for more info.
 ### Node.js
 
 ```typescript
-import { UNTPTestRunner, setCredentialData, trustedDIDs } from 'untp-test-suite-mocha';
+import { UNTPTestRunner, setCredentialData, trustedDIDs } from '@uncefact/untp-test-suite';
 import * as fs from 'fs';
 
 // Set up credential data (replace 'credential.json' with your credential file path)

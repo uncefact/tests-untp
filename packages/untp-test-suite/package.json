@@ -1,5 +1,5 @@
 {
-  "name": "untp-test-suite-mocha",
+  "name": "@uncefact/untp-test-suite",
   "version": "0.1.0",
   "description": "A reusable Mocha-based testing library for UNTP (United Nations Transparency Protocol) credentials",
   "main": "dist/index.js",
@@ -9,7 +9,8 @@
   },
   "files": [
     "dist/**/*",
-    "example-credentials/**/*"
+    "example-credentials/**/*",
+    "untp-tests/**/*"
   ],
   "scripts": {
     "build": "node scripts/generate-test-list.js && node scripts/generate-inference-bundle.js && tsc",

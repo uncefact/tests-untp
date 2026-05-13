@@ -43,7 +43,7 @@ minio_data
 documentation
 local.env
 
-packages/untp-test-suite-mocha
+packages/untp-test-suite
 
 packages/reference-implementation/src/constants/app-config.json
 packages/components/src/constants/app-config.json
