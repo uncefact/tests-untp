@@ -557,7 +557,7 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
 
   return (
     <div className='space-y-4'>
-      <SectionHeader title='Your Credentials'>
+      <SectionHeader title='Verifiable Credentials'>
         <GenerateReportDialog />
         <TooltipWrapper
           content={

@@ -136,7 +136,7 @@ export default function Home() {
             )}
 
             <div>
-              <h2 className='text-xl font-semibold mb-6'>Download Samples</h2>
+              <h2 className='text-xl font-semibold mb-6'>Download test files</h2>
               <DownloadCredential />
             </div>
           </div>

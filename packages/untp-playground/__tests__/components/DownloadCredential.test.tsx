@@ -18,7 +18,7 @@ describe('DownloadCredential', () => {
   it('renders one button per sample artefact', () => {
     render(<DownloadCredential />);
 
-    expect(screen.getByRole('button', { name: /digital product passport/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /test credential \(dpp\)/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /conformity scheme/i })).toBeInTheDocument();
   });
 
@@ -26,7 +26,7 @@ describe('DownloadCredential', () => {
     render(<DownloadCredential />);
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /digital product passport/i }));
+      fireEvent.click(screen.getByRole('button', { name: /test credential \(dpp\)/i }));
     });
 
     await waitFor(() => {
@@ -56,7 +56,7 @@ describe('DownloadCredential', () => {
     (global.fetch as jest.Mock).mockRejectedValue(new Error('Download failed'));
 
     render(<DownloadCredential />);
-    await fireEvent.click(screen.getByRole('button', { name: /digital product passport/i }));
+    await fireEvent.click(screen.getByRole('button', { name: /test credential \(dpp\)/i }));
 
     expect(consoleSpy).toHaveBeenCalledWith(
       'Error downloading sample-digital-product-passport-v0.7.0.json:',

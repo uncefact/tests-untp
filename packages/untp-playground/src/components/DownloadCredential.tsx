@@ -12,12 +12,12 @@ interface SampleArtefact {
 
 const SAMPLES: SampleArtefact[] = [
   {
-    label: 'Download Sample Digital Product Passport',
+    label: 'Test Credential (DPP)',
     path: '/samples/sample-digital-product-passport-v0.7.0.json',
     fileName: 'sample-digital-product-passport-v0.7.0.json',
   },
   {
-    label: 'Download Sample Conformity Scheme',
+    label: 'Test Conformity Scheme',
     path: '/samples/sample-conformity-scheme-v0.7.0.json',
     fileName: 'sample-conformity-scheme-v0.7.0.json',
   },
@@ -39,7 +39,7 @@ export function DownloadCredential() {
   return (
     <div className='flex flex-col gap-2'>
       {SAMPLES.map((sample) => (
-        <Button key={sample.path} onClick={() => handleDownload(sample)} variant='outline'>
+        <Button key={sample.path} onClick={() => handleDownload(sample)} variant='outline' className='w-full'>
           <Download className='mr-2 h-4 w-4' />
           {sample.label}
         </Button>
