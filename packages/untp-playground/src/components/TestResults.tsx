@@ -48,7 +48,6 @@ interface TestGroupProps {
   credentialType: string;
   version: string;
   steps: TestStep[];
-  proofType: VCProofType;
   vcdmVersion: VCDMVersion | undefined;
   hasCredential: boolean;
   extensionCredentialType?: string;
@@ -71,7 +70,6 @@ const TestGroup = ({
   steps,
   isExpanded,
   onToggle,
-  proofType,
   hasCredential,
   vcdmVersion,
 }: TestGroupProps) => {
@@ -107,16 +105,6 @@ const TestGroup = ({
           )}
         </div>
         <div className='flex items-center gap-4'>
-          {hasCredential && proofType !== VCProofType.UNKNOWN && (
-            <span
-              className={`text-xs px-2 py-1 rounded-full ${
-                proofType === VCProofType.ENVELOPING ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-              }`}
-              data-testid={`${credentialType}-proof-type`}
-            >
-              {proofType} proof
-            </span>
-          )}
           {hasCredential && vcdmVersion && (
             <span
               className={`text-xs px-2 py-1 rounded-full ${
@@ -588,11 +576,6 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
           : VCDMVersion.UNKNOWN;
         const extensionCredentialType = extension?.extension?.type;
         const extensionVersion = extension?.extension?.version;
-        const proofType = credential
-          ? isEnvelopedProof(credential.original)
-            ? VCProofType.ENVELOPING
-            : VCProofType.EMBEDDED
-          : VCProofType.UNKNOWN;
         const vcdmVersion = hasCredential ? detectVcdmVersion(credential.decoded) : undefined;
 
         return (
@@ -606,7 +589,6 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
             steps={steps}
             isExpanded={expandedGroups.includes(type)}
             onToggle={() => toggleGroup(type)}
-            proofType={proofType}
             hasCredential={hasCredential}
           />
         );
