@@ -62,4 +62,31 @@ describe('buildResource', () => {
 
     expect(resource.attributes['deployment.environment.name']).toBe('dev');
   });
+
+  it('treats an empty DEPLOYMENT_ENVIRONMENT value as absent and falls back to "local"', () => {
+    process.env.DEPLOYMENT_ENVIRONMENT = '';
+
+    const resource = buildResource({ serviceVersion: '1.2.3' });
+
+    expect(resource.attributes['deployment.environment.name']).toBe('local');
+  });
+
+  it('treats a whitespace-only DEPLOYMENT_ENVIRONMENT value as absent', () => {
+    process.env.DEPLOYMENT_ENVIRONMENT = '   ';
+
+    const resource = buildResource({ serviceVersion: '1.2.3' });
+
+    expect(resource.attributes['deployment.environment.name']).toBe('local');
+  });
+
+  it('treats an empty deploymentEnvironment override as absent and falls through to env', () => {
+    process.env.DEPLOYMENT_ENVIRONMENT = 'staging';
+
+    const resource = buildResource({
+      serviceVersion: '1.2.3',
+      deploymentEnvironment: '',
+    });
+
+    expect(resource.attributes['deployment.environment.name']).toBe('staging');
+  });
 });

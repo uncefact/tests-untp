@@ -30,7 +30,7 @@ This brings up the app and shared services plus three observability containers:
 | `tempo` | `grafana/tempo` | Trace storage. |
 | `grafana` | `grafana/grafana` | Dashboard / Explore UI. |
 
-When everything is healthy, the reference implementation is at `http://localhost:3003` and Grafana is at `http://localhost:3030` (default admin login is `admin`/`admin`; you will be prompted to change it on first login).
+When everything is healthy, the reference implementation is at `http://localhost:3003` and Grafana is at `http://localhost:3030`. Grafana ships with the default `admin`/`admin` login and may prompt you to set a new password on first sign-in.
 
 ## Verifying that traces flow
 
@@ -61,14 +61,14 @@ The `-v` flag removes the named volumes (`tempo-data`, `grafana-data`) so the ne
 
 Per ADR 020, the root `docker-compose.yml` carries two observability profiles:
 
-- `observability`. Sidecars only. Production-shape locally: the OTel agent runs, but no local LGTM stack does. Once #595 stands up the central stack, this profile's agent forwards to that central gateway.
+- `observability`. Sidecars only. Production-shape locally: the OTel agent runs, but no local LGTM stack does. The agent is intended to forward to a central gateway (see #595); until that lands, this profile is structurally present but unverified.
 - `local-observability`. Superset of `observability`. Adds the local LGTM stack (currently just Tempo and Grafana; Loki and Prometheus join with #593 and #594).
 
 The walking skeleton verifies `local-observability` end-to-end. `observability` is structurally in place so later tickets can extend it without restructuring.
 
 ## How the app emits
 
-The reference implementation initialises the SDK via Next.js's `instrumentation.ts` hook, which Next.js calls once per process at startup. The hook guards on `NEXT_RUNTIME === 'nodejs'` so the Node SDK does not get pulled into the Edge runtime bundle. The SDK uses the OTLP gRPC trace exporter; the endpoint is read from `OTEL_EXPORTER_OTLP_ENDPOINT` and defaults to `http://localhost:4317` (suitable for `yarn dev` against the compose stack). The Docker Compose service for the reference implementation overrides this default to `http://otel-agent:4317` so containerised runs reach the sidecar through the compose network.
+The reference implementation initialises the SDK via Next.js's instrumentation hook at `packages/reference-implementation/src/instrumentation.ts`, which Next.js calls once per process at startup. The hook guards on `NEXT_RUNTIME === 'nodejs'` so the Node SDK does not get pulled into the Edge runtime bundle. The SDK uses the OTLP gRPC trace exporter; the endpoint is read from `OTEL_EXPORTER_OTLP_ENDPOINT` and defaults to `http://localhost:4317` (suitable for `yarn dev` against the compose stack). The Docker Compose service for the reference implementation overrides this default to `http://otel-agent:4317` so containerised runs reach the sidecar through the compose network.
 
 Auto-instrumentation is provided by `@opentelemetry/auto-instrumentations-node`, which covers HTTP, fetch, Next.js, Prisma, and other common libraries.
 

@@ -2,25 +2,17 @@
  * Node-side OpenTelemetry SDK initialisation.
  *
  * Loaded dynamically by `instrumentation.ts` at process startup when
- * running under the Node.js runtime. Sets up auto-instrumentation
- * (HTTP, Next.js, Prisma, fetch, etc.) and an OTLP gRPC trace exporter
- * pointed at the local OTel agent (see docker-compose's `otel-agent`
- * service under the `observability` / `local-observability` profiles,
- * per ADR 020).
+ * running under the Node.js runtime. The OTLP exporter targets the
+ * local OTel agent sidecar; the SDK does not crash the app on export
+ * failure, so running without an observability profile is safe.
  *
- * The SDK tolerates a missing collector: if `OTEL_EXPORTER_OTLP_ENDPOINT`
- * points nowhere reachable, exports retry with backoff and the app keeps
- * serving requests. Running without an observability profile is
- * therefore safe.
- *
- * Walking skeleton scope (#592): traces only. Pino logs (#593),
- * metrics (#594), and custom domain spans land in follow-up tickets.
+ * @see ../../../docs/observability.md
  */
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 
-import { buildResource } from './src/lib/observability/resource';
+import { buildResource } from './lib/observability/resource';
 
 const sdk = new NodeSDK({
   resource: buildResource(),

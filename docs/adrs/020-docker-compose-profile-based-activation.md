@@ -65,6 +65,8 @@ The walking-skeleton implementation of this ADR ships across the per-package E2E
 
 **Stage 3, observability walking skeleton (#592):** introduced the broader-vision profile shape on the root `docker-compose.yml`. Added an `otel-agent` sidecar tagged `['observability', 'local-observability']` and a `tempo` plus `grafana` pair tagged `['local-observability']`. The reference implementation gains `OTEL_EXPORTER_OTLP_ENDPOINT` / `DEPLOYMENT_ENVIRONMENT` env vars; the app and shared services remain untagged so default-profile runs are unaffected.
 
+The root and E2E compose files apply the same profile-activation pattern independently. They are different compose files with different concerns (local dev plus observability on the root; CI fixture composition on the E2E file), so the profile names are scoped per file rather than shared.
+
 The current profile tagging is:
 
 - `ri` profile (E2E compose): `app`, `vckit-api`, `db`, `storage-service`, `identity-resolver-service`, `identity-resolver-service-object-store`, `e2e-ri-db`, `e2e-keycloak`.

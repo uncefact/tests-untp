@@ -1,8 +1,5 @@
-# Local Tempo configuration. Walking skeleton scope (#592): single-instance
-# OTLP receiver writing to local filesystem storage. No S3, no retention
-# tuning, no compactor wiring beyond defaults. Production deployment with
-# S3 backend and retention by environment label lands with the cloud stack
-# (#595).
+# Local Tempo configuration: single-instance OTLP receiver writing to
+# local filesystem storage. See ../../docs/observability.md.
 server:
   http_listen_port: 3200
 
