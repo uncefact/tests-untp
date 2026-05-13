@@ -73,7 +73,9 @@
   },
   "devDependencies": {
     "@babel/preset-typescript": "^7.23.3",
+    "@types/jest": "29.5.11",
     "@types/jsonld": "^1.5.15",
+    "@types/uuid": "^9.0.7",
     "babel-jest": "^29.7.0",
     "typescript": "^5.3.3"
   }
