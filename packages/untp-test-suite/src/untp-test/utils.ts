@@ -66,20 +66,24 @@ function createAjvInstance(): any {
 // Storage for deferred test suite registration functions
 const registeredTestSuites: Array<(credentialState: any) => void> = [];
 
+// Single-tag match: one leading space, then `tag:`, then a run of
+// non-space characters. The earlier nested-quantifier form
+// `/( tag:[^ ]+)+/g` was vulnerable to polynomial backtracking on
+// untrusted input (CodeQL js/polynomial-redos). Matching each tag
+// individually with the `g` flag is linear.
+const TAG_RE = / tag:[^ ]+/g;
+
 /**
- * Extract and format tags from a title
+ * Extract and format tags from a title.
  */
 function formatTags(title: string): { cleanTitle: string; tags: string } {
-  const tagMatches = title.match(/( tag:[^ ]+)+/g);
+  const tagMatches = title.match(TAG_RE);
   if (!tagMatches) {
     return { cleanTitle: title, tags: '' };
   }
 
-  const tags = tagMatches[0]
-    .split(' ')
-    .filter((t) => t.startsWith('tag:'))
-    .map((t) => t.replace('tag:', ''));
-  const cleanTitle = title.replace(/( tag:[^ ]+)+/g, '').trim();
+  const tags = tagMatches.map((m) => m.trim().replace('tag:', ''));
+  const cleanTitle = title.replace(TAG_RE, '').trim();
 
   // Format tags with simple 'tags:' prefix and comma separation
   const formattedTags = tags.join(', ');
