@@ -49,7 +49,6 @@ minio_data/*
 *~
 /examples/*/node_modules/
 /examples/*/build/
-/docs
 /report
 **/build/
 **/*.log

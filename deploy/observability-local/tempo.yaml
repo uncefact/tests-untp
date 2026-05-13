@@ -1,0 +1,31 @@
+# Local Tempo configuration. Walking skeleton scope (#592): single-instance
+# OTLP receiver writing to local filesystem storage. No S3, no retention
+# tuning, no compactor wiring beyond defaults. Production deployment with
+# S3 backend and retention by environment label lands with the cloud stack
+# (#595).
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+
+ingester:
+  trace_idle_period: 10s
+  max_block_bytes: 1_000_000
+  max_block_duration: 5m
+
+compactor:
+  compaction:
+    block_retention: 24h
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/blocks
+    wal:
+      path: /var/tempo/wal

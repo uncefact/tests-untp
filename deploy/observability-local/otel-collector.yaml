@@ -1,0 +1,34 @@
+# Local OpenTelemetry Collector running in agent mode.
+#
+# Walking skeleton scope (#592): receive OTLP traces from apps on :4317
+# and export them to local Tempo. When the central OTel gateway lands
+# (#595), this exporter should target the gateway instead.
+#
+# Production-mode operation (ADR 019): the agent on each EC2 instance
+# also collects host metrics via the hostmetrics receiver. That, plus
+# the metrics pipeline, lands in #594/#596 and is not configured here.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/tempo]

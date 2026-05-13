@@ -139,6 +139,12 @@ services:
       SYSTEM_DID: ${SYSTEM_DID:-did:web:uncefact.github.io:project-vckit:test-and-development}
       SYSTEM_DID_NAME: ${SYSTEM_DID_NAME:-System Default DID}
       SYSTEM_DID_DESCRIPTION: ${SYSTEM_DID_DESCRIPTION:-System-wide default DID for the UNTP reference implementation}
+      # OpenTelemetry. When running under --profile local-observability or
+      # --profile observability, the otel-agent sidecar is reachable on the
+      # compose network at otel-agent:4317. The SDK tolerates a missing
+      # collector, so default-profile runs (no observability) still work.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-agent:4317}
+      DEPLOYMENT_ENVIRONMENT: ${DEPLOYMENT_ENVIRONMENT:-local}
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:3003/api/health"]
       interval: 30s
@@ -218,8 +224,50 @@ services:
     volumes:
       - ./minio_data/identity-resolver-service-object-store:/data
 
+  # Observability sidecar. Tagged for both profiles per ADR 020: this is
+  # the per-host OTel agent (ADR 019). In the walking skeleton (#592) it
+  # forwards directly to the local Tempo; once #595 stands up the central
+  # gateway, the agent's exporter target shifts to the gateway.
+  otel-agent:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    profiles: ['observability', 'local-observability']
+    command: ['--config=/etc/otel-collector.yaml']
+    volumes:
+      - ./deploy/observability-local/otel-collector.yaml:/etc/otel-collector.yaml:ro
+    ports:
+      - '4317:4317' # OTLP gRPC for host-running apps (yarn dev)
+      - '4318:4318' # OTLP HTTP
+
+  # Local Tempo trace backend. Walking skeleton scope (#592): single
+  # instance, local filesystem storage, no retention tuning. Production
+  # deployment uses the central stack from ADR 018.
+  tempo:
+    image: grafana/tempo:2.6.1
+    profiles: ['local-observability']
+    command: ['-config.file=/etc/tempo/tempo.yaml']
+    volumes:
+      - ./deploy/observability-local/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+
+  # Local Grafana with the Tempo data source provisioned. Exposed on
+  # :3030 to avoid colliding with the IDR (:3000) and the reference
+  # implementation (:3003). Default admin/admin login retained for
+  # local dev convenience.
+  grafana:
+    image: grafana/grafana:11.3.0
+    profiles: ['local-observability']
+    ports:
+      - '3030:3000'
+    environment:
+      GF_FEATURE_TOGGLES_ENABLE: 'traceqlEditor'
+    volumes:
+      - ./deploy/observability-local/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+
 volumes:
   ri-db-data:
   vckit-data:
   storage_service_data:
   keycloak-data:
+  tempo-data:
+  grafana-data:

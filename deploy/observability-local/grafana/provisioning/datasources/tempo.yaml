@@ -1,0 +1,12 @@
+# Provisioned Tempo data source for the local Grafana instance.
+# Lets devs land in Grafana and immediately query traces without
+# clicking through the data-sources UI.
+apiVersion: 1
+
+datasources:
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    isDefault: true
+    editable: false
