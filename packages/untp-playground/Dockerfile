@@ -14,12 +14,17 @@ WORKDIR /app
 COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc package.json ./
 COPY packages/untp-playground/package.json ./packages/untp-playground/
 
+# Install the playground's tree only. The filter keeps the rest of the
+# workspace (RI, services, components, cypress, turbo, storybook, etc.)
+# out of the image. The BuildKit cache mount on the pnpm store keeps
+# downloads warm across rebuilds.
+#
+# A previous version used `pnpm fetch` ahead of install. Removed because
+# pnpm 9's fetch ignores --filter (pnpm#4407, fixed in pnpm 10) and was
+# pulling cypress and the rest of the lockfile into the image.
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm-store,sharing=locked \
     pnpm config set store-dir /pnpm-store && \
-    pnpm fetch --frozen-lockfile --filter "untp-playground..."
-
-RUN --mount=type=cache,id=pnpm-store,target=/pnpm-store,sharing=locked \
-    pnpm install --frozen-lockfile --offline --filter "untp-playground..."
+    pnpm install --frozen-lockfile --filter "untp-playground..."
 
 # ---- Builder ----
 FROM deps AS builder

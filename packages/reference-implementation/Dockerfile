@@ -17,21 +17,20 @@ COPY packages/reference-implementation/package.json ./packages/reference-impleme
 COPY packages/components/package.json ./packages/components/
 COPY packages/services/package.json ./packages/services/
 
-# pnpm fetch populates the virtual store from the lockfile. Sharing the
-# pnpm store via a BuildKit cache mount means repeat builds (and the
-# runtime-deps stage in this same image) re-use the same tarballs.
-# --filter scopes the fetch to RI and its transitive workspace deps
-# (components, services); untp-utils, untp-playground and untp-test-suite
-# aren't part of RI's runtime or build graph so their tarballs stay out
-# of the cache layer.
+# Install RI's tree (RI itself + its transitive workspace deps:
+# components, services) plus their non-workspace dependencies. The
+# filter is the load-bearing optimisation here: untp-utils, untp-playground,
+# untp-test-suite, cypress (root devDep), turbo, storybook, etc. do not
+# get fetched into the image because nothing in RI's tree depends on them.
+#
+# A previous version used a separate `pnpm fetch` step ahead of install.
+# Removed because pnpm 9's `pnpm fetch` ignores `--filter` (pnpm#4407,
+# fixed in pnpm 10) and was prefetching the entire lockfile into the
+# layer including cypress. The BuildKit cache mount on the pnpm store
+# still preserves downloaded tarballs across rebuilds.
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm-store,sharing=locked \
     pnpm config set store-dir /pnpm-store && \
-    pnpm fetch --frozen-lockfile --filter "untp-reference-implementation..."
-
-# Install resolves the workspace symlinks against the prefetched store.
-# --offline skips network round-trips; everything is already on disk.
-RUN --mount=type=cache,id=pnpm-store,target=/pnpm-store,sharing=locked \
-    pnpm install --frozen-lockfile --offline --filter "untp-reference-implementation..."
+    pnpm install --frozen-lockfile --filter "untp-reference-implementation..."
 
 # ---- Builder ----
 # Builds the four workspace packages in dependency order. Reuses the deps
