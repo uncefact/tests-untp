@@ -68,7 +68,7 @@ The walking skeleton verifies `local-observability` end-to-end. `observability` 
 
 ## How the app emits
 
-The reference implementation initialises the SDK via Next.js's instrumentation hook at `packages/reference-implementation/src/instrumentation.ts`, which Next.js calls once per process at startup. The hook guards on `NEXT_RUNTIME === 'nodejs'` so the Node SDK does not get pulled into the Edge runtime bundle. The SDK uses the OTLP gRPC trace exporter; the endpoint is read from `OTEL_EXPORTER_OTLP_ENDPOINT` and defaults to `http://localhost:4317` (suitable for `yarn dev` against the compose stack). The Docker Compose service for the reference implementation overrides this default to `http://otel-agent:4317` so containerised runs reach the sidecar through the compose network.
+The reference implementation initialises the SDK via Next.js's instrumentation hook at `packages/reference-implementation/src/instrumentation.ts`, which Next.js calls once per process at startup. The hook guards on `NEXT_RUNTIME === 'nodejs'` so the Node SDK does not get pulled into the Edge runtime bundle. The SDK uses the OTLP gRPC trace exporter; the endpoint is read from `OTEL_EXPORTER_OTLP_ENDPOINT` and defaults to `http://localhost:4317` (suitable for `pnpm dev` against the compose stack). The Docker Compose service for the reference implementation overrides this default to `http://otel-agent:4317` so containerised runs reach the sidecar through the compose network.
 
 Auto-instrumentation is provided by `@opentelemetry/auto-instrumentations-node`, which covers HTTP, fetch, Next.js, Prisma, and other common libraries.
 
