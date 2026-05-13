@@ -1,5 +1,5 @@
 {
-  "name": "@uncefact/untp-playground",
+  "name": "untp-playground",
   "version": "0.2.2",
   "private": true,
   "scripts": {

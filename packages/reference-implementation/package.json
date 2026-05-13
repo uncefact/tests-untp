@@ -1,5 +1,5 @@
 {
-  "name": "@reference-implementation/core",
+  "name": "untp-reference-implementation",
   "version": "0.2.0",
   "private": true,
   "dependencies": {
@@ -7,9 +7,9 @@
     "@mui/icons-material": "^7.3.4",
     "@mui/material": "^7.3.4",
     "@prisma/client": "6.19.2",
-    "@reference-implementation/components": "0.2.0",
+    "@reference-implementation/components": "workspace:*",
     "@tailwindcss/postcss": "^4.1.16",
-    "@uncefact/untp-ri-services": "0.1.0",
+    "@uncefact/untp-ri-services": "workspace:*",
     "@uncefact/vckit-renderer": "1.0.0-next.61",
     "clsx": "^2.1.1",
     "dotenv": "^16.4.5",
