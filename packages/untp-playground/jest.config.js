@@ -15,9 +15,11 @@ const config = {
   coverageReporters: ['text', 'lcov', 'json', 'json-summary'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^lucide-react$': '<rootDir>/../../node_modules/lucide-react/dist/cjs/lucide-react.js',
-    '^react$': '<rootDir>/../../node_modules/react',
-    '^react-dom$': '<rootDir>/../../node_modules/react-dom',
+    // lucide-react ships ESM by default; redirect to its CJS bundle so
+    // jest does not need to transform it. The path resolves through
+    // the playground's own node_modules (pnpm symlinks it there from
+    // its virtual store), not the workspace root.
+    '^lucide-react$': '<rootDir>/node_modules/lucide-react/dist/cjs/lucide-react.js',
     '^.+\\.hbs$': '<rootDir>/__tests__/mocks/handlebars.ts',
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
