@@ -1,6 +1,6 @@
 import addFormats from 'ajv-formats';
 import Ajv2020 from 'ajv/dist/2020';
-import { UNTP_CORE_SCHEMA_FILENAMES, UNTP_SHORT_CREDENTIAL_TYPES } from '../../constants';
+import { UNTP_CONTEXT_DOMAINS, UNTP_CORE_SCHEMA_FILENAMES, UNTP_SHORT_CREDENTIAL_TYPES } from '../../constants';
 import { schemaCache } from './schemaValidation';
 
 const ajv = new Ajv2020({
@@ -49,8 +49,8 @@ export function detectSchemeVersion(scheme: Record<string, unknown>): string | n
   if (!Array.isArray(contexts)) return null;
   for (const entry of contexts) {
     if (typeof entry !== 'string') continue;
-    if (!entry.includes('vocabulary/untp/cs/')) continue;
-    const match = entry.match(/cs\/(\d+\.\d+\.\d+(?:-[a-zA-Z0-9]+)?)/);
+    if (!UNTP_CONTEXT_DOMAINS.some((domain) => entry.includes(domain))) continue;
+    const match = entry.match(/(\d+\.\d+\.\d+(?:-[a-zA-Z0-9]+)?)/);
     if (match) return match[1];
   }
   return null;

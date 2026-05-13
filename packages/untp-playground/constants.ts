@@ -61,7 +61,7 @@ export const UNTP_SHORT_CREDENTIAL_TYPES: Record<string, string> = {
   DigitalTraceabilityEvent: 'dte',
   DigitalFacilityRecord: 'dfr',
   DigitalIdentityAnchor: 'dia',
-  ConformityScheme: 'cs',
+  ConformityScheme: 'cvc',
 };
 
 // Schema filename (without `.json`) for each UNTP core credential type. Applies
