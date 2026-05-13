@@ -10,7 +10,7 @@ import {
   TestReportStep,
   TestStep,
 } from '@/types';
-import { reportName, testSuiteRunner, testSuiteVersion } from '../../config';
+import { reportName, testSuiteRunner, testSuiteUrl, testSuiteVersion } from '../../config';
 import { CredentialType, SchemeType, TestCaseStatus, TestCaseStepId } from '../../constants';
 
 interface GenerateReportParams {
@@ -111,6 +111,7 @@ export const generateReport = async ({
     testSuite: {
       runner: testSuiteRunner,
       version: testSuiteVersion,
+      ...(testSuiteUrl && { url: testSuiteUrl }),
     },
     implementation: {
       name: implementationName,

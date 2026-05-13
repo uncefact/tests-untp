@@ -10,6 +10,7 @@ export interface TestReport {
   testSuite: {
     runner: string;
     version: string;
+    url?: string;
   };
   implementation: {
     name: string;

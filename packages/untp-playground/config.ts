@@ -16,6 +16,11 @@ import packageJson from './package.json' assert { type: 'json' };
 const playgroundVersion = process.env.NEXT_PUBLIC_PLAYGROUND_VERSION || packageJson.version || 'unknown';
 const testSuiteRunner = 'untp-test-suite';
 const testSuiteVersion = process.env.NEXT_PUBLIC_TEST_SUITE_VERSION || packageJson.version || 'unknown';
+// Canonical home of the test runner. Surfaced as a link on the report's
+// 'Test runner' line. Defaults to the runner's current home; override when
+// the runner moves elsewhere (e.g. its own repository, an npm page, a
+// project site). Not assumed to be a GitHub URL.
+const testSuiteUrl = process.env.NEXT_PUBLIC_TEST_SUITE_URL || 'https://github.com/uncefact/tests-untp';
 const reportName = process.env.NEXT_PUBLIC_REPORT_NAME || 'UNTP';
 
-export { playgroundVersion, testSuiteRunner, testSuiteVersion, reportName };
+export { playgroundVersion, testSuiteRunner, testSuiteVersion, testSuiteUrl, reportName };

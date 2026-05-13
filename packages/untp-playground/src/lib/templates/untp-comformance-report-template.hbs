@@ -442,7 +442,14 @@
           {{credentialSubject.reportName}} Playground
         {{/if}}
       </span>
-      <span>untp-test-suite · v{{credentialSubject.testSuite.version}}</span>
+      <span>
+        {{#if credentialSubject.testSuite.url}}
+          <a href="{{credentialSubject.testSuite.url}}">{{credentialSubject.testSuite.runner}}</a>
+        {{else}}
+          {{credentialSubject.testSuite.runner}}
+        {{/if}}
+        · v{{credentialSubject.testSuite.version}}
+      </span>
     </footer>
 
   </main>

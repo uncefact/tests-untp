@@ -104,6 +104,7 @@ describe('generateReport', () => {
       testSuite: {
         runner: 'untp-test-suite',
         version: '0.2.2',
+        url: 'https://github.com/uncefact/tests-untp',
       },
       implementation: {
         name: 'Test Implementation',
