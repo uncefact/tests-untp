@@ -1,6 +1,7 @@
 import addFormats from 'ajv-formats';
 import Ajv2020 from 'ajv/dist/2020';
 import {
+  API_BASE_PATH,
   UNTP_CORE_SCHEMA_FILENAMES,
   UNTP_SHORT_CREDENTIAL_TYPES,
   VCDM_SCHEMA_URLS,
@@ -31,8 +32,7 @@ async function fetchSchema(schemaUrl: string): Promise<any> {
   if (inflight) {
     return inflight;
   }
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  const proxyUrl = `${baseUrl}/api/schema?url=${encodeURIComponent(schemaUrl)}`;
+  const proxyUrl = `${API_BASE_PATH}/api/schema?url=${encodeURIComponent(schemaUrl)}`;
   // Evict the in-flight entry once settled so a transient failure doesn't poison the cache.
   const promise = (async () => {
     try {
