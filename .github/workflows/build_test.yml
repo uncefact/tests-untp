@@ -211,13 +211,30 @@ jobs:
         if: steps.affected.outputs.result == 'true'
         uses: docker/setup-buildx-action@v3
 
-      # Builds the RI image via buildx's GHA cache backend
-      # (`cache_to: type=gha,mode=max` is configured per service in
-      # `docker-compose.e2e.yml`). The downstream `e2e-ri` matrix pulls
-      # from the same cache scope and skips the actual build work on a hit.
+      # Builds the RI image via `docker/build-push-action@v6` so the GHA
+      # cache backend actually exports layers. The previous approach used
+      # `docker compose build` with `cache_to` declared in
+      # `docker-compose.e2e.yml`, but compose silently failed to
+      # propagate `cache_to` to BuildKit when running the bake from
+      # stdin (https://github.com/docker/compose/issues/9094), so the
+      # downstream `e2e-ri` matrix had nothing to pull from and ended
+      # up rebuilding every layer.
+      #
+      # `load: true` puts the resulting image into the runner's Docker
+      # daemon under the `app:e2e` tag, matching the `image:` field on
+      # the `app` service in `docker-compose.e2e.yml`, so the downstream
+      # job's `docker compose up -d --no-build` finds it locally.
       - name: Build RI image
         if: steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml --profile ri build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./packages/reference-implementation/Dockerfile
+          target: development
+          tags: app:e2e
+          load: true
+          cache-from: type=gha,scope=reference-implementation-e2e
+          cache-to: type=gha,scope=reference-implementation-e2e,mode=max
 
   build-e2e-image-playground:
     name: Build E2E image (playground)
@@ -289,9 +306,18 @@ jobs:
         if: steps.affected.outputs.result == 'true'
         uses: docker/setup-buildx-action@v3
 
+      # See the matching `Build RI image` step above for why this uses
+      # `docker/build-push-action@v6` instead of `docker compose build`.
       - name: Build playground image
         if: steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml --profile playground build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./packages/untp-playground/Dockerfile
+          tags: untp-playground:e2e
+          load: true
+          cache-from: type=gha,scope=untp-playground-e2e
+          cache-to: type=gha,scope=untp-playground-e2e,mode=max
 
   e2e-ri:
     name: E2E RI (${{ matrix.mode }})
@@ -393,14 +419,26 @@ jobs:
         if: steps.affected.outputs.result == 'true'
         uses: docker/setup-buildx-action@v3
 
-      # Re-runs `docker compose build` for the RI image. The buildx GHA cache
-      # populated by `build-e2e-image-ri` (`cache_from: type=gha,...` in
-      # `docker-compose.e2e.yml`) typically turns this into a cache hit and an
-      # image load. On a cache miss (eviction, skipped upstream job) it falls
-      # back to a full build with no functional difference.
+      # Re-runs the RI image build but with full cache_from against the
+      # GHA scope populated by `build-e2e-image-ri`. With cache hit this
+      # is essentially a layer-reconstitution + image load step
+      # (~30-60s). With cache miss (e.g. eviction) it falls back to a
+      # full build with no functional difference.
+      #
+      # Uses `docker/build-push-action@v6` rather than `docker compose
+      # build` because compose doesn't reliably propagate `cache_from`
+      # to BuildKit when running its bake from stdin
+      # (https://github.com/docker/compose/issues/9094).
       - name: Build RI image (with cache)
         if: steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml --profile ri build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./packages/reference-implementation/Dockerfile
+          target: development
+          tags: app:e2e
+          load: true
+          cache-from: type=gha,scope=reference-implementation-e2e
 
       - name: Start RI stack (${{ matrix.mode }})
         if: steps.affected.outputs.result == 'true'
@@ -540,14 +578,18 @@ jobs:
         if: steps.affected.outputs.result == 'true'
         uses: docker/setup-buildx-action@v3
 
-      # Re-runs `docker compose build` for the playground image. The buildx
-      # GHA cache populated by `build-e2e-image-playground` (`cache_from:
-      # type=gha,...` in `docker-compose.e2e.yml`) typically turns this into
-      # a cache hit and an image load. On a cache miss (eviction, skipped
-      # upstream job) it falls back to a full build with no functional difference.
+      # See the matching `Build RI image (with cache)` step in the
+      # `e2e-ri` job above for why this uses
+      # `docker/build-push-action@v6` rather than `docker compose build`.
       - name: Build playground image (with cache)
         if: steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml --profile playground build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./packages/untp-playground/Dockerfile
+          tags: untp-playground:e2e
+          load: true
+          cache-from: type=gha,scope=untp-playground-e2e
 
       - name: Start playground stack
         if: steps.affected.outputs.result == 'true'
