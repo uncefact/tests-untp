@@ -2,6 +2,7 @@
   "name": "untp-reference-implementation",
   "version": "0.2.0",
   "private": true,
+  "license": "GPL-3.0-only",
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.75.0",
