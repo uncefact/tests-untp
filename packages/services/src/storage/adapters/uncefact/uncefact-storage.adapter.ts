@@ -9,11 +9,14 @@ import type { UncefactStorageConfig } from './uncefact-storage.schema.js';
 import { uncefactStorageConfigSchema, uncefactStorageSensitiveFields } from './uncefact-storage.schema.js';
 
 /**
- * The Uncefact storage service currently returns a `sha-256` hex digest as
- * the `hash` field on its response. This adapter rewraps that hex into a
- * `base58btc`-encoded multihash so the rest of the codebase only ever sees
- * a self-describing multibase digest. Remove this transcoding when the
- * storage service starts publishing multibase digests natively.
+ * The Uncefact storage service emits `multibaseDigest` in current versions.
+ * Older deployments still emit a hex `sha-256` digest in the `hash` field.
+ * This adapter accepts either, so the rest of the codebase only ever sees
+ * a multibase-encoded multihash regardless of which storage deployment is
+ * on the other end. Prefers `multibaseDigest` when present; falls back to
+ * transcoding the legacy `hash` field. The legacy fallback exists only to
+ * keep this repo working against older storage deployments in the wild and
+ * should be removed once every deployment we care about has cut over.
  */
 const HEX_SHA256_PATTERN = /^[a-fA-F0-9]{64}$/;
 
@@ -34,6 +37,36 @@ function transcodeStorageHashToMultibase(hash: string): string {
   }
   const digestBytes = hexToBytes(hash);
   return MultibaseDigest.fromDigest(digestBytes, { algorithm: 'sha2-256', base: 'base58btc' }).toString();
+}
+
+function resolveDigestMultibase(body: Record<string, unknown>, httpStatus: number): string {
+  const { multibaseDigest, hash } = body as { multibaseDigest?: unknown; hash?: unknown };
+
+  if (typeof multibaseDigest === 'string' && multibaseDigest.length > 0) {
+    try {
+      MultibaseDigest.fromString(multibaseDigest);
+    } catch {
+      throw new StorageStoreError(
+        httpStatus,
+        `Storage API returned "multibaseDigest" that is not a valid multibase-encoded multihash: "${multibaseDigest}".`,
+      );
+    }
+    return multibaseDigest;
+  }
+
+  // Legacy fallback: older storage service versions emit a hex `sha-256`
+  // digest in `hash` and no `multibaseDigest` field. Transcode locally so
+  // the adapter's contract (`digestMultibase`) stays consistent regardless
+  // of which storage version is on the other end. This branch can be
+  // deleted once every storage deployment we talk to emits `multibaseDigest`.
+  if (typeof hash === 'string' && hash.length > 0) {
+    return transcodeStorageHashToMultibase(hash);
+  }
+
+  throw new StorageStoreError(
+    httpStatus,
+    'Storage API returned invalid response: missing both "multibaseDigest" and legacy "hash" fields',
+  );
 }
 
 export const UNCEFACT_STORAGE_ADAPTER_TYPE = 'UNCEFACT_STORAGE' as const;
@@ -101,20 +134,11 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       throw new StorageStoreError(response.status, 'Storage API returned invalid JSON response');
     }
 
-    const { uri, hash, decryptionKey } = body as {
-      uri: string;
-      hash: string;
-      decryptionKey?: string;
-    };
+    const { uri, decryptionKey } = body as { uri?: unknown; decryptionKey?: unknown };
 
     if (!uri || typeof uri !== 'string') {
       this.logger.error({ uri }, 'Storage API response missing required "uri" field');
       throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "uri"');
-    }
-
-    if (!hash || typeof hash !== 'string') {
-      this.logger.error({ hash }, 'Storage API response missing required "hash" field');
-      throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "hash"');
     }
 
     if (encrypt && (!decryptionKey || typeof decryptionKey !== 'string')) {
@@ -125,14 +149,14 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "decryptionKey"');
     }
 
-    const digestMultibase = transcodeStorageHashToMultibase(hash);
+    const digestMultibase = resolveDigestMultibase(body, response.status);
 
     this.logger.info({ uri, encrypt, externalId }, 'Credential stored successfully');
 
     return {
       uri,
       digestMultibase,
-      decryptionKey,
+      decryptionKey: typeof decryptionKey === 'string' ? decryptionKey : undefined,
       externalId,
       bucket,
       mimeType: 'application/json',
@@ -195,20 +219,11 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       throw new StorageStoreError(response.status, 'Storage API returned invalid JSON response');
     }
 
-    const { uri, hash, decryptionKey } = body as {
-      uri: string;
-      hash: string;
-      decryptionKey?: string;
-    };
+    const { uri, decryptionKey } = body as { uri?: unknown; decryptionKey?: unknown };
 
     if (!uri || typeof uri !== 'string') {
       this.logger.error({ uri }, 'Storage API response missing required "uri" field');
       throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "uri"');
-    }
-
-    if (!hash || typeof hash !== 'string') {
-      this.logger.error({ hash }, 'Storage API response missing required "hash" field');
-      throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "hash"');
     }
 
     if (encrypt && (!decryptionKey || typeof decryptionKey !== 'string')) {
@@ -219,14 +234,14 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "decryptionKey"');
     }
 
-    const digestMultibase = transcodeStorageHashToMultibase(hash);
+    const digestMultibase = resolveDigestMultibase(body, response.status);
 
     this.logger.info({ uri, encrypt, filename, externalId }, 'Binary content stored successfully');
 
     return {
       uri,
       digestMultibase,
-      decryptionKey,
+      decryptionKey: typeof decryptionKey === 'string' ? decryptionKey : undefined,
       externalId,
       bucket,
       mimeType: contentType,

@@ -500,11 +500,63 @@ describe('UncefactStorageAdapter', () => {
         await expect(adapter.store(mockCredential)).rejects.toThrow(StorageStoreError);
       });
 
-      it('should throw StorageStoreError when response is missing "hash"', async () => {
+      it('should throw StorageStoreError when response is missing both "multibaseDigest" and "hash"', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
           json: jest.fn().mockResolvedValue({ uri: 'https://storage.example.com/documents/abc-123' }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.store(mockCredential)).rejects.toThrow(StorageStoreError);
+      });
+
+      it('should prefer "multibaseDigest" over legacy "hash" when both are present', async () => {
+        const PRESENT_MULTIBASE = `zTESTpreferred${HEX_B}`;
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/documents/abc-123',
+            multibaseDigest: PRESENT_MULTIBASE,
+            hash: HEX_A,
+          }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        const result = await adapter.store(mockCredential);
+
+        expect(result.digestMultibase).toBe(PRESENT_MULTIBASE);
+      });
+
+      it('should accept "multibaseDigest" as the sole digest field', async () => {
+        const ONLY_MULTIBASE = `zTESTonly${HEX_A}`;
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/documents/abc-123',
+            multibaseDigest: ONLY_MULTIBASE,
+          }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        const result = await adapter.store(mockCredential);
+
+        expect(result.digestMultibase).toBe(ONLY_MULTIBASE);
+      });
+
+      it('should throw StorageStoreError when "multibaseDigest" is not a valid multibase string', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/documents/abc-123',
+            multibaseDigest: 'not-a-multibase-string',
+          }),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -843,11 +895,63 @@ describe('UncefactStorageAdapter', () => {
         await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(StorageStoreError);
       });
 
-      it('should throw StorageStoreError when response is missing "hash"', async () => {
+      it('should throw StorageStoreError when response is missing both "multibaseDigest" and "hash"', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
           json: jest.fn().mockResolvedValue({ uri: 'https://storage.example.com/documents/abc-123' }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(StorageStoreError);
+      });
+
+      it('should prefer "multibaseDigest" over legacy "hash" when both are present', async () => {
+        const PRESENT_MULTIBASE = `zTESTpreferred${HEX_A}`;
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/documents/abc-123',
+            multibaseDigest: PRESENT_MULTIBASE,
+            hash: HEX_B,
+          }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        const result = await adapter.storeBinary('<html></html>', 'f.html', 'text/html');
+
+        expect(result.digestMultibase).toBe(PRESENT_MULTIBASE);
+      });
+
+      it('should accept "multibaseDigest" as the sole digest field', async () => {
+        const ONLY_MULTIBASE = `zTESTonly${HEX_B}`;
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/documents/abc-123',
+            multibaseDigest: ONLY_MULTIBASE,
+          }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        const result = await adapter.storeBinary('<html></html>', 'f.html', 'text/html');
+
+        expect(result.digestMultibase).toBe(ONLY_MULTIBASE);
+      });
+
+      it('should throw StorageStoreError when "multibaseDigest" is not a valid multibase string', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/documents/abc-123',
+            multibaseDigest: 'garbage',
+          }),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
