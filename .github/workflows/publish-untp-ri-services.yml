@@ -1,0 +1,91 @@
+name: 'Publish — @uncefact/untp-ri-services'
+
+# Per-package publish workflow for @uncefact/untp-ri-services. Triggers on
+# push of a tag matching `untp-ri-services-v<X.Y.Z>` (stable) or the
+# `<X.Y.Z>-rc.N` / `-alpha.N` / `-beta.N` / `-pre.N` pre-release variants.
+# The tag is the release event; this workflow publishes the artefact and
+# nothing else.
+#
+# Services depends on @uncefact/untp-utils via the workspace protocol. pnpm
+# publish rewrites the workspace specifier into the installed semver range
+# at publish time, so the published artefact pins to whatever utils version
+# was installed when this workflow ran. If the runtime utils version needs
+# to change, publish utils first (untp-utils-v<X.Y.Z> tag), then push the
+# services tag.
+#
+# Authentication uses npm OIDC Trusted Publishing. The npmjs.com Trusted
+# Publisher for `@uncefact/untp-ri-services` must be configured to point at
+# this workflow filename.
+#
+# See ADR 031: docs/adrs/031-per-package-tag-triggered-npm-release.md
+
+on:
+  push:
+    tags:
+      - 'untp-ri-services-v*'
+
+concurrency:
+  group: publish-untp-ri-services-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'uncefact'
+
+    steps:
+      - name: Checkout tagged commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Verify checkout
+        run: |
+          ACTUAL=$(git rev-parse HEAD)
+          if [ "$ACTUAL" != "${{ github.sha }}" ]; then
+            echo "::error::Wrong checkout. Expected ${{ github.sha }}, got $ACTUAL"
+            exit 1
+          fi
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter '@uncefact/untp-ri-services...'
+
+      - name: Verify tag/package version match
+        run: node scripts/check-tag-version-match.mjs untp-ri-services-v packages/services
+
+      - name: Build
+        # Build utils first so services links against fresh dist; services'
+        # build then emits its own dist.
+        run: |
+          pnpm --filter '@uncefact/untp-utils' run build
+          pnpm --filter '@uncefact/untp-ri-services' run build
+
+      - name: Determine npm dist-tag
+        id: dist
+        run: |
+          if [[ "${GITHUB_REF_NAME}" =~ -(rc|alpha|beta|pre)\. ]]; then
+            echo "tag=rc" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        working-directory: packages/services
+        env:
+          NPM_CONFIG_PROVENANCE: 'true'
+        run: pnpm publish --no-git-checks --access public --tag ${{ steps.dist.outputs.tag }}

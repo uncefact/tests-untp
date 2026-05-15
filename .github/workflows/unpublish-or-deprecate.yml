@@ -1,0 +1,101 @@
+name: 'npm rollback or archive'
+
+# Manual workflow for withdrawing a published version. Two outcomes:
+#
+#   * `unpublish` runs `npm unpublish <pkg>@<version>`. npm only permits
+#     unpublish within 72 hours of a version's first publish and only when
+#     no other packages depend on it. Outside that window the command
+#     fails; that failure is the prompt to fall back to `deprecate`.
+#
+#   * `deprecate` runs `npm deprecate <pkg>@<version> "<message>"`. The
+#     version remains installable but `npm install` emits a warning and the
+#     version is hidden from typical version listings. This is the long-
+#     term archive path for broken releases that cannot be unpublished.
+#
+# Authentication uses npm OIDC Trusted Publishing — the same mechanism the
+# per-package publish workflows use, so no separate token is required.
+#
+# See ADR 031: docs/adrs/031-per-package-tag-triggered-npm-release.md
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to act on'
+        required: true
+        type: choice
+        options:
+          - '@uncefact/untp-utils'
+          - '@uncefact/untp-ri-services'
+      version:
+        description: 'Version (e.g. 0.5.0 or 0.5.0-rc.1)'
+        required: true
+        type: string
+      action:
+        description: 'Action to take'
+        required: true
+        type: choice
+        options:
+          - unpublish
+          - deprecate
+      message:
+        description: 'Reason (shown by npm for deprecate; recorded in workflow logs for unpublish)'
+        required: true
+        type: string
+
+concurrency:
+  group: npm-rollback-${{ inputs.package }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  rollback:
+    name: ${{ inputs.action }} ${{ inputs.package }}@${{ inputs.version }}
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'uncefact'
+
+    steps:
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Record intent
+        env:
+          PKG: ${{ inputs.package }}
+          VER: ${{ inputs.version }}
+          ACTION: ${{ inputs.action }}
+          MESSAGE: ${{ inputs.message }}
+        run: |
+          echo "Action: ${ACTION}"
+          echo "Target: ${PKG}@${VER}"
+          echo "Reason: ${MESSAGE}"
+
+      - name: Unpublish
+        if: ${{ inputs.action == 'unpublish' }}
+        env:
+          PKG: ${{ inputs.package }}
+          VER: ${{ inputs.version }}
+        run: |
+          # `npm unpublish` against the public registry only succeeds inside
+          # the 72-hour window and when no published package depends on this
+          # version. If npm rejects the request, the command exits non-zero
+          # with the policy error and the operator should re-run with the
+          # `deprecate` action instead.
+          npm unpublish "${PKG}@${VER}"
+
+      - name: Deprecate
+        if: ${{ inputs.action == 'deprecate' }}
+        env:
+          PKG: ${{ inputs.package }}
+          VER: ${{ inputs.version }}
+          MESSAGE: ${{ inputs.message }}
+        run: |
+          npm deprecate "${PKG}@${VER}" "${MESSAGE}"
