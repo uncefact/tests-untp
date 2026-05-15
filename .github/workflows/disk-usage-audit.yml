@@ -65,7 +65,7 @@ jobs:
           docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -73,7 +73,7 @@ jobs:
         run: corepack enable
 
       - name: Install Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
 
@@ -197,7 +197,7 @@ jobs:
           driver: docker-container
 
       - name: Build E2E Docker images (with layer cache)
-        uses: docker/bake-action@v5
+        uses: docker/bake-action@v6
         with:
           files: docker-compose.e2e.yml
           load: true
