@@ -12,8 +12,11 @@ name: 'Publish — @uncefact/untp-utils'
 # stays on pnpm so the workspace install / filter still works.
 #
 # OIDC Trusted Publishing requires npm CLI >= 11.5.0. Node 22 (pinned via
-# .nvmrc) bundles npm 10.x, so we explicitly upgrade npm before publishing.
-# Without the upgrade, the publish PUT is anonymous and npm responds 404.
+# .nvmrc) bundles npm 10.x, so the publish step shells out to `npx npm@11`
+# instead of using the system npm. Self-upgrading the system npm with
+# `npm install --global npm@11` is fragile (tears down the running
+# process's own node_modules mid-install); npx fetches the binary into a
+# temp location and runs it directly.
 #
 # See ADR 031: docs/adrs/031-per-package-tag-triggered-npm-release.md
 
@@ -60,9 +63,6 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
 
-      - name: Upgrade npm to v11 (OIDC Trusted Publishing requires >= 11.5)
-        run: npm install --global npm@11
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --filter '@uncefact/untp-utils...'
 
@@ -85,4 +85,9 @@ jobs:
         working-directory: packages/untp-utils
         env:
           NPM_CONFIG_PROVENANCE: 'true'
-        run: npm publish --access public --tag ${{ steps.dist.outputs.tag }}
+        # Use npx to fetch npm@11 into a temp location instead of upgrading
+        # the system npm in place. Self-upgrading npm with
+        # `npm install --global npm@11` tears down the running process's
+        # own node_modules (e.g. `promise-retry`) mid-install and crashes.
+        # npx avoids that by running an isolated npm 11 binary.
+        run: npx --yes npm@11 publish --access public --tag ${{ steps.dist.outputs.tag }}
