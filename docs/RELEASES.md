@@ -19,7 +19,7 @@ The decision behind this layout is recorded in
    normal PR). For example, for `@uncefact/untp-utils`:
 
    ```bash
-   pnpm --filter '@uncefact/untp-utils' version <patch|minor|major>
+   pnpm --filter '@uncefact/untp-utils' version --no-git-tag-version <patch|minor|major>
    ```
 
    Open a PR titled `chore(release): @uncefact/untp-utils v<X.Y.Z>` and
@@ -49,7 +49,7 @@ The decision behind this layout is recorded in
    - Publishes to npm with `--provenance` via OIDC Trusted Publishing,
      tagging the release as `latest`.
 
-   Confirm the new version appears at https://www.npmjs.com/package/&lt;package&gt;
+   Confirm the new version appears at `https://www.npmjs.com/package/@uncefact/<package-name>`
    and that `npm view @uncefact/<pkg> versions --tags` shows `latest:
    <X.Y.Z>`.
 
