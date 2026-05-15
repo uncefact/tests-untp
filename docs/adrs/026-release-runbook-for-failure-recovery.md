@@ -1,7 +1,8 @@
 # ADR: Release runbook for failure recovery
 
 - **Date:** 2026-05-12
-- **Status:** proposed
+- **Status:** superseded by [031](./031-per-package-tag-triggered-npm-release.md)
+- **Update (2026-05-15):** Failure recovery is now handled by the `unpublish-or-deprecate` workflow described in ADR 031. The two outcomes (npm unpublish within the 72 h window; npm deprecate beyond it) are wired into the same `workflow_dispatch`-only workflow that authenticates via OIDC Trusted Publishing.
 
 ## Context
 

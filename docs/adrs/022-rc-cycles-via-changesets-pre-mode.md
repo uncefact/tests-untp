@@ -1,7 +1,8 @@
 # ADR: Release candidate cycles via Changesets pre mode
 
 - **Date:** 2026-05-12
-- **Status:** proposed
+- **Status:** superseded by [031](./031-per-package-tag-triggered-npm-release.md)
+- **Update (2026-05-15):** Changesets pre mode is replaced by SemVer-suffixed tags. A tag of the form `<prefix>-v<X.Y.Z>-rc.N` publishes to the `rc` dist-tag; promotion to stable is a tag push without the suffix. See ADR 031.
 
 ## Context
 

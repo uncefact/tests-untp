@@ -1,7 +1,8 @@
 # ADR: Changeset enforcement via three layers
 
 - **Date:** 2026-05-12
-- **Status:** proposed
+- **Status:** superseded by [031](./031-per-package-tag-triggered-npm-release.md)
+- **Update (2026-05-15):** Changesets is removed from the repository, so per-PR changeset enforcement no longer applies. See ADR 031 for the replacement release model.
 
 ## Context
 

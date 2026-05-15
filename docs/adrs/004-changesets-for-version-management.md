@@ -1,7 +1,8 @@
 # ADR: Changesets for version management and publishing
 
 - **Date:** 2026-05-12
-- **Status:** accepted
+- **Status:** superseded by [031](./031-per-package-tag-triggered-npm-release.md)
+- **Update (2026-05-15):** Changesets is removed from the repository. Per-package tag-triggered npm publishing replaces it; see ADR 031 for the new model and the rationale for the change.
 
 ## Context
 
