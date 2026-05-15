@@ -7,7 +7,11 @@ name: 'Publish — @uncefact/untp-utils'
 #
 # Authentication uses npm OIDC Trusted Publishing. The npmjs.com Trusted
 # Publisher for `@uncefact/untp-utils` must be configured to point at this
-# workflow filename.
+# workflow filename. Publish is done via `npm publish` (not `pnpm publish`):
+# OIDC Trusted Publishing landed in the npm CLI (v11+) which ships with
+# Node 22; pnpm 9.x still uses the legacy `_authToken` flow and produces
+# anonymous requests that npm rejects with a 404. The build step stays on
+# pnpm so the workspace install / filter still works.
 #
 # See ADR 031: docs/adrs/031-per-package-tag-triggered-npm-release.md
 
@@ -76,4 +80,4 @@ jobs:
         working-directory: packages/untp-utils
         env:
           NPM_CONFIG_PROVENANCE: 'true'
-        run: pnpm publish --no-git-checks --access public --tag ${{ steps.dist.outputs.tag }}
+        run: npm publish --access public --tag ${{ steps.dist.outputs.tag }}

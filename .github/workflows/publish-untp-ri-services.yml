@@ -6,16 +6,20 @@ name: 'Publish — @uncefact/untp-ri-services'
 # The tag is the release event; this workflow publishes the artefact and
 # nothing else.
 #
-# Services depends on @uncefact/untp-utils via the workspace protocol. pnpm
-# publish rewrites the workspace specifier into the installed semver range
-# at publish time, so the published artefact pins to whatever utils version
-# was installed when this workflow ran. If the runtime utils version needs
-# to change, publish utils first (untp-utils-v<X.Y.Z> tag), then push the
-# services tag.
+# Services may depend on @uncefact/untp-utils via the workspace protocol.
+# `npm publish` does NOT rewrite `workspace:*` specifiers; if such a dep is
+# introduced in packages/services/package.json, the publish step must
+# replace it with a concrete semver range before running, otherwise the
+# published manifest will contain an invalid `workspace:*` specifier and
+# installers will fail. There is no such workspace dep at the time of
+# writing.
 #
 # Authentication uses npm OIDC Trusted Publishing. The npmjs.com Trusted
 # Publisher for `@uncefact/untp-ri-services` must be configured to point at
-# this workflow filename.
+# this workflow filename. Publish is done via `npm publish` (not
+# `pnpm publish`): OIDC Trusted Publishing landed in the npm CLI (v11+)
+# which ships with Node 22; pnpm 9.x still uses the legacy `_authToken`
+# flow and produces anonymous requests that npm rejects with a 404.
 #
 # See ADR 031: docs/adrs/031-per-package-tag-triggered-npm-release.md
 
@@ -88,4 +92,4 @@ jobs:
         working-directory: packages/services
         env:
           NPM_CONFIG_PROVENANCE: 'true'
-        run: pnpm publish --no-git-checks --access public --tag ${{ steps.dist.outputs.tag }}
+        run: npm publish --access public --tag ${{ steps.dist.outputs.tag }}
