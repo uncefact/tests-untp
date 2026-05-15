@@ -25,7 +25,7 @@ Each publishable npm package owns its own tag prefix and its own publish workflo
 | `@uncefact/untp-ri-services` | `untp-ri-services-v` | `untp-ri-services-v1.2.3` |
 | `@uncefact/untp-utils` | `untp-utils-v` | `untp-utils-v0.5.0-rc.1` |
 
-Pre-release tags carry an SemVer suffix (`-rc.N`, `-alpha.N`, `-beta.N`, `-pre.N`). Stable tags carry only `X.Y.Z`.
+Pre-release tags carry a SemVer suffix (`-rc.N`, `-alpha.N`, `-beta.N`, `-pre.N`). Stable tags carry only `X.Y.Z`.
 
 **Workflow per package.** Two workflows are added, one per publishable package:
 
