@@ -60,6 +60,11 @@
   "keywords": [],
   "author": "",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uncefact/tests-untp.git",
+    "directory": "packages/services"
+  },
   "dependencies": {
     "@vckit/core-types": "1.0.0-beta.7",
     "ajv": "^8.17.1",

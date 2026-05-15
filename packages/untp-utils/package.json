@@ -39,6 +39,11 @@
   ],
   "author": "",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uncefact/tests-untp.git",
+    "directory": "packages/untp-utils"
+  },
   "dependencies": {
     "multiformats": "^13.3.1"
   },
