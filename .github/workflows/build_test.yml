@@ -5,11 +5,15 @@ on:
   # (which target an in-flight feature branch instead of `next`) need CI
   # too; the previous `branches: [next]` filter skipped them silently.
   pull_request: {}
-  # Running on push to `next` (post-merge) is intentional: it lets the
-  # `quality` job populate the `node_modules` cache from `refs/heads/next`,
-  # which subsequent PRs can then restore from. GitHub Actions caches
-  # written from a PR ref are scoped to that PR; only caches written from
-  # the base branch are shared across PRs targeting it.
+  # Running on push to `next` (post-merge) is intentional but narrow: it
+  # exists solely to let the `quality` job repopulate the `node_modules`
+  # cache from `refs/heads/next` so subsequent PRs can restore from it.
+  # GitHub Actions caches written from a PR ref are scoped to that PR;
+  # only caches written from the base branch are shared across PRs
+  # targeting it.
+  # All other jobs (qa matrix, e2e image builds, e2e runs) are PR-only
+  # via job-level `if:` guards below — re-running them post-merge adds
+  # no signal because the PR already validated the same code.
   push:
     branches:
       - next
@@ -79,6 +83,7 @@ jobs:
 
   qa:
     name: QA (${{ matrix.package }})
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: quality
     strategy:
@@ -142,6 +147,7 @@ jobs:
   # and the RI E2E matrix starts as soon as the RI image is ready.
   build-e2e-image-ri:
     name: Build E2E image (RI)
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: [quality, qa]
     steps:
@@ -241,6 +247,7 @@ jobs:
 
   build-e2e-image-playground:
     name: Build E2E image (playground)
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: [quality, qa]
     steps:
@@ -325,6 +332,7 @@ jobs:
 
   e2e-ri:
     name: E2E RI (${{ matrix.mode }})
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: [quality, qa, build-e2e-image-ri]
     strategy:
@@ -505,6 +513,7 @@ jobs:
 
   e2e-playground:
     name: E2E (untp-playground)
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: [quality, qa, build-e2e-image-playground]
     steps:

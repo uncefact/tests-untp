@@ -1,10 +1,17 @@
 name: Deploy to GitHub Pages
 
+# Only fires when files relevant to the Docusaurus build change. Pushes
+# that do not touch any of these paths leave the GitHub Pages site as-is
+# and do not consume action minutes.
 on:
   push:
     branches:
       - next
       - main
+    paths:
+      - 'documentation/**'
+      - '.github/workflows/buld_publish_docs.yml'
+      - '.nvmrc'
 
 # peaceiris/actions-gh-pages pushes the built site to the gh-pages branch,
 # which needs contents: write. Everything else stays at the default-deny
