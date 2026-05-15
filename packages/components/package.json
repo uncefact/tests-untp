@@ -1,6 +1,7 @@
 {
   "name": "@reference-implementation/components",
   "version": "0.2.0",
+  "private": true,
   "license": "GPL-3.0-only",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
@@ -96,8 +97,5 @@
     "typescript": "^5.9.3",
     "web-vitals": "^2.1.4",
     "webpack": "^5.11.0"
-  },
-  "publishConfig": {
-    "access": "public"
   }
 }
