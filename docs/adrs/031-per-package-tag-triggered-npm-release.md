@@ -3,6 +3,9 @@
 - **Date:** 2026-05-15
 - **Status:** accepted
 - **Supersedes:** [004](./004-changesets-for-version-management.md), [005](./005-changeset-enforcement-via-three-layers.md), [013](./013-release-workflow-correctness-measures.md), [022](./022-rc-cycles-via-changesets-pre-mode.md), [026](./026-release-runbook-for-failure-recovery.md)
+- **Update (2026-05-15):** publishing `@uncefact/untp-utils@0.1.0` surfaced two implementation requirements that were not obvious from the body of this ADR; both are now enforced in the publish workflows under `.github/workflows/publish-untp-utils.yml` and `.github/workflows/publish-untp-ri-services.yml`.
+  - The publish step must run on **npm CLI >= 11.5** (the version that implements OIDC Trusted Publishing). Node 22 (pinned via `.nvmrc`) bundles npm 10.x, so the workflows shell out to `npx --yes npm@11 publish ...`. `pnpm publish` is unsuitable because pnpm 9.x still uses the legacy `_authToken` flow.
+  - Every npm-published `package.json` MUST declare a `repository.url` whose URL matches the GitHub repository the workflow runs in. npm cross-validates this against the sigstore provenance attestation and rejects mismatches with HTTP 422. Use the monorepo-aware form (`type` / `url` / `directory`).
 
 ## Context
 
