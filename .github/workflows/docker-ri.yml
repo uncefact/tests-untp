@@ -88,5 +88,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Scope per workflow so the RI build does not share a cache key
+          # with the playground build. Unscoped `type=gha` caches collide
+          # across workflows, evicting each other's deps + builder layers.
+          cache-from: type=gha,scope=docker-ri
+          cache-to: type=gha,scope=docker-ri,mode=max
