@@ -6,6 +6,8 @@ on:
     branches:
       - next
       - 'cd/**'
+    tags:
+      - 'untp-playground-v*'
     paths:
       - 'packages/untp-playground/**'
       - '.github/workflows/ci_cd-untp-playground.yml'
@@ -69,7 +71,19 @@ jobs:
           STACK_NAME: test
 
   deploy_prod:
-    if: github.repository_owner == 'uncefact' && github.ref_type == 'tag' && github.event_name == 'workflow_dispatch'
+    # Stable releases only. A tag push for `untp-playground-v<X.Y.Z>` deploys
+    # to prod; pre-release tags carrying a `-rc` / `-alpha` / `-beta` / `-pre`
+    # suffix on the version do not. workflow_dispatch against a stable tag
+    # still works for a manual re-deploy.
+    if: >-
+      github.repository_owner == 'uncefact' &&
+      github.ref_type == 'tag' &&
+      startsWith(github.ref, 'refs/tags/untp-playground-v') &&
+      !contains(github.ref_name, '-rc') &&
+      !contains(github.ref_name, '-alpha') &&
+      !contains(github.ref_name, '-beta') &&
+      !contains(github.ref_name, '-pre') &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     concurrency:
       group: untp-plaground-${{github.ref}}
 
