@@ -1,8 +1,9 @@
 # ADR: Release workflow correctness measures
 
 - **Date:** 2026-05-12
-- **Status:** accepted
+- **Status:** superseded by [031](./031-per-package-tag-triggered-npm-release.md)
 - **Update (2026-05-13):** `release.yml` currently triggers on `push: branches: main`. PR #611 proposes switching it to `push: next` with Changesets-driven OIDC publishing, but is not yet merged. The pnpm migration on this branch converted the workflow's install step from yarn to pnpm without touching the trigger or the correctness measures (idempotency, single concurrency group, etc.), which are unchanged.
+- **Update (2026-05-15):** The single-workflow decision in this ADR is reversed by ADR 031. The portable correctness measures (SHA pin + verification, `cancel-in-progress: false`, npm provenance, `.nvmrc`) carry forward into the per-package publish workflows. The `GITHUB_TOKEN`-doesn't-trigger-downstream-workflows concern that justified the single-workflow design no longer applies because tag pushes are now deliberate human actions.
 
 ## Context
 
