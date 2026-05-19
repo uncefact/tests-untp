@@ -131,7 +131,7 @@ export default defineConfig({
     VCKIT_API_KEY: process.env.E2E_VCKIT_API_KEY || 'test123',
     STORAGE_BASE_URL: process.env.E2E_STORAGE_BASE_URL || 'http://storage-service:3334',
     STORAGE_API_KEY: process.env.E2E_STORAGE_API_KEY || 'test123',
-    STORAGE_API_VERSION: process.env.E2E_STORAGE_API_VERSION || '3.1.0',
+    STORAGE_API_VERSION: process.env.E2E_STORAGE_API_VERSION || '4.0',
     STORAGE_PUBLIC_BUCKET: process.env.E2E_STORAGE_PUBLIC_BUCKET || 'public-data',
     STORAGE_PRIVATE_BUCKET: process.env.E2E_STORAGE_PRIVATE_BUCKET || 'private-data',
 

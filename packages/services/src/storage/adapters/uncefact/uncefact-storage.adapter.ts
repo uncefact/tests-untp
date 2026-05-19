@@ -64,17 +64,37 @@ function resolveDigestMultibase(body: Record<string, unknown>, httpStatus: numbe
 
 export const UNCEFACT_STORAGE_ADAPTER_TYPE = 'UNCEFACT_STORAGE' as const;
 
+/**
+ * Translates a configured `apiVersion` (MAJOR.MINOR) into the URL path
+ * segment the storage service actually serves under. v4 onward routes
+ * under `/api/v4/...` (major-only); v3.x routes under the full SemVer
+ * `/api/3.1.0/...`. The config value mirrors the version the service
+ * reports in its `version.json`; the URL segment is whatever the service
+ * accepts on the wire.
+ *
+ * Note: v3.x is the only major served under the full SemVer scheme. v4
+ * and later all route under `vMAJOR`. If a future 3.x patch ever needed
+ * to be supported (unlikely), this helper's early-return would need to
+ * widen to match the whole 3.x family.
+ */
+function apiVersionToPathSegment(version: UncefactStorageConfig['apiVersion']): string {
+  if (version === '3.1.0') return '3.1.0';
+  // 4.0 -> `v4`. Future majors follow the same MAJOR.MINOR -> vMAJOR shape.
+  const [major] = version.split('.');
+  return `v${major}`;
+}
+
 export class UncefactStorageAdapter extends BaseServiceAdapter implements IStorageService {
   private readonly baseUrl: string;
   private readonly headers: Record<string, string>;
-  private readonly apiVersion: string;
+  private readonly apiPathSegment: string;
   private readonly publicBucket: string;
   private readonly privateBucket: string;
 
   constructor(config: UncefactStorageConfig, logger: LoggerService) {
     super(logger.child({ service: 'Storage - UncefactStorage' }));
     this.baseUrl = config.baseUrl;
-    this.apiVersion = config.apiVersion;
+    this.apiPathSegment = apiVersionToPathSegment(config.apiVersion);
     this.publicBucket = config.publicBucket;
     this.privateBucket = config.privateBucket;
     this.headers = { 'Content-Type': 'application/json' };
@@ -85,7 +105,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
 
   async store(credential: EnvelopedVerifiableCredential, encrypt = false): Promise<StorageRecord> {
     const endpoint = encrypt ? 'private' : 'public';
-    const url = `${this.baseUrl}/api/${this.apiVersion}/${endpoint}`;
+    const url = `${this.baseUrl}/api/${this.apiPathSegment}/${endpoint}`;
 
     const bucket = encrypt ? this.privateBucket : this.publicBucket;
     const externalId = crypto.randomUUID();
@@ -165,7 +185,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
 
   async storeBinary(content: string, filename: string, contentType: string, encrypt = false): Promise<StorageRecord> {
     const endpoint = encrypt ? 'private' : 'public';
-    const url = `${this.baseUrl}/api/${this.apiVersion}/${endpoint}`;
+    const url = `${this.baseUrl}/api/${this.apiPathSegment}/${endpoint}`;
 
     const bucket = encrypt ? this.privateBucket : this.publicBucket;
     const externalId = crypto.randomUUID();
@@ -261,7 +281,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       return;
     }
 
-    const url = `${this.baseUrl}/api/${this.apiVersion}/${bucket}/${externalId}`;
+    const url = `${this.baseUrl}/api/${this.apiPathSegment}/${bucket}/${externalId}`;
 
     this.logger.debug({ url, externalId, bucket }, 'Deleting stored content');
 
