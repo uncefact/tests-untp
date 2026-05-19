@@ -190,7 +190,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   // Reject server-managed fields
   if (body.storageUrl !== undefined) throw new ValidationError('storageUrl cannot be set directly');
-  if (body.hash !== undefined) throw new ValidationError('hash cannot be set directly');
+  if (body.digestMultibase !== undefined) throw new ValidationError('digestMultibase cannot be set directly');
 
   // Validate required fields
   if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');

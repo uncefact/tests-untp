@@ -34,7 +34,7 @@ const MOCK_EXISTING = {
   name: 'Old Template',
   renderMethodType: 'RenderTemplate2024',
   storageUrl: 'https://storage.example.com/old',
-  hash: 'sha256-old',
+  digestMultibase: 'zTESTold',
   storageExternalId: 'old-ext-id',
   storageBucket: 'old-bucket',
   storageContentType: 'text/html',
@@ -51,7 +51,7 @@ const MOCK_EXISTING = {
 
 const MOCK_STORAGE_RESULT = {
   uri: 'https://storage.example.com/new',
-  hash: 'sha256-new',
+  digestMultibase: 'zTESTnew',
   externalId: 'new-ext-id',
   bucket: 'new-bucket',
   mimeType: 'text/html',
@@ -159,7 +159,7 @@ describe('updateRenderTemplate', () => {
       'tenant-1',
       expect.objectContaining({
         storageUrl: 'https://storage.example.com/new',
-        hash: 'sha256-new',
+        digestMultibase: 'zTESTnew',
         storageExternalId: 'new-ext-id',
         storageBucket: 'new-bucket',
         storageContentType: 'text/html',

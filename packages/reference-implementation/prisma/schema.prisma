@@ -123,7 +123,7 @@ model Credential {
   id              String   @id @default(cuid())
   tenantId        String
   storageUri      String
-  hash            String
+  digestMultibase String
   decryptionKey   String?
   credentialType  String
   isPublished     Boolean  @default(false)
@@ -464,7 +464,7 @@ model RenderTemplate {
 
   name                     String
   storageUrl               String
-  hash                     String
+  digestMultibase          String
   isDefault                Boolean   @default(false)
   renderMethodType          RenderMethodType
   storageServiceInstanceId  String?

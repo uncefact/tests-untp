@@ -50,7 +50,7 @@ export async function createRenderTemplate(input: CreateRenderTemplateInput): Pr
     dataModelId,
     renderMethodType,
     storageUrl: storageResult.uri,
-    hash: storageResult.hash,
+    digestMultibase: storageResult.digestMultibase,
     isDefault,
     storageServiceInstanceId: storageService.instanceId,
     storageExternalId: storageResult.externalId,

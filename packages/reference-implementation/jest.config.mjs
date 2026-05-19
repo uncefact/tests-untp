@@ -26,6 +26,8 @@ const jestConfig = {
     '^@uncefact/untp-ri-services/encryption$': '<rootDir>/../services/build/encryption/index.js',
     '^@uncefact/untp-ri-services/key-provider$': '<rootDir>/../services/build/key-provider/index.js',
     '^@uncefact/untp-ri-services$': '<rootDir>/../services/build/index.js',
+    '^@uncefact/untp-utils/multibase-digest$': '<rootDir>/src/__mocks__/uncefact/multibase-digest.ts',
+    '^@uncefact/untp-utils$': '<rootDir>/src/__mocks__/uncefact/multibase-digest.ts',
     '^@reference-implementation/components$': '<rootDir>/node_modules/@reference-implementation/components/build/index.js',
   },
   transform: {

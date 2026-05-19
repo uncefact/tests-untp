@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
-import crypto from 'crypto';
+import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import {
   DidMethod,
   DidStatus,
@@ -563,7 +563,14 @@ async function main() {
             dataModelId: dm.id,
             name: `${dm.name} Default Template`,
             storageUrl: storageRecord.uri,
-            hash: storageRecord.hash ?? crypto.createHash('sha256').update(templateContent).digest('hex'),
+            digestMultibase:
+              storageRecord.digestMultibase ??
+              (
+                await MultibaseDigest.fromData(new TextEncoder().encode(templateContent), {
+                  algorithm: 'sha2-256',
+                  base: 'base58btc',
+                })
+              ).toString(),
             isDefault: true,
             renderMethodType: RenderMethodType.RenderTemplate2024,
             inline: false,

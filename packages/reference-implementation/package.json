@@ -14,6 +14,7 @@
     "@prisma/client": "6.19.2",
     "@reference-implementation/components": "workspace:*",
     "@uncefact/untp-ri-services": "workspace:*",
+    "@uncefact/untp-utils": "workspace:*",
     "@uncefact/vckit-renderer": "1.0.0-next.61",
     "clsx": "^2.1.1",
     "dotenv": "^16.4.5",

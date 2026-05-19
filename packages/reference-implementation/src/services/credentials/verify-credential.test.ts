@@ -87,13 +87,13 @@ describe('verifyCredential', () => {
       ok: false,
       status: 422,
       json: async () => ({
-        error: 'Credential hash does not match',
-        code: 'HASH_MISMATCH',
+        error: 'Credential digest does not match',
+        code: 'DIGEST_MISMATCH',
       }),
     });
 
     await expect(verifyCredential({ uri: 'https://example.com/cred', hash: 'abc' })).rejects.toThrow(
-      'Credential hash does not match (HASH_MISMATCH)',
+      'Credential digest does not match (DIGEST_MISMATCH)',
     );
   });
 

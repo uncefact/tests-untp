@@ -26,7 +26,7 @@ export type CreateRenderTemplateInput = {
   dataModelId: string;
   renderMethodType: RenderMethodType;
   storageUrl: string;
-  hash: string;
+  digestMultibase: string;
   isDefault?: boolean;
   storageServiceInstanceId?: string;
   storageExternalId?: string;
@@ -43,7 +43,7 @@ export type CreateRenderTemplateInput = {
 export type UpdateRenderTemplateInput = {
   name?: string;
   storageUrl?: string;
-  hash?: string;
+  digestMultibase?: string;
   isDefault?: boolean;
   storageServiceInstanceId?: string;
   storageExternalId?: string;
@@ -114,7 +114,7 @@ export async function createRenderTemplate(
         dataModelId: input.dataModelId,
         renderMethodType: input.renderMethodType,
         storageUrl: input.storageUrl,
-        hash: input.hash,
+        digestMultibase: input.digestMultibase,
         isDefault: input.isDefault ?? false,
         storageServiceInstanceId: input.storageServiceInstanceId,
         storageExternalId: input.storageExternalId,
@@ -228,7 +228,7 @@ export async function updateRenderTemplate(
       data: {
         ...(input.name !== undefined && { name: input.name }),
         ...(input.storageUrl !== undefined && { storageUrl: input.storageUrl }),
-        ...(input.hash !== undefined && { hash: input.hash }),
+        ...(input.digestMultibase !== undefined && { digestMultibase: input.digestMultibase }),
         ...(input.isDefault !== undefined && { isDefault: input.isDefault }),
         ...(input.storageServiceInstanceId !== undefined && {
           storageServiceInstanceId: input.storageServiceInstanceId,

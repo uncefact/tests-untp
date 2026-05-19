@@ -18,14 +18,18 @@ const Verify = () => {
   useEffect(() => {
     const run = async () => {
       let uri: string | undefined;
+      let digestMultibase: string | undefined;
       let hash: string | undefined;
       let decryptionKey: string | undefined;
 
-      // Support individual query params (?uri=...&hash=...&decryptionKey=...)
-      // and legacy ?q= JSON envelope ({ payload: { uri, key, hash } })
+      // Support individual query params and a legacy ?q= JSON envelope. The
+      // verify URL has historically carried a hex `hash`; new URLs carry
+      // `digestMultibase` instead. Read both so QR codes already in the wild
+      // keep working alongside newly issued URLs.
       const directUri = search?.get('uri');
       if (directUri) {
         uri = directUri;
+        digestMultibase = search?.get('digestMultibase') ?? undefined;
         hash = search?.get('hash') ?? undefined;
         decryptionKey = search?.get('decryptionKey') ?? undefined;
       } else {
@@ -34,6 +38,7 @@ const Verify = () => {
           try {
             const parsed = JSON.parse(q);
             uri = parsed?.payload?.uri;
+            digestMultibase = parsed?.payload?.digestMultibase;
             hash = parsed?.payload?.hash;
             decryptionKey = parsed?.payload?.decryptionKey ?? parsed?.payload?.key;
           } catch (e) {
@@ -49,7 +54,7 @@ const Verify = () => {
       }
 
       try {
-        const result = await verifyCredential({ uri, hash, decryptionKey });
+        const result = await verifyCredential({ uri, digestMultibase, hash, decryptionKey });
         setResult(result);
         setState('success');
       } catch (e: unknown) {

@@ -29,3 +29,19 @@ if (typeof AbortSignal.timeout !== 'function') {
     return controller.signal;
   };
 }
+
+// Polyfill `TextEncoder` for jsdom — the verify route encodes credential
+// JSON into bytes for digest verification, and jsdom does not expose
+// TextEncoder on `global` by default.
+if (typeof globalThis.TextEncoder === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+  globalThis.TextEncoder = require('util').TextEncoder as any;
+}
+
+// Polyfill `crypto.subtle` for jsdom — the verify route uses
+// `crypto.subtle.digest('SHA-256', ...)` on the legacy-hash code path.
+if (typeof globalThis.crypto === 'undefined' || typeof globalThis.crypto.subtle === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { webcrypto } = require('crypto');
+  Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
+}

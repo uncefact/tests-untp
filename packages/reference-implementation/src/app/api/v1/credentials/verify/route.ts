@@ -4,7 +4,8 @@ import { ValidationError } from '@/lib/api/validation';
 import { withPublicRoute } from '@/lib/api/with-public-route';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
-import { computeHash, decryptCredential, isEncryptedEnvelope, VcVerifyError } from '@uncefact/untp-ri-services';
+import { decryptCredential, isEncryptedEnvelope, VcVerifyError } from '@uncefact/untp-ri-services';
+import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import { validatePublicUrl } from '@uncefact/untp-ri-services/server';
 import type { EnvelopedVerifiableCredential, VerifyResult } from '@uncefact/untp-ri-services';
 import { decodeJwt } from 'jose';
@@ -54,10 +55,18 @@ function getMaxCredentialSize(): number {
  *                 format: uri
  *                 description: Storage URI where the credential is stored
  *                 example: https://storage.example.com/credentials/abc123
+ *               digestMultibase:
+ *                 type: string
+ *                 description: Expected multibase-encoded multihash digest of the credential content
+ *                 example: zQmExampleBase58btcMultihash
  *               hash:
  *                 type: string
  *                 pattern: '^[a-fA-F0-9]{64}$'
- *                 description: Expected SHA-256 hash (64-character hex string)
+ *                 description: |
+ *                   Expected SHA-256 hash (64-character hex string). Accepted
+ *                   for backwards compatibility with verify URLs already in
+ *                   the wild that were issued before the multibase migration.
+ *                   New URLs should use `digestMultibase` instead.
  *               decryptionKey:
  *                 type: string
  *                 pattern: '^[a-fA-F0-9]{64}$'
@@ -141,7 +150,7 @@ export const POST = withPublicRoute(async (req) => {
 
   // ── Step 1: Parse and validate input ────────────────────────────────
   logger.info('Parsing request body');
-  let body: { uri?: string; hash?: string; decryptionKey?: string };
+  let body: { uri?: string; digestMultibase?: string; hash?: string; decryptionKey?: string };
   try {
     body = await req.json();
   } catch {
@@ -165,6 +174,20 @@ export const POST = withPublicRoute(async (req) => {
     throw new ValidationError('uri must be a valid HTTP(S) URL');
   }
 
+  if (body.digestMultibase !== undefined) {
+    if (typeof body.digestMultibase !== 'string') {
+      throw new ValidationError('digestMultibase must be a string');
+    }
+    try {
+      MultibaseDigest.fromString(body.digestMultibase);
+    } catch {
+      throw new ValidationError('digestMultibase must be a valid multibase-encoded multihash');
+    }
+  }
+
+  // Accept the legacy `hash` query parameter (hex SHA-256) for verify URLs
+  // already issued before the multibase migration; they're out in the wild on
+  // QR codes and can't be reissued. Prefer `digestMultibase` when both are set.
   if (body.hash !== undefined && (typeof body.hash !== 'string' || !HEX_64.test(body.hash))) {
     throw new ValidationError('hash must be a 64-character hex string (SHA-256)');
   }
@@ -267,18 +290,40 @@ export const POST = withPublicRoute(async (req) => {
     credential = fetchedData as Record<string, unknown>;
   }
 
-  // ── Step 4: Hash verification ──────────────────────────────────────
-  if (body.hash) {
-    logger.info('Verifying credential hash');
-    const computed = computeHash(credential);
-    if (computed !== body.hash) {
-      logger.warn({ expected: body.hash, computed }, 'Hash mismatch');
-      return NextResponse.json(
-        { error: 'Credential hash does not match the expected hash', code: 'HASH_MISMATCH' },
-        { status: 422 },
-      );
+  // ── Step 4: Digest verification ────────────────────────────────────
+  // Prefer the multibase digest when provided; fall back to the legacy hex
+  // hash for verify URLs issued before the migration. Both compare against
+  // the same credential bytes.
+  if (body.digestMultibase || body.hash) {
+    const credentialBytes = new TextEncoder().encode(JSON.stringify(credential));
+
+    if (body.digestMultibase) {
+      logger.info('Verifying credential digestMultibase');
+      const expected = MultibaseDigest.fromString(body.digestMultibase);
+      const matches = await expected.verify(credentialBytes);
+      if (!matches) {
+        logger.warn({ expected: body.digestMultibase }, 'Digest mismatch');
+        return NextResponse.json(
+          { error: 'Credential digest does not match the expected digest', code: 'DIGEST_MISMATCH' },
+          { status: 422 },
+        );
+      }
+      logger.info('Digest verification passed');
+    } else if (body.hash) {
+      logger.info('Verifying credential legacy hex hash');
+      const digestBuffer = await crypto.subtle.digest('SHA-256', credentialBytes);
+      const computed = Array.from(new Uint8Array(digestBuffer))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+      if (computed !== body.hash) {
+        logger.warn({ expected: body.hash, computed }, 'Digest mismatch');
+        return NextResponse.json(
+          { error: 'Credential digest does not match the expected digest', code: 'DIGEST_MISMATCH' },
+          { status: 422 },
+        );
+      }
+      logger.info('Digest verification passed');
     }
-    logger.info('Hash verification passed');
   }
 
   // ── Step 5: Validate credential type ───────────────────────────────

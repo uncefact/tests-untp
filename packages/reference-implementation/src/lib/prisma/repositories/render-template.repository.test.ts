@@ -62,7 +62,7 @@ describe('render-template.repository', () => {
     name: 'DPP Default Template',
     renderMethodType: 'RenderTemplate2024',
     storageUrl: 'https://storage.example.com/templates/dpp-default.html',
-    hash: 'sha256-abc123',
+    digestMultibase: 'zTESTabc123',
     isDefault: false,
     storageServiceInstanceId: null,
     storageExternalId: null,
@@ -88,7 +88,7 @@ describe('render-template.repository', () => {
         dataModelId: CONFIG_ID,
         renderMethodType: 'RenderTemplate2024',
         storageUrl: 'https://storage.example.com/templates/dpp-default.html',
-        hash: 'sha256-abc123',
+        digestMultibase: 'zTESTabc123',
       });
 
       expect(mockTx.renderTemplate.create).toHaveBeenCalledWith({
@@ -98,7 +98,7 @@ describe('render-template.repository', () => {
           dataModelId: CONFIG_ID,
           renderMethodType: 'RenderTemplate2024',
           storageUrl: 'https://storage.example.com/templates/dpp-default.html',
-          hash: 'sha256-abc123',
+          digestMultibase: 'zTESTabc123',
           isDefault: false,
           storageServiceInstanceId: undefined,
           storageExternalId: undefined,
@@ -121,7 +121,7 @@ describe('render-template.repository', () => {
         dataModelId: CONFIG_ID,
         renderMethodType: 'RenderTemplate2024',
         storageUrl: 'https://storage.example.com/templates/dpp-default.html',
-        hash: 'sha256-abc123',
+        digestMultibase: 'zTESTabc123',
       });
 
       expect(mockTx.renderTemplate.create).toHaveBeenCalledWith({
@@ -142,7 +142,7 @@ describe('render-template.repository', () => {
         dataModelId: CONFIG_ID,
         renderMethodType: 'RenderTemplate2024',
         storageUrl: 'https://storage.example.com/templates/dpp-default.html',
-        hash: 'sha256-def456',
+        digestMultibase: 'zTESTdef456',
         isDefault: true,
       });
 
@@ -400,19 +400,19 @@ describe('render-template.repository', () => {
       mockTx.renderTemplate.update.mockResolvedValue({
         ...TEMPLATE_RECORD,
         storageUrl: 'https://storage.example.com/templates/updated.html',
-        hash: 'sha256-new789',
+        digestMultibase: 'zTESTnew789',
       });
 
       await updateRenderTemplate('template-1', TENANT_ID, {
         storageUrl: 'https://storage.example.com/templates/updated.html',
-        hash: 'sha256-new789',
+        digestMultibase: 'zTESTnew789',
       });
 
       expect(mockTx.renderTemplate.update).toHaveBeenCalledWith({
         where: { id: 'template-1' },
         data: {
           storageUrl: 'https://storage.example.com/templates/updated.html',
-          hash: 'sha256-new789',
+          digestMultibase: 'zTESTnew789',
         },
         include: INCLUDE_SHAPE,
       });

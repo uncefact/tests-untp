@@ -39,7 +39,7 @@ const MOCK_DATA_MODEL = {
 
 const MOCK_STORAGE_RESULT = {
   uri: 'https://storage.example.com/doc/123',
-  hash: 'sha256-abc',
+  digestMultibase: 'zTESTabc',
   externalId: 'ext-id-123',
   bucket: 'pub-bucket',
   mimeType: 'text/html',
@@ -58,7 +58,7 @@ const MOCK_CREATED_RECORD = {
   dataModelId: DATA_MODEL_ID,
   renderMethodType: 'RenderTemplate2024',
   storageUrl: MOCK_STORAGE_RESULT.uri,
-  hash: MOCK_STORAGE_RESULT.hash,
+  digestMultibase: MOCK_STORAGE_RESULT.digestMultibase,
   isDefault: false,
   dataModel: MOCK_DATA_MODEL,
 };
@@ -128,7 +128,7 @@ describe('createRenderTemplate', () => {
     expect(mockStoreBinary).toHaveBeenCalledWith('<p>content</p>', 'My Template', 'text/html', false);
   });
 
-  it('creates DB record with storage response uri, hash, externalId, bucket, mimeType, and instanceId', async () => {
+  it('creates DB record with storage response uri, digestMultibase, externalId, bucket, mimeType, and instanceId', async () => {
     await createRenderTemplate(buildInput());
 
     expect(mockCreateRenderTemplateRepo).toHaveBeenCalledWith(TENANT_ID, {
@@ -136,7 +136,7 @@ describe('createRenderTemplate', () => {
       dataModelId: DATA_MODEL_ID,
       renderMethodType: 'RenderTemplate2024',
       storageUrl: MOCK_STORAGE_RESULT.uri,
-      hash: MOCK_STORAGE_RESULT.hash,
+      digestMultibase: MOCK_STORAGE_RESULT.digestMultibase,
       isDefault: undefined,
       storageServiceInstanceId: 'storage-instance-1',
       storageExternalId: MOCK_STORAGE_RESULT.externalId,

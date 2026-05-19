@@ -291,6 +291,9 @@ importers:
       '@uncefact/untp-ri-services':
         specifier: workspace:*
         version: link:../services
+      '@uncefact/untp-utils':
+        specifier: workspace:*
+        version: link:../untp-utils
       '@uncefact/vckit-renderer':
         specifier: 1.0.0-next.61
         version: 1.0.0-next.61

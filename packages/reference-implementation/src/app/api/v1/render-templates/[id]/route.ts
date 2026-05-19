@@ -10,7 +10,7 @@ import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/render-templates/[id]' });
 
-const REJECTED_FIELDS = ['storageUrl', 'hash', 'renderMethodType'] as const;
+const REJECTED_FIELDS = ['storageUrl', 'digestMultibase', 'renderMethodType'] as const;
 const PATCHABLE_FIELDS = ['name', 'template', 'isDefault', 'inline', 'mediaType', 'mediaQuery'] as const;
 
 /**

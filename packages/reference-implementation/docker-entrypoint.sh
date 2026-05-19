@@ -19,6 +19,21 @@ if [ "${SKIP_MIGRATIONS:-false}" = "false" ]; then
     cd /app/prisma
     node /app/node_modules/prisma/build/index.js migrate deploy --config=prisma.config.ts
     echo "Database migrations completed"
+
+    # Run paired data backfills. Each backfill script is idempotent and
+    # safe to rerun; together with the schema migrations they bring an
+    # existing database fully in sync with the application's data
+    # expectations. Keep this block ordered after migrate deploy so
+    # column renames / adds have already landed by the time the
+    # backfills run.
+    if [ "${SKIP_BACKFILLS:-false}" = "false" ]; then
+        echo "Running database backfills..."
+        cd /app/prisma
+        /app/node_modules/.bin/tsx backfills/2026-05-19-hex-to-multibase.ts
+        echo "Database backfills completed"
+    else
+        echo "Skipping database backfills (SKIP_BACKFILLS is set)"
+    fi
 else
     echo "Skipping database migrations (SKIP_MIGRATIONS is set)"
 fi
