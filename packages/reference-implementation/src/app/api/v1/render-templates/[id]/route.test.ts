@@ -96,7 +96,7 @@ describe('GET /api/v1/render-templates/:id', () => {
       id: 'rt-1',
       name: 'DPP Default Template',
       storageUrl: 'https://storage.example.com/templates/dpp.html',
-      hash: 'abc123',
+      digestMultibase: 'zTESTabc123',
       isDefault: true,
       dataModel: { id: 'dm-1', name: 'DPP v0.6.0' },
     };
@@ -144,7 +144,7 @@ describe('PATCH /api/v1/render-templates/:id', () => {
       id: 'rt-1',
       name: 'Updated Template',
       storageUrl: 'https://storage.example.com/templates/dpp.html',
-      hash: 'abc123',
+      digestMultibase: 'zTESTabc123',
       isDefault: false,
       dataModel: { id: 'dm-1', name: 'DPP v0.6.0' },
     };
@@ -181,7 +181,7 @@ describe('PATCH /api/v1/render-templates/:id', () => {
       id: 'rt-1',
       name: 'DPP Template',
       storageUrl: 'https://storage.example.com/templates/new.html',
-      hash: 'newhash',
+      digestMultibase: 'zTESTnew',
       isDefault: false,
       dataModel: { id: 'dm-1', name: 'DPP v0.6.0' },
     };
@@ -243,13 +243,13 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     expect(json.error).toBe('storageUrl cannot be set directly');
   });
 
-  it('rejects hash in body', async () => {
-    const req = createFakeRequest({ method: 'PATCH', body: { hash: 'abc123' } });
+  it('rejects digestMultibase in body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { digestMultibase: 'zTESTabc123' } });
     const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toBe('hash cannot be set directly');
+    expect(json.error).toBe('digestMultibase cannot be set directly');
   });
 
   it('rejects renderMethodType in body', async () => {

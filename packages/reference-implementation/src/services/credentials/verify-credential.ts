@@ -1,5 +1,6 @@
 export type VerifyCredentialParams = {
   uri: string;
+  digestMultibase?: string;
   hash?: string;
   decryptionKey?: string;
 };

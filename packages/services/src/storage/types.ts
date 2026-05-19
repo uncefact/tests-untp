@@ -8,8 +8,13 @@ export const STORAGE_SERVICE_TYPE = 'STORAGE' as const;
 export type StorageRecord = {
   /** URI where the credential is stored */
   uri: string;
-  /** Hash of the stored credential for integrity verification */
-  hash: string;
+  /**
+   * Multibase-encoded multihash of the stored content for integrity
+   * verification. Default encoding is `base58btc` (`z…`) with `sha2-256`
+   * as the hash algorithm. Decoded and verified via {@link
+   * @uncefact/untp-utils/multibase-digest.MultibaseDigest}.
+   */
+  digestMultibase: string;
   /** Decryption key if the credential was stored encrypted */
   decryptionKey?: string;
   /** Storage resource identifier */

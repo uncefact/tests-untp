@@ -41,10 +41,11 @@ jest.mock('@/lib/api/with-public-route', () => {
 });
 
 const mockResolveVcService = jest.fn();
-const mockComputeHash = jest.fn();
 const mockDecryptCredential = jest.fn();
 const mockIsEncryptedEnvelope = jest.fn();
 const mockDecodeJwt = jest.fn();
+const mockMultibaseDigestVerify = jest.fn();
+const mockMultibaseDigestFromString = jest.fn((_input: string) => ({ verify: mockMultibaseDigestVerify }));
 
 jest.mock('@/lib/services/resolve-vc-service', () => ({
   resolveVcService: (...args: unknown[]) => mockResolveVcService(...args),
@@ -53,12 +54,17 @@ jest.mock('@/lib/services/resolve-vc-service', () => ({
 jest.mock('@uncefact/untp-ri-services', () => {
   const actual = jest.requireActual('@uncefact/untp-ri-services');
   return {
-    computeHash: (...args: unknown[]) => mockComputeHash(...args),
     decryptCredential: (...args: unknown[]) => mockDecryptCredential(...args),
     isEncryptedEnvelope: (...args: unknown[]) => mockIsEncryptedEnvelope(...args),
     VcVerifyError: actual.VcVerifyError,
   };
 });
+
+jest.mock('@uncefact/untp-utils/multibase-digest', () => ({
+  MultibaseDigest: {
+    fromString: (input: string) => mockMultibaseDigestFromString(input),
+  },
+}));
 
 jest.mock('jose', () => ({
   decodeJwt: (...args: unknown[]) => mockDecodeJwt(...args),
@@ -146,7 +152,7 @@ describe('POST /api/v1/credentials/verify', () => {
     jest.clearAllMocks();
     mockResolveVcService.mockResolvedValue({ service: mockVcService, instanceId: 'inst-1' });
     mockDecodeJwt.mockReturnValue(DECODED_JWT);
-    mockComputeHash.mockReturnValue(VALID_HASH);
+    mockMultibaseDigestVerify.mockResolvedValue(true);
     mockIsEncryptedEnvelope.mockReturnValue(false);
     mockValidatePublicUrl.mockResolvedValue(undefined);
     delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
@@ -352,15 +358,26 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.code).toBe('DECRYPTION_FAILED');
   });
 
-  it('returns 422 when hash does not match', async () => {
+  it('returns 422 when digestMultibase does not match', async () => {
     mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
-    mockComputeHash.mockReturnValue('c'.repeat(64));
+    mockMultibaseDigestVerify.mockResolvedValueOnce(false);
 
+    const res = await POST(createFakeRequest({ uri: VALID_URI, digestMultibase: 'zNOMATCH' }));
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error).toBe('Credential digest does not match the expected digest');
+    expect(json.code).toBe('DIGEST_MISMATCH');
+  });
+
+  it('returns 422 when legacy hex hash does not match', async () => {
+    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    // VALID_HASH is `a`.repeat(64); the real sha-256 of the JSON credential
+    // will not equal that, so the legacy path's comparison fails.
     const res = await POST(createFakeRequest({ uri: VALID_URI, hash: VALID_HASH }));
     expect(res.status).toBe(422);
     const json = await res.json();
-    expect(json.error).toBe('Credential hash does not match the expected hash');
-    expect(json.code).toBe('HASH_MISMATCH');
+    expect(json.error).toBe('Credential digest does not match the expected digest');
+    expect(json.code).toBe('DIGEST_MISMATCH');
   });
 
   it('returns 422 when credential is not an EnvelopedVerifiableCredential', async () => {
@@ -415,13 +432,13 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(mockDecryptCredential).not.toHaveBeenCalled();
   });
 
-  it('skips hash check when hash not provided', async () => {
+  it('skips digest check when neither digestMultibase nor hash is provided', async () => {
     mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
     mockVcService.verify.mockResolvedValue({ verified: true });
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(200);
-    expect(mockComputeHash).not.toHaveBeenCalled();
+    expect(mockMultibaseDigestFromString).not.toHaveBeenCalled();
   });
 
   it('omits decodedCredential and adds warning when JWT decode fails', async () => {

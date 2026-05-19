@@ -90,6 +90,7 @@ describe('VerifyPage', () => {
       expect(mockVerifyCredential).toHaveBeenCalledWith({
         uri: 'http://localhost:3333/v1/credentials/abc.json',
         decryptionKey: 'my-key',
+        digestMultibase: undefined,
         hash: 'my-hash',
       });
     });
@@ -116,6 +117,7 @@ describe('VerifyPage', () => {
       expect(mockVerifyCredential).toHaveBeenCalledWith({
         uri: 'http://localhost:3333/v1/credentials/abc.json',
         decryptionKey: 'my-key',
+        digestMultibase: undefined,
         hash: 'my-hash',
       });
     });

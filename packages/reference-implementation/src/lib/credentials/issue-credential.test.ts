@@ -38,7 +38,7 @@ const SIGNED_CREDENTIAL = {
 
 const STORAGE_RESPONSE = {
   uri: 'https://storage.example.com/abc',
-  hash: 'sha256-abc',
+  digestMultibase: 'zTESTabc',
   decryptionKey: 'key-1',
 };
 
@@ -122,7 +122,7 @@ describe('issueCredential', () => {
     expect(mockCreateCredential).toHaveBeenCalledWith({
       tenantId: TENANT_ID,
       storageUri: STORAGE_RESPONSE.uri,
-      hash: STORAGE_RESPONSE.hash,
+      digestMultibase: STORAGE_RESPONSE.digestMultibase,
       decryptionKey: STORAGE_RESPONSE.decryptionKey,
       credentialType: 'DigitalProductPassport',
       isPublished: false,

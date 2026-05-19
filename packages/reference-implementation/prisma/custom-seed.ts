@@ -1,13 +1,13 @@
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
 import { parse as parseYaml } from 'yaml';
+import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import type { LoggerService as Logger, ICvcParser } from '@uncefact/untp-ri-services';
-import type { PrismaClient, Prisma } from '../src/lib/prisma/generated';
-import { RenderMethodType } from '../src/lib/prisma/generated';
-import { customSeedSchema, type CustomSeedManifest } from './custom-seed-schema';
-import { validateManifestReferences, type ValidationContext } from './custom-seed-validate';
-import { buildUpsertOperations } from './custom-seed-upsert';
+import type { PrismaClient, Prisma } from '../src/lib/prisma/generated/index.js';
+import { RenderMethodType } from '../src/lib/prisma/generated/index.js';
+import { customSeedSchema, type CustomSeedManifest } from './custom-seed-schema.js';
+import { validateManifestReferences, type ValidationContext } from './custom-seed-validate.js';
+import { buildUpsertOperations } from './custom-seed-upsert.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ export interface CustomSeedDependencies {
       mimeType: string,
     ) => Promise<{
       uri: string;
-      hash?: string;
+      digestMultibase?: string;
       externalId?: string;
       bucket?: string;
     }>;
@@ -262,7 +262,7 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
   interface TemplateStorageResult {
     templateId: string;
     storageUrl: string;
-    hash: string;
+    digestMultibase: string;
     externalId?: string;
     bucket?: string;
     contentType: string;
@@ -283,10 +283,14 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
 
       const storageRecord = await deps.storageService.storeBinary(templateContent, fileName, 'text/html');
 
+      const digestMultibase =
+        storageRecord.digestMultibase ??
+        (await MultibaseDigest.fromText(templateContent, { algorithm: 'sha2-256', base: 'base58btc' })).toString();
+
       templateResults.push({
         templateId: template.id,
         storageUrl: storageRecord.uri,
-        hash: storageRecord.hash ?? crypto.createHash('sha256').update(templateContent).digest('hex'),
+        digestMultibase,
         externalId: storageRecord.externalId,
         bucket: storageRecord.bucket,
         contentType: 'text/html',
@@ -421,7 +425,7 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
             name: template.name,
             dataModelId: template.dataModelId,
             storageUrl: storageResult.storageUrl,
-            hash: storageResult.hash,
+            digestMultibase: storageResult.digestMultibase,
             isDefault: template.isDefault,
             renderMethodType: template.renderMethodType as RenderMethodType,
             inline: template.inline,
@@ -438,7 +442,7 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
             name: template.name,
             dataModelId: template.dataModelId,
             storageUrl: storageResult.storageUrl,
-            hash: storageResult.hash,
+            digestMultibase: storageResult.digestMultibase,
             isDefault: template.isDefault,
             renderMethodType: template.renderMethodType as RenderMethodType,
             inline: template.inline,

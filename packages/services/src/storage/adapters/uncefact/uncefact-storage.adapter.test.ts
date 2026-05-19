@@ -8,6 +8,17 @@ import type { UncefactStorageConfig } from './uncefact-storage.schema';
 import type { LoggerService } from '../../../logging/types';
 import type { EnvelopedVerifiableCredential } from '../../../verifiable-credential/types';
 
+// Sha-256 hex digests and the corresponding `digestMultibase` strings the
+// adapter is expected to emit. The multibase form is produced by the test
+// stub at `__tests__/mocks/multibase-digest.ts` (which is wired up via
+// moduleNameMapper in services jest.config.js), so it uses the stub's
+// deterministic `zTEST<hex>` shape rather than a real multihash encoding.
+// Real multibase encoding round-trip coverage lives in untp-utils.
+const HEX_A = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+const MULTIBASE_A = `zTEST${HEX_A}`;
+const HEX_B = '9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca7';
+const MULTIBASE_B = `zTEST${HEX_B}`;
+
 describe('UncefactStorageAdapter', () => {
   const MOCK_UUID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
 
@@ -45,7 +56,7 @@ describe('UncefactStorageAdapter', () => {
       statusText: 'OK',
       json: jest.fn().mockResolvedValue({
         uri: 'https://storage.example.com/documents/abc-123',
-        hash: 'sha256-abc123def456',
+        hash: HEX_A,
         decryptionKey: undefined,
       }),
     });
@@ -141,7 +152,7 @@ describe('UncefactStorageAdapter', () => {
         status: 200,
         json: jest.fn().mockResolvedValue({
           uri: 'https://storage.example.com/credentials/xyz-789',
-          hash: 'sha256-xyz789',
+          hash: HEX_B,
           decryptionKey: 'decryption-key-abc',
         }),
       });
@@ -177,7 +188,7 @@ describe('UncefactStorageAdapter', () => {
         ok: true,
         json: jest.fn().mockResolvedValue({
           uri: 'https://storage.example.com/documents/abc-123',
-          hash: 'sha256-abc123def456',
+          hash: HEX_A,
         }),
       });
 
@@ -186,7 +197,7 @@ describe('UncefactStorageAdapter', () => {
 
       expect(result).toEqual({
         uri: 'https://storage.example.com/documents/abc-123',
-        hash: 'sha256-abc123def456',
+        digestMultibase: MULTIBASE_A,
         decryptionKey: undefined,
         externalId: MOCK_UUID,
         bucket: 'public-data',
@@ -199,7 +210,7 @@ describe('UncefactStorageAdapter', () => {
         ok: true,
         json: jest.fn().mockResolvedValue({
           uri: 'https://storage.example.com/credentials/xyz-789',
-          hash: 'sha256-xyz789',
+          hash: HEX_B,
           decryptionKey: 'decryption-key-abc',
         }),
       });
@@ -209,7 +220,7 @@ describe('UncefactStorageAdapter', () => {
 
       expect(result).toEqual({
         uri: 'https://storage.example.com/credentials/xyz-789',
-        hash: 'sha256-xyz789',
+        digestMultibase: MULTIBASE_B,
         decryptionKey: 'decryption-key-abc',
         externalId: MOCK_UUID,
         bucket: 'private-data',
@@ -261,7 +272,7 @@ describe('UncefactStorageAdapter', () => {
           status: 200,
           json: jest.fn().mockResolvedValue({
             uri: 'https://storage.example.com/credentials/xyz-789',
-            hash: 'sha256-xyz789',
+            hash: HEX_B,
             decryptionKey: 'decryption-key-abc',
           }),
         });
@@ -280,7 +291,7 @@ describe('UncefactStorageAdapter', () => {
           status: 200,
           json: jest.fn().mockResolvedValue({
             uri: 'https://storage.example.com/credentials/xyz-789',
-            hash: 'sha256-xyz789',
+            hash: HEX_B,
             decryptionKey: 'decryption-key-abc',
           }),
         });
@@ -477,11 +488,32 @@ describe('UncefactStorageAdapter', () => {
         );
       });
 
+      it.each([
+        ['null', null],
+        ['array', []],
+        ['string', 'not-an-object'],
+        ['number', 42],
+      ])('should throw StorageStoreError when response body is %s', async (_label, value) => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue(value),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.store(mockCredential)).rejects.toThrow(
+          expect.objectContaining({
+            message: expect.stringContaining('body is not an object'),
+          }),
+        );
+      });
+
       it('should throw StorageStoreError when response is missing "uri"', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
-          json: jest.fn().mockResolvedValue({ hash: 'sha256-abc123' }),
+          json: jest.fn().mockResolvedValue({ hash: HEX_A }),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -489,11 +521,63 @@ describe('UncefactStorageAdapter', () => {
         await expect(adapter.store(mockCredential)).rejects.toThrow(StorageStoreError);
       });
 
-      it('should throw StorageStoreError when response is missing "hash"', async () => {
+      it('should throw StorageStoreError when response is missing both "multibaseDigest" and "hash"', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
           json: jest.fn().mockResolvedValue({ uri: 'https://storage.example.com/documents/abc-123' }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.store(mockCredential)).rejects.toThrow(StorageStoreError);
+      });
+
+      it('should prefer "multibaseDigest" over legacy "hash" when both are present', async () => {
+        const PRESENT_MULTIBASE = `zTESTpreferred${HEX_B}`;
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/documents/abc-123',
+            multibaseDigest: PRESENT_MULTIBASE,
+            hash: HEX_A,
+          }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        const result = await adapter.store(mockCredential);
+
+        expect(result.digestMultibase).toBe(PRESENT_MULTIBASE);
+      });
+
+      it('should accept "multibaseDigest" as the sole digest field', async () => {
+        const ONLY_MULTIBASE = `zTESTonly${HEX_A}`;
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/documents/abc-123',
+            multibaseDigest: ONLY_MULTIBASE,
+          }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        const result = await adapter.store(mockCredential);
+
+        expect(result.digestMultibase).toBe(ONLY_MULTIBASE);
+      });
+
+      it('should throw StorageStoreError when "multibaseDigest" is not a valid multibase string', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/documents/abc-123',
+            multibaseDigest: 'not-a-multibase-string',
+          }),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -507,7 +591,7 @@ describe('UncefactStorageAdapter', () => {
           status: 200,
           json: jest.fn().mockResolvedValue({
             uri: 'https://storage.example.com/credentials/xyz-789',
-            hash: 'sha256-xyz789',
+            hash: HEX_B,
           }),
         });
 
@@ -653,7 +737,7 @@ describe('UncefactStorageAdapter', () => {
         status: 200,
         json: jest.fn().mockResolvedValue({
           uri: 'https://storage.example.com/documents/binary-456',
-          hash: 'sha256-binary456',
+          hash: HEX_A,
           decryptionKey: 'key-abc',
         }),
       });
@@ -740,7 +824,7 @@ describe('UncefactStorageAdapter', () => {
 
       expect(result).toEqual({
         uri: 'https://storage.example.com/documents/abc-123',
-        hash: 'sha256-abc123def456',
+        digestMultibase: MULTIBASE_A,
         decryptionKey: undefined,
         externalId: MOCK_UUID,
         bucket: 'pub-bucket',
@@ -754,7 +838,7 @@ describe('UncefactStorageAdapter', () => {
         status: 200,
         json: jest.fn().mockResolvedValue({
           uri: 'https://storage.example.com/documents/binary-456',
-          hash: 'sha256-binary456',
+          hash: HEX_A,
           decryptionKey: 'decrypt-key-xyz',
         }),
       });
@@ -764,7 +848,7 @@ describe('UncefactStorageAdapter', () => {
 
       expect(result).toEqual({
         uri: 'https://storage.example.com/documents/binary-456',
-        hash: 'sha256-binary456',
+        digestMultibase: MULTIBASE_A,
         decryptionKey: 'decrypt-key-xyz',
         externalId: MOCK_UUID,
         bucket: 'priv-bucket',
@@ -824,7 +908,7 @@ describe('UncefactStorageAdapter', () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
-          json: jest.fn().mockResolvedValue({ hash: 'sha256-abc123' }),
+          json: jest.fn().mockResolvedValue({ hash: HEX_A }),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
@@ -832,7 +916,7 @@ describe('UncefactStorageAdapter', () => {
         await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(StorageStoreError);
       });
 
-      it('should throw StorageStoreError when response is missing "hash"', async () => {
+      it('should throw StorageStoreError when response is missing both "multibaseDigest" and "hash"', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
@@ -842,6 +926,79 @@ describe('UncefactStorageAdapter', () => {
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
 
         await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(StorageStoreError);
+      });
+
+      it('should prefer "multibaseDigest" over legacy "hash" when both are present', async () => {
+        const PRESENT_MULTIBASE = `zTESTpreferred${HEX_A}`;
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/documents/abc-123',
+            multibaseDigest: PRESENT_MULTIBASE,
+            hash: HEX_B,
+          }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        const result = await adapter.storeBinary('<html></html>', 'f.html', 'text/html');
+
+        expect(result.digestMultibase).toBe(PRESENT_MULTIBASE);
+      });
+
+      it('should accept "multibaseDigest" as the sole digest field', async () => {
+        const ONLY_MULTIBASE = `zTESTonly${HEX_B}`;
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/documents/abc-123',
+            multibaseDigest: ONLY_MULTIBASE,
+          }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        const result = await adapter.storeBinary('<html></html>', 'f.html', 'text/html');
+
+        expect(result.digestMultibase).toBe(ONLY_MULTIBASE);
+      });
+
+      it('should throw StorageStoreError when "multibaseDigest" is not a valid multibase string', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            uri: 'https://storage.example.com/documents/abc-123',
+            multibaseDigest: 'garbage',
+          }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(StorageStoreError);
+      });
+
+      it.each([
+        ['null', null],
+        ['array', []],
+        ['string', 'not-an-object'],
+        ['number', 42],
+      ])('should throw StorageStoreError when response body is %s', async (_label, value) => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue(value),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(
+          expect.objectContaining({
+            message: expect.stringContaining('body is not an object'),
+          }),
+        );
       });
 
       it('should throw StorageStoreError when response is not valid JSON', async () => {
@@ -866,7 +1023,7 @@ describe('UncefactStorageAdapter', () => {
           status: 200,
           json: jest.fn().mockResolvedValue({
             uri: 'https://storage.example.com/documents/binary-123',
-            hash: 'sha256-binary123',
+            hash: HEX_A,
           }),
         });
 

@@ -1,7 +1,12 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
-import crypto from 'crypto';
+import { fileURLToPath } from 'url';
+import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
+
+// Reconstruct `__dirname` for ESM (prisma/ is scoped to `"type": "module"`
+// via prisma/package.json so the multibase digest imports resolve).
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import {
   DidMethod,
   DidStatus,
@@ -10,7 +15,7 @@ import {
   RenderMethodType,
   ServiceType as PrismaServiceType,
   AdapterType as PrismaAdapterType,
-} from '../src/lib/prisma/generated';
+} from '../src/lib/prisma/generated/index.js';
 import { AesGcmEncryptionAdapter, didAdapterRegistry } from '@uncefact/untp-ri-services/server';
 import {
   EncryptionAlgorithm,
@@ -22,14 +27,14 @@ import {
   adapterRegistry,
   ServiceType,
 } from '@uncefact/untp-ri-services';
-import { getDidConfig } from '../src/lib/config/did.config';
+import { getDidConfig } from '../src/lib/config/did.config.js';
 import {
   SYSTEM_TENANT_ID,
   SYSTEM_IDR_SERVICE_ID,
   SYSTEM_STORAGE_SERVICE_ID,
   SYSTEM_VC_SERVICE_ID,
   SYSTEM_DID_ID,
-} from '../src/lib/prisma/constants';
+} from '../src/lib/prisma/constants.js';
 
 const logger = createLogger().child({ module: 'prisma-seed' });
 
@@ -563,7 +568,11 @@ async function main() {
             dataModelId: dm.id,
             name: `${dm.name} Default Template`,
             storageUrl: storageRecord.uri,
-            hash: storageRecord.hash ?? crypto.createHash('sha256').update(templateContent).digest('hex'),
+            digestMultibase:
+              storageRecord.digestMultibase ??
+              (
+                await MultibaseDigest.fromText(templateContent, { algorithm: 'sha2-256', base: 'base58btc' })
+              ).toString(),
             isDefault: true,
             renderMethodType: RenderMethodType.RenderTemplate2024,
             inline: false,

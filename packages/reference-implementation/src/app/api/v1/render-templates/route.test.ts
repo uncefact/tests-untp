@@ -96,14 +96,14 @@ describe('GET /api/v1/render-templates', () => {
         name: 'DPP Template',
         dataModelId: 'dm-1',
         storageUrl: 'https://example.com/tpl1.html',
-        hash: 'abc123',
+        digestMultibase: 'zTESTabc123',
       },
       {
         id: 'rt-2',
         name: 'DCC Template',
         dataModelId: 'dm-2',
         storageUrl: 'https://example.com/tpl2.html',
-        hash: 'def456',
+        digestMultibase: 'zTESTdef456',
       },
     ];
     mockListRenderTemplates.mockResolvedValue({ data: renderTemplates, total: 2 });
@@ -281,7 +281,24 @@ describe('POST /api/v1/render-templates', () => {
     expect(json.error).toContain('storageUrl cannot be set directly');
   });
 
-  it('rejects when hash is provided', async () => {
+  it('rejects when digestMultibase is provided', async () => {
+    const req = createFakeRequest({
+      body: {
+        name: 'Template',
+        dataModelId: 'dm-1',
+        renderMethodType: 'RenderTemplate2024',
+        template: '<div>Hello</div>',
+        digestMultibase: 'zTESTsneaky',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('digestMultibase cannot be set directly');
+  });
+
+  it('rejects when legacy hash is provided', async () => {
     const req = createFakeRequest({
       body: {
         name: 'Template',
@@ -295,7 +312,7 @@ describe('POST /api/v1/render-templates', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('hash cannot be set directly');
+    expect(json.error).toContain('hash is no longer accepted');
   });
 
   it('rejects when renderMethodType is missing', async () => {

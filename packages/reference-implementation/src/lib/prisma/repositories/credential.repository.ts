@@ -7,7 +7,7 @@ import { prisma } from '../prisma';
 export type CreateCredentialInput = {
   tenantId: string;
   storageUri: string;
-  hash: string;
+  digestMultibase: string;
   decryptionKey?: string;
   credentialType: string;
   isPublished?: boolean;
@@ -35,7 +35,7 @@ export async function createCredential(input: CreateCredentialInput): Promise<Cr
     data: {
       tenantId: input.tenantId,
       storageUri: input.storageUri,
-      hash: input.hash,
+      digestMultibase: input.digestMultibase,
       decryptionKey: input.decryptionKey,
       credentialType: input.credentialType,
       isPublished: input.isPublished ?? false,

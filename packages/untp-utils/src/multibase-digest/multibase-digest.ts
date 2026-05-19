@@ -125,6 +125,18 @@ export class MultibaseDigest {
   }
 
   /**
+   * UTF-8 encodes `text` and delegates to {@link MultibaseDigest.fromData}.
+   * Convenience for the very common case of digesting a string of content
+   * (rendered template HTML, JSON-serialised credential, etc.) without
+   * hand-rolling the `TextEncoder` boilerplate at every call site.
+   *
+   * @throws If `algorithm` or `base` is not in the allow-list.
+   */
+  static async fromText(text: string, opts: MultibaseDigestOptions): Promise<MultibaseDigest> {
+    return MultibaseDigest.fromData(new TextEncoder().encode(text), opts);
+  }
+
+  /**
    * Wraps an already-computed raw `digest` (the bytes a hash function produces,
    * no multihash prefix) and tags it with the requested multibase encoding. The
    * caller asserts the algorithm; the byte length must match its expected
@@ -143,6 +155,36 @@ export class MultibaseDigest {
     const hasher = HASHERS[opts.algorithm];
     const mh = Digest.create(hasher.code, digest);
     return new MultibaseDigest(opts.algorithm, opts.base, mh.digest, mh.bytes);
+  }
+
+  /**
+   * Wraps a hex-encoded raw `digest` and tags it with the requested multibase
+   * encoding. The caller asserts the algorithm; the decoded byte length must
+   * match its expected digest size.
+   *
+   * Provided as the canonical bridge from hex-based legacy systems (Uncefact
+   * storage's pre-migration `hash` field, RI rows still holding hex values
+   * during the multibase migration, etc.) to multibase-encoded consumers.
+   *
+   * @throws If `hex` is empty, contains non-hex characters, or has an odd
+   *   number of characters, or if the decoded byte length does not match
+   *   the expected size for `algorithm`.
+   */
+  static fromHex(hex: string, opts: MultibaseDigestOptions): MultibaseDigest {
+    if (typeof hex !== 'string' || hex.length === 0) {
+      throw new Error('Hex digest must be a non-empty string');
+    }
+    if (hex.length % 2 !== 0) {
+      throw new Error(`Hex digest must have an even number of characters; got ${hex.length}`);
+    }
+    if (!/^[a-fA-F0-9]+$/.test(hex)) {
+      throw new Error(`Hex digest contains non-hex characters: "${hex}"`);
+    }
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bytes.length; i += 1) {
+      bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    }
+    return MultibaseDigest.fromDigest(bytes, opts);
   }
 
   /**

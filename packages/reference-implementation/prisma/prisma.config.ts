@@ -1,6 +1,13 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { defineConfig } from 'prisma/config';
+
+// Resolve the directory containing this file in ESM mode (the `prisma/`
+// directory was scoped to ESM via `prisma/package.json` so the seed and
+// backfill scripts can import `@uncefact/untp-utils/multibase-digest`).
+// `__dirname` is a CJS-only global, so reconstruct it from `import.meta.url`.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Load .env from repository root
 // Local dev: Loads environment variables from .env file

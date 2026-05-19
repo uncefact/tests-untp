@@ -5,9 +5,9 @@ describe('Verify Page', { testIsolation: false }, () => {
   let testTenantId: string;
   let defaultDidValue: string;
   let unencryptedUri: string;
-  let unencryptedHash: string;
+  let unencryptedDigest: string;
   let encryptedUri: string;
-  let encryptedHash: string;
+  let encryptedDigest: string;
   let encryptedKey: string;
 
   function buildCredentialPayload(issuerDid: string) {
@@ -118,7 +118,7 @@ describe('Verify Page', { testIsolation: false }, () => {
         cy.request(`/api/v1/credentials/${credId}`).then((res) => {
           const cred = res.body;
           unencryptedUri = cred.storageUri;
-          unencryptedHash = cred.hash;
+          unencryptedDigest = cred.digestMultibase;
         });
       });
     });
@@ -139,7 +139,7 @@ describe('Verify Page', { testIsolation: false }, () => {
         cy.request(`/api/v1/credentials/${credId}`).then((res) => {
           const cred = res.body;
           encryptedUri = cred.storageUri;
-          encryptedHash = cred.hash;
+          encryptedDigest = cred.digestMultibase;
           encryptedKey = cred.decryptionKey;
         });
       });
@@ -149,8 +149,8 @@ describe('Verify Page', { testIsolation: false }, () => {
   // ── Happy paths ──────────────────────────────────────────────────
 
   describe('Happy paths', () => {
-    it('verifies unencrypted credential via direct params', () => {
-      cy.visit(buildDirectVerifyUrl({ uri: unencryptedUri, hash: unencryptedHash }));
+    it('verifies unencrypted credential via direct params with digestMultibase', () => {
+      cy.visit(buildDirectVerifyUrl({ uri: unencryptedUri, digestMultibase: unencryptedDigest }));
 
       // Wait for loading to finish
       cy.contains('Verifying the credential', { timeout: 30000 }).should('not.exist');
@@ -160,19 +160,19 @@ describe('Verify Page', { testIsolation: false }, () => {
       cy.contains('JSON', { timeout: 30000 }).should('be.visible');
     });
 
-    it('verifies unencrypted credential via legacy ?q= format', () => {
-      cy.visit(buildLegacyVerifyUrl({ uri: unencryptedUri, hash: unencryptedHash }));
+    it('verifies unencrypted credential via legacy ?q= format with digestMultibase', () => {
+      cy.visit(buildLegacyVerifyUrl({ uri: unencryptedUri, digestMultibase: unencryptedDigest }));
 
       cy.contains('Verifying the credential', { timeout: 30000 }).should('not.exist');
       cy.contains('Invalid verification link').should('not.exist');
       cy.contains('JSON', { timeout: 30000 }).should('be.visible');
     });
 
-    it('verifies encrypted credential via direct params', () => {
+    it('verifies encrypted credential via direct params with digestMultibase', () => {
       cy.visit(
         buildDirectVerifyUrl({
           uri: encryptedUri,
-          hash: encryptedHash,
+          digestMultibase: encryptedDigest,
           decryptionKey: encryptedKey,
         }),
       );
@@ -182,11 +182,11 @@ describe('Verify Page', { testIsolation: false }, () => {
       cy.contains('JSON', { timeout: 30000 }).should('be.visible');
     });
 
-    it('verifies encrypted credential via legacy ?q= format', () => {
+    it('verifies encrypted credential via legacy ?q= format with digestMultibase', () => {
       cy.visit(
         buildLegacyVerifyUrl({
           uri: encryptedUri,
-          hash: encryptedHash,
+          digestMultibase: encryptedDigest,
           key: encryptedKey,
         }),
       );
@@ -215,15 +215,26 @@ describe('Verify Page', { testIsolation: false }, () => {
       cy.contains('Invalid verification link', { timeout: 10000 }).should('be.visible');
     });
 
-    it('shows error when hash does not match', () => {
-      const wrongHash = 'f'.repeat(64);
-      cy.visit(buildDirectVerifyUrl({ uri: unencryptedUri, hash: wrongHash }));
+    it('shows error when digestMultibase does not match', () => {
+      // SHA-256 of the empty string, wrapped as multihash and encoded as
+      // base58btc. Parseable as a multibase digest (so it passes the API's
+      // validation step), but cannot match the credential's JSON content.
+      const wrongDigest = 'zQmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n';
+      cy.visit(buildDirectVerifyUrl({ uri: unencryptedUri, digestMultibase: wrongDigest }));
 
       // Should not show the "invalid link" message (the link itself is valid)
       cy.contains('Invalid verification link').should('not.exist');
 
-      // The API returns 422 HASH_MISMATCH; the page displays the thrown error
-      cy.contains('HASH_MISMATCH', { timeout: 30000 }).should('be.visible');
+      // The API returns 422 DIGEST_MISMATCH; the page displays the thrown error
+      cy.contains('DIGEST_MISMATCH', { timeout: 30000 }).should('be.visible');
+    });
+
+    it('shows error when legacy hex hash does not match', () => {
+      const wrongHash = 'f'.repeat(64);
+      cy.visit(buildDirectVerifyUrl({ uri: unencryptedUri, hash: wrongHash }));
+
+      cy.contains('Invalid verification link').should('not.exist');
+      cy.contains('DIGEST_MISMATCH', { timeout: 30000 }).should('be.visible');
     });
 
     it('shows error for unreachable URI', () => {

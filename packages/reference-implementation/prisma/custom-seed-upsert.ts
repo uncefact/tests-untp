@@ -1,4 +1,4 @@
-import type { CustomSeedManifest } from './custom-seed-schema';
+import type { CustomSeedManifest } from './custom-seed-schema.js';
 
 export interface RegistrarUpsert {
   id: string;

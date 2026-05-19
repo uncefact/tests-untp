@@ -276,7 +276,7 @@ describe('Credential API', { testIsolation: false }, () => {
         const cred = response.body;
         expect(cred.id).to.eq(encryptedCredentialId);
         expect(cred.storageUri).to.be.a('string');
-        expect(cred.hash).to.be.a('string');
+        expect(cred.digestMultibase).to.be.a('string');
         expect(cred.credentialType).to.eq('DigitalProductPassport');
         expect(cred.isPublished).to.be.false;
         // API defaults encrypt to true, so decryptionKey is present
@@ -555,7 +555,7 @@ describe('Credential API', { testIsolation: false }, () => {
         const cred = response.body.data[0];
         expect(cred.id).to.be.a('string');
         expect(cred.storageUri).to.be.a('string');
-        expect(cred.hash).to.be.a('string');
+        expect(cred.digestMultibase).to.be.a('string');
         expect(cred.credentialType).to.be.a('string');
         expect(cred).to.have.property('isPublished');
         expect(cred).to.have.property('createdAt');

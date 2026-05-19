@@ -16,6 +16,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc package.json ./
 COPY packages/reference-implementation/package.json ./packages/reference-implementation/
 COPY packages/components/package.json ./packages/components/
 COPY packages/services/package.json ./packages/services/
+COPY packages/untp-utils/package.json ./packages/untp-utils/
 
 # Install RI's tree (RI itself + its transitive workspace deps:
 # components, services) plus their non-workspace dependencies. The
@@ -44,10 +45,14 @@ WORKDIR /app
 # build layer and everything downstream, instead of busting the whole
 # chain. Order:
 #   1. components — most stable (UI primitives change infrequently)
-#   2. services   — changes more often than components
-#   3. reference-implementation — the app, changes the most
+#   2. untp-utils — stable, no in-repo deps
+#   3. services   — depends on untp-utils, changes more often
+#   4. reference-implementation — the app, changes the most
 COPY packages/components/. ./packages/components/
 RUN pnpm --filter @reference-implementation/components run build
+
+COPY packages/untp-utils/. ./packages/untp-utils/
+RUN pnpm --filter @uncefact/untp-utils run build
 
 COPY packages/services/. ./packages/services/
 RUN pnpm --filter @uncefact/untp-ri-services run build
@@ -146,6 +151,16 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/config ./src/lib/config
 # Render templates used by prisma/seed.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/templates ./src/templates
+
+# Declare ./src as ESM so tsx interprets imported .ts files (constants.ts,
+# did.config.ts, etc.) as ESM and their named exports bind cleanly when
+# the ESM-scoped prisma/seed.ts imports them. Without this, tsx walks up
+# from ./src/lib/prisma/constants.ts to the next ancestor without a
+# "type" field and treats the file as CJS — ESM-side named imports then
+# fail with "module does not provide an export named …". The Prisma
+# generated client under src/lib/prisma/generated/ keeps its own
+# package.json (no "type" field), so it remains CJS as Prisma expects.
+RUN echo '{"type":"module"}' > ./src/package.json
 
 COPY --chown=nextjs:nodejs packages/reference-implementation/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh

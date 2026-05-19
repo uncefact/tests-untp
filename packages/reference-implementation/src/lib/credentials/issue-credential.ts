@@ -47,7 +47,7 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
   const credentialRecord = await createCredential({
     tenantId,
     storageUri: storageResponse.uri,
-    hash: storageResponse.hash,
+    digestMultibase: storageResponse.digestMultibase,
     decryptionKey: storageResponse.decryptionKey,
     credentialType,
     isPublished: false,

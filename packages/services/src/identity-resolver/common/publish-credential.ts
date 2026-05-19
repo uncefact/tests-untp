@@ -58,7 +58,7 @@ export function buildPublishLinks(
       href: constructVerifyURL({
         baseUrl: options.humanVerificationUrl,
         uri: storage.uri,
-        hash: storage.hash,
+        digestMultibase: storage.digestMultibase,
       }),
       rel: credentialLinkType,
       type: 'text/html',

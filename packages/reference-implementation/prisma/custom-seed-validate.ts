@@ -1,5 +1,5 @@
 import path from 'path';
-import { CustomSeedManifest } from './custom-seed-schema';
+import { CustomSeedManifest } from './custom-seed-schema.js';
 
 // ── Validation context ────────────────────────────────────────────────────────
 

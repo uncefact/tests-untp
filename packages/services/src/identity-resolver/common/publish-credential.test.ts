@@ -5,9 +5,11 @@ import type { StorageRecord } from '../../storage/types';
 // Mock constructVerifyURL so we don't depend on window.location or URL construction details
 jest.mock('../../utils/helpers', () => ({
   ...jest.requireActual('../../utils/helpers'),
-  constructVerifyURL: jest.fn(({ baseUrl, uri, hash }: { baseUrl: string; uri: string; hash: string }) => {
-    return `${baseUrl}?q=${encodeURIComponent(JSON.stringify({ payload: { uri, hash } }))}`;
-  }),
+  constructVerifyURL: jest.fn(
+    ({ baseUrl, uri, digestMultibase }: { baseUrl: string; uri: string; digestMultibase: string }) => {
+      return `${baseUrl}?q=${encodeURIComponent(JSON.stringify({ payload: { uri, digestMultibase } }))}`;
+    },
+  ),
 }));
 import { constructVerifyURL } from '../../utils/helpers';
 const mockConstructVerifyURL = constructVerifyURL as jest.MockedFunction<typeof constructVerifyURL>;
@@ -17,7 +19,7 @@ const mockConstructVerifyURL = constructVerifyURL as jest.MockedFunction<typeof 
 function makeStorage(overrides: Partial<StorageRecord> = {}): StorageRecord {
   return {
     uri: 'https://storage.example.com/cred-123.json',
-    hash: 'abc123hash',
+    digestMultibase: 'zabc123hash',
     externalId: 'test-external-id',
     mimeType: 'application/json',
     ...overrides,
@@ -89,7 +91,7 @@ describe('buildPublishLinks', () => {
     expect(mockConstructVerifyURL).toHaveBeenCalledWith({
       baseUrl: 'https://app.example.com/verify',
       uri: storage.uri,
-      hash: storage.hash,
+      digestMultibase: storage.digestMultibase,
     });
   });
 
@@ -122,7 +124,7 @@ describe('buildPublishLinks', () => {
     expect(mockConstructVerifyURL).toHaveBeenCalledWith({
       baseUrl: 'https://app.example.com/verify',
       uri: storage.uri,
-      hash: storage.hash,
+      digestMultibase: storage.digestMultibase,
     });
   });
 

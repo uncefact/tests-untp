@@ -37,7 +37,7 @@ export async function updateRenderTemplate(input: UpdateRenderTemplateInput): Pr
 
   let storageUpdates: {
     storageUrl?: string;
-    hash?: string;
+    digestMultibase?: string;
     storageServiceInstanceId?: string;
     storageExternalId?: string;
     storageBucket?: string;
@@ -58,7 +58,7 @@ export async function updateRenderTemplate(input: UpdateRenderTemplateInput): Pr
     );
     storageUpdates = {
       storageUrl: storageResult.uri,
-      hash: storageResult.hash,
+      digestMultibase: storageResult.digestMultibase,
       storageServiceInstanceId: storageService.instanceId,
       storageExternalId: storageResult.externalId,
       storageBucket: storageResult.bucket,
