@@ -1,0 +1,4 @@
+{
+  "//": "Scopes prisma/ scripts (seed, custom-seed, backfills, prisma.config) to ESM so tsx and Prisma's config loader handle imports from `@uncefact/untp-utils/multibase-digest` correctly. The utils package and its `multiformats` transitive dependency are ESM-only; loading them via CJS resolution throws ERR_PACKAGE_PATH_NOT_EXPORTED on the `multiformats/hashes/digest` subpath.",
+  "type": "module"
+}

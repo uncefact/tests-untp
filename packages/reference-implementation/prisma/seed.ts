@@ -1,7 +1,12 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
+
+// Reconstruct `__dirname` for ESM (prisma/ is scoped to `"type": "module"`
+// via prisma/package.json so the multibase digest imports resolve).
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import {
   DidMethod,
   DidStatus,
