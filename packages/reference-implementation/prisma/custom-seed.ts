@@ -3,11 +3,11 @@ import path from 'path';
 import { parse as parseYaml } from 'yaml';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import type { LoggerService as Logger, ICvcParser } from '@uncefact/untp-ri-services';
-import type { PrismaClient, Prisma } from '../src/lib/prisma/generated';
-import { RenderMethodType } from '../src/lib/prisma/generated';
-import { customSeedSchema, type CustomSeedManifest } from './custom-seed-schema';
-import { validateManifestReferences, type ValidationContext } from './custom-seed-validate';
-import { buildUpsertOperations } from './custom-seed-upsert';
+import type { PrismaClient, Prisma } from '../src/lib/prisma/generated/index.js';
+import { RenderMethodType } from '../src/lib/prisma/generated/index.js';
+import { customSeedSchema, type CustomSeedManifest } from './custom-seed-schema.js';
+import { validateManifestReferences, type ValidationContext } from './custom-seed-validate.js';
+import { buildUpsertOperations } from './custom-seed-upsert.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 

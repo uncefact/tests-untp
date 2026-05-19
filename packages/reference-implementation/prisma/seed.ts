@@ -15,7 +15,7 @@ import {
   RenderMethodType,
   ServiceType as PrismaServiceType,
   AdapterType as PrismaAdapterType,
-} from '../src/lib/prisma/generated';
+} from '../src/lib/prisma/generated/index.js';
 import { AesGcmEncryptionAdapter, didAdapterRegistry } from '@uncefact/untp-ri-services/server';
 import {
   EncryptionAlgorithm,
@@ -27,14 +27,14 @@ import {
   adapterRegistry,
   ServiceType,
 } from '@uncefact/untp-ri-services';
-import { getDidConfig } from '../src/lib/config/did.config';
+import { getDidConfig } from '../src/lib/config/did.config.js';
 import {
   SYSTEM_TENANT_ID,
   SYSTEM_IDR_SERVICE_ID,
   SYSTEM_STORAGE_SERVICE_ID,
   SYSTEM_VC_SERVICE_ID,
   SYSTEM_DID_ID,
-} from '../src/lib/prisma/constants';
+} from '../src/lib/prisma/constants.js';
 
 const logger = createLogger().child({ module: 'prisma-seed' });
 
