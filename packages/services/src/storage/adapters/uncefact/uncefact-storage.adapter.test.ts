@@ -488,6 +488,27 @@ describe('UncefactStorageAdapter', () => {
         );
       });
 
+      it.each([
+        ['null', null],
+        ['array', []],
+        ['string', 'not-an-object'],
+        ['number', 42],
+      ])('should throw StorageStoreError when response body is %s', async (_label, value) => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue(value),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.store(mockCredential)).rejects.toThrow(
+          expect.objectContaining({
+            message: expect.stringContaining('body is not an object'),
+          }),
+        );
+      });
+
       it('should throw StorageStoreError when response is missing "uri"', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
@@ -957,6 +978,27 @@ describe('UncefactStorageAdapter', () => {
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
 
         await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(StorageStoreError);
+      });
+
+      it.each([
+        ['null', null],
+        ['array', []],
+        ['string', 'not-an-object'],
+        ['number', 42],
+      ])('should throw StorageStoreError when response body is %s', async (_label, value) => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue(value),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(
+          expect.objectContaining({
+            message: expect.stringContaining('body is not an object'),
+          }),
+        );
       });
 
       it('should throw StorageStoreError when response is not valid JSON', async () => {

@@ -126,13 +126,20 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       throw new StorageStoreError(response.status, detail);
     }
 
-    let body: Record<string, unknown>;
+    let parsed: unknown;
     try {
-      body = await response.json();
+      parsed = await response.json();
     } catch {
       this.logger.error({ httpStatus: response.status }, 'Storage API returned non-JSON response');
       throw new StorageStoreError(response.status, 'Storage API returned invalid JSON response');
     }
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      this.logger.error({ httpStatus: response.status }, 'Storage API returned non-object response body');
+      throw new StorageStoreError(response.status, 'Storage API returned invalid response: body is not an object');
+    }
+
+    const body = parsed as Record<string, unknown>;
 
     const { uri, decryptionKey } = body as { uri?: unknown; decryptionKey?: unknown };
 
@@ -211,13 +218,20 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       throw new StorageStoreError(response.status, detail);
     }
 
-    let body: Record<string, unknown>;
+    let parsed: unknown;
     try {
-      body = await response.json();
+      parsed = await response.json();
     } catch {
       this.logger.error({ httpStatus: response.status }, 'Storage API returned non-JSON response');
       throw new StorageStoreError(response.status, 'Storage API returned invalid JSON response');
     }
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      this.logger.error({ httpStatus: response.status }, 'Storage API returned non-object response body');
+      throw new StorageStoreError(response.status, 'Storage API returned invalid response: body is not an object');
+    }
+
+    const body = parsed as Record<string, unknown>;
 
     const { uri, decryptionKey } = body as { uri?: unknown; decryptionKey?: unknown };
 
