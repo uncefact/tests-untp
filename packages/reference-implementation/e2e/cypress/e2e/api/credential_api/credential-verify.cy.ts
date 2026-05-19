@@ -302,10 +302,10 @@ describe('Credential Verify API', { testIsolation: false }, () => {
     });
 
     it('returns 422 when digestMultibase does not match', () => {
-      // A well-formed multibase-encoded sha2-256 multihash that doesn't match
-      // the stored credential's content. `zQm` is the base58btc prefix for
-      // sha2-256 multihashes; the trailing body is just non-matching bytes.
-      const wrongDigest = 'zQm' + 'X'.repeat(43);
+      // SHA-256 of the empty string, wrapped as multihash and encoded as
+      // base58btc. Parseable as a multibase digest (so it passes API
+      // validation) but cannot match the credential's JSON content.
+      const wrongDigest = 'zQmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n';
       cy.request({
         method: 'POST',
         url: '/api/v1/credentials/verify',

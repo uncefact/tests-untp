@@ -216,7 +216,10 @@ describe('Verify Page', { testIsolation: false }, () => {
     });
 
     it('shows error when digestMultibase does not match', () => {
-      const wrongDigest = 'zQm' + 'X'.repeat(43);
+      // SHA-256 of the empty string, wrapped as multihash and encoded as
+      // base58btc. Parseable as a multibase digest (so it passes the API's
+      // validation step), but cannot match the credential's JSON content.
+      const wrongDigest = 'zQmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n';
       cy.visit(buildDirectVerifyUrl({ uri: unencryptedUri, digestMultibase: wrongDigest }));
 
       // Should not show the "invalid link" message (the link itself is valid)
