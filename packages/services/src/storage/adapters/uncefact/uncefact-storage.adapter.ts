@@ -65,22 +65,21 @@ function resolveDigestMultibase(body: Record<string, unknown>, httpStatus: numbe
 export const UNCEFACT_STORAGE_ADAPTER_TYPE = 'UNCEFACT_STORAGE' as const;
 
 /**
- * Translates a configured `apiVersion` (MAJOR.MINOR) into the URL path
- * segment the storage service actually serves under. v4 onward routes
- * under `/api/v4/...` (major-only); v3.x routes under the full SemVer
- * `/api/3.1.0/...`. The config value mirrors the version the service
+ * Translates a configured `apiVersion` into the URL path segment the
+ * storage service actually serves under. v3.x routes under the full
+ * SemVer (`/api/3.1.0/...`); v4 and later route under `vMAJOR`
+ * (`/api/v4/...`). The config value mirrors the version the service
  * reports in its `version.json`; the URL segment is whatever the service
  * accepts on the wire.
  *
- * Note: v3.x is the only major served under the full SemVer scheme. v4
- * and later all route under `vMAJOR`. If a future 3.x patch ever needed
- * to be supported (unlikely), this helper's early-return would need to
- * widen to match the whole 3.x family.
+ * Dispatch is on the major version so adding a future 3.x patch to the
+ * enum (or a future major) requires no change here.
  */
 function apiVersionToPathSegment(version: UncefactStorageConfig['apiVersion']): string {
-  if (version === '3.1.0') return '3.1.0';
-  // 4.0 -> `v4`. Future majors follow the same MAJOR.MINOR -> vMAJOR shape.
   const [major] = version.split('.');
+  // v3.x is the only family served under the full SemVer scheme.
+  if (major === '3') return version;
+  // 4.0 -> `v4`. Future majors follow the same MAJOR.MINOR -> vMAJOR shape.
   return `v${major}`;
 }
 
