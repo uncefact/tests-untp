@@ -5,9 +5,9 @@ describe('Credential Verify API', { testIsolation: false }, () => {
   let testTenantId: string;
   let defaultDidValue: string;
   let unencryptedUri: string;
-  let unencryptedHash: string;
+  let unencryptedDigest: string;
   let encryptedUri: string;
-  let encryptedHash: string;
+  let encryptedDigest: string;
   let encryptedKey: string;
 
   function buildCredentialPayload(issuerDid: string) {
@@ -109,7 +109,7 @@ describe('Credential Verify API', { testIsolation: false }, () => {
         cy.request(`/api/v1/credentials/${credId}`).then((res) => {
           const cred = res.body;
           unencryptedUri = cred.storageUri;
-          unencryptedHash = cred.hash;
+          unencryptedDigest = cred.digestMultibase;
         });
       });
     });
@@ -130,7 +130,7 @@ describe('Credential Verify API', { testIsolation: false }, () => {
         cy.request(`/api/v1/credentials/${credId}`).then((res) => {
           const cred = res.body;
           encryptedUri = cred.storageUri;
-          encryptedHash = cred.hash;
+          encryptedDigest = cred.digestMultibase;
           encryptedKey = cred.decryptionKey;
         });
       });
@@ -144,7 +144,7 @@ describe('Credential Verify API', { testIsolation: false }, () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/credentials/verify',
-        body: { uri: unencryptedUri, hash: unencryptedHash },
+        body: { uri: unencryptedUri, digestMultibase: unencryptedDigest },
       }).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.verified).to.be.true;
@@ -163,7 +163,7 @@ describe('Credential Verify API', { testIsolation: false }, () => {
         url: '/api/v1/credentials/verify',
         body: {
           uri: encryptedUri,
-          hash: encryptedHash,
+          digestMultibase: encryptedDigest,
           decryptionKey: encryptedKey,
         },
       }).then((response) => {
@@ -225,11 +225,22 @@ describe('Credential Verify API', { testIsolation: false }, () => {
       });
     });
 
-    it('returns 400 for invalid hash format', () => {
+    it('returns 400 for invalid legacy hex hash format', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/credentials/verify',
         body: { uri: unencryptedUri, hash: 'too-short' },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+      });
+    });
+
+    it('returns 400 for invalid digestMultibase format', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials/verify',
+        body: { uri: unencryptedUri, digestMultibase: 'not-a-multibase-string' },
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
@@ -277,7 +288,7 @@ describe('Credential Verify API', { testIsolation: false }, () => {
       });
     });
 
-    it('returns 422 when hash does not match', () => {
+    it('returns 422 when legacy hex hash does not match', () => {
       const wrongHash = 'f'.repeat(64);
       cy.request({
         method: 'POST',
@@ -286,7 +297,23 @@ describe('Credential Verify API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(422);
-        expect(response.body.code).to.eq('HASH_MISMATCH');
+        expect(response.body.code).to.eq('DIGEST_MISMATCH');
+      });
+    });
+
+    it('returns 422 when digestMultibase does not match', () => {
+      // A well-formed multibase-encoded sha2-256 multihash that doesn't match
+      // the stored credential's content. `zQm` is the base58btc prefix for
+      // sha2-256 multihashes; the trailing body is just non-matching bytes.
+      const wrongDigest = 'zQm' + 'X'.repeat(43);
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials/verify',
+        body: { uri: unencryptedUri, digestMultibase: wrongDigest },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(422);
+        expect(response.body.code).to.eq('DIGEST_MISMATCH');
       });
     });
 

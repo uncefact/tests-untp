@@ -51,7 +51,7 @@ describe('Render Template API', { testIsolation: false }, () => {
         expect(response.body.dataModelId).to.eq(dataModelId);
         expect(response.body.renderMethodType).to.eq('WebRenderingTemplate2022');
         expect(response.body.storageUrl).to.be.a('string').and.not.be.empty;
-        expect(response.body.hash).to.be.a('string').and.not.be.empty;
+        expect(response.body.digestMultibase).to.be.a('string').and.not.be.empty;
         expect(response.body.storageExternalId).to.be.a('string');
         expect(response.body.storageServiceInstanceId).to.be.a('string');
 
@@ -169,9 +169,9 @@ describe('Render Template API', { testIsolation: false }, () => {
     it('PATCH — re-uploads when template content is provided', function () {
       if (!createdTemplateId) this.skip();
 
-      // Capture old hash before update
+      // Capture old digest before update
       cy.request(`/api/v1/render-templates/${createdTemplateId}`).then((before) => {
-        const oldHash = before.body.hash;
+        const oldDigest = before.body.digestMultibase;
 
         cy.request({
           method: 'PATCH',
@@ -179,11 +179,11 @@ describe('Render Template API', { testIsolation: false }, () => {
           body: { template: `<html><body><h1>Updated content ${RUN_ID}</h1></body></html>` },
         }).then((response) => {
           expect(response.status).to.eq(200);
-          // Server re-uploads so storageUrl and hash are present
+          // Server re-uploads so storageUrl and digestMultibase are present
           expect(response.body.storageUrl).to.be.a('string').and.not.be.empty;
-          expect(response.body.hash).to.be.a('string').and.not.be.empty;
-          // Hash must differ because content changed
-          expect(response.body.hash).to.not.eq(oldHash);
+          expect(response.body.digestMultibase).to.be.a('string').and.not.be.empty;
+          // Digest must differ because content changed
+          expect(response.body.digestMultibase).to.not.eq(oldDigest);
         });
       });
     });
@@ -386,7 +386,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('returns 400 when hash is provided (server-managed)', () => {
+    it('returns 400 when legacy hash field is provided (server-managed)', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/render-templates',
@@ -401,6 +401,24 @@ describe('Render Template API', { testIsolation: false }, () => {
       }).then((response) => {
         expect(response.status).to.eq(400);
         expect(response.body.error).to.include('hash');
+      });
+    });
+
+    it('returns 400 when digestMultibase is provided (server-managed)', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/render-templates',
+        body: {
+          name: 'Test',
+          dataModelId: 'dm-1',
+          renderMethodType: 'WebRenderingTemplate2022',
+          template: '<html>test</html>',
+          digestMultibase: 'zTESTinjected',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.include('digestMultibase');
       });
     });
 

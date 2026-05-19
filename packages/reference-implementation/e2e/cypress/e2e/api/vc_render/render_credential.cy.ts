@@ -104,18 +104,18 @@ describe('Verify page credential rendering', () => {
   });
 
   describe('API errors', () => {
-    it('should display error when hash does not match', () => {
+    it('should display error when digest does not match', () => {
       cy.intercept('POST', '/api/v1/credentials/verify', {
         statusCode: 422,
         body: {
-          error: 'Credential hash does not match the expected hash',
-          code: 'HASH_MISMATCH',
+          error: 'Credential digest does not match the expected digest',
+          code: 'DIGEST_MISMATCH',
         },
       }).as('verifyCredential');
 
       cy.visit('/verify?uri=https://example.com/test-credential');
       cy.wait('@verifyCredential');
-      verifyErrorDisplayed('HASH_MISMATCH');
+      verifyErrorDisplayed('DIGEST_MISMATCH');
     });
 
     it('should display error when decryption key is missing', () => {
