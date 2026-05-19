@@ -14,29 +14,22 @@ import { uncefactStorageConfigSchema, uncefactStorageSensitiveFields } from './u
  * This adapter accepts either, so the rest of the codebase only ever sees
  * a multibase-encoded multihash regardless of which storage deployment is
  * on the other end. Prefers `multibaseDigest` when present; falls back to
- * transcoding the legacy `hash` field. The legacy fallback exists only to
- * keep this repo working against older storage deployments in the wild and
- * should be removed once every deployment we care about has cut over.
+ * transcoding the legacy `hash` field via `MultibaseDigest.fromHex`. The
+ * legacy fallback exists only to keep this repo working against older
+ * storage deployments in the wild and should be removed once every
+ * deployment we care about has cut over.
  */
-const HEX_SHA256_PATTERN = /^[a-fA-F0-9]{64}$/;
-
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < bytes.length; i += 1) {
-    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
-}
-
 function transcodeStorageHashToMultibase(hash: string): string {
-  if (!HEX_SHA256_PATTERN.test(hash)) {
+  try {
+    return MultibaseDigest.fromHex(hash, { algorithm: 'sha2-256', base: 'base58btc' }).toString();
+  } catch (err) {
     throw new StorageStoreError(
       502,
-      `Storage API returned hash in an unrecognised format. Expected sha-256 hex (64 chars), got "${hash}".`,
+      `Storage API returned hash in an unrecognised format. Expected sha-256 hex (64 chars), got "${hash}". ${
+        err instanceof Error ? err.message : ''
+      }`,
     );
   }
-  const digestBytes = hexToBytes(hash);
-  return MultibaseDigest.fromDigest(digestBytes, { algorithm: 'sha2-256', base: 'base58btc' }).toString();
 }
 
 function resolveDigestMultibase(body: Record<string, unknown>, httpStatus: number): string {

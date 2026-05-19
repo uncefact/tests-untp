@@ -566,10 +566,7 @@ async function main() {
             digestMultibase:
               storageRecord.digestMultibase ??
               (
-                await MultibaseDigest.fromData(new TextEncoder().encode(templateContent), {
-                  algorithm: 'sha2-256',
-                  base: 'base58btc',
-                })
+                await MultibaseDigest.fromText(templateContent, { algorithm: 'sha2-256', base: 'base58btc' })
               ).toString(),
             isDefault: true,
             renderMethodType: RenderMethodType.RenderTemplate2024,

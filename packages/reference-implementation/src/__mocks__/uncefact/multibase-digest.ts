@@ -20,11 +20,27 @@ export class MultibaseDigest {
     return new MultibaseDigest(`zTEST${Buffer.from(digest).toString('hex')}`);
   }
 
+  static fromHex(hex: string, opts: { algorithm: HashAlgorithm; base: MultibaseEncoding }): MultibaseDigest {
+    if (typeof hex !== 'string' || hex.length === 0 || hex.length % 2 !== 0 || !/^[a-fA-F0-9]+$/.test(hex)) {
+      throw new Error(`Invalid hex digest: "${hex}"`);
+    }
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bytes.length; i += 1) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    return MultibaseDigest.fromDigest(bytes, opts);
+  }
+
   static async fromData(
     data: Uint8Array,
     _opts: { algorithm: HashAlgorithm; base: MultibaseEncoding },
   ): Promise<MultibaseDigest> {
     return new MultibaseDigest(`zTESTDATA${Buffer.from(data).toString('hex').slice(0, 16)}`);
+  }
+
+  static async fromText(
+    text: string,
+    opts: { algorithm: HashAlgorithm; base: MultibaseEncoding },
+  ): Promise<MultibaseDigest> {
+    return MultibaseDigest.fromData(new TextEncoder().encode(text), opts);
   }
 
   static fromString(encoded: string): MultibaseDigest {

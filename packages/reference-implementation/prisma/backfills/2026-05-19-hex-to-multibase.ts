@@ -17,23 +17,6 @@
 import { PrismaClient } from '../../src/lib/prisma/generated/index.js';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 
-const HEX_SHA256_PATTERN = /^[a-fA-F0-9]{64}$/;
-
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < bytes.length; i += 1) {
-    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
-}
-
-function transcodeHexToMultibase(hex: string): string {
-  return MultibaseDigest.fromDigest(hexToBytes(hex), {
-    algorithm: 'sha2-256',
-    base: 'base58btc',
-  }).toString();
-}
-
 type BackfillStats = { scanned: number; transcoded: number; skipped: number; unknown: number };
 
 function classifyAndTranscode(value: string): { action: 'skip' | 'transcode'; next?: string; reason?: string } {
@@ -42,14 +25,15 @@ function classifyAndTranscode(value: string): { action: 'skip' | 'transcode'; ne
     MultibaseDigest.fromString(value);
     return { action: 'skip' };
   } catch {
-    // Not multibase; check the legacy hex shape.
+    // Not multibase; try the legacy hex shape.
   }
 
-  if (HEX_SHA256_PATTERN.test(value)) {
-    return { action: 'transcode', next: transcodeHexToMultibase(value) };
+  try {
+    const next = MultibaseDigest.fromHex(value, { algorithm: 'sha2-256', base: 'base58btc' }).toString();
+    return { action: 'transcode', next };
+  } catch {
+    return { action: 'skip', reason: 'unknown-format' };
   }
-
-  return { action: 'skip', reason: 'unknown-format' };
 }
 
 async function backfillCredentials(prisma: PrismaClient): Promise<BackfillStats> {

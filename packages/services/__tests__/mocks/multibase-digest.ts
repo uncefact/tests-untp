@@ -26,6 +26,18 @@ export class MultibaseDigest {
     return new MultibaseDigest(`zTEST${Buffer.from(digest).toString('hex')}`);
   }
 
+  static fromHex(
+    hex: string,
+    opts: { algorithm: 'sha2-256' | 'sha2-512'; base: 'base58btc' | 'base64' },
+  ): MultibaseDigest {
+    if (typeof hex !== 'string' || hex.length === 0 || hex.length % 2 !== 0 || !/^[a-fA-F0-9]+$/.test(hex)) {
+      throw new Error(`Invalid hex digest: "${hex}"`);
+    }
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bytes.length; i += 1) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    return MultibaseDigest.fromDigest(bytes, opts);
+  }
+
   static fromString(encoded: string): MultibaseDigest {
     if (typeof encoded !== 'string' || encoded.length < 2 || !/^[zm]/.test(encoded)) {
       throw new Error(`Invalid multibase-encoded multihash: "${encoded}"`);

@@ -32,9 +32,6 @@ export function convertBase64ToString(base64: string) {
  * lock-step with how the rest of the codebase produces digests.
  */
 export async function computeDigestMultibase({ content }: { content: string }): Promise<string> {
-  const digest = await MultibaseDigest.fromData(new TextEncoder().encode(content), {
-    algorithm: 'sha2-256',
-    base: 'base58btc',
-  });
+  const digest = await MultibaseDigest.fromText(content, { algorithm: 'sha2-256', base: 'base58btc' });
   return digest.toString();
 }
