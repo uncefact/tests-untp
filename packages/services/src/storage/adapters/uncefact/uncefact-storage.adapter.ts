@@ -9,15 +9,15 @@ import type { UncefactStorageConfig } from './uncefact-storage.schema.js';
 import { uncefactStorageConfigSchema, uncefactStorageSensitiveFields } from './uncefact-storage.schema.js';
 
 /**
- * The Uncefact storage service emits `multibaseDigest` in current versions.
- * Older deployments still emit a hex `sha-256` digest in the `hash` field.
- * This adapter accepts either, so the rest of the codebase only ever sees
- * a multibase-encoded multihash regardless of which storage deployment is
- * on the other end. Prefers `multibaseDigest` when present; falls back to
- * transcoding the legacy `hash` field via `MultibaseDigest.fromHex`. The
- * legacy fallback exists only to keep this repo working against older
- * storage deployments in the wild and should be removed once every
- * deployment we care about has cut over.
+ * The Uncefact storage service emits `digestMultibase` in current versions
+ * (v4+). Older deployments still emit a hex `sha-256` digest in the `hash`
+ * field. This adapter accepts either, so the rest of the codebase only
+ * ever sees a multibase-encoded multihash regardless of which storage
+ * deployment is on the other end. Prefers `digestMultibase` when present;
+ * falls back to transcoding the legacy `hash` field via
+ * `MultibaseDigest.fromHex`. The legacy fallback exists only to keep this
+ * repo working against older storage deployments in the wild and should
+ * be removed once every deployment we care about has cut over.
  */
 function transcodeStorageHashToMultibase(hash: string): string {
   try {
@@ -33,32 +33,32 @@ function transcodeStorageHashToMultibase(hash: string): string {
 }
 
 function resolveDigestMultibase(body: Record<string, unknown>, httpStatus: number): string {
-  const { multibaseDigest, hash } = body as { multibaseDigest?: unknown; hash?: unknown };
+  const { digestMultibase, hash } = body as { digestMultibase?: unknown; hash?: unknown };
 
-  if (typeof multibaseDigest === 'string' && multibaseDigest.length > 0) {
+  if (typeof digestMultibase === 'string' && digestMultibase.length > 0) {
     try {
-      MultibaseDigest.fromString(multibaseDigest);
+      MultibaseDigest.fromString(digestMultibase);
     } catch {
       throw new StorageStoreError(
         httpStatus,
-        `Storage API returned "multibaseDigest" that is not a valid multibase-encoded multihash: "${multibaseDigest}".`,
+        `Storage API returned "digestMultibase" that is not a valid multibase-encoded multihash: "${digestMultibase}".`,
       );
     }
-    return multibaseDigest;
+    return digestMultibase;
   }
 
   // Legacy fallback: older storage service versions emit a hex `sha-256`
-  // digest in `hash` and no `multibaseDigest` field. Transcode locally so
+  // digest in `hash` and no `digestMultibase` field. Transcode locally so
   // the adapter's contract (`digestMultibase`) stays consistent regardless
   // of which storage version is on the other end. This branch can be
-  // deleted once every storage deployment we talk to emits `multibaseDigest`.
+  // deleted once every storage deployment we talk to emits `digestMultibase`.
   if (typeof hash === 'string' && hash.length > 0) {
     return transcodeStorageHashToMultibase(hash);
   }
 
   throw new StorageStoreError(
     httpStatus,
-    'Storage API returned invalid response: missing both "multibaseDigest" and legacy "hash" fields',
+    'Storage API returned invalid response: missing both "digestMultibase" and legacy "hash" fields',
   );
 }
 
