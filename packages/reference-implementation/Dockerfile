@@ -152,6 +152,16 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 # Render templates used by prisma/seed.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/templates ./src/templates
 
+# Declare ./src as ESM so tsx interprets imported .ts files (constants.ts,
+# did.config.ts, etc.) as ESM and their named exports bind cleanly when
+# the ESM-scoped prisma/seed.ts imports them. Without this, tsx walks up
+# from ./src/lib/prisma/constants.ts to the next ancestor without a
+# "type" field and treats the file as CJS — ESM-side named imports then
+# fail with "module does not provide an export named …". The Prisma
+# generated client under src/lib/prisma/generated/ keeps its own
+# package.json (no "type" field), so it remains CJS as Prisma expects.
+RUN echo '{"type":"module"}' > ./src/package.json
+
 COPY --chown=nextjs:nodejs packages/reference-implementation/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 
