@@ -17,7 +17,7 @@ When using the Docker Compose configuration from the [Reference Implementation r
 
 ## Supported Version
 
-The supported version of the UNCEFACT Storage Service is `3.2.1`.
+The supported version of the UNCEFACT Storage Service is `4.0.0`. The adapter also retains compatibility with the previous `3.x` deployments via the `apiVersion` configuration option.
 
 ## Environment Variables
 
@@ -30,7 +30,7 @@ The following environment variables configure the connection between the Referen
 | `SYSTEM_STORAGE_ADAPTER_TYPE` | Must be set to `UNCEFACT_STORAGE` | Yes | `UNCEFACT_STORAGE` |
 | `SYSTEM_STORAGE_SERVICE_NAME` | Display name for this service instance | No | `System Default Storage` |
 | `SYSTEM_STORAGE_SERVICE_DESCRIPTION` | Description for this service instance | No | — |
-| `SYSTEM_STORAGE_API_VERSION` | API version | No | `3.1.0` |
+| `SYSTEM_STORAGE_API_VERSION` | API version (MAJOR.MINOR). `4.0` targets storage service >= 4.0.0; `3.1.0` targets the legacy 3.x deployment. | No | `4.0` |
 | `SYSTEM_STORAGE_PUBLIC_BUCKET` | Bucket name for public (unencrypted) storage | Yes | `public-data` |
 | `SYSTEM_STORAGE_PRIVATE_BUCKET` | Bucket name for private (encrypted) storage | Yes | `private-data` |
 
@@ -46,7 +46,7 @@ When creating or updating a UNCEFACT Storage service instance via the [Services 
 |-------|------|----------|---------|-------------|
 | `baseUrl` | `string` (URL) | Yes | — | Base URL of the storage service (e.g., `http://storage-service:3334`) |
 | `apiKey` | `string` | No | — | Authentication token for the storage service API. **Sensitive** — masked in API responses. |
-| `apiVersion` | `string` | Yes | `3.1.0` | API version to use when communicating with the storage service. Currently only `3.1.0` is accepted. |
+| `apiVersion` | `string` | No | `4.0` | API version (MAJOR.MINOR) to use when communicating with the storage service. Mirrors the value reported in the service's `version.json`. `4.0` targets storage service >= 4.0.0; `3.1.0` is also accepted for 3.x deployments. |
 | `publicBucket` | `string` | Yes | — | Bucket name for public (unencrypted) storage. Can be the same value as `privateBucket`. |
 | `privateBucket` | `string` | Yes | — | Bucket name for private (encrypted) storage. Can be the same value as `publicBucket`. |
 
@@ -56,7 +56,7 @@ When creating or updating a UNCEFACT Storage service instance via the [Services 
 {
   "baseUrl": "https://storage.example.com",
   "apiKey": "your-api-key",
-  "apiVersion": "3.1.0",
+  "apiVersion": "4.0",
   "publicBucket": "public-data",
   "privateBucket": "private-data"
 }

@@ -33,7 +33,7 @@ describe('UncefactStorageAdapter', () => {
   const mockConfig: UncefactStorageConfig = {
     baseUrl: 'https://storage.example.com',
     apiKey: 'test-api-key',
-    apiVersion: '3.1.0',
+    apiVersion: '4.0',
     publicBucket: 'public-data',
     privateBucket: 'private-data',
   };
@@ -103,7 +103,7 @@ describe('UncefactStorageAdapter', () => {
     it('should not include X-API-Key header when apiKey is omitted', async () => {
       const configWithoutKey: UncefactStorageConfig = {
         baseUrl: 'https://storage.example.com',
-        apiVersion: '3.1.0',
+        apiVersion: '4.0',
         publicBucket: 'public-data',
         privateBucket: 'private-data',
       };
@@ -129,6 +129,14 @@ describe('UncefactStorageAdapter', () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential);
 
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/v4/public', expect.any(Object));
+    });
+
+    it('should construct the legacy /api/3.1.0/... URL when configured for storage 3.x', async () => {
+      const legacyConfig: UncefactStorageConfig = { ...mockConfig, apiVersion: '3.1.0' };
+      const adapter = new UncefactStorageAdapter(legacyConfig, mockLogger);
+      await adapter.store(mockCredential);
+
       expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.1.0/public', expect.any(Object));
     });
 
@@ -136,14 +144,14 @@ describe('UncefactStorageAdapter', () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential, false);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.1.0/public', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/v4/public', expect.any(Object));
     });
 
     it('should use /public endpoint when encrypt is not specified (defaults to false)', async () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.1.0/public', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/v4/public', expect.any(Object));
     });
 
     it('should use /private endpoint for encrypted storage (encrypt = true)', async () => {
@@ -160,7 +168,7 @@ describe('UncefactStorageAdapter', () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential, true);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.1.0/private', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/v4/private', expect.any(Object));
     });
 
     it('should send correct payload with data and client-generated id', async () => {
@@ -325,7 +333,7 @@ describe('UncefactStorageAdapter', () => {
         // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(mockLogger.debug).toHaveBeenCalledWith(
           expect.objectContaining({
-            url: 'https://storage.example.com/api/3.1.0/public',
+            url: 'https://storage.example.com/api/v4/public',
             encrypt: false,
             bucket: 'public-data',
             externalId: MOCK_UUID,
@@ -521,7 +529,7 @@ describe('UncefactStorageAdapter', () => {
         await expect(adapter.store(mockCredential)).rejects.toThrow(StorageStoreError);
       });
 
-      it('should throw StorageStoreError when response is missing both "multibaseDigest" and "hash"', async () => {
+      it('should throw StorageStoreError when response is missing both "digestMultibase" and "hash"', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
@@ -533,14 +541,14 @@ describe('UncefactStorageAdapter', () => {
         await expect(adapter.store(mockCredential)).rejects.toThrow(StorageStoreError);
       });
 
-      it('should prefer "multibaseDigest" over legacy "hash" when both are present', async () => {
+      it('should prefer "digestMultibase" over legacy "hash" when both are present', async () => {
         const PRESENT_MULTIBASE = `zTESTpreferred${HEX_B}`;
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
           json: jest.fn().mockResolvedValue({
             uri: 'https://storage.example.com/documents/abc-123',
-            multibaseDigest: PRESENT_MULTIBASE,
+            digestMultibase: PRESENT_MULTIBASE,
             hash: HEX_A,
           }),
         });
@@ -552,14 +560,14 @@ describe('UncefactStorageAdapter', () => {
         expect(result.digestMultibase).toBe(PRESENT_MULTIBASE);
       });
 
-      it('should accept "multibaseDigest" as the sole digest field', async () => {
+      it('should accept "digestMultibase" as the sole digest field', async () => {
         const ONLY_MULTIBASE = `zTESTonly${HEX_A}`;
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
           json: jest.fn().mockResolvedValue({
             uri: 'https://storage.example.com/documents/abc-123',
-            multibaseDigest: ONLY_MULTIBASE,
+            digestMultibase: ONLY_MULTIBASE,
           }),
         });
 
@@ -570,13 +578,13 @@ describe('UncefactStorageAdapter', () => {
         expect(result.digestMultibase).toBe(ONLY_MULTIBASE);
       });
 
-      it('should throw StorageStoreError when "multibaseDigest" is not a valid multibase string', async () => {
+      it('should throw StorageStoreError when "digestMultibase" is not a valid multibase string', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
           json: jest.fn().mockResolvedValue({
             uri: 'https://storage.example.com/documents/abc-123',
-            multibaseDigest: 'not-a-multibase-string',
+            digestMultibase: 'not-a-multibase-string',
           }),
         });
 
@@ -728,6 +736,14 @@ describe('UncefactStorageAdapter', () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
 
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/v4/public', expect.any(Object));
+    });
+
+    it('should construct the legacy /api/3.1.0/... URL when configured for storage 3.x', async () => {
+      const legacyConfig: UncefactStorageConfig = { ...mockConfig, apiVersion: '3.1.0' };
+      const adapter = new UncefactStorageAdapter(legacyConfig, mockLogger);
+      await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
+
       expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.1.0/public', expect.any(Object));
     });
 
@@ -745,7 +761,7 @@ describe('UncefactStorageAdapter', () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.storeBinary('<html>Secret</html>', 'template.html', 'text/html', true);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/3.1.0/private', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/v4/private', expect.any(Object));
     });
 
     it('should send FormData body with file field', async () => {
@@ -806,7 +822,7 @@ describe('UncefactStorageAdapter', () => {
     it('should not include X-API-Key header when apiKey is omitted', async () => {
       const configWithoutKey: UncefactStorageConfig = {
         baseUrl: 'https://storage.example.com',
-        apiVersion: '3.1.0',
+        apiVersion: '4.0',
         publicBucket: 'public-data',
         privateBucket: 'private-data',
       };
@@ -916,7 +932,7 @@ describe('UncefactStorageAdapter', () => {
         await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(StorageStoreError);
       });
 
-      it('should throw StorageStoreError when response is missing both "multibaseDigest" and "hash"', async () => {
+      it('should throw StorageStoreError when response is missing both "digestMultibase" and "hash"', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
@@ -928,14 +944,14 @@ describe('UncefactStorageAdapter', () => {
         await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(StorageStoreError);
       });
 
-      it('should prefer "multibaseDigest" over legacy "hash" when both are present', async () => {
+      it('should prefer "digestMultibase" over legacy "hash" when both are present', async () => {
         const PRESENT_MULTIBASE = `zTESTpreferred${HEX_A}`;
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
           json: jest.fn().mockResolvedValue({
             uri: 'https://storage.example.com/documents/abc-123',
-            multibaseDigest: PRESENT_MULTIBASE,
+            digestMultibase: PRESENT_MULTIBASE,
             hash: HEX_B,
           }),
         });
@@ -947,14 +963,14 @@ describe('UncefactStorageAdapter', () => {
         expect(result.digestMultibase).toBe(PRESENT_MULTIBASE);
       });
 
-      it('should accept "multibaseDigest" as the sole digest field', async () => {
+      it('should accept "digestMultibase" as the sole digest field', async () => {
         const ONLY_MULTIBASE = `zTESTonly${HEX_B}`;
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
           json: jest.fn().mockResolvedValue({
             uri: 'https://storage.example.com/documents/abc-123',
-            multibaseDigest: ONLY_MULTIBASE,
+            digestMultibase: ONLY_MULTIBASE,
           }),
         });
 
@@ -965,13 +981,13 @@ describe('UncefactStorageAdapter', () => {
         expect(result.digestMultibase).toBe(ONLY_MULTIBASE);
       });
 
-      it('should throw StorageStoreError when "multibaseDigest" is not a valid multibase string', async () => {
+      it('should throw StorageStoreError when "digestMultibase" is not a valid multibase string', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
           json: jest.fn().mockResolvedValue({
             uri: 'https://storage.example.com/documents/abc-123',
-            multibaseDigest: 'garbage',
+            digestMultibase: 'garbage',
           }),
         });
 
@@ -1044,6 +1060,19 @@ describe('UncefactStorageAdapter', () => {
       await adapter.delete('resource-id-42', 'my-bucket');
 
       expect(mockFetch).toHaveBeenCalledWith(
+        'https://storage.example.com/api/v4/my-bucket/resource-id-42',
+        expect.objectContaining({ method: 'DELETE' }),
+      );
+    });
+
+    it('should construct the legacy /api/3.1.0/... URL when configured for storage 3.x', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 204 });
+
+      const legacyConfig: UncefactStorageConfig = { ...mockConfig, apiVersion: '3.1.0' };
+      const adapter = new UncefactStorageAdapter(legacyConfig, mockLogger);
+      await adapter.delete('resource-id-42', 'my-bucket');
+
+      expect(mockFetch).toHaveBeenCalledWith(
         'https://storage.example.com/api/3.1.0/my-bucket/resource-id-42',
         expect.objectContaining({ method: 'DELETE' }),
       );
@@ -1073,7 +1102,7 @@ describe('UncefactStorageAdapter', () => {
 
       const configWithoutKey: UncefactStorageConfig = {
         baseUrl: 'https://storage.example.com',
-        apiVersion: '3.1.0',
+        apiVersion: '4.0',
         publicBucket: 'public-data',
         privateBucket: 'private-data',
       };
@@ -1287,9 +1316,20 @@ describe('UncefactStorageAdapter', () => {
       ).toThrow();
     });
 
-    it('should default apiVersion to "3.1.0" when not provided', () => {
+    it('should default apiVersion to "4.0" when not provided', () => {
       const config = {
         baseUrl: 'https://storage.example.com',
+        publicBucket: 'public-data',
+        privateBucket: 'private-data',
+      };
+      const result = uncefactStorageRegistryEntry.configSchema.parse(config);
+      expect(result.apiVersion).toBe('4.0');
+    });
+
+    it('should accept the legacy "3.1.0" apiVersion for storage deployments still on 3.x', () => {
+      const config = {
+        baseUrl: 'https://storage.example.com',
+        apiVersion: '3.1.0',
         publicBucket: 'public-data',
         privateBucket: 'private-data',
       };

@@ -9,15 +9,15 @@ import type { UncefactStorageConfig } from './uncefact-storage.schema.js';
 import { uncefactStorageConfigSchema, uncefactStorageSensitiveFields } from './uncefact-storage.schema.js';
 
 /**
- * The Uncefact storage service emits `multibaseDigest` in current versions.
- * Older deployments still emit a hex `sha-256` digest in the `hash` field.
- * This adapter accepts either, so the rest of the codebase only ever sees
- * a multibase-encoded multihash regardless of which storage deployment is
- * on the other end. Prefers `multibaseDigest` when present; falls back to
- * transcoding the legacy `hash` field via `MultibaseDigest.fromHex`. The
- * legacy fallback exists only to keep this repo working against older
- * storage deployments in the wild and should be removed once every
- * deployment we care about has cut over.
+ * The Uncefact storage service emits `digestMultibase` in current versions
+ * (v4+). Older deployments still emit a hex `sha-256` digest in the `hash`
+ * field. This adapter accepts either, so the rest of the codebase only
+ * ever sees a multibase-encoded multihash regardless of which storage
+ * deployment is on the other end. Prefers `digestMultibase` when present;
+ * falls back to transcoding the legacy `hash` field via
+ * `MultibaseDigest.fromHex`. The legacy fallback exists only to keep this
+ * repo working against older storage deployments in the wild and should
+ * be removed once every deployment we care about has cut over.
  */
 function transcodeStorageHashToMultibase(hash: string): string {
   try {
@@ -33,48 +33,67 @@ function transcodeStorageHashToMultibase(hash: string): string {
 }
 
 function resolveDigestMultibase(body: Record<string, unknown>, httpStatus: number): string {
-  const { multibaseDigest, hash } = body as { multibaseDigest?: unknown; hash?: unknown };
+  const { digestMultibase, hash } = body as { digestMultibase?: unknown; hash?: unknown };
 
-  if (typeof multibaseDigest === 'string' && multibaseDigest.length > 0) {
+  if (typeof digestMultibase === 'string' && digestMultibase.length > 0) {
     try {
-      MultibaseDigest.fromString(multibaseDigest);
+      MultibaseDigest.fromString(digestMultibase);
     } catch {
       throw new StorageStoreError(
         httpStatus,
-        `Storage API returned "multibaseDigest" that is not a valid multibase-encoded multihash: "${multibaseDigest}".`,
+        `Storage API returned "digestMultibase" that is not a valid multibase-encoded multihash: "${digestMultibase}".`,
       );
     }
-    return multibaseDigest;
+    return digestMultibase;
   }
 
   // Legacy fallback: older storage service versions emit a hex `sha-256`
-  // digest in `hash` and no `multibaseDigest` field. Transcode locally so
+  // digest in `hash` and no `digestMultibase` field. Transcode locally so
   // the adapter's contract (`digestMultibase`) stays consistent regardless
   // of which storage version is on the other end. This branch can be
-  // deleted once every storage deployment we talk to emits `multibaseDigest`.
+  // deleted once every storage deployment we talk to emits `digestMultibase`.
   if (typeof hash === 'string' && hash.length > 0) {
     return transcodeStorageHashToMultibase(hash);
   }
 
   throw new StorageStoreError(
     httpStatus,
-    'Storage API returned invalid response: missing both "multibaseDigest" and legacy "hash" fields',
+    'Storage API returned invalid response: missing both "digestMultibase" and legacy "hash" fields',
   );
 }
 
 export const UNCEFACT_STORAGE_ADAPTER_TYPE = 'UNCEFACT_STORAGE' as const;
 
+/**
+ * Translates a configured `apiVersion` into the URL path segment the
+ * storage service actually serves under. v3.x routes under the full
+ * SemVer (`/api/3.1.0/...`); v4 and later route under `vMAJOR`
+ * (`/api/v4/...`). The config value mirrors the version the service
+ * reports in its `version.json`; the URL segment is whatever the service
+ * accepts on the wire.
+ *
+ * Dispatch is on the major version so adding a future 3.x patch to the
+ * enum (or a future major) requires no change here.
+ */
+function apiVersionToPathSegment(version: UncefactStorageConfig['apiVersion']): string {
+  const [major] = version.split('.');
+  // v3.x is the only family served under the full SemVer scheme.
+  if (major === '3') return version;
+  // 4.0 -> `v4`. Future majors follow the same MAJOR.MINOR -> vMAJOR shape.
+  return `v${major}`;
+}
+
 export class UncefactStorageAdapter extends BaseServiceAdapter implements IStorageService {
   private readonly baseUrl: string;
   private readonly headers: Record<string, string>;
-  private readonly apiVersion: string;
+  private readonly apiPathSegment: string;
   private readonly publicBucket: string;
   private readonly privateBucket: string;
 
   constructor(config: UncefactStorageConfig, logger: LoggerService) {
     super(logger.child({ service: 'Storage - UncefactStorage' }));
     this.baseUrl = config.baseUrl;
-    this.apiVersion = config.apiVersion;
+    this.apiPathSegment = apiVersionToPathSegment(config.apiVersion);
     this.publicBucket = config.publicBucket;
     this.privateBucket = config.privateBucket;
     this.headers = { 'Content-Type': 'application/json' };
@@ -85,7 +104,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
 
   async store(credential: EnvelopedVerifiableCredential, encrypt = false): Promise<StorageRecord> {
     const endpoint = encrypt ? 'private' : 'public';
-    const url = `${this.baseUrl}/api/${this.apiVersion}/${endpoint}`;
+    const url = `${this.baseUrl}/api/${this.apiPathSegment}/${endpoint}`;
 
     const bucket = encrypt ? this.privateBucket : this.publicBucket;
     const externalId = crypto.randomUUID();
@@ -165,7 +184,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
 
   async storeBinary(content: string, filename: string, contentType: string, encrypt = false): Promise<StorageRecord> {
     const endpoint = encrypt ? 'private' : 'public';
-    const url = `${this.baseUrl}/api/${this.apiVersion}/${endpoint}`;
+    const url = `${this.baseUrl}/api/${this.apiPathSegment}/${endpoint}`;
 
     const bucket = encrypt ? this.privateBucket : this.publicBucket;
     const externalId = crypto.randomUUID();
@@ -261,7 +280,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       return;
     }
 
-    const url = `${this.baseUrl}/api/${this.apiVersion}/${bucket}/${externalId}`;
+    const url = `${this.baseUrl}/api/${this.apiPathSegment}/${bucket}/${externalId}`;
 
     this.logger.debug({ url, externalId, bucket }, 'Deleting stored content');
 

@@ -120,7 +120,7 @@ services:
       SYSTEM_STORAGE_BASE_URL: http://storage-service:3334
       SYSTEM_STORAGE_API_KEY: ${SYSTEM_STORAGE_API_KEY:-test123}
       SYSTEM_STORAGE_ADAPTER_TYPE: ${SYSTEM_STORAGE_ADAPTER_TYPE:-UNCEFACT_STORAGE}
-      SYSTEM_STORAGE_API_VERSION: ${SYSTEM_STORAGE_API_VERSION:-3.1.0}
+      SYSTEM_STORAGE_API_VERSION: ${SYSTEM_STORAGE_API_VERSION:-4.0}
       SYSTEM_STORAGE_PUBLIC_BUCKET: ${SYSTEM_STORAGE_PUBLIC_BUCKET:-public-data}
       SYSTEM_STORAGE_PRIVATE_BUCKET: ${SYSTEM_STORAGE_PRIVATE_BUCKET:-private-data}
       SYSTEM_STORAGE_SERVICE_NAME: ${SYSTEM_STORAGE_SERVICE_NAME:-System Default Storage}
@@ -171,7 +171,7 @@ services:
     restart: always
 
   storage-service:
-    image: ghcr.io/uncefact/project-storage-service:3.2.1
+    image: ghcr.io/uncefact/project-storage-service:4.0.0
     ports:
       - 3334:3334
     environment:
