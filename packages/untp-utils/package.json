@@ -12,12 +12,19 @@
     "./multibase-digest": {
       "types": "./build/multibase-digest/index.d.ts",
       "default": "./build/multibase-digest/index.js"
+    },
+    "./conformity-vocabulary": {
+      "types": "./build/conformity-vocabulary/index.d.ts",
+      "default": "./build/conformity-vocabulary/index.js"
     }
   },
   "typesVersions": {
     "*": {
       "multibase-digest": [
         "./build/multibase-digest/index.d.ts"
+      ],
+      "conformity-vocabulary": [
+        "./build/conformity-vocabulary/index.d.ts"
       ]
     }
   },
@@ -35,7 +42,8 @@
     "untp",
     "multibase",
     "multihash",
-    "digest"
+    "digest",
+    "conformity-vocabulary"
   ],
   "author": "",
   "license": "Apache-2.0",
