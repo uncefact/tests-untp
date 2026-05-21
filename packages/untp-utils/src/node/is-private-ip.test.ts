@@ -103,4 +103,10 @@ describe('isPrivateHostname', () => {
     expect(isPrivateHostname('1.1.1.1')).toBe(false);
     expect(isPrivateHostname('2606:4700:4700::1111')).toBe(false);
   });
+
+  it('handles IPv6 literals wrapped in brackets (as URL.hostname returns)', () => {
+    expect(isPrivateHostname('[::1]')).toBe(true);
+    expect(isPrivateHostname('[fc00::1]')).toBe(true);
+    expect(isPrivateHostname('[2606:4700:4700::1111]')).toBe(false);
+  });
 });

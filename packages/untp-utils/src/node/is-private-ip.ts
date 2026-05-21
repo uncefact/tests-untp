@@ -116,7 +116,14 @@ export function isPrivateIpv6(address: string): boolean {
  */
 export function isPrivateHostname(host: string): boolean {
   if (!host) return true;
-  const lower = host.toLowerCase().replace(/\.$/, '');
+  // Strip leading/trailing brackets (URL.hostname wraps IPv6 literals like
+  // `[::1]`) and any trailing dot before further checks; without this, a
+  // direct caller passing `URL.hostname` for an IPv6 URL would silently
+  // miss the private-range match.
+  const lower = host
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '')
+    .replace(/\.$/, '');
   if (lower === 'localhost') return true;
   if (PRIVATE_HOSTNAME_SUFFIXES.some((suffix) => lower.endsWith(suffix))) return true;
   if (isIPv4(lower)) return isPrivateIpv4(lower);
