@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { parse as parseYaml } from 'yaml';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
-import type { LoggerService as Logger, ICvcParser } from '@uncefact/untp-ri-services';
+import type { LoggerService as Logger } from '@uncefact/untp-ri-services';
 import type { PrismaClient, Prisma } from '../src/lib/prisma/generated/index.js';
 import { RenderMethodType } from '../src/lib/prisma/generated/index.js';
 import { customSeedSchema, type CustomSeedManifest } from './custom-seed-schema.js';
@@ -13,8 +13,6 @@ import { buildUpsertOperations } from './custom-seed-upsert.js';
 
 const TRANSACTION_TIMEOUT = 60_000;
 const TRANSACTION_MAX_WAIT = 10_000;
-const CVC_FETCH_TIMEOUT = 30_000;
-const CVC_MAX_RETRIES = 2;
 
 // ── Dependencies interface ───────────────────────────────────────────────────
 
@@ -36,9 +34,6 @@ export interface CustomSeedDependencies {
     }>;
   } | null;
   storageServiceInstanceId: string | null;
-  getCvcParser: (version: string) => ICvcParser | undefined;
-  importCatalogue: (input: unknown) => Promise<unknown>;
-  supportedCvcVersions: string[];
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -47,11 +42,7 @@ export interface CustomSeedDependencies {
  * Count total entities in a parsed manifest.
  */
 function countEntities(manifest: CustomSeedManifest): number {
-  let count =
-    manifest.registrars.length +
-    manifest.dataModels.length +
-    manifest.renderTemplates.length +
-    manifest.cvcCatalogues.length;
+  let count = manifest.registrars.length + manifest.dataModels.length + manifest.renderTemplates.length;
 
   for (const registrar of manifest.registrars) {
     count += registrar.identifierSchemes.length;
@@ -63,50 +54,11 @@ function countEntities(manifest: CustomSeedManifest): number {
   return count;
 }
 
-/**
- * Fetch JSON from a URL with timeout and retry.
- */
-async function fetchWithRetry(
-  url: string,
-  logger: Logger,
-  timeoutMs: number = CVC_FETCH_TIMEOUT,
-  maxRetries: number = CVC_MAX_RETRIES,
-): Promise<unknown> {
-  let lastError: Error | undefined;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: { Accept: 'application/ld+json' },
-      });
-      clearTimeout(timer);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      logger.warn(
-        { url, attempt, maxRetries, error: lastError.message },
-        `CVC catalogue fetch attempt ${attempt}/${maxRetries} failed`,
-      );
-    }
-  }
-
-  throw lastError;
-}
-
 // ── Main orchestrator ────────────────────────────────────────────────────────
 
 /**
  * Run the custom seed process: parse YAML manifest, validate, upload templates,
- * fetch CVC catalogues, and upsert all entities in an atomic transaction.
+ * and upsert all entities in an atomic transaction.
  */
 export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void> {
   const { logger, prisma, systemTenantId, customSeedDir } = deps;
@@ -177,7 +129,6 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
   }
   for (const dm of manifest.dataModels) allManifestIds.push(dm.id);
   for (const rt of manifest.renderTemplates) allManifestIds.push(rt.id);
-  for (const cc of manifest.cvcCatalogues) allManifestIds.push(cc.id);
 
   // Batch collision detection: find IDs owned by non-system tenants.
   const collisionIds = new Set<string>();
@@ -243,7 +194,6 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
       }
     },
     mountDir,
-    supportedCvcVersions: deps.supportedCvcVersions,
     isNonSystemCollision: (id: string) => collisionIds.has(id),
   };
 
@@ -298,27 +248,7 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
     }
   }
 
-  // ── 8. External I/O — Fetch CVC catalogues ─────────────────────────────
-  const cvcData = new Map<string, unknown>();
-
-  for (const catalogue of ops.cvcCatalogues) {
-    try {
-      const data = await fetchWithRetry(catalogue.endpointUrl, logger);
-      cvcData.set(catalogue.id, data);
-    } catch (error) {
-      logger.error(
-        {
-          catalogueId: catalogue.id,
-          url: catalogue.endpointUrl,
-          error: error instanceof Error ? error.message : error,
-        },
-        `Failed to fetch CVC catalogue after ${CVC_MAX_RETRIES} attempts`,
-      );
-      process.exit(1);
-    }
-  }
-
-  // ── 9. Atomic DB transaction ───────────────────────────────────────────
+  // ── 8. Atomic DB transaction ───────────────────────────────────────────
   await prisma.$transaction(
     async (tx: Prisma.TransactionClient) => {
       // Upsert registrars
@@ -459,45 +389,13 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
     { timeout: TRANSACTION_TIMEOUT, maxWait: TRANSACTION_MAX_WAIT },
   );
 
-  // ── 10. CVC import OUTSIDE transaction ─────────────────────────────────
-  // importCatalogue() runs its own internal $transaction, so we call it
-  // outside our main transaction to avoid unsupported nested transactions.
-  for (const catalogue of ops.cvcCatalogues) {
-    const data = cvcData.get(catalogue.id);
-    if (!data) continue;
-
-    const parser = deps.getCvcParser(catalogue.version);
-    if (!parser) {
-      logger.warn(
-        { catalogueId: catalogue.id, version: catalogue.version },
-        'No CVC parser available for version — skipping import',
-      );
-      continue;
-    }
-
-    // Parse the pre-fetched CVC data using the version-specific parser
-    const parsed = parser.parse(data, catalogue.endpointUrl);
-
-    // Use the existing importCatalogue function (full nested persistence)
-    const result = await deps.importCatalogue({
-      ...parsed,
-      tenantId: systemTenantId,
-      specVersion: catalogue.version,
-    });
-
-    const resultObj = result as Record<string, unknown>;
-    const summary = (resultObj?.summary ?? {}) as Record<string, unknown>;
-    logger.info({ catalogueId: catalogue.id, ...summary }, 'CVC catalogue imported');
-  }
-
-  // ── 11. Log success summary ────────────────────────────────────────────
+  // ── 9. Log success summary ────────────────────────────────────────────
   const summary = {
     registrars: ops.registrars.length,
     identifierSchemes: ops.identifierSchemes.length,
     qualifiers: ops.qualifiers.length,
     dataModels: ops.dataModels.length,
     renderTemplates: ops.renderTemplates.length,
-    cvcCatalogues: ops.cvcCatalogues.length,
   };
 
   logger.info(summary, 'Custom seed completed successfully');

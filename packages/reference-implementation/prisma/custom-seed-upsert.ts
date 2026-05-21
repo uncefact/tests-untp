@@ -54,20 +54,12 @@ export interface RenderTemplateUpsert {
   mediaQuery?: string | null;
 }
 
-export interface CvcCatalogueUpsert {
-  id: string;
-  name: string;
-  version: string;
-  endpointUrl: string;
-}
-
 export interface UpsertOperations {
   registrars: RegistrarUpsert[];
   identifierSchemes: IdentifierSchemeUpsert[];
   qualifiers: QualifierUpsert[];
   dataModels: DataModelUpsert[];
   renderTemplates: RenderTemplateUpsert[];
-  cvcCatalogues: CvcCatalogueUpsert[];
 }
 
 /**
@@ -141,19 +133,11 @@ export function buildUpsertOperations(manifest: CustomSeedManifest, systemTenant
     mediaQuery: rt.mediaQuery ?? null,
   }));
 
-  const cvcCatalogues: CvcCatalogueUpsert[] = manifest.cvcCatalogues.map((cc) => ({
-    id: cc.id,
-    name: cc.name,
-    version: cc.version,
-    endpointUrl: cc.endpointUrl,
-  }));
-
   return {
     registrars,
     identifierSchemes,
     qualifiers,
     dataModels,
     renderTemplates,
-    cvcCatalogues,
   };
 }

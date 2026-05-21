@@ -605,7 +605,6 @@ async function main() {
   //   SKIP_CUSTOM_SEED=true   - Skip custom seed (deployer-provided data from /app/seed/custom/)
   if (process.env.SKIP_CUSTOM_SEED !== 'true') {
     const { runCustomSeed } = await import('./custom-seed');
-    const { SUPPORTED_CVC_VERSIONS, getCvcParser } = await import('@uncefact/untp-ri-services');
 
     await runCustomSeed({
       logger: logger.child({ module: 'custom-seed' }),
@@ -620,12 +619,6 @@ async function main() {
             )
           : null,
       storageServiceInstanceId: SYSTEM_STORAGE_SERVICE_ID,
-      getCvcParser,
-      importCatalogue: async (input: unknown) => {
-        const { importCatalogue } = await import('../src/lib/prisma/repositories/cvc.repository');
-        return importCatalogue(input as Parameters<typeof importCatalogue>[0]);
-      },
-      supportedCvcVersions: SUPPORTED_CVC_VERSIONS,
     });
   } else {
     logger.info('Skipping custom seed (SKIP_CUSTOM_SEED is set)');

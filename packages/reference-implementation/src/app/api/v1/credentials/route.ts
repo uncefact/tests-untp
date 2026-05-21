@@ -9,7 +9,7 @@ import {
 } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
-import { resolveDataModel, isDccDataModel } from '@/lib/credentials/resolve-data-model';
+import { resolveDataModel } from '@/lib/credentials/resolve-data-model';
 import { validateCredentialPayload } from '@/lib/credentials/validate-credential-payload';
 import { issueCredential } from '@/lib/credentials/issue-credential';
 import { updateCredentialPublished, listCredentials } from '@/lib/prisma/repositories';
@@ -20,8 +20,8 @@ import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { getDidByDid } from '@/lib/prisma/repositories';
 import { buildPublishLinks } from '@uncefact/untp-ri-services';
 import type { CredentialPayload, ExtractedRefs } from '@uncefact/untp-ri-services';
-import { validateCvcCompliance } from '@/lib/services/cvc-validation.service';
-import type { CvcValidationWarning } from '@/lib/services/cvc-validation.service';
+
+type CredentialWarning = { code: string; message: string };
 
 const logger = apiLogger.child({ route: '/api/v1/credentials' });
 
@@ -146,10 +146,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   logger.info('Validating credential payload against schema');
   await validateCredentialPayload(credentialPayload, schemaUrls);
 
-  // ── Step 3.5: CVC validation (advisory) ─────────────────────────────
+  // ── Step 3.5: Extract entity references for publishing ──────────────────
 
-  let cvcWarnings: CvcValidationWarning[] = [];
-  const isDcc = isDccDataModel(dataModel);
+  const warnings: CredentialWarning[] = [];
 
   let refs: ExtractedRefs | undefined;
   try {
@@ -157,35 +156,11 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     refs = bridge.extractRefs(subject);
   } catch (error) {
     logger.error({ err: error, credentialType }, 'Reference extraction failed');
-    cvcWarnings = [
-      {
-        code: 'CVC_VALIDATION_ERROR' as const,
-        message: publishingOptions.publish
-          ? 'Failed to extract references from credential payload — publishing will be skipped'
-          : 'Failed to extract references from credential payload',
-      },
-    ];
-  }
-
-  if (isDcc && refs && !refs.conformity) {
-    cvcWarnings.push({
-      code: 'CVC_NO_CONFORMITY' as const,
-      message: 'No conformity data found in DCC credential payload',
-    });
-  }
-
-  if (isDcc && refs?.conformity) {
-    try {
-      const result = await validateCvcCompliance(tenantId, refs.conformity);
-      cvcWarnings = result.warnings;
-    } catch (error) {
-      logger.error({ err: error, credentialType }, 'CVC compliance validation failed');
-      cvcWarnings = [
-        {
-          code: 'CVC_VALIDATION_ERROR' as const,
-          message: 'CVC validation could not be performed — credential was issued without CVC checks',
-        },
-      ];
+    if (publishingOptions.publish) {
+      warnings.push({
+        code: 'REFS_EXTRACTION_FAILED',
+        message: 'Failed to extract references from credential payload — publishing will be skipped',
+      });
     }
   }
 
@@ -248,13 +223,13 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   if (publishingOptions.publish === true) {
     if (!primaryEntity.schemePrimaryKey || !primaryEntity.schemeNamespace) {
       logger.warn({ credentialId }, 'Publishing requested but entity has no scheme configuration — skipping');
-      cvcWarnings.push({
+      warnings.push({
         code: 'PUBLISH_SKIPPED' as const,
         message: 'Publishing was requested but the entity has no identity scheme configuration',
       });
     } else if (!primaryEntity.primaryIdentifier) {
       logger.warn({ credentialId }, 'Publishing requested but no primary identifier resolved — skipping');
-      cvcWarnings.push({
+      warnings.push({
         code: 'PUBLISH_SKIPPED' as const,
         message: 'Publishing was requested but no primary identifier could be resolved from the credential payload',
       });
@@ -291,13 +266,13 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
           { err: error, credentialId, scheme: primaryEntity.schemePrimaryKey },
           'Failed to publish credential to IDR',
         );
-        cvcWarnings.push({
+        warnings.push({
           code: 'IDR_PUBLISH_FAILED',
           message: `Failed to publish credential to identity resolver: ${detail}. Ensure the identifier scheme is registered with the IDR service. Contact your IDR operator if this persists.`,
         });
       }
 
-      if (!cvcWarnings.some((w) => w.code === 'IDR_PUBLISH_FAILED')) {
+      if (!warnings.some((w) => w.code === 'IDR_PUBLISH_FAILED')) {
         try {
           await updateCredentialPublished(credentialId, tenantId, true);
         } catch (error) {
@@ -305,7 +280,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
             { err: error, credentialId },
             'Failed to update published status — credential was published to IDR but DB record is stale',
           );
-          cvcWarnings.push({
+          warnings.push({
             code: 'DB_STATUS_UPDATE_FAILED' as const,
             message: 'Credential was published to IDR but the published status could not be saved',
           });
@@ -316,7 +291,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   logger.info({ credentialId }, 'Credential issued successfully');
   const response: Record<string, unknown> = { credentialId };
-  if (cvcWarnings.length > 0) response.warnings = cvcWarnings;
+  if (warnings.length > 0) response.warnings = warnings;
   return NextResponse.json(response, { status: 201 });
 });
 

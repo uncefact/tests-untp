@@ -27,7 +27,6 @@ function emptyManifest(): CustomSeedManifest {
     registrars: [],
     dataModels: [],
     renderTemplates: [],
-    cvcCatalogues: [],
   };
 }
 
@@ -42,7 +41,6 @@ describe('buildUpsertOperations — empty manifest', () => {
     expect(result.qualifiers).toEqual([]);
     expect(result.dataModels).toEqual([]);
     expect(result.renderTemplates).toEqual([]);
-    expect(result.cvcCatalogues).toEqual([]);
   });
 });
 
@@ -410,51 +408,6 @@ describe('buildUpsertOperations — render templates', () => {
     expect(renderTemplates[0].inline).toBeNull();
     expect(renderTemplates[0].mediaType).toBeNull();
     expect(renderTemplates[0].mediaQuery).toBeNull();
-  });
-});
-
-// ── CVC catalogues ────────────────────────────────────────────────────────────
-
-describe('buildUpsertOperations — CVC catalogues', () => {
-  it('passes through CVC catalogue data (no tenantId)', () => {
-    const manifest: CustomSeedManifest = {
-      ...emptyManifest(),
-      cvcCatalogues: [
-        {
-          id: IDS.cvcCatalogue1,
-          name: 'UNTP Core Catalogue',
-          version: '1.0.0',
-          endpointUrl: 'https://example.com/catalogue.jsonld',
-        },
-      ],
-    };
-
-    const { cvcCatalogues } = buildUpsertOperations(manifest, TENANT_ID);
-
-    expect(cvcCatalogues).toHaveLength(1);
-    expect(cvcCatalogues[0]).toEqual({
-      id: IDS.cvcCatalogue1,
-      name: 'UNTP Core Catalogue',
-      version: '1.0.0',
-      endpointUrl: 'https://example.com/catalogue.jsonld',
-    });
-  });
-
-  it('does not add tenantId to CVC catalogue entries', () => {
-    const manifest: CustomSeedManifest = {
-      ...emptyManifest(),
-      cvcCatalogues: [
-        {
-          id: IDS.cvcCatalogue1,
-          name: 'Catalogue',
-          version: '1.0.0',
-          endpointUrl: 'https://example.com/catalogue.jsonld',
-        },
-      ],
-    };
-
-    const { cvcCatalogues } = buildUpsertOperations(manifest, TENANT_ID);
-    expect((cvcCatalogues[0] as unknown as Record<string, unknown>).tenantId).toBeUndefined();
   });
 });
 

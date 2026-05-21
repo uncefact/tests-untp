@@ -39,7 +39,6 @@ const IDS = {
   qualifier1: 'ckabcdefghij0003klmnopqrv',
   dataModel1: 'ckabcdefghij0005klmnopqrx',
   renderTemplate1: 'ckabcdefghij0006klmnopqry',
-  cvcCatalogue1: 'ckabcdefghij0007klmnopqrz',
   parentConfig: 'ckabcdefghij0009klmnopqsb',
 };
 
@@ -77,7 +76,6 @@ function createMockPrisma() {
     identifierScheme: { findMany: findManyFn, upsert: upsertFn },
     schemeQualifier: { findMany: findManyFn, upsert: upsertFn },
     renderTemplate: { findMany: findManyFn, upsert: upsertFn },
-    cvcCatalogue: { upsert: upsertFn },
     $transaction: transactionFn,
   } as unknown as CustomSeedDependencies['prisma'];
 }
@@ -90,9 +88,6 @@ function createDeps(overrides?: Partial<CustomSeedDependencies>): CustomSeedDepe
     customSeedDir: CUSTOM_SEED_DIR,
     storageService: null,
     storageServiceInstanceId: null,
-    getCvcParser: jest.fn().mockReturnValue(undefined),
-    importCatalogue: jest.fn().mockResolvedValue({ catalogue: {}, summary: { schemes: 0, profiles: 0, criteria: 0 } }),
-    supportedCvcVersions: ['1.0'],
     ...overrides,
   };
 }
@@ -131,7 +126,6 @@ describe('runCustomSeed', () => {
         registrars: [],
         dataModels: [],
         renderTemplates: [],
-        cvcCatalogues: [],
       });
 
       const deps = createDeps();
@@ -209,7 +203,6 @@ describe('runCustomSeed', () => {
             mediaQuery: null,
           },
         ],
-        cvcCatalogues: [],
       };
 
       (parseYaml as jest.Mock).mockReturnValue(manifestData);
