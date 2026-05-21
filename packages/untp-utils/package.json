@@ -16,6 +16,14 @@
     "./conformity-vocabulary": {
       "types": "./build/conformity-vocabulary/index.d.ts",
       "default": "./build/conformity-vocabulary/index.js"
+    },
+    "./validation": {
+      "types": "./build/validation/index.d.ts",
+      "default": "./build/validation/index.js"
+    },
+    "./schema-loaders": {
+      "types": "./build/schema-loaders/index.d.ts",
+      "default": "./build/schema-loaders/index.js"
     }
   },
   "typesVersions": {
@@ -25,6 +33,12 @@
       ],
       "conformity-vocabulary": [
         "./build/conformity-vocabulary/index.d.ts"
+      ],
+      "validation": [
+        "./build/validation/index.d.ts"
+      ],
+      "schema-loaders": [
+        "./build/schema-loaders/index.d.ts"
       ]
     }
   },
@@ -53,10 +67,15 @@
     "directory": "packages/untp-utils"
   },
   "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "jsonld": "^8.3.3",
     "multiformats": "^13.3.1"
   },
   "devDependencies": {
+    "@jest/globals": "29.7.0",
     "@types/jest": "29.5.11",
+    "@types/jsonld": "^1.5.15",
     "cross-env": "^7.0.3",
     "jest": "29.7.0",
     "ts-jest": "29.1.1",
