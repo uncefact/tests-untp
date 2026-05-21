@@ -32,6 +32,10 @@
     "./cache": {
       "types": "./build/cache/index.d.ts",
       "default": "./build/cache/index.js"
+    },
+    "./resolvers": {
+      "types": "./build/resolvers/index.d.ts",
+      "default": "./build/resolvers/index.js"
     }
   },
   "typesVersions": {
@@ -53,6 +57,9 @@
       ],
       "cache": [
         "./build/cache/index.d.ts"
+      ],
+      "resolvers": [
+        "./build/resolvers/index.d.ts"
       ]
     }
   },
@@ -85,7 +92,8 @@
     "ajv-formats": "^3.0.1",
     "ipaddr.js": "^2.4.0",
     "jsonld": "^8.3.3",
-    "multiformats": "^13.3.1"
+    "multiformats": "^13.3.1",
+    "undici": "^6.25.0"
   },
   "devDependencies": {
     "@jest/globals": "29.7.0",
