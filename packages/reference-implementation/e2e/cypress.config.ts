@@ -36,15 +36,14 @@ function getDbClient() {
 async function deleteTenantData(client: any, tenantId: string, options?: { preserveTenant?: boolean }) {
   // Delete in dependency order (children first)
 
-  // CVC tables (join table → profiles → schemes → catalogues → orphan criteria)
+  // CVC tables (join table → profiles → schemes → orphan criteria)
   await client.query(
-    `DELETE FROM "ProfileCriterion" WHERE "profileId" IN (SELECT id FROM "ConformityProfile" WHERE "tenantId" = $1)`,
+    `DELETE FROM "ConformityProfileCriterion" WHERE "profileId" IN (SELECT id FROM "ConformityProfile" WHERE "tenantId" = $1)`,
     [tenantId],
   );
   await client.query(`DELETE FROM "ConformityProfile" WHERE "tenantId" = $1`, [tenantId]);
   await client.query(`DELETE FROM "ConformityScheme" WHERE "tenantId" = $1`, [tenantId]);
-  await client.query(`DELETE FROM "CvcCatalogue" WHERE "tenantId" = $1`, [tenantId]);
-  await client.query(`DELETE FROM "Criterion" WHERE "tenantId" = $1`, [tenantId]);
+  await client.query(`DELETE FROM "ConformityCriterion" WHERE "tenantId" = $1`, [tenantId]);
 
   // Master data secondary identifier join tables
   await client.query(
@@ -477,73 +476,6 @@ export default defineConfig({
               await client.query(`DELETE FROM "User" WHERE email = $1`, [email]);
             }
             return null;
-          } finally {
-            await client.end();
-          }
-        },
-        async seedCvcCatalogue({ tenantId }: { tenantId: string }) {
-          const client = getDbClient();
-          await client.connect();
-          try {
-            await client.query('BEGIN');
-
-            const now = new Date().toISOString();
-
-            // Create catalogue
-            const catResult = await client.query(
-              `INSERT INTO "CvcCatalogue" (id, "canonicalId", name, "sourceUrl", "specVersion", "tenantId", "createdAt", "updatedAt")
-               VALUES (gen_random_uuid(), 'https://example.com/e2e-cvc', 'E2E Test Catalogue', 'https://example.com/e2e-cvc', '0.7.0', $1, $2, $2)
-               RETURNING id`,
-              [tenantId, now],
-            );
-            const catalogueId = catResult.rows[0].id;
-
-            // Create scheme
-            const schemeResult = await client.query(
-              `INSERT INTO "ConformityScheme" (id, "canonicalId", name, slug, description, "tenantId", "catalogueId", "createdAt", "updatedAt")
-               VALUES (gen_random_uuid(), 'https://example.com/e2e-cvc/scheme-1', 'E2E Test Scheme', 'e2e-test-scheme', 'A test scheme for E2E', $1, $2, $3, $3)
-               RETURNING id`,
-              [tenantId, catalogueId, now],
-            );
-            const schemeId = schemeResult.rows[0].id;
-
-            // Create profile
-            const profileResult = await client.query(
-              `INSERT INTO "ConformityProfile" (id, "canonicalId", name, slug, version, status, description, "tenantId", "schemeId", "createdAt", "updatedAt")
-               VALUES (gen_random_uuid(), 'https://example.com/e2e-cvc/scheme-1/profile-1', 'E2E Test Profile', 'e2e-test-profile', '1.0.0', 'active', 'A test profile for E2E', $1, $2, $3, $3)
-               RETURNING id`,
-              [tenantId, schemeId, now],
-            );
-            const profileId = profileResult.rows[0].id;
-
-            // Create two criteria
-            const criterion1Result = await client.query(
-              `INSERT INTO "Criterion" (id, "canonicalId", name, version, status, description, "conformityTopic", "tenantId", "createdAt", "updatedAt")
-               VALUES (gen_random_uuid(), 'https://example.com/e2e-cvc/criterion-1', 'E2E Criterion Alpha', '1.0.0', 'active', 'First test criterion', 'environment.emissions', $1, $2, $2)
-               RETURNING id`,
-              [tenantId, now],
-            );
-            const criterion2Result = await client.query(
-              `INSERT INTO "Criterion" (id, "canonicalId", name, version, status, description, "conformityTopic", "tenantId", "createdAt", "updatedAt")
-               VALUES (gen_random_uuid(), 'https://example.com/e2e-cvc/criterion-2', 'E2E Criterion Beta', '1.0.0', 'active', 'Second test criterion', 'environment.water', $1, $2, $2)
-               RETURNING id`,
-              [tenantId, now],
-            );
-            const criterionId1 = criterion1Result.rows[0].id;
-            const criterionId2 = criterion2Result.rows[0].id;
-
-            // Link criteria to profile via join table
-            await client.query(
-              `INSERT INTO "ProfileCriterion" (id, "profileId", "criterionId")
-               VALUES (gen_random_uuid(), $1, $2), (gen_random_uuid(), $1, $3)`,
-              [profileId, criterionId1, criterionId2],
-            );
-
-            await client.query('COMMIT');
-            return { catalogueId, schemeId, profileId, criterionIds: [criterionId1, criterionId2] };
-          } catch (e) {
-            await client.query('ROLLBACK');
-            throw e;
           } finally {
             await client.end();
           }

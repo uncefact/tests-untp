@@ -144,17 +144,6 @@ export {
 } from './verifiable-credential/adapters/vckit/vckit-verifiable-credential.schema.js';
 export { decodeCredential } from './verifiable-credential/common/decode-credential.js';
 
-// CVC parsing
-export type {
-  ICvcParser,
-  ParsedCvcCatalogue,
-  ParsedCvcScheme,
-  ParsedCvcProfile,
-  ParsedCvcCriterion,
-} from './cvc-parsing/index.js';
-export { getCvcParser, SUPPORTED_CVC_VERSIONS } from './cvc-parsing/index.js';
-export { CvcV070Parser } from './cvc-parsing/index.js';
-
 // ── Data model bridges ──────────────────────────────────────────────────────
 export type {
   IDataModelBridge,

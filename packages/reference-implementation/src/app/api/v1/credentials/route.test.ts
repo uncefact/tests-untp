@@ -118,11 +118,6 @@ jest.mock('@/lib/api/validation', () => {
   };
 });
 
-const mockValidateCvcCompliance = jest.fn();
-jest.mock('@/lib/services/cvc-validation.service', () => ({
-  validateCvcCompliance: (...args: unknown[]) => mockValidateCvcCompliance(...args),
-}));
-
 import { POST, GET } from './route';
 
 // ---------------------------------------------------------------------------
@@ -215,7 +210,6 @@ function setupHappyPath() {
     schemaUrls: [DATA_MODEL.schemaUrl],
   });
   mockValidateCredentialPayload.mockResolvedValue(undefined);
-  mockValidateCvcCompliance.mockResolvedValue({ warnings: [] });
   mockGetDidByDid.mockResolvedValue({
     id: 'did-1',
     did: 'did:web:vckit.example.com:tenant-1',
@@ -420,171 +414,6 @@ describe('POST /api/v1/credentials', () => {
 
       expect(res.status).toBe(400);
       expect(json.error).toContain('Schema validation failed');
-    });
-  });
-
-  // ── CVC validation ──────────────────────────────────────────────────
-
-  describe('CVC validation', () => {
-    it('skips CVC validation for non-DCC credential types', async () => {
-      const req = createFakeRequest(validBody());
-      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-
-      expect(mockValidateCvcCompliance).not.toHaveBeenCalled();
-    });
-
-    it('runs CVC validation for DCC credential type', async () => {
-      const conformityRefs = {
-        schemeUrl: undefined,
-        standardUrls: [],
-        regulationUrls: [],
-        criteriaUrls: [],
-      };
-      const dccBridge = {
-        buildSubject: jest.fn().mockReturnValue({}),
-        extractRefs: jest.fn().mockReturnValue({ conformity: conformityRefs }),
-      };
-      mockResolveDataModel.mockResolvedValue({
-        dataModel: {
-          ...DATA_MODEL,
-          credentialType: 'DigitalConformityCredential',
-          name: 'Digital Conformity Credential',
-        },
-        bridge: dccBridge,
-        schemaUrls: [DATA_MODEL.schemaUrl],
-      });
-      mockValidateCvcCompliance.mockResolvedValue({ warnings: [] });
-
-      const req = createFakeRequest(validBody({ credentialType: 'DigitalConformityCredential' }));
-      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-
-      expect(dccBridge.extractRefs).toHaveBeenCalled();
-      expect(mockValidateCvcCompliance).toHaveBeenCalledWith('tenant-1', conformityRefs);
-    });
-
-    it('includes CVC warnings in response when present', async () => {
-      const dccBridge = {
-        buildSubject: jest.fn().mockReturnValue({}),
-        extractRefs: jest.fn().mockReturnValue({
-          conformity: { schemeUrl: undefined, standardUrls: [], regulationUrls: [], criteriaUrls: [] },
-        }),
-      };
-      mockResolveDataModel.mockResolvedValue({
-        dataModel: {
-          ...DATA_MODEL,
-          credentialType: 'DigitalConformityCredential',
-          name: 'Digital Conformity Credential',
-        },
-        bridge: dccBridge,
-        schemaUrls: [DATA_MODEL.schemaUrl],
-      });
-      const warnings = [{ code: 'CVC_NO_SCOPE', message: 'No conformity scope found in credential payload' }];
-      mockValidateCvcCompliance.mockResolvedValue({ warnings });
-
-      const req = createFakeRequest(validBody({ credentialType: 'DigitalConformityCredential' }));
-      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-      const json = await res.json();
-
-      expect(res.status).toBe(201);
-      expect(json.credentialId).toBe('cred-1');
-      expect(json.warnings).toEqual(warnings);
-    });
-
-    it('does not include warnings key when no CVC warnings', async () => {
-      const req = createFakeRequest(validBody());
-      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-      const json = await res.json();
-
-      expect(res.status).toBe(201);
-      expect(json.credentialId).toBe('cred-1');
-      expect(json).not.toHaveProperty('warnings');
-    });
-
-    it('continues issuing credential even when CVC validation throws', async () => {
-      const dccBridge = {
-        buildSubject: jest.fn().mockReturnValue({}),
-        extractRefs: jest.fn().mockReturnValue({
-          conformity: { schemeUrl: undefined, standardUrls: [], regulationUrls: [], criteriaUrls: [] },
-        }),
-      };
-      mockResolveDataModel.mockResolvedValue({
-        dataModel: {
-          ...DATA_MODEL,
-          credentialType: 'DigitalConformityCredential',
-          name: 'Digital Conformity Credential',
-        },
-        bridge: dccBridge,
-        schemaUrls: [DATA_MODEL.schemaUrl],
-      });
-      mockValidateCvcCompliance.mockRejectedValue(new Error('DB connection lost'));
-
-      const req = createFakeRequest(validBody({ credentialType: 'DigitalConformityCredential' }));
-      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-      const json = await res.json();
-
-      expect(res.status).toBe(201);
-      expect(json.credentialId).toBe('cred-1');
-      expect(json.warnings).toEqual([
-        {
-          code: 'CVC_VALIDATION_ERROR',
-          message: 'CVC validation could not be performed — credential was issued without CVC checks',
-        },
-      ]);
-    });
-
-    it('adds CVC_NO_CONFORMITY warning when DCC has no conformity data', async () => {
-      const dccBridge = {
-        buildSubject: jest.fn().mockReturnValue({}),
-        extractRefs: jest.fn().mockReturnValue({ organisations: [{ id: '1234567890' }], facilities: [], products: [] }),
-      };
-      mockResolveDataModel.mockResolvedValue({
-        dataModel: {
-          ...DATA_MODEL,
-          credentialType: 'DigitalConformityCredential',
-          name: 'Digital Conformity Credential',
-        },
-        bridge: dccBridge,
-        schemaUrls: [DATA_MODEL.schemaUrl],
-      });
-
-      const req = createFakeRequest(validBody({ credentialType: 'DigitalConformityCredential' }));
-      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-      const json = await res.json();
-
-      expect(res.status).toBe(201);
-      expect(json.warnings).toEqual([
-        { code: 'CVC_NO_CONFORMITY', message: 'No conformity data found in DCC credential payload' },
-      ]);
-      expect(mockValidateCvcCompliance).not.toHaveBeenCalled();
-    });
-
-    it('runs CVC validation for DCC extension credential types', async () => {
-      const dccBridge = {
-        buildSubject: jest.fn().mockReturnValue({}),
-        extractRefs: jest.fn().mockReturnValue({
-          conformity: { schemeUrl: undefined, standardUrls: [], regulationUrls: [], criteriaUrls: [] },
-        }),
-      };
-      mockResolveDataModel.mockResolvedValue({
-        dataModel: {
-          ...DATA_MODEL,
-          credentialType: 'DigitalConformityCredential',
-          isExtension: true,
-          parentConfig: {
-            credentialType: 'DigitalConformityCredential',
-            version: '0.6.1',
-            schemaUrl: 'https://example.com/schema.json',
-          },
-        },
-        bridge: dccBridge,
-        schemaUrls: [DATA_MODEL.schemaUrl],
-      });
-      mockValidateCvcCompliance.mockResolvedValue({ warnings: [] });
-
-      const req = createFakeRequest(validBody({ credentialType: 'DigitalConformityCredential' }));
-      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-
-      expect(mockValidateCvcCompliance).toHaveBeenCalled();
     });
   });
 
@@ -847,6 +676,30 @@ describe('POST /api/v1/credentials', () => {
 
       mockUpdateCredentialPublished.mockResolvedValue({});
     }
+
+    it('does not add PUBLISH_SKIPPED when refs extraction already failed', async () => {
+      setupPublishingHappyPath();
+      const failingBridge = {
+        buildSubject: jest.fn().mockReturnValue({}),
+        extractRefs: jest.fn().mockImplementation(() => {
+          throw new Error('bad subject');
+        }),
+      };
+      mockResolveDataModel.mockResolvedValue({
+        dataModel: DATA_MODEL,
+        bridge: failingBridge,
+        schemaUrls: [DATA_MODEL.schemaUrl],
+      });
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      const codes = ((json.warnings ?? []) as Array<{ code: string }>).map((w) => w.code);
+      expect(codes).toContain('REFS_EXTRACTION_FAILED');
+      expect(codes).not.toContain('PUBLISH_SKIPPED');
+    });
 
     it('publishes to IDR when publish=true and entity has scheme config', async () => {
       setupPublishingHappyPath();

@@ -11,7 +11,6 @@ const ID_DATA_MODEL = 'ckabcdefghij0000klmnopqrs';
 const ID_DATA_MODEL_2 = 'ckabcdefghij0001klmnopqrt';
 const ID_RENDER_TEMPLATE = 'ckabcdefghij0002klmnopqru';
 const ID_RENDER_TEMPLATE_2 = 'ckabcdefghij0003klmnopqrv';
-const ID_CVC_CATALOGUE = 'ckabcdefghij0004klmnopqrw';
 const ID_REGISTRAR = 'ckabcdefghij0005klmnopqrx';
 const ID_SCHEME = 'ckabcdefghij0006klmnopqry';
 const ID_QUALIFIER = 'ckabcdefghij0007klmnopqrz';
@@ -27,7 +26,6 @@ function buildCtx(overrides: Partial<ValidationContext> = {}): ValidationContext
     fileExists: () => true,
     resolvePath: (relativePath) => path.join(MOUNT_DIR, relativePath),
     mountDir: MOUNT_DIR,
-    supportedCvcVersions: ['1.0.0', '1.1.0'],
     isNonSystemCollision: () => false,
     ...overrides,
   };
@@ -67,23 +65,12 @@ function buildRenderTemplate(
   };
 }
 
-/** Build a minimal valid CVC catalogue entry. */
-function buildCvcCatalogue(id = ID_CVC_CATALOGUE, version = '1.0.0') {
-  return {
-    id,
-    name: 'Test Catalogue',
-    version,
-    endpointUrl: 'https://example.com/cvc.jsonld',
-  };
-}
-
 /** Build a minimal valid manifest (no entities). */
 function emptyManifest(): CustomSeedManifest {
   return {
     registrars: [],
     dataModels: [],
     renderTemplates: [],
-    cvcCatalogues: [],
   };
 }
 
@@ -129,7 +116,6 @@ describe('validateManifestReferences', () => {
         ],
         dataModels: [buildDataModel()],
         renderTemplates: [buildRenderTemplate()],
-        cvcCatalogues: [buildCvcCatalogue()],
       };
 
       const errors = validateManifestReferences(manifest, buildCtx());
@@ -378,20 +364,6 @@ describe('validateManifestReferences', () => {
       const errors = validateManifestReferences(manifest, ctx);
       expect(errors.some((e) => e.includes('non-system tenant') && e.includes(ID_RENDER_TEMPLATE))).toBe(true);
     });
-
-    it('returns an error when a CVC catalogue ID exists in a non-system tenant', () => {
-      const manifest: CustomSeedManifest = {
-        ...emptyManifest(),
-        cvcCatalogues: [buildCvcCatalogue()],
-      };
-
-      const ctx = buildCtx({
-        isNonSystemCollision: (id) => id === ID_CVC_CATALOGUE,
-      });
-
-      const errors = validateManifestReferences(manifest, ctx);
-      expect(errors.some((e) => e.includes('non-system tenant') && e.includes(ID_CVC_CATALOGUE))).toBe(true);
-    });
   });
 
   // ── System-tenant upsert (no collision) ───────────────────────────────────
@@ -402,7 +374,6 @@ describe('validateManifestReferences', () => {
         ...emptyManifest(),
         dataModels: [buildDataModel()],
         renderTemplates: [buildRenderTemplate()],
-        cvcCatalogues: [buildCvcCatalogue()],
       };
 
       const ctx = buildCtx({ isNonSystemCollision: () => false });
@@ -461,40 +432,6 @@ describe('validateManifestReferences', () => {
     });
   });
 
-  // ── CVC version ───────────────────────────────────────────────────────────
-
-  describe('CVC version validation', () => {
-    it('returns an error when the CVC version is not supported', () => {
-      const manifest: CustomSeedManifest = {
-        ...emptyManifest(),
-        cvcCatalogues: [buildCvcCatalogue(ID_CVC_CATALOGUE, '9.9.9')],
-      };
-
-      const errors = validateManifestReferences(manifest, buildCtx());
-      expect(errors.some((e) => e.includes('unsupported version') && e.includes('9.9.9'))).toBe(true);
-    });
-
-    it('accepts a supported CVC version', () => {
-      const manifest: CustomSeedManifest = {
-        ...emptyManifest(),
-        cvcCatalogues: [buildCvcCatalogue(ID_CVC_CATALOGUE, '1.0.0')],
-      };
-
-      const errors = validateManifestReferences(manifest, buildCtx());
-      expect(errors.filter((e) => e.includes('unsupported version'))).toHaveLength(0);
-    });
-
-    it('accepts all supported CVC versions', () => {
-      const manifest: CustomSeedManifest = {
-        ...emptyManifest(),
-        cvcCatalogues: [buildCvcCatalogue(ID_CVC_CATALOGUE, '1.1.0')],
-      };
-
-      const errors = validateManifestReferences(manifest, buildCtx());
-      expect(errors.filter((e) => e.includes('unsupported version'))).toHaveLength(0);
-    });
-  });
-
   // ── Multiple errors collected ──────────────────────────────────────────────
 
   describe('multiple errors collected', () => {
@@ -515,29 +452,21 @@ describe('validateManifestReferences', () => {
           buildRenderTemplate(ID_RENDER_TEMPLATE, badDataModelRef, 'tmpl.hbs'),
           // Error 4: file does not exist
           buildRenderTemplate(ID_RENDER_TEMPLATE_2, ID_DATA_MODEL, 'missing.hbs'),
-          // Error 5: two defaults for same data model
-          buildRenderTemplate(ID_CVC_CATALOGUE, ID_DATA_MODEL, 'extra.hbs', true),
-        ],
-        cvcCatalogues: [
-          // Error 6: unsupported version
-          buildCvcCatalogue(ID_REGISTRAR, '9.9.9'),
         ],
       };
 
       const ctx = buildCtx({
         fileExists: (p) => !p.includes('missing.hbs'),
-        // ID_RENDER_TEMPLATE_2 triggers isDefault duplicate (2 defaults for ID_DATA_MODEL)
       });
 
       const errors = validateManifestReferences(manifest, ctx);
-      // We should get multiple errors — at least 4 distinct issues
-      expect(errors.length).toBeGreaterThanOrEqual(4);
+      // We should get multiple errors — at least 3 distinct issues
+      expect(errors.length).toBeGreaterThanOrEqual(3);
 
       // Verify specific errors are present
       expect(errors.some((e) => e.includes('Duplicate'))).toBe(true);
       expect(errors.some((e) => e.includes('parentConfigId'))).toBe(true);
       expect(errors.some((e) => e.includes('unknown dataModelId'))).toBe(true);
-      expect(errors.some((e) => e.includes('unsupported version'))).toBe(true);
     });
   });
 });

@@ -10,4 +10,3 @@ export * from './facility.repository';
 export * from './product.repository';
 export * from './data-model.repository';
 export * from './render-template.repository';
-export * from './cvc.repository';

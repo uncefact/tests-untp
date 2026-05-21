@@ -371,7 +371,7 @@ describe('Credential API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/credentials — issues a v0.6.0 DCC credential with CVC validation', () => {
+    it('POST /api/v1/credentials — issues a v0.6.0 DCC credential', () => {
       const uniqueSuffix = `${RUN_ID}-${Math.random().toString(36).slice(2, 8)}`;
       const payload = {
         '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dcc/0.6.0/'],

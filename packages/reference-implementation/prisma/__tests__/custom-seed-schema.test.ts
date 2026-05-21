@@ -17,7 +17,6 @@ describe('customSeedSchema — empty and minimal manifests', () => {
       expect(result.data.registrars).toEqual([]);
       expect(result.data.dataModels).toEqual([]);
       expect(result.data.renderTemplates).toEqual([]);
-      expect(result.data.cvcCatalogues).toEqual([]);
     }
   });
 
@@ -26,14 +25,12 @@ describe('customSeedSchema — empty and minimal manifests', () => {
       registrars: null,
       dataModels: null,
       renderTemplates: null,
-      cvcCatalogues: null,
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.registrars).toEqual([]);
       expect(result.data.dataModels).toEqual([]);
       expect(result.data.renderTemplates).toEqual([]);
-      expect(result.data.cvcCatalogues).toEqual([]);
     }
   });
 
@@ -42,7 +39,6 @@ describe('customSeedSchema — empty and minimal manifests', () => {
       registrars: undefined,
       dataModels: undefined,
       renderTemplates: undefined,
-      cvcCatalogues: undefined,
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -623,61 +619,6 @@ describe('customSeedSchema — renderTemplates', () => {
   it('rejects a render template missing renderMethodType', () => {
     const { renderMethodType: _r, ...rest } = validRenderTemplate;
     const result = customSeedSchema.safeParse({ renderTemplates: [rest] });
-    expect(result.success).toBe(false);
-  });
-});
-
-// ── CVC catalogues ────────────────────────────────────────────────────────────
-
-describe('customSeedSchema — cvcCatalogues', () => {
-  const validCatalogue = {
-    id: CUID,
-    name: 'UNTP CVC',
-    version: '1.0.0',
-    endpointUrl: 'https://example.org/cvc.jsonld',
-  };
-
-  it('accepts a valid CVC catalogue with all required fields', () => {
-    const result = customSeedSchema.safeParse({ cvcCatalogues: [validCatalogue] });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects a CVC catalogue missing name', () => {
-    const { name: _n, ...rest } = validCatalogue;
-    const result = customSeedSchema.safeParse({ cvcCatalogues: [rest] });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a CVC catalogue missing version', () => {
-    const { version: _v, ...rest } = validCatalogue;
-    const result = customSeedSchema.safeParse({ cvcCatalogues: [rest] });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a CVC catalogue missing endpointUrl', () => {
-    const { endpointUrl: _e, ...rest } = validCatalogue;
-    const result = customSeedSchema.safeParse({ cvcCatalogues: [rest] });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects an invalid URL for endpointUrl', () => {
-    const result = customSeedSchema.safeParse({
-      cvcCatalogues: [{ ...validCatalogue, endpointUrl: 'not-a-url' }],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a CVC catalogue with an invalid CUID id', () => {
-    const result = customSeedSchema.safeParse({
-      cvcCatalogues: [{ ...validCatalogue, id: 'invalid' }],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a CVC catalogue with an empty string id', () => {
-    const result = customSeedSchema.safeParse({
-      cvcCatalogues: [{ ...validCatalogue, id: '' }],
-    });
     expect(result.success).toBe(false);
   });
 });

@@ -58,17 +58,16 @@ export const credentialIssueRequestSchema = z.object({
   publishingOptions: publishingOptionsSchema.optional().describe('IDR publishing options'),
 });
 
-/** CVC validation warning returned when advisory checks find issues. */
-export const cvcValidationWarningSchema = z.object({
-  code: z.string().describe('Warning code (e.g. CVC_UNKNOWN_CRITERION)'),
+/** Advisory warning that may accompany a credential-issue response. */
+export const credentialWarningSchema = z.object({
+  code: z.string().describe('Warning code'),
   message: z.string().describe('Human-readable warning message'),
-  detail: z.string().optional().describe('Additional context (e.g. the unrecognised criterion URL)'),
 });
 
 /** Successful credential issue response from POST /credentials. */
 export const credentialIssueResponseSchema = z.object({
   credentialId: z.string().describe('Database ID of the stored credential record'),
-  warnings: z.array(cvcValidationWarningSchema).optional().describe('CVC compliance warnings (advisory only)'),
+  warnings: z.array(credentialWarningSchema).optional().describe('Advisory warnings (e.g. publishing failures)'),
 });
 
 /** Credential resource as returned by GET /credentials and GET /credentials/:id. */
@@ -85,79 +84,6 @@ export const credentialSchema = z.object({
   productId: z.string().nullable().describe('ID of the linked product entity (null if none)'),
   createdAt: z.string().datetime().describe('ISO 8601 timestamp'),
   updatedAt: z.string().datetime().describe('ISO 8601 timestamp'),
-});
-
-// ============================================================================
-// CVC Schemas (local — CVC is a reference-implementation concern)
-// ============================================================================
-
-/** CVC catalogue as returned by the API. */
-export const cvcCatalogueSchema = z.object({
-  id: z.string().describe('Database ID'),
-  canonicalId: z.string().describe('JSON-LD @id from the source document'),
-  name: z.string().describe('Catalogue display name'),
-  sourceUrl: z.string().describe('URL the catalogue was imported from'),
-  specVersion: z.string().describe('CVC spec version used to parse this catalogue (e.g. "0.7.0")'),
-  metadata: z.record(z.unknown()).nullable().optional().describe('Extra JSON-LD properties'),
-  createdAt: z.string().datetime().describe('Creation timestamp'),
-  updatedAt: z.string().datetime().describe('Last update timestamp'),
-});
-
-/** Import request body for POST /cvc/catalogues. */
-export const cvcImportRequestSchema = z.object({
-  url: z.string().url().describe('URL of the CVC JSON-LD document to import'),
-  version: z.string().describe('CVC spec version to use for parsing (e.g. "0.7.0")'),
-});
-
-/** Import summary returned alongside the catalogue after import. */
-export const cvcImportSummarySchema = z.object({
-  schemes: z.number().int().describe('Number of schemes imported'),
-  profiles: z.number().int().describe('Number of profiles imported'),
-  criteria: z.number().int().describe('Number of criteria imported'),
-});
-
-/** Conformity scheme as returned by the API. */
-export const conformitySchemeSchema = z.object({
-  id: z.string().describe('Database ID'),
-  canonicalId: z.string().describe('JSON-LD @id from the source document'),
-  name: z.string().describe('Scheme display name'),
-  slug: z.string().describe('URL-friendly identifier derived from the canonical ID'),
-  description: z.string().nullable().optional().describe('Scheme description'),
-  metadata: z.record(z.unknown()).nullable().optional().describe('Extra JSON-LD properties'),
-  createdAt: z.string().datetime().describe('Creation timestamp'),
-  updatedAt: z.string().datetime().describe('Last update timestamp'),
-  catalogueId: z.string().describe('Parent catalogue ID'),
-});
-
-/** Conformity profile as returned by the API. */
-export const conformityProfileSchema = z.object({
-  id: z.string().describe('Database ID'),
-  canonicalId: z.string().describe('JSON-LD @id from the source document'),
-  name: z.string().describe('Profile display name'),
-  slug: z.string().describe('URL-friendly identifier derived from the canonical ID'),
-  version: z.string().describe('Profile version'),
-  status: z.string().describe('Profile status (e.g. Active, Draft)'),
-  description: z.string().nullable().optional().describe('Profile description'),
-  metadata: z.record(z.unknown()).nullable().optional().describe('Extra JSON-LD properties'),
-  createdAt: z.string().datetime().describe('Creation timestamp'),
-  updatedAt: z.string().datetime().describe('Last update timestamp'),
-  schemeId: z.string().describe('Parent scheme ID'),
-});
-
-/** Criterion as returned by the API. */
-export const criterionSchema = z.object({
-  id: z.string().describe('Database ID'),
-  canonicalId: z.string().describe('JSON-LD @id from the source document'),
-  name: z.string().describe('Criterion display name'),
-  version: z.string().describe('Criterion version'),
-  status: z.string().describe('Criterion status (e.g. Active, Draft)'),
-  description: z.string().nullable().optional().describe('Criterion description'),
-  conformityTopic: z.string().nullable().optional().describe('Conformity topic classification'),
-  passThreshold: z.record(z.unknown()).nullable().optional().describe('Pass/fail threshold definition'),
-  documentation: z.string().nullable().optional().describe('Documentation URL'),
-  metadata: z.record(z.unknown()).nullable().optional().describe('Extra JSON-LD properties'),
-  createdAt: z.string().datetime().describe('Creation timestamp'),
-  updatedAt: z.string().datetime().describe('Last update timestamp'),
 });
 
 // ============================================================================
@@ -295,19 +221,13 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     CredentialIssueRequest: credentialIssueRequestSchema,
     CredentialIssueResponse: credentialIssueResponseSchema,
     Credential: credentialSchema,
-    CvcValidationWarning: cvcValidationWarningSchema,
+    CredentialWarning: credentialWarningSchema,
     Registrar: registrarSchema,
     SchemeQualifier: schemeQualifierSchema,
     IdentifierScheme: identifierSchemeSchema,
     Identifier: identifierSchema,
     LinkRegistration: linkRegistrationSchema,
     ServiceInstance: serviceInstanceResponseSchema,
-    CvcCatalogue: cvcCatalogueSchema,
-    CvcImportRequest: cvcImportRequestSchema,
-    CvcImportSummary: cvcImportSummarySchema,
-    ConformityScheme: conformitySchemeSchema,
-    ConformityProfile: conformityProfileSchema,
-    Criterion: criterionSchema,
     DataModel: dataModelSchema,
     RenderTemplate: renderTemplateSchema,
     Product: productSchema,

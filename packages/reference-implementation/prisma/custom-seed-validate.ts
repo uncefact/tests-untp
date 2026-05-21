@@ -14,8 +14,6 @@ export interface ValidationContext {
   resolvePath: (relativePath: string) => string;
   /** The mount directory root */
   mountDir: string;
-  /** Supported CVC versions */
-  supportedCvcVersions: string[];
   /** Check if an ID exists in a non-system tenant (collision) */
   isNonSystemCollision: (id: string) => boolean;
 }
@@ -54,10 +52,6 @@ function collectDuplicateIds(manifest: CustomSeedManifest): Set<string> {
 
   for (const renderTemplate of manifest.renderTemplates) {
     check(renderTemplate.id);
-  }
-
-  for (const cvcCatalogue of manifest.cvcCatalogues) {
-    check(cvcCatalogue.id);
   }
 
   return duplicates;
@@ -150,23 +144,7 @@ export function validateManifestReferences(manifest: CustomSeedManifest, ctx: Va
     }
   }
 
-  // ── 4. CVC catalogue validations ──────────────────────────────────────────
-  for (const catalogue of manifest.cvcCatalogues) {
-    if (!ctx.supportedCvcVersions.includes(catalogue.version)) {
-      errors.push(
-        `CVC catalogue "${catalogue.id}" has unsupported version "${
-          catalogue.version
-        }" (supported: ${ctx.supportedCvcVersions.join(', ')})`,
-      );
-    }
-
-    // ID collision — exists in a non-system tenant.
-    if (ctx.isNonSystemCollision(catalogue.id)) {
-      errors.push(`CVC catalogue ID "${catalogue.id}" already exists in a non-system tenant and cannot be upserted`);
-    }
-  }
-
-  // ── 5. Registrar ID collision checks ──────────────────────────────────────
+  // ── 4. Registrar ID collision checks ──────────────────────────────────────
   for (const registrar of manifest.registrars) {
     if (ctx.isNonSystemCollision(registrar.id)) {
       errors.push(`Registrar ID "${registrar.id}" already exists in a non-system tenant and cannot be upserted`);

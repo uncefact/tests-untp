@@ -128,21 +128,6 @@ export const customSeedRenderTemplateSchema = z.object({
 
 export type CustomSeedRenderTemplate = z.infer<typeof customSeedRenderTemplateSchema>;
 
-// ── CVC catalogue schema ──────────────────────────────────────────────────────
-
-export const customSeedCvcCatalogueSchema = z.object({
-  /** CUID v1 primary key. */
-  id: z.string().cuid(),
-  /** Human-readable name for the catalogue. */
-  name: z.string(),
-  /** Catalogue version string. */
-  version: z.string(),
-  /** URL of the remote CVC JSON-LD endpoint. */
-  endpointUrl: z.string().url(),
-});
-
-export type CustomSeedCvcCatalogue = z.infer<typeof customSeedCvcCatalogueSchema>;
-
 // ── Root manifest schema ──────────────────────────────────────────────────────
 
 /**
@@ -166,12 +151,6 @@ export const customSeedSchema = z.object({
 
   /** Render templates to upsert (template files are read from disk via the `file` path). */
   renderTemplates: customSeedRenderTemplateSchema
-    .array()
-    .nullish()
-    .transform((v) => v ?? []),
-
-  /** CVC catalogues to import from remote endpoints. */
-  cvcCatalogues: customSeedCvcCatalogueSchema
     .array()
     .nullish()
     .transform((v) => v ?? []),
