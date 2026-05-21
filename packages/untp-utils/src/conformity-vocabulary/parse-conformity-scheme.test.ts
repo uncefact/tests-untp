@@ -181,6 +181,15 @@ describe('parseConformityScheme', () => {
       expect(outcome.value?.profiles[0].criteria[0].tags).toEqual(['forced-labor', 'human-rights']);
     });
 
+    it('parses a single string tag as a one-element array', () => {
+      const doc = minimalSchemeDoc({
+        includedProfile: [profile({ criterion: [criterion({ tag: 'forced-labor' })] })],
+      });
+      const outcome = parseConformityScheme(doc, { sourceUrl: 'https://example.com/scheme' });
+      expect(outcome.errors).toEqual([]);
+      expect(outcome.value?.profiles[0].criteria[0].tags).toEqual(['forced-labor']);
+    });
+
     it('captures the owner reference when present', () => {
       const doc = minimalSchemeDoc({
         owner: {
@@ -197,6 +206,20 @@ describe('parseConformityScheme', () => {
         canonicalId: 'https://example.com/owner',
         name: 'Example Owner',
       });
+    });
+
+    it('parses owner as a bare URI string (compact form)', () => {
+      const doc = minimalSchemeDoc({ owner: 'https://example.com/owner' });
+      const outcome = parseConformityScheme(doc, { sourceUrl: 'https://example.com/scheme' });
+      expect(outcome.errors).toEqual([]);
+      expect(outcome.value?.owner).toEqual({ canonicalId: 'https://example.com/owner' });
+    });
+
+    it('returns undefined owner when input is an array', () => {
+      const doc = minimalSchemeDoc({ owner: ['not', 'a', 'party'] });
+      const outcome = parseConformityScheme(doc, { sourceUrl: 'https://example.com/scheme' });
+      expect(outcome.errors).toEqual([]);
+      expect(outcome.value?.owner).toBeUndefined();
     });
   });
 

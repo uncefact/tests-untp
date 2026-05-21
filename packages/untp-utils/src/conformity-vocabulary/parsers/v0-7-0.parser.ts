@@ -247,6 +247,9 @@ function parseTopic(input: unknown): ConformityTopic | undefined {
 }
 
 function parseTags(input: unknown): string[] {
+  if (typeof input === 'string' && input.length > 0) {
+    return [input];
+  }
   if (!Array.isArray(input)) {
     return [];
   }
@@ -254,7 +257,10 @@ function parseTags(input: unknown): string[] {
 }
 
 function parseOwner(input: unknown): ConformitySchemeOwner | undefined {
-  if (!input || typeof input !== 'object') {
+  if (typeof input === 'string' && input.length > 0) {
+    return { canonicalId: input };
+  }
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return undefined;
   }
   const o = input as Record<string, unknown>;
