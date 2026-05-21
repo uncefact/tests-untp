@@ -505,18 +505,9 @@ importers:
       '@vckit/core-types':
         specifier: 1.0.0-beta.7
         version: 1.0.0-beta.7
-      ajv:
-        specifier: ^8.17.1
-        version: 8.20.0
-      ajv-formats:
-        specifier: ^3.0.1
-        version: 3.0.1(ajv@8.20.0)
       jose:
         specifier: ^5.9.3
         version: 5.10.0
-      jsonld:
-        specifier: ^8.3.3
-        version: 8.3.3(web-streams-polyfill@3.3.3)
       pino:
         specifier: ^10.3.1
         version: 10.3.1
@@ -536,9 +527,6 @@ importers:
       '@types/jest':
         specifier: 29.5.11
         version: 29.5.11
-      '@types/jsonld':
-        specifier: ^1.5.15
-        version: 1.5.15
       '@types/uuid':
         specifier: ^9.0.7
         version: 9.0.8
@@ -757,13 +745,28 @@ importers:
 
   packages/untp-utils:
     dependencies:
+      ajv:
+        specifier: ^8.17.1
+        version: 8.20.0
+      ajv-formats:
+        specifier: ^3.0.1
+        version: 3.0.1(ajv@8.20.0)
+      jsonld:
+        specifier: ^8.3.3
+        version: 8.3.3(web-streams-polyfill@3.3.3)
       multiformats:
         specifier: ^13.3.1
         version: 13.4.2
     devDependencies:
+      '@jest/globals':
+        specifier: 29.7.0
+        version: 29.7.0
       '@types/jest':
         specifier: 29.5.11
         version: 29.5.11
+      '@types/jsonld':
+        specifier: ^1.5.15
+        version: 1.5.15
       cross-env:
         specifier: ^7.0.3
         version: 7.0.3

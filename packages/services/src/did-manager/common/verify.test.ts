@@ -1,11 +1,6 @@
 import { verifyDid } from './verify';
 import { DidVerificationCheckName } from '../types';
 import { DidInputError, DidMethodNotSupportedError } from '../errors';
-import * as jsonld from 'jsonld';
-
-jest.mock('jsonld', () => ({
-  toRDF: jest.fn(),
-}));
 
 // -- Helpers -----------------------------------------------------------------
 
@@ -71,7 +66,6 @@ const validDidDocument = {
 describe('verifyDid', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
-    (jsonld.toRDF as jest.Mock).mockResolvedValue([{}]);
   });
 
   afterEach(() => {
