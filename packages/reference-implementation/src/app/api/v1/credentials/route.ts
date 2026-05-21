@@ -220,7 +220,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   // ── Step 8: Publish to IDR ──────────────────────────────────────────────
 
-  if (publishingOptions.publish === true) {
+  if (publishingOptions.publish === true && refs) {
     if (!primaryEntity.schemePrimaryKey || !primaryEntity.schemeNamespace) {
       logger.warn({ credentialId }, 'Publishing requested but entity has no scheme configuration — skipping');
       warnings.push({

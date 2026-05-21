@@ -677,6 +677,30 @@ describe('POST /api/v1/credentials', () => {
       mockUpdateCredentialPublished.mockResolvedValue({});
     }
 
+    it('does not add PUBLISH_SKIPPED when refs extraction already failed', async () => {
+      setupPublishingHappyPath();
+      const failingBridge = {
+        buildSubject: jest.fn().mockReturnValue({}),
+        extractRefs: jest.fn().mockImplementation(() => {
+          throw new Error('bad subject');
+        }),
+      };
+      mockResolveDataModel.mockResolvedValue({
+        dataModel: DATA_MODEL,
+        bridge: failingBridge,
+        schemaUrls: [DATA_MODEL.schemaUrl],
+      });
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      const codes = ((json.warnings ?? []) as Array<{ code: string }>).map((w) => w.code);
+      expect(codes).toContain('REFS_EXTRACTION_FAILED');
+      expect(codes).not.toContain('PUBLISH_SKIPPED');
+    });
+
     it('publishes to IDR when publish=true and entity has scheme config', async () => {
       setupPublishingHappyPath();
 
