@@ -96,6 +96,18 @@ describe('validateAgainstSchemas', () => {
     ]);
   });
 
+  it('emits a schema-compilation-failed error when the fetched schema is invalid', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ type: 'not-a-real-type' }),
+    } as never);
+
+    const outcome = await validateAgainstSchemas({}, [SCHEMA_URL_NAME]);
+
+    expect(outcome.errors).toEqual([expect.objectContaining({ code: SchemaValidationCode.SchemaCompilationFailed })]);
+  });
+
   it('continues to the next schema after a fetch failure on one', async () => {
     fetchMock.mockImplementation((async (url: string) => {
       if (url === SCHEMA_URL_NAME) {

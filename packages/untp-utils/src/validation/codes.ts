@@ -25,6 +25,8 @@ export type JsonLdValidationCode = (typeof JsonLdValidationCode)[keyof typeof Js
 export const SchemaValidationCode = {
   /** The schema URL could not be fetched (network failure, non-200, non-JSON). */
   SchemaFetchFailed: 'schema.fetch-failed',
+  /** The fetched schema document could not be compiled by Ajv (malformed schema, duplicate `$id`, etc.). */
+  SchemaCompilationFailed: 'schema.compilation-failed',
   /** The payload failed Ajv validation against one of the supplied schemas. */
   PayloadInvalid: 'schema.payload-invalid',
 } as const;

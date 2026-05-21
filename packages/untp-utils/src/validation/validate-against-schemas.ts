@@ -52,7 +52,18 @@ export async function validateAgainstSchemas(payload: unknown, schemaUrls: strin
       continue;
     }
 
-    const validate = ajv.compile(fetchOutcome.value);
+    let validate: ReturnType<typeof ajv.compile>;
+    try {
+      validate = ajv.compile(fetchOutcome.value);
+    } catch (error) {
+      errors.push({
+        code: SchemaValidationCode.SchemaCompilationFailed,
+        message: `Could not compile schema from ${url}.`,
+        received: error instanceof Error ? error.message : String(error),
+        raw: error,
+      });
+      continue;
+    }
     const valid = validate(payload);
 
     if (!valid && validate.errors) {
