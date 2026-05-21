@@ -31,11 +31,37 @@ Errors and warnings carry a structured, library-agnostic shape:
 | `message` | yes | utils | Neutral, factual summary in English. No app concepts. |
 | `received` | optional | utils | What the data showed, when relevant. Plain JSON-serialisable. |
 | `expected` | optional | utils | What was expected, when knowable. Plain JSON-serialisable. |
-| `pointer` | optional | utils when its inputs allow; consumer otherwise | JSON pointer (or other locator) into the input the utility received. The consumer re-maps if needed. See §4. |
+| `pointer` | optional | utils when its inputs allow; consumer otherwise | JSON Pointer (RFC 6901) into the input the utility received. The consumer re-maps if needed. See §4. |
 | `remediation` | optional | consumer (utils only when agnostic and derivable from `expected`) | User-facing remediation in the consumer's tone and audience. See §4. |
 | `raw` | optional | utils | Underlying error, when wrapping a third-party exception (Ajv, jsonld). For tooling, not for display. |
 
 The same shape applies to errors and to warnings. Both are returned as arrays (see §5); the library does not throw for input-related failures.
+
+In TypeScript terms, the canonical shapes are:
+
+```ts
+// Errors carry an optional `raw` (for wrapping third-party exceptions);
+// warnings do not.
+
+export interface ValidationError {
+  code: string;
+  message: string;
+  received?: unknown;
+  expected?: unknown;
+  pointer?: string;     // JSON Pointer (RFC 6901)
+  remediation?: string;
+  raw?: unknown;
+}
+
+export interface ValidationWarning {
+  code: string;
+  message: string;
+  received?: unknown;
+  expected?: unknown;
+  pointer?: string;     // JSON Pointer (RFC 6901)
+  remediation?: string;
+}
+```
 
 ### 2. Code namespacing
 
@@ -79,7 +105,7 @@ Both fields end up where the most informed source can fill them. The convention:
 - JSON-LD safe-mode expansion: when the underlying library reports a term-resolution failure or structural fault with a position or path, the util passes that through.
 - Functions that walk an iterable internal structure: for example, `validateConformityClaim` knows it iterated `claim.criteria[i]`, so a `criterion-not-in-profile` warning carries `pointer: '/criteria/0/criterion'`.
 
-A util-supplied `pointer` is **relative to the input the consumer passed in**. If the consumer extracted that input from a larger document (e.g., the RI extracts a claim object from `credentialSubject.conformityClaim` before passing it in), the consumer re-maps the pointer by prepending the wrapper path. The consumer is also free to replace the pointer entirely if its document model differs.
+A util-supplied `pointer` is a JSON Pointer per RFC 6901, **relative to the input the consumer passed in**. If the consumer extracted that input from a larger document (e.g., the RI extracts a claim object from `credentialSubject.conformityClaim` before passing it in), the consumer re-maps the pointer by prepending the wrapper path. The consumer is also free to replace the pointer entirely if its document model differs.
 
 The util **omits** `pointer` when it has no knowledge of the input's internal structure (for example, when it operates on a pair of fragments and compares them without traversing).
 
@@ -91,7 +117,7 @@ Consumers enrich via a simple map at the call site; no overrides parameter is re
 const { warnings } = validateConformityClaim(claim, scheme);
 const enriched = warnings.map((w) => ({
   ...w,
-  pointer: w.pointer ? `/credentialSubject/conformityClaim${w.pointer}` : undefined,
+  pointer: w.pointer !== undefined ? `/credentialSubject/conformityClaim${w.pointer}` : undefined,
   remediation: remediationForRiOperator(w),
 }));
 ```
