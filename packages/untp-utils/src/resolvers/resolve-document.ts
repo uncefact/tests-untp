@@ -154,15 +154,143 @@ export async function resolveDocument(url: string, options?: ResolveDocumentOpti
         );
       }
 
-      let response: Awaited<ReturnType<typeof undiciFetch>>;
+      // The entire request lifecycle (fetch + status-check + body read +
+      // digest) must sit inside one try/finally with the dispatcher close:
+      // `undici.Agent.close()` waits for active requests to drain, and a
+      // request is "drained" only once its body has been consumed. Closing
+      // before `readWithLimit` deadlocks the close on the unconsumed body.
       try {
-        response = await undiciFetch(currentUrl, {
+        const response = await undiciFetch(currentUrl, {
           method: 'GET',
           redirect: 'manual',
           signal: controller.signal,
           headers: options?.headers,
           dispatcher,
         });
+
+        // 304 Not Modified is semantically distinct from a redirect: the body
+        // is intentionally empty and the caller is expected to use its cached
+        // copy. Return it without treating it as a redirect or as an error so
+        // {@link import('./resolve-document-if-changed.js').resolveDocumentIfChanged}
+        // can map it to `unchanged`.
+        if (response.status === 304) {
+          const headerView = extractHeaders(response.headers);
+          const empty = new Uint8Array(0);
+          const digest = await computeDigest(empty);
+          if (digest.kind === 'error') {
+            return outcomeWithError(digest.error, accumulatedWarnings);
+          }
+          return {
+            value: {
+              finalUrl: currentUrl,
+              status: 304,
+              body: empty,
+              bodyDigest: digest.value,
+              etag: headerView.etag,
+              lastModified: headerView.lastModified,
+              contentType: headerView.contentType,
+            },
+            errors: [],
+            warnings: accumulatedWarnings,
+          };
+        }
+
+        if (response.status >= 300 && response.status < 400) {
+          const location = response.headers.get('location');
+          if (!location) {
+            return outcomeWithError(
+              {
+                code: ResolverCode.RedirectMissingLocation,
+                message: `Redirect response from ${currentUrl} had no Location header.`,
+                received: response.status,
+              },
+              accumulatedWarnings,
+            );
+          }
+          // Don't trust the upstream's Location header to be well-formed;
+          // a malformed URL must surface as a structured error rather than
+          // a thrown `TypeError` (ADR-034: never throw for input-related
+          // failures, including upstream-supplied inputs).
+          try {
+            currentUrl = new URL(location, currentUrl).toString();
+          } catch (error) {
+            return outcomeWithError(
+              {
+                code: ResolverCode.RedirectMissingLocation,
+                message: `Redirect Location header from ${currentUrl} is not a valid URL.`,
+                received: location,
+                raw: error,
+              },
+              accumulatedWarnings,
+            );
+          }
+          // The 3xx body (if any) was discarded above by virtue of not being
+          // read; cancel the stream so `dispatcher.close()` in `finally` can
+          // proceed without waiting for body drain.
+          if (response.body) await response.body.cancel().catch(() => undefined);
+          continue;
+        }
+
+        if (!response.ok) {
+          // Drain the body so the dispatcher's keep-alive close can proceed
+          // without waiting for the unread error-response body.
+          if (response.body) await response.body.cancel().catch(() => undefined);
+          return outcomeWithError(
+            {
+              code: ResolverCode.HttpError,
+              message: `Upstream returned HTTP ${response.status} for ${currentUrl}.`,
+              received: response.status,
+            },
+            accumulatedWarnings,
+          );
+        }
+
+        const readBody = await readWithLimit(response, maxBytes);
+        if (readBody.kind === 'too-large') {
+          return outcomeWithError(
+            {
+              code: ResolverCode.TooLarge,
+              message: `Response body for ${currentUrl} exceeds ${maxBytes}-byte limit.`,
+              received: maxBytes,
+            },
+            accumulatedWarnings,
+          );
+        }
+        if (readBody.kind === 'error') {
+          // An abort that fired during body read manifests here as a stream
+          // error; classify as TimedOut so the operator sees the same code
+          // they would if the timeout had fired pre-headers.
+          const code = isAbortLikeError(readBody.error) ? ResolverCode.TimedOut : ResolverCode.NetworkError;
+          return outcomeWithError(
+            {
+              code,
+              message:
+                code === ResolverCode.TimedOut
+                  ? `Request to ${currentUrl} timed out after ${totalTimeoutMs}ms.`
+                  : `Failed to read response body from ${currentUrl}.`,
+              received: readBody.error instanceof Error ? readBody.error.message : String(readBody.error),
+              raw: readBody.error,
+            },
+            accumulatedWarnings,
+          );
+        }
+
+        const digest = await computeDigest(readBody.body);
+        if (digest.kind === 'error') {
+          return outcomeWithError(digest.error, accumulatedWarnings);
+        }
+
+        const headerView = extractHeaders(response.headers);
+        const result: LoadResult = {
+          finalUrl: currentUrl,
+          status: response.status,
+          body: readBody.body,
+          bodyDigest: digest.value,
+          etag: headerView.etag,
+          lastModified: headerView.lastModified,
+          contentType: headerView.contentType,
+        };
+        return { value: result, errors: [], warnings: accumulatedWarnings };
       } catch (error) {
         if (isAbortLikeError(error)) {
           return outcomeWithError(
@@ -187,123 +315,6 @@ export async function resolveDocument(url: string, options?: ResolveDocumentOpti
       } finally {
         await dispatcher.close().catch(() => undefined);
       }
-
-      // 304 Not Modified is semantically distinct from a redirect: the body
-      // is intentionally empty and the caller is expected to use its cached
-      // copy. Return it without treating it as a redirect or as an error so
-      // {@link import('./resolve-document-if-changed.js').resolveDocumentIfChanged}
-      // can map it to `unchanged`.
-      if (response.status === 304) {
-        const headerView = extractHeaders(response.headers);
-        const empty = new Uint8Array(0);
-        const digest = await computeDigest(empty);
-        if (digest.kind === 'error') {
-          return outcomeWithError(digest.error, accumulatedWarnings);
-        }
-        return {
-          value: {
-            finalUrl: currentUrl,
-            status: 304,
-            body: empty,
-            bodyDigest: digest.value,
-            etag: headerView.etag,
-            lastModified: headerView.lastModified,
-            contentType: headerView.contentType,
-          },
-          errors: [],
-          warnings: accumulatedWarnings,
-        };
-      }
-
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get('location');
-        if (!location) {
-          return outcomeWithError(
-            {
-              code: ResolverCode.RedirectMissingLocation,
-              message: `Redirect response from ${currentUrl} had no Location header.`,
-              received: response.status,
-            },
-            accumulatedWarnings,
-          );
-        }
-        // Don't trust the upstream's Location header to be well-formed;
-        // a malformed URL must surface as a structured error rather than
-        // a thrown `TypeError` (ADR-034: never throw for input-related
-        // failures, including upstream-supplied inputs).
-        try {
-          currentUrl = new URL(location, currentUrl).toString();
-        } catch (error) {
-          return outcomeWithError(
-            {
-              code: ResolverCode.RedirectMissingLocation,
-              message: `Redirect Location header from ${currentUrl} is not a valid URL.`,
-              received: location,
-              raw: error,
-            },
-            accumulatedWarnings,
-          );
-        }
-        continue;
-      }
-
-      if (!response.ok) {
-        return outcomeWithError(
-          {
-            code: ResolverCode.HttpError,
-            message: `Upstream returned HTTP ${response.status} for ${currentUrl}.`,
-            received: response.status,
-          },
-          accumulatedWarnings,
-        );
-      }
-
-      const readBody = await readWithLimit(response, maxBytes);
-      if (readBody.kind === 'too-large') {
-        return outcomeWithError(
-          {
-            code: ResolverCode.TooLarge,
-            message: `Response body for ${currentUrl} exceeds ${maxBytes}-byte limit.`,
-            received: maxBytes,
-          },
-          accumulatedWarnings,
-        );
-      }
-      if (readBody.kind === 'error') {
-        // An abort that fired during body read manifests here as a stream
-        // error; classify as TimedOut so the operator sees the same code
-        // they would if the timeout had fired pre-headers.
-        const code = isAbortLikeError(readBody.error) ? ResolverCode.TimedOut : ResolverCode.NetworkError;
-        return outcomeWithError(
-          {
-            code,
-            message:
-              code === ResolverCode.TimedOut
-                ? `Request to ${currentUrl} timed out after ${totalTimeoutMs}ms.`
-                : `Failed to read response body from ${currentUrl}.`,
-            received: readBody.error instanceof Error ? readBody.error.message : String(readBody.error),
-            raw: readBody.error,
-          },
-          accumulatedWarnings,
-        );
-      }
-
-      const digest = await computeDigest(readBody.body);
-      if (digest.kind === 'error') {
-        return outcomeWithError(digest.error, accumulatedWarnings);
-      }
-
-      const headerView = extractHeaders(response.headers);
-      const result: LoadResult = {
-        finalUrl: currentUrl,
-        status: response.status,
-        body: readBody.body,
-        bodyDigest: digest.value,
-        etag: headerView.etag,
-        lastModified: headerView.lastModified,
-        contentType: headerView.contentType,
-      };
-      return { value: result, errors: [], warnings: accumulatedWarnings };
     }
 
     return outcomeWithError(

@@ -4,9 +4,14 @@ import { NodeUrlValidationCode } from '../node/index.js';
 import { ResolverCode } from './codes.js';
 
 const undiciFetch = jest.fn();
+let lastAgentClose: jest.Mock = jest.fn(() => Promise.resolve());
 
 class FakeAgent {
-  close = jest.fn(() => Promise.resolve());
+  close: jest.Mock;
+  constructor() {
+    this.close = jest.fn(() => Promise.resolve());
+    lastAgentClose = this.close;
+  }
 }
 
 jest.unstable_mockModule('undici', () => ({
@@ -260,6 +265,40 @@ describe('resolveDocument', () => {
       const outcome = await resolveDocument('https://example.com/');
 
       expect(outcome.errors[0]).toEqual(expect.objectContaining({ code: ResolverCode.RedirectMissingLocation }));
+    });
+  });
+
+  describe('dispatcher lifecycle', () => {
+    it('closes the dispatcher only after the response body has been fully read', async () => {
+      validatePublicUrl.mockResolvedValue(validUrl() as never);
+      // Real undici Agent.close() waits for active requests to drain (and a
+      // request only drains once its body has been consumed). Closing before
+      // the body read deadlocks. With mocked Agent the deadlock doesn't
+      // manifest, so the test instead asserts call order via jest's globally
+      // monotonic `invocationCallOrder` counters.
+      const bodyPull = jest.fn();
+      const slowStream = new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          bodyPull();
+          controller.enqueue(new TextEncoder().encode('chunk'));
+          controller.close();
+        },
+      });
+      undiciFetch.mockResolvedValue({
+        status: 200,
+        ok: true,
+        headers: new Headers(),
+        body: slowStream,
+      } as never);
+
+      const outcome = await resolveDocument('https://example.com/');
+
+      expect(outcome.errors).toEqual([]);
+      expect(bodyPull).toHaveBeenCalled();
+      expect(lastAgentClose).toHaveBeenCalled();
+      const pullOrder = bodyPull.mock.invocationCallOrder[0];
+      const closeOrder = lastAgentClose.mock.invocationCallOrder[0];
+      expect(closeOrder).toBeGreaterThan(pullOrder);
     });
   });
 
