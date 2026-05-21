@@ -108,6 +108,41 @@ describe('validateAgainstSchemas', () => {
     expect(outcome.errors).toEqual([expect.objectContaining({ code: SchemaValidationCode.SchemaCompilationFailed })]);
   });
 
+  describe('inline schema references', () => {
+    it('validates against an inline schema without making any fetch call', async () => {
+      const outcome = await validateAgainstSchemas({ name: 'Alice' }, [NAME_SCHEMA]);
+
+      expect(outcome).toEqual({ errors: [], warnings: [] });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('emits a payload-invalid error from an inline schema when the payload fails', async () => {
+      const outcome = await validateAgainstSchemas({}, [NAME_SCHEMA]);
+
+      expect(outcome.errors.length).toBeGreaterThan(0);
+      expect(outcome.errors[0]).toEqual(expect.objectContaining({ code: SchemaValidationCode.PayloadInvalid }));
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('emits a schema-compilation-failed error for an inline schema that does not compile', async () => {
+      const badSchema = { type: 'not-a-real-type' };
+
+      const outcome = await validateAgainstSchemas({}, [badSchema]);
+
+      expect(outcome.errors).toEqual([expect.objectContaining({ code: SchemaValidationCode.SchemaCompilationFailed })]);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('mixes URL and inline schema references in a single call', async () => {
+      mockSchemaResponses({ [SCHEMA_URL_NAME]: NAME_SCHEMA });
+
+      const outcome = await validateAgainstSchemas({ name: 'Alice', age: 30 }, [SCHEMA_URL_NAME, AGE_SCHEMA]);
+
+      expect(outcome).toEqual({ errors: [], warnings: [] });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('continues to the next schema after a fetch failure on one', async () => {
     fetchMock.mockImplementation((async (url: string) => {
       if (url === SCHEMA_URL_NAME) {
