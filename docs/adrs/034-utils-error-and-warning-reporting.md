@@ -1,7 +1,10 @@
 # ADR-034: Error and Warning Reporting Convention for `@uncefact/untp-utils`
 
 - **Date:** 2026-05-21
-- **Status:** accepted
+- **Status:** superseded
+- **Superseded by:** [ADR-035](./035-utils-throws-structured-errors.md)
+
+> **Update (2026-05-26):** Superseded by [ADR-035](./035-utils-throws-structured-errors.md). The structured-payload contract from this ADR (`code`, `message`, `received`, `expected`, `remediation`, `pointer`, wrapped cause) is preserved in ADR-035; only the delivery mechanism changes (from outcome-array return shapes to thrown `StructuredError` subclasses). The body below remains as the historical record of the original decision.
 
 ## Context
 
