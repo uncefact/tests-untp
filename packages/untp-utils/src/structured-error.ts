@@ -7,7 +7,7 @@
  *
  * @see ../../../docs/adrs/035-utils-throws-structured-errors.md
  */
-export interface StructuredErrorInit {
+export interface StructuredDiagnostic {
   /** Stable, namespaced identifier (e.g. `url.private-address`). */
   code: string;
   /** Human-facing summary. */
@@ -20,6 +20,9 @@ export interface StructuredErrorInit {
   remediation?: string;
   /** RFC 6901 JSON pointer into the input. */
   pointer?: string;
+}
+
+export interface StructuredErrorInit extends StructuredDiagnostic {
   /** Underlying error wrapped via `Error.cause`. */
   cause?: unknown;
 }
@@ -48,14 +51,7 @@ export class StructuredError extends Error {
  * Advisory diagnostic returned on the success path of functions that
  * opt into warnings (ADR-035 §5).
  */
-export interface StructuredWarning {
-  code: string;
-  message: string;
-  received?: unknown;
-  expected?: unknown;
-  remediation?: string;
-  pointer?: string;
-}
+export interface StructuredWarning extends StructuredDiagnostic {}
 
 /**
  * One entry in a multi-failure case (e.g. one of N Ajv `allErrors`).
@@ -63,11 +59,4 @@ export interface StructuredWarning {
  * (ADR-035 §4). Same shape as {@link StructuredWarning}; the type
  * distinguishes fatal sub-failure from advisory at the call site.
  */
-export interface ValidationFailure {
-  code: string;
-  message: string;
-  received?: unknown;
-  expected?: unknown;
-  remediation?: string;
-  pointer?: string;
-}
+export interface ValidationFailure extends StructuredDiagnostic {}
