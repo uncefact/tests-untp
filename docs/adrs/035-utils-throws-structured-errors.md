@@ -155,6 +155,14 @@ Consumers that need to collect diagnostics across many utils calls (multi-URL in
 3. Inspects the success return for the opt-in `{ value, warnings }` shape (§5) and extracts warnings.
 
 ```ts
+// Heterogeneous on purpose: a `StructuredError` instance carries `Error`
+// affordances (`stack`, `cause`, `name`) that an aggregator may want to
+// log on the singular case; a `ValidationFailure` is a plain payload that
+// only carries the structured fields. Both share `code`, `message`,
+// `received`, `expected`, `pointer`, `remediation`. Aggregating consumers
+// that need a uniform shape project both into their own report type.
+type StructuredErrorLike = StructuredError | ValidationFailure;
+
 async function captureStructured(fn: () => Promise<unknown>): Promise<{
   errors: readonly StructuredErrorLike[];
   warnings: readonly StructuredWarning[];
