@@ -25,6 +25,10 @@
     "./key-provider": {
       "types": "./build/key-provider/index.d.ts",
       "default": "./build/key-provider/index.js"
+    },
+    "./cvc": {
+      "types": "./build/cvc/index.d.ts",
+      "default": "./build/cvc/index.js"
     }
   },
   "typesVersions": {
@@ -40,6 +44,9 @@
       ],
       "key-provider": [
         "./build/key-provider/index.d.ts"
+      ],
+      "cvc": [
+        "./build/cvc/index.d.ts"
       ]
     }
   },

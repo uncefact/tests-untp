@@ -45,6 +45,13 @@ export class MultibaseDigest {
     return new MultibaseDigest(encoded);
   }
 
+  static async fromData(
+    data: Uint8Array,
+    _opts: { algorithm: 'sha2-256' | 'sha2-512'; base: 'base58btc' | 'base64' },
+  ): Promise<MultibaseDigest> {
+    return new MultibaseDigest(`zTESTDATA${Buffer.from(data).toString('hex').slice(0, 16)}`);
+  }
+
   toString(): string {
     return this.encoded;
   }
