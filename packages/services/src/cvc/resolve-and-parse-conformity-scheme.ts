@@ -23,7 +23,7 @@ import {
  * Three terminal outcomes:
  * `{ kind: 'unchanged' }`, the conditional-fetch skip chain hit; bump
  *   `lastFetchedAt` only, retain previous content.
- * `{ kind: 'success', scheme, raw, bodyDigest, etag?, lastModified? }`,
+ * `{ kind: 'success', scheme, raw, bodyDigest, etag?, lastModifiedHeader? }`,
  *   full upsert of the scheme + profiles + criteria + cache validators.
  * `{ kind: 'failure', error }`, a gate failed. Caller persists
  *   `lastFetchStatus = error.status` and retains previous content.
@@ -38,23 +38,19 @@ export async function resolveAndParseConformityScheme(
 ): Promise<ResolveAndParseConformitySchemeResult> {
   let body: Uint8Array;
   let etag: string | undefined;
-  let lastModified: string | undefined;
+  let lastModifiedHeader: string | undefined;
 
   if (input.prefetched) {
     body = input.prefetched.body;
     etag = input.prefetched.etag;
-    lastModified = input.prefetched.lastModified;
+    lastModifiedHeader = input.prefetched.lastModifiedHeader;
   } else {
     try {
-      const outcome = await resolveDocumentIfChanged(input.sourceUrl, {
-        etag: input.cached?.etag,
-        lastModifiedHeader: input.cached?.lastModified,
-        bodyDigest: input.cached?.bodyDigest,
-      });
+      const outcome = await resolveDocumentIfChanged(input.sourceUrl, input.cached ?? {});
       if (outcome.kind === 'unchanged') return { kind: 'unchanged' };
       body = outcome.result.body;
       etag = outcome.result.etag;
-      lastModified = outcome.result.lastModified;
+      lastModifiedHeader = outcome.result.lastModified;
     } catch (cause) {
       return failure(RESOLVE_FAILURE_STATUS.FetchFailed, input.sourceUrl, cause);
     }
@@ -102,7 +98,7 @@ export async function resolveAndParseConformityScheme(
     raw: parsedJson,
     bodyDigest,
     ...(etag !== undefined ? { etag } : {}),
-    ...(lastModified !== undefined ? { lastModified } : {}),
+    ...(lastModifiedHeader !== undefined ? { lastModifiedHeader } : {}),
   };
 }
 
