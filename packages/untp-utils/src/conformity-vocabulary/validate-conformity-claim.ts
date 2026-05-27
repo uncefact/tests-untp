@@ -1,40 +1,24 @@
-import type { ValidationOutcome } from '../validation-outcome.js';
 import { ConformityWarningCode } from './codes.js';
 import type { ConformityClaim, ConformityScheme, ConformityWarning } from './types.js';
 
 /**
- * Validates a credential's conformity claim against a parsed scheme. The
- * function is pure: it never fetches, never reads the database, never throws
- * for input-related failures, and never mutates its inputs. The caller is
- * responsible for sourcing the scheme that `claim.scheme` refers to.
+ * Validates a credential's conformity claim against a parsed scheme.
  *
- * Per ADR-034, the outcome carries both `errors[]` (always empty in this
- * function because the inputs are typed) and `warnings[]` (the meaningful
- * output). The walk goes scheme → profile → criteria → criterion topics and
- * short-circuits at the first miss:
+ * Short-circuits at the first miss:
+ * - scheme null or `canonicalId` mismatch → only `conformity-scheme.not-found`.
+ * - profile not in scheme → only `conformity-profile.not-found`.
+ * - otherwise → criteria-level and topic-level warnings accumulate.
  *
- * - If `scheme` is null (or its `canonicalId` doesn't match `claim.scheme`),
- *   only `conformity-scheme.not-found` is emitted.
- * - If the claim's profile is not in the scheme, only
- *   `conformity-profile.not-found` is emitted.
- * - Otherwise the criteria-level and topic-level checks run.
- *
- * Pointers on emitted warnings are relative to `claim`. Consumers re-map
- * them by prepending a wrapper path if the claim was extracted from a
- * larger document (e.g. an RI flow would prepend
- * `/credentialSubject/conformityClaim` for display in the credential).
- *
- * @param claim - Conformity claim extracted from a DCC.
- * @param scheme - The parsed scheme the caller looked up by `claim.scheme`,
- *   or `null` when no scheme could be found.
- * @returns A {@link ValidationOutcome} carrying advisory warnings.
+ * Pointers are relative to `claim`; consumers re-map them by prepending
+ * a wrapper path when the claim is extracted from a larger document.
  *
  * @see ADR-033 §3 for warning code definitions.
- * @see ADR-034 for the error and warning reporting convention.
  */
-export function validateConformityClaim(claim: ConformityClaim, scheme: ConformityScheme | null): ValidationOutcome {
+export function validateConformityClaim(
+  claim: ConformityClaim,
+  scheme: ConformityScheme | null,
+): readonly ConformityWarning[] {
   const warnings: ConformityWarning[] = [];
-  const errors: never[] = [];
 
   if (!scheme || scheme.canonicalId !== claim.scheme) {
     warnings.push({
@@ -43,7 +27,7 @@ export function validateConformityClaim(claim: ConformityClaim, scheme: Conformi
       received: claim.scheme,
       pointer: '/scheme',
     });
-    return { errors, warnings };
+    return warnings;
   }
 
   const profile = scheme.profiles.find((p) => p.canonicalId === claim.profile);
@@ -55,7 +39,7 @@ export function validateConformityClaim(claim: ConformityClaim, scheme: Conformi
       expected: scheme.profiles.map((p) => p.canonicalId),
       pointer: '/profile',
     });
-    return { errors, warnings };
+    return warnings;
   }
 
   const profileCriteriaById = new Map(profile.criteria.map((c) => [c.canonicalId, c]));
@@ -109,5 +93,5 @@ export function validateConformityClaim(claim: ConformityClaim, scheme: Conformi
     }
   });
 
-  return { errors, warnings };
+  return warnings;
 }

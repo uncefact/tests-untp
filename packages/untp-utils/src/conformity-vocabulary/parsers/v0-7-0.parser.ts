@@ -1,44 +1,29 @@
-import { ConformitySchemeErrorCode } from '../codes.js';
+import type { ValidationFailure } from '../../structured-error.js';
 import type {
   ConformityCriterion,
   ConformityProfile,
   ConformityScheme,
-  ConformitySchemeError,
   ConformitySchemeOwner,
   ConformityTopic,
 } from '../types.js';
 
 const SPEC_VERSION = '0.7.0';
 
+const INVALID_SHAPE = 'conformity-scheme.invalid-shape';
+const MISSING_REQUIRED_FIELD = 'conformity-scheme.missing-required-field';
+
 /**
  * Parses a v0.7.0 ConformityScheme JSON-LD document.
  *
- * Per the v0.7 spec, the document is rooted at a Conformity Scheme that
- * inlines its versioned Profiles, each of which inlines its versioned
- * Criteria. The scheme URI is stable but not independently versioned;
- * profile and criterion URIs include version segments.
+ * Lenient relative to the canonical `ConformityScheme.json` JSON Schema:
+ * extracts only the fields downstream consumers need (canonical IDs and
+ * the names, versions, statuses of profiles and criteria). Document-level
+ * conformance is the upstream JSON Schema validation gate's responsibility
+ * (ADR-033 §1).
  *
- * **Parser leniency.** This parser focuses on **structural extraction** of
- * the fields the rest of the package needs. It is intentionally lenient
- * relative to the canonical `ConformityScheme.json` JSON Schema: it does not
- * re-enforce required fields the parser does not need to construct its
- * output (for example, `endorsementLevel`, `requiredPerformance`, or the
- * profile's back-reference `scheme`). Document-level conformance to the
- * canonical schema is the responsibility of the upstream JSON Schema
- * validation gate the ingestion pipeline runs before invoking the parser
- * (see ADR-033 §1, "Validation at ingest"). The parser only emits errors
- * for fields it cannot proceed without (the canonical IDs and the names,
- * versions, and statuses of profiles and criteria).
- *
- * All errors are accumulated into the `errors` sink rather than thrown, so
- * a single parse pass surfaces every problem it can detect.
- *
- * @param doc - The parsed JSON-LD document.
- * @param sourceUrl - The URL the document was fetched from (recorded on the
- *   returned scheme).
- * @param errors - Sink the parser appends to on each detected problem.
- * @returns The parsed scheme, or `undefined` if a fatal shape problem
- *   prevented construction.
+ * Failures are accumulated into the `failures` sink so a single parse pass
+ * surfaces every problem it can detect. The outer `parseConformityScheme`
+ * throws a {@link ConformitySchemeParseError} carrying them.
  *
  * @see https://untp.unece.org/docs/specification/ConformityVocabularyCatalog
  * @see https://untp.unece.org/artefacts/schema/v0.7.0/cvc/ConformityScheme.json
@@ -46,11 +31,11 @@ const SPEC_VERSION = '0.7.0';
 export function parseV070ConformityScheme(
   doc: unknown,
   sourceUrl: string,
-  errors: ConformitySchemeError[],
+  failures: ValidationFailure[],
 ): ConformityScheme | undefined {
   if (!doc || typeof doc !== 'object') {
-    errors.push({
-      code: ConformitySchemeErrorCode.InvalidShape,
+    failures.push({
+      code: INVALID_SHAPE,
       message: 'Conformity scheme document must be a non-null object.',
       received: doc === null ? 'null' : typeof doc,
       expected: 'object',
@@ -60,10 +45,10 @@ export function parseV070ConformityScheme(
   }
   const root = doc as Record<string, unknown>;
 
-  const canonicalId = requireString(root.id, 'scheme.id', '/id', errors);
-  const name = requireString(root.name, 'scheme.name', '/name', errors);
+  const canonicalId = requireString(root.id, 'scheme.id', '/id', failures);
+  const name = requireString(root.name, 'scheme.name', '/name', failures);
 
-  const profiles = parseProfiles(root.includedProfile, '/includedProfile', errors);
+  const profiles = parseProfiles(root.includedProfile, '/includedProfile', failures);
 
   if (canonicalId === undefined || name === undefined) {
     return undefined;
@@ -81,13 +66,13 @@ export function parseV070ConformityScheme(
   };
 }
 
-function parseProfiles(input: unknown, pointer: string, errors: ConformitySchemeError[]): ConformityProfile[] {
+function parseProfiles(input: unknown, pointer: string, failures: ValidationFailure[]): ConformityProfile[] {
   if (input === undefined || input === null) {
     return [];
   }
   if (!Array.isArray(input)) {
-    errors.push({
-      code: ConformitySchemeErrorCode.InvalidShape,
+    failures.push({
+      code: INVALID_SHAPE,
       message: 'scheme.includedProfile must be an array.',
       received: typeof input,
       expected: 'array',
@@ -97,7 +82,7 @@ function parseProfiles(input: unknown, pointer: string, errors: ConformityScheme
   }
   const out: ConformityProfile[] = [];
   input.forEach((entry, i) => {
-    const parsed = parseProfile(entry, i, `${pointer}/${i}`, errors);
+    const parsed = parseProfile(entry, i, `${pointer}/${i}`, failures);
     if (parsed) {
       out.push(parsed);
     }
@@ -109,11 +94,11 @@ function parseProfile(
   input: unknown,
   index: number,
   pointer: string,
-  errors: ConformitySchemeError[],
+  failures: ValidationFailure[],
 ): ConformityProfile | undefined {
   if (!input || typeof input !== 'object') {
-    errors.push({
-      code: ConformitySchemeErrorCode.InvalidShape,
+    failures.push({
+      code: INVALID_SHAPE,
       message: `Profile at index ${index} must be a non-null object.`,
       received: input === null ? 'null' : typeof input,
       expected: 'object',
@@ -122,12 +107,12 @@ function parseProfile(
     return undefined;
   }
   const p = input as Record<string, unknown>;
-  const canonicalId = requireString(p.id, `profile[${index}].id`, `${pointer}/id`, errors);
-  const name = requireString(p.name, `profile[${index}].name`, `${pointer}/name`, errors);
-  const version = requireString(p.version, `profile[${index}].version`, `${pointer}/version`, errors);
-  const status = requireString(p.status, `profile[${index}].status`, `${pointer}/status`, errors);
+  const canonicalId = requireString(p.id, `profile[${index}].id`, `${pointer}/id`, failures);
+  const name = requireString(p.name, `profile[${index}].name`, `${pointer}/name`, failures);
+  const version = requireString(p.version, `profile[${index}].version`, `${pointer}/version`, failures);
+  const status = requireString(p.status, `profile[${index}].status`, `${pointer}/status`, failures);
 
-  const criteria = parseCriteria(p.criterion, `${pointer}/criterion`, errors);
+  const criteria = parseCriteria(p.criterion, `${pointer}/criterion`, failures);
 
   if (!canonicalId || !name || !version || !status) {
     return undefined;
@@ -145,13 +130,13 @@ function parseProfile(
   };
 }
 
-function parseCriteria(input: unknown, pointer: string, errors: ConformitySchemeError[]): ConformityCriterion[] {
+function parseCriteria(input: unknown, pointer: string, failures: ValidationFailure[]): ConformityCriterion[] {
   if (input === undefined || input === null) {
     return [];
   }
   if (!Array.isArray(input)) {
-    errors.push({
-      code: ConformitySchemeErrorCode.InvalidShape,
+    failures.push({
+      code: INVALID_SHAPE,
       message: 'profile.criterion must be an array.',
       received: typeof input,
       expected: 'array',
@@ -161,7 +146,7 @@ function parseCriteria(input: unknown, pointer: string, errors: ConformityScheme
   }
   const out: ConformityCriterion[] = [];
   input.forEach((entry, i) => {
-    const parsed = parseCriterion(entry, `${pointer}/${i}`, errors);
+    const parsed = parseCriterion(entry, `${pointer}/${i}`, failures);
     if (parsed) {
       out.push(parsed);
     }
@@ -172,11 +157,11 @@ function parseCriteria(input: unknown, pointer: string, errors: ConformityScheme
 function parseCriterion(
   input: unknown,
   pointer: string,
-  errors: ConformitySchemeError[],
+  failures: ValidationFailure[],
 ): ConformityCriterion | undefined {
   if (!input || typeof input !== 'object') {
-    errors.push({
-      code: ConformitySchemeErrorCode.InvalidShape,
+    failures.push({
+      code: INVALID_SHAPE,
       message: 'Criterion must be a non-null object.',
       received: input === null ? 'null' : typeof input,
       expected: 'object',
@@ -185,10 +170,10 @@ function parseCriterion(
     return undefined;
   }
   const c = input as Record<string, unknown>;
-  const canonicalId = requireString(c.id, 'criterion.id', `${pointer}/id`, errors);
-  const name = requireString(c.name, 'criterion.name', `${pointer}/name`, errors);
-  const version = requireString(c.version, 'criterion.version', `${pointer}/version`, errors);
-  const status = requireString(c.status, 'criterion.status', `${pointer}/status`, errors);
+  const canonicalId = requireString(c.id, 'criterion.id', `${pointer}/id`, failures);
+  const name = requireString(c.name, 'criterion.name', `${pointer}/name`, failures);
+  const version = requireString(c.version, 'criterion.version', `${pointer}/version`, failures);
+  const status = requireString(c.status, 'criterion.status', `${pointer}/status`, failures);
 
   if (!canonicalId || !name || !version || !status) {
     return undefined;
@@ -274,11 +259,11 @@ function requireString(
   value: unknown,
   fieldName: string,
   pointer: string,
-  errors: ConformitySchemeError[],
+  failures: ValidationFailure[],
 ): string | undefined {
   if (typeof value !== 'string' || value.length === 0) {
-    errors.push({
-      code: ConformitySchemeErrorCode.MissingRequiredField,
+    failures.push({
+      code: MISSING_REQUIRED_FIELD,
       message: `${fieldName} is required and must be a non-empty string.`,
       received: value === undefined ? 'undefined' : value === null ? 'null' : typeof value,
       expected: 'non-empty string',

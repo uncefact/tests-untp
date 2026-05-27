@@ -1,16 +1,5 @@
-import type { ValidationError, ValidationWarning } from '../validation-outcome.js';
-import type { ConformitySchemeErrorCode, ConformityWarningCode } from './codes.js';
-
-/**
- * Types for the UNTP Conformity Vocabulary primitives.
- *
- * Mirrors the v0.7 spec hierarchy: a Conformity Scheme inlines its versioned
- * Profiles, each of which inlines its versioned Criteria. Scheme URIs are
- * stable and not independently versioned; profile and criterion URIs include
- * a version segment per spec.
- *
- * @see https://untp.unece.org/docs/specification/ConformityVocabularyCatalog
- */
+import type { StructuredWarning } from '../structured-error.js';
+import type { ConformityWarningCode } from './codes.js';
 
 /**
  * Reference to the scheme owner. Optional; not all scheme documents carry it.
@@ -82,6 +71,8 @@ export interface ConformityProfile {
  *
  * The scheme URI is stable but not independently versioned. Profiles and
  * criteria inside the scheme carry their own version segments.
+ *
+ * @see https://untp.unece.org/docs/specification/ConformityVocabularyCatalog
  */
 export interface ConformityScheme {
   /** Canonical scheme URI (no version segment). */
@@ -98,21 +89,11 @@ export interface ConformityScheme {
   profiles: ConformityProfile[];
 }
 
-// ---------------------------------------------------------------------------
-// Errors and warnings narrowed to this sub-entry's codes.
-// ---------------------------------------------------------------------------
-
-/**
- * Parse errors emitted by {@link parseConformityScheme}. Narrows
- * {@link ValidationError} so the `code` is one of the parser's known codes.
- */
-export type ConformitySchemeError = ValidationError & { code: ConformitySchemeErrorCode };
-
 /**
  * Warnings emitted by {@link validateConformityClaim}. Narrows
- * {@link ValidationWarning} so the `code` is one of the validator's known codes.
+ * {@link StructuredWarning} so the `code` is one of the validator's known codes.
  */
-export type ConformityWarning = ValidationWarning & { code: ConformityWarningCode };
+export type ConformityWarning = StructuredWarning & { code: ConformityWarningCode };
 
 // ---------------------------------------------------------------------------
 // Claim validation
