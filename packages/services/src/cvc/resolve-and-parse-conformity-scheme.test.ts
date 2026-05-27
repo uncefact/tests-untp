@@ -94,15 +94,20 @@ describe('resolveAndParseConformityScheme', () => {
       expect(result.bodyDigest).toBeDefined();
     });
 
-    it('passes the cached resource to resolveDocumentIfChanged', async () => {
-      const cached = { etag: '"prev"', lastModifiedHeader: 'Tue, 20 May 2026 11:00:00 GMT' };
+    it('transcodes the cached resource into the resolver input shape', async () => {
       mockResolveDocumentIfChanged.mockResolvedValue(loadedResponse('{"id":"x"}'));
       mockValidateJsonLd.mockResolvedValue(undefined);
       mockValidateAgainstSchemas.mockResolvedValue(undefined);
       mockParseConformityScheme.mockReturnValue(fakeScheme());
 
-      await resolveAndParseConformityScheme(baseInput({ cached }));
-      expect(mockResolveDocumentIfChanged).toHaveBeenCalledWith(SOURCE_URL, cached);
+      await resolveAndParseConformityScheme(
+        baseInput({ cached: { etag: '"prev"', lastModified: 'Tue, 20 May 2026 11:00:00 GMT' } }),
+      );
+      expect(mockResolveDocumentIfChanged).toHaveBeenCalledWith(SOURCE_URL, {
+        etag: '"prev"',
+        lastModifiedHeader: 'Tue, 20 May 2026 11:00:00 GMT',
+        bodyDigest: undefined,
+      });
     });
   });
 

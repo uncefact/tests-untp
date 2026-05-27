@@ -34,7 +34,7 @@ export interface PrefetchedDocument {
  */
 export interface CachedResource {
   etag?: string;
-  lastModifiedHeader?: string;
+  lastModified?: string;
   bodyDigest?: MultibaseDigest;
 }
 

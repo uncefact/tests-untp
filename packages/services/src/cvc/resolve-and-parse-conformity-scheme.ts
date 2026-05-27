@@ -46,7 +46,11 @@ export async function resolveAndParseConformityScheme(
     lastModified = input.prefetched.lastModified;
   } else {
     try {
-      const outcome = await resolveDocumentIfChanged(input.sourceUrl, input.cached ?? {});
+      const outcome = await resolveDocumentIfChanged(input.sourceUrl, {
+        etag: input.cached?.etag,
+        lastModifiedHeader: input.cached?.lastModified,
+        bodyDigest: input.cached?.bodyDigest,
+      });
       if (outcome.kind === 'unchanged') return { kind: 'unchanged' };
       body = outcome.result.body;
       etag = outcome.result.etag;
