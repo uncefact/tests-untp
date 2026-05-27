@@ -25,7 +25,7 @@ export type ConformitySchemeSource = 'UNTP' | 'SYSTEM_SEED' | 'TENANT_IMPORTED';
 export interface PrefetchedDocument {
   body: Uint8Array;
   etag?: string;
-  lastModified?: string;
+  lastModifiedHeader?: string;
 }
 
 /**
@@ -34,7 +34,7 @@ export interface PrefetchedDocument {
  */
 export interface CachedResource {
   etag?: string;
-  lastModified?: string;
+  lastModifiedHeader?: string;
   bodyDigest?: MultibaseDigest;
 }
 
@@ -69,7 +69,7 @@ export interface ResolveAndParseConformitySchemeSuccess {
   raw: unknown;
   bodyDigest: MultibaseDigest;
   etag?: string;
-  lastModified?: string;
+  lastModifiedHeader?: string;
 }
 
 /** The skip chain hit; persist `lastFetchedAt` only and retain previous content. */

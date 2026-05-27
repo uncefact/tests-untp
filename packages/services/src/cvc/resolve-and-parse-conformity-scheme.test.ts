@@ -90,24 +90,29 @@ describe('resolveAndParseConformityScheme', () => {
       expect(result.scheme).toEqual(fakeScheme());
       expect(result.raw).toEqual({ '@context': [], id: 'x', name: 'x', includedProfile: [] });
       expect(result.etag).toBe('"abc"');
-      expect(result.lastModified).toBe('Wed, 21 May 2026 12:00:00 GMT');
+      expect(result.lastModifiedHeader).toBe('Wed, 21 May 2026 12:00:00 GMT');
       expect(result.bodyDigest).toBeDefined();
     });
 
-    it('transcodes the cached resource into the resolver input shape', async () => {
+    it('passes the cached resource to resolveDocumentIfChanged', async () => {
+      const cached = { etag: '"prev"', lastModifiedHeader: 'Tue, 20 May 2026 11:00:00 GMT' };
       mockResolveDocumentIfChanged.mockResolvedValue(loadedResponse('{"id":"x"}'));
       mockValidateJsonLd.mockResolvedValue(undefined);
       mockValidateAgainstSchemas.mockResolvedValue(undefined);
       mockParseConformityScheme.mockReturnValue(fakeScheme());
 
-      await resolveAndParseConformityScheme(
-        baseInput({ cached: { etag: '"prev"', lastModified: 'Tue, 20 May 2026 11:00:00 GMT' } }),
-      );
-      expect(mockResolveDocumentIfChanged).toHaveBeenCalledWith(SOURCE_URL, {
-        etag: '"prev"',
-        lastModifiedHeader: 'Tue, 20 May 2026 11:00:00 GMT',
-        bodyDigest: undefined,
-      });
+      await resolveAndParseConformityScheme(baseInput({ cached }));
+      expect(mockResolveDocumentIfChanged).toHaveBeenCalledWith(SOURCE_URL, cached);
+    });
+
+    it('passes an empty object to resolveDocumentIfChanged when no cached resource is supplied', async () => {
+      mockResolveDocumentIfChanged.mockResolvedValue(loadedResponse('{"id":"x"}'));
+      mockValidateJsonLd.mockResolvedValue(undefined);
+      mockValidateAgainstSchemas.mockResolvedValue(undefined);
+      mockParseConformityScheme.mockReturnValue(fakeScheme());
+
+      await resolveAndParseConformityScheme(baseInput());
+      expect(mockResolveDocumentIfChanged).toHaveBeenCalledWith(SOURCE_URL, {});
     });
   });
 
@@ -123,7 +128,7 @@ describe('resolveAndParseConformityScheme', () => {
           prefetched: {
             body: new TextEncoder().encode('{"id":"seed"}'),
             etag: '"seed-etag"',
-            lastModified: 'Mon, 19 May 2026 10:00:00 GMT',
+            lastModifiedHeader: 'Mon, 19 May 2026 10:00:00 GMT',
           },
         }),
       );
