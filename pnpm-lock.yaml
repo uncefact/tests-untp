@@ -760,6 +760,9 @@ importers:
       multiformats:
         specifier: ^13.3.1
         version: 13.4.2
+      undici:
+        specifier: ^6.24.0
+        version: 6.25.0
     devDependencies:
       '@jest/globals':
         specifier: 29.7.0
