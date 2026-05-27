@@ -28,9 +28,9 @@ describe('makeRequireString', () => {
     ]);
   });
 
-  it('returns undefined and pushes a failure when the value is the empty string', () => {
+  it('returns undefined and pushes a failure when the value is the empty string (discriminated from typeof "string")', () => {
     expect(requireString('', 'scheme.name', '/name', failures)).toBeUndefined();
-    expect(failures[0]).toMatchObject({ code: CODE, pointer: '/name' });
+    expect(failures[0]).toMatchObject({ code: CODE, pointer: '/name', received: 'empty string' });
   });
 
   it.each([

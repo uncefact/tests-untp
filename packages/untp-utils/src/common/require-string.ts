@@ -23,7 +23,8 @@ export function makeRequireString(code: string) {
     failures.push({
       code,
       message: `${fieldName} is required and must be a non-empty string.`,
-      received: value === undefined ? 'undefined' : value === null ? 'null' : typeof value,
+      received:
+        value === undefined ? 'undefined' : value === null ? 'null' : value === '' ? 'empty string' : typeof value,
       expected: 'non-empty string',
       pointer,
     });

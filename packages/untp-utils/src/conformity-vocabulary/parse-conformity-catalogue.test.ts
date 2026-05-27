@@ -120,6 +120,27 @@ describe('parseConformityCatalogue', () => {
         expect.objectContaining({
           code: 'conformity-catalogue.missing-required-field',
           pointer: '/entries',
+          received: 'undefined',
+        }),
+      ]);
+    });
+
+    it('throws when entries is null (reports `null`, not `undefined`)', () => {
+      const doc = registerDoc({ entries: null });
+      const error = (() => {
+        try {
+          parseConformityCatalogue(doc);
+          return undefined;
+        } catch (e) {
+          return e;
+        }
+      })();
+      expect(error).toBeInstanceOf(ConformityCatalogueParseError);
+      expect((error as ConformityCatalogueParseError).failures).toEqual([
+        expect.objectContaining({
+          code: 'conformity-catalogue.missing-required-field',
+          pointer: '/entries',
+          received: 'null',
         }),
       ]);
     });

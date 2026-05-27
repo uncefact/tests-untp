@@ -57,7 +57,7 @@ export function parseConformityCatalogue(
     failures.push({
       code: MISSING_REQUIRED_FIELD,
       message: 'Conformity catalogue document must include an `entries` array.',
-      received: 'undefined',
+      received: rawEntries === null ? 'null' : 'undefined',
       expected: 'array',
       pointer: '/entries',
     });
