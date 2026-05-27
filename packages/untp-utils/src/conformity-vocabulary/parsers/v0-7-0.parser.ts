@@ -1,3 +1,5 @@
+import { asNonEmptyString } from '../../common/as-non-empty-string.js';
+import { makeRequireString } from '../../common/require-string.js';
 import type { ValidationFailure } from '../../structured-error.js';
 import type {
   ConformityCriterion,
@@ -11,6 +13,8 @@ const SPEC_VERSION = '0.7.0';
 
 const INVALID_SHAPE = 'conformity-scheme.invalid-shape';
 const MISSING_REQUIRED_FIELD = 'conformity-scheme.missing-required-field';
+
+const requireString = makeRequireString(MISSING_REQUIRED_FIELD);
 
 /**
  * Parses a v0.7.0 ConformityScheme JSON-LD document.
@@ -59,8 +63,8 @@ export function parseV070ConformityScheme(
     sourceUrl,
     specVersion: SPEC_VERSION,
     name,
-    description: optionalString(root.description),
-    documentation: optionalString(root.documentation),
+    description: asNonEmptyString(root.description),
+    documentation: asNonEmptyString(root.documentation),
     owner: parseOwner(root.owner),
     profiles,
   };
@@ -123,9 +127,9 @@ function parseProfile(
     name,
     version,
     status,
-    description: optionalString(p.description),
-    documentation: optionalString(p.documentation),
-    validFrom: optionalString(p.validFrom),
+    description: asNonEmptyString(p.description),
+    documentation: asNonEmptyString(p.documentation),
+    validFrom: asNonEmptyString(p.validFrom),
     criteria,
   };
 }
@@ -184,8 +188,8 @@ function parseCriterion(
     name,
     version,
     status,
-    description: optionalString(c.description),
-    documentation: optionalString(c.documentation),
+    description: asNonEmptyString(c.description),
+    documentation: asNonEmptyString(c.documentation),
     topics: parseTopics(c.conformityTopic),
     tags: parseTags(c.tag),
   };
@@ -220,14 +224,14 @@ function parseTopic(input: unknown): ConformityTopic | undefined {
     return undefined;
   }
   const t = input as Record<string, unknown>;
-  const id = optionalString(t.id);
+  const id = asNonEmptyString(t.id);
   if (!id) {
     return undefined;
   }
   return {
     canonicalId: id,
-    name: optionalString(t.name),
-    definition: optionalString(t.definition),
+    name: asNonEmptyString(t.name),
+    definition: asNonEmptyString(t.definition),
   };
 }
 
@@ -250,30 +254,7 @@ function parseOwner(input: unknown): ConformitySchemeOwner | undefined {
   }
   const o = input as Record<string, unknown>;
   return {
-    canonicalId: optionalString(o.id),
-    name: optionalString(o.name),
+    canonicalId: asNonEmptyString(o.id),
+    name: asNonEmptyString(o.name),
   };
-}
-
-function requireString(
-  value: unknown,
-  fieldName: string,
-  pointer: string,
-  failures: ValidationFailure[],
-): string | undefined {
-  if (typeof value !== 'string' || value.length === 0) {
-    failures.push({
-      code: MISSING_REQUIRED_FIELD,
-      message: `${fieldName} is required and must be a non-empty string.`,
-      received: value === undefined ? 'undefined' : value === null ? 'null' : typeof value,
-      expected: 'non-empty string',
-      pointer,
-    });
-    return undefined;
-  }
-  return value;
-}
-
-function optionalString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }

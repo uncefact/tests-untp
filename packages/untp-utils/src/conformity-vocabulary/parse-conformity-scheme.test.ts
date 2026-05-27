@@ -1,4 +1,8 @@
-import { ConformitySchemeError, ConformitySchemeParseError, ConformityUnsupportedSpecVersionError } from './errors.js';
+import {
+  ConformityVocabularyError,
+  ConformitySchemeParseError,
+  ConformityUnsupportedSpecVersionError,
+} from './errors.js';
 import { parseConformityScheme } from './parse-conformity-scheme.js';
 
 const UNTP_V070_CONTEXT = 'https://vocabulary.uncefact.org/untp/0.7.0/context/';
@@ -297,14 +301,14 @@ describe('parseConformityScheme', () => {
   });
 
   describe('hierarchy', () => {
-    it('every concrete error extends ConformitySchemeError', () => {
+    it('every concrete error extends ConformityVocabularyError', () => {
       // unsupported version
       expect(() => parseConformityScheme(minimalSchemeDoc(), { sourceUrl: 'x', specVersion: '99.0.0' })).toThrow(
-        ConformitySchemeError,
+        ConformityVocabularyError,
       );
       // parse failure
       expect(() => parseConformityScheme(null, { sourceUrl: 'x', specVersion: '0.7.0' })).toThrow(
-        ConformitySchemeError,
+        ConformityVocabularyError,
       );
     });
   });

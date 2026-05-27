@@ -90,6 +90,22 @@ export interface ConformityScheme {
 }
 
 /**
+ * One entry in the UNTP Conformity Vocabulary Catalogue Register. Ingestion
+ * consumers route on {@link status} (skipping deprecated entries) and fetch
+ * the scheme document from {@link vocabularyUrl}.
+ */
+export interface ConformityCatalogueEntry {
+  /** CVC-canonical scheme URI; from the register entry's `id`. */
+  canonicalId: string;
+  /** Owner-published scheme document URL; from the register entry's `vocabularyURL`. Validated as a parseable URL at parse time. */
+  vocabularyUrl: string;
+  /** Human-readable scheme name. */
+  name: string;
+  /** Lifecycle status of the scheme in the register, when supplied (`'pilot'`, `'active'`, `'deprecated'`, etc.). */
+  status?: string;
+}
+
+/**
  * Warnings emitted by {@link validateConformityClaim}. Narrows
  * {@link StructuredWarning} so the `code` is one of the validator's known codes.
  */
