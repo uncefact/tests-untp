@@ -45,15 +45,13 @@ function scheme(): ConformityScheme {
 }
 
 describe('validateConformityClaim', () => {
-  it('returns no errors and no warnings when the claim matches the scheme exactly', () => {
+  it('returns an empty array when the claim matches the scheme exactly', () => {
     const claim: ConformityClaim = {
       scheme: SCHEME_URI,
       profile: PROFILE_URI,
       criteria: [{ criterion: CRITERION_A, conformityTopic: TOPIC_A1 }, { criterion: CRITERION_B }],
     };
-    const outcome = validateConformityClaim(claim, scheme());
-    expect(outcome.errors).toEqual([]);
-    expect(outcome.warnings).toEqual([]);
+    expect(validateConformityClaim(claim, scheme())).toEqual([]);
   });
 
   describe('scheme-not-found', () => {
@@ -63,8 +61,7 @@ describe('validateConformityClaim', () => {
         profile: PROFILE_URI,
         criteria: [],
       };
-      const outcome = validateConformityClaim(claim, null);
-      expect(outcome.warnings).toEqual([
+      expect(validateConformityClaim(claim, null)).toEqual([
         expect.objectContaining({
           code: ConformityWarningCode.SchemeNotFound,
           received: SCHEME_URI,
@@ -80,8 +77,8 @@ describe('validateConformityClaim', () => {
         profile: PROFILE_URI,
         criteria: [{ criterion: CRITERION_A }],
       };
-      const outcome = validateConformityClaim(claim, wrongScheme);
-      expect(outcome.warnings.map((w) => w.code)).toEqual([ConformityWarningCode.SchemeNotFound]);
+      const warnings = validateConformityClaim(claim, wrongScheme);
+      expect(warnings.map((w) => w.code)).toEqual([ConformityWarningCode.SchemeNotFound]);
     });
 
     it('short-circuits: no profile or criterion checks run', () => {
@@ -90,9 +87,9 @@ describe('validateConformityClaim', () => {
         profile: 'https://example.com/scheme/does-not-exist/9.9.9',
         criteria: [{ criterion: 'https://example.com/criterion/does-not-exist/9.9.9' }],
       };
-      const outcome = validateConformityClaim(claim, null);
-      expect(outcome.warnings).toHaveLength(1);
-      expect(outcome.warnings[0].code).toBe(ConformityWarningCode.SchemeNotFound);
+      const warnings = validateConformityClaim(claim, null);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].code).toBe(ConformityWarningCode.SchemeNotFound);
     });
   });
 
@@ -103,8 +100,7 @@ describe('validateConformityClaim', () => {
         profile: 'https://example.com/scheme/other/2.0.0',
         criteria: [{ criterion: CRITERION_A }],
       };
-      const outcome = validateConformityClaim(claim, scheme());
-      expect(outcome.warnings).toEqual([
+      expect(validateConformityClaim(claim, scheme())).toEqual([
         expect.objectContaining({
           code: ConformityWarningCode.ProfileNotFound,
           received: 'https://example.com/scheme/other/2.0.0',
@@ -123,8 +119,7 @@ describe('validateConformityClaim', () => {
           { criterion: CRITERION_A, conformityTopic: 'https://example.com/topics/unknown' },
         ],
       };
-      const outcome = validateConformityClaim(claim, scheme());
-      expect(outcome.warnings).toHaveLength(1);
+      expect(validateConformityClaim(claim, scheme())).toHaveLength(1);
     });
   });
 
@@ -139,8 +134,7 @@ describe('validateConformityClaim', () => {
           { criterion: 'https://example.com/criterion/unknown/1.0.0' },
         ],
       };
-      const outcome = validateConformityClaim(claim, scheme());
-      expect(outcome.warnings).toEqual([
+      expect(validateConformityClaim(claim, scheme())).toEqual([
         expect.objectContaining({
           code: ConformityWarningCode.CriterionNotInProfile,
           received: 'https://example.com/criterion/unknown/1.0.0',
@@ -163,8 +157,7 @@ describe('validateConformityClaim', () => {
           },
         ],
       };
-      const outcome = validateConformityClaim(claim, scheme());
-      const codes = outcome.warnings.map((w) => w.code);
+      const codes = validateConformityClaim(claim, scheme()).map((w) => w.code);
       expect(codes).toContain(ConformityWarningCode.CriterionNotInProfile);
       expect(codes).not.toContain(ConformityWarningCode.CriterionTopicMismatch);
     });
@@ -177,8 +170,7 @@ describe('validateConformityClaim', () => {
         profile: PROFILE_URI,
         criteria: [{ criterion: CRITERION_A, conformityTopic: TOPIC_A1 }],
       };
-      const outcome = validateConformityClaim(claim, scheme());
-      expect(outcome.warnings).toEqual([
+      expect(validateConformityClaim(claim, scheme())).toEqual([
         expect.objectContaining({
           code: ConformityWarningCode.CriterionMissing,
           expected: CRITERION_B,
@@ -193,8 +185,7 @@ describe('validateConformityClaim', () => {
         profile: PROFILE_URI,
         criteria: [],
       };
-      const outcome = validateConformityClaim(claim, scheme());
-      const missingExpected = outcome.warnings
+      const missingExpected = validateConformityClaim(claim, scheme())
         .filter((w) => w.code === ConformityWarningCode.CriterionMissing)
         .map((w) => w.expected);
       expect(missingExpected).toEqual([CRITERION_A, CRITERION_B]);
@@ -211,8 +202,7 @@ describe('validateConformityClaim', () => {
           { criterion: CRITERION_B },
         ],
       };
-      const outcome = validateConformityClaim(claim, scheme());
-      expect(outcome.warnings).toEqual([
+      expect(validateConformityClaim(claim, scheme())).toEqual([
         expect.objectContaining({
           code: ConformityWarningCode.CriterionTopicMismatch,
           received: 'https://example.com/topics/wrong',
@@ -228,8 +218,7 @@ describe('validateConformityClaim', () => {
         profile: PROFILE_URI,
         criteria: [{ criterion: CRITERION_A }, { criterion: CRITERION_B }],
       };
-      const outcome = validateConformityClaim(claim, scheme());
-      expect(outcome.warnings).toEqual([]);
+      expect(validateConformityClaim(claim, scheme())).toEqual([]);
     });
 
     it("does not fire when the claim's topic matches one of the criterion's topics", () => {
@@ -238,8 +227,7 @@ describe('validateConformityClaim', () => {
         profile: PROFILE_URI,
         criteria: [{ criterion: CRITERION_A, conformityTopic: TOPIC_A2 }, { criterion: CRITERION_B }],
       };
-      const outcome = validateConformityClaim(claim, scheme());
-      expect(outcome.warnings).toEqual([]);
+      expect(validateConformityClaim(claim, scheme())).toEqual([]);
     });
   });
 });
