@@ -60,6 +60,30 @@ describe('makeInMemoryTtlCache', () => {
     });
   });
 
+  describe('invalidate during inflight', () => {
+    it('does not repopulate the cache when invalidate runs while a fetch is inflight', async () => {
+      const cache = makeInMemoryTtlCache<string>({ ttlMs: 60_000 });
+      let resolveFetcher!: (v: string) => void;
+      const fetcher = jest.fn(
+        () =>
+          new Promise<string>((r) => {
+            resolveFetcher = r;
+          }),
+      );
+
+      const inflightLoad = cache.get('k', fetcher);
+      await cache.invalidate('k');
+      resolveFetcher('value-that-should-not-be-cached');
+      await inflightLoad;
+
+      const second = await cache.get(
+        'k',
+        jest.fn(async () => 'fresh-value'),
+      );
+      expect(second).toBe('fresh-value');
+    });
+  });
+
   describe('options', () => {
     it('rejects negative ttlMs', () => {
       expect(() => makeInMemoryTtlCache({ ttlMs: -1 })).toThrow(RangeError);

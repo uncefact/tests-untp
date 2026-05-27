@@ -10,21 +10,28 @@ export function makeInMemoryTtlCache<T>(options: TtlCacheOptions): TtlCache<T> {
 
   return {
     async get(key, fetcher) {
-      const cached = cache.get(key);
-      if (cached && Date.now() - cached.storedAt < ttlMs) {
-        return cached.value;
+      if (ttlMs > 0) {
+        const cached = cache.get(key);
+        if (cached && Date.now() - cached.storedAt < ttlMs) {
+          return cached.value;
+        }
       }
 
       const existing = inflight.get(key);
       if (existing) return existing;
 
-      const promise = (async () => {
+      let promise!: Promise<T>;
+      promise = (async () => {
         try {
           const value = await fetcher();
-          cache.set(key, { value, storedAt: Date.now() });
+          if (ttlMs > 0 && inflight.get(key) === promise) {
+            cache.set(key, { value, storedAt: Date.now() });
+          }
           return value;
         } finally {
-          inflight.delete(key);
+          if (inflight.get(key) === promise) {
+            inflight.delete(key);
+          }
         }
       })();
 
@@ -33,6 +40,7 @@ export function makeInMemoryTtlCache<T>(options: TtlCacheOptions): TtlCache<T> {
     },
     async invalidate(key) {
       cache.delete(key);
+      inflight.delete(key);
     },
     async clear() {
       cache.clear();

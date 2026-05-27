@@ -1,4 +1,4 @@
-import { makeInMemoryTtlCache } from '@uncefact/untp-utils';
+import { makeInMemoryTtlCache } from '@uncefact/untp-utils/cache';
 import { makeSchemaLoader, type SchemaLoader } from '@uncefact/untp-utils/schema-loaders';
 import { apiLogger } from '@/lib/api/logger';
 
@@ -7,7 +7,7 @@ const logger = apiLogger.child({ module: 'schema-loader' });
 
 export function readSchemaCacheTtlMs(env: Record<string, string | undefined> = process.env): number {
   const raw = env.SCHEMA_CACHE_TTL_MS;
-  if (raw === undefined || raw === '') return DEFAULT_TTL_MS;
+  if (raw === undefined || raw.trim() === '') return DEFAULT_TTL_MS;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed < 0) {
     logger.warn(

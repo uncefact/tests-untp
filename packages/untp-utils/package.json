@@ -28,6 +28,10 @@
     "./node": {
       "types": "./build/node/index.d.ts",
       "default": "./build/node/index.js"
+    },
+    "./cache": {
+      "types": "./build/cache/index.d.ts",
+      "default": "./build/cache/index.js"
     }
   },
   "typesVersions": {
@@ -46,6 +50,9 @@
       ],
       "node": [
         "./build/node/index.d.ts"
+      ],
+      "cache": [
+        "./build/cache/index.d.ts"
       ]
     }
   },

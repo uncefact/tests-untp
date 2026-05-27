@@ -4,14 +4,10 @@ import type { SchemaLoader } from '../schema-loaders/schema-loader.js';
 import type { ValidationFailure } from '../structured-error.js';
 import { SchemaCompilationFailedError, SchemaFetchFailedError, SchemaPayloadError } from './errors.js';
 
-let ajvInstance: Ajv2020 | undefined;
-
-function getAjv(): Ajv2020 {
-  if (!ajvInstance) {
-    ajvInstance = new Ajv2020({ strict: false, allErrors: true, verbose: true });
-    addFormats(ajvInstance);
-  }
-  return ajvInstance;
+function buildAjv(): Ajv2020 {
+  const ajv = new Ajv2020({ strict: false, allErrors: true, verbose: true });
+  addFormats(ajv);
+  return ajv;
 }
 
 /**
@@ -41,7 +37,7 @@ export async function validateAgainstSchemas(
   loader: SchemaLoader,
 ): Promise<void> {
   const failures: ValidationFailure[] = [];
-  const ajv = getAjv();
+  const ajv = buildAjv();
 
   for (const ref of schemas) {
     let schemaDoc: object;

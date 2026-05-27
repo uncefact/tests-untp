@@ -5,15 +5,17 @@ export interface SchemaLoader {
   load(url: string): Promise<object>;
 }
 
+const FETCH_TIMEOUT_MS = 10_000;
+
 /**
- * @throws {SchemaLoaderNetworkError} if the network request rejects.
+ * @throws {SchemaLoaderNetworkError} if the network request rejects or times out.
  * @throws {SchemaLoaderHttpError} on a non-2xx HTTP status.
  * @throws {SchemaLoaderInvalidJsonError} if the body is not parseable as JSON.
  */
 async function fetchSchema(url: string): Promise<object> {
   let response: Response;
   try {
-    response = await fetch(url);
+    response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   } catch (cause) {
     throw new SchemaLoaderNetworkError(url, cause);
   }
