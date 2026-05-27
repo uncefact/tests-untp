@@ -1,4 +1,4 @@
-import type { TtlCache } from '../ttl-cache.js';
+import type { TtlCache } from '../cache/ttl-cache.js';
 import { SchemaLoaderHttpError, SchemaLoaderInvalidJsonError, SchemaLoaderNetworkError } from './errors.js';
 
 export interface SchemaLoader {

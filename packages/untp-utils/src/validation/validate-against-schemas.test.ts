@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { makeInMemoryTtlCache } from '../in-memory-ttl-cache.js';
+import { makeInMemoryTtlCache } from '../cache/in-memory-ttl-cache.js';
 import { makeSchemaLoader, type SchemaLoader } from '../schema-loaders/schema-loader.js';
 import {
   SchemaCompilationFailedError,
