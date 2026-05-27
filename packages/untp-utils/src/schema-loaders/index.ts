@@ -1,7 +1,7 @@
 export {
-  fetchSchema,
-  clearSchemaCache,
-  getSchemaCache,
-  type CachedSchema,
-  type FetchSchemaOutcome,
-} from './schema-cache.js';
+  SchemaLoaderError,
+  SchemaLoaderNetworkError,
+  SchemaLoaderHttpError,
+  SchemaLoaderInvalidJsonError,
+} from './errors.js';
+export { makeSchemaLoader, type SchemaLoader } from './schema-loader.js';
