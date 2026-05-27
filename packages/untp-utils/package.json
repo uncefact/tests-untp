@@ -36,6 +36,10 @@
     "./resolvers": {
       "types": "./build/resolvers/index.d.ts",
       "default": "./build/resolvers/index.js"
+    },
+    "./http-headers": {
+      "types": "./build/http-headers/index.d.ts",
+      "default": "./build/http-headers/index.js"
     }
   },
   "typesVersions": {
@@ -60,6 +64,9 @@
       ],
       "resolvers": [
         "./build/resolvers/index.d.ts"
+      ],
+      "http-headers": [
+        "./build/http-headers/index.d.ts"
       ]
     }
   },

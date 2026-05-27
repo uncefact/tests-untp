@@ -1,9 +1,16 @@
 import { ReadableStream } from 'node:stream/web';
 import { Agent, fetch as undiciFetch } from 'undici';
+import { parseEntityTag, parseImfDate, parseMediaType } from '../http-headers/index.js';
 import { MultibaseDigest, type HashAlgorithm, type MultibaseEncoding } from '../multibase-digest/index.js';
 import { validatePublicUrl } from '../node/index.js';
-import type { ParseOutcome, ValidationError, ValidationWarning } from '../validation-outcome.js';
-import { ResolverCode } from './codes.js';
+import {
+  ResolverHttpError,
+  ResolverNetworkError,
+  ResolverRedirectMissingLocationError,
+  ResolverTimedOutError,
+  ResolverTooLargeError,
+  ResolverTooManyRedirectsError,
+} from './errors.js';
 
 /**
  * Defaults applied by {@link resolveDocument} (and, via composition,
@@ -11,11 +18,11 @@ import { ResolverCode } from './codes.js';
  * when the caller does not supply a value.
  */
 export const RESOLVER_DEFAULTS = {
-  /** Body-size cap in bytes; exceeding emits {@link ResolverCode.TooLarge}. */
-  maxResponseBytes: 1_048_576, // 1 MiB
+  /** Body-size cap in bytes; exceeding throws {@link ResolverTooLargeError}. */
+  maxResponseBytes: 1_048_576,
   /** Total request timeout in milliseconds (DNS + connect + TLS + first byte + body). */
   totalTimeoutMs: 10_000,
-  /** Maximum additional hops after the initial request; exceeding emits {@link ResolverCode.TooManyRedirects}. */
+  /** Maximum additional hops after the initial request; exceeding throws {@link ResolverTooManyRedirectsError}. */
   maxRedirects: 3,
   /** Multibase digest algorithm used to hash response bodies. */
   digestAlgorithm: 'sha2-256',
@@ -33,12 +40,9 @@ export const RESOLVER_DEFAULTS = {
  * Result of a fetch that produced a final response (any non-redirect status,
  * including `304 Not Modified`).
  *
- * Only an allowlisted subset of response headers is exposed (the ones we
- * know consumers need: `etag` and `last-modified` for the conditional-fetch
- * skip chain, `content-type` for body-type checks). Returning the entire
- * header set would persist arbitrary attacker-influenced bytes for no
- * reason; if a new header is genuinely required by a consumer, add a
- * named field for it here rather than re-introducing a catch-all.
+ * Only an allowlisted subset of response headers is exposed (the ones
+ * downstream consumers need: `etag` and `last-modified` for the conditional-
+ * fetch skip chain, `content-type` for body-type checks).
  *
  * All fields are `readonly`: a `LoadResult` is a frozen snapshot of one
  * fetch and must not be mutated by consumers.
@@ -52,9 +56,9 @@ export interface LoadResult {
   readonly body: Uint8Array;
   /** Multibase digest of {@link body} (algorithm/encoding per {@link RESOLVER_DEFAULTS}). */
   readonly bodyDigest: MultibaseDigest;
-  /** The response's `ETag` header if present. Echoed into the next `CachedResource.etag`. */
+  /** The response's `ETag` header if present. */
   readonly etag?: string;
-  /** The response's `Last-Modified` header if present. Echoed into the next `CachedResource.lastModifiedHeader`. */
+  /** The response's `Last-Modified` header if present. */
   readonly lastModified?: string;
   /** The response's `Content-Type` header if present. */
   readonly contentType?: string;
@@ -78,16 +82,8 @@ export interface ResolveDocumentOptions {
   /** Additional headers to send with the request (e.g. `Accept`). */
   headers?: Record<string, string>;
   /** Allowed URL schemes (forwarded to {@link import('../node/index.js').validatePublicUrl}). */
-  allowedSchemes?: readonly `${string}:`[];
+  allowedSchemes?: readonly string[];
 }
-
-/**
- * Outcome of {@link resolveDocument}, per ADR-034. `value` is present iff
- * `errors.length === 0`.
- *
- * @see ../../../docs/adrs/034-utils-error-and-warning-reporting.md
- */
-export type ResolveDocumentOutcome = ParseOutcome<LoadResult>;
 
 /**
  * Fetches `url` with the standard SSRF / size / timeout / redirect guards
@@ -99,63 +95,44 @@ export type ResolveDocumentOutcome = ParseOutcome<LoadResult>;
  * cannot redirect to a private URL or rebind its hostname between check
  * and connect.
  *
- * Per ADR-034, this function does not throw for input-related failures.
- * URL / scheme / hostname / DNS rejections from `validatePublicUrl`,
- * fetch-level errors, size-limit hits, redirect-cap hits, malformed
- * upstream `Location` headers, and HTTP error statuses all surface as
- * entries in the outcome's `errors[]`.
+ * @throws {UrlValidationError} for URL / scheme / hostname / DNS / private-address rejections from `validatePublicUrl`.
+ * @throws {ResolverNetworkError} when fetch rejects before producing a response.
+ * @throws {ResolverHttpError} on a non-2xx response status (with `.status`).
+ * @throws {ResolverTooLargeError} when the body exceeds the size cap (with `.limit`).
+ * @throws {ResolverTooManyRedirectsError} when the redirect chain exceeds the hop cap (with `.limit`).
+ * @throws {ResolverTimedOutError} when the total timeout fires (with `.timeoutMs`).
+ * @throws {ResolverRedirectMissingLocationError} for a 3xx with no / unparseable Location header.
  *
  * @see https://owasp.org/www-community/attacks/Server_Side_Request_Forgery
- * @see ../../../docs/adrs/033-cvc-architecture.md
- * @see ../../../docs/adrs/034-utils-error-and-warning-reporting.md
  */
-export async function resolveDocument(url: string, options?: ResolveDocumentOptions): Promise<ResolveDocumentOutcome> {
+export async function resolveDocument(url: string, options?: ResolveDocumentOptions): Promise<LoadResult> {
   const maxBytes = options?.maxResponseBytes ?? RESOLVER_DEFAULTS.maxResponseBytes;
   const totalTimeoutMs = options?.totalTimeoutMs ?? RESOLVER_DEFAULTS.totalTimeoutMs;
   const maxRedirects = options?.maxRedirects ?? RESOLVER_DEFAULTS.maxRedirects;
 
-  const accumulatedWarnings: ValidationWarning[] = [];
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => controller.abort(), totalTimeoutMs);
 
   try {
     let currentUrl = url;
-    for (let hop = 0; hop <= maxRedirects; hop++) {
-      const validation = await validatePublicUrl(currentUrl, { allowedSchemes: options?.allowedSchemes });
-      // Collect any advisory warnings even when validation passed, so the caller
-      // sees every hop's warnings (e.g. near-private addresses) in the outcome.
-      accumulatedWarnings.push(...validation.warnings);
-      if (validation.errors.length > 0 || !validation.value) {
-        return { errors: validation.errors, warnings: accumulatedWarnings };
-      }
+    for (let hop = 0; hop <= maxRedirects; hop += 1) {
+      const { address: pinnedAddress, family: pinnedFamily } = await validatePublicUrl(currentUrl, {
+        allowedSchemes: options?.allowedSchemes,
+      });
 
-      const { address: pinnedAddress, family: pinnedFamily } = validation.value;
-      let dispatcher: Agent;
-      try {
-        dispatcher = new Agent({
-          connect: {
-            // undici resolves the connect target with `all: true` to support
-            // happy-eyeballs; the callback receives a `LookupAddress[]`. We
-            // return a single-entry array containing the IP we pinned via
-            // `validatePublicUrl`, so the connection target is exactly the
-            // address that the SSRF check validated.
-            lookup: (_hostname, _opts, cb) => cb(null, [{ address: pinnedAddress, family: pinnedFamily }]),
-          },
-        });
-      } catch (error) {
-        return outcomeWithError(
-          {
-            code: ResolverCode.NetworkError,
-            message: `Failed to construct dispatcher for ${currentUrl}.`,
-            received: currentUrl,
-            raw: error,
-          },
-          accumulatedWarnings,
-        );
-      }
+      const dispatcher = new Agent({
+        connect: {
+          // undici resolves the connect target with `all: true` to support
+          // happy-eyeballs; the callback receives a `LookupAddress[]`.
+          // Return a single-entry array containing the IP we pinned via
+          // `validatePublicUrl`, so the connection target is exactly the
+          // address that the SSRF check validated.
+          lookup: (_hostname, _opts, cb) => cb(null, [{ address: pinnedAddress, family: pinnedFamily }]),
+        },
+      });
 
       // The entire request lifecycle (fetch + status-check + body read +
-      // digest) must sit inside one try/finally with the dispatcher close:
+      // digest) sits inside one try/finally with the dispatcher close:
       // `undici.Agent.close()` waits for active requests to drain, and a
       // request is "drained" only once its body has been consumed. Closing
       // before `readWithLimit` deadlocks the close on the unconsumed body.
@@ -168,170 +145,84 @@ export async function resolveDocument(url: string, options?: ResolveDocumentOpti
           dispatcher,
         });
 
-        // 304 Not Modified is semantically distinct from a redirect: the body
-        // is intentionally empty and the caller is expected to use its cached
-        // copy. Return it without treating it as a redirect or as an error so
-        // {@link import('./resolve-document-if-changed.js').resolveDocumentIfChanged}
-        // can map it to `unchanged`.
+        // 304 Not Modified: body is intentionally empty; the caller maps it
+        // to `unchanged` in `resolveDocumentIfChanged`.
         if (response.status === 304) {
           const headerView = extractHeaders(response.headers);
           const empty = new Uint8Array(0);
-          const digest = await computeDigest(empty);
-          if (digest.kind === 'error') {
-            return outcomeWithError(digest.error, accumulatedWarnings);
-          }
+          const bodyDigest = await computeDigest(empty);
           return {
-            value: {
-              finalUrl: currentUrl,
-              status: 304,
-              body: empty,
-              bodyDigest: digest.value,
-              etag: headerView.etag,
-              lastModified: headerView.lastModified,
-              contentType: headerView.contentType,
-            },
-            errors: [],
-            warnings: accumulatedWarnings,
+            finalUrl: currentUrl,
+            status: 304,
+            body: empty,
+            bodyDigest,
+            etag: headerView.etag,
+            lastModified: headerView.lastModified,
+            contentType: headerView.contentType,
           };
         }
 
         if (response.status >= 300 && response.status < 400) {
           const location = response.headers.get('location');
           if (!location) {
-            return outcomeWithError(
-              {
-                code: ResolverCode.RedirectMissingLocation,
-                message: `Redirect response from ${currentUrl} had no Location header.`,
-                received: response.status,
-              },
-              accumulatedWarnings,
-            );
+            throw new ResolverRedirectMissingLocationError(currentUrl, response.status);
           }
-          // Don't trust the upstream's Location header to be well-formed;
-          // a malformed URL must surface as a structured error rather than
-          // a thrown `TypeError` (ADR-034: never throw for input-related
-          // failures, including upstream-supplied inputs).
+          let nextUrl: string;
           try {
-            currentUrl = new URL(location, currentUrl).toString();
-          } catch (error) {
-            return outcomeWithError(
-              {
-                code: ResolverCode.RedirectMissingLocation,
-                message: `Redirect Location header from ${currentUrl} is not a valid URL.`,
-                received: location,
-                raw: error,
-              },
-              accumulatedWarnings,
-            );
+            nextUrl = new URL(location, currentUrl).toString();
+          } catch (cause) {
+            throw new ResolverRedirectMissingLocationError(currentUrl, location, cause);
           }
-          // The 3xx body (if any) was discarded above by virtue of not being
-          // read; cancel the stream so `dispatcher.close()` in `finally` can
+          // Cancel the 3xx body so `dispatcher.close()` in `finally` can
           // proceed without waiting for body drain.
           if (response.body) await response.body.cancel().catch(() => undefined);
+          currentUrl = nextUrl;
           continue;
         }
 
         if (!response.ok) {
-          // Drain the body so the dispatcher's keep-alive close can proceed
-          // without waiting for the unread error-response body.
           if (response.body) await response.body.cancel().catch(() => undefined);
-          return outcomeWithError(
-            {
-              code: ResolverCode.HttpError,
-              message: `Upstream returned HTTP ${response.status} for ${currentUrl}.`,
-              received: response.status,
-            },
-            accumulatedWarnings,
-          );
+          throw new ResolverHttpError(currentUrl, response.status);
         }
 
-        const readBody = await readWithLimit(response, maxBytes);
-        if (readBody.kind === 'too-large') {
-          return outcomeWithError(
-            {
-              code: ResolverCode.TooLarge,
-              message: `Response body for ${currentUrl} exceeds ${maxBytes}-byte limit.`,
-              received: maxBytes,
-            },
-            accumulatedWarnings,
-          );
-        }
-        if (readBody.kind === 'error') {
-          // An abort that fired during body read manifests here as a stream
-          // error; classify as TimedOut so the operator sees the same code
-          // they would if the timeout had fired pre-headers.
-          const code = isAbortLikeError(readBody.error) ? ResolverCode.TimedOut : ResolverCode.NetworkError;
-          return outcomeWithError(
-            {
-              code,
-              message:
-                code === ResolverCode.TimedOut
-                  ? `Request to ${currentUrl} timed out after ${totalTimeoutMs}ms.`
-                  : `Failed to read response body from ${currentUrl}.`,
-              received: readBody.error instanceof Error ? readBody.error.message : String(readBody.error),
-              raw: readBody.error,
-            },
-            accumulatedWarnings,
-          );
-        }
-
-        const digest = await computeDigest(readBody.body);
-        if (digest.kind === 'error') {
-          return outcomeWithError(digest.error, accumulatedWarnings);
-        }
-
+        const body = await readWithLimit(response, maxBytes, currentUrl, totalTimeoutMs);
+        const bodyDigest = await computeDigest(body);
         const headerView = extractHeaders(response.headers);
-        const result: LoadResult = {
+        return {
           finalUrl: currentUrl,
           status: response.status,
-          body: readBody.body,
-          bodyDigest: digest.value,
+          body,
+          bodyDigest,
           etag: headerView.etag,
           lastModified: headerView.lastModified,
           contentType: headerView.contentType,
         };
-        return { value: result, errors: [], warnings: accumulatedWarnings };
-      } catch (error) {
-        if (isAbortLikeError(error)) {
-          return outcomeWithError(
-            {
-              code: ResolverCode.TimedOut,
-              message: `Request to ${currentUrl} timed out after ${totalTimeoutMs}ms.`,
-              received: currentUrl,
-              raw: error,
-            },
-            accumulatedWarnings,
-          );
-        }
-        return outcomeWithError(
-          {
-            code: ResolverCode.NetworkError,
-            message: `Network error fetching ${currentUrl}.`,
-            received: error instanceof Error ? error.message : String(error),
-            raw: error,
-          },
-          accumulatedWarnings,
-        );
       } finally {
         await dispatcher.close().catch(() => undefined);
       }
     }
 
-    return outcomeWithError(
-      {
-        code: ResolverCode.TooManyRedirects,
-        message: `Exceeded ${maxRedirects} redirect hops starting from ${url}.`,
-        received: maxRedirects,
-      },
-      accumulatedWarnings,
-    );
+    throw new ResolverTooManyRedirectsError(url, maxRedirects);
+  } catch (cause) {
+    if (cause instanceof Error && (cause as Error & { code?: string }).code?.startsWith('resolver.')) {
+      throw cause;
+    }
+    // Re-throw UrlValidationErrors and other StructuredErrors unwrapped.
+    if (
+      cause instanceof Error &&
+      typeof (cause as Error & { code?: unknown }).code === 'string' &&
+      ((cause as Error & { code: string }).code.startsWith('url.') ||
+        (cause as Error & { code: string }).code.startsWith('resolver.'))
+    ) {
+      throw cause;
+    }
+    if (isAbortLikeError(cause)) {
+      throw new ResolverTimedOutError(url, totalTimeoutMs, cause);
+    }
+    throw new ResolverNetworkError(url, cause);
   } finally {
     clearTimeout(timeoutHandle);
   }
-}
-
-function outcomeWithError(error: ValidationError, warnings: ValidationWarning[]): ResolveDocumentOutcome {
-  return { errors: [error], warnings };
 }
 
 function isAbortLikeError(error: unknown): boolean {
@@ -346,44 +237,29 @@ interface HeaderView {
 
 function extractHeaders(headers: Headers): HeaderView {
   const view: HeaderView = {};
-  const etag = headers.get('etag');
-  if (etag) view.etag = etag;
-  const lastModified = headers.get('last-modified');
-  if (lastModified) view.lastModified = lastModified;
-  const contentType = headers.get('content-type');
-  if (contentType) view.contentType = contentType;
+  const etag = parseEntityTag(headers.get('etag') ?? '');
+  if (etag !== undefined) view.etag = etag;
+  const lastModified = parseImfDate(headers.get('last-modified') ?? '');
+  if (lastModified !== undefined) view.lastModified = lastModified;
+  const contentType = parseMediaType(headers.get('content-type') ?? '');
+  if (contentType !== undefined) view.contentType = contentType;
   return view;
 }
 
-type DigestResult = { kind: 'value'; value: MultibaseDigest } | { kind: 'error'; error: ValidationError };
-
-async function computeDigest(body: Uint8Array): Promise<DigestResult> {
-  try {
-    const value = await MultibaseDigest.fromData(body, {
-      algorithm: RESOLVER_DEFAULTS.digestAlgorithm,
-      base: RESOLVER_DEFAULTS.digestEncoding,
-    });
-    return { kind: 'value', value };
-  } catch (error) {
-    return {
-      kind: 'error',
-      error: {
-        code: ResolverCode.NetworkError,
-        message: 'Failed to compute body digest.',
-        received: error instanceof Error ? error.message : String(error),
-        raw: error,
-      },
-    };
-  }
+async function computeDigest(body: Uint8Array): Promise<MultibaseDigest> {
+  return MultibaseDigest.fromData(body, {
+    algorithm: RESOLVER_DEFAULTS.digestAlgorithm,
+    base: RESOLVER_DEFAULTS.digestEncoding,
+  });
 }
-
-type ReadBodyResult = { kind: 'ok'; body: Uint8Array } | { kind: 'too-large' } | { kind: 'error'; error: unknown };
 
 async function readWithLimit(
   response: { body: ReadableStream<Uint8Array> | null },
   limit: number,
-): Promise<ReadBodyResult> {
-  if (!response.body) return { kind: 'ok', body: new Uint8Array(0) };
+  url: string,
+  totalTimeoutMs: number,
+): Promise<Uint8Array> {
+  if (!response.body) return new Uint8Array(0);
 
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -398,16 +274,16 @@ async function readWithLimit(
       total += value.byteLength;
       if (total > limit) {
         await reader.cancel().catch(() => undefined);
-        return { kind: 'too-large' };
+        throw new ResolverTooLargeError(url, limit);
       }
       chunks.push(value);
     }
   } catch (error) {
-    // Release the underlying response stream so the upstream socket can be
-    // recycled; otherwise the reader holds the lock until GC and the
-    // dispatcher's keep-alive pool leaks one slot per mid-stream failure.
+    // Release the reader so the upstream socket can be recycled.
     await reader.cancel().catch(() => undefined);
-    return { kind: 'error', error };
+    if (error instanceof ResolverTooLargeError) throw error;
+    if (isAbortLikeError(error)) throw new ResolverTimedOutError(url, totalTimeoutMs, error);
+    throw new ResolverNetworkError(url, error);
   }
 
   const merged = new Uint8Array(total);
@@ -416,5 +292,5 @@ async function readWithLimit(
     merged.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return { kind: 'ok', body: merged };
+  return merged;
 }
