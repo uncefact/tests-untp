@@ -30,6 +30,7 @@ const jestConfig = {
     '^@uncefact/untp-utils/validation$': '<rootDir>/../untp-utils/build/validation/index.js',
     '^@uncefact/untp-utils/schema-loaders$': '<rootDir>/../untp-utils/build/schema-loaders/index.js',
     '^@uncefact/untp-utils/cache$': '<rootDir>/../untp-utils/build/cache/index.js',
+    '^@uncefact/untp-utils/conformity-vocabulary$': '<rootDir>/../untp-utils/build/conformity-vocabulary/index.js',
     '^@uncefact/untp-utils$': '<rootDir>/../untp-utils/build/index.js',
     '^@reference-implementation/components$': '<rootDir>/node_modules/@reference-implementation/components/build/index.js',
   },
