@@ -102,7 +102,9 @@ describe('resolveAndParseConformityScheme', () => {
       mockParseConformityScheme.mockReturnValue(fakeScheme());
 
       await resolveAndParseConformityScheme(baseInput({ cached }));
-      expect(mockResolveDocumentIfChanged).toHaveBeenCalledWith(SOURCE_URL, cached);
+      expect(mockResolveDocumentIfChanged).toHaveBeenCalledWith(SOURCE_URL, cached, {
+        headers: { Accept: 'application/ld+json' },
+      });
     });
 
     it('passes an empty object to resolveDocumentIfChanged when no cached resource is supplied', async () => {
@@ -112,7 +114,13 @@ describe('resolveAndParseConformityScheme', () => {
       mockParseConformityScheme.mockReturnValue(fakeScheme());
 
       await resolveAndParseConformityScheme(baseInput());
-      expect(mockResolveDocumentIfChanged).toHaveBeenCalledWith(SOURCE_URL, {});
+      expect(mockResolveDocumentIfChanged).toHaveBeenCalledWith(
+        SOURCE_URL,
+        {},
+        {
+          headers: { Accept: 'application/ld+json' },
+        },
+      );
     });
   });
 

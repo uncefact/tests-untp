@@ -46,7 +46,9 @@ export async function resolveAndParseConformityScheme(
     lastModifiedHeader = input.prefetched.lastModifiedHeader;
   } else {
     try {
-      const outcome = await resolveDocumentIfChanged(input.sourceUrl, input.cached ?? {});
+      const outcome = await resolveDocumentIfChanged(input.sourceUrl, input.cached ?? {}, {
+        headers: { Accept: 'application/ld+json' },
+      });
       if (outcome.kind === 'unchanged') return { kind: 'unchanged' };
       body = outcome.result.body;
       etag = outcome.result.etag;
