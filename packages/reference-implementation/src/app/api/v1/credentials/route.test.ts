@@ -401,7 +401,11 @@ describe('POST /api/v1/credentials', () => {
       const req = createFakeRequest(validBody());
       await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
-      expect(mockValidateCredentialPayload).toHaveBeenCalledWith(VALID_PAYLOAD, [DATA_MODEL.schemaUrl]);
+      expect(mockValidateCredentialPayload).toHaveBeenCalledWith(
+        VALID_PAYLOAD,
+        [DATA_MODEL.schemaUrl],
+        expect.objectContaining({ load: expect.any(Function) }),
+      );
     });
 
     it('returns 400 when validateCredentialPayload throws ValidationError', async () => {

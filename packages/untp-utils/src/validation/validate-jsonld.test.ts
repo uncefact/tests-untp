@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { JsonLdValidationCode } from './codes.js';
+import { JsonLdExpansionFailedError, JsonLdInvalidShapeError, JsonLdValidationError } from './errors.js';
 
 const toRDF = jest.fn();
 
@@ -15,60 +15,45 @@ describe('validateJsonLd', () => {
     toRDF.mockReset();
   });
 
-  it('returns an empty outcome when JSON-LD expansion succeeds', async () => {
+  it('returns void when JSON-LD expansion succeeds', async () => {
     toRDF.mockResolvedValue([] as never);
 
-    const outcome = await validateJsonLd({ '@context': 'https://example.com' });
-
-    expect(outcome).toEqual({ errors: [], warnings: [] });
+    await expect(validateJsonLd({ '@context': 'https://example.com' })).resolves.toBeUndefined();
     expect(toRDF).toHaveBeenCalledWith({ '@context': 'https://example.com' }, { safe: true });
   });
 
-  it('emits an expansion-failed error when toRDF rejects', async () => {
+  it('throws JsonLdExpansionFailedError when toRDF rejects', async () => {
     toRDF.mockRejectedValue(new Error('Invalid JSON-LD') as never);
 
-    const outcome = await validateJsonLd({});
-
-    expect(outcome.errors).toEqual([
-      expect.objectContaining({
-        code: JsonLdValidationCode.ExpansionFailed,
-        received: 'Invalid JSON-LD',
-      }),
-    ]);
-    expect(outcome.warnings).toEqual([]);
+    await expect(validateJsonLd({})).rejects.toMatchObject({
+      name: 'JsonLdExpansionFailedError',
+      code: 'jsonld.expansion-failed',
+      received: 'Invalid JSON-LD',
+    });
   });
 
-  it('captures the original error on raw', async () => {
+  it('captures the original error on Error.cause', async () => {
     const cause = new Error('Missing @context');
     toRDF.mockRejectedValue(cause as never);
 
-    const outcome = await validateJsonLd({});
-
-    expect(outcome.errors[0].raw).toBe(cause);
+    await expect(validateJsonLd({})).rejects.toMatchObject({ cause });
   });
 
-  it('emits an invalid-shape error when the document is not an object', async () => {
-    const outcome = await validateJsonLd('not-an-object');
-
-    expect(outcome.errors).toEqual([
-      expect.objectContaining({
-        code: JsonLdValidationCode.InvalidShape,
-        received: 'string',
-        expected: 'object',
-      }),
-    ]);
+  it('throws JsonLdInvalidShapeError when the document is not an object', async () => {
+    await expect(validateJsonLd('not-an-object')).rejects.toMatchObject({
+      name: 'JsonLdInvalidShapeError',
+      code: 'jsonld.invalid-shape',
+      received: 'string',
+      expected: 'object',
+    });
     expect(toRDF).not.toHaveBeenCalled();
   });
 
-  it('emits an invalid-shape error for null input', async () => {
-    const outcome = await validateJsonLd(null);
-
-    expect(outcome.errors).toEqual([
-      expect.objectContaining({
-        code: JsonLdValidationCode.InvalidShape,
-        received: 'null',
-      }),
-    ]);
+  it('throws JsonLdInvalidShapeError for null input', async () => {
+    await expect(validateJsonLd(null)).rejects.toMatchObject({
+      name: 'JsonLdInvalidShapeError',
+      received: 'null',
+    });
   });
 
   it('passes safe: false to toRDF when options.safe is false', async () => {
@@ -90,13 +75,15 @@ describe('validateJsonLd', () => {
   it('handles non-Error thrown values', async () => {
     toRDF.mockRejectedValue('string error' as never);
 
-    const outcome = await validateJsonLd({});
+    await expect(validateJsonLd({})).rejects.toMatchObject({
+      code: 'jsonld.expansion-failed',
+      received: 'string error',
+    });
+  });
 
-    expect(outcome.errors[0]).toEqual(
-      expect.objectContaining({
-        code: JsonLdValidationCode.ExpansionFailed,
-        received: 'string error',
-      }),
-    );
+  it('every concrete error extends JsonLdValidationError', async () => {
+    await expect(validateJsonLd(null)).rejects.toBeInstanceOf(JsonLdValidationError);
+    toRDF.mockRejectedValue(new Error('x') as never);
+    await expect(validateJsonLd({})).rejects.toBeInstanceOf(JsonLdValidationError);
   });
 });

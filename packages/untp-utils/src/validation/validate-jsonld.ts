@@ -1,38 +1,22 @@
 import type { JsonLdDocument } from 'jsonld';
-import type { ValidationError, ValidationOutcome } from '../validation-outcome.js';
-import { JsonLdValidationCode } from './codes.js';
+import { JsonLdExpansionFailedError, JsonLdInvalidShapeError } from './errors.js';
 
-/**
- * Options for {@link validateJsonLd}.
- */
 export interface ValidateJsonLdOptions {
   /** Whether to use safe mode for JSON-LD expansion. Defaults to true. */
   safe?: boolean;
 }
 
 /**
- * Validates a JSON-LD document by attempting to expand it to RDF in safe
- * mode (or non-safe mode if explicitly requested). Catches malformed
- * contexts, undefined terms, and structurally invalid linked data.
+ * Catches malformed contexts, undefined terms, and structurally invalid
+ * linked data by expanding to RDF in safe mode (unless explicitly disabled).
  *
- * Returns a {@link ValidationOutcome}. Per ADR-034, this function does not
- * throw for input-related failures: input shape problems and expansion
- * failures both surface as entries in `errors[]`.
- *
- * @param document - The JSON-LD document to validate.
- * @param options - {@link ValidateJsonLdOptions}.
+ * @see https://www.w3.org/TR/json-ld11-api/#dfn-safe-mode JSON-LD safe mode.
+ * @throws {JsonLdInvalidShapeError} if `document` is not a non-null object.
+ * @throws {JsonLdExpansionFailedError} if `jsonld.toRDF` rejects.
  */
-export async function validateJsonLd(document: unknown, options?: ValidateJsonLdOptions): Promise<ValidationOutcome> {
-  const errors: ValidationError[] = [];
-
+export async function validateJsonLd(document: unknown, options?: ValidateJsonLdOptions): Promise<void> {
   if (typeof document !== 'object' || document === null) {
-    errors.push({
-      code: JsonLdValidationCode.InvalidShape,
-      message: 'JSON-LD document must be a non-null object.',
-      received: document === null ? 'null' : typeof document,
-      expected: 'object',
-    });
-    return { errors, warnings: [] };
+    throw new JsonLdInvalidShapeError(document);
   }
 
   // Dynamic import: jsonld pulls in undici/TextDecoder which aren't
@@ -46,14 +30,7 @@ export async function validateJsonLd(document: unknown, options?: ValidateJsonLd
       document as JsonLdDocument,
       { safe: options?.safe ?? true } as Parameters<typeof jsonld.toRDF>[1],
     );
-  } catch (error) {
-    errors.push({
-      code: JsonLdValidationCode.ExpansionFailed,
-      message: 'JSON-LD expansion failed.',
-      received: error instanceof Error ? error.message : String(error),
-      raw: error,
-    });
+  } catch (cause) {
+    throw new JsonLdExpansionFailedError(cause);
   }
-
-  return { errors, warnings: [] };
 }
