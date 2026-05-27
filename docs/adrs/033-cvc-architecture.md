@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-21
 - **Status:** accepted
+- **Update (2026-05-27):** The services-side function this ADR calls `ingest(input)` ships as `resolveAndParseConformityScheme(input)`. "Ingest" is reserved for the RI-side step that consumes this function's output and performs the actual persistence (the RI iterates `parseConformityCatalogue` entries during UNTP discovery and calls it once per scheme; the tenant-import endpoint and the seed loader call it the same way). The function returns a discriminated `{ kind: 'unchanged' | 'success' | 'failure' }` result and never throws for known gate failures. The gate order is fetch, then JSON parse, then JSON Schema validation, then JSON-LD expansion, then parse, then body-digest. Schema validation runs before JSON-LD expansion because Ajv compile + check is local CPU, while JSON-LD expansion may fetch remote `@context` documents and walks the full RDF tree. Six `lastFetchStatus` values are now distinguished: `FETCH_FAILED`, `INVALID_JSON`, `SCHEMA_INVALID`, `JSONLD_EXPANSION_FAILED`, `PARSE_FAILED`, and `DIGEST_FAILED`. The body of this ADR retains the original framing for historical record.
 
 ## Context
 
