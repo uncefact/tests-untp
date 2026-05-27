@@ -1,0 +1,4 @@
+{
+  "//": "Scopes scripts/ to ESM so tsx handles @uncefact/untp-utils/multibase-digest correctly (same reason as prisma/package.json).",
+  "type": "module"
+}
