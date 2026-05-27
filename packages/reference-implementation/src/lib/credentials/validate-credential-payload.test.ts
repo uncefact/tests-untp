@@ -1,82 +1,96 @@
 import { ValidationError } from '@/lib/api/validation';
+import {
+  SchemaPayloadError,
+  SchemaFetchFailedError,
+  JsonLdExpansionFailedError,
+} from '@uncefact/untp-utils/validation';
+import type { SchemaLoader } from '@uncefact/untp-utils/schema-loaders';
 
 const mockValidateAgainstSchemas = jest.fn();
 const mockValidateJsonLd = jest.fn();
 
-jest.mock('@uncefact/untp-utils/validation', () => ({
-  validateAgainstSchemas: (...args: unknown[]) => mockValidateAgainstSchemas(...args),
-  validateJsonLd: (...args: unknown[]) => mockValidateJsonLd(...args),
-}));
+jest.mock('@uncefact/untp-utils/validation', () => {
+  const actual = jest.requireActual('@uncefact/untp-utils/validation');
+  return {
+    ...actual,
+    validateAgainstSchemas: (...args: unknown[]) => mockValidateAgainstSchemas(...args),
+    validateJsonLd: (...args: unknown[]) => mockValidateJsonLd(...args),
+  };
+});
 
 import { validateCredentialPayload } from './validate-credential-payload';
 
 const payload = { '@context': ['https://www.w3.org/ns/credentials/v2'], type: ['DigitalProductPassport'] };
 const schemaUrls = ['https://example.com/schema.json'];
-
-const emptyOutcome = { errors: [], warnings: [] };
+const loader: SchemaLoader = { load: jest.fn() };
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
 describe('validateCredentialPayload', () => {
-  it('calls schema validation then JSON-LD validation in order', async () => {
+  it('calls schema validation then JSON-LD validation in order, with the supplied loader', async () => {
     const callOrder: string[] = [];
     mockValidateAgainstSchemas.mockImplementation(async () => {
       callOrder.push('schema');
-      return emptyOutcome;
     });
     mockValidateJsonLd.mockImplementation(async () => {
       callOrder.push('jsonld');
-      return emptyOutcome;
     });
 
-    await validateCredentialPayload(payload, schemaUrls);
+    await validateCredentialPayload(payload, schemaUrls, loader);
 
     expect(callOrder).toEqual(['schema', 'jsonld']);
-    expect(mockValidateAgainstSchemas).toHaveBeenCalledWith(payload, schemaUrls);
+    expect(mockValidateAgainstSchemas).toHaveBeenCalledWith(payload, schemaUrls, loader);
     expect(mockValidateJsonLd).toHaveBeenCalledWith(payload);
   });
 
-  it('does not throw when both validations return empty outcomes', async () => {
-    mockValidateAgainstSchemas.mockResolvedValue(emptyOutcome);
-    mockValidateJsonLd.mockResolvedValue(emptyOutcome);
+  it('does not throw when both validations resolve', async () => {
+    mockValidateAgainstSchemas.mockResolvedValue(undefined);
+    mockValidateJsonLd.mockResolvedValue(undefined);
 
-    await expect(validateCredentialPayload(payload, schemaUrls)).resolves.toBeUndefined();
+    await expect(validateCredentialPayload(payload, schemaUrls, loader)).resolves.toBeUndefined();
   });
 
-  it('throws ValidationError when schema validation surfaces errors', async () => {
-    mockValidateAgainstSchemas.mockResolvedValue({
-      errors: [{ code: 'schema.payload-invalid', message: 'Invalid against schema' }],
-      warnings: [],
-    });
+  it('translates SchemaPayloadError into ValidationError, joining every failure message', async () => {
+    mockValidateAgainstSchemas.mockRejectedValue(
+      new SchemaPayloadError([
+        { code: 'schema.payload-invalid', message: 'Missing required property "id"' },
+        { code: 'schema.payload-invalid', message: 'Type must be array' },
+      ]),
+    );
 
-    await expect(validateCredentialPayload(payload, schemaUrls)).rejects.toThrow(ValidationError);
-    await expect(validateCredentialPayload(payload, schemaUrls)).rejects.toThrow('Invalid against schema');
+    const error = await validateCredentialPayload(payload, schemaUrls, loader).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ValidationError);
+    expect((error as Error).message).toContain('Missing required property "id"');
+    expect((error as Error).message).toContain('Type must be array');
     expect(mockValidateJsonLd).not.toHaveBeenCalled();
   });
 
-  it('throws ValidationError when JSON-LD validation surfaces errors', async () => {
-    mockValidateAgainstSchemas.mockResolvedValue(emptyOutcome);
-    mockValidateJsonLd.mockResolvedValue({
-      errors: [{ code: 'jsonld.expansion-failed', message: 'Invalid JSON-LD context' }],
-      warnings: [],
-    });
+  it('translates other SchemaValidationError subclasses (fetch / compile) into ValidationError', async () => {
+    mockValidateAgainstSchemas.mockRejectedValue(
+      new SchemaFetchFailedError('https://example.com/schema.json', new Error('connection refused')),
+    );
 
-    await expect(validateCredentialPayload(payload, schemaUrls)).rejects.toThrow(ValidationError);
-    await expect(validateCredentialPayload(payload, schemaUrls)).rejects.toThrow('Invalid JSON-LD context');
+    const error = await validateCredentialPayload(payload, schemaUrls, loader).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ValidationError);
+    expect((error as Error).message).toMatch(/Could not load schema/);
+    expect(mockValidateJsonLd).not.toHaveBeenCalled();
   });
 
-  it('combines multiple schema errors into the thrown message', async () => {
-    mockValidateAgainstSchemas.mockResolvedValue({
-      errors: [
-        { code: 'schema.payload-invalid', message: 'Missing required property "id"' },
-        { code: 'schema.payload-invalid', message: 'Type must be array' },
-      ],
-      warnings: [],
-    });
+  it('translates JsonLdValidationError into ValidationError', async () => {
+    mockValidateAgainstSchemas.mockResolvedValue(undefined);
+    mockValidateJsonLd.mockRejectedValue(new JsonLdExpansionFailedError(new Error('Undefined term: foo')));
 
-    await expect(validateCredentialPayload(payload, schemaUrls)).rejects.toThrow('Missing required property "id"');
-    await expect(validateCredentialPayload(payload, schemaUrls)).rejects.toThrow('Type must be array');
+    const error = await validateCredentialPayload(payload, schemaUrls, loader).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ValidationError);
+    expect((error as Error).message).toContain('JSON-LD validation failed');
+  });
+
+  it('rethrows non-validation errors unchanged', async () => {
+    const unexpected = new Error('something else broke');
+    mockValidateAgainstSchemas.mockRejectedValue(unexpected);
+
+    await expect(validateCredentialPayload(payload, schemaUrls, loader)).rejects.toBe(unexpected);
   });
 });

@@ -12,6 +12,7 @@ import { apiLogger } from '@/lib/api/logger';
 import { resolveDataModel } from '@/lib/credentials/resolve-data-model';
 import { validateCredentialPayload } from '@/lib/credentials/validate-credential-payload';
 import { issueCredential } from '@/lib/credentials/issue-credential';
+import { schemaLoader } from '@/lib/credentials/schema-loader';
 import { updateCredentialPublished, listCredentials } from '@/lib/prisma/repositories';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
@@ -144,7 +145,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // ── Step 3: Validate payload ────────────────────────────────────────────
 
   logger.info('Validating credential payload against schema');
-  await validateCredentialPayload(credentialPayload, schemaUrls);
+  await validateCredentialPayload(credentialPayload, schemaUrls, schemaLoader);
 
   // ── Step 3.5: Extract entity references for publishing ──────────────────
 

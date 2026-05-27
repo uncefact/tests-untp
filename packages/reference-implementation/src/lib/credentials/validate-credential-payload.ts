@@ -1,16 +1,37 @@
-import { validateAgainstSchemas, validateJsonLd } from '@uncefact/untp-utils/validation';
+import {
+  validateAgainstSchemas,
+  validateJsonLd,
+  SchemaPayloadError,
+  SchemaValidationError,
+  JsonLdValidationError,
+} from '@uncefact/untp-utils/validation';
+import type { SchemaLoader } from '@uncefact/untp-utils/schema-loaders';
 import { ValidationError } from '@/lib/api/validation';
 
-export async function validateCredentialPayload(credentialPayload: unknown, schemaUrls: string[]): Promise<void> {
-  const schemaOutcome = await validateAgainstSchemas(credentialPayload, schemaUrls);
-  if (schemaOutcome.errors.length > 0) {
-    const summary = schemaOutcome.errors.map((e) => e.message).join('; ');
-    throw new ValidationError(`Schema validation failed: ${summary}`);
+export async function validateCredentialPayload(
+  credentialPayload: unknown,
+  schemaUrls: string[],
+  loader: SchemaLoader,
+): Promise<void> {
+  try {
+    await validateAgainstSchemas(credentialPayload, schemaUrls, loader);
+  } catch (e) {
+    if (e instanceof SchemaPayloadError) {
+      const summary = e.failures.map((f) => f.message).join('; ');
+      throw new ValidationError(`Schema validation failed: ${summary}`);
+    }
+    if (e instanceof SchemaValidationError) {
+      throw new ValidationError(`Schema validation failed: ${e.message}`);
+    }
+    throw e;
   }
 
-  const jsonldOutcome = await validateJsonLd(credentialPayload);
-  if (jsonldOutcome.errors.length > 0) {
-    const summary = jsonldOutcome.errors.map((e) => e.message).join('; ');
-    throw new ValidationError(`JSON-LD validation failed: ${summary}`);
+  try {
+    await validateJsonLd(credentialPayload);
+  } catch (e) {
+    if (e instanceof JsonLdValidationError) {
+      throw new ValidationError(`JSON-LD validation failed: ${e.message}`);
+    }
+    throw e;
   }
 }

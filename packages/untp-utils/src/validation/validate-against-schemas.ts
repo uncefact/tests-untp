@@ -1,59 +1,43 @@
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
-import { fetchSchema } from '../schema-loaders/schema-cache.js';
-import type { ValidationError, ValidationOutcome } from '../validation-outcome.js';
-import { SchemaValidationCode } from './codes.js';
+import type { SchemaLoader } from '../schema-loaders/schema-loader.js';
+import type { ValidationFailure } from '../structured-error.js';
+import { SchemaCompilationFailedError, SchemaFetchFailedError, SchemaPayloadError } from './errors.js';
 
-// ---------------------------------------------------------------------------
-// Singleton Ajv instance
-// ---------------------------------------------------------------------------
-
-let ajvInstance: Ajv2020 | undefined;
-
-function getAjv(): Ajv2020 {
-  if (!ajvInstance) {
-    ajvInstance = new Ajv2020({ strict: false, allErrors: true });
-    addFormats(ajvInstance);
-  }
-  return ajvInstance;
+function buildAjv(): Ajv2020 {
+  const ajv = new Ajv2020({ strict: false, allErrors: true, verbose: true });
+  addFormats(ajv);
+  return ajv;
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
 /**
- * A schema reference accepted by {@link validateAgainstSchemas}.
- *
- * - A **string** is treated as a URL; the schema is fetched (and cached) via
- *   {@link fetchSchema} before compilation. Fetch failures surface as
- *   `schema.fetch-failed` errors.
- * - An **object** is treated as the JSON Schema document itself and is used
- *   directly without any network IO. Consumers with bundled schemas (test
- *   fixtures, in-memory constants, schemas loaded from disk) pass them this
- *   way to skip the fetch.
- *
- * The two forms can be mixed in a single call.
+ * A schema reference. A string is treated as a URL and loaded via the
+ * supplied {@link SchemaLoader}; an object is used directly as the JSON
+ * Schema document. The two forms may be mixed in one call.
  */
 export type SchemaReference = string | object;
 
 /**
- * Validates a payload against one or more JSON Schemas. Schemas may be
- * supplied as URL strings (fetched via {@link fetchSchema}) or as inline
- * schema objects (used directly). Each schema is compiled and the payload
- * is validated against it. Ajv runs with `allErrors: true`, so a single
- * payload can surface multiple errors per schema.
+ * Validates a payload against one or more JSON Schemas. Ajv runs with
+ * `allErrors: true` so a single payload surfaces every validation failure
+ * per schema, and payload failures accumulate across all schemas.
  *
- * Per ADR-034, this function does not throw for input-related failures.
- * Schema-fetch failures, schema-compile failures, and payload-invalid
- * errors all surface as entries in `errors[]`. Each Ajv error becomes a
- * structured `ValidationError` with `pointer` set to the Ajv
- * `instancePath` (RFC 6901), `received` to the failing data, `expected` to
- * Ajv's `params`, and `raw` to the original Ajv error.
+ * Fetch and compile failures are fail-fast: the first schema that cannot
+ * be loaded or compiled aborts the run. Only payload-invalid failures
+ * accumulate.
+ *
+ * @throws {SchemaFetchFailedError} if a schema URL cannot be loaded.
+ * @throws {SchemaCompilationFailedError} if Ajv refuses a schema.
+ * @throws {SchemaPayloadError} carrying every Ajv `allErrors` failure in
+ *   `failures[]` if any payload validation failed.
  */
-export async function validateAgainstSchemas(payload: unknown, schemas: SchemaReference[]): Promise<ValidationOutcome> {
-  const errors: ValidationError[] = [];
-  const ajv = getAjv();
+export async function validateAgainstSchemas(
+  payload: unknown,
+  schemas: SchemaReference[],
+  loader: SchemaLoader,
+): Promise<void> {
+  const failures: ValidationFailure[] = [];
+  const ajv = buildAjv();
 
   for (const ref of schemas) {
     let schemaDoc: object;
@@ -61,17 +45,11 @@ export async function validateAgainstSchemas(payload: unknown, schemas: SchemaRe
 
     if (typeof ref === 'string') {
       identifier = ref;
-      const fetchOutcome = await fetchSchema(ref);
-      if (fetchOutcome.errors.length > 0 || !fetchOutcome.value) {
-        errors.push({
-          code: SchemaValidationCode.SchemaFetchFailed,
-          message: `Could not load schema from ${ref}.`,
-          expected: 'a fetchable JSON Schema',
-          raw: fetchOutcome.errors,
-        });
-        continue;
+      try {
+        schemaDoc = await loader.load(ref);
+      } catch (cause) {
+        throw new SchemaFetchFailedError(ref, cause);
       }
-      schemaDoc = fetchOutcome.value;
     } else {
       identifier = '<inline schema>';
       schemaDoc = ref;
@@ -80,30 +58,24 @@ export async function validateAgainstSchemas(payload: unknown, schemas: SchemaRe
     let validate: ReturnType<typeof ajv.compile>;
     try {
       validate = ajv.compile(schemaDoc);
-    } catch (error) {
-      errors.push({
-        code: SchemaValidationCode.SchemaCompilationFailed,
-        message: `Could not compile schema from ${identifier}.`,
-        received: error instanceof Error ? error.message : String(error),
-        raw: error,
-      });
-      continue;
+    } catch (cause) {
+      throw new SchemaCompilationFailedError(identifier, cause);
     }
-    const valid = validate(payload);
 
-    if (!valid && validate.errors) {
+    if (!validate(payload) && validate.errors) {
       for (const ajvError of validate.errors) {
-        errors.push({
-          code: SchemaValidationCode.PayloadInvalid,
+        failures.push({
+          code: 'schema.payload-invalid',
           message: ajvError.message ?? 'Schema validation failed.',
           pointer: ajvError.instancePath || '',
           received: ajvError.data,
           expected: ajvError.params,
-          raw: ajvError,
         });
       }
     }
   }
 
-  return { errors, warnings: [] };
+  if (failures.length > 0) {
+    throw new SchemaPayloadError(failures);
+  }
 }
