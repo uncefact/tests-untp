@@ -5,6 +5,7 @@ import type { ConformitySchemeResolveError } from './errors.js';
 
 export const RESOLVE_FAILURE_STATUS = {
   FetchFailed: 'FETCH_FAILED',
+  TooLarge: 'TOO_LARGE',
   InvalidJson: 'INVALID_JSON',
   SchemaInvalid: 'SCHEMA_INVALID',
   JsonLdExpansionFailed: 'JSONLD_EXPANSION_FAILED',

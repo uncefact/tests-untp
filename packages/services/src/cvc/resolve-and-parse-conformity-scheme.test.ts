@@ -5,8 +5,16 @@ const mockValidateJsonLd = jest.fn();
 const mockValidateAgainstSchemas = jest.fn();
 const mockParseConformityScheme = jest.fn();
 
+class FakeResolverTooLargeError extends Error {
+  constructor(public readonly limit: number) {
+    super(`exceeds ${limit} bytes`);
+    this.name = 'ResolverTooLargeError';
+  }
+}
+
 jest.mock('@uncefact/untp-utils/resolvers', () => ({
   resolveDocumentIfChanged: (...args: unknown[]) => mockResolveDocumentIfChanged(...args),
+  ResolverTooLargeError: FakeResolverTooLargeError,
 }));
 jest.mock('@uncefact/untp-utils/validation', () => ({
   validateJsonLd: (...args: unknown[]) => mockValidateJsonLd(...args),
@@ -176,6 +184,19 @@ describe('resolveAndParseConformityScheme', () => {
     });
   });
 
+  describe('failure: TOO_LARGE', () => {
+    it('distinguishes a size-cap throw from generic fetch failure', async () => {
+      const cause = new FakeResolverTooLargeError(1_048_576);
+      mockResolveDocumentIfChanged.mockRejectedValue(cause);
+
+      const result = await resolveAndParseConformityScheme(baseInput());
+      expect(result.kind).toBe('failure');
+      if (result.kind !== 'failure') throw new Error('unreachable');
+      expect(result.error.status).toBe(RESOLVE_FAILURE_STATUS.TooLarge);
+      expect(result.error.cause).toBe(cause);
+    });
+  });
+
   describe('failure: INVALID_JSON', () => {
     it('wraps a JSON.parse failure when the body is not valid JSON', async () => {
       mockResolveDocumentIfChanged.mockResolvedValue(loadedResponse('not-json'));
@@ -288,6 +309,7 @@ describe('resolveAndParseConformityScheme', () => {
     });
 
     it.each([
+      [RESOLVE_FAILURE_STATUS.TooLarge, 'conformity-scheme.resolve-failed.too-large'],
       [RESOLVE_FAILURE_STATUS.InvalidJson, 'conformity-scheme.resolve-failed.invalid-json'],
       [RESOLVE_FAILURE_STATUS.SchemaInvalid, 'conformity-scheme.resolve-failed.schema-invalid'],
       [RESOLVE_FAILURE_STATUS.JsonLdExpansionFailed, 'conformity-scheme.resolve-failed.jsonld-expansion-failed'],

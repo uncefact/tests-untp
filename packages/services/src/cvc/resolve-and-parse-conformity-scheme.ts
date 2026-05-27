@@ -1,6 +1,6 @@
 import { TextDecoder } from 'node:util';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
-import { resolveDocumentIfChanged } from '@uncefact/untp-utils/resolvers';
+import { resolveDocumentIfChanged, ResolverTooLargeError } from '@uncefact/untp-utils/resolvers';
 import { validateAgainstSchemas, validateJsonLd } from '@uncefact/untp-utils/validation';
 import { parseConformityScheme } from '@uncefact/untp-utils/conformity-vocabulary';
 import { ConformitySchemeResolveError } from './errors.js';
@@ -54,7 +54,9 @@ export async function resolveAndParseConformityScheme(
       etag = outcome.result.etag;
       lastModifiedHeader = outcome.result.lastModified;
     } catch (cause) {
-      return failure(RESOLVE_FAILURE_STATUS.FetchFailed, input.sourceUrl, cause);
+      const status =
+        cause instanceof ResolverTooLargeError ? RESOLVE_FAILURE_STATUS.TooLarge : RESOLVE_FAILURE_STATUS.FetchFailed;
+      return failure(status, input.sourceUrl, cause);
     }
   }
 
