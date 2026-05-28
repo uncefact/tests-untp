@@ -369,6 +369,33 @@ describe('POST /api/v1/credentials', () => {
 
       expect(mockAssertPublicUrl).not.toHaveBeenCalled();
     });
+
+    it('returns 400 when publishingOptions.hreflang is a string rather than an array', async () => {
+      const req = createFakeRequest(validBody({ publishingOptions: { hreflang: 'en' as unknown as string[] } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toMatch(/hreflang/);
+    });
+
+    it('returns 400 when publishingOptions.public is a string rather than a boolean', async () => {
+      const req = createFakeRequest(validBody({ publishingOptions: { public: 'true' as unknown as boolean } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toMatch(/public/);
+    });
+
+    it('returns 400 when publishingOptions.additionalRels contains a non-string entry', async () => {
+      const req = createFakeRequest(validBody({ publishingOptions: { additionalRels: [123 as unknown as string] } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toMatch(/additionalRels/);
+    });
   });
 
   // ── Data model resolution ────────────────────────────────────────────
