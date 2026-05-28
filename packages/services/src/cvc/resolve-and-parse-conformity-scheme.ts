@@ -1,6 +1,6 @@
 import { TextDecoder } from 'node:util';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
-import { resolveDocumentIfChanged } from '@uncefact/untp-utils/resolvers';
+import { resolveDocumentIfChanged, ResolverTooLargeError } from '@uncefact/untp-utils/resolvers';
 import { validateAgainstSchemas, validateJsonLd } from '@uncefact/untp-utils/validation';
 import { parseConformityScheme } from '@uncefact/untp-utils/conformity-vocabulary';
 import { ConformitySchemeResolveError } from './errors.js';
@@ -19,6 +19,10 @@ import {
  * JSON-LD expansion may fetch remote `@context` documents and walks the full
  * RDF tree. Failing fast on schema-shape problems avoids paying the JSON-LD
  * cost on documents that wouldn't have parsed anyway.
+ *
+ * The fetch gate distinguishes `TOO_LARGE` from `FETCH_FAILED` when a
+ * `ResolverTooLargeError` is thrown, so an oversized-document signal stays
+ * separate from generic network failure in the operator view.
  *
  * Three terminal outcomes:
  * `{ kind: 'unchanged' }`, the conditional-fetch skip chain hit; bump
@@ -54,7 +58,9 @@ export async function resolveAndParseConformityScheme(
       etag = outcome.result.etag;
       lastModifiedHeader = outcome.result.lastModified;
     } catch (cause) {
-      return failure(RESOLVE_FAILURE_STATUS.FetchFailed, input.sourceUrl, cause);
+      const status =
+        cause instanceof ResolverTooLargeError ? RESOLVE_FAILURE_STATUS.TooLarge : RESOLVE_FAILURE_STATUS.FetchFailed;
+      return failure(status, input.sourceUrl, cause);
     }
   }
 
@@ -81,7 +87,7 @@ export async function resolveAndParseConformityScheme(
   try {
     scheme = parseConformityScheme(parsedJson, {
       sourceUrl: input.sourceUrl,
-      specVersion: input.cvcSpecVersion,
+      specVersion: input.conformityVocabularySpecVersion,
     });
   } catch (cause) {
     return failure(RESOLVE_FAILURE_STATUS.ParseFailed, input.sourceUrl, cause);

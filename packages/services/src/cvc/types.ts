@@ -5,6 +5,7 @@ import type { ConformitySchemeResolveError } from './errors.js';
 
 export const RESOLVE_FAILURE_STATUS = {
   FetchFailed: 'FETCH_FAILED',
+  TooLarge: 'TOO_LARGE',
   InvalidJson: 'INVALID_JSON',
   SchemaInvalid: 'SCHEMA_INVALID',
   JsonLdExpansionFailed: 'JSONLD_EXPANSION_FAILED',
@@ -14,7 +15,7 @@ export const RESOLVE_FAILURE_STATUS = {
 
 export type ResolveFailureStatus = (typeof RESOLVE_FAILURE_STATUS)[keyof typeof RESOLVE_FAILURE_STATUS];
 
-/** Source category for a {@link ConformityScheme} row; mirrors the RI's `CvcSchemeSource` Prisma enum. */
+/** Source category for a {@link ConformityScheme} row; mirrors the RI's `ConformitySchemeSource` Prisma enum. */
 export type ConformitySchemeSource = 'UNTP' | 'SYSTEM_SEED' | 'TENANT_IMPORTED';
 
 /**
@@ -48,7 +49,7 @@ export interface ResolveAndParseConformitySchemeInput {
   /**
    * URL of the `ConformityScheme.json` JSON Schema the document must
    * conform to. The RI resolves this from its `DataModel` table by
-   * `(credentialType: 'ConformityScheme', version: cvcSpecVersion ?? '0.7.0')`.
+   * `(credentialType: 'ConformityScheme', version: conformityVocabularySpecVersion ?? '0.7.0')`.
    */
   conformitySchemaUrl: string;
   /** Loader used by the inner `validateAgainstSchemas` call to fetch the JSON Schema. */
@@ -58,7 +59,7 @@ export interface ResolveAndParseConformitySchemeInput {
   /** Conditional-fetch validators from the previous successful run; ignored when `prefetched` is set. */
   cached?: CachedResource;
   /** Override the spec-version detection that `parseConformityScheme` performs from `@context`. */
-  cvcSpecVersion?: string;
+  conformityVocabularySpecVersion?: string;
 }
 
 /** Outcome of a successful run; everything the caller needs to upsert the row. */
