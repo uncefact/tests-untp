@@ -149,4 +149,50 @@ describe('buildPublishLinks', () => {
     expect(links).toHaveLength(1);
     expect(links[0].href).toBe(storage.uri);
   });
+
+  it('attaches hreflang, additionalRels, and public to the credential link only', () => {
+    const options: BuildPublishLinksOptions = {
+      machineVerificationUrl: 'https://vckit.example.com/verify',
+      humanVerificationUrl: 'https://app.example.com/verify',
+      hreflang: ['en', 'de'],
+      additionalRels: ['gs1:certificationInfo'],
+      public: true,
+    };
+
+    const links = buildPublishLinks(storage, linkTitle, options);
+
+    expect(links).toHaveLength(3);
+    expect(links[0]).not.toHaveProperty('hreflang');
+    expect(links[0]).not.toHaveProperty('additionalRels');
+    expect(links[0]).not.toHaveProperty('public');
+
+    expect(links[1]).toMatchObject({
+      href: storage.uri,
+      hreflang: ['en', 'de'],
+      additionalRels: ['gs1:certificationInfo'],
+      public: true,
+    });
+
+    expect(links[2]).not.toHaveProperty('hreflang');
+    expect(links[2]).not.toHaveProperty('additionalRels');
+    expect(links[2]).not.toHaveProperty('public');
+  });
+
+  it('omits hreflang, additionalRels, and public when not provided', () => {
+    const links = buildPublishLinks(storage, linkTitle);
+    expect(links[0]).not.toHaveProperty('hreflang');
+    expect(links[0]).not.toHaveProperty('additionalRels');
+    expect(links[0]).not.toHaveProperty('public');
+  });
+
+  it('round-trips public: false distinctly from unset', () => {
+    const links = buildPublishLinks(storage, linkTitle, { public: false });
+    expect(links[0].public).toBe(false);
+  });
+
+  it('omits hreflang and additionalRels when arrays are empty', () => {
+    const links = buildPublishLinks(storage, linkTitle, { hreflang: [], additionalRels: [] });
+    expect(links[0]).not.toHaveProperty('hreflang');
+    expect(links[0]).not.toHaveProperty('additionalRels');
+  });
 });

@@ -11,6 +11,22 @@ export type BuildPublishLinksOptions = {
   machineVerificationUrl?: string;
   /** Base URL of the human-readable verification page (omit to skip) */
   humanVerificationUrl?: string;
+  /**
+   * BCP 47 language tags the credential resource is available in. Attached to
+   * the credential link only; verification links are not language-specific.
+   */
+  hreflang?: string[];
+  /**
+   * Additional link relation types qualifying the credential link beyond its
+   * primary `rel`. Attached to the credential link only.
+   */
+  additionalRels?: string[];
+  /**
+   * Whether the credential target URL is safe to publish in a public
+   * directory. Attached to the credential link only. Unset round-trips
+   * distinctly from `false`.
+   */
+  public?: boolean;
 };
 
 // ── buildPublishLinks ────────────────────────────────────────────────────────
@@ -51,6 +67,9 @@ export function buildPublishLinks(
     rel: credentialLinkType,
     type: 'application/json',
     title: linkTitle,
+    ...(options?.hreflang && options.hreflang.length > 0 ? { hreflang: options.hreflang } : {}),
+    ...(options?.additionalRels && options.additionalRels.length > 0 ? { additionalRels: options.additionalRels } : {}),
+    ...(options?.public !== undefined ? { public: options.public } : {}),
   });
 
   if (options?.humanVerificationUrl) {

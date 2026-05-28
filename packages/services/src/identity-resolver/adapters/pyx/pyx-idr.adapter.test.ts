@@ -30,7 +30,7 @@ describe('PyxIdentityResolverAdapter', () => {
   const mockConfig: PyxIdrConfig = {
     baseUrl: 'https://resolver.example.com',
     apiKey: 'test-api-key',
-    apiVersion: '3.0.0',
+    apiVersion: '4.0',
     defaultLinkType: 'untp:dpp',
     defaultMimeType: 'text/html',
     defaultIanaLanguage: 'en',
@@ -121,7 +121,7 @@ describe('PyxIdentityResolverAdapter', () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
       await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
 
-      expect(mockFetch).toHaveBeenCalledWith('https://resolver.example.com/api/3.0.0/resolver', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('https://resolver.example.com/api/v4/resolver', expect.any(Object));
     });
 
     it('should include authorization and content-type headers', async () => {
@@ -203,12 +203,11 @@ describe('PyxIdentityResolverAdapter', () => {
         mimeType: 'application/json',
         title: 'Digital Product Passport',
         active: true,
-        ianaLanguage: 'en',
+        hreflang: ['en'],
         context: 'au',
-        defaultLinkType: true, // 'untp:dpp' === config.defaultLinkType
-        defaultMimeType: false, // 'application/json' !== config.defaultMimeType ('text/html')
-        defaultIanaLanguage: true, // link language ('en') matches default language ('en')
-        defaultContext: true, // link context ('au') matches default context ('au')
+        defaultLinkType: true,
+        defaultMimeType: false,
+        defaultContext: true,
         fwqs: false,
       });
     });
@@ -220,7 +219,6 @@ describe('PyxIdentityResolverAdapter', () => {
         context: 'us',
         defaultLinkType: 'untp:dcc' as const,
         defaultMimeType: 'application/json',
-        defaultIanaLanguage: 'de',
         defaultContext: 'us',
         fwqs: true,
       };
@@ -230,14 +228,61 @@ describe('PyxIdentityResolverAdapter', () => {
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
       expect(body.responses[0]).toMatchObject({
-        ianaLanguage: 'de',
+        hreflang: ['de'],
         context: 'us',
-        defaultLinkType: true, // 'untp:dcc' === overrideOptions.defaultLinkType
-        defaultMimeType: true, // 'application/json' === overrideOptions.defaultMimeType
-        defaultIanaLanguage: true, // 'de' === overrideOptions.defaultIanaLanguage
-        defaultContext: true, // 'us' === overrideOptions.defaultContext
+        defaultLinkType: true,
+        defaultMimeType: true,
+        defaultContext: true,
         fwqs: true,
       });
+    });
+
+    it('should include `public` on the variant when set on the link', async () => {
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      await adapter.publishLinks('abn', '51824753556', [{ ...mockLinks[0], public: true }], undefined, mockOptions);
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.responses[0].public).toBe(true);
+    });
+
+    it('should distinguish `public: false` from `public` being unset', async () => {
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      await adapter.publishLinks(
+        'abn',
+        '51824753556',
+        [{ ...mockLinks[0], public: false }, { ...mockLinks[1] }],
+        undefined,
+        mockOptions,
+      );
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.responses[0].public).toBe(false);
+      expect(body.responses[1]).not.toHaveProperty('public');
+    });
+
+    it('should include `rel` (additional rels) on the variant when set on the link', async () => {
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      await adapter.publishLinks(
+        'abn',
+        '51824753556',
+        [{ ...mockLinks[0], additionalRels: ['gs1:certificationInfo', 'gs1:productInfo'] }],
+        undefined,
+        mockOptions,
+      );
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.responses[0].rel).toEqual(['gs1:certificationInfo', 'gs1:productInfo']);
+    });
+
+    it('should omit `rel` when additionalRels is unset or empty', async () => {
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      await adapter.publishLinks(
+        'abn',
+        '51824753556',
+        [{ ...mockLinks[0], additionalRels: [] }, { ...mockLinks[1] }],
+        undefined,
+        mockOptions,
+      );
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.responses[0]).not.toHaveProperty('rel');
+      expect(body.responses[1]).not.toHaveProperty('rel');
     });
 
     it('should handle response with "responses" key instead of "linkResponses"', async () => {
@@ -357,7 +402,7 @@ describe('PyxIdentityResolverAdapter', () => {
           linkType: 'untp:dpp',
           mimeType: 'application/json',
           title: 'My DPP',
-          ianaLanguage: 'en',
+          hreflang: ['en'],
         }),
       });
 
@@ -387,7 +432,7 @@ describe('PyxIdentityResolverAdapter', () => {
       await adapter.getLinkById('link-123');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://resolver.example.com/api/3.0.0/resolver/links/link-123',
+        'https://resolver.example.com/api/v4/resolver/links/link-123',
         expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer test-api-key' }) }),
       );
     });
@@ -408,7 +453,7 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(result.title).toBe('');
     });
 
-    it('should handle missing ianaLanguage gracefully', async () => {
+    it('should handle missing hreflang gracefully', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: jest.fn().mockResolvedValue({
@@ -422,6 +467,44 @@ describe('PyxIdentityResolverAdapter', () => {
       const result = await adapter.getLinkById('link-123');
 
       expect(result.hreflang).toBeUndefined();
+    });
+
+    it('should map `public` and `rel` (additional rels) from the response when present', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          targetUrl: 'https://example.com/dpp.json',
+          linkType: 'untp:dpp',
+          mimeType: 'application/json',
+          title: 'My DPP',
+          hreflang: ['en'],
+          public: true,
+          rel: ['gs1:certificationInfo'],
+        }),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      const result = await adapter.getLinkById('link-123');
+
+      expect(result.public).toBe(true);
+      expect(result.additionalRels).toEqual(['gs1:certificationInfo']);
+    });
+
+    it('should map `public: false` distinctly from unset', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          targetUrl: 'https://example.com/dpp.json',
+          linkType: 'untp:dpp',
+          mimeType: 'application/json',
+          public: false,
+        }),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      const result = await adapter.getLinkById('link-123');
+
+      expect(result.public).toBe(false);
     });
 
     it('should throw IdrLinkNotFoundError on HTTP 404', async () => {
@@ -471,7 +554,7 @@ describe('PyxIdentityResolverAdapter', () => {
           linkType: 'untp:dpp',
           mimeType: 'application/ld+json',
           title: 'Updated Title',
-          ianaLanguage: 'en',
+          hreflang: ['en'],
         }),
       });
 
@@ -491,7 +574,7 @@ describe('PyxIdentityResolverAdapter', () => {
       });
 
       const callArgs = mockFetch.mock.calls[0];
-      expect(callArgs[0]).toBe('https://resolver.example.com/api/3.0.0/resolver/links/link-123');
+      expect(callArgs[0]).toBe('https://resolver.example.com/api/v4/resolver/links/link-123');
       expect(callArgs[1].method).toBe('PUT');
 
       const body = JSON.parse(callArgs[1].body);
@@ -519,8 +602,48 @@ describe('PyxIdentityResolverAdapter', () => {
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
       expect(body).toEqual({ title: 'New Title' });
-      expect(body.targetUrl).toBeUndefined();
-      expect(body.linkType).toBeUndefined();
+    });
+
+    it('should forward `hreflang`, `additionalRels`, and `public` when set', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          targetUrl: 'https://example.com/resource.json',
+          linkType: 'untp:dpp',
+          mimeType: 'application/json',
+        }),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      await adapter.updateLink('link-123', {
+        hreflang: ['en', 'de'],
+        additionalRels: ['gs1:certificationInfo'],
+        public: true,
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body).toEqual({
+        hreflang: ['en', 'de'],
+        rel: ['gs1:certificationInfo'],
+        public: true,
+      });
+    });
+
+    it('should round-trip `public: false` distinctly from unset in the PUT payload', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          targetUrl: 'https://example.com/resource.json',
+          linkType: 'untp:dpp',
+          mimeType: 'application/json',
+        }),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      await adapter.updateLink('link-123', { public: false });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body).toEqual({ public: false });
     });
 
     it('should throw IdrLinkNotFoundError on HTTP 404', async () => {
@@ -571,7 +694,7 @@ describe('PyxIdentityResolverAdapter', () => {
       await adapter.deleteLink('link-123');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://resolver.example.com/api/3.0.0/resolver/links/link-123',
+        'https://resolver.example.com/api/v4/resolver/links/link-123',
         expect.objectContaining({
           method: 'DELETE',
           headers: expect.objectContaining({ Authorization: 'Bearer test-api-key' }),
@@ -668,7 +791,7 @@ describe('PyxIdentityResolverAdapter', () => {
 
       expect(result).toEqual(mockLinkTypes);
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://resolver.example.com/api/3.0.0/voc?show=linktypes',
+        'https://resolver.example.com/api/v4/voc?show=linktypes',
         expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer test-api-key' }) }),
       );
     });
@@ -783,14 +906,14 @@ describe('PyxIdentityResolverAdapter', () => {
 
       expect(mockFetch).toHaveBeenCalledTimes(2);
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://resolver.example.com/api/3.0.0/identifiers',
+        'https://resolver.example.com/api/v4/identifiers',
         expect.objectContaining({
           method: 'POST',
           body: expect.stringContaining('"namespace":"untp"'),
         }),
       );
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://resolver.example.com/api/3.0.0/identifiers',
+        'https://resolver.example.com/api/v4/identifiers',
         expect.objectContaining({
           method: 'POST',
           body: expect.stringContaining('"namespace":"gs1"'),
@@ -871,7 +994,7 @@ describe('PyxIdentityResolverAdapter', () => {
         defaultContext: 'au',
       };
       const result = pyxIdrRegistryEntry.configSchema.parse(config);
-      expect(result.apiVersion).toBe('3.0.0');
+      expect(result.apiVersion).toBe('4.0');
       expect(result.defaultFwqs).toBe(false);
     });
 

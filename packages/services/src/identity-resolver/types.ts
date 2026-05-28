@@ -113,6 +113,20 @@ export type UNTPLinkExtensions = {
   context?: string;
   /** Whether this is the default link for its relation type */
   default?: boolean;
+  /**
+   * Additional link relation types beyond the primary `rel`. These qualify
+   * the link further without replacing the primary relation. Maps to the
+   * Pyx IDR v4 variant `rel: string[]` field.
+   */
+  additionalRels?: string[];
+  /**
+   * Whether the target URL itself is safe to publish in a public directory.
+   * Distinct from `accessRole` and `encryptionMethod`, which govern who may
+   * retrieve or decrypt the resource: a link can be `public: true` and still
+   * require an authorised role to fetch its content. Unset round-trips
+   * distinctly from `false`.
+   */
+  public?: boolean;
 };
 
 /**
@@ -159,8 +173,6 @@ export type PublishLinksOptions = {
   defaultLinkType?: string;
   /** Default MIME type override (e.g., "text/html") — falls back to service config */
   defaultMimeType?: string;
-  /** Default IANA language override (e.g., "en") — falls back to service config */
-  defaultIanaLanguage?: string;
   /** Default context override (e.g., "au") — falls back to service config */
   defaultContext?: string;
   /** Forward query string override — falls back to service config */
