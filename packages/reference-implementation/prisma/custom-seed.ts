@@ -93,6 +93,16 @@ async function processConformitySchemes(
         sourceUrl = entry.url;
       } else if (entry.file !== undefined) {
         const filePath = path.resolve(customSeedDir, entry.file);
+        const normalisedSeedDir = path.normalize(customSeedDir);
+        const normalisedFilePath = path.normalize(filePath);
+        if (!normalisedFilePath.startsWith(normalisedSeedDir + path.sep) && normalisedFilePath !== normalisedSeedDir) {
+          logger.error(
+            { file: entry.file, filePath },
+            'Conformity scheme seed file path resolves outside the seed directory (potential path traversal); skipping',
+          );
+          summary.failed += 1;
+          continue;
+        }
         if (!fs.existsSync(filePath)) {
           logger.error({ file: entry.file, filePath }, 'Conformity scheme seed file not found; skipping');
           summary.failed += 1;
@@ -107,7 +117,7 @@ async function processConformitySchemes(
           summary.failed += 1;
           continue;
         }
-        const canonicalId = doc.id ?? doc['@id'];
+        const canonicalId = doc?.id ?? doc?.['@id'];
         if (typeof canonicalId !== 'string' || canonicalId.length === 0) {
           logger.error({ file: entry.file }, 'Conformity scheme seed file missing top-level `id`; skipping');
           summary.failed += 1;

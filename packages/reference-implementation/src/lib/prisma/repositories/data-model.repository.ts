@@ -136,22 +136,6 @@ export async function getDataModelById(id: string, tenantId: string): Promise<Da
 }
 
 /**
- * Looks up a system-provisioned data model by `(credentialType, version)`.
- * Used by infrastructure paths that need the canonical schema or context URL
- * for a known credential type (e.g. the CVC seed loader resolving the
- * `ConformityScheme` JSON Schema URL).
- */
-export async function findSystemDataModelByTypeAndVersion(
-  credentialType: string,
-  version: string,
-): Promise<DataModelListItem | null> {
-  return prisma.dataModel.findFirst({
-    where: { tenantId: SYSTEM_TENANT_ID, credentialType, version },
-    include: DATA_MODEL_LIST_INCLUDE,
-  });
-}
-
-/**
  * Lists data models for a tenant, including system-provisioned configs.
  * Supports filtering by isExtension, credentialType, and version.
  * Returns lean items without extensions or renderTemplates.
