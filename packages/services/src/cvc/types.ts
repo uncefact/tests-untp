@@ -49,7 +49,7 @@ export interface ResolveAndParseConformitySchemeInput {
   /**
    * URL of the `ConformityScheme.json` JSON Schema the document must
    * conform to. The RI resolves this from its `DataModel` table by
-   * `(credentialType: 'ConformityScheme', version: cvcSpecVersion ?? '0.7.0')`.
+   * `(credentialType: 'ConformityScheme', version: conformityVocabularySpecVersion ?? '0.7.0')`.
    */
   conformitySchemaUrl: string;
   /** Loader used by the inner `validateAgainstSchemas` call to fetch the JSON Schema. */
@@ -59,7 +59,7 @@ export interface ResolveAndParseConformitySchemeInput {
   /** Conditional-fetch validators from the previous successful run; ignored when `prefetched` is set. */
   cached?: CachedResource;
   /** Override the spec-version detection that `parseConformityScheme` performs from `@context`. */
-  cvcSpecVersion?: string;
+  conformityVocabularySpecVersion?: string;
 }
 
 /** Outcome of a successful run; everything the caller needs to upsert the row. */

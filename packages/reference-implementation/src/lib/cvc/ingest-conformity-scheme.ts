@@ -19,7 +19,7 @@ export interface IngestConformitySchemeInput {
   conformitySchemaUrl: string;
   schemaLoader: SchemaLoader;
   prefetched?: PrefetchedDocument;
-  cvcSpecVersion?: string;
+  conformityVocabularySpecVersion?: string;
 }
 
 export type IngestConformitySchemeResult =
@@ -69,7 +69,7 @@ export async function ingestConformityScheme(
     schemaLoader: input.schemaLoader,
     prefetched: input.prefetched,
     cached,
-    cvcSpecVersion: input.cvcSpecVersion,
+    conformityVocabularySpecVersion: input.conformityVocabularySpecVersion,
   });
 
   const now = new Date();

@@ -321,14 +321,14 @@ describe('resolveAndParseConformityScheme', () => {
     });
   });
 
-  describe('cvcSpecVersion override', () => {
+  describe('conformityVocabularySpecVersion override', () => {
     it('forwards the override to parseConformityScheme', async () => {
       mockResolveDocumentIfChanged.mockResolvedValue(loadedResponse('{"id":"x"}'));
       mockValidateJsonLd.mockResolvedValue(undefined);
       mockValidateAgainstSchemas.mockResolvedValue(undefined);
       mockParseConformityScheme.mockReturnValue(fakeScheme());
 
-      await resolveAndParseConformityScheme(baseInput({ cvcSpecVersion: '0.7.0' }));
+      await resolveAndParseConformityScheme(baseInput({ conformityVocabularySpecVersion: '0.7.0' }));
       expect(mockParseConformityScheme).toHaveBeenCalledWith(expect.anything(), {
         sourceUrl: SOURCE_URL,
         specVersion: '0.7.0',

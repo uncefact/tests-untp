@@ -83,7 +83,7 @@ export async function resolveAndParseConformityScheme(
   try {
     scheme = parseConformityScheme(parsedJson, {
       sourceUrl: input.sourceUrl,
-      specVersion: input.cvcSpecVersion,
+      specVersion: input.conformityVocabularySpecVersion,
     });
   } catch (cause) {
     return failure(RESOLVE_FAILURE_STATUS.ParseFailed, input.sourceUrl, cause);
