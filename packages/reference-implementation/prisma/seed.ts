@@ -35,6 +35,7 @@ import {
   SYSTEM_VC_SERVICE_ID,
   SYSTEM_DID_ID,
 } from '../src/lib/prisma/constants.js';
+import { buildUntpArtefactUrls, buildSpecificationPageUrl } from '@uncefact/untp-utils/artefacts';
 
 const logger = createLogger().child({ module: 'prisma-seed' });
 
@@ -358,8 +359,6 @@ async function main() {
   // ── Seed core data model configs ────────────────────────────────────────────
   // Static UUIDs ensure idempotent seeding — if the record already exists, skip.
 
-  const UNTP_BASE = 'https://test.uncefact.org/vocabulary/untp';
-
   const coreDataModels = [
     {
       id: 'cxuj555flzqtp4ldvklv6ya39',
@@ -505,6 +504,9 @@ async function main() {
       continue;
     }
 
+    const { schemaUrl, contextUrl } = buildUntpArtefactUrls(dm.credentialType, dm.version);
+    const websiteUrl = buildSpecificationPageUrl(dm.credentialType, dm.version);
+
     await prisma.dataModel.create({
       data: {
         id: dm.id,
@@ -513,9 +515,9 @@ async function main() {
         credentialType: dm.credentialType,
         version: dm.version,
         isExtension: false,
-        schemaUrl: `${UNTP_BASE}/${dm.shortCode}/untp-${dm.shortCode}-schema-${dm.version}.json`,
-        contextUrl: `${UNTP_BASE}/${dm.shortCode}/${dm.version}/context/`,
-        websiteUrl: 'https://untp.unece.org/',
+        schemaUrl,
+        contextUrl,
+        websiteUrl,
       },
     });
 
@@ -524,9 +526,10 @@ async function main() {
 
   // ── Seed the ConformityScheme data model row ────────────────────────────────
   // The custom-seed `conformitySchemes` processor resolves the JSON Schema URL
-  // for ingestion by looking this row up via (credentialType, version). It
-  // does not share the `UNTP_BASE` URL pattern with the credential data models;
-  // the CVC artefacts live under the production `untp.unece.org` origin.
+  // for ingestion by looking this row up via (credentialType, version).
+  // ConformityScheme was introduced in v0.7.0, so it always resolves to the
+  // v0.7.0+ artefacts layout (schema under `untp.unece.org/artefacts`, unified
+  // context on `vocabulary.uncefact.org`).
   const CONFORMITY_SCHEME_DATA_MODEL_ID = 'c4fxk5o3sqrm6n0u7c7akm0sb';
   const conformitySchemeExists = await prisma.dataModel.findUnique({
     where: { id: CONFORMITY_SCHEME_DATA_MODEL_ID },
@@ -537,6 +540,8 @@ async function main() {
       'Data model already exists, skipping',
     );
   } else {
+    const { schemaUrl, contextUrl } = buildUntpArtefactUrls('ConformityScheme', '0.7.0');
+    const websiteUrl = buildSpecificationPageUrl('ConformityScheme', '0.7.0');
     await prisma.dataModel.create({
       data: {
         id: CONFORMITY_SCHEME_DATA_MODEL_ID,
@@ -545,9 +550,9 @@ async function main() {
         credentialType: 'ConformityScheme',
         version: '0.7.0',
         isExtension: false,
-        schemaUrl: 'https://untp.unece.org/artefacts/schema/v0.7.0/cvc/ConformityScheme.json',
-        contextUrl: 'https://untp.unece.org/artefacts/contexts/v0.7.0/cvc/ConformityScheme.context.jsonld',
-        websiteUrl: 'https://untp.unece.org/docs/specification/ConformityVocabularyCatalog',
+        schemaUrl,
+        contextUrl,
+        websiteUrl,
       },
     });
     logger.info(

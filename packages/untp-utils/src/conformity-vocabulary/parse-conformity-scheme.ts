@@ -1,4 +1,4 @@
-import { detectVersionFromContext } from '../detect-version-from-context.js';
+import { detectVersionFromContext } from '../artefacts/detect-version-from-context.js';
 import type { ValidationFailure } from '../structured-error.js';
 import { ConformitySchemeParseError, ConformityUnsupportedSpecVersionError } from './errors.js';
 import { parseV070ConformityScheme } from './parsers/v0-7-0.parser.js';
