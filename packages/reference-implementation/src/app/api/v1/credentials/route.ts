@@ -97,6 +97,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       qualifierPath?: string;
       machineVerificationUrl?: string;
       humanVerificationUrl?: string;
+      hreflang?: string[];
+      additionalRels?: string[];
+      public?: boolean;
     };
   };
 
@@ -243,6 +246,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
         linkType: publishingOptions.linkType,
         machineVerificationUrl: publishingOptions.machineVerificationUrl,
         humanVerificationUrl: publishingOptions.humanVerificationUrl,
+        ...(publishingOptions.hreflang !== undefined ? { hreflang: publishingOptions.hreflang } : {}),
+        ...(publishingOptions.additionalRels !== undefined ? { additionalRels: publishingOptions.additionalRels } : {}),
+        ...(publishingOptions.public !== undefined ? { public: publishingOptions.public } : {}),
       });
 
       logger.info(

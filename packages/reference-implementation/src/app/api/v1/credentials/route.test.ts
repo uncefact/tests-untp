@@ -792,6 +792,54 @@ describe('POST /api/v1/credentials', () => {
       });
     });
 
+    it('passes hreflang, additionalRels, and public to buildPublishLinks', async () => {
+      setupPublishingHappyPath();
+
+      const req = createFakeRequest(
+        validBody({
+          publishingOptions: {
+            publish: true,
+            hreflang: ['en', 'de'],
+            additionalRels: ['gs1:certificationInfo'],
+            public: true,
+          },
+        }),
+      );
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockBuildPublishLinks).toHaveBeenCalledWith(
+        STORAGE_RESPONSE,
+        'Digital Product Passport',
+        expect.objectContaining({
+          hreflang: ['en', 'de'],
+          additionalRels: ['gs1:certificationInfo'],
+          public: true,
+        }),
+      );
+    });
+
+    it('omits hreflang, additionalRels, and public from buildPublishLinks options when unset', async () => {
+      setupPublishingHappyPath();
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      const optionsArg = mockBuildPublishLinks.mock.calls[0][2];
+      expect(optionsArg).not.toHaveProperty('hreflang');
+      expect(optionsArg).not.toHaveProperty('additionalRels');
+      expect(optionsArg).not.toHaveProperty('public');
+    });
+
+    it('round-trips publishingOptions.public: false distinctly from unset', async () => {
+      setupPublishingHappyPath();
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true, public: false } }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      const optionsArg = mockBuildPublishLinks.mock.calls[0][2];
+      expect(optionsArg.public).toBe(false);
+    });
+
     it('passes qualifierPath to publishLinks when provided', async () => {
       setupPublishingHappyPath();
 

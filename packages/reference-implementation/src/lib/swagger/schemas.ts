@@ -45,6 +45,20 @@ const publishingOptionsSchema = z.object({
     .describe('Qualifier path for sub-identifiers (e.g. /10/LOT123/21/SER456). Defaults to /'),
   machineVerificationUrl: z.string().optional().describe('Machine verification URL'),
   humanVerificationUrl: z.string().optional().describe('Human verification URL'),
+  hreflang: z
+    .array(z.string().min(1))
+    .optional()
+    .describe('BCP 47 language tags the credential resource is available in (attached to the credential link only)'),
+  additionalRels: z
+    .array(z.string().min(1))
+    .optional()
+    .describe('Additional link relation types qualifying the credential link beyond its primary rel'),
+  public: z
+    .boolean()
+    .optional()
+    .describe(
+      'Whether the credential target URL is safe to publish in a public directory. Distinct from access control on the resource content',
+    ),
 });
 
 /** Request body for POST /credentials. */

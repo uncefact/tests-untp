@@ -268,6 +268,28 @@ describe('PATCH /api/v1/identifiers/[id]/links/[linkId]', () => {
     expect(res.status).toBe(400);
     expect(body.error).toBe('Invalid JSON body');
   });
+
+  it('forwards hreflang, additionalRels, and public to updateLink', async () => {
+    const req = createFakeRequest({
+      hreflang: ['en', 'de'],
+      additionalRels: ['gs1:certificationInfo'],
+      public: true,
+    });
+
+    await PATCH(req, createContext());
+
+    expect(MOCK_IDR_SERVICE.updateLink).toHaveBeenCalledWith('idr-link-1', {
+      hreflang: ['en', 'de'],
+      additionalRels: ['gs1:certificationInfo'],
+      public: true,
+    });
+  });
+
+  it('forwards public: false distinctly from unset to updateLink', async () => {
+    const req = createFakeRequest({ public: false });
+    await PATCH(req, createContext());
+    expect(MOCK_IDR_SERVICE.updateLink).toHaveBeenCalledWith('idr-link-1', { public: false });
+  });
 });
 
 describe('DELETE /api/v1/identifiers/[id]/links/[linkId]', () => {
