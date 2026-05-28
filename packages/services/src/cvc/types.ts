@@ -15,7 +15,7 @@ export const RESOLVE_FAILURE_STATUS = {
 
 export type ResolveFailureStatus = (typeof RESOLVE_FAILURE_STATUS)[keyof typeof RESOLVE_FAILURE_STATUS];
 
-/** Source category for a {@link ConformityScheme} row; mirrors the RI's `CvcSchemeSource` Prisma enum. */
+/** Source category for a {@link ConformityScheme} row; mirrors the RI's `ConformitySchemeSource` Prisma enum. */
 export type ConformitySchemeSource = 'UNTP' | 'SYSTEM_SEED' | 'TENANT_IMPORTED';
 
 /**
