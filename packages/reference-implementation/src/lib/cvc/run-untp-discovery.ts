@@ -1,8 +1,23 @@
 import { parseConformityCatalogue } from '@uncefact/untp-utils/conformity-vocabulary';
 import type { SchemaLoader } from '@uncefact/untp-utils/schema-loaders';
+import { apiLogger } from '@/lib/api/logger';
 import { ConformityFetchStatus, ConformitySchemeSource } from '@/lib/prisma/generated';
 import { prisma } from '@/lib/prisma/prisma';
 import { ingestConformityScheme } from './ingest-conformity-scheme';
+
+const logger = apiLogger.child({ module: 'cvc-discovery' });
+
+/**
+ * Minimal structural shape `runUntpDiscovery` needs from a fetch response.
+ * `globalThis.fetch`'s `Response` is assignment-compatible; tests can supply
+ * a plain duck-typed object without casting through the DOM lib.
+ */
+export interface RegisterFetchResponse {
+  readonly ok: boolean;
+  readonly status: number;
+  readonly statusText: string;
+  json(): Promise<unknown>;
+}
 
 export interface RunUntpDiscoveryInput {
   tenantId: string;
@@ -17,7 +32,7 @@ export interface RunUntpDiscoveryInput {
    */
   staleFailureMs?: number;
   /** Inject for tests. Defaults to `globalThis.fetch`. */
-  fetchRegister?: (url: string) => Promise<Response>;
+  fetchRegister?: (url: string) => Promise<RegisterFetchResponse>;
 }
 
 export interface RunUntpDiscoveryResult {
@@ -46,6 +61,10 @@ const DEFAULT_STALE_FAILURE_MS = 7 * 24 * 60 * 60 * 1000;
  *   is deleted. Handles owner-side URLs that have been persistently
  *   unreachable.
  *
+ * Per-entry ingest errors are caught and logged. The loop continues to the
+ * next entry, the row's `sourceUrl` still counts as "seen" (so it isn't
+ * evicted by the unseen pass), and `failed` is incremented.
+ *
  * If the register parses to zero entries, the unseen eviction is skipped so a
  * transient empty register can't nuke the local mirror. Tenant-imported and
  * seed-loaded rows are out of scope for both evictions.
@@ -61,7 +80,9 @@ export async function runUntpDiscovery(input: RunUntpDiscoveryInput): Promise<Ru
 
   const response = await fetchRegister(input.registerUrl);
   if (!response.ok) {
-    throw new Error(`UNTP CVC register fetch failed: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `UNTP CVC register fetch failed for ${input.registerUrl}: ${response.status} ${response.statusText}`,
+    );
   }
   const doc = await response.json();
   const { entries } = parseConformityCatalogue(doc, { sourceUrl: input.registerUrl });
@@ -73,17 +94,25 @@ export async function runUntpDiscovery(input: RunUntpDiscoveryInput): Promise<Ru
 
   for (const entry of entries) {
     seenSourceUrls.add(entry.vocabularyUrl);
-    const result = await ingestConformityScheme({
-      sourceUrl: entry.vocabularyUrl,
-      source: ConformitySchemeSource.UNTP,
-      tenantId: input.tenantId,
-      conformitySchemaUrl: input.conformitySchemaUrl,
-      schemaLoader: input.schemaLoader,
-      conformityVocabularySpecVersion: input.conformityVocabularySpecVersion,
-    });
-    if (result.kind === 'success') succeeded += 1;
-    else if (result.kind === 'unchanged') unchanged += 1;
-    else failed += 1;
+    try {
+      const result = await ingestConformityScheme({
+        sourceUrl: entry.vocabularyUrl,
+        source: ConformitySchemeSource.UNTP,
+        tenantId: input.tenantId,
+        conformitySchemaUrl: input.conformitySchemaUrl,
+        schemaLoader: input.schemaLoader,
+        conformityVocabularySpecVersion: input.conformityVocabularySpecVersion,
+      });
+      if (result.kind === 'success') succeeded += 1;
+      else if (result.kind === 'unchanged') unchanged += 1;
+      else failed += 1;
+    } catch (err) {
+      logger.error(
+        { err, sourceUrl: entry.vocabularyUrl, tenantId: input.tenantId },
+        'ingestConformityScheme threw during UNTP discovery pass',
+      );
+      failed += 1;
+    }
   }
 
   let evictedUnseen = 0;

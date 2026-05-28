@@ -163,6 +163,71 @@ describe('runUntpDiscovery', () => {
     });
   });
 
+  it('forwards conformityVocabularySpecVersion to each ingest call', async () => {
+    const fetchRegister = fetchRegisterReturning(
+      registerDoc([
+        { id: 'reg/a', vocabularyURL: 'https://owner/a' },
+        { id: 'reg/b', vocabularyURL: 'https://owner/b' },
+      ]),
+    );
+    mockIngestConformityScheme.mockResolvedValue({ kind: 'success', schemeId: 'row-x' });
+
+    await runUntpDiscovery({
+      tenantId: TENANT_ID,
+      registerUrl: REGISTER_URL,
+      conformitySchemaUrl: SCHEMA_URL,
+      schemaLoader: fakeLoader,
+      conformityVocabularySpecVersion: '0.7.0',
+      fetchRegister,
+    });
+
+    expect(mockIngestConformityScheme).toHaveBeenCalledTimes(2);
+    expect(mockIngestConformityScheme).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ conformityVocabularySpecVersion: '0.7.0' }),
+    );
+    expect(mockIngestConformityScheme).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ conformityVocabularySpecVersion: '0.7.0' }),
+    );
+  });
+
+  it('continues iterating when a per-entry ingest throws, counting the throw as failed', async () => {
+    const fetchRegister = fetchRegisterReturning(
+      registerDoc([
+        { id: 'reg/a', vocabularyURL: 'https://owner/a' },
+        { id: 'reg/b', vocabularyURL: 'https://owner/b' },
+        { id: 'reg/c', vocabularyURL: 'https://owner/c' },
+      ]),
+    );
+    mockIngestConformityScheme
+      .mockResolvedValueOnce({ kind: 'success', schemeId: 'row-a' })
+      .mockRejectedValueOnce(new Error('database transient'))
+      .mockResolvedValueOnce({ kind: 'success', schemeId: 'row-c' });
+
+    const result = await runUntpDiscovery({
+      tenantId: TENANT_ID,
+      registerUrl: REGISTER_URL,
+      conformitySchemaUrl: SCHEMA_URL,
+      schemaLoader: fakeLoader,
+      fetchRegister,
+    });
+
+    expect(result.iterated).toBe(3);
+    expect(result.succeeded).toBe(2);
+    expect(result.failed).toBe(1);
+    expect(mockIngestConformityScheme).toHaveBeenCalledTimes(3);
+    // Throwing entry's sourceUrl is still in the seen set, so unseen-eviction
+    // doesn't delete its prior row (if any).
+    expect(mockScheme.deleteMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        tenantId: TENANT_ID,
+        source: ConformitySchemeSource.UNTP,
+        sourceUrl: { notIn: ['https://owner/a', 'https://owner/b', 'https://owner/c'] },
+      },
+    });
+  });
+
   it('throws and runs no eviction when the register fetch fails', async () => {
     const fetchRegister = fetchRegisterReturning({}, false);
 

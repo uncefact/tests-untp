@@ -20,6 +20,10 @@ import {
  * RDF tree. Failing fast on schema-shape problems avoids paying the JSON-LD
  * cost on documents that wouldn't have parsed anyway.
  *
+ * The fetch gate distinguishes `TOO_LARGE` from `FETCH_FAILED` when a
+ * `ResolverTooLargeError` is thrown, so an oversized-document signal stays
+ * separate from generic network failure in the operator view.
+ *
  * Three terminal outcomes:
  * `{ kind: 'unchanged' }`, the conditional-fetch skip chain hit; bump
  *   `lastFetchedAt` only, retain previous content.

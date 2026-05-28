@@ -33,7 +33,9 @@ export type IngestConformitySchemeResult =
  * (and child) tables, mapping each outcome onto a Prisma write.
  *
  * Outcomes mirror ADR-033 §1's partial-failure semantics:
- * `unchanged`: previous content retained; only `lastFetchedAt` is bumped.
+ * `unchanged`: previous content retained; `lastFetchedAt` and
+ *   `lastSuccessAt` are bumped (an unchanged poll counts as a successful
+ *   poll for the stale-failure eviction policy in {@link runUntpDiscovery}).
  * `success`: full upsert of the scheme + profiles + criteria + join rows;
  *   stale profiles owned by this scheme are deleted to keep the persisted
  *   content in step with the resolved document.
