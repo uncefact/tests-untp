@@ -121,7 +121,7 @@ describe('ingestConformityScheme', () => {
       expect(result).toEqual({ kind: 'unchanged', schemeId: 'row-1' });
       expect(mockScheme.update).toHaveBeenCalledWith({
         where: { id: 'row-1' },
-        data: { lastFetchedAt: expect.any(Date) },
+        data: { lastFetchedAt: expect.any(Date), lastSuccessAt: expect.any(Date) },
       });
     });
 
@@ -223,6 +223,7 @@ describe('ingestConformityScheme', () => {
           lastModifiedHeader: 'Wed, 21 May 2026 12:00:00 GMT',
           bodyDigest: 'zNEW',
           lastFetchStatus: ConformityFetchStatus.SUCCESS,
+          lastSuccessAt: expect.any(Date),
           source: ConformitySchemeSource.UNTP,
         }),
         select: { id: true },
@@ -264,6 +265,7 @@ describe('ingestConformityScheme', () => {
           bodyDigest: 'zNEW',
           lastFetchStatus: ConformityFetchStatus.SUCCESS,
           lastFetchedAt: expect.any(Date),
+          lastSuccessAt: expect.any(Date),
         }),
         select: { id: true },
       });

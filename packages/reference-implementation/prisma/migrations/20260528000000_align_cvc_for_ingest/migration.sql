@@ -36,3 +36,14 @@ DROP TYPE "CvcFetchStatus_old";
 -- (sourceUrl, tenantId) since the canonical id is only known after resolve.
 CREATE UNIQUE INDEX "ConformityScheme_sourceUrl_tenantId_key"
     ON "ConformityScheme"("sourceUrl", "tenantId");
+
+-- Track when this row was last successfully fetched (or unchanged via the skip
+-- chain). The discovery loop uses this column to evict rows whose owner-side
+-- URL has been unreachable for too long.
+ALTER TABLE "ConformityScheme" ADD COLUMN "lastSuccessAt" TIMESTAMP(3);
+
+-- Backfill: rows currently marked SUCCESS must have succeeded at least once;
+-- lastFetchedAt is the best available approximation.
+UPDATE "ConformityScheme"
+   SET "lastSuccessAt" = "lastFetchedAt"
+ WHERE "lastFetchStatus" = 'SUCCESS';

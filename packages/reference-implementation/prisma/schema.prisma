@@ -519,6 +519,7 @@ model ConformityScheme {
   lastModifiedHeader String?
   bodyDigest         String?
   lastFetchedAt      DateTime?
+  lastSuccessAt      DateTime?
   lastFetchStatus    ConformityFetchStatus
   rawDocument        Json?
   createdAt          DateTime        @default(now())

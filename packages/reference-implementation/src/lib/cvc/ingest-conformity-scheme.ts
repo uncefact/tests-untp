@@ -77,7 +77,7 @@ export async function ingestConformityScheme(
   if (result.kind === 'unchanged') {
     await prisma.conformityScheme.update({
       where: { id: existing!.id },
-      data: { lastFetchedAt: now },
+      data: { lastFetchedAt: now, lastSuccessAt: now },
     });
     return { kind: 'unchanged', schemeId: existing!.id };
   }
@@ -133,6 +133,7 @@ async function persistSuccess(args: PersistSuccessArgs): Promise<IngestConformit
     lastModifiedHeader: lastModifiedHeader ?? null,
     bodyDigest: bodyDigestEncoded,
     lastFetchedAt: now,
+    lastSuccessAt: now,
     lastFetchStatus: ConformityFetchStatus.SUCCESS,
     rawDocument: raw as Prisma.InputJsonValue,
     tenantId: input.tenantId,
