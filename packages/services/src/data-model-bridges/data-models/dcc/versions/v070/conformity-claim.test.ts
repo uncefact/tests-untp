@@ -73,6 +73,15 @@ describe('extractDccConformityClaim (v0.7.0)', () => {
     ]);
   });
 
+  it('skips null assessment and null criterion entries from a malformed payload', () => {
+    const subject = {
+      referenceScheme: { id: 'https://s.example' },
+      referenceProfile: { id: 'https://s.example/p/1.0.0' },
+      conformityAssessment: [null, { assessmentCriteria: [null, { id: 'https://s.example/c/1.0.0' }] }],
+    } as unknown as Record<string, unknown>;
+    expect(extractDccConformityClaim(subject)?.criteria).toEqual([{ criterion: 'https://s.example/c/1.0.0' }]);
+  });
+
   it('returns null when the scheme reference is missing', () => {
     expect(extractDccConformityClaim({ referenceProfile: { id: 'https://s.example/p/1.0.0' } })).toBeNull();
   });

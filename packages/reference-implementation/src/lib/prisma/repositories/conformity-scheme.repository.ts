@@ -39,7 +39,7 @@ function toCriterion(row: CriterionRow): ConformityCriterion {
     ...(row.description != null && { description: row.description }),
     ...(row.documentation != null && { documentation: row.documentation }),
     topics: toTopics(row.topics),
-    tags: row.tags,
+    tags: Array.isArray(row.tags) ? row.tags : [],
   };
 }
 
@@ -52,7 +52,7 @@ function toProfile(row: ProfileRow): ConformityProfile {
     ...(row.description != null && { description: row.description }),
     ...(row.documentation != null && { documentation: row.documentation }),
     ...(row.validFrom != null && { validFrom: row.validFrom }),
-    criteria: row.criteria.map((pc) => toCriterion(pc.criterion)),
+    criteria: row.criteria.filter((pc) => pc.criterion != null).map((pc) => toCriterion(pc.criterion)),
   };
 }
 

@@ -37,8 +37,9 @@ export function extractDccConformityClaim(subject: CredentialSubject): Conformit
 
   const criteria: ConformityClaim['criteria'] = [];
   for (const assessment of dcc.conformityAssessment ?? []) {
+    if (!assessment) continue;
     for (const criterion of assessment.assessmentCriteria ?? []) {
-      if (!criterion.id) continue;
+      if (!criterion?.id) continue;
       const topic = criterion.conformityTopic?.[0]?.id;
       criteria.push({ criterion: criterion.id, ...(topic ? { conformityTopic: topic } : {}) });
     }

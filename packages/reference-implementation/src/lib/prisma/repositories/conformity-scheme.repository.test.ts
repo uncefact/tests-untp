@@ -124,6 +124,15 @@ describe('findConformitySchemeByCanonicalId', () => {
     expect(result).not.toHaveProperty('owner');
   });
 
+  it('filters out a profile-criterion row whose criterion relation is missing', async () => {
+    const row = schemeRow();
+    row.profiles[0].criteria.unshift({ criterion: null } as unknown as (typeof row.profiles)[0]['criteria'][0]);
+    mockFindMany.mockResolvedValue([row]);
+    const result = await findConformitySchemeByCanonicalId(CANONICAL, TENANT);
+    expect(result?.profiles[0].criteria).toHaveLength(1);
+    expect(result?.profiles[0].criteria[0].canonicalId).toBe('https://coppermark.org/rra/v3.0/criterion/26');
+  });
+
   it('returns null when no row exists in either lane', async () => {
     mockFindMany.mockResolvedValue([]);
     expect(await findConformitySchemeByCanonicalId(CANONICAL, TENANT)).toBeNull();
