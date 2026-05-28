@@ -71,6 +71,7 @@ function emptyManifest(): CustomSeedManifest {
     registrars: [],
     dataModels: [],
     renderTemplates: [],
+    conformitySchemes: [],
   };
 }
 
@@ -116,6 +117,7 @@ describe('validateManifestReferences', () => {
         ],
         dataModels: [buildDataModel()],
         renderTemplates: [buildRenderTemplate()],
+        conformitySchemes: [],
       };
 
       const errors = validateManifestReferences(manifest, buildCtx());

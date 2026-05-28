@@ -9,8 +9,8 @@ import type {
   ConformityCriterion as ParsedCriterion,
   ConformityScheme as ParsedScheme,
 } from '@uncefact/untp-utils/conformity-vocabulary';
-import { ConformityFetchStatus, ConformitySchemeSource, Prisma } from '@/lib/prisma/generated';
-import { prisma } from '@/lib/prisma/prisma';
+import { ConformityFetchStatus, ConformitySchemeSource, Prisma } from '../prisma/generated';
+import { prisma } from '../prisma/prisma';
 
 export interface IngestConformitySchemeInput {
   sourceUrl: string;

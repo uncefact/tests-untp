@@ -15,6 +15,16 @@ jest.mock('yaml', () => ({
   parse: jest.fn(),
 }));
 
+// ── Mock the CVC ingest entry to avoid pulling utils + undici through jest ────
+
+jest.mock('../../src/lib/cvc/index.js', () => ({
+  ingestConformityScheme: jest.fn(),
+}));
+
+jest.mock('../../src/lib/credentials/schema-loader.js', () => ({
+  schemaLoader: { load: jest.fn() },
+}));
+
 // ── Mock process.exit ────────────────────────────────────────────────────────
 
 const mockExit = jest.spyOn(process, 'exit').mockImplementation((() => {
@@ -71,11 +81,12 @@ function createMockPrisma() {
   });
 
   return {
-    dataModel: { findMany: findManyFn },
+    dataModel: { findMany: findManyFn, findFirst: jest.fn().mockResolvedValue(null) },
     registrar: { findMany: findManyFn, upsert: upsertFn },
     identifierScheme: { findMany: findManyFn, upsert: upsertFn },
     schemeQualifier: { findMany: findManyFn, upsert: upsertFn },
     renderTemplate: { findMany: findManyFn, upsert: upsertFn },
+    conformityScheme: { findUnique: jest.fn().mockResolvedValue(null) },
     $transaction: transactionFn,
   } as unknown as CustomSeedDependencies['prisma'];
 }
@@ -230,6 +241,97 @@ describe('runCustomSeed', () => {
 
       expect(mockExit).toHaveBeenCalledWith(1);
       expect(deps.logger.error).toHaveBeenCalledWith(expect.stringContaining('storage service'));
+    });
+  });
+
+  describe('conformitySchemes seed processing', () => {
+    function setupManifest(conformitySchemes: unknown[]) {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockImplementation((p: string) => {
+        if (p.endsWith('seed.yaml')) return '';
+        return Buffer.from('{"id":"https://example.com/scheme","name":"Example"}');
+      });
+      (parseYaml as jest.Mock).mockReturnValue({
+        registrars: [],
+        dataModels: [],
+        renderTemplates: [],
+        conformitySchemes,
+      });
+    }
+
+    it('ingests a URL-based conformity scheme entry when not already present', async () => {
+      setupManifest([{ url: 'https://example.com/scheme', version: '0.7.0' }]);
+      const deps = createDeps();
+      const ingestMock = require('../../src/lib/cvc/index.js').ingestConformityScheme as jest.Mock;
+      ingestMock.mockResolvedValue({ kind: 'success', schemeId: 'row-1' });
+      (deps.prisma.dataModel.findFirst as jest.Mock).mockResolvedValue({
+        schemaUrl: 'https://example.com/schema.json',
+      });
+
+      await runCustomSeed(deps);
+
+      expect(deps.prisma.conformityScheme.findUnique).toHaveBeenCalledWith({
+        where: { sourceUrl_tenantId: { sourceUrl: 'https://example.com/scheme', tenantId: SYSTEM_TENANT_ID } },
+      });
+      expect(ingestMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceUrl: 'https://example.com/scheme',
+          source: 'SYSTEM_SEED',
+          tenantId: SYSTEM_TENANT_ID,
+          conformitySchemaUrl: 'https://example.com/schema.json',
+          conformityVocabularySpecVersion: '0.7.0',
+        }),
+      );
+    });
+
+    it('skips an entry whose (sourceUrl, tenantId) row already exists (insert-only-if-absent)', async () => {
+      setupManifest([{ url: 'https://example.com/scheme', version: '0.7.0' }]);
+      const deps = createDeps();
+      const ingestMock = require('../../src/lib/cvc/index.js').ingestConformityScheme as jest.Mock;
+      (deps.prisma.conformityScheme.findUnique as jest.Mock).mockResolvedValue({ id: 'existing-row' });
+
+      await runCustomSeed(deps);
+
+      expect(ingestMock).not.toHaveBeenCalled();
+      expect(deps.logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({ sourceUrl: 'https://example.com/scheme' }),
+        expect.stringContaining('insert-only-if-absent'),
+      );
+    });
+
+    it('skips an entry whose version has no ConformityScheme DataModel row', async () => {
+      setupManifest([{ url: 'https://example.com/scheme', version: '9.9.9' }]);
+      const deps = createDeps();
+      const ingestMock = require('../../src/lib/cvc/index.js').ingestConformityScheme as jest.Mock;
+      (deps.prisma.dataModel.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await runCustomSeed(deps);
+
+      expect(ingestMock).not.toHaveBeenCalled();
+      expect(deps.logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ version: '9.9.9' }),
+        expect.stringContaining('ConformityScheme DataModel'),
+      );
+    });
+
+    it('ingests a file-based entry by reading the JSON-LD and extracting `id` as sourceUrl', async () => {
+      setupManifest([{ file: 'schemes/example.json', version: '0.7.0' }]);
+      const deps = createDeps();
+      const ingestMock = require('../../src/lib/cvc/index.js').ingestConformityScheme as jest.Mock;
+      ingestMock.mockResolvedValue({ kind: 'success', schemeId: 'row-1' });
+      (deps.prisma.dataModel.findFirst as jest.Mock).mockResolvedValue({
+        schemaUrl: 'https://example.com/schema.json',
+      });
+
+      await runCustomSeed(deps);
+
+      expect(ingestMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceUrl: 'https://example.com/scheme',
+          source: 'SYSTEM_SEED',
+          prefetched: expect.objectContaining({ body: expect.any(Uint8Array) }),
+        }),
+      );
     });
   });
 });

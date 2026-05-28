@@ -522,6 +522,40 @@ async function main() {
     logger.info({ dataModelId: dm.id, credentialType: dm.credentialType }, 'Data model created');
   }
 
+  // ── Seed the ConformityScheme data model row ────────────────────────────────
+  // The custom-seed `conformitySchemes` processor resolves the JSON Schema URL
+  // for ingestion by looking this row up via (credentialType, version). It
+  // does not share the `UNTP_BASE` URL pattern with the credential data models;
+  // the CVC artefacts live under the production `untp.unece.org` origin.
+  const CONFORMITY_SCHEME_DATA_MODEL_ID = 'c4fxk5o3sqrm6n0u7c7akm0sb';
+  const conformitySchemeExists = await prisma.dataModel.findUnique({
+    where: { id: CONFORMITY_SCHEME_DATA_MODEL_ID },
+  });
+  if (conformitySchemeExists) {
+    logger.info(
+      { dataModelId: CONFORMITY_SCHEME_DATA_MODEL_ID, credentialType: 'ConformityScheme' },
+      'Data model already exists, skipping',
+    );
+  } else {
+    await prisma.dataModel.create({
+      data: {
+        id: CONFORMITY_SCHEME_DATA_MODEL_ID,
+        tenantId: SYSTEM_TENANT_ID,
+        name: 'Conformity Scheme v0.7.0',
+        credentialType: 'ConformityScheme',
+        version: '0.7.0',
+        isExtension: false,
+        schemaUrl: 'https://untp.unece.org/artefacts/schema/v0.7.0/cvc/ConformityScheme.json',
+        contextUrl: 'https://untp.unece.org/artefacts/contexts/v0.7.0/cvc/ConformityScheme.context.jsonld',
+        websiteUrl: 'https://untp.unece.org/docs/specification/ConformityVocabularyCatalog',
+      },
+    });
+    logger.info(
+      { dataModelId: CONFORMITY_SCHEME_DATA_MODEL_ID, credentialType: 'ConformityScheme' },
+      'Data model created',
+    );
+  }
+
   // ── Seed default render templates ───────────────────────────────────────────
   // Upload .hbs templates to the storage service and record the returned URIs.
   // Requires the storage service to be available (skipped otherwise).
@@ -727,7 +761,7 @@ async function main() {
 
 main()
   .catch((e) => {
-    logger.error({ error: e }, 'Seed failed');
+    logger.error({ err: e }, 'Seed failed');
     process.exit(1);
   })
   .finally(async () => {

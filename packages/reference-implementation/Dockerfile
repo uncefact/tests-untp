@@ -148,7 +148,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 # Modules required by prisma/seed.ts (relative imports from ../src/lib/...)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/prisma/constants.ts ./src/lib/prisma/constants.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/prisma/generated ./src/lib/prisma/generated
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/prisma/prisma.ts ./src/lib/prisma/prisma.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/config ./src/lib/config
+# Modules required by prisma/custom-seed.ts (conformity-scheme ingestion path)
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/api/logger.ts ./src/lib/api/logger.ts
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/schema-loader.ts ./src/lib/credentials/schema-loader.ts
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/cvc ./src/lib/cvc
 # Render templates used by prisma/seed.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/templates ./src/templates
 

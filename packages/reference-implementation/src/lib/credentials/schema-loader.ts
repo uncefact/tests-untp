@@ -1,6 +1,6 @@
 import { makeInMemoryTtlCache } from '@uncefact/untp-utils/cache';
 import { makeSchemaLoader, type SchemaLoader } from '@uncefact/untp-utils/schema-loaders';
-import { apiLogger } from '@/lib/api/logger';
+import { apiLogger } from '../api/logger';
 
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
 const logger = apiLogger.child({ module: 'schema-loader' });

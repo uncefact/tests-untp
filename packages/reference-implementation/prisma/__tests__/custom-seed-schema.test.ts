@@ -623,6 +623,58 @@ describe('customSeedSchema — renderTemplates', () => {
   });
 });
 
+// ── Conformity schemes ────────────────────────────────────────────────────────
+
+describe('customSeedSchema — conformitySchemes', () => {
+  it('accepts a URL-only entry with a version', () => {
+    const result = customSeedSchema.safeParse({
+      conformitySchemes: [{ url: 'https://example.com/scheme', version: '0.7.0' }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a file-only entry with a version', () => {
+    const result = customSeedSchema.safeParse({
+      conformitySchemes: [{ file: 'schemes/example.json', version: '0.7.0' }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an entry with neither `url` nor `file`', () => {
+    const result = customSeedSchema.safeParse({
+      conformitySchemes: [{ version: '0.7.0' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an entry with both `url` and `file` set', () => {
+    const result = customSeedSchema.safeParse({
+      conformitySchemes: [{ url: 'https://example.com/scheme', file: 'a.json', version: '0.7.0' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an entry missing the `version` field', () => {
+    const result = customSeedSchema.safeParse({
+      conformitySchemes: [{ url: 'https://example.com/scheme' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an entry with a non-URL value in `url`', () => {
+    const result = customSeedSchema.safeParse({
+      conformitySchemes: [{ url: 'not-a-url', version: '0.7.0' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('defaults conformitySchemes to [] when omitted', () => {
+    const result = customSeedSchema.safeParse({});
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.conformitySchemes).toEqual([]);
+  });
+});
+
 // ── Type exports ──────────────────────────────────────────────────────────────
 
 describe('customSeedSchema — exported types', () => {

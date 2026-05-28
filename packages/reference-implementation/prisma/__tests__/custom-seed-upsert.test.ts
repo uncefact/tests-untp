@@ -27,6 +27,7 @@ function emptyManifest(): CustomSeedManifest {
     registrars: [],
     dataModels: [],
     renderTemplates: [],
+    conformitySchemes: [],
   };
 }
 
