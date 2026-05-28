@@ -128,6 +128,36 @@ export const customSeedRenderTemplateSchema = z.object({
 
 export type CustomSeedRenderTemplate = z.infer<typeof customSeedRenderTemplateSchema>;
 
+// ── Conformity scheme schema ──────────────────────────────────────────────────
+
+/**
+ * A conformity scheme to seed under the system tenant (`source = SYSTEM_SEED`).
+ *
+ * Each entry references exactly one source:
+ * - `url`: an HTTP(S) URL the seed loader fetches at seed-time.
+ * - `file`: a path relative to the custom-seed directory pointing at a local
+ *   JSON-LD document.
+ *
+ * The scheme's display name and structure are derived from the document
+ * itself; the operator does not supply a name. The `version` selects the CVC
+ * specification version (and therefore the JSON Schema URL resolved from the
+ * `ConformityScheme` data-model row).
+ */
+export const customSeedConformitySchemeSchema = z
+  .object({
+    /** HTTP(S) URL of the scheme document to fetch at seed-time. */
+    url: z.string().url().optional(),
+    /** Path relative to the custom-seed directory of a local JSON-LD scheme document. */
+    file: z.string().optional(),
+    /** CVC specification version this document conforms to, e.g. `"0.7.0"`. */
+    version: z.string(),
+  })
+  .refine((entry) => (entry.url === undefined) !== (entry.file === undefined), {
+    message: 'Exactly one of `url` or `file` must be provided',
+  });
+
+export type CustomSeedConformityScheme = z.infer<typeof customSeedConformitySchemeSchema>;
+
 // ── Root manifest schema ──────────────────────────────────────────────────────
 
 /**
@@ -151,6 +181,12 @@ export const customSeedSchema = z.object({
 
   /** Render templates to upsert (template files are read from disk via the `file` path). */
   renderTemplates: customSeedRenderTemplateSchema
+    .array()
+    .nullish()
+    .transform((v) => v ?? []),
+
+  /** Conformity schemes to ingest under the system tenant as `SYSTEM_SEED`. */
+  conformitySchemes: customSeedConformitySchemeSchema
     .array()
     .nullish()
     .transform((v) => v ?? []),

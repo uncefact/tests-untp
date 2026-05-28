@@ -1,8 +1,8 @@
 import { parseConformityCatalogue } from '@uncefact/untp-utils/conformity-vocabulary';
 import type { SchemaLoader } from '@uncefact/untp-utils/schema-loaders';
-import { apiLogger } from '@/lib/api/logger';
-import { ConformityFetchStatus, ConformitySchemeSource } from '@/lib/prisma/generated';
-import { prisma } from '@/lib/prisma/prisma';
+import { apiLogger } from '../api/logger';
+import { ConformityFetchStatus, ConformitySchemeSource } from '../prisma/generated';
+import { prisma } from '../prisma/prisma';
 import { ingestConformityScheme } from './ingest-conformity-scheme';
 
 const logger = apiLogger.child({ module: 'cvc-discovery' });

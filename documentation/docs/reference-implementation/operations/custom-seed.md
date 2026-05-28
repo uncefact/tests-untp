@@ -7,7 +7,7 @@ title: Custom Seed
 
 The Reference Implementation ships with a set of [default seed data](./startup.md#step-2-database-seed) — registrars, identifier schemes, data models, render templates, and service instances. These defaults cover common UNTP use cases out of the box.
 
-Deployers who need additional data — custom registrars, identifier schemes, data models, render templates, or CVC catalogues — can supply a YAML manifest via a Docker volume mount, without modifying the source code or rebuilding the image.
+Deployers who need additional data — custom registrars, identifier schemes, data models, render templates, or conformity schemes — can supply a YAML manifest via a Docker volume mount, without modifying the source code or rebuilding the image.
 
 ## How It Works
 
@@ -66,10 +66,10 @@ Each ID must be unique across the entire manifest. If an ID matches a record alr
 The manifest is a YAML file with four top-level arrays. All are optional — omit any section you do not need.
 
 ```yaml
-registrars: []        # Identifier registrars with nested schemes and qualifiers
-dataModels: []        # Data model extension configurations
-renderTemplates: []   # HTML render templates (files referenced by relative path)
-cvcCatalogues: []     # Remote CVC catalogue endpoints to import
+registrars: []         # Identifier registrars with nested schemes and qualifiers
+dataModels: []         # Data model extension configurations
+renderTemplates: []    # HTML render templates (files referenced by relative path)
+conformitySchemes: []  # Conformity schemes to ingest under the system tenant
 ```
 
 ### Registrars
@@ -206,30 +206,33 @@ The template file at the specified path is uploaded to the storage service durin
 Only one render template per data model may have `isDefault: true`. If multiple templates for the same data model are marked as default, validation will fail.
 :::
 
-### CVC Catalogues
+### Conformity Schemes
 
-CVC (Conformity Verification Certificate) catalogues define remote endpoints from which conformity credential catalogues are imported.
+Conformity schemes are ingested under the system tenant with `source = SYSTEM_SEED`. Each entry points at a single scheme document — either a remote URL the loader fetches at seed time, or a local JSON-LD file in the mount directory.
 
 ```yaml
-cvcCatalogues:
-  - id: "clxyz1234567890cvc01"
-    name: "Example CVC Catalogue"
-    version: "0.6.0"
-    endpointUrl: "https://example.com/api/cvc-catalogue"
+conformitySchemes:
+  - url: "https://vocab.example.com/scheme-a"
+    version: "0.7.0"
+  - file: "schemes/scheme-b.json"
+    version: "0.7.0"
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `id` | CUID v1 | Yes | Unique identifier |
-| `name` | string | Yes | Display name |
-| `version` | string | Yes | CVC specification version (must be a supported version) |
-| `endpointUrl` | URL | Yes | Remote endpoint to fetch the catalogue from |
+| `url` | URL | Yes (or `file`) | HTTP(S) URL of the scheme document to fetch at seed time |
+| `file` | string | Yes (or `url`) | Path relative to the mount directory of a local JSON-LD scheme document |
+| `version` | string | Yes | CVC specification version this document conforms to, e.g. `"0.7.0"` |
 
-The endpoint is fetched during seed processing (with automatic retry on failure). The remote service must be reachable at seed time.
+Exactly one of `url` or `file` must be set per entry. The scheme's display name and structure (profiles, criteria) are derived from the document itself; no operator-supplied name is required.
+
+The seed loader is **insert-only-if-absent**: if a row already exists at `(sourceUrl, systemTenantId)` (from a prior seed run, UNTP discovery, or operator action), the entry is skipped. This preserves any post-seed updates rather than overwriting them.
+
+For file entries, the loader reads the top-level `id` (or `@id`) from the JSON-LD document to determine the row's `sourceUrl`. The file must be a valid JSON-LD scheme document.
 
 ## Complete Example
 
-Below is a full example manifest that provisions a custom registrar with an identifier scheme, a data model extension, a render template, and a CVC catalogue.
+Below is a full example manifest that provisions a custom registrar with an identifier scheme, a data model extension, a render template, and two conformity schemes (one fetched from a URL, one read from a local file).
 
 Mount directory structure:
 
@@ -273,11 +276,11 @@ renderTemplates:
     renderMethodType: "RenderTemplate2024"
     isDefault: true
 
-cvcCatalogues:
-  - id: "clxyz1234567890cvcau"
-    name: "AU Conformity Catalogue"
-    version: "0.6.0"
-    endpointUrl: "https://example.com/api/cvc-catalogue"
+conformitySchemes:
+  - url: "https://vocab.example.com/au-scheme"
+    version: "0.7.0"
+  - file: "schemes/au-fallback-scheme.json"
+    version: "0.7.0"
 ```
 
 ## Validation
@@ -305,18 +308,18 @@ After schema validation passes, the system checks cross-references and constrain
 - **Path traversal protection** — template file paths cannot reference files outside the mount directory (e.g. `../../etc/passwd` is rejected)
 - **Default template uniqueness** — only one render template per data model may be marked as `isDefault: true`
 - **Tenant ID collision protection** — IDs that already exist in a non-system tenant cannot be upserted
-- **CVC version support** — catalogue versions must be supported by the system
 
 If any validation error is detected, the seed process exits with code 1 and logs the specific errors. No data is written.
+
+Conformity scheme entries are validated structurally (URL XOR file, required `version`) at Phase 1. Other concerns (URL reachability, file existence, presence of the `ConformityScheme` data-model row for the entry's `version`) are evaluated at processing time and recorded as per-entry skips or failures; they do not abort the seed pass.
 
 ## Processing Order
 
 Once validation passes, the custom seed processes entities in the following order:
 
 1. **Upload render template files** to the storage service
-2. **Fetch CVC catalogues** from remote endpoints (with retry)
-3. **Upsert all entities** (registrars, schemes, qualifiers, data models, render templates) in a single atomic database transaction
-4. **Import CVC catalogues** (outside the main transaction)
+2. **Upsert all entities** (registrars, schemes, qualifiers, data models, render templates) in a single atomic database transaction
+3. **Ingest conformity schemes** (outside the main transaction). For each entry, the loader either fetches the URL or reads the file, then runs the scheme through the CVC pipeline (fetch → JSON parse → schema validate → JSON-LD expand → parse → persist). Per-entry failures are logged and counted; the loop continues to the next entry.
 
 ## Important Notes
 
@@ -325,5 +328,5 @@ Once validation passes, the custom seed processes entities in the following orde
 - **Atomic** — registrars, schemes, qualifiers, data models, and render templates are written in a single database transaction. If any write fails, the entire batch is rolled back.
 - **System tenant ownership** — all custom seed entities are owned by the system tenant.
 - **Storage service required for templates** — if your manifest includes render templates, the storage service must be configured and reachable at seed time.
-- **Network access required for CVC catalogues** — catalogue endpoints must be reachable at seed time.
+- **Network access required for URL-sourced conformity schemes** — any `conformitySchemes` entry with a `url` field must be reachable at seed time. File-sourced entries are read directly from the mount directory and do not need network access.
 - **Exit on error** — validation failures cause the seed process to exit with code 1, preventing the application from starting with invalid data.

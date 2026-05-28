@@ -4,7 +4,9 @@ import { parse as parseYaml } from 'yaml';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import type { LoggerService as Logger } from '@uncefact/untp-ri-services';
 import type { PrismaClient, Prisma } from '../src/lib/prisma/generated/index.js';
-import { RenderMethodType } from '../src/lib/prisma/generated/index.js';
+import { ConformitySchemeSource, RenderMethodType } from '../src/lib/prisma/generated/index.js';
+import { schemaLoader } from '../src/lib/credentials/schema-loader.js';
+import { ingestConformityScheme } from '../src/lib/cvc/index.js';
 import { customSeedSchema, type CustomSeedManifest } from './custom-seed-schema.js';
 import { validateManifestReferences, type ValidationContext } from './custom-seed-validate.js';
 import { buildUpsertOperations } from './custom-seed-upsert.js';
@@ -42,7 +44,11 @@ export interface CustomSeedDependencies {
  * Count total entities in a parsed manifest.
  */
 function countEntities(manifest: CustomSeedManifest): number {
-  let count = manifest.registrars.length + manifest.dataModels.length + manifest.renderTemplates.length;
+  let count =
+    manifest.registrars.length +
+    manifest.dataModels.length +
+    manifest.renderTemplates.length +
+    manifest.conformitySchemes.length;
 
   for (const registrar of manifest.registrars) {
     count += registrar.identifierSchemes.length;
@@ -52,6 +58,133 @@ function countEntities(manifest: CustomSeedManifest): number {
   }
 
   return count;
+}
+
+// ── Conformity scheme seed processing ────────────────────────────────────────
+
+interface ConformitySchemeSeedSummary {
+  ingested: number;
+  skipped: number;
+  failed: number;
+}
+
+/**
+ * Processes the `conformitySchemes` entries from the manifest after the main
+ * upsert transaction has committed. Each entry is ingested under
+ * `tenantId = SYSTEM_TENANT_ID` with `source = SYSTEM_SEED`. Existing rows
+ * (matched by `(sourceUrl, tenantId)`) are left untouched — the policy is
+ * insert-only-if-absent so that subsequent UNTP discovery or operator updates
+ * are preserved. The schema URL is resolved from the `ConformityScheme`
+ * system data-model row keyed by `(credentialType, version)`.
+ */
+async function processConformitySchemes(
+  deps: CustomSeedDependencies,
+  manifest: CustomSeedManifest,
+): Promise<ConformitySchemeSeedSummary> {
+  const { logger, prisma, systemTenantId, customSeedDir } = deps;
+  const summary: ConformitySchemeSeedSummary = { ingested: 0, skipped: 0, failed: 0 };
+
+  for (const entry of manifest.conformitySchemes) {
+    try {
+      let sourceUrl: string;
+      let prefetchedBody: Uint8Array | undefined;
+
+      if (entry.url !== undefined) {
+        sourceUrl = entry.url;
+      } else if (entry.file !== undefined) {
+        const filePath = path.resolve(customSeedDir, entry.file);
+        const normalisedSeedDir = path.normalize(customSeedDir);
+        const normalisedFilePath = path.normalize(filePath);
+        if (!normalisedFilePath.startsWith(normalisedSeedDir + path.sep) && normalisedFilePath !== normalisedSeedDir) {
+          logger.error(
+            { file: entry.file, filePath },
+            'Conformity scheme seed file path resolves outside the seed directory (potential path traversal); skipping',
+          );
+          summary.failed += 1;
+          continue;
+        }
+        if (!fs.existsSync(filePath)) {
+          logger.error({ file: entry.file, filePath }, 'Conformity scheme seed file not found; skipping');
+          summary.failed += 1;
+          continue;
+        }
+        const bytes = fs.readFileSync(filePath);
+        let doc: { id?: string; '@id'?: string };
+        try {
+          doc = JSON.parse(bytes.toString('utf-8')) as { id?: string; '@id'?: string };
+        } catch (parseErr) {
+          logger.error({ file: entry.file, err: parseErr }, 'Conformity scheme seed file is not valid JSON; skipping');
+          summary.failed += 1;
+          continue;
+        }
+        const canonicalId = doc?.id ?? doc?.['@id'];
+        if (typeof canonicalId !== 'string' || canonicalId.length === 0) {
+          logger.error({ file: entry.file }, 'Conformity scheme seed file missing top-level `id`; skipping');
+          summary.failed += 1;
+          continue;
+        }
+        sourceUrl = canonicalId;
+        prefetchedBody = new Uint8Array(bytes);
+      } else {
+        logger.error({ entry }, 'Conformity scheme entry has neither `url` nor `file`; skipping');
+        summary.failed += 1;
+        continue;
+      }
+
+      const existing = await prisma.conformityScheme.findUnique({
+        where: { sourceUrl_tenantId: { sourceUrl, tenantId: systemTenantId } },
+      });
+      if (existing) {
+        logger.info({ sourceUrl }, 'Conformity scheme already present (insert-only-if-absent); skipping');
+        summary.skipped += 1;
+        continue;
+      }
+
+      const dataModel = await prisma.dataModel.findFirst({
+        where: { tenantId: systemTenantId, credentialType: 'ConformityScheme', version: entry.version },
+      });
+      if (!dataModel) {
+        logger.error(
+          { version: entry.version, sourceUrl },
+          'ConformityScheme DataModel row for this version is not seeded; skipping',
+        );
+        summary.failed += 1;
+        continue;
+      }
+
+      const result = await ingestConformityScheme({
+        sourceUrl,
+        source: ConformitySchemeSource.SYSTEM_SEED,
+        tenantId: systemTenantId,
+        conformitySchemaUrl: dataModel.schemaUrl,
+        schemaLoader,
+        conformityVocabularySpecVersion: entry.version,
+        ...(prefetchedBody !== undefined ? { prefetched: { body: prefetchedBody } } : {}),
+      });
+
+      if (result.kind === 'success') {
+        logger.info({ sourceUrl, schemeId: result.schemeId }, 'Seeded conformity scheme');
+        summary.ingested += 1;
+      } else if (result.kind === 'failure') {
+        logger.error(
+          { sourceUrl, status: result.error.status, message: result.error.message },
+          'Failed to seed conformity scheme',
+        );
+        summary.failed += 1;
+      } else {
+        logger.info({ sourceUrl }, 'Conformity scheme reported unchanged on seed; counted as ingested');
+        summary.ingested += 1;
+      }
+    } catch (err) {
+      logger.error(
+        { err: err instanceof Error ? err.message : err, entry },
+        'Unexpected error while seeding conformity scheme; skipping',
+      );
+      summary.failed += 1;
+    }
+  }
+
+  return summary;
 }
 
 // ── Main orchestrator ────────────────────────────────────────────────────────
@@ -389,13 +522,22 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
     { timeout: TRANSACTION_TIMEOUT, maxWait: TRANSACTION_MAX_WAIT },
   );
 
-  // ── 9. Log success summary ────────────────────────────────────────────
+  // ── 9. Ingest conformity schemes (post-transaction) ───────────────────
+  // Each ingest manages its own transaction internally; run after the main
+  // commit so failures here don't roll back the upserts above.
+  const conformitySummary =
+    manifest.conformitySchemes.length > 0
+      ? await processConformitySchemes(deps, manifest)
+      : { ingested: 0, skipped: 0, failed: 0 };
+
+  // ── 10. Log success summary ───────────────────────────────────────────
   const summary = {
     registrars: ops.registrars.length,
     identifierSchemes: ops.identifierSchemes.length,
     qualifiers: ops.qualifiers.length,
     dataModels: ops.dataModels.length,
     renderTemplates: ops.renderTemplates.length,
+    conformitySchemes: conformitySummary,
   };
 
   logger.info(summary, 'Custom seed completed successfully');
