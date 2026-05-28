@@ -189,7 +189,10 @@ async function persistSuccess(args: PersistSuccessArgs): Promise<IngestConformit
         },
         select: { id: true },
       });
+      const seenCriterionIds = new Set<string>();
       for (const criterion of profile.criteria) {
+        if (seenCriterionIds.has(criterion.canonicalId)) continue;
+        seenCriterionIds.add(criterion.canonicalId);
         const criterionId = criterionRowIds.get(criterion.canonicalId);
         if (!criterionId) throw new Error(`criterion ${criterion.canonicalId} not upserted before profile join`);
         await tx.conformityProfileCriterion.create({

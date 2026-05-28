@@ -325,5 +325,29 @@ describe('ingestConformityScheme', () => {
         data: { profileId: 'prof-2', criterionId: 'crit-shared' },
       });
     });
+
+    it('deduplicates criteria listed multiple times in the same profile', async () => {
+      mockScheme.findUnique.mockResolvedValue(null);
+      const duplicate = parsedCriterion({ canonicalId: 'https://example.com/criterion/dup/1.0.0' });
+      mockResolveAndParseConformityScheme.mockResolvedValue({
+        kind: 'success',
+        scheme: parsedScheme({
+          profiles: [parsedProfile({ criteria: [duplicate, duplicate] })],
+        }),
+        raw: { id: 'x' },
+        bodyDigest: { toString: () => 'zNEW' },
+      });
+      mockTx.conformityScheme.create.mockResolvedValue({ id: 'row-new' });
+      mockTx.conformityCriterion.upsert.mockResolvedValue({ id: 'crit-dup' });
+      mockTx.conformityProfile.create.mockResolvedValue({ id: 'prof-1' });
+
+      await ingestConformityScheme(baseInput());
+
+      expect(mockTx.conformityCriterion.upsert).toHaveBeenCalledTimes(1);
+      expect(mockTx.conformityProfileCriterion.create).toHaveBeenCalledTimes(1);
+      expect(mockTx.conformityProfileCriterion.create).toHaveBeenCalledWith({
+        data: { profileId: 'prof-1', criterionId: 'crit-dup' },
+      });
+    });
   });
 });
