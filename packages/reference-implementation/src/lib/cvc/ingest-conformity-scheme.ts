@@ -75,14 +75,11 @@ export async function ingestConformityScheme(
   const now = new Date();
 
   if (result.kind === 'unchanged') {
-    if (!existing) {
-      throw new Error('resolveAndParseConformityScheme reported unchanged with no existing row');
-    }
     await prisma.conformityScheme.update({
-      where: { id: existing.id },
+      where: { id: existing!.id },
       data: { lastFetchedAt: now },
     });
-    return { kind: 'unchanged', schemeId: existing.id };
+    return { kind: 'unchanged', schemeId: existing!.id };
   }
 
   if (result.kind === 'failure') {

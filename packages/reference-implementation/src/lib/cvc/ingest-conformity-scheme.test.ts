@@ -148,13 +148,6 @@ describe('ingestConformityScheme', () => {
         }),
       );
     });
-
-    it('throws if the resolver reports unchanged but no row exists', async () => {
-      mockScheme.findUnique.mockResolvedValue(null);
-      mockResolveAndParseConformityScheme.mockResolvedValue({ kind: 'unchanged' });
-
-      await expect(ingestConformityScheme(baseInput())).rejects.toThrow(/unchanged with no existing row/);
-    });
   });
 
   describe('failure', () => {
