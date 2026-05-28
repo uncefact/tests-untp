@@ -28,6 +28,11 @@ export { IdrLinkNotFoundError } from '../../errors.js';
 /** Adapter type identifier for Pyx IDR provider. */
 export const PYX_IDR_ADAPTER_TYPE = 'PYX_IDR' as const;
 
+function apiVersionToPathSegment(version: PyxIdrConfig['apiVersion']): string {
+  const [major] = version.split('.');
+  return `v${major}`;
+}
+
 /**
  * Pyx Identity Resolver adapter implementation.
  * Registers and manages links with a Pyx IDR instance to make them
@@ -39,7 +44,7 @@ export const PYX_IDR_ADAPTER_TYPE = 'PYX_IDR' as const;
 export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements IIdentityResolverService {
   private readonly baseURL: string;
   private readonly headers: Record<string, string>;
-  private readonly apiVersion: string;
+  private readonly apiPathSegment: string;
   private readonly defaultLinkType: string;
   private readonly defaultMimeType: string;
   private readonly defaultIanaLanguage: string;
@@ -53,7 +58,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
       Authorization: `Bearer ${config.apiKey}`,
       'Content-Type': 'application/json',
     };
-    this.apiVersion = config.apiVersion;
+    this.apiPathSegment = apiVersionToPathSegment(config.apiVersion);
     this.defaultLinkType = config.defaultLinkType;
     this.defaultMimeType = config.defaultMimeType;
     this.defaultIanaLanguage = config.defaultIanaLanguage;
@@ -62,7 +67,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
   }
 
   private get apiBasePath(): string {
-    return `${this.baseURL}/api/${this.apiVersion}`;
+    return `${this.baseURL}/api/${this.apiPathSegment}`;
   }
 
   async publishLinks(
@@ -77,7 +82,6 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
     const context = options.context ?? this.defaultContext;
     const defaultLinkType = options.defaultLinkType ?? this.defaultLinkType;
     const defaultMimeType = options.defaultMimeType ?? this.defaultMimeType;
-    const defaultIanaLanguage = options.defaultIanaLanguage ?? this.defaultIanaLanguage;
     const defaultContext = options.defaultContext ?? this.defaultContext;
     const fwqs = options.fwqs ?? this.defaultFwqs;
 
@@ -90,7 +94,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
       active: true,
       responses: links.map((link) => ({
         linkType: link.rel,
-        ianaLanguage,
+        hreflang: link.hreflang && link.hreflang.length > 0 ? link.hreflang : [ianaLanguage],
         context,
         mimeType: link.type,
         title: link.title,
@@ -98,9 +102,10 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
         active: true,
         defaultLinkType: link.rel === defaultLinkType,
         defaultMimeType: link.type === defaultMimeType,
-        defaultIanaLanguage: ianaLanguage === defaultIanaLanguage,
         defaultContext: context === defaultContext,
         fwqs,
+        ...(link.additionalRels && link.additionalRels.length > 0 ? { rel: link.additionalRels } : {}),
+        ...(link.public !== undefined ? { public: link.public } : {}),
       })),
     };
 
@@ -161,7 +166,9 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
       rel: result.linkType,
       type: result.mimeType,
       title: result.title ?? result.linkTitle ?? '',
-      hreflang: result.ianaLanguage ? [result.ianaLanguage] : undefined,
+      hreflang: Array.isArray(result.hreflang) && result.hreflang.length > 0 ? result.hreflang : undefined,
+      ...(Array.isArray(result.rel) && result.rel.length > 0 ? { additionalRels: result.rel } : {}),
+      ...(typeof result.public === 'boolean' ? { public: result.public } : {}),
     };
   }
 
@@ -172,6 +179,9 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
     if (link.rel !== undefined) payload.linkType = link.rel;
     if (link.type !== undefined) payload.mimeType = link.type;
     if (link.title !== undefined) payload.title = link.title;
+    if (link.hreflang !== undefined) payload.hreflang = link.hreflang;
+    if (link.additionalRels !== undefined) payload.rel = link.additionalRels;
+    if (link.public !== undefined) payload.public = link.public;
 
     const response = await fetch(`${this.apiBasePath}/resolver/links/${linkId}`, {
       method: 'PUT',
@@ -193,7 +203,9 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
       rel: result.linkType,
       type: result.mimeType,
       title: result.title ?? result.linkTitle ?? '',
-      hreflang: result.ianaLanguage ? [result.ianaLanguage] : undefined,
+      hreflang: Array.isArray(result.hreflang) && result.hreflang.length > 0 ? result.hreflang : undefined,
+      ...(Array.isArray(result.rel) && result.rel.length > 0 ? { additionalRels: result.rel } : {}),
+      ...(typeof result.public === 'boolean' ? { public: result.public } : {}),
     };
   }
 

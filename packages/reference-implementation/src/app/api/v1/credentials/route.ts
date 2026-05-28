@@ -21,6 +21,7 @@ import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { getDidByDid } from '@/lib/prisma/repositories';
 import { buildPublishLinks } from '@uncefact/untp-ri-services';
 import type { CredentialPayload, ExtractedRefs } from '@uncefact/untp-ri-services';
+import { publishingOptionsSchema } from '@/lib/swagger/schemas';
 
 type CredentialWarning = { code: string; message: string };
 
@@ -97,6 +98,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       qualifierPath?: string;
       machineVerificationUrl?: string;
       humanVerificationUrl?: string;
+      hreflang?: string[];
+      additionalRels?: string[];
+      public?: boolean;
     };
   };
 
@@ -125,7 +129,13 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   const { credentialPayload, credentialType, version } = body;
   const storageOptions = body.storageOptions ?? {};
-  const publishingOptions = body.publishingOptions ?? {};
+
+  const publishingOptionsParse = publishingOptionsSchema.safeParse(body.publishingOptions ?? {});
+  if (!publishingOptionsParse.success) {
+    const issue = publishingOptionsParse.error.issues[0];
+    throw new ValidationError(`publishingOptions.${issue.path.join('.') || ''}: ${issue.message}`);
+  }
+  const publishingOptions = publishingOptionsParse.data;
 
   // ── SSRF validation for URL fields ────────────────────────────────────
   if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
@@ -243,6 +253,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
         linkType: publishingOptions.linkType,
         machineVerificationUrl: publishingOptions.machineVerificationUrl,
         humanVerificationUrl: publishingOptions.humanVerificationUrl,
+        ...(publishingOptions.hreflang !== undefined ? { hreflang: publishingOptions.hreflang } : {}),
+        ...(publishingOptions.additionalRels !== undefined ? { additionalRels: publishingOptions.additionalRels } : {}),
+        ...(publishingOptions.public !== undefined ? { public: publishingOptions.public } : {}),
       });
 
       logger.info(

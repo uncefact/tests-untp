@@ -190,6 +190,85 @@ describe('POST /api/v1/identifiers/[id]/links', () => {
     expect(body.error).toBe('Invalid JSON body');
   });
 
+  it('forwards hreflang, additionalRels, and public on each link to publishLinks', async () => {
+    const req = createFakeRequest({
+      links: [
+        {
+          href: 'https://example.com/cred.json',
+          rel: 'untp:dpp',
+          type: 'application/json',
+          hreflang: ['en', 'de'],
+          additionalRels: ['gs1:certificationInfo'],
+          public: true,
+        },
+      ],
+    });
+
+    const res = await POST(req, createContext());
+    expect(res.status).toBe(201);
+
+    const linksArg = MOCK_IDR_SERVICE.publishLinks.mock.calls[0][2];
+    expect(linksArg[0]).toMatchObject({
+      hreflang: ['en', 'de'],
+      additionalRels: ['gs1:certificationInfo'],
+      public: true,
+    });
+  });
+
+  it('returns 400 when hreflang is a string rather than an array', async () => {
+    const req = createFakeRequest({
+      links: [{ href: 'https://example.com/cred.json', rel: 'untp:dpp', type: 'application/json', hreflang: 'en' }],
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/hreflang/);
+  });
+
+  it('returns 400 when a link is missing required href/rel/type', async () => {
+    const req = createFakeRequest({
+      links: [{ rel: 'untp:dpp', type: 'application/json' }],
+    });
+
+    const res = await POST(req, createContext());
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when href is not a valid URL', async () => {
+    const req = createFakeRequest({
+      links: [{ href: 'not-a-url', rel: 'untp:dpp', type: 'application/json' }],
+    });
+
+    const res = await POST(req, createContext());
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when public is not a boolean', async () => {
+    const req = createFakeRequest({
+      links: [{ href: 'https://example.com/cred.json', rel: 'untp:dpp', type: 'application/json', public: 'true' }],
+    });
+
+    const res = await POST(req, createContext());
+    expect(res.status).toBe(400);
+  });
+
+  it('round-trips public: false distinctly from unset when forwarding to publishLinks', async () => {
+    const req = createFakeRequest({
+      links: [
+        { href: 'https://example.com/a.json', rel: 'untp:dpp', type: 'application/json', public: false },
+        { href: 'https://example.com/b.json', rel: 'untp:dpp', type: 'application/json' },
+      ],
+    });
+
+    await POST(req, createContext());
+
+    const linksArg = MOCK_IDR_SERVICE.publishLinks.mock.calls[0][2];
+    expect(linksArg[0].public).toBe(false);
+    expect(linksArg[1]).not.toHaveProperty('public');
+  });
+
   it('returns IDR service error with proper status when publishLinks fails', async () => {
     MOCK_IDR_SERVICE.publishLinks.mockRejectedValue(
       new IdrPublishError('01', '09520123456788', 500, 'upstream timeout'),

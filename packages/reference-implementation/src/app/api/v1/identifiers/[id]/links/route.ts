@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { NotFoundError } from '@/lib/api/errors';
 import { assertPublicUrl, ValidationError, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
@@ -7,6 +8,27 @@ import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 import type { Link } from '@uncefact/untp-ri-services';
+
+const linkSchema = z.object({
+  href: z.string().url(),
+  rel: z.string().min(1),
+  type: z.string().min(1),
+  title: z.string().optional(),
+  hreflang: z.array(z.string().min(1)).optional(),
+  context: z.string().optional(),
+  default: z.boolean().optional(),
+  method: z.enum(['GET', 'POST']).optional(),
+  encryptionMethod: z.string().optional(),
+  accessRole: z.array(z.string()).optional(),
+  additionalRels: z.array(z.string().min(1)).optional(),
+  public: z.boolean().optional(),
+});
+
+const publishLinksRequestSchema = z.object({
+  links: z.array(linkSchema).min(1),
+  qualifierPath: z.string().optional(),
+  description: z.string().optional(),
+});
 
 const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
 
@@ -39,18 +61,41 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
  *                 items:
  *                   type: object
  *                   required:
- *                     - linkType
- *                     - targetUrl
- *                     - mimeType
+ *                     - href
+ *                     - rel
+ *                     - type
  *                   properties:
- *                     linkType:
+ *                     href:
  *                       type: string
- *                     targetUrl:
+ *                       format: uri
+ *                       description: Target URL of the linked resource
+ *                     rel:
  *                       type: string
- *                     mimeType:
+ *                       description: Primary RFC 9264 link relation type (e.g. untp:dpp)
+ *                     type:
  *                       type: string
+ *                       description: IANA media type of the target resource
  *                     title:
  *                       type: string
+ *                     hreflang:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                       description: BCP 47 language tags the variant serves
+ *                     context:
+ *                       type: string
+ *                       description: Regional context for the variant (e.g. au)
+ *                     default:
+ *                       type: boolean
+ *                       description: Whether this is the default variant for its relation type
+ *                     additionalRels:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                       description: Additional link relation types qualifying the link beyond its primary rel
+ *                     public:
+ *                       type: boolean
+ *                       description: Whether the target URL itself is safe to publish in a public directory
  *               qualifierPath:
  *                 type: string
  *                 description: Optional qualifier path for the IDR link
@@ -114,27 +159,24 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId } = await params;
 
   logger.info({ identifierId }, 'Parsing request body');
-  let body: {
-    links?: Array<Record<string, unknown>>;
-    qualifierPath?: string;
-    description?: string;
-  };
+  let rawBody: unknown;
   try {
-    body = await req.json();
+    rawBody = await req.json();
   } catch {
     throw new ValidationError('Invalid JSON body');
   }
 
   logger.info({ identifierId }, 'Validating input parameters');
-  if (!body.links || !Array.isArray(body.links) || body.links.length === 0) {
-    throw new ValidationError('links is required and must be a non-empty array');
+  const parsed = publishLinksRequestSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    throw new ValidationError(`${issue.path.join('.') || 'body'}: ${issue.message}`);
   }
+  const body = parsed.data;
 
-  // Validate targetUrl in each link for SSRF protection
+  // SSRF guard on each link's target URL.
   for (const link of body.links) {
-    if (typeof link.targetUrl === 'string') {
-      await assertPublicUrl(link.targetUrl, 'links[].targetUrl');
-    }
+    await assertPublicUrl(link.href, 'links[].href');
   }
 
   logger.info({ identifierId, linkCount: body.links.length }, 'Looking up identifier for link publishing');
@@ -160,7 +202,7 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
     identifier.value,
     body.links as Link[],
     body.qualifierPath,
-    { namespace, description: body.description },
+    { namespace, ...(body.description !== undefined ? { description: body.description } : {}) },
   );
 
   logger.info({ identifierId, publishedCount: registration.links.length }, 'Storing audit records');

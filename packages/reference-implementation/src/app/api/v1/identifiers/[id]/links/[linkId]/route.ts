@@ -146,10 +146,23 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             properties:
  *               href:
  *                 type: string
+ *                 format: uri
  *               rel:
  *                 type: string
  *               type:
  *                 type: string
+ *               title:
+ *                 type: string
+ *               hreflang:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               additionalRels:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               public:
+ *                 type: boolean
  *     responses:
  *       200:
  *         description: Link updated successfully
@@ -164,6 +177,18 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                   type: string
  *                 type:
  *                   type: string
+ *                 title:
+ *                   type: string
+ *                 hreflang:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 additionalRels:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 public:
+ *                   type: boolean
  *       400:
  *         description: Validation error
  *         content:
