@@ -1,4 +1,8 @@
--- Reconcile CvcFetchStatus with what resolveAndParseConformityScheme returns.
+-- Rename `CvcSchemeSource` to `ConformitySchemeSource` for naming consistency
+-- with the `ConformityScheme*` models and the services-side type union.
+ALTER TYPE "CvcSchemeSource" RENAME TO "ConformitySchemeSource";
+
+-- Reconcile the fetch-status enum and rename it to `ConformityFetchStatus`.
 -- Add INVALID_JSON, DIGEST_FAILED; drop INVALID and SEED (placeholders with
 -- no consumer). TOO_LARGE is retained so an oversized-document failure stays
 -- distinguishable from a generic network failure in the operator view.
@@ -8,10 +12,10 @@ UPDATE "ConformityScheme"
    SET "lastFetchStatus" = 'FETCH_FAILED'
  WHERE "lastFetchStatus" IN ('INVALID', 'SEED');
 
--- Postgres cannot drop enum values in-place; rebuild the type.
+-- Postgres cannot drop enum values in-place; rebuild the type under its new name.
 ALTER TYPE "CvcFetchStatus" RENAME TO "CvcFetchStatus_old";
 
-CREATE TYPE "CvcFetchStatus" AS ENUM (
+CREATE TYPE "ConformityFetchStatus" AS ENUM (
     'SUCCESS',
     'FETCH_FAILED',
     'TOO_LARGE',
@@ -23,8 +27,8 @@ CREATE TYPE "CvcFetchStatus" AS ENUM (
 );
 
 ALTER TABLE "ConformityScheme"
-    ALTER COLUMN "lastFetchStatus" TYPE "CvcFetchStatus"
-    USING "lastFetchStatus"::text::"CvcFetchStatus";
+    ALTER COLUMN "lastFetchStatus" TYPE "ConformityFetchStatus"
+    USING "lastFetchStatus"::text::"ConformityFetchStatus";
 
 DROP TYPE "CvcFetchStatus_old";
 

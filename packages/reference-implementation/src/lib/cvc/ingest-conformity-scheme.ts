@@ -9,12 +9,12 @@ import type {
   ConformityCriterion as ParsedCriterion,
   ConformityScheme as ParsedScheme,
 } from '@uncefact/untp-utils/conformity-vocabulary';
-import { CvcFetchStatus, CvcSchemeSource, Prisma } from '@/lib/prisma/generated';
+import { ConformityFetchStatus, ConformitySchemeSource, Prisma } from '@/lib/prisma/generated';
 import { prisma } from '@/lib/prisma/prisma';
 
 export interface IngestConformitySchemeInput {
   sourceUrl: string;
-  source: CvcSchemeSource;
+  source: ConformitySchemeSource;
   tenantId: string;
   conformitySchemaUrl: string;
   schemaLoader: SchemaLoader;
@@ -91,7 +91,7 @@ export async function ingestConformityScheme(
     }
     await prisma.conformityScheme.update({
       where: { id: existing.id },
-      data: { lastFetchedAt: now, lastFetchStatus: result.error.status as CvcFetchStatus },
+      data: { lastFetchedAt: now, lastFetchStatus: result.error.status as ConformityFetchStatus },
     });
     return { kind: 'failure', schemeId: existing.id, error: result.error };
   }
@@ -136,7 +136,7 @@ async function persistSuccess(args: PersistSuccessArgs): Promise<IngestConformit
     lastModifiedHeader: lastModifiedHeader ?? null,
     bodyDigest: bodyDigestEncoded,
     lastFetchedAt: now,
-    lastFetchStatus: CvcFetchStatus.SUCCESS,
+    lastFetchStatus: ConformityFetchStatus.SUCCESS,
     rawDocument: raw as Prisma.InputJsonValue,
     tenantId: input.tenantId,
   };

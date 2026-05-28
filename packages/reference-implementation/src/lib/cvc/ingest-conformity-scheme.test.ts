@@ -41,7 +41,7 @@ jest.mock('@/lib/prisma/prisma', () => ({
 
 import { ingestConformityScheme } from './ingest-conformity-scheme';
 import { prisma } from '@/lib/prisma/prisma';
-import { CvcFetchStatus, CvcSchemeSource } from '@/lib/prisma/generated';
+import { ConformityFetchStatus, ConformitySchemeSource } from '@/lib/prisma/generated';
 
 const mockScheme = prisma.conformityScheme as unknown as {
   findUnique: jest.Mock;
@@ -57,7 +57,7 @@ const fakeLoader = { load: jest.fn() } as never;
 function baseInput(overrides: Partial<Parameters<typeof ingestConformityScheme>[0]> = {}) {
   return {
     sourceUrl: SOURCE_URL,
-    source: CvcSchemeSource.UNTP,
+    source: ConformitySchemeSource.UNTP,
     tenantId: TENANT_ID,
     conformitySchemaUrl: SCHEMA_URL,
     schemaLoader: fakeLoader,
@@ -229,8 +229,8 @@ describe('ingestConformityScheme', () => {
           etag: '"new"',
           lastModifiedHeader: 'Wed, 21 May 2026 12:00:00 GMT',
           bodyDigest: 'zNEW',
-          lastFetchStatus: CvcFetchStatus.SUCCESS,
-          source: CvcSchemeSource.UNTP,
+          lastFetchStatus: ConformityFetchStatus.SUCCESS,
+          source: ConformitySchemeSource.UNTP,
         }),
         select: { id: true },
       });
@@ -269,7 +269,7 @@ describe('ingestConformityScheme', () => {
           etag: '"new"',
           lastModifiedHeader: 'Wed, 21 May 2026 12:00:00 GMT',
           bodyDigest: 'zNEW',
-          lastFetchStatus: CvcFetchStatus.SUCCESS,
+          lastFetchStatus: ConformityFetchStatus.SUCCESS,
           lastFetchedAt: expect.any(Date),
         }),
         select: { id: true },

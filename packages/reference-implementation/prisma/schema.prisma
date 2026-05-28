@@ -483,13 +483,13 @@ model RenderTemplate {
 
 // ── CVC (Conformity Vocabulary Catalogue) models ────────────────────────────
 
-enum CvcSchemeSource {
+enum ConformitySchemeSource {
   UNTP
   SYSTEM_SEED
   TENANT_IMPORTED
 }
 
-enum CvcFetchStatus {
+enum ConformityFetchStatus {
   SUCCESS
   FETCH_FAILED
   TOO_LARGE
@@ -501,7 +501,7 @@ enum CvcFetchStatus {
 }
 
 /**
- * A conformity scheme published by a scheme owner (per UNTP v0.7 CVC).
+ * A conformity scheme published by a scheme owner.
  * Inlines versioned profiles and criteria.
  */
 model ConformityScheme {
@@ -513,13 +513,13 @@ model ConformityScheme {
   ownerCanonicalId   String?
   ownerName          String?
   specVersion        String
-  source             CvcSchemeSource
+  source             ConformitySchemeSource
   sourceUrl          String
   etag               String?
   lastModifiedHeader String?
   bodyDigest         String?
   lastFetchedAt      DateTime?
-  lastFetchStatus    CvcFetchStatus
+  lastFetchStatus    ConformityFetchStatus
   rawDocument        Json?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
