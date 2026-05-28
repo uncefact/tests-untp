@@ -1,3 +1,5 @@
+import type { ConformityClaim } from '@uncefact/untp-utils/conformity-vocabulary';
+
 // Bridge-specific CredentialSubject (object-only, NOT the VC payload union)
 export type CredentialSubject = Record<string, unknown>;
 
@@ -105,14 +107,25 @@ export type ConformityRefs = NonNullable<ExtractedRefs['conformity']>;
 export interface IDataModelBridge<TSubject extends CredentialSubject = CredentialSubject> {
   buildSubject(entities: BridgeEntities): TSubject;
   extractRefs(subject: TSubject): ExtractedRefs;
+  /**
+   * Extracts the conformity claim from the subject for conformity vocabulary
+   * validation, or
+   * `null` when the credential type / version carries no conformity claim
+   * (only the Digital Conformity Credential does). Bridges without a claim
+   * extractor return `null`.
+   */
+  extractConformityClaim(subject: TSubject): ConformityClaim | null;
 }
 
 // ── Internal types (not exported from index.ts) ───────────────────────────────
 
 export type SubjectBuilder = (entities: BridgeEntities) => CredentialSubject;
 export type RefsExtractor = (subject: CredentialSubject) => ExtractedRefs;
+export type ConformityClaimExtractor = (subject: CredentialSubject) => ConformityClaim | null;
 
 export interface VersionSpec {
   builder: SubjectBuilder;
   extractor: RefsExtractor;
+  /** Optional; only credential types carrying a conformity claim (DCC) set this. */
+  conformityClaimExtractor?: ConformityClaimExtractor;
 }
