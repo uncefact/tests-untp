@@ -8,5 +8,8 @@ export function makeBridge(spec: VersionSpec): IDataModelBridge {
     extractRefs(subject) {
       return spec.extractor(subject);
     },
+    extractConformityClaim(subject) {
+      return spec.conformityClaimExtractor ? spec.conformityClaimExtractor(subject) : null;
+    },
   };
 }

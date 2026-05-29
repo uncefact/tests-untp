@@ -103,10 +103,19 @@ jest.mock('@uncefact/untp-ri-services', () => ({
 const mockUpdateCredentialPublished = jest.fn();
 const mockListCredentials = jest.fn();
 const mockGetDidByDid = jest.fn();
+const mockFindConformityScheme = jest.fn();
 jest.mock('@/lib/prisma/repositories', () => ({
   updateCredentialPublished: (...args: unknown[]) => mockUpdateCredentialPublished(...args),
   listCredentials: (...args: unknown[]) => mockListCredentials(...args),
   getDidByDid: (...args: unknown[]) => mockGetDidByDid(...args),
+  findConformitySchemeByCanonicalId: (...args: unknown[]) => mockFindConformityScheme(...args),
+}));
+
+// Conformity-vocabulary validator mock — the real cross-check is unit-tested in
+// `@uncefact/untp-utils`; here we only assert the route wires it up.
+const mockValidateConformityClaim = jest.fn();
+jest.mock('@uncefact/untp-utils/conformity-vocabulary', () => ({
+  validateConformityClaim: (...args: unknown[]) => mockValidateConformityClaim(...args),
 }));
 
 const mockAssertPublicUrl = jest.fn();
@@ -183,6 +192,7 @@ const STORAGE_RESPONSE = {
 const stubBridge = {
   buildSubject: jest.fn().mockReturnValue({}),
   extractRefs: jest.fn().mockReturnValue({ organisations: [], facilities: [], products: [] }),
+  extractConformityClaim: jest.fn().mockReturnValue(null),
 };
 
 const DATA_MODEL = {
@@ -223,6 +233,11 @@ function setupHappyPath() {
     storageResponse: STORAGE_RESPONSE,
     primaryEntity: {},
   });
+  // Conformity-claim defaults: no claim on the credential (non-DCC), so the
+  // validator is not invoked. DCC tests override these.
+  stubBridge.extractConformityClaim.mockReturnValue(null);
+  mockValidateConformityClaim.mockReturnValue([]);
+  mockFindConformityScheme.mockResolvedValue(null);
 }
 
 // ---------------------------------------------------------------------------
@@ -988,6 +1003,127 @@ describe('POST /api/v1/credentials', () => {
 
       expect(res.status).toBe(500);
       expect(json.error).toContain('Signing service unavailable');
+    });
+  });
+
+  // ── Conformity claim validation (advisory) ──────────────────────────────
+  describe('conformity claim validation', () => {
+    const CLAIM = {
+      scheme: 'https://coppermark.org',
+      profile: 'https://coppermark.org/rra/v3.0',
+      criteria: [{ criterion: 'https://coppermark.org/rra/v3.0/criterion/26' }],
+    };
+    const SCHEME = { canonicalId: 'https://coppermark.org', profiles: [] };
+
+    it('validates the extracted claim against the resolved scheme and attaches no warnings on a clean match', async () => {
+      stubBridge.extractConformityClaim.mockReturnValue(CLAIM);
+      mockFindConformityScheme.mockResolvedValue(SCHEME);
+      mockValidateConformityClaim.mockReturnValue([]);
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(mockFindConformityScheme).toHaveBeenCalledWith('https://coppermark.org', 'tenant-1');
+      expect(mockValidateConformityClaim).toHaveBeenCalledWith(CLAIM, SCHEME);
+      expect(json.warnings).toBeUndefined();
+    });
+
+    it('attaches the validator warnings (with structured detail) to the response', async () => {
+      stubBridge.extractConformityClaim.mockReturnValue(CLAIM);
+      mockFindConformityScheme.mockResolvedValue(SCHEME);
+      mockValidateConformityClaim.mockReturnValue([
+        {
+          code: 'conformity-criterion.not-in-profile',
+          message: 'Criterion is not published by the profile.',
+          received: 'https://coppermark.org/rra/v3.0/criterion/26',
+          pointer: '/criteria/0',
+        },
+      ]);
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings).toEqual([
+        {
+          code: 'conformity-criterion.not-in-profile',
+          message: 'Criterion is not published by the profile.',
+          received: 'https://coppermark.org/rra/v3.0/criterion/26',
+          pointer: '/criteria/0',
+        },
+      ]);
+    });
+
+    it('passes a null scheme to the validator when the scheme URI is unknown', async () => {
+      stubBridge.extractConformityClaim.mockReturnValue(CLAIM);
+      mockFindConformityScheme.mockResolvedValue(null);
+      mockValidateConformityClaim.mockReturnValue([
+        { code: 'conformity-scheme.not-found', message: 'Scheme URI is not in the known set.' },
+      ]);
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(mockValidateConformityClaim).toHaveBeenCalledWith(CLAIM, null);
+      expect(json.warnings[0].code).toBe('conformity-scheme.not-found');
+    });
+
+    it('skips validation entirely when the credential carries no conformity claim', async () => {
+      stubBridge.extractConformityClaim.mockReturnValue(null);
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(mockFindConformityScheme).not.toHaveBeenCalled();
+      expect(mockValidateConformityClaim).not.toHaveBeenCalled();
+      expect(json.warnings).toBeUndefined();
+    });
+
+    it('never blocks issuance: emits an advisory warning when extraction throws', async () => {
+      stubBridge.extractConformityClaim.mockImplementation(() => {
+        throw new Error('boom');
+      });
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings).toEqual([expect.objectContaining({ code: 'conformity-claim.validation-error' })]);
+    });
+
+    it('never blocks issuance: degrades to an advisory warning when the scheme lookup rejects', async () => {
+      stubBridge.extractConformityClaim.mockReturnValue(CLAIM);
+      mockFindConformityScheme.mockRejectedValue(new Error('db down'));
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings).toEqual([expect.objectContaining({ code: 'conformity-claim.validation-error' })]);
+    });
+
+    it('never blocks issuance: degrades to an advisory warning when the validator throws', async () => {
+      stubBridge.extractConformityClaim.mockReturnValue(CLAIM);
+      mockFindConformityScheme.mockResolvedValue(SCHEME);
+      mockValidateConformityClaim.mockImplementation(() => {
+        throw new Error('validator blew up');
+      });
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings).toEqual([expect.objectContaining({ code: 'conformity-claim.validation-error' })]);
     });
   });
 });

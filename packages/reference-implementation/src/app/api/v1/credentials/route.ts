@@ -18,12 +18,20 @@ import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
-import { getDidByDid } from '@/lib/prisma/repositories';
+import { getDidByDid, findConformitySchemeByCanonicalId } from '@/lib/prisma/repositories';
 import { buildPublishLinks } from '@uncefact/untp-ri-services';
 import type { CredentialPayload, ExtractedRefs } from '@uncefact/untp-ri-services';
+import { validateConformityClaim } from '@uncefact/untp-utils/conformity-vocabulary';
 import { publishingOptionsSchema } from '@/lib/swagger/schemas';
 
-type CredentialWarning = { code: string; message: string };
+type CredentialWarning = {
+  code: string;
+  message: string;
+  received?: unknown;
+  expected?: unknown;
+  remediation?: string;
+  pointer?: string;
+};
 
 const logger = apiLogger.child({ route: '/api/v1/credentials' });
 
@@ -173,6 +181,28 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
         message: 'Failed to extract references from credential payload — publishing will be skipped',
       });
     }
+  }
+
+  // ── Step 3.6: Conformity claim validation (advisory) ────────────────────
+  // For credentials carrying a conformity claim (the DCC), cross-check the
+  // claim's scheme / profile / criteria URIs against the locally cached
+  // vocabulary. Advisory only per ADR-033 §3: a mismatch never blocks
+  // issuance; it surfaces as `conformity-*` warnings on the response. Reads
+  // only the local projection (no network).
+  try {
+    const subject = credentialPayload.credentialSubject as Record<string, unknown>;
+    const claim = bridge.extractConformityClaim(subject);
+    if (claim) {
+      const scheme = await findConformitySchemeByCanonicalId(claim.scheme, tenantId);
+      warnings.push(...validateConformityClaim(claim, scheme));
+    }
+  } catch (error) {
+    logger.error({ err: error, credentialType }, 'Conformity claim validation failed');
+    warnings.push({
+      code: 'conformity-claim.validation-error',
+      message:
+        'Conformity claim validation could not be performed; credential was issued without conformity vocabulary checks.',
+    });
   }
 
   // ── Step 4: Validate issuer DID ownership ────────────────────────────────
