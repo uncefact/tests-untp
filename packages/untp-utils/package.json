@@ -9,6 +9,10 @@
       "types": "./build/index.d.ts",
       "default": "./build/index.js"
     },
+    "./artefacts": {
+      "types": "./build/artefacts/index.d.ts",
+      "default": "./build/artefacts/index.js"
+    },
     "./multibase-digest": {
       "types": "./build/multibase-digest/index.d.ts",
       "default": "./build/multibase-digest/index.js"

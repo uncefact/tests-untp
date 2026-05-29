@@ -459,28 +459,42 @@ jobs:
           load: true
           cache-from: type=gha,scope=reference-implementation-e2e
 
-      - name: Start RI stack (${{ matrix.mode }})
-        if: steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri up -d --no-build
-
-      - name: Wait for app container
+      - name: Pull latest published Playground image
         if: steps.affected.outputs.result == 'true'
         run: |
-          echo "--- Waiting up to 180s for app to respond on http://localhost:3003 ---"
+          docker pull ghcr.io/uncefact/tests-untp/untp-playground:latest
+          docker tag ghcr.io/uncefact/tests-untp/untp-playground:latest untp-playground:e2e
+
+      - name: Start RI stack (${{ matrix.mode }})
+        if: steps.affected.outputs.result == 'true'
+        run: docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground up -d --no-build
+
+      - name: Wait for app and playground containers
+        if: steps.affected.outputs.result == 'true'
+        run: |
+          echo "--- Waiting up to 180s for app on http://localhost:3003 and playground on http://localhost:4000 ---"
           deadline=$(($(date +%s) + 180))
           while [ $(date +%s) -lt $deadline ]; do
-            if curl -sS -o /dev/null -m 2 http://localhost:3003 2>/dev/null; then
-              echo "--- App is responding ---"
+            app_ok=0
+            pg_ok=0
+            curl -sS -o /dev/null -m 2 http://localhost:3003 2>/dev/null && app_ok=1
+            curl -sS -o /dev/null -m 2 http://localhost:4000 2>/dev/null && pg_ok=1
+            if [ "$app_ok" = 1 ] && [ "$pg_ok" = 1 ]; then
+              echo "--- Both services responding ---"
               break
             fi
             sleep 2
           done
-          echo "--- App container logs ---"
-          docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri logs app
           echo "--- Container status ---"
-          docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri ps
+          docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground ps
           if ! curl -sS -o /dev/null -m 2 http://localhost:3003 2>/dev/null; then
             echo "::error::App did not respond on :3003 within 180s (${{ matrix.mode }} mode)"
+            docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground logs app
+            exit 1
+          fi
+          if ! curl -sS -o /dev/null -m 2 http://localhost:4000 2>/dev/null; then
+            echo "::error::Playground did not respond on :4000 within 180s (${{ matrix.mode }} mode)"
+            docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground logs untp-playground
             exit 1
           fi
 
@@ -490,10 +504,11 @@ jobs:
         env:
           NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module' # See issue https://github.com/cypress-io/github-action/issues/1408
           VERIFY_ALLOW_PRIVATE_URLS: 'true' # Skip SSRF E2E tests, Docker services use internal addresses
+          CYPRESS_PLAYGROUND_BASE_URL: 'http://localhost:4000'
 
       - name: Dump RI container logs on failure
         if: failure() && steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri logs app
+        run: docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground logs app
 
       - name: Upload Cypress artifacts on failure
         if: failure() && steps.affected.outputs.result == 'true'
@@ -509,7 +524,7 @@ jobs:
 
       - name: Stop RI stack
         if: steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri down -v
+        run: docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground down -v
 
   e2e-playground:
     name: E2E (untp-playground)
