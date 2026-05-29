@@ -110,6 +110,7 @@ describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => 
             credentialPayload,
             credentialType: entry.credentialType,
             version: '0.7.0',
+            storageOptions: { encrypt: false },
           },
         }).then((issueResponse) => {
           expect(issueResponse.status).to.eq(201);
