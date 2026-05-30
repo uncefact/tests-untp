@@ -117,17 +117,20 @@ export type ConformityWarning = StructuredWarning & { code: ConformityWarningCod
 
 /**
  * A single criterion entry on a credential's conformity claim. The credential
- * issuer asserts conformity to `criterion` and may declare a `conformityTopic`
- * that scopes the claim to one of the topics the criterion publishes.
+ * issuer asserts conformity to `criterion` and may classify it with conformity
+ * topics.
  */
 export interface ConformityClaimCriterion {
   /** Criterion URI the claim references. */
   criterion: string;
   /**
-   * Topic URI the claim is scoped to. Optional; when present, the validator
-   * checks it against the criterion's published topic set.
+   * Topic URIs the claim declares for this criterion. Optional and
+   * version-specific: an extractor populates it only when its data model
+   * carries criterion topics. A criterion may be classified by more than one
+   * topic, so it is a list; when present, the validator checks every entry
+   * against the criterion's published topic set.
    */
-  conformityTopic?: string;
+  conformityTopics?: string[];
 }
 
 /**

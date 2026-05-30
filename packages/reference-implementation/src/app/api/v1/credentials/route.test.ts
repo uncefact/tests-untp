@@ -1009,11 +1009,11 @@ describe('POST /api/v1/credentials', () => {
   // ── Conformity claim validation (advisory) ──────────────────────────────
   describe('conformity claim validation', () => {
     const CLAIM = {
-      scheme: 'https://coppermark.org',
-      profile: 'https://coppermark.org/rra/v3.0',
-      criteria: [{ criterion: 'https://coppermark.org/rra/v3.0/criterion/26' }],
+      scheme: 'https://example.com',
+      profile: 'https://example.com/rra/v3.0',
+      criteria: [{ criterion: 'https://example.com/rra/v3.0/criterion/26' }],
     };
-    const SCHEME = { canonicalId: 'https://coppermark.org', profiles: [] };
+    const SCHEME = { canonicalId: 'https://example.com', profiles: [] };
 
     it('validates the extracted claim against the resolved scheme and attaches no warnings on a clean match', async () => {
       stubBridge.extractConformityClaim.mockReturnValue(CLAIM);
@@ -1025,7 +1025,7 @@ describe('POST /api/v1/credentials', () => {
       const json = await res.json();
 
       expect(res.status).toBe(201);
-      expect(mockFindConformityScheme).toHaveBeenCalledWith('https://coppermark.org', 'tenant-1');
+      expect(mockFindConformityScheme).toHaveBeenCalledWith('https://example.com', 'tenant-1');
       expect(mockValidateConformityClaim).toHaveBeenCalledWith(CLAIM, SCHEME);
       expect(json.warnings).toBeUndefined();
     });
@@ -1037,7 +1037,7 @@ describe('POST /api/v1/credentials', () => {
         {
           code: 'conformity-criterion.not-in-profile',
           message: 'Criterion is not published by the profile.',
-          received: 'https://coppermark.org/rra/v3.0/criterion/26',
+          received: 'https://example.com/rra/v3.0/criterion/26',
           pointer: '/criteria/0',
         },
       ]);
@@ -1051,7 +1051,7 @@ describe('POST /api/v1/credentials', () => {
         {
           code: 'conformity-criterion.not-in-profile',
           message: 'Criterion is not published by the profile.',
-          received: 'https://coppermark.org/rra/v3.0/criterion/26',
+          received: 'https://example.com/rra/v3.0/criterion/26',
           pointer: '/criteria/0',
         },
       ]);
