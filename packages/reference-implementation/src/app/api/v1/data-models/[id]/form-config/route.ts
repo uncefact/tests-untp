@@ -31,6 +31,13 @@ const ENTITY_REQUIREMENTS: Record<string, Array<FormSection>> = {
       required: false,
       dependsOn: 'conformityScheme',
     },
+    {
+      entityType: 'conformityCriteria',
+      label: 'Conformity Criteria',
+      endpoint: '/api/v1/cvc/criteria?profileId=:conformityProfile',
+      required: false,
+      dependsOn: 'conformityProfile',
+    },
   ],
   DigitalConformityCredential: [
     { entityType: 'organisation', label: 'Organisation', endpoint: '/api/v1/organisations', required: true },
@@ -41,6 +48,13 @@ const ENTITY_REQUIREMENTS: Record<string, Array<FormSection>> = {
       endpoint: '/api/v1/cvc/profiles?schemeId=:conformityScheme',
       required: false,
       dependsOn: 'conformityScheme',
+    },
+    {
+      entityType: 'conformityCriteria',
+      label: 'Conformity Criteria',
+      endpoint: '/api/v1/cvc/criteria?profileId=:conformityProfile',
+      required: false,
+      dependsOn: 'conformityProfile',
     },
   ],
   DigitalFacilityRecord: [
@@ -53,6 +67,13 @@ const ENTITY_REQUIREMENTS: Record<string, Array<FormSection>> = {
       endpoint: '/api/v1/cvc/profiles?schemeId=:conformityScheme',
       required: false,
       dependsOn: 'conformityScheme',
+    },
+    {
+      entityType: 'conformityCriteria',
+      label: 'Conformity Criteria',
+      endpoint: '/api/v1/cvc/criteria?profileId=:conformityProfile',
+      required: false,
+      dependsOn: 'conformityProfile',
     },
   ],
   DigitalIdentityAnchor: [

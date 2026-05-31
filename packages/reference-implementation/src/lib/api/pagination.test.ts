@@ -1,4 +1,4 @@
-import { buildPaginatedResponse, paginationMetaSchema, DEFAULT_PAGE_LIMIT } from './pagination';
+import { buildPaginatedResponse, paginateInMemory, paginationMetaSchema, DEFAULT_PAGE_LIMIT } from './pagination';
 
 describe('buildPaginatedResponse', () => {
   it('returns correct pagination metadata with explicit limit and offset', () => {
@@ -71,6 +71,31 @@ describe('buildPaginatedResponse', () => {
         hasMore: false,
       },
     });
+  });
+});
+
+describe('paginateInMemory', () => {
+  const items = Array.from({ length: 5 }, (_, i) => ({ id: i }));
+
+  it('slices the page by limit and offset and reports the full total', () => {
+    const result = paginateInMemory(items, 2, 1);
+
+    expect(result.data).toEqual([{ id: 1 }, { id: 2 }]);
+    expect(result.pagination).toEqual({ total: 5, limit: 2, offset: 1, hasMore: true });
+  });
+
+  it('defaults to DEFAULT_PAGE_LIMIT and offset 0 when not provided', () => {
+    const result = paginateInMemory(items);
+
+    expect(result.data).toEqual(items);
+    expect(result.pagination).toEqual({ total: 5, limit: DEFAULT_PAGE_LIMIT, offset: 0, hasMore: false });
+  });
+
+  it('returns an empty page with hasMore false when the offset is past the end', () => {
+    const result = paginateInMemory(items, 2, 10);
+
+    expect(result.data).toEqual([]);
+    expect(result.pagination).toEqual({ total: 5, limit: 2, offset: 10, hasMore: false });
   });
 });
 

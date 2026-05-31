@@ -101,6 +101,13 @@ describe('GET /api/v1/data-models/:id/form-config', () => {
           required: false,
           dependsOn: 'conformityScheme',
         },
+        {
+          entityType: 'conformityCriteria',
+          label: 'Conformity Criteria',
+          endpoint: '/api/v1/cvc/criteria?profileId=:conformityProfile',
+          required: false,
+          dependsOn: 'conformityProfile',
+        },
       ],
     });
     expect(mockGetDataModelById).toHaveBeenCalledWith('dm-1', 'tenant-1');
@@ -121,7 +128,7 @@ describe('GET /api/v1/data-models/:id/form-config', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.formConfig.sections).toHaveLength(3);
+    expect(json.formConfig.sections).toHaveLength(4);
     expect(json.formConfig.sections).toEqual([
       { entityType: 'organisation', label: 'Organisation', endpoint: '/api/v1/organisations', required: true },
       { entityType: 'conformityScheme', label: 'Conformity Scheme', endpoint: '/api/v1/cvc/schemes', required: false },
@@ -131,6 +138,13 @@ describe('GET /api/v1/data-models/:id/form-config', () => {
         endpoint: '/api/v1/cvc/profiles?schemeId=:conformityScheme',
         required: false,
         dependsOn: 'conformityScheme',
+      },
+      {
+        entityType: 'conformityCriteria',
+        label: 'Conformity Criteria',
+        endpoint: '/api/v1/cvc/criteria?profileId=:conformityProfile',
+        required: false,
+        dependsOn: 'conformityProfile',
       },
     ]);
   });
@@ -150,7 +164,7 @@ describe('GET /api/v1/data-models/:id/form-config', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.formConfig.sections).toHaveLength(4);
+    expect(json.formConfig.sections).toHaveLength(5);
     expect(json.formConfig.sections).toEqual([
       { entityType: 'organisation', label: 'Organisation', endpoint: '/api/v1/organisations', required: true },
       { entityType: 'facility', label: 'Facility', endpoint: '/api/v1/facilities', required: true },
@@ -161,6 +175,13 @@ describe('GET /api/v1/data-models/:id/form-config', () => {
         endpoint: '/api/v1/cvc/profiles?schemeId=:conformityScheme',
         required: false,
         dependsOn: 'conformityScheme',
+      },
+      {
+        entityType: 'conformityCriteria',
+        label: 'Conformity Criteria',
+        endpoint: '/api/v1/cvc/criteria?profileId=:conformityProfile',
+        required: false,
+        dependsOn: 'conformityProfile',
       },
     ]);
   });
@@ -282,7 +303,7 @@ describe('GET /api/v1/data-models/:id/form-config', () => {
       const json = await res.json();
 
       const conformitySections = json.formConfig.sections.filter((s: { entityType: string }) =>
-        ['conformityScheme', 'conformityProfile'].includes(s.entityType),
+        ['conformityScheme', 'conformityProfile', 'conformityCriteria'].includes(s.entityType),
       );
       expect(conformitySections.length).toBeGreaterThan(0);
       for (const section of conformitySections) {
