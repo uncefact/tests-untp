@@ -35,3 +35,16 @@ export function buildPaginatedResponse<T>(
     },
   };
 }
+
+/**
+ * Slices a fully-materialised array to the requested page and wraps it. For
+ * endpoints that must load the whole result set before paging (e.g. the CVC
+ * browse routes, which dedupe across tenant lanes), rather than paging at the
+ * database. Pass the same `limit`/`offset` already parsed and capped by the
+ * route.
+ */
+export function paginateInMemory<T>(items: T[], limit?: number, offset?: number): PaginatedResponse<T> {
+  const start = offset ?? 0;
+  const page = items.slice(start, start + (limit ?? DEFAULT_PAGE_LIMIT));
+  return buildPaginatedResponse(page, items.length, limit, offset);
+}

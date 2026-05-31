@@ -257,6 +257,42 @@ export default defineConfig({
             });
           });
         },
+        async seedConformitySchemes({ tenantId }: { tenantId: string }) {
+          const client = getDbClient();
+          const scheme = 'https://e2e.example/scheme';
+          const profile = 'https://e2e.example/scheme/profile/1.0.0';
+          const criterion = 'https://e2e.example/scheme/criterion/1.0.0';
+          const topic = 'https://vocabulary.example.com/conformity-topic/e2e';
+          try {
+            await client.connect();
+            await client.query(
+              `INSERT INTO "ConformityScheme" (id, "canonicalId", name, "specVersion", source, "sourceUrl", "lastFetchStatus", "tenantId", "createdAt", "updatedAt")
+               VALUES ($1, $2, 'E2E Scheme', '0.7.0', 'TENANT_IMPORTED', $3, 'SUCCESS', $4, NOW(), NOW())
+               ON CONFLICT (id) DO NOTHING`,
+              [`e2e-cvc-scheme-${tenantId}`, scheme, `${scheme}.json`, tenantId],
+            );
+            await client.query(
+              `INSERT INTO "ConformityProfile" (id, "canonicalId", name, version, status, "tenantId", "schemeId", "createdAt", "updatedAt")
+               VALUES ($1, $2, 'E2E Profile', '1.0.0', 'active', $3, $4, NOW(), NOW())
+               ON CONFLICT (id) DO NOTHING`,
+              [`e2e-cvc-profile-${tenantId}`, profile, tenantId, `e2e-cvc-scheme-${tenantId}`],
+            );
+            await client.query(
+              `INSERT INTO "ConformityCriterion" (id, "canonicalId", name, version, status, topics, tags, "tenantId", "createdAt", "updatedAt")
+               VALUES ($1, $2, 'E2E Criterion', '1.0.0', 'active', $3::jsonb, ARRAY['e2e']::text[], $4, NOW(), NOW())
+               ON CONFLICT (id) DO NOTHING`,
+              [`e2e-cvc-criterion-${tenantId}`, criterion, JSON.stringify([{ canonicalId: topic }]), tenantId],
+            );
+            await client.query(
+              `INSERT INTO "ConformityProfileCriterion" (id, "profileId", "criterionId")
+               VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`,
+              [`e2e-cvc-join-${tenantId}`, `e2e-cvc-profile-${tenantId}`, `e2e-cvc-criterion-${tenantId}`],
+            );
+            return { scheme, profile, criterion, topic };
+          } finally {
+            await client.end();
+          }
+        },
         async seedTestOrg({ userEmail }: { userEmail: string }) {
           const tenantMode = process.env.E2E_TENANT_MODE || 'open';
           const client = getDbClient();
