@@ -71,26 +71,52 @@ export function validateConformityClaim(
     }
   }
 
-  // criterion-topic-mismatch
+  // criterion-topic-mismatch: each criterion defines its own conformity topics,
+  // and a profile references a collection of independently-versioned criteria.
+  // For each criterion the claim addresses, the topics it declares should match
+  // the topics that criterion defines. The check runs whenever the claim carries
+  // a topic list, including an empty one, so a criterion that omits a topic it
+  // defines is flagged. An absent list marks a data model that classifies
+  // criteria without conformity topics, and the check passes over it.
   claim.criteria.forEach((claimCriterion, i) => {
-    if (!claimCriterion.conformityTopic) {
+    // `== null` covers both undefined and a runtime null (for example a claim
+    // parsed from JSON or a database row where the optional field serialised
+    // as null); an empty array still runs the check.
+    if (claimCriterion.conformityTopics == null) {
       return;
     }
-    const schemeCriterion = profileCriteriaById.get(claimCriterion.criterion);
-    if (!schemeCriterion) {
+    const profileCriterion = profileCriteriaById.get(claimCriterion.criterion);
+    if (!profileCriterion) {
       // already surfaced by criterion-not-in-profile
       return;
     }
-    const publishedTopicIds = schemeCriterion.topics.map((t) => t.canonicalId);
-    if (!publishedTopicIds.includes(claimCriterion.conformityTopic)) {
-      warnings.push({
-        code: ConformityWarningCode.CriterionTopicMismatch,
-        message: "Claim's declared topic is not among the criterion's published topics.",
-        received: claimCriterion.conformityTopic,
-        expected: publishedTopicIds,
-        pointer: `/criteria/${i}/conformityTopic`,
-      });
-    }
+    const criterionTopicIds = profileCriterion.topics.map((t) => t.canonicalId);
+    const declaredTopics = claimCriterion.conformityTopics;
+
+    // A topic the criterion defines that the claim leaves out.
+    criterionTopicIds.forEach((expected) => {
+      if (!declaredTopics.includes(expected)) {
+        warnings.push({
+          code: ConformityWarningCode.CriterionTopicMismatch,
+          message: 'The criterion defines a topic the claim does not declare.',
+          expected,
+          pointer: `/criteria/${i}/conformityTopics`,
+        });
+      }
+    });
+
+    // A topic the claim declares that the criterion does not define.
+    declaredTopics.forEach((declared, t) => {
+      if (!criterionTopicIds.includes(declared)) {
+        warnings.push({
+          code: ConformityWarningCode.CriterionTopicMismatch,
+          message: 'The claim declares a topic the criterion does not define.',
+          received: declared,
+          expected: criterionTopicIds,
+          pointer: `/criteria/${i}/conformityTopics/${t}`,
+        });
+      }
+    });
   });
 
   return warnings;

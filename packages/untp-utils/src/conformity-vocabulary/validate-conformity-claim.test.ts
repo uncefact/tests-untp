@@ -6,8 +6,8 @@ const SCHEME_URI = 'https://example.com/scheme';
 const PROFILE_URI = 'https://example.com/scheme/full/1.0.0';
 const CRITERION_A = 'https://example.com/criterion/a/1.0.0';
 const CRITERION_B = 'https://example.com/criterion/b/1.0.0';
-const TOPIC_A1 = 'https://vocabulary.uncefact.org/conformity-topics/a-1';
-const TOPIC_A2 = 'https://vocabulary.uncefact.org/conformity-topics/a-2';
+const TOPIC_A1 = 'https://vocabulary.example.com/conformity-topics/a-1';
+const TOPIC_A2 = 'https://vocabulary.example.com/conformity-topics/a-2';
 
 function scheme(): ConformityScheme {
   return {
@@ -49,18 +49,17 @@ describe('validateConformityClaim', () => {
     const claim: ConformityClaim = {
       scheme: SCHEME_URI,
       profile: PROFILE_URI,
-      criteria: [{ criterion: CRITERION_A, conformityTopic: TOPIC_A1 }, { criterion: CRITERION_B }],
+      criteria: [
+        { criterion: CRITERION_A, conformityTopics: [TOPIC_A1, TOPIC_A2] },
+        { criterion: CRITERION_B, conformityTopics: [] },
+      ],
     };
     expect(validateConformityClaim(claim, scheme())).toEqual([]);
   });
 
   describe('scheme-not-found', () => {
     it('fires when the scheme is null', () => {
-      const claim: ConformityClaim = {
-        scheme: SCHEME_URI,
-        profile: PROFILE_URI,
-        criteria: [],
-      };
+      const claim: ConformityClaim = { scheme: SCHEME_URI, profile: PROFILE_URI, criteria: [] };
       expect(validateConformityClaim(claim, null)).toEqual([
         expect.objectContaining({
           code: ConformityWarningCode.SchemeNotFound,
@@ -75,7 +74,7 @@ describe('validateConformityClaim', () => {
       const claim: ConformityClaim = {
         scheme: SCHEME_URI,
         profile: PROFILE_URI,
-        criteria: [{ criterion: CRITERION_A }],
+        criteria: [{ criterion: CRITERION_A, conformityTopics: [TOPIC_A1, TOPIC_A2] }],
       };
       const warnings = validateConformityClaim(claim, wrongScheme);
       expect(warnings.map((w) => w.code)).toEqual([ConformityWarningCode.SchemeNotFound]);
@@ -85,7 +84,7 @@ describe('validateConformityClaim', () => {
       const claim: ConformityClaim = {
         scheme: SCHEME_URI,
         profile: 'https://example.com/scheme/does-not-exist/9.9.9',
-        criteria: [{ criterion: 'https://example.com/criterion/does-not-exist/9.9.9' }],
+        criteria: [{ criterion: 'https://example.com/criterion/does-not-exist/9.9.9', conformityTopics: [] }],
       };
       const warnings = validateConformityClaim(claim, null);
       expect(warnings).toHaveLength(1);
@@ -98,7 +97,7 @@ describe('validateConformityClaim', () => {
       const claim: ConformityClaim = {
         scheme: SCHEME_URI,
         profile: 'https://example.com/scheme/other/2.0.0',
-        criteria: [{ criterion: CRITERION_A }],
+        criteria: [{ criterion: CRITERION_A, conformityTopics: [TOPIC_A1, TOPIC_A2] }],
       };
       expect(validateConformityClaim(claim, scheme())).toEqual([
         expect.objectContaining({
@@ -115,8 +114,8 @@ describe('validateConformityClaim', () => {
         scheme: SCHEME_URI,
         profile: 'https://example.com/scheme/other/2.0.0',
         criteria: [
-          { criterion: 'https://example.com/criterion/unknown/1.0.0' },
-          { criterion: CRITERION_A, conformityTopic: 'https://example.com/topics/unknown' },
+          { criterion: 'https://example.com/criterion/unknown/1.0.0', conformityTopics: [] },
+          { criterion: CRITERION_A, conformityTopics: ['https://vocabulary.example.com/topics/unknown'] },
         ],
       };
       expect(validateConformityClaim(claim, scheme())).toHaveLength(1);
@@ -129,9 +128,9 @@ describe('validateConformityClaim', () => {
         scheme: SCHEME_URI,
         profile: PROFILE_URI,
         criteria: [
-          { criterion: CRITERION_A },
-          { criterion: CRITERION_B },
-          { criterion: 'https://example.com/criterion/unknown/1.0.0' },
+          { criterion: CRITERION_A, conformityTopics: [TOPIC_A1, TOPIC_A2] },
+          { criterion: CRITERION_B, conformityTopics: [] },
+          { criterion: 'https://example.com/criterion/unknown/1.0.0', conformityTopics: [] },
         ],
       };
       expect(validateConformityClaim(claim, scheme())).toEqual([
@@ -144,16 +143,16 @@ describe('validateConformityClaim', () => {
       ]);
     });
 
-    it('does not double-report missing criteria as topic-mismatch', () => {
+    it('does not run topic checks for a criterion that is not in the profile', () => {
       const claim: ConformityClaim = {
         scheme: SCHEME_URI,
         profile: PROFILE_URI,
         criteria: [
-          { criterion: CRITERION_A },
-          { criterion: CRITERION_B },
+          { criterion: CRITERION_A, conformityTopics: [TOPIC_A1, TOPIC_A2] },
+          { criterion: CRITERION_B, conformityTopics: [] },
           {
             criterion: 'https://example.com/criterion/unknown/1.0.0',
-            conformityTopic: 'https://example.com/topics/unknown',
+            conformityTopics: ['https://vocabulary.example.com/topics/unknown'],
           },
         ],
       };
@@ -168,7 +167,7 @@ describe('validateConformityClaim', () => {
       const claim: ConformityClaim = {
         scheme: SCHEME_URI,
         profile: PROFILE_URI,
-        criteria: [{ criterion: CRITERION_A, conformityTopic: TOPIC_A1 }],
+        criteria: [{ criterion: CRITERION_A, conformityTopics: [TOPIC_A1, TOPIC_A2] }],
       };
       expect(validateConformityClaim(claim, scheme())).toEqual([
         expect.objectContaining({
@@ -180,11 +179,7 @@ describe('validateConformityClaim', () => {
     });
 
     it('fires for every missing criterion (no short-circuit)', () => {
-      const claim: ConformityClaim = {
-        scheme: SCHEME_URI,
-        profile: PROFILE_URI,
-        criteria: [],
-      };
+      const claim: ConformityClaim = { scheme: SCHEME_URI, profile: PROFILE_URI, criteria: [] };
       const missingExpected = validateConformityClaim(claim, scheme())
         .filter((w) => w.code === ConformityWarningCode.CriterionMissing)
         .map((w) => w.expected);
@@ -193,26 +188,109 @@ describe('validateConformityClaim', () => {
   });
 
   describe('criterion-topic-mismatch', () => {
-    it("fires when the claim's topic for a criterion isn't in the criterion's published topics", () => {
+    it('fires when the claim omits a topic the profile publishes for the criterion', () => {
       const claim: ConformityClaim = {
         scheme: SCHEME_URI,
         profile: PROFILE_URI,
         criteria: [
-          { criterion: CRITERION_A, conformityTopic: 'https://example.com/topics/wrong' },
-          { criterion: CRITERION_B },
+          { criterion: CRITERION_A, conformityTopics: [TOPIC_A1] },
+          { criterion: CRITERION_B, conformityTopics: [] },
         ],
       };
       expect(validateConformityClaim(claim, scheme())).toEqual([
         expect.objectContaining({
           code: ConformityWarningCode.CriterionTopicMismatch,
-          received: 'https://example.com/topics/wrong',
-          expected: [TOPIC_A1, TOPIC_A2],
-          pointer: '/criteria/0/conformityTopic',
+          expected: TOPIC_A2,
+          pointer: '/criteria/0/conformityTopics',
         }),
       ]);
     });
 
-    it('does not fire when the claim does not declare a topic', () => {
+    it('fires for every published topic when the claim declares none', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [
+          { criterion: CRITERION_A, conformityTopics: [] },
+          { criterion: CRITERION_B, conformityTopics: [] },
+        ],
+      };
+      const mismatchExpected = validateConformityClaim(claim, scheme())
+        .filter((w) => w.code === ConformityWarningCode.CriterionTopicMismatch)
+        .map((w) => w.expected);
+      expect(mismatchExpected).toEqual([TOPIC_A1, TOPIC_A2]);
+    });
+
+    it('fires when the claim declares a topic the profile does not publish', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [
+          {
+            criterion: CRITERION_A,
+            conformityTopics: [TOPIC_A1, TOPIC_A2, 'https://vocabulary.example.com/topics/wrong'],
+          },
+          { criterion: CRITERION_B, conformityTopics: [] },
+        ],
+      };
+      expect(validateConformityClaim(claim, scheme())).toEqual([
+        expect.objectContaining({
+          code: ConformityWarningCode.CriterionTopicMismatch,
+          received: 'https://vocabulary.example.com/topics/wrong',
+          expected: [TOPIC_A1, TOPIC_A2],
+          pointer: '/criteria/0/conformityTopics/2',
+        }),
+      ]);
+    });
+
+    it('does not fire when the declared topics exactly match the published topics', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [
+          { criterion: CRITERION_A, conformityTopics: [TOPIC_A1, TOPIC_A2] },
+          { criterion: CRITERION_B, conformityTopics: [] },
+        ],
+      };
+      expect(validateConformityClaim(claim, scheme())).toEqual([]);
+    });
+
+    it('matches the topic set regardless of order', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [
+          { criterion: CRITERION_A, conformityTopics: [TOPIC_A2, TOPIC_A1] },
+          { criterion: CRITERION_B, conformityTopics: [] },
+        ],
+      };
+      expect(validateConformityClaim(claim, scheme())).toEqual([]);
+    });
+
+    it('flags both an omitted and an unexpected topic on the same criterion', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [
+          { criterion: CRITERION_A, conformityTopics: [TOPIC_A1, 'https://vocabulary.example.com/topics/wrong'] },
+          { criterion: CRITERION_B, conformityTopics: [] },
+        ],
+      };
+      expect(validateConformityClaim(claim, scheme())).toEqual([
+        expect.objectContaining({
+          code: ConformityWarningCode.CriterionTopicMismatch,
+          expected: TOPIC_A2,
+          pointer: '/criteria/0/conformityTopics',
+        }),
+        expect.objectContaining({
+          code: ConformityWarningCode.CriterionTopicMismatch,
+          received: 'https://vocabulary.example.com/topics/wrong',
+          pointer: '/criteria/0/conformityTopics/1',
+        }),
+      ]);
+    });
+
+    it('does not run when the claim carries no topic list (version that does not model topics)', () => {
       const claim: ConformityClaim = {
         scheme: SCHEME_URI,
         profile: PROFILE_URI,
@@ -221,11 +299,14 @@ describe('validateConformityClaim', () => {
       expect(validateConformityClaim(claim, scheme())).toEqual([]);
     });
 
-    it("does not fire when the claim's topic matches one of the criterion's topics", () => {
+    it('treats a runtime null topic list like an absent one and runs no topic check', () => {
       const claim: ConformityClaim = {
         scheme: SCHEME_URI,
         profile: PROFILE_URI,
-        criteria: [{ criterion: CRITERION_A, conformityTopic: TOPIC_A2 }, { criterion: CRITERION_B }],
+        criteria: [
+          { criterion: CRITERION_A, conformityTopics: null as unknown as string[] },
+          { criterion: CRITERION_B },
+        ],
       };
       expect(validateConformityClaim(claim, scheme())).toEqual([]);
     });

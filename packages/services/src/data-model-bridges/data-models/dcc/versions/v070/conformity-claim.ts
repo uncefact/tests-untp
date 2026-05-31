@@ -19,8 +19,12 @@ type DccConformitySubject = {
  *
  * The v0.7.0 DCC does not carry a single `conformityClaim` object; the claim is
  * assembled from `referenceScheme`, `referenceProfile`, and the criteria listed
- * across `conformityAssessment[].assessmentCriteria[]`. Each criterion's first
- * `conformityTopic` (when present) scopes the claim for that criterion.
+ * across `conformityAssessment[].assessmentCriteria[]`. Each criterion may be
+ * classified by one or more `conformityTopic` entries, all of which are
+ * collected. The v0.7.0 data model always classifies criteria by topic, so
+ * `conformityTopics` is always populated (empty when the credential declared
+ * none), letting the validator flag a criterion that omits a topic the profile
+ * publishes.
  *
  * @param subject - The DCC `credentialSubject`.
  * @returns The extracted claim, or `null` when the subject references neither a
@@ -40,8 +44,10 @@ export function extractDccConformityClaim(subject: CredentialSubject): Conformit
     if (!assessment) continue;
     for (const criterion of assessment.assessmentCriteria ?? []) {
       if (!criterion?.id) continue;
-      const topic = criterion.conformityTopic?.[0]?.id;
-      criteria.push({ criterion: criterion.id, ...(topic ? { conformityTopic: topic } : {}) });
+      const conformityTopics = (criterion.conformityTopic ?? [])
+        .map((topic) => topic?.id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0);
+      criteria.push({ criterion: criterion.id, conformityTopics });
     }
   }
 
