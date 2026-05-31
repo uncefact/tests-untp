@@ -79,7 +79,10 @@ export function validateConformityClaim(
   // defines is flagged. An absent list marks a data model that classifies
   // criteria without conformity topics, and the check passes over it.
   claim.criteria.forEach((claimCriterion, i) => {
-    if (claimCriterion.conformityTopics === undefined) {
+    // `== null` covers both undefined and a runtime null (for example a claim
+    // parsed from JSON or a database row where the optional field serialised
+    // as null); an empty array still runs the check.
+    if (claimCriterion.conformityTopics == null) {
       return;
     }
     const profileCriterion = profileCriteriaById.get(claimCriterion.criterion);

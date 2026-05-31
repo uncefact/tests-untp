@@ -298,5 +298,17 @@ describe('validateConformityClaim', () => {
       };
       expect(validateConformityClaim(claim, scheme())).toEqual([]);
     });
+
+    it('treats a runtime null topic list like an absent one and runs no topic check', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [
+          { criterion: CRITERION_A, conformityTopics: null as unknown as string[] },
+          { criterion: CRITERION_B },
+        ],
+      };
+      expect(validateConformityClaim(claim, scheme())).toEqual([]);
+    });
   });
 });
