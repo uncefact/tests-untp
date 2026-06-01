@@ -9,7 +9,7 @@ The [Pyx Identity Resolver](https://github.com/pyx-industries/pyx-identity-resol
 
 ## About
 
-The Pyx Identity Resolver is a standards-compliant identity resolution service. It uses MinIO as its object store backend.
+The Pyx Identity Resolver is a standards-compliant identity resolution service.
 
 - **Repository:** [github.com/pyx-industries/pyx-identity-resolver](https://github.com/pyx-industries/pyx-identity-resolver)
 - **Docker image:** `ghcr.io/pyx-industries/pyx-identity-resolver`
@@ -17,7 +17,7 @@ When using the Docker Compose configuration from the [Reference Implementation r
 
 ## Supported Version
 
-The supported version of the Pyx Identity Resolver is `3.0.0`.
+The supported version of the Pyx Identity Resolver is `4.0.0`, served over its `4.0` API.
 
 ## Environment Variables
 
@@ -30,7 +30,7 @@ The following environment variables configure the connection between the Referen
 | `SYSTEM_IDR_ADAPTER_TYPE` | Must be set to `PYX_IDR` | Yes | `PYX_IDR` |
 | `SYSTEM_IDR_SERVICE_NAME` | Display name for this service instance | No | `System Default IDR` |
 | `SYSTEM_IDR_SERVICE_DESCRIPTION` | Description for this service instance | No | — |
-| `SYSTEM_IDR_API_VERSION` | API version | No | `3.0.0` |
+| `SYSTEM_IDR_API_VERSION` | API version | No | `4.0` |
 | `SYSTEM_IDR_DEFAULT_LINK_TYPE` | Default link type for credential registration | Yes | `untp:dpp` |
 | `SYSTEM_IDR_DEFAULT_MIME_TYPE` | Default MIME type | Yes | `text/html` |
 | `SYSTEM_IDR_DEFAULT_LANGUAGE` | Default language code | Yes | `en` |
@@ -47,7 +47,7 @@ When creating or updating a Pyx IDR service instance via the [Services API](../.
 |-------|------|----------|---------|-------------|
 | `baseUrl` | `string` (URL) | Yes | — | Base URL of the identity resolver (e.g., `http://identity-resolver-service:3000`) |
 | `apiKey` | `string` | Yes | — | Authentication token for the identity resolver API. **Sensitive** — masked in API responses. |
-| `apiVersion` | `string` | Yes | `3.0.0` | API version to use when communicating with the identity resolver. Currently only `3.0.0` is accepted. |
+| `apiVersion` | `string` | Yes | `4.0` | API version to use when communicating with the identity resolver. Currently only `4.0` is accepted. |
 | `defaultLinkType` | `string` (enum) | Yes | — | Default link type for credential registration. Accepted values: `untp:dpp`, `untp:dcc`, `untp:dte`, `untp:idr`, `untp:dfr`, `untp:dia`, `untp:cvc`. |
 | `defaultMimeType` | `string` | Yes | — | Default MIME type for linked resources (e.g., `text/html`) |
 | `defaultIanaLanguage` | `string` | Yes | — | Default language code (e.g., `en`) |
@@ -62,7 +62,7 @@ The `defaultLinkType`, `defaultMimeType`, `defaultIanaLanguage`, `defaultContext
 {
   "baseUrl": "https://idr.example.com",
   "apiKey": "your-api-key",
-  "apiVersion": "3.0.0",
+  "apiVersion": "4.0",
   "defaultLinkType": "untp:dpp",
   "defaultMimeType": "text/html",
   "defaultIanaLanguage": "en",

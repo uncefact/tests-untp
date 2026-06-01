@@ -77,7 +77,7 @@ Publishing is optional and requires the credential's primary entity (product, fa
 
 ### CVC Compliance (Conformity Credentials Only)
 
-For [Digital Conformity Credentials](./data-models), the issuance pipeline performs an extra advisory check: it compares the conformity criteria, standards, and regulations referenced in the credential against the tenant's imported [CVC (Conformity Vocabulary Catalogue)](https://untp.unece.org/docs/specification/ConformityVocabularyCatalog) data. This helps catch mistakes like referencing a non-existent standard or missing a required criterion.
+For [Digital Conformity Credentials](./data-models), the issuance pipeline performs an extra advisory check: it compares the conformity scheme, profile, and criteria referenced in the credential against the locally known [Conformity Vocabulary Catalogue (CVC)](https://untp.unece.org/docs/specification/ConformityVocabularyCatalog) schemes. This helps catch mistakes like referencing a non-existent scheme or omitting a required criterion.
 
 CVC validation is **advisory only** — it never blocks issuance. If issues are found, the credential is still issued but the response includes warnings.
 
@@ -149,19 +149,18 @@ If either check fails, the request is rejected with HTTP 400.
 
 #### Stage 3.5: CVC Compliance Validation (Advisory)
 
-For [Digital Conformity Credentials](./data-models) (DCC), the issuance pipeline performs an advisory check against the tenant's imported CVC (Conformity Vocabulary Catalogue) data. This check verifies that the conformity criteria, standards, and regulations referenced in the credential payload correspond to entries in the tenant's CVC catalogues.
+For [Digital Conformity Credentials](./data-models) (DCC), the issuance pipeline performs an advisory check against the locally known conformity schemes (operator-seeded in this release). This check verifies that the conformity scheme, profile, and criteria referenced in the credential payload correspond to entries in the catalogue, and that the claimed criteria line up with what the profile defines.
 
-CVC validation is advisory only. It never blocks issuance. If the check fails or no CVC data is available, the credential is issued with warnings in the response. Warning codes include:
+CVC validation is advisory only. It never blocks issuance. If the check fails or no matching scheme is available, the credential is issued with warnings in the response. Warning codes include:
 
 | Code | Meaning |
 |------|---------|
-| `CVC_NO_CONFORMITY` | DCC credential payload has no conformity data to validate |
-| `CVC_NO_SCOPE` | No conformity scope (standard, regulation, or criterion) found in the payload |
-| `CVC_SCOPE_NOT_FOUND` | Referenced scope URL not found in imported CVC catalogues |
-| `CVC_UNKNOWN_CRITERION` | Referenced criterion URL not found in imported CVC catalogues |
-| `CVC_MISSING_CRITERION` | A required criterion from the scheme profile is not present in the credential |
-| `CVC_NO_CRITERIA` | No criteria found in the payload |
-| `CVC_VALIDATION_ERROR` | CVC validation could not be performed (infrastructure or extraction failure) |
+| `conformity-scheme.not-found` | A referenced conformity scheme URI is not in the locally known catalogue |
+| `conformity-profile.not-found` | A referenced profile URI is not found within the scheme |
+| `conformity-criterion.not-in-profile` | A claimed criterion is not one the referenced profile publishes |
+| `conformity-criterion.missing` | A criterion the profile defines is absent from the claim |
+| `conformity-criterion.topic-mismatch` | A criterion's declared conformity topics do not match those the criterion defines |
+| `conformity-claim.validation-error` | Validation could not be performed (extraction or infrastructure failure) |
 
 #### Stage 4: Issuer DID Ownership Validation
 
@@ -212,11 +211,14 @@ The IDR entry's `description` field is taken from the primary entity's `descript
 | Publishing Option | Type | Description |
 |-------------------|------|-------------|
 | `publish` | boolean | Whether to publish to the identity resolver |
-| `linkType` | string | Link relation type (defaults to `gs1:sustainabilityInfo`) |
+| `linkType` | string | Link relation type (defaults to the IDR service's configured default link type) |
 | `linkTitle` | string | Human-readable title for the link (defaults to the data model name) |
 | `qualifierPath` | string | Qualifier path for sub-identifiers, e.g., `/10/LOT123/21/SER456` (defaults to `/`) |
 | `machineVerificationUrl` | string | URL for machine-readable verification of the credential |
 | `humanVerificationUrl` | string | URL for human-readable verification of the credential |
+| `hreflang` | string[] | BCP 47 language tags for the link's target content |
+| `additionalRels` | string[] | Additional link relation types to attach beyond `linkType` |
+| `public` | boolean | Whether the published link is publicly resolvable |
 
 ## Issuance Endpoints
 
@@ -243,6 +245,9 @@ Validates, signs, stores, and optionally publishes a verifiable credential. Retu
 | `publishingOptions.qualifierPath` | string | No | Qualifier path (default: `/`) |
 | `publishingOptions.machineVerificationUrl` | string | No | Machine verification URL |
 | `publishingOptions.humanVerificationUrl` | string | No | Human verification URL |
+| `publishingOptions.hreflang` | string[] | No | BCP 47 language tags for the link's target content |
+| `publishingOptions.additionalRels` | string[] | No | Additional link relation types beyond `linkType` |
+| `publishingOptions.public` | boolean | No | Whether the published link is publicly resolvable |
 
 ---
 

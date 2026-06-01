@@ -9,7 +9,7 @@ The [UNCEFACT Storage Service](https://github.com/uncefact/project-storage-servi
 
 ## About
 
-The UNCEFACT Storage Service is a standalone service that provides public and private bucket-based storage for credentials, render templates, and other binary data. It supports encryption for private storage and returns URIs, integrity hashes, and decryption keys for stored items.
+The UNCEFACT Storage Service is a standalone service that provides public and private bucket-based storage for credentials, render templates, and other binary data. It supports encryption for private storage and returns URIs, multibase digests (`digestMultibase`), and decryption keys for stored items.
 
 - **Repository:** [github.com/uncefact/project-storage-service](https://github.com/uncefact/project-storage-service)
 - **Docker image:** `ghcr.io/uncefact/project-storage-service`

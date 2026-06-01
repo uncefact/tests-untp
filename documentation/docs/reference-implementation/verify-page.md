@@ -45,18 +45,19 @@ The verify page supports two URL formats for passing credential parameters.
 The preferred format passes parameters directly as query parameters:
 
 ```
-/verify?uri=<credential-url>&hash=<sha256-hex>&decryptionKey=<hex-key>
+/verify?uri=<credential-url>&digestMultibase=<multibase-digest>&decryptionKey=<hex-key>
 ```
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `uri` | Yes | The URL of the stored credential |
-| `hash` | No | A SHA-256 hash of the credential for integrity validation |
+| `digestMultibase` | No | A multibase-encoded digest of the credential for integrity validation |
+| `hash` | No | A legacy SHA-256 hex hash, accepted for backwards compatibility with links created before the digest migration. Prefer `digestMultibase`. |
 | `decryptionKey` | No | The decryption key for encrypted credentials |
 
 **Example:**
 ```
-https://example.com/verify?uri=https://storage.example.com/credentials/dpp-1234.json&hash=595d8d20c586c6f55f8a758f294674fa85069db5c518a0f4cbbd3fd61f46522f&decryptionKey=a1b2c3d4e5f6...
+https://example.com/verify?uri=https://storage.example.com/credentials/dpp-1234.json&digestMultibase=zQmcyxhmhvRbUZHSZyi1EDf6v4ZAVmaT3skUuwisxFRFp9v&decryptionKey=a1b2c3d4e5f6...
 ```
 
 ### Legacy JSON Envelope
@@ -68,16 +69,16 @@ This format is supported for backwards compatibility and will be removed in a fu
 The legacy format encodes parameters as a JSON object in a single `q` query parameter:
 
 ```
-/verify?q={"payload":{"uri":"...","hash":"...","key":"..."}}
+/verify?q={"payload":{"uri":"...","digestMultibase":"...","decryptionKey":"..."}}
 ```
 
-The legacy format accepts both `key` and `decryptionKey` for the decryption key. If both are present, `decryptionKey` takes precedence.
+The `payload` object accepts the same integrity fields as the direct parameters, `digestMultibase` and the legacy `hash`. For the decryption key it accepts both `key` and `decryptionKey`; if both are present, `decryptionKey` takes precedence.
 
 If both direct query parameters and a legacy `q` parameter are present, the direct parameters take precedence.
 
-## Hash Validation
+## Integrity Validation
 
-A verification link may include a SHA-256 hash of the credential. When present, the verify page computes the hash of the fetched credential and compares it to the value in the URL. If they do not match, the credential is flagged as potentially tampered with. The hash is optional — if not included in the URL, this check is skipped.
+A verification link may include a digest of the credential. When present, the verify page computes the digest of the fetched credential and compares it to the value in the link; if they do not match, the credential is flagged as potentially tampered with. The current format is `digestMultibase` (a multibase-encoded digest); a legacy SHA-256 hex `hash` is still accepted for links created before the digest migration. The check is optional, if neither is included, it is skipped.
 
 ## Decryption
 

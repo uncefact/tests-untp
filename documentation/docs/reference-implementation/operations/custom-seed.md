@@ -160,14 +160,19 @@ The `parentConfigId` must reference a core data model created by the default see
 |----------------|---------|-----|
 | DigitalProductPassport | 0.6.0 | `cxuj555flzqtp4ldvklv6ya39` |
 | DigitalProductPassport | 0.6.1 | `c1pxfzzkeb86jgeel7hrvmcle` |
+| DigitalProductPassport | 0.7.0 | `ca3frzta22f7lblxntvw6ukuh` |
 | DigitalConformityCredential | 0.6.0 | `c3imzyum0txv1y9xkww88aktp` |
 | DigitalConformityCredential | 0.6.1 | `cttpz40pfgcfeue2wmbc3jti8` |
+| DigitalConformityCredential | 0.7.0 | `ca9ndkrc8lxmtsfzwynui40zy` |
 | DigitalFacilityRecord | 0.6.0 | `ctfgtrsuiwv1fedo9t5swxhnk` |
 | DigitalFacilityRecord | 0.6.1 | `csrtste8ai2llop7ui8u6n11l` |
+| DigitalFacilityRecord | 0.7.0 | `cj3s37lt6pvh56ggspr9upt5m` |
 | DigitalIdentityAnchor | 0.6.0 | `cz9raijqcay5nzmq59geoggrk` |
 | DigitalIdentityAnchor | 0.6.1 | `cn5u63huxvqgdwppebaxmqt9l` |
+| DigitalIdentityAnchor | 0.7.0 | `cw0tzf723j1oql3u4s1r0c2g2` |
 | DigitalTraceabilityEvent | 0.6.0 | `crqvpwffc0k2p4bvr8za1ii6j` |
 | DigitalTraceabilityEvent | 0.6.1 | `cwb7m3k0hpz9xqft6rjn2oe4s` |
+| DigitalTraceabilityEvent | 0.7.0 | `cfhlj3bumipb74z8irp6uiuxn` |
 
 These IDs are defined in [`prisma/seed.ts`](https://github.com/uncefact/tests-untp/blob/main/packages/reference-implementation/prisma/seed.ts). New core data models may be added in future releases.
 
