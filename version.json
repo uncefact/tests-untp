@@ -1,18 +1,18 @@
 {
-  "version": "0.2.0",
-  "docVersion": "0.2.0",
+  "version": "0.3.0",
+  "docVersion": "0.3.0",
   "dependencies": {
     "vckit": {
       "repoUrl": "https://github.com/uncefact/project-vckit.git",
-      "versions": ["1.1.0"]
+      "versions": ["1.2.1"]
     },
     "storage-service": {
-      "repoUrl": "https://github.com/uncefact/project-identity-resolver.git",
-      "versions": ["1.0.1"]
+      "repoUrl": "https://github.com/uncefact/project-storage-service.git",
+      "versions": ["4.0.0"]
     },
     "idr": {
       "repoUrl": "https://github.com/pyx-industries/pyx-identity-resolver.git",
-      "versions": ["1.0.0"]
+      "versions": ["4.0.0"]
     }
   }
 }
