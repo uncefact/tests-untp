@@ -16,6 +16,7 @@ type PerformanceClaim = {
 type DppSubject = {
   type?: string[];
   id?: string;
+  modelNumber?: string;
   batchNumber?: string;
   itemNumber?: string;
   producedAtFacility?: { registeredId?: string };
@@ -32,16 +33,19 @@ export function extractDppRefs(subject: CredentialSubject): ExtractedRefs {
 
   const dpp = subject as DppSubject;
 
-  // In v0.7.0 the credentialSubject IS the Product directly (no wrapper).
-  if (!dpp.id) return { ...EMPTY_REFS };
-
   const refs: ExtractedRefs = { organisations: [], facilities: [], products: [] };
 
-  refs.products.push({
-    id: dpp.id,
-    ...(dpp.batchNumber && { batchNumber: dpp.batchNumber }),
-    ...(dpp.itemNumber && { serialNumber: dpp.itemNumber }),
-  });
+  // In v0.7.0 the credentialSubject IS the Product directly. The product's
+  // primary identifier is the model number; the batch and item numbers are
+  // secondary qualifiers. The `id` is the product URI, so it is not extracted here. Model number is optional, so the
+  // product reference is emitted only when it is present.
+  if (dpp.modelNumber) {
+    refs.products.push({
+      id: dpp.modelNumber,
+      ...(dpp.batchNumber && { batchNumber: dpp.batchNumber }),
+      ...(dpp.itemNumber && { serialNumber: dpp.itemNumber }),
+    });
+  }
 
   if (dpp.relatedParty && dpp.relatedParty.length > 0) {
     for (const pr of dpp.relatedParty) {

@@ -27,7 +27,7 @@ describe('extractDppRefs (v0.7.0)', () => {
       expect(refs).toEqual(EMPTY_ARRAYS);
     });
 
-    it('returns empty arrays when subject has no id (no wrapper in v0.7.0)', () => {
+    it('returns empty arrays when subject has no extractable identifiers', () => {
       const refs = bridge.extractRefs({ type: ['Product'] });
       expect(refs).toEqual(EMPTY_ARRAYS);
     });
@@ -36,42 +36,48 @@ describe('extractDppRefs (v0.7.0)', () => {
   // ── product refs ─────────────────────────────────────────────────────────────
 
   describe('product refs', () => {
-    it('extracts products[0].id from the top-level id field', () => {
+    it('extracts products[0].id from the modelNumber field (the primary identifier)', () => {
+      const refs = bridge.extractRefs({
+        type: ['Product'],
+        modelNumber: '09520123456788',
+      });
+      expect(refs.products).toEqual([{ id: '09520123456788' }]);
+    });
+
+    it('does not emit a product ref when modelNumber is absent (the id URI is not a resolvable identifier)', () => {
       const refs = bridge.extractRefs({
         type: ['Product'],
         id: 'https://id.gs1.org/01/09520123456788',
       });
-      expect(refs.products).toEqual([{ id: 'https://id.gs1.org/01/09520123456788' }]);
+      expect(refs.products).toEqual([]);
     });
 
     it('includes batchNumber when present', () => {
       const refs = bridge.extractRefs({
         type: ['Product'],
-        id: 'https://id.gs1.org/01/09520123456788',
+        modelNumber: '09520123456788',
         batchNumber: 'BATCH-001',
       });
-      expect(refs.products).toEqual([{ id: 'https://id.gs1.org/01/09520123456788', batchNumber: 'BATCH-001' }]);
+      expect(refs.products).toEqual([{ id: '09520123456788', batchNumber: 'BATCH-001' }]);
     });
 
     it('extracts serialNumber from itemNumber (v0.7.0 field rename)', () => {
       const refs = bridge.extractRefs({
         type: ['Product'],
-        id: 'https://id.gs1.org/01/09520123456788',
+        modelNumber: '09520123456788',
         itemNumber: 'SN-999',
       });
-      expect(refs.products).toEqual([{ id: 'https://id.gs1.org/01/09520123456788', serialNumber: 'SN-999' }]);
+      expect(refs.products).toEqual([{ id: '09520123456788', serialNumber: 'SN-999' }]);
     });
 
     it('includes both batchNumber and serialNumber when present', () => {
       const refs = bridge.extractRefs({
         type: ['Product'],
-        id: 'https://id.gs1.org/01/09520123456788',
+        modelNumber: '09520123456788',
         batchNumber: 'BATCH-001',
         itemNumber: 'SN-999',
       });
-      expect(refs.products).toEqual([
-        { id: 'https://id.gs1.org/01/09520123456788', batchNumber: 'BATCH-001', serialNumber: 'SN-999' },
-      ]);
+      expect(refs.products).toEqual([{ id: '09520123456788', batchNumber: 'BATCH-001', serialNumber: 'SN-999' }]);
     });
   });
 
@@ -218,7 +224,7 @@ describe('extractDppRefs (v0.7.0)', () => {
 
       expect(refs.products).toEqual([
         {
-          id: 'did:web:example.com:product:1',
+          id: '9520123456788',
           batchNumber: 'BATCH-001',
         },
       ]);
@@ -252,7 +258,7 @@ describe('extractDppRefs (v0.7.0)', () => {
       const refs = bridge.extractRefs(subject);
 
       expect(refs.products[0]).toEqual({
-        id: 'did:web:example.com:product:1',
+        id: '9520123456788',
         serialNumber: 'SN-42',
       });
     });

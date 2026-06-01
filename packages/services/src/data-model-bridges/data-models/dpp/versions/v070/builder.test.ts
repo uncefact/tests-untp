@@ -90,8 +90,9 @@ describe('buildDppSubject (v0.7.0)', () => {
   // ── product identifier fields ─────────────────────────────────────────────────
 
   describe('product identifiers', () => {
-    it('includes idScheme inline (no top-level registeredId)', () => {
+    it('writes the primary identifier value to modelNumber and idScheme inline (no top-level registeredId)', () => {
       const subject = bridge.buildSubject(createBridgeEntities());
+      expect(subject.modelNumber).toBe('9520123456788');
       expect(subject.idScheme).toEqual({
         type: ['IdentifierScheme'],
         id: 'https://id.gs1.org/01/',
@@ -100,10 +101,11 @@ describe('buildDppSubject (v0.7.0)', () => {
       expect(subject.registeredId).toBeUndefined();
     });
 
-    it('omits idScheme when primaryIdentifier is absent', () => {
+    it('omits modelNumber and idScheme when primaryIdentifier is absent', () => {
       const subject = bridge.buildSubject(
         createBridgeEntities({ product: createProduct({ primaryIdentifier: null }) }),
       );
+      expect(subject.modelNumber).toBeUndefined();
       expect(subject.idScheme).toBeUndefined();
     });
 
