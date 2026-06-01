@@ -16,7 +16,7 @@ The Test Suite comprises four primary components:
  - Graph Validation
 
 ## Reference implementations
-[Reference implementations](/docs/reference-implementation/) allow implementers to model a value chain using UNTP and integrate their implementation at any point within it. These apps provide a flexible environment for testing and demonstrating UNTP functionality in real-world scenarios.
+[Reference implementations](/docs/0.1.0/reference-implementation/) allow implementers to model a value chain using UNTP and integrate their implementation at any point within it. These apps provide a flexible environment for testing and demonstrating UNTP functionality in real-world scenarios.
 
 ## Technical Interoperability
 This component tests the technical interoperability of implementations based on the UNTP specification. It ensures that the technical aspects of the implementation align with the protocol's requirements.

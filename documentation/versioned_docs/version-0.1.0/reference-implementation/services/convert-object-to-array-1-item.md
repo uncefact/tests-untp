@@ -9,7 +9,7 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The `convertObjectToArray1Item` service is responsible for converting an object to an array with one item. This service is used to convert an object to an array with one item to be used in the individual event services like [processObjectEvent](/docs/reference-implementation/services/process-object-event), [processAggregationEvent](/docs/reference-implementation/services/process-aggregation-event), [processTransformationEventOnly](/docs/reference-implementation/services/process-transformation-event-only), [processAssociationEvent](/docs/reference-implementation/services/process-association-event), and [processTransactionEvent](/docs/reference-implementation/services/process-transaction-event). The service will convert the data that is from the JSON form of the JSON schema with the root type is an object to an array with one item.
+The `convertObjectToArray1Item` service is responsible for converting an object to an array with one item. This service is used to convert an object to an array with one item to be used in the individual event services like [processObjectEvent](/docs/0.1.0/reference-implementation/services/process-object-event), [processAggregationEvent](/docs/0.1.0/reference-implementation/services/process-aggregation-event), [processTransformationEventOnly](/docs/0.1.0/reference-implementation/services/process-transformation-event-only), [processAssociationEvent](/docs/0.1.0/reference-implementation/services/process-association-event), and [processTransactionEvent](/docs/0.1.0/reference-implementation/services/process-transaction-event). The service will convert the data that is from the JSON form of the JSON schema with the root type is an object to an array with one item.
 
 ## Diagram
 
@@ -31,7 +31,7 @@ flowchart TD
 
 | Property | Required | Description                                                                                      | Type                                                            |
 | -------- | -------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| path     | No       | The path of the data wants to convert. If the path is undefined, it will convert the whole data. | [IdentifierKeyPath](/docs/reference-implementation/common/identifier-key-path) |
+| path     | No       | The path of the data wants to convert. If the path is undefined, it will convert the whole data. | [IdentifierKeyPath](/docs/0.1.0/reference-implementation/common/identifier-key-path) |
 
 ## Function type
 

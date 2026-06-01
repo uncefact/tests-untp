@@ -9,11 +9,11 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The `type` property of the `props` object in a [component](/docs/reference-implementation/configuration/component-config) configuration defines the kind of data that component is responsible for handling.
+The `type` property of the `props` object in a [component](/docs/0.2.0/reference-implementation/configuration/component-config) configuration defines the kind of data that component is responsible for handling.
 
 ## Usage
 
-The `type` property of the `props` object is required for component receiving data such as [import-button](/docs/reference-implementation/components/import-button), [qr-code-scanner-dialog-button](/docs/reference-implementation/components/qr-code-scanner-dialog-button), etc. The component will use the `type` to determine how to handle the data it receives.
+The `type` property of the `props` object is required for component receiving data such as [import-button](/docs/0.2.0/reference-implementation/components/import-button), [qr-code-scanner-dialog-button](/docs/0.2.0/reference-implementation/components/qr-code-scanner-dialog-button), etc. The component will use the `type` to determine how to handle the data it receives.
 
 ## Types
 
@@ -23,7 +23,7 @@ When a component has the `JSON` type, it will suppose receive any JSON object as
 
 ### VerifiableCredential
 
-When a component has the `VerifiableCredential` type, it will suppose receive a [Verifiable Credential](/docs/reference-implementation/common/verifiable-credentials) as its payload and will verify the credential before using it.
+When a component has the `VerifiableCredential` type, it will suppose receive a [Verifiable Credential](/docs/0.2.0/reference-implementation/common/verifiable-credentials) as its payload and will verify the credential before using it.
 
 ## Examples
 

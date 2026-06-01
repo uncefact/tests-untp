@@ -9,7 +9,7 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 ## Description
 
-The `IDR` object contains configuration for the [Identity Resolver Service](/docs/reference-implementation/dependent-services/identity-resolution-service), which is used to create and manage resolvable links for the UNTP credentials.
+The `IDR` object contains configuration for the [Identity Resolver Service](/docs/0.2.0/reference-implementation/dependent-services/identity-resolution-service), which is used to create and manage resolvable links for the UNTP credentials.
 
 ## Definition
 

@@ -13,7 +13,7 @@ Not only can the functionality/business logic be configured but the style of eac
 
 Each app is a page within the reference implementation system where the name of the value chain actor set in the config file is used as a path segment just as the general feature `{mock_app_system_base_url}/{actor_name or general_feature_name}`. Each app defined in the config file will be displayed in the sidebar menu.
 
-Apps are composed of features which have ids and names to be able to discern between features within the UI of the respective app and the entry point of each feature (button) is displayed on the home page of the respective app just as the [general features](/docs/reference-implementation/configuration/general-feature-config).
+Apps are composed of features which have ids and names to be able to discern between features within the UI of the respective app and the entry point of each feature (button) is displayed on the home page of the respective app just as the [general features](/docs/0.1.0/reference-implementation/configuration/general-feature-config).
 
 ## Diagram
 
@@ -52,9 +52,9 @@ graph TD
 | -------- | -------- | --------------------------------------------------- | ------ |
 | name     | Yes      | The name of the app                                 | String |
 | type     | Yes      | The type of the app (e.g., "producer", "processor") | String |
-| assets   | Yes      | Assets associated with the app                      | [Asset](/docs/reference-implementation/common/asset) |
-| styles   | Yes      | Styling information for the app                     | [Style](/docs/reference-implementation/common/style) |
-| features | Yes      | Array of features available in the app              | [Feature](/docs/reference-implementation/configuration/feature-config)[]  |
+| assets   | Yes      | Assets associated with the app                      | [Asset](/docs/0.1.0/reference-implementation/common/asset) |
+| styles   | Yes      | Styling information for the app                     | [Style](/docs/0.1.0/reference-implementation/common/style) |
+| features | Yes      | Array of features available in the app              | [Feature](/docs/0.1.0/reference-implementation/configuration/feature-config)[]  |
 
 ## Example
 

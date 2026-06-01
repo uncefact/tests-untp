@@ -38,12 +38,12 @@ The LocalStorageLoader component is responsible for loading data from local stor
 | Property | Required | Description | Type |
 |----------|----------|-------------|------|
 | name | Yes | The name of the component(should be "LocalStorageLoader")| String |
-| type | Yes | The type of the component (should be "EntryData") | [ComponentType](/docs/reference-implementation/common/component-type) |
-| props | Yes | The properties for the LocalStorageLoader | [Props](/docs/reference-implementation/components/local-storage-loader#props) |
+| type | Yes | The type of the component (should be "EntryData") | [ComponentType](/docs/0.1.0/reference-implementation/common/component-type) |
+| props | Yes | The properties for the LocalStorageLoader | [Props](/docs/0.1.0/reference-implementation/components/local-storage-loader#props) |
 
 ### Props
 
 | Property | Required | Description | Type |
 |----------|----------|-------------|------|
 | storageKey | Yes | The key used to retrieve data from local storage | String |
-| nestedComponents | Yes | An array of components to be rendered with the loaded data | [Component](/docs/reference-implementation/components/)[] |
+| nestedComponents | Yes | An array of components to be rendered with the loaded data | [Component](/docs/0.1.0/reference-implementation/components/)[] |

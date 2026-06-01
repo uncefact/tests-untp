@@ -42,14 +42,14 @@ The RenderCheckList component is responsible for rendering a list of items with 
 | Property | Required | Description                                            | Type                                                        |
 | -------- | -------- | ------------------------------------------------------ | ----------------------------------------------------------- |
 | name     | Yes      | The name of the component(should be "RenderCheckList") | String                                                      |
-| type     | Yes      | The type of the component (should be "EntryData")      | [ComponentType](/docs/reference-implementation/common/component-type)      |
-| props    | Yes      | The properties for the RenderCheckList                 | [Props](/docs/reference-implementation/components/render-check-list#props) |
+| type     | Yes      | The type of the component (should be "EntryData")      | [ComponentType](/docs/0.2.0/reference-implementation/common/component-type)      |
+| props    | Yes      | The properties for the RenderCheckList                 | [Props](/docs/0.2.0/reference-implementation/components/render-check-list#props) |
 
 ### Props
 
 | Property         | Required | Description                                                | Type                                       |
 | ---------------- | -------- | ---------------------------------------------------------- | ------------------------------------------ |
-| nestedComponents | Yes      | An array of components to be rendered with the loaded data | [Component](/docs/reference-implementation/components/)[] |
+| nestedComponents | Yes      | An array of components to be rendered with the loaded data | [Component](/docs/0.2.0/reference-implementation/components/)[] |
 | checkBoxLabel    | Yes      | The label for the checkbox list                            | String                                     |
 | style            | No       | The style for the component                                | Object                                     |
 

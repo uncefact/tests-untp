@@ -22,7 +22,7 @@ Most of the service endpoints in the example configuration are already set to us
 
 ### Updating the Issuer
 
-You will need to update the `issuer` property value (did:web) inside the `vckit` object. This should be set to the identifier you created using the [Verifiable Credential Service](/docs/reference-implementation/dependent-services/verifiable-credential-service).
+You will need to update the `issuer` property value (did:web) inside the `vckit` object. This should be set to the identifier you created using the [Verifiable Credential Service](/docs/0.2.0/reference-implementation/dependent-services/verifiable-credential-service).
 
 For example:
 

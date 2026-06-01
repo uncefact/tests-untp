@@ -24,7 +24,7 @@ For the Reference implementations, we recommend and will be using the UN's Verif
 
 #### Option 1: Using Docker Compose (Recommended)
 
-If you've chosen to use the Docker Compose setup as described in the [Dependent Services](/docs/reference-implementation/dependent-services/) section, most of the configuration is already done for you. In this case, you only need to:
+If you've chosen to use the Docker Compose setup as described in the [Dependent Services](/docs/0.1.0/reference-implementation/dependent-services/) section, most of the configuration is already done for you. In this case, you only need to:
 
 1. Create an identifier (did:web) within the Verifiable Credential Service.
 2. Record this identifier for use in the reference implementation configuration.

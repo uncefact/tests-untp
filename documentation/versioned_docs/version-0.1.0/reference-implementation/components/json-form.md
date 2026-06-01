@@ -18,15 +18,15 @@ As a developer using the reference implementation system, you can now provide a 
 | Property | Required | Description | Type |
 |----------|----------|-------------|------|
 | name | Yes | The name of the component (should be "JsonForm") | String |
-| type | Yes | The type of the component (should be "EntryData") | [ComponentType](/docs/reference-implementation/common/component-type) |
-| props | Yes | The properties for the JsonForm component | [Props](/docs/reference-implementation/components/json-form#props) |
+| type | Yes | The type of the component (should be "EntryData") | [ComponentType](/docs/0.1.0/reference-implementation/common/component-type) |
+| props | Yes | The properties for the JsonForm component | [Props](/docs/0.1.0/reference-implementation/components/json-form#props) |
 
 ## Props
 
 | Property | Required | Description | Type |
 |----------|----------|-------------|------|
 | schema | Yes | The JSON schema that defines the structure of the form. It can either be a local object or an object with a URL property pointing to an external schema. | Object or `{ url: string }` |
-| constructData | No | Defines the schema for constructing event data, including field mappings, default values, and data generation rules. | [ConstructData](/docs/reference-implementation/common/construct-data) |
+| constructData | No | Defines the schema for constructing event data, including field mappings, default values, and data generation rules. | [ConstructData](/docs/0.1.0/reference-implementation/common/construct-data) |
 | data | No | The initial data for the form | Object |
 | className | No | CSS class name for styling the form | String |
 | style | No | CSS styles to apply to the form | Object |

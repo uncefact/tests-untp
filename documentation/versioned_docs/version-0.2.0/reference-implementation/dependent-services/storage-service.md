@@ -20,7 +20,7 @@ For the Reference implementations, we recommend and will be using the UN's refer
 
 #### Option 1: Using Docker Compose (Recommended)
 
-If you've chosen to use the Docker Compose setup as described in the [Dependent Services](/docs/reference-implementation/dependent-services/) section, the Storage Service is already configured and ready to use. You don't need to perform any additional setup steps.
+If you've chosen to use the Docker Compose setup as described in the [Dependent Services](/docs/0.2.0/reference-implementation/dependent-services/) section, the Storage Service is already configured and ready to use. You don't need to perform any additional setup steps.
 
 #### Option 2: Manual Setup
 

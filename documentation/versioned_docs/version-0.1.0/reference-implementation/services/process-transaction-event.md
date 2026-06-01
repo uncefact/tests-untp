@@ -9,7 +9,7 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The `processTransactionEvent` service is responsible for processing a [Transaction Event (DTE)](https://uncefact.github.io/spec-untp/docs/specification/DigitalTraceabilityEvents), issuing a [Verifiable Credential (VC)](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials), uploading it to the [Storage service](/docs/reference-implementation/dependent-services/storage-service), registering the link to the stored DTE with the [Identity Resolver service](/docs/reference-implementation/dependent-services/identity-resolution-service), and managing DPPs in local storage associated with the event. It handles the entire lifecycle of creating and managing a transaction event, from data input to storage, resolution, and local data management.
+The `processTransactionEvent` service is responsible for processing a [Transaction Event (DTE)](https://uncefact.github.io/spec-untp/docs/specification/DigitalTraceabilityEvents), issuing a [Verifiable Credential (VC)](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials), uploading it to the [Storage service](/docs/0.1.0/reference-implementation/dependent-services/storage-service), registering the link to the stored DTE with the [Identity Resolver service](/docs/0.1.0/reference-implementation/dependent-services/identity-resolution-service), and managing DPPs in local storage associated with the event. It handles the entire lifecycle of creating and managing a transaction event, from data input to storage, resolution, and local data management.
 
 ## Diagram
 
@@ -93,12 +93,12 @@ P-->>C: Return VC and resolver URL
 
 | Property           | Required | Description                                                                                                                         | Type                                                            |
 | ------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| vckit              | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/reference-implementation/common/vckit)                           |
-| traceabilityEvent  | Yes      | Configuration for the EPCIS Transaction Event                                                                                       | [Credential](/docs/reference-implementation/common/credential)                 |
-| storage            | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/reference-implementation/common/storage)                       |
-| dlr                | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/reference-implementation/common/idr)                               |
-| identifierKeyPath  | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/reference-implementation/common/identifier-key-path) |
-| localStorageParams | Yes      | Configuration for local storage management                                                                                          | [LocalStorage](/docs/reference-implementation/common/local-storage)            |
+| vckit              | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/0.1.0/reference-implementation/common/vckit)                           |
+| traceabilityEvent  | Yes      | Configuration for the EPCIS Transaction Event                                                                                       | [Credential](/docs/0.1.0/reference-implementation/common/credential)                 |
+| storage            | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/0.1.0/reference-implementation/common/storage)                       |
+| dlr                | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/0.1.0/reference-implementation/common/idr)                               |
+| identifierKeyPath  | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/0.1.0/reference-implementation/common/identifier-key-path) |
+| localStorageParams | Yes      | Configuration for local storage management                                                                                          | [LocalStorage](/docs/0.1.0/reference-implementation/common/local-storage)            |
 
 ## Function type
 

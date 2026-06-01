@@ -34,11 +34,11 @@ graph TD
 | Property | Required | Description | Type |
 |----------|----------|-------------|------|
 | name | Yes | The name of the reference implementation system (displayed in the header) | String |
-| styles | Yes | Custom styling options for the overall system | [Style](/docs/reference-implementation/common/style) |
-| generalFeatures | Yes | A list of common features accessible across all apps | [GeneralFeature](/docs/reference-implementation/configuration/general-feature-config)[] |
-| apps | Yes | A collection of individual apps representing different actors in the value chain | [App](/docs/reference-implementation/configuration/app-config)[] |
-| identifyProvider | Yes | The service used to resolve identifiers to their respective Identity Resolver Services (E.g. Mock Verified By GS1 Service) | [IdentifyProvider](/docs/reference-implementation/common/identify-provider) |
-| defaultVerificationServiceLink | Yes | The default link to the verification service for credential verification (used by the verify page) | [DefaultVerificationServiceLink](/docs/reference-implementation/common/default-verification-service-link) |
+| styles | Yes | Custom styling options for the overall system | [Style](/docs/0.2.0/reference-implementation/common/style) |
+| generalFeatures | Yes | A list of common features accessible across all apps | [GeneralFeature](/docs/0.2.0/reference-implementation/configuration/general-feature-config)[] |
+| apps | Yes | A collection of individual apps representing different actors in the value chain | [App](/docs/0.2.0/reference-implementation/configuration/app-config)[] |
+| identifyProvider | Yes | The service used to resolve identifiers to their respective Identity Resolver Services (E.g. Mock Verified By GS1 Service) | [IdentifyProvider](/docs/0.2.0/reference-implementation/common/identify-provider) |
+| defaultVerificationServiceLink | Yes | The default link to the verification service for credential verification (used by the verify page) | [DefaultVerificationServiceLink](/docs/0.2.0/reference-implementation/common/default-verification-service-link) |
 
 ## Example
 ``` json

@@ -9,7 +9,7 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 ## Description
 
-The `constructData` object defines the schema for constructing event data, including field mappings, default values, and data generation rules. It is used in the [Json Form component](/docs/reference-implementation/components/json-form) and is used when data needs to be mapped from one credential to another.
+The `constructData` object defines the schema for constructing event data, including field mappings, default values, and data generation rules. It is used in the [Json Form component](/docs/0.2.0/reference-implementation/components/json-form) and is used when data needs to be mapped from one credential to another.
 
 For example, when values from a DPP need to be mapped to properties within a transaction event or transformation event credential.
 
@@ -102,9 +102,9 @@ For example, when values from a DPP need to be mapped to properties within a tra
 
 | Property | Required | Description | Type |
 |----------|:--------:|-------------|------|
-| mappingFields | No | An array of objects that define how data should be mapped from source paths to destination paths | [MappingFields](/docs/reference-implementation/common/construct-data#mappingfields)[] |
-| dummyFields | No | An array of objects that specify default values for certain fields in the event data | [DummyFields](/docs/reference-implementation/common/construct-data#dummyfields)[] |
-| generationFields | No | An array of objects that define fields whose values should be dynamically generated | [GenerationFields](/docs/reference-implementation/common/construct-data#generationfields)[] |
+| mappingFields | No | An array of objects that define how data should be mapped from source paths to destination paths | [MappingFields](/docs/0.2.0/reference-implementation/common/construct-data#mappingfields)[] |
+| dummyFields | No | An array of objects that specify default values for certain fields in the event data | [DummyFields](/docs/0.2.0/reference-implementation/common/construct-data#dummyfields)[] |
+| generationFields | No | An array of objects that define fields whose values should be dynamically generated | [GenerationFields](/docs/0.2.0/reference-implementation/common/construct-data#generationfields)[] |
 
 #### mappingFields
 

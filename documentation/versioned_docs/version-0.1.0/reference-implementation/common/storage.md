@@ -9,7 +9,7 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 ## Description
 
-The `Storage` object is responsible for managing the configuration of the [Storage service](/docs/reference-implementation/dependent-services/storage-service) which is used to store and manage Verifiable Credentials within the Reference implementation system.
+The `Storage` object is responsible for managing the configuration of the [Storage service](/docs/0.1.0/reference-implementation/dependent-services/storage-service) which is used to store and manage Verifiable Credentials within the Reference implementation system.
 
 ## Example
 
@@ -35,8 +35,8 @@ The `Storage` object is responsible for managing the configuration of the [Stora
 | Property | Required | Description                             | Type                                              |
 | -------- | -------- | --------------------------------------- | ------------------------------------------------- |
 | url      | Yes      | URL for the storage service             | String                                            |
-| params   | Yes      | Parameters for the storage service      | [Params](/docs/reference-implementation/common/storage#params)   |
-| options  | Yes      | Options for the storage service request | [Options](/docs/reference-implementation/common/storage#options) |
+| params   | Yes      | Parameters for the storage service      | [Params](/docs/0.1.0/reference-implementation/common/storage#params)   |
+| options  | Yes      | Options for the storage service request | [Options](/docs/0.1.0/reference-implementation/common/storage#options) |
 
 ### params
 
@@ -53,7 +53,7 @@ The `options` object defines the HTTP request options for interacting with the s
 | Property | Required | Description                                  | Type                                              |
 | -------- | -------- | -------------------------------------------- | ------------------------------------------------- |
 | method   | Yes      | The HTTP method for the request (e.g., POST) | String                                            |
-| headers  | Yes      | The headers to be sent with the request      | [Headers](/docs/reference-implementation/common/storage#headers) |
+| headers  | Yes      | The headers to be sent with the request      | [Headers](/docs/0.1.0/reference-implementation/common/storage#headers) |
 
 ### headers
 

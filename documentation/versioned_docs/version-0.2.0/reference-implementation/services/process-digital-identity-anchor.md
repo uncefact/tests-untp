@@ -9,7 +9,7 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The `processDigitalIdentityAnchor` service is responsible for processing a digital identity anchor, issuing a [Verifiable Credential (VC)](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials), uploading it to the [Storage service](/docs/reference-implementation/dependent-services/storage-service), registering the link to the stored digital identity anchor with the [Identity Resolver service](/docs/reference-implementation/dependent-services/identity-resolution-service). It handles the entire lifecycle of creating and managing a digital identity anchor, from data input to storage and resolution.
+The `processDigitalIdentityAnchor` service is responsible for processing a digital identity anchor, issuing a [Verifiable Credential (VC)](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials), uploading it to the [Storage service](/docs/0.2.0/reference-implementation/dependent-services/storage-service), registering the link to the stored digital identity anchor with the [Identity Resolver service](/docs/0.2.0/reference-implementation/dependent-services/identity-resolution-service). It handles the entire lifecycle of creating and managing a digital identity anchor, from data input to storage and resolution.
 
 ## Diagram
 
@@ -87,11 +87,11 @@ P-->>C: Return digital identity anchor VC and resolver URL
 
 | Property              | Required | Description                                                                                                                         | Type                                                            |
 | --------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| vckit                 | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/reference-implementation/common/vckit)                           |
-| digitalIdentityAnchor | Yes      | Configuration for the Digital Identity Anchor                                                                                       | [Credential](/docs/reference-implementation/common/credential)                 |
-| storage               | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/reference-implementation/common/storage)                       |
-| dlr                   | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/reference-implementation/common/idr)                               |
-| identifierKeyPath     | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/reference-implementation/common/identifier-key-path) |
+| vckit                 | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/0.2.0/reference-implementation/common/vckit)                           |
+| digitalIdentityAnchor | Yes      | Configuration for the Digital Identity Anchor                                                                                       | [Credential](/docs/0.2.0/reference-implementation/common/credential)                 |
+| storage               | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/0.2.0/reference-implementation/common/storage)                       |
+| dlr                   | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/0.2.0/reference-implementation/common/idr)                               |
+| identifierKeyPath     | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/0.2.0/reference-implementation/common/identifier-key-path) |
 
 ## Function type
 

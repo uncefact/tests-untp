@@ -9,7 +9,7 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 ## Description
 
-The `Identify Provider` object is a key component in the Reference implementation system that links scanned identifiers to their corresponding [Identity Resolver Service](/docs/reference-implementation/dependent-services/identity-resolution-service), understands how to communicate with such services and encapsulates logic to interpret data retrieved from data carriers.
+The `Identify Provider` object is a key component in the Reference implementation system that links scanned identifiers to their corresponding [Identity Resolver Service](/docs/0.2.0/reference-implementation/dependent-services/identity-resolution-service), understands how to communicate with such services and encapsulates logic to interpret data retrieved from data carriers.
 
 It serves three main functions:
 
@@ -42,7 +42,7 @@ The Reference implementation system can use multiple identify providers, each ta
 
 | Property  | Required | Description                                                   | Type                                                                    |
 | --------- | :------: | ------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| type      |   Yes    | The type of identify provider, e.g., "gs1" for GS1 standards. | [ProviderType](/docs/reference-implementation/common/identify-provider#provider-types) |
+| type      |   Yes    | The type of identify provider, e.g., "gs1" for GS1 standards. | [ProviderType](/docs/0.2.0/reference-implementation/common/identify-provider#provider-types) |
 | url       |   Yes    | The URL endpoint for the identify provider service.           | String                                                                  |
 | namespace |   Yes    | The namespace for the identify provider.                      | String                                                                  |
 

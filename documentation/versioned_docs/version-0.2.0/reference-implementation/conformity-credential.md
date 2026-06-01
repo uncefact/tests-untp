@@ -18,10 +18,10 @@ This method involves manually creating and importing a Conformity Credential.
 Steps:
 
 1. Craft the Conformity Credential payload based on the [desired schema](https://uncefact.github.io/spec-untp/docs/specification/ConformityCredential#versions).
-2. Sign the credential using the [Verifiable Credential service](/docs/reference-implementation/dependent-services/verifiable-credential-service).
-3. Store the credential in an external or [Local Storage service](/docs/reference-implementation/dependent-services/storage-service).
-4. [Format the URL](/docs/reference-implementation/common/verify-link) for the conformity evidence reference.
-5. Include the formatted URL in the Conformity Credential within the DPP data props in the [app config](/docs/reference-implementation/configuration/) (conformityEvidence.reference).
+2. Sign the credential using the [Verifiable Credential service](/docs/0.2.0/reference-implementation/dependent-services/verifiable-credential-service).
+3. Store the credential in an external or [Local Storage service](/docs/0.2.0/reference-implementation/dependent-services/storage-service).
+4. [Format the URL](/docs/0.2.0/reference-implementation/common/verify-link) for the conformity evidence reference.
+5. Include the formatted URL in the Conformity Credential within the DPP data props in the [app config](/docs/0.2.0/reference-implementation/configuration/) (conformityEvidence.reference).
 
 #### Example config snippet:
 
@@ -131,23 +131,23 @@ Steps:
 
 **To Be Implemented**
 
-This method involves creating the conformity credential within the Reference implementation system by using a [feature](/docs/reference-implementation/configuration/feature-config) that is composed of the [JsonForm component](/docs/reference-implementation/components/json-form) and storing it in local storage or by using the Storage service.
+This method involves creating the conformity credential within the Reference implementation system by using a [feature](/docs/0.2.0/reference-implementation/configuration/feature-config) that is composed of the [JsonForm component](/docs/0.2.0/reference-implementation/components/json-form) and storing it in local storage or by using the Storage service.
 
 ### Request Conformity Credential from External Service
 
 <!-- TODO: Confirm with Nam about this flow -->
 
-This method uses the [ConformityCredential component](/docs/reference-implementation/components/conformity-credential) to request a conformity credential from an external service, store it, and manage the received credentials.
+This method uses the [ConformityCredential component](/docs/0.2.0/reference-implementation/components/conformity-credential) to request a conformity credential from an external service, store it, and manage the received credentials.
 
 Steps:
 
-1. Configure the [ConformityCredential component](/docs/reference-implementation/components/conformity-credential) in the [app config](/docs/reference-implementation/configuration/) to specify the external service details and [storage options](/docs/reference-implementation/common/storage).
-2. Use the [ConformityCredential component](/docs/reference-implementation/components/conformity-credential) to send a request to the external service for a Conformity Credential.
+1. Configure the [ConformityCredential component](/docs/0.2.0/reference-implementation/components/conformity-credential) in the [app config](/docs/0.2.0/reference-implementation/configuration/) to specify the external service details and [storage options](/docs/0.2.0/reference-implementation/common/storage).
+2. Use the [ConformityCredential component](/docs/0.2.0/reference-implementation/components/conformity-credential) to send a request to the external service for a Conformity Credential.
 3. Receive the credential from the external service.
-4. Store the received credential in the specified [storage service](/docs/reference-implementation/dependent-services/storage-service).
+4. Store the received credential in the specified [storage service](/docs/0.2.0/reference-implementation/dependent-services/storage-service).
 5. Save a reference to the stored credential in local storage for future use (only accessible by the specified app).
 
-All of the steps above are handled inside of the [ConformityCredential component](/docs/reference-implementation/components/conformity-credential).
+All of the steps above are handled inside of the [ConformityCredential component](/docs/0.2.0/reference-implementation/components/conformity-credential).
 
 Example config snippet:
 
@@ -202,14 +202,14 @@ Example config snippet:
 
 To use the stored Conformity Credentials in the DPP issuance process, you have two options:
 
-1. Using the [Conformity Credential Checkbox component](/docs/reference-implementation/components/conformity-credential-checkbox)
-2. Using the [Local Storage Loader component](/docs/reference-implementation/components/local-storage-loader)
+1. Using the [Conformity Credential Checkbox component](/docs/0.2.0/reference-implementation/components/conformity-credential-checkbox)
+2. Using the [Local Storage Loader component](/docs/0.2.0/reference-implementation/components/local-storage-loader)
 
 #### Option 1: Using the Conformity Credential Checkbox component
 
 <!-- TODO: Confirm with Nam about the order of components -->
 
-The [Conformity Credential Checkbox component](/docs/reference-implementation/components/conformity-credential-checkbox) allows users to select one or more Conformity Credentials from a list of checkboxes. The component is added to the issue DPP [feature](/docs/reference-implementation/configuration/feature-config). Here's how you can incorporate it into your DPP issuance process:
+The [Conformity Credential Checkbox component](/docs/0.2.0/reference-implementation/components/conformity-credential-checkbox) allows users to select one or more Conformity Credentials from a list of checkboxes. The component is added to the issue DPP [feature](/docs/0.2.0/reference-implementation/configuration/feature-config). Here's how you can incorporate it into your DPP issuance process:
 
 ```json
 {
@@ -264,7 +264,7 @@ The [Conformity Credential Checkbox component](/docs/reference-implementation/co
 
 <!-- TODO: Confirm with Nam about the mapping from local storage for CC -->
 
-The [Local Storage Loader component](/docs/reference-implementation/components/local-storage-loader) loads data from local storage and provides it to nested components. Here's how you can use it to load and incorporate Conformity Credentials:
+The [Local Storage Loader component](/docs/0.2.0/reference-implementation/components/local-storage-loader) loads data from local storage and provides it to nested components. Here's how you can use it to load and incorporate Conformity Credentials:
 
 ```json
 {

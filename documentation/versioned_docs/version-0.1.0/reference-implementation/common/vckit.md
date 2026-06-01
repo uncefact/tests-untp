@@ -9,7 +9,7 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 <!-- TODO: Add the ability to pass in an API key -->
 ## Description
 
-The `VCkit` object contains configuration details for the [Verifiable Credential service](/docs/reference-implementation/dependent-services/verifiable-credential-service), which is used to issue and manage Verifiable Credentials.
+The `VCkit` object contains configuration details for the [Verifiable Credential service](/docs/0.1.0/reference-implementation/dependent-services/verifiable-credential-service), which is used to issue and manage Verifiable Credentials.
 
 ## Definition
 
@@ -17,8 +17,8 @@ The `VCkit` object contains configuration details for the [Verifiable Credential
 | ----------- | -------- | --------------------------------------------------------------------------------- | --------------------------------------------------- |
 | vckitAPIUrl | Yes      | URL for the VCKit API                                                             | String                                              |
 | issuer      | Yes      | Issuer identifier for the Verifiable Credential                                   | String                                              |
-| headers     | No       | Custom headers to be included in the request to the Verifiable Credential service | [HTTP Headers](/docs/reference-implementation/common/http-headers) |
-| restOfVC    | No       | Contain any additional properties that are a part of the standard VC structure    | [restOfVC](/docs/reference-implementation/common/vckit#restofvc)   |
+| headers     | No       | Custom headers to be included in the request to the Verifiable Credential service | [HTTP Headers](/docs/0.1.0/reference-implementation/common/http-headers) |
+| restOfVC    | No       | Contain any additional properties that are a part of the standard VC structure    | [restOfVC](/docs/0.1.0/reference-implementation/common/vckit#restofvc)   |
 
 ### restOfVC
 
@@ -28,7 +28,7 @@ The `restOfVC` object contains any additional properties that are a part of the 
 | ---------- | -------- | ---------------------------------------------------------------- | ------------------------------------------------- |
 | id         | No       | values include UUID and DIDs                                     | String                                            |
 | validUntil | No       | representing the date and time the credential ceases to be valid | DateTimeStamp                                     |
-| renderMethod     | No       | render template used in VCkit                                    | [renderMethod](/docs/reference-implementation/common/vckit#rendermethod) |
+| renderMethod     | No       | render template used in VCkit                                    | [renderMethod](/docs/0.1.0/reference-implementation/common/vckit#rendermethod) |
 
 ### renderMethod
 
