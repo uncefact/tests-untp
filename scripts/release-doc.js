@@ -13,7 +13,7 @@ try {
   const docPath = path.join(__dirname, '..', 'documentation');
   process.chdir(docPath);
   // Execute the Docusaurus version command
-  execSync(`yarn docusaurus docs:version ${docVersion}`, { stdio: 'inherit' });
+  execSync(`pnpm docusaurus docs:version ${docVersion}`, { stdio: 'inherit' });
   console.log(`Successfully created documentation version ${docVersion}`);
   process.exit(0);
 } catch (error) {
