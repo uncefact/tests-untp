@@ -18,7 +18,7 @@ The `Credential` object defines the structure and properties of the compliant [V
 | Property            | Required | Description                                                           | Type                                                       |
 | ------------------- | -------- | --------------------------------------------------------------------- | ---------------------------------------------------------- |
 | context             | Yes      | JSON-LD context for the Verifiable Credential                         | String[]                                                   |
-| renderTemplate      | No       | Templates for rendering the Verifiable Credential                     | [RenderTemplate](/docs/reference-implementation/common/render-template)[] |
+| renderTemplate      | No       | Templates for rendering the Verifiable Credential                     | [RenderTemplate](/docs/0.1.0/reference-implementation/common/render-template)[] |
 | type                | Yes      | Types of the Verifiable Credential                                    | String[]                                                   |
 | dlrLinkTitle        | Yes      | Title for the Identity Register link                                  | String                                                     |
 | dlrVerificationPage | Yes      | URL of the verification page used to verify and render the credential | String                                                     |

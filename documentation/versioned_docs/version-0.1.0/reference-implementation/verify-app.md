@@ -9,7 +9,7 @@ import Disclaimer from '.././\_disclaimer.mdx';
 
 ## Description
 
-The Verify App is a crucial component of the [Scanning App](/docs/reference-implementation/scanning-app), responsible for verifying UNTP credentials and displaying the verified credentials. It handles the decryption of encrypted Verifiable Credentials (VCs), verification through a dedicated service, and presentation of the results to the user. The main entrypoints into the Verify App are through the [Scanning App](/docs/reference-implementation/scanning-app) or by a [Verify Link](/docs/reference-implementation/common/verify-link).
+The Verify App is a crucial component of the [Scanning App](/docs/0.1.0/reference-implementation/scanning-app), responsible for verifying UNTP credentials and displaying the verified credentials. It handles the decryption of encrypted Verifiable Credentials (VCs), verification through a dedicated service, and presentation of the results to the user. The main entrypoints into the Verify App are through the [Scanning App](/docs/0.1.0/reference-implementation/scanning-app) or by a [Verify Link](/docs/0.1.0/reference-implementation/common/verify-link).
 
 ## Overall Flow Diagram
 

@@ -9,7 +9,7 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 ## Description
 
-The `IdentifierKeyPath` can be an object or a string that defines the path to extract the identifier data from the [Json Form component](/docs/reference-implementation/components/json-form). When the `identifierKeyPath` is a string, it should be a link resolver URL. When the `identifierKeyPath` is an object, it should contain AI codes and JSON pointer paths to extract the appropriate data for identifier generation.
+The `IdentifierKeyPath` can be an object or a string that defines the path to extract the identifier data from the [Json Form component](/docs/0.2.0/reference-implementation/components/json-form). When the `identifierKeyPath` is a string, it should be a link resolver URL. When the `identifierKeyPath` is an object, it should contain AI codes and JSON pointer paths to extract the appropriate data for identifier generation.
 
 ## Example
 
@@ -46,4 +46,4 @@ or
 
 | Property          | Required | Description                             | Type                                                         |
 | ----------------- | :------: | --------------------------------------- | ------------------------------------------------------------ |
-| identifierKeyPath |   Yes    | The path to extract the identifier data | String or [AIData](/docs/reference-implementation/common/construct-ai-data) |
+| identifierKeyPath |   Yes    | The path to extract the identifier data | String or [AIData](/docs/0.2.0/reference-implementation/common/construct-ai-data) |

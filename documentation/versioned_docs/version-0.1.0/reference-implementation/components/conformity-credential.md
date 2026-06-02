@@ -73,15 +73,15 @@ The ConformityCredential component allows users to request and manage conformity
 | Property | Required | Description                                                  | Type                                                            |
 | -------- | -------- | ------------------------------------------------------------ | --------------------------------------------------------------- |
 | name     | Yes      | The name of the component (should be "ConformityCredential") | String                                                          |
-| type     | Yes      | The type of the component (should be "Void")                 | [ComponentType](/docs/reference-implementation/common/component-type)          |
-| props    | Yes      | The properties for the ConformityCredential                  | [Props](/docs/reference-implementation/components/conformity-credential#props) |
+| type     | Yes      | The type of the component (should be "Void")                 | [ComponentType](/docs/0.1.0/reference-implementation/common/component-type)          |
+| props    | Yes      | The properties for the ConformityCredential                  | [Props](/docs/0.1.0/reference-implementation/components/conformity-credential#props) |
 
 ### Props
 
 | Property                 | Required | Description                                   | Type                                                                                                  |
 | ------------------------ | -------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| credentialRequestConfigs | Yes      | An array of credential request configurations | [CredentialRequestConfig[]](/docs/reference-implementation/components/conformity-credential#credentialrequestconfig) |
-| storedCredentialsConfig  | Yes      | Configuration for storing credentials         | [Storage](/docs/reference-implementation/common/storage)                                                             |
+| credentialRequestConfigs | Yes      | An array of credential request configurations | [CredentialRequestConfig[]](/docs/0.1.0/reference-implementation/components/conformity-credential#credentialrequestconfig) |
+| storedCredentialsConfig  | Yes      | Configuration for storing credentials         | [Storage](/docs/0.1.0/reference-implementation/common/storage)                                                             |
 
 ### CredentialRequestConfig
 
@@ -89,7 +89,7 @@ The ConformityCredential component allows users to request and manage conformity
 | -------------- | -------- | ---------------------------------------------------- | --------------------------------------------------------------------------------- |
 | url            | Yes      | The URL for the credential request                   | String                                                                            |
 | params         | No       | Parameters for the request                           | Object                                                                            |
-| options        | Yes      | Request options                                      | [RequestOptions](/docs/reference-implementation/components/conformity-credential#requestoptions) |
+| options        | Yes      | Request options                                      | [RequestOptions](/docs/0.1.0/reference-implementation/components/conformity-credential#requestoptions) |
 | credentialName | Yes      | The name of the credential                           | String                                                                            |
 | credentialPath | No       | The path to extract the credential from the response | String                                                                            |
 | appOnly        | Yes      | The application context for the credential           | String                                                                            |

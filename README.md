@@ -56,7 +56,9 @@ docker compose up -d --build
 
 ### Local Development
 
-For development with hot reloading, stop the Reference Implementation container and run it locally instead:
+For development with hot reloading, stop the Reference Implementation container and run it locally instead.
+
+> **Warning**: Running the Reference Implementation on the host needs a one-line Keycloak change first. The Compose config sets `KC_HOSTNAME` to `http://keycloak:8080` for the containerised RI, but the host process cannot resolve `keycloak:8080` and the issuer in Keycloak's tokens would not match, so API authentication fails. Before the steps below, change `KC_HOSTNAME` to `http://localhost:8080` in `docker-compose.yml` and recreate Keycloak with `docker compose up -d keycloak`. Revert it to `http://keycloak:8080` before running the Reference Implementation in Docker again.
 
 ```bash
 docker compose stop ri

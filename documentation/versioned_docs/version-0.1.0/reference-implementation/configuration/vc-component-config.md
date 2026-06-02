@@ -17,7 +17,7 @@ The VC Component Configuration object contains the configuration details for the
 | -------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | credentialPath | Yes      | The path for the credential in the data. In some case, the credential can be the whole data or just be contained in the data | String                                              |
 | vckitAPIUrl    | Yes      | The URL for the vckit API                                                                                                    | String                                              |
-| headers        | No       | The headers for the vckit API, example: \{ Authorization: "Bearer test123"\}                                                 | [HTTP Headers](/docs/reference-implementation/common/http-headers) |
+| headers        | No       | The headers for the vckit API, example: \{ Authorization: "Bearer test123"\}                                                 | [HTTP Headers](/docs/0.1.0/reference-implementation/common/http-headers) |
 
 ## Example
 

@@ -15,7 +15,7 @@ Implementers can customise each General Feature page with branding elements, suc
 
 Each General Feature comprises a collection of features that encapsulate specific functionality or business logic. These features are made up of configurable components and services.
 
-For instance, a General Feature might involve [requesting a Conformity Credential from an external conformity assessment body (CAB)](/docs/reference-implementation/conformity-credential#request-conformity-credential-from-external-service). This is a common process that each app associated with an actor in the value chain would most likely need to perform.
+For instance, a General Feature might involve [requesting a Conformity Credential from an external conformity assessment body (CAB)](/docs/0.1.0/reference-implementation/conformity-credential#request-conformity-credential-from-external-service). This is a common process that each app associated with an actor in the value chain would most likely need to perform.
 
 ## Diagram 
 ``` mermaid
@@ -45,8 +45,8 @@ graph TD
 |----------|----------|-------------|------|
 | name | Yes | The name of the general feature (displayed in the sidebar)| String |
 | type | No | The type of the general feature | String |
-| style | Yes | Custom styling options for the general feature (Used to determine the colour of the header and buttons on the general feature page)| [Style](/docs/reference-implementation/common/style) |
-| features | Yes | A collection of features that make up this general feature | [Feature](/docs/reference-implementation/configuration/feature-config)[] |
+| style | Yes | Custom styling options for the general feature (Used to determine the colour of the header and buttons on the general feature page)| [Style](/docs/0.1.0/reference-implementation/common/style) |
+| features | Yes | A collection of features that make up this general feature | [Feature](/docs/0.1.0/reference-implementation/configuration/feature-config)[] |
 
 ## Example
 <!-- TODO: Update with CC request feature -->

@@ -38,8 +38,8 @@ graph TD
 | ---------- | -------- | ---------------------------------------------- | ------ |
 | name       | Yes      | The name of the feature (Displayed on buttons to access the feature within the respective reference implementation and used to construct the path to the feature)                       | String |
 | id         | Yes      | The id of the feature                          | String |
-| components | Yes      | A collection of components used in the feature | [Component](/docs/reference-implementation/configuration/component-config)[]  |
-| services   | Yes      | A collection of services used in the feature   | [Service](/docs/reference-implementation/configuration/service-config)[]  |
+| components | Yes      | A collection of components used in the feature | [Component](/docs/0.2.0/reference-implementation/configuration/component-config)[]  |
+| services   | Yes      | A collection of services used in the feature   | [Service](/docs/0.2.0/reference-implementation/configuration/service-config)[]  |
 
 ## Example
 

@@ -57,12 +57,12 @@ This example specifies that for each item in the `outputEPCList`, the `name` fie
 | Property | Required | Description                                              | Type                                                        |
 | -------- | -------- | -------------------------------------------------------- | ----------------------------------------------------------- |
 | name     | Yes      | The name of the component (should be "BarcodeGenerator") | String                                                      |
-| type     | Yes      | The type of the component (should be "Result")           | [ComponentType](/docs/reference-implementation/common/component-type)      |
-| props    | Yes      | The properties for the BarcodeGenerator                  | [Props](/docs/reference-implementation/components/barcode-generator#props) |
+| type     | Yes      | The type of the component (should be "Result")           | [ComponentType](/docs/0.2.0/reference-implementation/common/component-type)      |
+| props    | Yes      | The properties for the BarcodeGenerator                  | [Props](/docs/0.2.0/reference-implementation/components/barcode-generator#props) |
 
 ### Props
 
 | Property | Required | Description                                                                                       | Type                                               |
 | -------- | -------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | data     | No       | The credential object containing the data for barcode generation (usually automatically provided) | Object                                             |
-| dataPath | Yes      | A JSON pointer path to extract barcode data from the credential object                            | [AIData](/docs/reference-implementation/common/construct-ai-data) |
+| dataPath | Yes      | A JSON pointer path to extract barcode data from the credential object                            | [AIData](/docs/0.2.0/reference-implementation/common/construct-ai-data) |

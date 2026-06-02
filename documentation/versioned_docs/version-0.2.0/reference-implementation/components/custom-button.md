@@ -33,8 +33,8 @@ This component is used to download data returned by the last service in the serv
 | Property | Required | Description | Type |
 |----------|----------|-------------|------|
 | name | Yes | The name of the component (should be "CustomButton")| String |
-| type | Yes | The type of the button (should be "Submit")| [ComponentType](/docs/reference-implementation/common/component-type) |
-| props | Yes | The properties for the CustomButton | [Props](/docs/reference-implementation/components/custom-button#props) |
+| type | Yes | The type of the button (should be "Submit")| [ComponentType](/docs/0.2.0/reference-implementation/common/component-type) |
+| props | Yes | The properties for the CustomButton | [Props](/docs/0.2.0/reference-implementation/components/custom-button#props) |
 
 ### Props
 

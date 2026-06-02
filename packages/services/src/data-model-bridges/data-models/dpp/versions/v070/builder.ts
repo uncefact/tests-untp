@@ -94,6 +94,7 @@ export function buildDppSubject(entities: BridgeEntities): CredentialSubject {
     name: product?.name,
     ...(product?.description && { description: product.description }),
     ...(product?.primaryIdentifier && {
+      modelNumber: product.primaryIdentifier.value,
       idScheme: buildIdentifierScheme(product.primaryIdentifier.scheme),
     }),
     ...(product?.batchNumber && { batchNumber: product.batchNumber }),

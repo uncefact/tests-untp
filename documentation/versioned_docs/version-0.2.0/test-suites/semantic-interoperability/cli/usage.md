@@ -11,7 +11,7 @@ Once you have configured the test suite, you can run it to validate your UNTP cr
 
 ## Running the Test Suite
 
-To run the test suite with the configuration defined in the [Configuration section](/docs/test-suites/semantic-interoperability/cli/configuration):
+To run the test suite with the configuration defined in the [Configuration section](/docs/0.2.0/test-suites/semantic-interoperability/cli/configuration):
 
 ```bash
 yarn run untp test

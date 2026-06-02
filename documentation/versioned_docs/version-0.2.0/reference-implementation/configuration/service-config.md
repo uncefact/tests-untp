@@ -31,8 +31,8 @@ graph TD
 
 | Property   | Required | Description                                                              | Type                                 |
 | ---------- | -------- | ------------------------------------------------------------------------ | ------------------------------------ |
-| name       | Yes      | The name of the service (depends on service used)                        | [Service](/docs/reference-implementation/services/) |
-| parameters | Yes      | An array of parameter objects for the services (depends on service used) | [Service](/docs/reference-implementation/services/) |
+| name       | Yes      | The name of the service (depends on service used)                        | [Service](/docs/0.2.0/reference-implementation/services/) |
+| parameters | Yes      | An array of parameter objects for the services (depends on service used) | [Service](/docs/0.2.0/reference-implementation/services/) |
 
 ## Example
 

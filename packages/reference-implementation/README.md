@@ -26,12 +26,14 @@ The default values in `.env.example` are sufficient for local development — no
 
 See the [Quick Start guide](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/quick-start) for getting the full stack running with Docker Compose.
 
-For local development with hot reloading, stop the RI container and run it locally from the **repository root**:
+For local development with hot reloading, stop the RI container and run it locally from the **repository root**.
+
+> **Warning**: Running the RI on the host needs a one-line Keycloak change first. The Compose config sets `KC_HOSTNAME` to `http://keycloak:8080` for the containerised RI, but the host process cannot resolve `keycloak:8080` and the issuer in Keycloak's tokens would not match, so API authentication fails. Before the steps below, change `KC_HOSTNAME` to `http://localhost:8080` in `docker-compose.yml` and recreate Keycloak with `docker compose up -d keycloak`. Revert it to `http://keycloak:8080` before running the RI in Docker again.
 
 ```bash
 docker compose stop ri
-yarn build
-yarn start
+pnpm build
+pnpm start
 ```
 
 > **Note**: Ensure you have completed the [Prerequisites](../../README.md#prerequisites) in the root README before running locally.
@@ -75,16 +77,16 @@ docker compose up -d --build
 
 The RI uses **PostgreSQL** for all application-level data and **Prisma** as the database client.
 
-The Prisma client is generated automatically during `yarn build`. If the schema changes, apply migrations:
+The Prisma client is generated automatically during `pnpm build`. If the schema changes, apply migrations:
 
 ```bash
-yarn prisma migrate dev
+pnpm prisma migrate dev
 ```
 
 View or modify data using Prisma Studio:
 
 ```bash
-yarn prisma studio --config=prisma/prisma.config.ts
+pnpm prisma studio --config=prisma/prisma.config.ts
 ```
 
 Accessible at [http://localhost:5555](http://localhost:5555).
@@ -105,7 +107,7 @@ packages/reference-implementation/
 ### Testing
 
 ```bash
-yarn test          # Run all RI tests
+pnpm test          # Run all RI tests
 ```
 
 See the root [README](../../README.md) for E2E testing instructions.

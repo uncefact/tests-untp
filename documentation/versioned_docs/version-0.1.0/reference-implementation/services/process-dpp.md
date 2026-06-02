@@ -9,7 +9,7 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The `processDPP` service is responsible for processing a [Digital Product Passport (DPP)](https://uncefact.github.io/spec-untp/docs/specification/DigitalProductPassport), issuing a [Verifiable Credential (VC)](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials), uploading it to the [Storage service](/docs/reference-implementation/dependent-services/storage-service), and registering the link to the stored DPP with the [Identity Resolver service](/docs/reference-implementation/dependent-services/identity-resolution-service). It handles the entire lifecycle of creating and managing a DPP, from data input to storage and resolution.
+The `processDPP` service is responsible for processing a [Digital Product Passport (DPP)](https://uncefact.github.io/spec-untp/docs/specification/DigitalProductPassport), issuing a [Verifiable Credential (VC)](https://uncefact.github.io/spec-untp/docs/specification/VerifiableCredentials), uploading it to the [Storage service](/docs/0.1.0/reference-implementation/dependent-services/storage-service), and registering the link to the stored DPP with the [Identity Resolver service](/docs/0.1.0/reference-implementation/dependent-services/identity-resolution-service). It handles the entire lifecycle of creating and managing a DPP, from data input to storage and resolution.
 
 ## Diagram
 
@@ -104,11 +104,11 @@ P-->>C: Return VC and resolver URL
 
 | Property          | Required | Description                                                                                                                         | Type                                                            |
 | ----------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| vckit             | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/reference-implementation/common/vckit)                           |
-| dpp               | Yes      | Configuration for the Digital Product Passport                                                                                      | [DPP](/docs/reference-implementation/common/credential)                        |
-| dlr               | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/reference-implementation/common/idr)                               |
-| storage           | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/reference-implementation/common/storage)                       |
-| identifierKeyPath | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/reference-implementation/common/identifier-key-path) |
+| vckit             | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/0.1.0/reference-implementation/common/vckit)                           |
+| dpp               | Yes      | Configuration for the Digital Product Passport                                                                                      | [DPP](/docs/0.1.0/reference-implementation/common/credential)                        |
+| dlr               | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/0.1.0/reference-implementation/common/idr)                               |
+| storage           | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/0.1.0/reference-implementation/common/storage)                       |
+| identifierKeyPath | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/0.1.0/reference-implementation/common/identifier-key-path) |
 
 ## Function type
 

@@ -53,16 +53,16 @@ sequenceDiagram
 | Property | Required | Description                                                      | Type                                                                    |
 | -------- | -------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | name     | Yes      | The name of the component(should be "QRCodeScannerDialogButton") | String                                                                  |
-| type     | Yes      | The type of the component (should be "EntryData")                | [ComponentType](/docs/reference-implementation/common/component-type)                  |
-| props    | Yes      | The properties for the QRCodeScannerDialogButton                 | [Props](/docs/reference-implementation/components/qr-code-scanner-dialog-button#props) |
+| type     | Yes      | The type of the component (should be "EntryData")                | [ComponentType](/docs/0.2.0/reference-implementation/common/component-type)                  |
+| props    | Yes      | The properties for the QRCodeScannerDialogButton                 | [Props](/docs/0.2.0/reference-implementation/components/qr-code-scanner-dialog-button#props) |
 
 ### Props
 
 | Property  | Required | Description                                                                                           | Type                                                                            |
 | --------- | -------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| style     | No       | The style for the component                                                                           | [Style](/docs/reference-implementation/common/style)                                           |
-| type      | No       | The type of data (should be 'VerifiableCredential' and 'JSON'), the default is 'VerifiableCredential' | [PayloadType](/docs/reference-implementation/common/payload-type)                              |
-| vcOptions | No       | The options for the VC data processing                                                                | [VC component configuration](/docs/reference-implementation/configuration/vc-component-config) |
+| style     | No       | The style for the component                                                                           | [Style](/docs/0.2.0/reference-implementation/common/style)                                           |
+| type      | No       | The type of data (should be 'VerifiableCredential' and 'JSON'), the default is 'VerifiableCredential' | [PayloadType](/docs/0.2.0/reference-implementation/common/payload-type)                              |
+| vcOptions | No       | The options for the VC data processing                                                                | [VC component configuration](/docs/0.2.0/reference-implementation/configuration/vc-component-config) |
 
 ## Data Structure
 

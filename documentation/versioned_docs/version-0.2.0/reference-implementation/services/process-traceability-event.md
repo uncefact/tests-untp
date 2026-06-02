@@ -9,7 +9,7 @@ import Disclaimer from '../../\_disclaimer.mdx';
 
 ## Description
 
-The `processTraceabilityEvent` service is responsible for processing an [Traceability Event (DTE)](https://uncefact.github.io/spec-untp/docs/specification/DigitalTraceabilityEvents), it only process one event type in one time. The service will check the event type and call the corresponding service to process the event such as [processObjectEvent](/docs/reference-implementation/services/process-object-event), [processAggregationEvent](/docs/reference-implementation/services/process-aggregation-event), [processTransformationEventOnly](/docs/reference-implementation/services/process-transformation-event-only), [processAssociationEvent](/docs/reference-implementation/services/process-association-event), and [processTransactionEvent](/docs/reference-implementation/services/process-transaction-event).
+The `processTraceabilityEvent` service is responsible for processing an [Traceability Event (DTE)](https://uncefact.github.io/spec-untp/docs/specification/DigitalTraceabilityEvents), it only process one event type in one time. The service will check the event type and call the corresponding service to process the event such as [processObjectEvent](/docs/0.2.0/reference-implementation/services/process-object-event), [processAggregationEvent](/docs/0.2.0/reference-implementation/services/process-aggregation-event), [processTransformationEventOnly](/docs/0.2.0/reference-implementation/services/process-transformation-event-only), [processAssociationEvent](/docs/0.2.0/reference-implementation/services/process-association-event), and [processTransactionEvent](/docs/0.2.0/reference-implementation/services/process-transaction-event).
 
 ## Diagram
 
@@ -82,11 +82,11 @@ P-->>C: Return event VC and resolver URL
 
 | Property          | Required | Description                                                                                                                         | Type                                                            |
 | ----------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| vckit             | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/reference-implementation/common/vckit)                           |
-| traceabilityEvent | Yes      | Configuration for the EPCIS Traceability Event Event                                                                                | [Credential](/docs/reference-implementation/common/credential)                 |
-| storage           | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/reference-implementation/common/storage)                       |
-| dlr               | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/reference-implementation/common/idr)                               |
-| identifierKeyPath | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/reference-implementation/common/identifier-key-path) |
+| vckit             | Yes      | Configuration for the VCKit service                                                                                                 | [VCKit](/docs/0.2.0/reference-implementation/common/vckit)                           |
+| traceabilityEvent | Yes      | Configuration for the EPCIS Traceability Event Event                                                                                | [Credential](/docs/0.2.0/reference-implementation/common/credential)                 |
+| storage           | Yes      | Configuration for storage service                                                                                                   | [Storage](/docs/0.2.0/reference-implementation/common/storage)                       |
+| dlr               | Yes      | Configuration for the Digital Link Resolver                                                                                         | [IDR](/docs/0.2.0/reference-implementation/common/idr)                               |
+| identifierKeyPath | Yes      | JSON path to the identifier in the credential subject or the object for function and arguments of JSON path to construct identifier | [IdentifierKeyPath](/docs/0.2.0/reference-implementation/common/identifier-key-path) |
 | eventTypePath     | Yes      | JSON path to the event type in the credential subject                                                                               | String                                                          |
 
 ## Function type

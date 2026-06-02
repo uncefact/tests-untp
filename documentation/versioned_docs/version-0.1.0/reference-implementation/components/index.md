@@ -36,7 +36,7 @@ graph TD
 | Property | Required | Description                                                    | Type                                                   |
 | -------- | -------- | -------------------------------------------------------------- | ------------------------------------------------------ |
 | name     | Yes      | The name of the component (depends on component used)          | [Component](#available-components)                     |
-| type     | Yes      | The type of the component (depends on component used)          | [ComponentType](/docs/reference-implementation/common/component-type) |
+| type     | Yes      | The type of the component (depends on component used)          | [ComponentType](/docs/0.1.0/reference-implementation/common/component-type) |
 | props    | Yes      | Properties passed to the component (depends on component used) | [Component](#available-components)                     |
 
 ## Example

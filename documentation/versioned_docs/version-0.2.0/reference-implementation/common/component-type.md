@@ -9,11 +9,11 @@ import Disclaimer from '../../_disclaimer.mdx';
 
 ## Description
 
-The `type` property in a component configuration specifies the role or purpose of the [component](/docs/reference-implementation/configuration/component-config) within the feature. It determines how the component interacts with other parts of the system and what kind of data it handles.
+The `type` property in a component configuration specifies the role or purpose of the [component](/docs/0.2.0/reference-implementation/configuration/component-config) within the feature. It determines how the component interacts with other parts of the system and what kind of data it handles.
 
 ## Usage
 
-The `type` property is a required field in the [component](/docs/reference-implementation/configuration/component-config) configuration. It is used in conjunction with the `name` property to define the behavior and rendering of the component.
+The `type` property is a required field in the [component](/docs/0.2.0/reference-implementation/configuration/component-config) configuration. It is used in conjunction with the `name` property to define the behavior and rendering of the component.
 
 ## Types
 
@@ -23,9 +23,9 @@ Components with the `EntryData` type are responsible for capturing or providing 
 
 ### Submit
 
-Components with the `Submit` type are used for triggering actions or submitting data. They are often used for buttons that initiate a process or send data to a [service](/docs/reference-implementation/services/). 
+Components with the `Submit` type are used for triggering actions or submitting data. They are often used for buttons that initiate a process or send data to a [service](/docs/0.2.0/reference-implementation/services/). 
 
-When a Submit type component is activated, it executes the first element in the [services](/docs/reference-implementation/configuration/service-config) array. Components and services can be chained together, allowing each subsequent Submit event to correspond to executing the next element in the services array.
+When a Submit type component is activated, it executes the first element in the [services](/docs/0.2.0/reference-implementation/configuration/service-config) array. Components and services can be chained together, allowing each subsequent Submit event to correspond to executing the next element in the services array.
 
 ### Result
 

@@ -9,7 +9,7 @@ import Disclaimer from './../../../\_disclaimer.mdx';
 
 The QR Link / Encryption feature is a crucial component of the UNTP ecosystem, providing a standardised way to access, verify, and render credentials.
 
-For detailed information about the Verify Link structure and usage, please refer to the [Verify Link documentation](/docs/reference-implementation/common/verify-link).
+For detailed information about the Verify Link structure and usage, please refer to the [Verify Link documentation](/docs/0.1.0/reference-implementation/common/verify-link).
 
 ## Testing Instructions
 
@@ -20,7 +20,7 @@ To test your QR Link / Encryption implementation, follow these steps:
 2. **Update the Configuration**:
 
    - Navigate to the config file: `packages/vc-test-suite/config.ts`
-   - Update the `QrLinkEncrypted` section with your verify link (see [payload structure](/docs/test-suites/technical-interoperability/untp-extensions/qr-link-encryption#payload-structure)). The file should look similar to this:
+   - Update the `QrLinkEncrypted` section with your verify link (see [payload structure](/docs/0.1.0/test-suites/technical-interoperability/untp-extensions/qr-link-encryption#payload-structure)). The file should look similar to this:
 
      ```typescript
      export default {

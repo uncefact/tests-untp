@@ -36,8 +36,8 @@ The `constructAiData` object defines the schema for constructing event data for 
 
 | Property   | Required | Description                                                                        | Type                                                              |
 | ---------- | :------: | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| primary    |   Yes    | The primary AI that defines the AI code and the path for primary AI value          | [AI config](/docs/reference-implementation/common/construct-ai-data#ai-config)   |
-| qualifiers |    No    | The list of qualifiers that define the AI code and the path for qualifier AI value | [AI config](/docs/reference-implementation/common/construct-ai-data#ai-config)[] |
+| primary    |   Yes    | The primary AI that defines the AI code and the path for primary AI value          | [AI config](/docs/0.2.0/reference-implementation/common/construct-ai-data#ai-config)   |
+| qualifiers |    No    | The list of qualifiers that define the AI code and the path for qualifier AI value | [AI config](/docs/0.2.0/reference-implementation/common/construct-ai-data#ai-config)[] |
 
 #### AI config
 

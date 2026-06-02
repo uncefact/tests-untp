@@ -83,12 +83,12 @@ const config: Config = {
       items: [
         { to: '/docs/introduction', label: 'Introduction', position: 'right' },
         {
-          to: '/docs/reference-implementation/',
+          to: '/docs/reference-implementation/overview',
           label: 'Getting started',
           position: 'right',
         },
         {
-          to: '/docs/reference-implementation/',
+          to: '/docs/reference-implementation/overview',
           label: 'Tools and support',
           position: 'right',
         },
@@ -127,7 +127,7 @@ const config: Config = {
             },
             {
               label: 'Getting Started',
-              to: '/docs/reference-implementation/',
+              to: '/docs/reference-implementation/overview',
             },
           ],
         },
@@ -136,19 +136,19 @@ const config: Config = {
           items: [
             {
               label: 'Reference Implementation',
-              to: '/docs/reference-implementation/',
+              to: '/docs/reference-implementation/overview',
             },
             {
               label: 'Technical Interoperability',
-              to: '/docs/reference-implementation/',
+              to: '/docs/reference-implementation/overview',
             },
             {
               label: 'Semantic Interoperability',
-              to: '/docs/reference-implementation/',
+              to: '/docs/reference-implementation/overview',
             },
             {
               label: 'Graph Validation',
-              to: '/docs/reference-implementation/',
+              to: '/docs/reference-implementation/overview',
             },
           ],
         },

@@ -9,12 +9,12 @@ import Disclaimer from '../.././\_disclaimer.mdx';
 
 ## Description
 
-The `DefaultVerificationServiceLink` object defines the default link and parameters of the verification service used when verifying credentials within the [verify page](/docs/reference-implementation/verify-app) of the Reference implementation system.
+The `DefaultVerificationServiceLink` object defines the default link and parameters of the verification service used when verifying credentials within the [verify page](/docs/0.2.0/reference-implementation/verify-app) of the Reference implementation system.
 
 The typical flow is as follows:
-1. A user runs through the [scanning app](/docs/reference-implementation/scanning-app) flow.
-2. The resulting credential is passed to the [verify page](/docs/reference-implementation/verify-app) of the Reference implementation system.
-3. The [verify page](/docs/reference-implementation/verify-app) uses the verification service defined in the `Default Verification Service Link` object to verify the credential.
+1. A user runs through the [scanning app](/docs/0.2.0/reference-implementation/scanning-app) flow.
+2. The resulting credential is passed to the [verify page](/docs/0.2.0/reference-implementation/verify-app) of the Reference implementation system.
+3. The [verify page](/docs/0.2.0/reference-implementation/verify-app) uses the verification service defined in the `Default Verification Service Link` object to verify the credential.
 
 This object ensures that the Reference implementation system has a consistent and predefined method for credential verification.
 

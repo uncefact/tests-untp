@@ -27,4 +27,4 @@ On mount, the component reads the stored conformity credentials from local stora
 | Property | Required | Description | Type |
 |----------|:--------:|-------------|------|
 | name | Yes | The name of the component (should be "ConformityCredentialCheckbox") | String |
-| type | Yes | The type of the component (should be "EntryData") | [ComponentType](/docs/reference-implementation/common/component-type) |
+| type | Yes | The type of the component (should be "EntryData") | [ComponentType](/docs/0.2.0/reference-implementation/common/component-type) |
