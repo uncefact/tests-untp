@@ -139,7 +139,7 @@ The version.json file serves as a central metadata file to define the versioning
    # Run the release script
    pnpm release:doc
    ```
-8. Update the affected packages' `CHANGELOG.md` (and `RELEASE_NOTES.md` where applicable) by hand before tagging.
+8. Update the affected packages' CHANGELOG.md (and RELEASE_NOTES.md where applicable) manually before tagging.
 
 **2. Release Steps**
 
