@@ -139,16 +139,12 @@ const config: Config = {
               to: '/docs/reference-implementation/overview',
             },
             {
-              label: 'Technical Interoperability',
-              to: '/docs/reference-implementation/overview',
+              label: 'Test Suites',
+              to: '/docs/test-suites',
             },
             {
-              label: 'Semantic Interoperability',
-              to: '/docs/reference-implementation/overview',
-            },
-            {
-              label: 'Graph Validation',
-              to: '/docs/reference-implementation/overview',
+              label: 'UNTP Playground',
+              href: 'https://test.uncefact.org/untp-playground',
             },
           ],
         },
