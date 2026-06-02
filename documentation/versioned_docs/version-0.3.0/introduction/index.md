@@ -25,30 +25,8 @@ The [UNTP Playground](https://test.uncefact.org/untp-playground) is a web applic
 
 ## Test Suites
 
-The [Test Suites](../test-suites) provide structured conformance testing across multiple dimensions:
-
-### Technical Interoperability
-
-Tests the technical interoperability of implementations based on the UNTP specification, ensuring that the technical aspects — credential formats, data structures, and protocol requirements — align with the specification.
-
-### Semantic Interoperability
-
-The [Semantic Interoperability tests](../test-suites/semantic-interoperability) verify that the credentials produced by an implementation are semantically consistent with the UNTP specification. This allows implementors to be conformant with the core specification while allowing for extensions.
-
-### Graph Validation
-
-Tests the entire trust graph produced by an implementation against the UNTP specification, ensuring the integrity and validity of the trust relationships within the system.
+The UNTP [test suite](../test-suites) is being refactored. It will be distributed as a Node.js library and a command-line interface, with significant improvements to the testing infrastructure planned across subsequent releases.
 
 ## Extensibility
 
 The Test Suites and Reference Implementation can be extended to meet the specific needs of industries or value chain actors while still conforming to the core UNTP specification. This flexibility allows for customisation without compromising the protocol's fundamental principles.
-
-## Tiered Approach
-
-The Test Suites follow a tiered approach, with each tier building upon the previous one:
-
-- **Tier 1**: Technical interoperability
-- [**Tier 2**](../test-suites/semantic-interoperability): Semantic interoperability
-- **Tier 3**: Graph validation
-
-This tiered structure allows implementers to progressively validate their UNTP implementations, ensuring a systematic approach to conformance testing.

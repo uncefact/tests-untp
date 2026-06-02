@@ -20,7 +20,7 @@ To test your QR Link / Encryption implementation, follow these steps:
 2. **Update the Configuration**:
 
    - Navigate to the config file: `packages/vc-test-suite/config.ts`
-   - Update the `QrLinkEncrypted` section with your verify link (see [payload structure](/docs/test-suites/technical-interoperability/untp-extensions/qr-link-encryption#payload-structure)). The file should look similar to this:
+   - Update the `QrLinkEncrypted` section with your verify link (see [payload structure](/docs/0.2.0/test-suites/technical-interoperability/untp-extensions/qr-link-encryption#payload-structure)). The file should look similar to this:
 
      ```typescript
      export default {
