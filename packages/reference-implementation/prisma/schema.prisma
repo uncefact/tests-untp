@@ -280,7 +280,7 @@ model Identifier {
   facilitySecondaries     FacilitySecondaryIdentifier[]     @relation("FacilitySecondaryIdentifiers")
   productSecondaries      ProductSecondaryIdentifier[]      @relation("ProductSecondaryIdentifiers")
 
-  @@unique([schemeId, value])
+  @@unique([schemeId, value, tenantId])
   @@index([tenantId])
 }
 
