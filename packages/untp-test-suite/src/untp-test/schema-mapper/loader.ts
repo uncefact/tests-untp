@@ -157,36 +157,30 @@ function getSchemaUrlFromMappings(credential: any, mappings: SchemaMappingConfig
     return null;
   }
 
-  // Find matching mapping by credential type
-  let matchedMapping: SchemaMappingConfig | undefined;
-
-  // Look for specific target type
-  if (credential.type.includes(targetType)) {
-    matchedMapping = mappings.find((mapping) => mapping.credentialType === targetType);
-  } else {
-    // Target type not found in credential - return null
+  // Target type must be present in the credential
+  if (!credential.type.includes(targetType)) {
     return null;
   }
 
-  if (!matchedMapping) {
-    return null;
-  }
-
-  // If no version regex, return the schema URL as-is
-  if (!matchedMapping.versionRegex) {
-    return matchedMapping.schemaUrlPattern;
-  }
-
-  // Extract version using the regex
+  // A credential type may have more than one mapping (e.g. one per UNTP context
+  // scheme: the 0.6.x per-type context and the 0.7.0 unified context). Try every
+  // mapping for this type and return the first that resolves a URL, rather than
+  // committing to the first entry and giving up if its versionRegex does not match.
   const credentialString = JSON.stringify(credential);
-  const versionMatch = credentialString.match(new RegExp(matchedMapping.versionRegex));
 
-  if (!versionMatch || !versionMatch[1]) {
-    return null;
+  for (const mapping of mappings.filter((m) => m.credentialType === targetType)) {
+    // If no version regex, the schema URL is fixed.
+    if (!mapping.versionRegex) {
+      return mapping.schemaUrlPattern;
+    }
+
+    const versionMatch = credentialString.match(new RegExp(mapping.versionRegex));
+    if (versionMatch && versionMatch[1]) {
+      return mapping.schemaUrlPattern.replace('{version}', versionMatch[1]);
+    }
   }
 
-  const version = versionMatch[1];
-  return matchedMapping.schemaUrlPattern.replace('{version}', version);
+  return null;
 }
 
 /**

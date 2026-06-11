@@ -290,18 +290,30 @@ export function extractUNTPVersion(credential: any): string | null {
     return null;
   }
 
-  // Create regex patterns for all UNTP credential types
+  // 0.6.x scheme: per-type context, e.g.
+  // https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/ — version is the 2nd group.
   const abbreviations = Object.values(UNTP_CREDENTIAL_TYPE_ABBREVIATIONS);
-  const untpContextRegex = new RegExp(
+  const legacyContextRegex = new RegExp(
     `https://test\\.uncefact\\.org/vocabulary/untp/(${abbreviations.join('|')})/([^/]+)/`,
   );
 
+  // 0.7.0+ scheme: single unified context, e.g.
+  // https://vocabulary.uncefact.org/untp/0.7.0/context/ — version is the 1st group.
+  const unifiedContextRegex = new RegExp('https://vocabulary\\.uncefact\\.org/untp/([^/]+)/context/');
+
   for (const contextUrl of credential['@context']) {
-    if (typeof contextUrl === 'string') {
-      const match = contextUrl.match(untpContextRegex);
-      if (match && match[2]) {
-        return match[2]; // Return the captured version (second capture group)
-      }
+    if (typeof contextUrl !== 'string') {
+      continue;
+    }
+
+    const legacyMatch = contextUrl.match(legacyContextRegex);
+    if (legacyMatch && legacyMatch[2]) {
+      return legacyMatch[2];
+    }
+
+    const unifiedMatch = contextUrl.match(unifiedContextRegex);
+    if (unifiedMatch && unifiedMatch[1]) {
+      return unifiedMatch[1];
     }
   }
 

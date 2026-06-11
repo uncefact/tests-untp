@@ -27,6 +27,31 @@
       "schemaUrlPattern": "https://test.uncefact.org/vocabulary/untp/dte/untp-dte-schema-{version}.json"
     },
     {
+      "credentialType": "DigitalProductPassport",
+      "versionRegex": "https://vocabulary\\.uncefact\\.org/untp/([^/]+)/context/",
+      "schemaUrlPattern": "https://untp.unece.org/artefacts/schema/v{version}/dpp/DigitalProductPassport.json"
+    },
+    {
+      "credentialType": "DigitalConformityCredential",
+      "versionRegex": "https://vocabulary\\.uncefact\\.org/untp/([^/]+)/context/",
+      "schemaUrlPattern": "https://untp.unece.org/artefacts/schema/v{version}/dcc/ConformityCredential.json"
+    },
+    {
+      "credentialType": "DigitalFacilityRecord",
+      "versionRegex": "https://vocabulary\\.uncefact\\.org/untp/([^/]+)/context/",
+      "schemaUrlPattern": "https://untp.unece.org/artefacts/schema/v{version}/dfr/DigitalFacilityRecord.json"
+    },
+    {
+      "credentialType": "DigitalIdentityAnchor",
+      "versionRegex": "https://vocabulary\\.uncefact\\.org/untp/([^/]+)/context/",
+      "schemaUrlPattern": "https://untp.unece.org/artefacts/schema/v{version}/dia/DigitalIdentityAnchor.json"
+    },
+    {
+      "credentialType": "DigitalTraceabilityEvent",
+      "versionRegex": "https://vocabulary\\.uncefact\\.org/untp/([^/]+)/context/",
+      "schemaUrlPattern": "https://untp.unece.org/artefacts/schema/v{version}/dte/DigitalTraceabilityEvent.json"
+    },
+    {
       "credentialType": "VerifiableCredential",
       "schemaUrlPattern": "https://raw.githubusercontent.com/w3c/vc-data-model/refs/heads/main/schema/verifiable-credential/verifiable-credential-schema.json"
     }
