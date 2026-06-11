@@ -1,41 +1,36 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import ProtectedLayout from './layout';
 
 const mockPush = jest.fn();
-const mockPathname = jest.fn(() => '/configuration/dids');
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
   }),
-  usePathname: () => mockPathname(),
+  usePathname: () => '/dashboard',
 }));
+
+jest.mock('lucide-react', () => ({
+  LogOut: () => <span>LogOut</span>,
+}));
+
+const mockUseAuth = jest.fn();
 
 jest.mock('@/contexts/auth', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useAuth: () => ({
-    user: { name: 'Test User', email: 'test@example.com', roles: [] },
-    isLoading: false,
-    isAuthenticated: true,
-    logout: jest.fn(),
-  }),
+  useAuth: () => mockUseAuth(),
 }));
 
+jest.mock('@/contexts/did/DidContext', () => ({
+  DidProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+// Mocked so the absence assertions trip if the layout renders the sidebars again.
+// The mocks render their test ids unconditionally (the real Sidebar swaps to a
+// skeleton without its test id while loading) and avoid the real components'
+// dependencies on '@reference-implementation/components', mocked below. See #715.
 jest.mock('@/components/sidebar', () => ({
-  Sidebar: ({ onNavClick, selectedNavId }: { onNavClick: (id: string) => void; selectedNavId?: string }) => (
-    <div data-testid='sidebar' data-selected-nav-id={selectedNavId}>
-      <button data-testid='nav-dids' onClick={() => onNavClick('dids')}>
-        DIDs
-      </button>
-      <button data-testid='nav-credentials' onClick={() => onNavClick('credentials')}>
-        Credentials
-      </button>
-      <button data-testid='nav-resources' onClick={() => onNavClick('resources')}>
-        Resources
-      </button>
-    </div>
-  ),
+  Sidebar: () => <div data-testid='sidebar' />,
   MobileSidebar: () => <div data-testid='mobile-sidebar' />,
 }));
 
@@ -43,84 +38,64 @@ jest.mock('@reference-implementation/components', () => ({
   Loader: () => <div data-testid='loader' />,
 }));
 
-jest.mock('lucide-react', () => ({
-  LogOut: () => <span>LogOut</span>,
-}));
-
-describe('ProtectedLayout navigation', () => {
+describe('ProtectedLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      user: { name: 'Test User', email: 'test@example.com', roles: [] },
+      isLoading: false,
+      isAuthenticated: true,
+      logout: jest.fn(),
+    });
   });
 
-  it('calls router.push when clicking a mapped nav item', async () => {
-    const user = userEvent.setup();
+  it('renders children without the navigation sidebars', () => {
     render(
       <ProtectedLayout>
-        <div>Content</div>
+        <div data-testid='content'>Content</div>
       </ProtectedLayout>,
     );
 
-    await user.click(screen.getByTestId('nav-dids'));
-
-    expect(mockPush).toHaveBeenCalledWith('/configuration/dids');
+    expect(screen.getByTestId('content')).toBeInTheDocument();
+    expect(screen.queryByTestId('sidebar')).toBeNull();
+    expect(screen.queryByTestId('mobile-sidebar')).toBeNull();
   });
 
-  it('does not call router.push when clicking an unmapped nav item', async () => {
-    const user = userEvent.setup();
+  it('shows the loader while authentication is pending', () => {
+    mockUseAuth.mockReturnValue({
+      user: null,
+      isLoading: true,
+      isAuthenticated: false,
+      logout: jest.fn(),
+    });
+
     render(
       <ProtectedLayout>
-        <div>Content</div>
+        <div data-testid='content'>Content</div>
       </ProtectedLayout>,
     );
 
-    await user.click(screen.getByTestId('nav-credentials'));
-
+    expect(screen.getByTestId('loader')).toBeInTheDocument();
+    expect(screen.queryByTestId('content')).toBeNull();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('does not call router.push for external nav items', async () => {
-    const user = userEvent.setup();
+  it('redirects to sign-in when unauthenticated', () => {
+    mockUseAuth.mockReturnValue({
+      user: null,
+      isLoading: false,
+      isAuthenticated: false,
+      logout: jest.fn(),
+    });
+
     render(
       <ProtectedLayout>
-        <div>Content</div>
+        <div data-testid='content'>Content</div>
       </ProtectedLayout>,
     );
 
-    await user.click(screen.getByTestId('nav-resources'));
-
-    expect(mockPush).not.toHaveBeenCalled();
-  });
-
-  it('derives selectedNavId from the current pathname', () => {
-    mockPathname.mockReturnValue('/configuration/dids');
-    render(
-      <ProtectedLayout>
-        <div>Content</div>
-      </ProtectedLayout>,
-    );
-
-    expect(screen.getByTestId('sidebar')).toHaveAttribute('data-selected-nav-id', 'dids');
-  });
-
-  it('sets selectedNavId to undefined for unrecognised paths', () => {
-    mockPathname.mockReturnValue('/dashboard');
-    render(
-      <ProtectedLayout>
-        <div>Content</div>
-      </ProtectedLayout>,
-    );
-
-    expect(screen.getByTestId('sidebar')).not.toHaveAttribute('data-selected-nav-id', 'dids');
-  });
-
-  it('matches sub-paths to the correct nav item', () => {
-    mockPathname.mockReturnValue('/configuration/dids/create');
-    render(
-      <ProtectedLayout>
-        <div>Content</div>
-      </ProtectedLayout>,
-    );
-
-    expect(screen.getByTestId('sidebar')).toHaveAttribute('data-selected-nav-id', 'dids');
+    expect(mockPush).toHaveBeenCalledWith('/api/auth/signin');
+    expect(screen.getByTestId('loader')).toBeInTheDocument();
+    expect(screen.queryByTestId('content')).toBeNull();
   });
 });

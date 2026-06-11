@@ -8,6 +8,9 @@ import { DidProvider } from '@/contexts/did/DidContext';
 import { Sidebar, MobileSidebar } from '@/components/sidebar';
 import { LogOut } from 'lucide-react';
 
+// Navigation is hidden until the pages it links to exist; flip to true to reinstate (#715).
+const SHOW_NAVIGATION = false;
+
 interface ProtectedLayoutProps {
   children: React.ReactNode;
 }
@@ -144,17 +147,21 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className='flex h-screen overflow-hidden'>
-      {/* Mobile Sidebar/Navbar - hidden on desktop */}
-      <div className='md:hidden'>
-        <MobileSidebar {...sidebarProps} />
-      </div>
+      {SHOW_NAVIGATION && (
+        <>
+          {/* Mobile Sidebar/Navbar - hidden on desktop */}
+          <div className='md:hidden'>
+            <MobileSidebar {...sidebarProps} />
+          </div>
 
-      {/* Desktop Sidebar - hidden on mobile */}
-      <div className='hidden md:block'>
-        <Sidebar {...sidebarProps} />
-      </div>
+          {/* Desktop Sidebar - hidden on mobile */}
+          <div className='hidden md:block'>
+            <Sidebar {...sidebarProps} />
+          </div>
+        </>
+      )}
 
-      <main className='flex-1 overflow-auto pt-16 md:pt-0'>
+      <main className={`flex-1 overflow-auto${SHOW_NAVIGATION ? ' pt-16 md:pt-0' : ''}`}>
         <div className='px-6 py-6'>
           {isLoading ? (
             <Loader size={60} text='Loading...' className='min-h-[calc(100vh-3rem)]' />
