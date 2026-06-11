@@ -38,8 +38,20 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
     // Create a query engine
     const mySparqlEngine = new querySparql.QueryEngine();
 
-    // Execute a SPARQL query directly on the n3store to get products, claims, and criteria
-    const result = await mySparqlEngine.queryBindings(
+    // Create maps for organizing the data
+    const productsMap = new Map<string, Product>();
+    const claimsMap = new Map<string, Claim>();
+
+    // UNTP has two context schemes that expand to different RDF shapes:
+    //  - 0.6.x: per-type vocabulary (test.uncefact.org/vocabulary/untp/{dpp,core}/0/),
+    //    with an intermediate `untp:product` node and `conformityClaim` /
+    //    `assessmentCriteria` predicates.
+    //  - 0.7.0+: a single unified vocabulary (vocabulary.uncefact.org/untp/), where the
+    //    `credentialSubject` IS the Product and claims use `performanceClaim` /
+    //    `referenceCriteria`.
+    // Query both shapes (version-aware) so a graph in either version yields products.
+    const criteriaQueries = [
+      // 0.6.x scheme
       `
       PREFIX dpp: <https://test.uncefact.org/vocabulary/untp/dpp/0/>
       PREFIX schemaorg: <https://schema.org/>
@@ -66,17 +78,35 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
         ?criterion schemaorg:name ?criterionName .
       }
     `,
-      {
-        sources: [n3store],
-      },
-    );
+      // 0.7.0+ unified scheme
+      `
+      PREFIX untp: <https://vocabulary.uncefact.org/untp/>
+      PREFIX schemaorg: <https://schema.org/>
+      PREFIX vc: <https://www.w3.org/2018/credentials#>
+      PREFIX result: <http://example.org/result#>
 
-    // Create maps for organizing the data
-    const productsMap = new Map<string, Product>();
-    const claimsMap = new Map<string, Claim>();
+      SELECT ?credential ?product ?productName ?claim ?topic ?conformance ?criterion ?criterionName
+             (EXISTS { ?claim result:allCriteriaVerified true } AS ?claimVerified)
+             (EXISTS { ?claim result:verifiedCriterion ?criterion } AS ?criterionVerified)
+      WHERE {
+        ?credential a untp:DigitalProductPassport .
+        ?credential vc:credentialSubject ?product .
+        ?product a untp:Product .
+        ?product schemaorg:name ?productName .
 
-    // Process each binding (row of results) using async iteration
-    for await (const binding of result) {
+        # Find performance claims (the 0.7.0 equivalent of conformityClaim)
+        ?product untp:performanceClaim ?claim .
+        ?claim untp:conformityTopic ?topic .
+
+        # Get reference criteria (the 0.7.0 equivalent of assessmentCriteria)
+        ?claim untp:referenceCriteria ?criterion .
+        ?criterion schemaorg:name ?criterionName .
+      }
+    `,
+    ];
+
+    // Process one criteria binding into the products/claims maps.
+    const processCriteriaBinding = (binding: any) => {
       const dppId = binding.get('credential')?.value || '';
       const productId = binding.get('product')?.value || '';
       const productName = binding.get('productName')?.value || '';
@@ -124,7 +154,14 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
           verifiedBy: criterionVerified ? 'verified' : undefined,
         };
         claim.criteria.push(criterion);
-        //console.log(`Product ${productName}: Found criterion ${criterionName} for claim ${claim.topic}`)
+      }
+    };
+
+    // Execute the version-aware criteria queries and process their bindings.
+    for (const criteriaQuery of criteriaQueries) {
+      const result = await mySparqlEngine.queryBindings(criteriaQuery, { sources: [n3store] });
+      for await (const binding of result) {
+        processCriteriaBinding(binding);
       }
     }
 
@@ -165,8 +202,10 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
       }
     }
 
-    // Get simple claims (claims without criteria)
-    const simpleClaimsResult = await mySparqlEngine.queryBindings(
+    // Get simple claims (claims without criteria), version-aware across both
+    // the 0.6.x per-type scheme and the 0.7.0+ unified scheme.
+    const simpleClaimsQueries = [
+      // 0.6.x scheme
       `
       PREFIX dpp: <https://test.uncefact.org/vocabulary/untp/dpp/0/>
       PREFIX schemaorg: <https://schema.org/>
@@ -191,13 +230,33 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
         FILTER NOT EXISTS { ?claim untp:assessmentCriteria ?criterion }
       }
     `,
-      {
-        sources: [n3store],
-      },
-    );
+      // 0.7.0+ unified scheme
+      `
+      PREFIX untp: <https://vocabulary.uncefact.org/untp/>
+      PREFIX schemaorg: <https://schema.org/>
+      PREFIX vc: <https://www.w3.org/2018/credentials#>
+      PREFIX result: <http://example.org/result#>
 
-    // Process simple claims
-    for await (const binding of simpleClaimsResult) {
+      SELECT ?credential ?product ?productName ?claim ?topic ?conformance
+             (EXISTS { ?claim result:allCriteriaVerified true } AS ?claimVerified)
+      WHERE {
+        ?credential a untp:DigitalProductPassport .
+        ?credential vc:credentialSubject ?product .
+        ?product a untp:Product .
+        ?product schemaorg:name ?productName .
+
+        # Find performance claims
+        ?product untp:performanceClaim ?claim .
+        ?claim untp:conformityTopic ?topic .
+
+        # Ensure this is a simple claim (no reference criteria)
+        FILTER NOT EXISTS { ?claim untp:referenceCriteria ?criterion }
+      }
+    `,
+    ];
+
+    // Process one simple-claim binding into the products/claims maps.
+    const processSimpleClaimBinding = (binding: any) => {
       const dppId = binding.get('credential')?.value || '';
       const productId = binding.get('product')?.value || '';
       const productName = binding.get('productName')?.value || '';
@@ -233,6 +292,14 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
         claimsMap.get(claimKey)!.verified = true;
       }
       console.warn(`Product ${productName}: Found claim ${topic} without any criteria!`);
+    };
+
+    // Execute the version-aware simple-claim queries and process their bindings.
+    for (const simpleClaimsQuery of simpleClaimsQueries) {
+      const simpleClaimsResult = await mySparqlEngine.queryBindings(simpleClaimsQuery, { sources: [n3store] });
+      for await (const binding of simpleClaimsResult) {
+        processSimpleClaimBinding(binding);
+      }
     }
 
     return Array.from(productsMap.values());
