@@ -85,7 +85,7 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
       PREFIX vc: <https://www.w3.org/2018/credentials#>
       PREFIX result: <http://example.org/result#>
 
-      SELECT ?credential ?product ?productName ?claim ?topic ?conformance ?criterion ?criterionName
+      SELECT ?credential ?product ?productName ?claim ?topic ?criterion ?criterionName
              (EXISTS { ?claim result:allCriteriaVerified true } AS ?claimVerified)
              (EXISTS { ?claim result:verifiedCriterion ?criterion } AS ?criterionVerified)
       WHERE {
@@ -94,7 +94,9 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
         ?product a untp:Product .
         ?product schemaorg:name ?productName .
 
-        # Find performance claims (the 0.7.0 equivalent of conformityClaim)
+        # Find performance claims (the 0.7.0 equivalent of conformityClaim).
+        # Note: 0.7.0 has no boolean conformance predicate on the claim
+        # (verified against the RDF expansion of real 0.7.0 DPPs), so it is not selected.
         ?product untp:performanceClaim ?claim .
         ?claim untp:conformityTopic ?topic .
 
@@ -237,7 +239,7 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
       PREFIX vc: <https://www.w3.org/2018/credentials#>
       PREFIX result: <http://example.org/result#>
 
-      SELECT ?credential ?product ?productName ?claim ?topic ?conformance
+      SELECT ?credential ?product ?productName ?claim ?topic
              (EXISTS { ?claim result:allCriteriaVerified true } AS ?claimVerified)
       WHERE {
         ?credential a untp:DigitalProductPassport .
@@ -245,7 +247,8 @@ export async function listAllProducts(n3store: n3.Store): Promise<Product[]> {
         ?product a untp:Product .
         ?product schemaorg:name ?productName .
 
-        # Find performance claims
+        # Find performance claims (0.7.0 has no boolean conformance predicate on
+        # the claim, so it is not selected).
         ?product untp:performanceClaim ?claim .
         ?claim untp:conformityTopic ?topic .
 
