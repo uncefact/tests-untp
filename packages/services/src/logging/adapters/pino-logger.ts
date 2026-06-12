@@ -14,6 +14,14 @@ export function registerRequestContextProvider(fn: RequestContextProvider): void
   _requestContextProvider = fn;
 }
 
+/**
+ * Sensitive paths redacted in every log entry: decryptionKey at the top level
+ * and one level deep. Pino wildcards match a single level, so values nested
+ * two or more levels deep are not redacted; do not log secret-bearing objects
+ * inside wrappers.
+ */
+const DEFAULT_REDACT_PATHS = ['decryptionKey', '*.decryptionKey'];
+
 export class PinoLoggerAdapter implements LoggerService {
   private logger: pino.Logger;
 
@@ -22,36 +30,44 @@ export class PinoLoggerAdapter implements LoggerService {
       this.logger = configOrLogger;
     } else {
       const config = configOrLogger || {};
-      this.logger = pino({
-        level: config.level || process.env.LOG_LEVEL || 'info',
-        mixin() {
-          if (_requestContextProvider) {
-            try {
-              const context = _requestContextProvider();
-              return context ? { ...context } : {};
-            } catch (e) {
-              console.error('Failed to get request context for logging:', e);
-              return {};
+      this.logger = pino(
+        {
+          level: config.level || process.env.LOG_LEVEL || 'info',
+          redact: {
+            paths: [...DEFAULT_REDACT_PATHS, ...(config.redactPaths ?? [])],
+            censor: '[REDACTED]',
+          },
+          mixin() {
+            if (_requestContextProvider) {
+              try {
+                const context = _requestContextProvider();
+                return context ? { ...context } : {};
+              } catch (e) {
+                console.error('Failed to get request context for logging:', e);
+                return {};
+              }
             }
-          }
-          return {};
-        },
-        ...(config.pretty && {
-          transport: {
-            target: 'pino-pretty',
-            options: {
-              colorize: true,
-              translateTime: 'SYS:standard',
-              ignore: 'pid,hostname',
+            return {};
+          },
+          ...(config.pretty &&
+            !config.destination && {
+              transport: {
+                target: 'pino-pretty',
+                options: {
+                  colorize: true,
+                  translateTime: 'SYS:standard',
+                  ignore: 'pid,hostname',
+                },
+              },
+            }),
+          ...(config.correlationId && {
+            base: {
+              correlationId: config.correlationId,
             },
-          },
-        }),
-        ...(config.correlationId && {
-          base: {
-            correlationId: config.correlationId,
-          },
-        }),
-      });
+          }),
+        },
+        config.destination,
+      );
     }
   }
 

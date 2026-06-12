@@ -239,3 +239,86 @@ describe('PinoLoggerAdapter', () => {
     });
   });
 });
+
+describe('PinoLoggerAdapter redaction', () => {
+  function createCapture(): {
+    destination: { write: (msg: string) => void };
+    entries: () => Record<string, unknown>[];
+  } {
+    const lines: string[] = [];
+    return {
+      destination: { write: (msg: string) => void lines.push(msg.trim()) },
+      entries: () => lines.map((line) => JSON.parse(line)),
+    };
+  }
+
+  it('redacts a top-level decryptionKey field', () => {
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    logger.info({ decryptionKey: 'a'.repeat(64) }, 'storing credential');
+
+    const [entry] = capture.entries();
+    expect(entry.decryptionKey).toBe('[REDACTED]');
+  });
+
+  it('redacts a nested decryptionKey field', () => {
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    logger.info({ credential: { id: 'cred-1', decryptionKey: 'a'.repeat(64) } }, 'credential issued');
+
+    const [entry] = capture.entries();
+    expect((entry.credential as Record<string, unknown>).decryptionKey).toBe('[REDACTED]');
+    expect((entry.credential as Record<string, unknown>).id).toBe('cred-1');
+  });
+
+  it('redacts decryptionKey logged through a child logger', () => {
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    logger.child({ module: 'issue-credential' }).info({ decryptionKey: 'a'.repeat(64) }, 'saving record');
+
+    const [entry] = capture.entries();
+    expect(entry.decryptionKey).toBe('[REDACTED]');
+    expect(entry.module).toBe('issue-credential');
+  });
+
+  it('redacts additional paths supplied via redactPaths alongside the defaults', () => {
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({
+      level: 'info',
+      destination: capture.destination,
+      redactPaths: ['apiKey'],
+    });
+
+    logger.info({ apiKey: 'secret-key', decryptionKey: 'a'.repeat(64) }, 'configuring service');
+
+    const [entry] = capture.entries();
+    expect(entry.apiKey).toBe('[REDACTED]');
+    expect(entry.decryptionKey).toBe('[REDACTED]');
+  });
+
+  it('does not redact decryptionKey nested two levels deep (wildcards match one level)', () => {
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    logger.info({ result: { credential: { decryptionKey: 'leaks-at-depth-two' } } }, 'documenting the boundary');
+
+    const [entry] = capture.entries();
+    const credential = (entry.result as { credential: Record<string, unknown> }).credential;
+    expect(credential.decryptionKey).toBe('leaks-at-depth-two');
+  });
+
+  it('leaves non-sensitive fields intact', () => {
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    logger.info({ credentialId: 'cred-1', count: 3 }, 'credentials listed');
+
+    const [entry] = capture.entries();
+    expect(entry.credentialId).toBe('cred-1');
+    expect(entry.count).toBe(3);
+    expect(entry.msg).toBe('credentials listed');
+  });
+});
