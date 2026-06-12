@@ -5,7 +5,7 @@ const renderPage = new RenderPage();
 describe('Verify page credential rendering', () => {
   function verifyErrorDisplayed(errorText: string) {
     cy.contains(errorText, { timeout: 10000 }).should('be.visible');
-    cy.get('button').contains('JSON').should('not.exist');
+    cy.contains('button', 'JSON').should('not.exist');
   }
 
   describe('successful verification', () => {
