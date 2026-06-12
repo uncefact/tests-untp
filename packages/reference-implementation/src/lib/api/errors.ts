@@ -62,7 +62,7 @@ export class ConfigDecryptionError extends ServiceRegistryError {
   constructor(instanceId: string) {
     super(
       `Failed to decrypt configuration for service instance "${instanceId}". ` +
-        `Check that SERVICE_ENCRYPTION_KEY matches the key used during encryption.`,
+        `Check that DATA_ENCRYPTION_KEY matches the key used during encryption.`,
     );
     this.name = 'ConfigDecryptionError';
   }

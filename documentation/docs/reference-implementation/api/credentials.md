@@ -54,7 +54,7 @@ The type of credential determines what kind of data it contains and which schema
 
 When a credential is issued, two things are created: the **signed credential** (stored externally by the [storage service](./services)) and a **credential record** (stored in the Reference Implementation's database, tracking metadata like the storage URI, hash, and published status).
 
-By default, the [storage service](./services) **encrypts** the signed credential before storing it. When encrypted, the file at the storage URI is unreadable without the decryption key. The decryption key is returned by the storage service and saved in the credential record so it can be provided later during [verification](#verify-a-credential).
+By default, the [storage service](./services) **encrypts** the signed credential before storing it. When encrypted, the file at the storage URI is unreadable without the decryption key. The decryption key is returned by the storage service and saved in the credential record so it can be provided later during [verification](#verify-a-credential). Keys saved from this version onwards are themselves encrypted at rest with the `DATA_ENCRYPTION_KEY`, so reading the raw database row does not expose a usable key; the API decrypts it when returning the credential record. Credential records created by earlier versions hold their original plaintext key; run the `backfill:decryption-keys` script in the reference implementation package to encrypt them in place.
 
 This matters for privacy: a credential about a product's supply chain might contain commercially sensitive information. Encryption ensures that only someone with the key can read it, even if they have the storage URL.
 

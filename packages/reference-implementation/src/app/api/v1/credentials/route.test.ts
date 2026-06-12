@@ -111,6 +111,12 @@ jest.mock('@/lib/prisma/repositories', () => ({
   findConformitySchemeByCanonicalId: (...args: unknown[]) => mockFindConformityScheme(...args),
 }));
 
+// Pass stored keys through by default; individual tests override per call
+const mockRevealDecryptionKey = jest.fn((...args: unknown[]) => args[0]);
+jest.mock('@/lib/credentials/decryption-key-protection', () => ({
+  revealDecryptionKey: (...args: unknown[]) => mockRevealDecryptionKey(...args),
+}));
+
 // Conformity-vocabulary validator mock — the real cross-check is unit-tested in
 // `@uncefact/untp-utils`; here we only assert the route wires it up.
 const mockValidateConformityClaim = jest.fn();
@@ -1161,6 +1167,36 @@ describe('GET /api/v1/credentials', () => {
     await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
 
     expect(mockListCredentials).toHaveBeenCalledWith(expect.objectContaining({ credentialType: 'DPP' }));
+  });
+
+  it('returns 500 when a stored decryption key cannot be decrypted', async () => {
+    mockListCredentials.mockResolvedValue({
+      data: [{ id: 'cred-1', decryptionKey: 'stored-envelope' }],
+      total: 1,
+    });
+    mockRevealDecryptionKey.mockImplementationOnce(() => {
+      throw new Error('Failed to decrypt the stored credential decryption key.');
+    });
+
+    const req = createFakeGetRequest();
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(res.status).toBe(500);
+  });
+
+  it('reveals stored decryption keys in the listed credentials', async () => {
+    mockListCredentials.mockResolvedValue({
+      data: [{ id: 'cred-1', decryptionKey: 'stored-envelope' }],
+      total: 1,
+    });
+    mockRevealDecryptionKey.mockReturnValueOnce('plain-key');
+
+    const req = createFakeGetRequest();
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(mockRevealDecryptionKey).toHaveBeenCalledWith('stored-envelope');
+    expect(json.data[0].decryptionKey).toBe('plain-key');
   });
 
   it('passes isPublished=true filter to repository', async () => {

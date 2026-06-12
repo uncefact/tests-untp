@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getCredentialById } from '@/lib/prisma/repositories';
+import { revealDecryptionKey } from '@/lib/credentials/decryption-key-protection';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/credentials/[id]' });
@@ -58,5 +59,6 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 
   logger.info({ credentialId: credential.id }, 'Credential retrieved');
 
-  return NextResponse.json(credential);
+  const decryptionKey = revealDecryptionKey(credential.decryptionKey);
+  return NextResponse.json({ ...credential, decryptionKey });
 });

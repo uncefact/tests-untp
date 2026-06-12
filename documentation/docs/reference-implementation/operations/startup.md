@@ -66,11 +66,11 @@ The seed creates the following defaults. Each category is independent — if a r
 | Registrars | Identifier registrars (GS1, Australian Business Register, ASIC) | None |
 | Identifier schemes | Identifier types (GTIN, GLN, ABN, ACN) with validation patterns and qualifiers | None |
 | Data models | UNTP credential types (DPP, DCC, DFR, DIA, DTE) for each supported spec version, with their schema and context URLs | None |
-| Service instances | Default [verifiable credential](../services/verifiable-credential-service), [storage](../services/storage-service), and [identity resolver](../services/identity-resolver-service) service instances — see each service's page for the required environment variables and what they do | `SERVICE_ENCRYPTION_KEY` and each service's `SYSTEM_*` variables |
+| Service instances | Default [verifiable credential](../services/verifiable-credential-service), [storage](../services/storage-service), and [identity resolver](../services/identity-resolver-service) service instances — see each service's page for the required environment variables and what they do | `DATA_ENCRYPTION_KEY` and each service's `SYSTEM_*` variables |
 | Default DID | A system Decentralised Identifier (DID) created via the verifiable credential service | `SYSTEM_DID` and `SYSTEM_VC_*` variables |
 | Render templates | Default HTML render templates for each data model, uploaded to the storage service | `SYSTEM_STORAGE_*` variables (storage service must be reachable) |
 
-For example, if `SERVICE_ENCRYPTION_KEY` is not set, the service instances, default DID, and render templates are all skipped — but the system tenant, registrars, identifier schemes, and data models are still created. The skipped items must be configured before the system can issue, store, or resolve credentials — ensure all required environment variables are set.
+For example, if `DATA_ENCRYPTION_KEY` is not set, the service instances, default DID, and render templates are all skipped — but the system tenant, registrars, identifier schemes, and data models are still created. The skipped items must be configured before the system can issue, store, or resolve credentials — ensure all required environment variables are set.
 
 ### Customising seed data
 

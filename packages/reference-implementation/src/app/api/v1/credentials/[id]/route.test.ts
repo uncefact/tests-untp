@@ -49,6 +49,12 @@ jest.mock('@/lib/prisma/repositories', () => ({
   getCredentialById: (...args: unknown[]) => mockGetCredentialById(...args),
 }));
 
+// Pass stored keys through by default; individual tests override per call
+const mockRevealDecryptionKey = jest.fn((...args: unknown[]) => args[0]);
+jest.mock('@/lib/credentials/decryption-key-protection', () => ({
+  revealDecryptionKey: (...args: unknown[]) => mockRevealDecryptionKey(...args),
+}));
+
 // Import handler after mocks are in place
 import { GET } from './route';
 
@@ -93,6 +99,17 @@ describe('GET /api/v1/credentials/:id', () => {
     expect(body).toEqual(credential);
   });
 
+  it('reveals the stored decryption key before returning the credential', async () => {
+    mockGetCredentialById.mockResolvedValue({ id: 'cred-1', decryptionKey: 'stored-envelope' });
+    mockRevealDecryptionKey.mockReturnValueOnce('plain-key');
+
+    const res = (await GET(createFakeRequest(), AUTH_CONTEXT)) as { status: number; json: () => Promise<unknown> };
+    const body = (await res.json()) as { decryptionKey?: string };
+
+    expect(mockRevealDecryptionKey).toHaveBeenCalledWith('stored-envelope');
+    expect(body.decryptionKey).toBe('plain-key');
+  });
+
   it('calls getCredentialById with correct id and tenantId', async () => {
     mockGetCredentialById.mockResolvedValue({ id: 'cred-1' });
 
@@ -112,6 +129,17 @@ describe('GET /api/v1/credentials/:id', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body).toEqual({ error: 'Credential not found' });
+  });
+
+  it('returns 500 when the stored decryption key cannot be decrypted', async () => {
+    mockGetCredentialById.mockResolvedValue({ id: 'cred-1', decryptionKey: 'stored-envelope' });
+    mockRevealDecryptionKey.mockImplementationOnce(() => {
+      throw new Error('Failed to decrypt the stored credential decryption key.');
+    });
+
+    const res = (await GET(createFakeRequest(), AUTH_CONTEXT)) as { status: number; json: () => Promise<unknown> };
+
+    expect(res.status).toBe(500);
   });
 
   it('returns 500 when repository throws', async () => {

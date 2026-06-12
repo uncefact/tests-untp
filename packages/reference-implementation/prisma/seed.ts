@@ -73,15 +73,15 @@ async function main() {
     );
   }
 
-  // ── Seed service instances (requires SERVICE_ENCRYPTION_KEY) ────────────────
+  // ── Seed service instances (requires DATA_ENCRYPTION_KEY) ───────────────────
 
-  const ENCRYPTION_KEY = process.env.SERVICE_ENCRYPTION_KEY;
+  const ENCRYPTION_KEY = process.env.DATA_ENCRYPTION_KEY || process.env.SERVICE_ENCRYPTION_KEY;
   let encryptionService: AesGcmEncryptionAdapter | null = null;
   if (ENCRYPTION_KEY) {
     encryptionService = new AesGcmEncryptionAdapter(ENCRYPTION_KEY, logger);
   } else {
     logger.warn(
-      'SERVICE_ENCRYPTION_KEY not set; skipping service instance seeds (IDR, storage, VC). ' +
+      'DATA_ENCRYPTION_KEY not set; skipping service instance seeds (IDR, storage, VC). ' +
         'These can be configured later via the application UI.',
     );
   }

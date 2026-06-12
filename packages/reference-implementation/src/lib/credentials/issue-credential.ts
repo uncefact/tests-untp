@@ -7,6 +7,7 @@ import type {
 } from '@uncefact/untp-ri-services';
 import type { ResolvedService } from '@/lib/services/resolve-service';
 import { createCredential } from '@/lib/prisma/repositories';
+import { protectDecryptionKey } from './decryption-key-protection';
 import { resolvePrimaryEntity } from '@/lib/entities/resolve-primary-entity';
 import type { PrimaryEntityResult } from '@/lib/entities/resolve-primary-entity';
 import { apiLogger } from '@/lib/api/logger';
@@ -44,11 +45,13 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
 
   const primaryEntity = await resolvePrimaryEntity(refs, tenantId);
 
+  const decryptionKey = protectDecryptionKey(storageResponse.decryptionKey);
+
   const credentialRecord = await createCredential({
     tenantId,
     storageUri: storageResponse.uri,
     digestMultibase: storageResponse.digestMultibase,
-    decryptionKey: storageResponse.decryptionKey,
+    decryptionKey,
     credentialType,
     isPublished: false,
     organisationId: primaryEntity.organisationId,

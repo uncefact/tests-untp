@@ -12,6 +12,7 @@ import { apiLogger } from '@/lib/api/logger';
 import { resolveDataModel } from '@/lib/credentials/resolve-data-model';
 import { validateCredentialPayload } from '@/lib/credentials/validate-credential-payload';
 import { issueCredential } from '@/lib/credentials/issue-credential';
+import { revealDecryptionKey } from '@/lib/credentials/decryption-key-protection';
 import { schemaLoader } from '@/lib/credentials/schema-loader';
 import { updateCredentialPublished, listCredentials } from '@/lib/prisma/repositories';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
@@ -435,5 +436,9 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   });
 
   logger.info({ count: data.length }, 'Credentials listed');
-  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset));
+  const credentials = data.map((credential) => ({
+    ...credential,
+    decryptionKey: revealDecryptionKey(credential.decryptionKey),
+  }));
+  return NextResponse.json(buildPaginatedResponse(credentials, total, limit, offset));
 });
