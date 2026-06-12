@@ -38,7 +38,8 @@
     "storybook": "storybook dev -p 6006",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "backfill:decryption-keys": "npx tsx scripts/backfill-decryption-keys.ts"
   },
   "browserslist": {
     "production": [

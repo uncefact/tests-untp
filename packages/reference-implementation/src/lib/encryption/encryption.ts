@@ -1,4 +1,4 @@
-import { AesGcmEncryptionAdapter } from '@uncefact/untp-ri-services/server';
+import { AesGcmEncryptionAdapter } from '@uncefact/untp-ri-services/encryption';
 import { createLogger } from '@uncefact/untp-ri-services/logging';
 
 const logger = createLogger().child({ module: 'encryption' });
@@ -8,10 +8,13 @@ let cached: AesGcmEncryptionAdapter | null = null;
 export function getEncryptionService(): AesGcmEncryptionAdapter {
   if (cached) return cached;
 
-  const key = process.env.SERVICE_ENCRYPTION_KEY;
+  const key = process.env.DATA_ENCRYPTION_KEY || process.env.SERVICE_ENCRYPTION_KEY;
+  if (!process.env.DATA_ENCRYPTION_KEY && process.env.SERVICE_ENCRYPTION_KEY) {
+    logger.warn('SERVICE_ENCRYPTION_KEY is deprecated; rename it to DATA_ENCRYPTION_KEY');
+  }
   if (!key) {
     throw new Error(
-      'Missing required SERVICE_ENCRYPTION_KEY environment variable. ' + 'Set this in your .env file or environment.',
+      'Missing required DATA_ENCRYPTION_KEY environment variable. ' + 'Set this in your .env file or environment.',
     );
   }
 

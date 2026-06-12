@@ -103,8 +103,8 @@ services:
       TENANT_MODE: ${TENANT_MODE:-open}
       TENANT_CLAIM_NAME: ${TENANT_CLAIM_NAME:-groups}
       TENANT_CLAIM_FORMAT: ${TENANT_CLAIM_FORMAT:-array_first}
-      # Service registry encryption
-      SERVICE_ENCRYPTION_KEY: ${SERVICE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      # Encryption at rest (service instance configs and credential decryption keys)
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-${SERVICE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}}
       # Verification URLs
       DEFAULT_HUMAN_VERIFICATION_URL: http://localhost:3003/verify
       DEFAULT_MACHINE_VERIFICATION_URL: http://localhost:3332/agent/routeVerificationCredential

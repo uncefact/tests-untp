@@ -15,8 +15,13 @@ jest.mock('@/lib/entities/resolve-primary-entity', () => ({
 jest.mock('@uncefact/untp-ri-services', () => ({}));
 jest.mock('@/lib/services/resolve-service', () => ({}));
 
+// decryption-key-protection is exercised for real in these tests (so the
+// round-trip assertion uses real crypto); its encryption service requires this key.
+process.env.DATA_ENCRYPTION_KEY = 'a'.repeat(64);
+
 import { issueCredential } from './issue-credential';
 import type { IssueCredentialInput } from './issue-credential';
+import { revealDecryptionKey } from './decryption-key-protection';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -119,17 +124,40 @@ describe('issueCredential', () => {
   it('saves credential record with entity IDs', async () => {
     await issueCredential(buildInput());
 
-    expect(mockCreateCredential).toHaveBeenCalledWith({
-      tenantId: TENANT_ID,
-      storageUri: STORAGE_RESPONSE.uri,
+    expect(mockCreateCredential).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: TENANT_ID,
+        storageUri: STORAGE_RESPONSE.uri,
+        digestMultibase: STORAGE_RESPONSE.digestMultibase,
+        credentialType: 'DigitalProductPassport',
+        isPublished: false,
+        organisationId: undefined,
+        facilityId: undefined,
+        productId: 'prod-1',
+      }),
+    );
+  });
+
+  it('persists the decryption key encrypted at rest, not as plaintext', async () => {
+    await issueCredential(buildInput());
+
+    const saved = mockCreateCredential.mock.calls[0][0];
+    expect(saved.decryptionKey).toBeDefined();
+    expect(saved.decryptionKey).not.toBe(STORAGE_RESPONSE.decryptionKey);
+    expect(saved.decryptionKey).not.toContain(STORAGE_RESPONSE.decryptionKey);
+    expect(revealDecryptionKey(saved.decryptionKey)).toBe(STORAGE_RESPONSE.decryptionKey);
+  });
+
+  it('persists no decryption key when storage returns none', async () => {
+    stubStorageService.service.store.mockResolvedValueOnce({
+      uri: STORAGE_RESPONSE.uri,
       digestMultibase: STORAGE_RESPONSE.digestMultibase,
-      decryptionKey: STORAGE_RESPONSE.decryptionKey,
-      credentialType: 'DigitalProductPassport',
-      isPublished: false,
-      organisationId: undefined,
-      facilityId: undefined,
-      productId: 'prod-1',
     });
+
+    await issueCredential(buildInput({ storageOptions: { encrypt: false } }));
+
+    const saved = mockCreateCredential.mock.calls[0][0];
+    expect(saved.decryptionKey).toBeUndefined();
   });
 
   it('returns storage response and primary entity for publishing', async () => {
