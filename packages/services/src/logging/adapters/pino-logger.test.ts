@@ -299,15 +299,41 @@ describe('PinoLoggerAdapter redaction', () => {
     expect(entry.decryptionKey).toBe('[REDACTED]');
   });
 
-  it('does not redact decryptionKey nested two levels deep (wildcards match one level)', () => {
+  it('redacts decryptionKey inside an array of objects', () => {
     const capture = createCapture();
     const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
 
-    logger.info({ result: { credential: { decryptionKey: 'leaks-at-depth-two' } } }, 'documenting the boundary');
+    logger.info({ credentials: [{ id: 'cred-1', decryptionKey: 'a'.repeat(64) }] }, 'credentials listed');
+
+    const [entry] = capture.entries();
+    const [credential] = entry.credentials as Record<string, unknown>[];
+    expect(credential.decryptionKey).toBe('[REDACTED]');
+    expect(credential.id).toBe('cred-1');
+  });
+
+  it('redacts decryptionKey nested two levels deep', () => {
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    logger.info({ result: { credential: { decryptionKey: 'a'.repeat(64) } } }, 'credential issued');
 
     const [entry] = capture.entries();
     const credential = (entry.result as { credential: Record<string, unknown> }).credential;
-    expect(credential.decryptionKey).toBe('leaks-at-depth-two');
+    expect(credential.decryptionKey).toBe('[REDACTED]');
+  });
+
+  it('does not redact decryptionKey nested three levels deep (each wildcard matches one level)', () => {
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    logger.info(
+      { outcome: { result: { credential: { decryptionKey: 'leaks-at-depth-three' } } } },
+      'documenting the boundary',
+    );
+
+    const [entry] = capture.entries();
+    const result = (entry.outcome as { result: { credential: Record<string, unknown> } }).result;
+    expect(result.credential.decryptionKey).toBe('leaks-at-depth-three');
   });
 
   it('leaves non-sensitive fields intact', () => {

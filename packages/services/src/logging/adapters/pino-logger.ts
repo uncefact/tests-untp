@@ -15,12 +15,14 @@ export function registerRequestContextProvider(fn: RequestContextProvider): void
 }
 
 /**
- * Sensitive paths redacted in every log entry: decryptionKey at the top level
- * and one level deep. Pino wildcards match a single level, so values nested
- * two or more levels deep are not redacted; do not log secret-bearing objects
- * inside wrappers.
+ * Sensitive paths redacted in every log entry: decryptionKey at the top
+ * level, one level deep, and two levels deep (the `*[*]` subscript wildcard
+ * matches arrays and plain objects alike, covering shapes such as
+ * `{ credentials: [{ decryptionKey }] }`). Pino wildcards match a single
+ * level each, so values nested three or more levels deep are not redacted;
+ * do not log secret-bearing objects inside wrappers.
  */
-const DEFAULT_REDACT_PATHS = ['decryptionKey', '*.decryptionKey'];
+const DEFAULT_REDACT_PATHS = ['decryptionKey', '*.decryptionKey', '*[*].decryptionKey'];
 
 export class PinoLoggerAdapter implements LoggerService {
   private logger: pino.Logger;
