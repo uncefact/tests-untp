@@ -89,6 +89,12 @@ const PRODUCT_LEVELS = ['MODEL', 'BATCH', 'ITEM'] as const;
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: An identifier in this request is already the primary identifier of another product
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:

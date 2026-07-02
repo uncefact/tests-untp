@@ -5,6 +5,8 @@ import {
   updateIdentifierScheme,
   deleteIdentifierScheme,
 } from './identifier-scheme.repository';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
+import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { SYSTEM_TENANT_ID } from '../constants';
 
@@ -17,6 +19,7 @@ const mockTx = {
   },
   schemeQualifier: {
     deleteMany: jest.fn(),
+    createMany: jest.fn(),
   },
 };
 
@@ -42,6 +45,29 @@ const mockIdentifierScheme = prisma.identifierScheme as unknown as {
   findMany: jest.Mock;
   count: jest.Mock;
 };
+
+function prismaUniqueConstraintError(): Error {
+  const error = new Error('Unique constraint failed on the fields: (`registrarId`,`primaryKey`)');
+  error.name = 'PrismaClientKnownRequestError';
+  Object.assign(error, { code: 'P2002', clientVersion: '6.0.0' });
+  return error;
+}
+
+function prismaRecordNotFoundError(): Error {
+  const error = new Error(
+    'An operation failed because it depends on one or more records that were required but not found.',
+  );
+  error.name = 'PrismaClientKnownRequestError';
+  Object.assign(error, { code: 'P2025', clientVersion: '6.0.0' });
+  return error;
+}
+
+function prismaForeignKeyViolationError(): Error {
+  const error = new Error('Foreign key constraint failed on the field: `registrarId`');
+  error.name = 'PrismaClientKnownRequestError';
+  Object.assign(error, { code: 'P2003', clientVersion: '6.0.0' });
+  return error;
+}
 
 describe('identifier-scheme.repository', () => {
   const TENANT_ID = 'tenant-1';
@@ -141,6 +167,75 @@ describe('identifier-scheme.repository', () => {
           registrar: true,
         },
       });
+    });
+
+    it('maps a unique-constraint violation to ConflictError with a clean message', async () => {
+      mockIdentifierScheme.create.mockRejectedValue(prismaUniqueConstraintError());
+
+      const result = createIdentifierScheme({
+        tenantId: TENANT_ID,
+        registrarId: REGISTRAR_ID,
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{13,14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+      });
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow(
+        'An identifier scheme with this primary key already exists for the registrar',
+      );
+    });
+
+    it('maps a foreign-key violation to ValidationError', async () => {
+      mockIdentifierScheme.create.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = createIdentifierScheme({
+        tenantId: TENANT_ID,
+        registrarId: 'nonexistent-registrar',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{13,14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+      });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('The referenced registrar or IDR service instance does not exist');
+    });
+
+    it('rejects duplicate qualifier keys without hitting the database', async () => {
+      const result = createIdentifierScheme({
+        tenantId: TENANT_ID,
+        registrarId: REGISTRAR_ID,
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{13,14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+        qualifiers: [
+          { key: 'batch', description: 'Batch number', validationPattern: '^[A-Za-z0-9]{1,20}$' },
+          { key: 'batch', description: 'Duplicate batch', validationPattern: '^[A-Za-z0-9]{1,20}$' },
+        ],
+      });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Qualifier keys must be unique');
+      expect(mockIdentifierScheme.create).not.toHaveBeenCalled();
+    });
+
+    it('rethrows a non-database error unchanged', async () => {
+      const connectionError = new Error('connection lost');
+      mockIdentifierScheme.create.mockRejectedValue(connectionError);
+
+      await expect(
+        createIdentifierScheme({
+          tenantId: TENANT_ID,
+          registrarId: REGISTRAR_ID,
+          name: 'GTIN',
+          primaryKey: 'gtin',
+          validationPattern: '^\\d{13,14}$',
+          linkTemplate: '/{primaryKey}/{value}',
+        }),
+      ).rejects.toThrow(connectionError);
     });
   });
 
@@ -266,6 +361,7 @@ describe('identifier-scheme.repository', () => {
     it('replaces qualifiers when provided', async () => {
       mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
       mockTx.schemeQualifier.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.schemeQualifier.createMany.mockResolvedValue({ count: 1 });
       mockTx.identifierScheme.update.mockResolvedValue({
         ...SCHEME_RECORD,
         qualifiers: [
@@ -288,18 +384,44 @@ describe('identifier-scheme.repository', () => {
       expect(mockTx.schemeQualifier.deleteMany).toHaveBeenCalledWith({
         where: { schemeId: 'scheme-1' },
       });
+      expect(mockTx.schemeQualifier.createMany).toHaveBeenCalledWith({
+        data: [{ schemeId: 'scheme-1', key: 'serial', description: 'Serial number', validationPattern: '^[A-Z0-9]+$' }],
+      });
       expect(mockTx.identifierScheme.update).toHaveBeenCalledWith({
         where: { id: 'scheme-1' },
-        data: {
-          qualifiers: {
-            create: [{ key: 'serial', description: 'Serial number', validationPattern: '^[A-Z0-9]+$' }],
-          },
-        },
+        data: {},
         include: {
           qualifiers: true,
           registrar: true,
         },
       });
+    });
+
+    it('does not call schemeQualifier.createMany when qualifiers is an empty array', async () => {
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.schemeQualifier.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.identifierScheme.update.mockResolvedValue({ ...SCHEME_RECORD, qualifiers: [] });
+
+      await updateIdentifierScheme('scheme-1', TENANT_ID, { qualifiers: [] });
+
+      expect(mockTx.schemeQualifier.deleteMany).toHaveBeenCalledWith({
+        where: { schemeId: 'scheme-1' },
+      });
+      expect(mockTx.schemeQualifier.createMany).not.toHaveBeenCalled();
+    });
+
+    it('maps a unique-constraint violation on qualifier creation to ConflictError with a clean message', async () => {
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.schemeQualifier.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.schemeQualifier.createMany.mockRejectedValue(prismaUniqueConstraintError());
+
+      const result = updateIdentifierScheme('scheme-1', TENANT_ID, {
+        qualifiers: [{ key: 'serial', description: 'Serial number', validationPattern: '^[A-Z0-9]+$' }],
+      });
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow('A qualifier with this key already exists for the scheme');
+      expect(mockTx.identifierScheme.update).not.toHaveBeenCalled();
     });
 
     it('allows setting idrServiceInstanceId to null', async () => {
@@ -325,6 +447,55 @@ describe('identifier-scheme.repository', () => {
         'Identifier scheme not found or access denied',
       );
     });
+
+    it('maps a unique-constraint violation to ConflictError with a clean message', async () => {
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.identifierScheme.update.mockRejectedValue(prismaUniqueConstraintError());
+
+      const result = updateIdentifierScheme('scheme-1', TENANT_ID, { primaryKey: 'gtin-14' });
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow(
+        'An identifier scheme with this primary key already exists for the registrar',
+      );
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.identifierScheme.update.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = updateIdentifierScheme('scheme-1', TENANT_ID, { name: 'GTIN-14' });
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Identifier scheme not found or access denied');
+    });
+
+    it('maps a foreign-key violation to ValidationError', async () => {
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.identifierScheme.update.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = updateIdentifierScheme('scheme-1', TENANT_ID, { idrServiceInstanceId: 'nonexistent-si' });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('The referenced IDR service instance does not exist');
+    });
+
+    it('rejects duplicate qualifier keys without hitting the database', async () => {
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+
+      const result = updateIdentifierScheme('scheme-1', TENANT_ID, {
+        qualifiers: [
+          { key: 'serial', description: 'Serial number', validationPattern: '^[A-Z0-9]+$' },
+          { key: 'serial', description: 'Duplicate serial', validationPattern: '^[A-Z0-9]+$' },
+        ],
+      });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Qualifier keys must be unique');
+      expect(mockTx.schemeQualifier.deleteMany).not.toHaveBeenCalled();
+      expect(mockTx.schemeQualifier.createMany).not.toHaveBeenCalled();
+      expect(mockTx.identifierScheme.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('deleteIdentifierScheme', () => {
@@ -349,6 +520,26 @@ describe('identifier-scheme.repository', () => {
       await expect(deleteIdentifierScheme('scheme-1', 'other-tenant')).rejects.toThrow(
         'Identifier scheme not found or access denied',
       );
+    });
+
+    it('maps a foreign-key violation to ConflictError when identifiers still reference the scheme', async () => {
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.identifierScheme.delete.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = deleteIdentifierScheme('scheme-1', TENANT_ID);
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow('The identifier scheme has identifiers and cannot be deleted');
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.identifierScheme.delete.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = deleteIdentifierScheme('scheme-1', TENANT_ID);
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Identifier scheme not found or access denied');
     });
   });
 });

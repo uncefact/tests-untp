@@ -158,7 +158,7 @@ describe('resolveServiceAccountUser', () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 'user-race', tenantId: 'tenant-race' });
 
-    const p2002Error = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
+    const p2002Error = Object.assign(new Error('Unique constraint failed'), { code: 'P2002', clientVersion: '6.0.0' });
     mockPrisma.$transaction.mockRejectedValueOnce(p2002Error);
 
     const result = await resolveServiceAccountUser(CLAIMS);
@@ -172,7 +172,7 @@ describe('resolveServiceAccountUser', () => {
   it('returns null when retry lookup after P2002 still finds no user', async () => {
     mockPrisma.user.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
 
-    const p2002Error = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
+    const p2002Error = Object.assign(new Error('Unique constraint failed'), { code: 'P2002', clientVersion: '6.0.0' });
     mockPrisma.$transaction.mockRejectedValueOnce(p2002Error);
 
     const result = await resolveServiceAccountUser(CLAIMS);

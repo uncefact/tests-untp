@@ -93,7 +93,7 @@ describe('resolveClosedModeTenant', () => {
   // P2002 retry
   it('retries full resolution on P2002 unique constraint violation', async () => {
     // First attempt: transaction throws P2002
-    mockPrisma.$transaction.mockRejectedValueOnce({ code: 'P2002' });
+    mockPrisma.$transaction.mockRejectedValueOnce({ code: 'P2002', clientVersion: '6.0.0' });
     // Second attempt (retry): succeeds
     mockPrisma.$transaction.mockImplementationOnce((cb: (tx: unknown) => Promise<unknown>) => cb(mockPrisma));
     mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-1' });

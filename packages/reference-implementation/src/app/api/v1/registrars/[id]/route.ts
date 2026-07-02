@@ -198,6 +198,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: The registrar has schemes with identifiers and cannot be deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:

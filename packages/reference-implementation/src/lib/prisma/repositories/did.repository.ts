@@ -1,6 +1,7 @@
 import { Did, DidStatus, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
+import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
@@ -59,21 +60,28 @@ export async function createDid(input: CreateDidInput): Promise<Did> {
     serviceInstanceId: input.serviceInstanceId,
   };
 
-  if (input.isDefault) {
-    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      await tx.did.updateMany({
-        where: {
-          tenantId: input.tenantId,
-          isDefault: true,
-          type: { not: 'DEFAULT' },
-        },
-        data: { isDefault: false },
+  try {
+    if (input.isDefault) {
+      return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.did.updateMany({
+          where: {
+            tenantId: input.tenantId,
+            isDefault: true,
+            type: { not: 'DEFAULT' },
+          },
+          data: { isDefault: false },
+        });
+        return tx.did.create({ data });
       });
-      return tx.did.create({ data });
+    }
+
+    return await prisma.did.create({ data });
+  } catch (e) {
+    mapDatabaseError(e, {
+      conflict: 'A DID record with this DID already exists',
+      invalidReference: 'Service instance not found',
     });
   }
-
-  return prisma.did.create({ data });
 }
 
 /**
@@ -202,14 +210,18 @@ export async function updateDid(id: string, tenantId: string, input: UpdateDidIn
       });
     }
 
-    return tx.did.update({
-      where: { id },
-      data: {
-        ...(input.name !== undefined && { name: input.name }),
-        ...(input.description !== undefined && { description: input.description }),
-        ...(input.isDefault !== undefined && { isDefault: input.isDefault }),
-      },
-    });
+    try {
+      return await tx.did.update({
+        where: { id },
+        data: {
+          ...(input.name !== undefined && { name: input.name }),
+          ...(input.description !== undefined && { description: input.description }),
+          ...(input.isDefault !== undefined && { isDefault: input.isDefault }),
+        },
+      });
+    } catch (e) {
+      mapDatabaseError(e, { notFound: 'DID not found or access denied' });
+    }
   });
 }
 
@@ -227,10 +239,14 @@ export async function updateDidStatus(id: string, tenantId: string, status: DidS
       throw new NotFoundError('DID not found or access denied');
     }
 
-    return tx.did.update({
-      where: { id },
-      data: { status },
-    });
+    try {
+      return await tx.did.update({
+        where: { id },
+        data: { status },
+      });
+    } catch (e) {
+      mapDatabaseError(e, { notFound: 'DID not found or access denied' });
+    }
   });
 }
 
@@ -248,9 +264,13 @@ export async function deleteDid(id: string, tenantId: string): Promise<void> {
       throw new NotFoundError('DID not found or access denied');
     }
 
-    await tx.did.delete({
-      where: { id },
-    });
+    try {
+      await tx.did.delete({
+        where: { id },
+      });
+    } catch (e) {
+      mapDatabaseError(e, { notFound: 'DID not found or access denied' });
+    }
   });
 }
 

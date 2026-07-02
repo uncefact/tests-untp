@@ -139,6 +139,12 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: The identifier is already the primary identifier of another facility
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:

@@ -88,6 +88,12 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: An identifier scheme with this primary key already exists for the registrar
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:

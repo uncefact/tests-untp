@@ -139,6 +139,12 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: An identifier scheme with this primary key already exists for the registrar
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
@@ -254,6 +260,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Scheme not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: The identifier scheme has identifiers and cannot be deleted
  *         content:
  *           application/json:
  *             schema:

@@ -6,6 +6,7 @@ import {
   deleteRenderTemplate,
   getDefaultRenderTemplate,
 } from './render-template.repository';
+import { NotFoundError } from '@/lib/api/errors';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
@@ -51,6 +52,22 @@ const mockRenderTemplate = prisma.renderTemplate as unknown as {
 };
 
 const INCLUDE_SHAPE = {};
+
+function prismaRecordNotFoundError(): Error {
+  const error = new Error(
+    'An operation failed because it depends on one or more records that were required but not found.',
+  );
+  error.name = 'PrismaClientKnownRequestError';
+  Object.assign(error, { code: 'P2025', clientVersion: '6.0.0' });
+  return error;
+}
+
+function prismaForeignKeyViolationError(): Error {
+  const error = new Error('Foreign key constraint failed on the field: `dataModelId`');
+  error.name = 'PrismaClientKnownRequestError';
+  Object.assign(error, { code: 'P2003', clientVersion: '6.0.0' });
+  return error;
+}
 
 describe('render-template.repository', () => {
   const TENANT_ID = 'tenant-1';
@@ -160,6 +177,36 @@ describe('render-template.repository', () => {
         }),
         include: INCLUDE_SHAPE,
       });
+    });
+
+    it('maps a foreign-key violation to NotFoundError when the data model was deleted before insert', async () => {
+      mockTx.renderTemplate.create.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = createRenderTemplate(TENANT_ID, {
+        name: 'DPP Default Template',
+        dataModelId: CONFIG_ID,
+        renderMethodType: 'RenderTemplate2024',
+        storageUrl: 'https://storage.example.com/templates/dpp-default.html',
+        digestMultibase: 'zTESTabc123',
+      });
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Data model not found');
+    });
+
+    it('rethrows a non-database error unchanged', async () => {
+      const connectionError = new Error('connection lost');
+      mockTx.renderTemplate.create.mockRejectedValue(connectionError);
+
+      await expect(
+        createRenderTemplate(TENANT_ID, {
+          name: 'DPP Default Template',
+          dataModelId: CONFIG_ID,
+          renderMethodType: 'RenderTemplate2024',
+          storageUrl: 'https://storage.example.com/templates/dpp-default.html',
+          digestMultibase: 'zTESTabc123',
+        }),
+      ).rejects.toThrow(connectionError);
     });
   });
 
@@ -455,6 +502,16 @@ describe('render-template.repository', () => {
         include: INCLUDE_SHAPE,
       });
     });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.renderTemplate.findFirst.mockResolvedValue(TEMPLATE_RECORD);
+      mockTx.renderTemplate.update.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = updateRenderTemplate('template-1', TENANT_ID, { name: 'Updated Template' });
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Render template not found or access denied');
+    });
   });
 
   describe('deleteRenderTemplate', () => {
@@ -480,6 +537,16 @@ describe('render-template.repository', () => {
       await expect(deleteRenderTemplate('template-1', 'other-tenant')).rejects.toThrow(
         'Render template not found or access denied',
       );
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.renderTemplate.findFirst.mockResolvedValue(TEMPLATE_RECORD);
+      mockTx.renderTemplate.delete.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = deleteRenderTemplate('template-1', TENANT_ID);
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Render template not found or access denied');
     });
   });
 

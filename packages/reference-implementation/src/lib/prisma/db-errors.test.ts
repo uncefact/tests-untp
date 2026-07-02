@@ -29,6 +29,11 @@ describe('isUniqueConstraintViolation', () => {
     expect(isUniqueConstraintViolation(null)).toBe(false);
     expect(isUniqueConstraintViolation('P2002')).toBe(false);
   });
+
+  it('rejects a non-Prisma error carrying a matching code property', () => {
+    const impostor = Object.assign(new Error('not from the ORM'), { code: 'P2002' });
+    expect(isUniqueConstraintViolation(impostor)).toBe(false);
+  });
 });
 
 describe('isForeignKeyViolation', () => {
@@ -36,12 +41,22 @@ describe('isForeignKeyViolation', () => {
     expect(isForeignKeyViolation(prismaKnownError('P2003'))).toBe(true);
     expect(isForeignKeyViolation(prismaKnownError('P2002'))).toBe(false);
   });
+
+  it('rejects a non-Prisma error carrying a matching code property', () => {
+    const impostor = Object.assign(new Error('not from the ORM'), { code: 'P2003' });
+    expect(isForeignKeyViolation(impostor)).toBe(false);
+  });
 });
 
 describe('isRecordNotFound', () => {
   it('matches only P2025', () => {
     expect(isRecordNotFound(prismaKnownError('P2025'))).toBe(true);
     expect(isRecordNotFound(prismaKnownError('P2003'))).toBe(false);
+  });
+
+  it('rejects a non-Prisma error carrying a matching code property', () => {
+    const impostor = Object.assign(new Error('not from the ORM'), { code: 'P2025' });
+    expect(isRecordNotFound(impostor)).toBe(false);
   });
 });
 

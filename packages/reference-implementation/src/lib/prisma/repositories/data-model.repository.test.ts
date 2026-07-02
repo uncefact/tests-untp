@@ -5,6 +5,7 @@ import {
   updateDataModel,
   deleteDataModel,
 } from './data-model.repository';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Transaction mock — functions called via $transaction callback
@@ -56,6 +57,22 @@ const DETAIL_INCLUDE_SHAPE = {
 const LIST_INCLUDE_SHAPE = {
   parentConfig: true,
 };
+
+function prismaUniqueConstraintError(): Error {
+  const error = new Error('Unique constraint failed on the fields: (`tenantId`,`name`,`credentialType`,`version`)');
+  error.name = 'PrismaClientKnownRequestError';
+  Object.assign(error, { code: 'P2002', clientVersion: '6.0.0' });
+  return error;
+}
+
+function prismaRecordNotFoundError(): Error {
+  const error = new Error(
+    'An operation failed because it depends on one or more records that were required but not found.',
+  );
+  error.name = 'PrismaClientKnownRequestError';
+  Object.assign(error, { code: 'P2025', clientVersion: '6.0.0' });
+  return error;
+}
 
 describe('data-model.repository', () => {
   const TENANT_ID = 'tenant-1';
@@ -208,6 +225,40 @@ describe('data-model.repository', () => {
         }),
         include: DETAIL_INCLUDE_SHAPE,
       });
+    });
+
+    it('maps a unique-constraint violation to ConflictError with a clean message', async () => {
+      mockTx.dataModel.create.mockRejectedValue(prismaUniqueConstraintError());
+
+      const result = createDataModel(TENANT_ID, {
+        name: 'Digital Product Passport v0.6.0',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        isExtension: false,
+      });
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow(
+        'A data model with this name already exists for the credential type and version',
+      );
+    });
+
+    it('rethrows a non-database error unchanged', async () => {
+      const dbError = new Error('connection lost');
+      mockTx.dataModel.create.mockRejectedValue(dbError);
+
+      await expect(
+        createDataModel(TENANT_ID, {
+          name: 'Digital Product Passport v0.6.0',
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.0',
+          schemaUrl: 'https://example.com/schema.json',
+          contextUrl: 'https://example.com/context.jsonld',
+          isExtension: false,
+        }),
+      ).rejects.toThrow(dbError);
     });
   });
 
@@ -379,6 +430,28 @@ describe('data-model.repository', () => {
         include: DETAIL_INCLUDE_SHAPE,
       });
     });
+
+    it('maps a unique-constraint violation to ConflictError with a clean message', async () => {
+      mockTx.dataModel.findFirst.mockResolvedValue(EXTENSION_RECORD);
+      mockTx.dataModel.update.mockRejectedValue(prismaUniqueConstraintError());
+
+      const result = updateDataModel('config-ext-1', TENANT_ID, { name: 'Updated Name' });
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow(
+        'A data model with this name already exists for the credential type and version',
+      );
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.dataModel.findFirst.mockResolvedValue(EXTENSION_RECORD);
+      mockTx.dataModel.update.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = updateDataModel('config-ext-1', TENANT_ID, { name: 'Updated Name' });
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Data model not found or access denied');
+    });
   });
 
   describe('deleteDataModel', () => {
@@ -402,6 +475,16 @@ describe('data-model.repository', () => {
       await expect(deleteDataModel('config-1', 'other-tenant')).rejects.toThrow(
         'Data model not found or access denied',
       );
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.dataModel.findFirst.mockResolvedValue(EXTENSION_RECORD);
+      mockTx.dataModel.delete.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = deleteDataModel('config-ext-1', TENANT_ID);
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Data model not found or access denied');
     });
   });
 });

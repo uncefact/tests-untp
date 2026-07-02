@@ -1,7 +1,8 @@
 import { Registrar, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
-import { NotFoundError } from '@/lib/api/errors';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
+import { isForeignKeyViolation, mapDatabaseError } from '@/lib/prisma/db-errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
@@ -37,15 +38,19 @@ export type ListRegistrarsOptions = {
  * Creates a new registrar scoped to an organisation (tenant).
  */
 export async function createRegistrar(input: CreateRegistrarInput): Promise<Registrar> {
-  return prisma.registrar.create({
-    data: {
-      tenantId: input.tenantId,
-      name: input.name,
-      namespace: input.namespace,
-      url: input.url,
-      idrServiceInstanceId: input.idrServiceInstanceId,
-    },
-  });
+  try {
+    return await prisma.registrar.create({
+      data: {
+        tenantId: input.tenantId,
+        name: input.name,
+        namespace: input.namespace,
+        url: input.url,
+        idrServiceInstanceId: input.idrServiceInstanceId,
+      },
+    });
+  } catch (e) {
+    mapDatabaseError(e, { invalidReference: 'The referenced IDR service instance does not exist' });
+  }
 }
 
 /**
@@ -109,15 +114,22 @@ export async function updateRegistrar(id: string, tenantId: string, input: Updat
       throw new NotFoundError('Registrar not found or access denied');
     }
 
-    return tx.registrar.update({
-      where: { id },
-      data: {
-        ...(input.name !== undefined && { name: input.name }),
-        ...(input.namespace !== undefined && { namespace: input.namespace }),
-        ...(input.url !== undefined && { url: input.url }),
-        ...(input.idrServiceInstanceId !== undefined && { idrServiceInstanceId: input.idrServiceInstanceId }),
-      },
-    });
+    try {
+      return await tx.registrar.update({
+        where: { id },
+        data: {
+          ...(input.name !== undefined && { name: input.name }),
+          ...(input.namespace !== undefined && { namespace: input.namespace }),
+          ...(input.url !== undefined && { url: input.url }),
+          ...(input.idrServiceInstanceId !== undefined && { idrServiceInstanceId: input.idrServiceInstanceId }),
+        },
+      });
+    } catch (e) {
+      mapDatabaseError(e, {
+        notFound: 'Registrar not found or access denied',
+        invalidReference: 'The referenced IDR service instance does not exist',
+      });
+    }
   });
 }
 
@@ -135,8 +147,19 @@ export async function deleteRegistrar(id: string, tenantId: string): Promise<Reg
       throw new NotFoundError('Registrar not found or access denied');
     }
 
-    return tx.registrar.delete({
-      where: { id },
-    });
+    try {
+      return await tx.registrar.delete({
+        where: { id },
+      });
+    } catch (e) {
+      // Deleting a registrar cascades into its schemes, and Identifier.scheme
+      // is declared with onDelete: Restrict, so a foreign-key violation here
+      // means identifiers block the cascade (a conflict), not that a
+      // referenced record is missing.
+      if (isForeignKeyViolation(e)) {
+        throw new ConflictError('The registrar has schemes with identifiers and cannot be deleted');
+      }
+      mapDatabaseError(e, { notFound: 'Registrar not found or access denied' });
+    }
   });
 }

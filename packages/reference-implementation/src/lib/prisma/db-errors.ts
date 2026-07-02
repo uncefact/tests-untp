@@ -13,13 +13,11 @@ import { ValidationError } from '@/lib/api/validation';
  */
 
 function hasPrismaErrorCode(error: unknown, code: string): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    typeof (error as { code: unknown }).code === 'string' &&
-    (error as { code: string }).code === code
-  );
+  // Gated on isDatabaseError so a non-Prisma error that happens to carry a
+  // matching `code` string is never misclassified as a constraint violation.
+  if (!isDatabaseError(error)) return false;
+  const candidate = error as { code?: unknown };
+  return typeof candidate.code === 'string' && candidate.code === code;
 }
 
 /** P2002: a unique-constraint violation (the record already exists). */
@@ -59,6 +57,11 @@ export function isDatabaseError(error: unknown): boolean {
  * Provide a message only for the outcomes the operation can actually produce;
  * anything else rethrows unchanged. At least one key is required: a call with
  * no context is a plain rethrow and should not be written as a mapping.
+ *
+ * A P2003 raised by a delete usually means an onDelete: Restrict relation
+ * blocked it, which a surface may treat as a conflict rather than a bad
+ * reference; call sites needing that semantic use the exported guards
+ * directly instead of `invalidReference`.
  */
 export type DatabaseErrorContext =
   | { conflict: string; notFound?: string; invalidReference?: string }

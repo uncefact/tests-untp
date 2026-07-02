@@ -73,6 +73,12 @@ const logger = apiLogger.child({ route: '/api/v1/facilities' });
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: An identifier in this request is already the primary identifier of another facility
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:
