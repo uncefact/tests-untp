@@ -1,5 +1,5 @@
 import type { TtlCache } from '../cache/ttl-cache.js';
-import { resolveJsonDocument, ResolverHttpError, ResolverInvalidJsonError } from '../resolvers/index.js';
+import { ResolverHttpError, ResolverInvalidJsonError } from '../resolvers/errors.js';
 import { SchemaLoaderHttpError, SchemaLoaderInvalidJsonError, SchemaLoaderNetworkError } from './errors.js';
 
 /**
@@ -43,6 +43,10 @@ function toSchemaLoaderError(url: string, cause: unknown): Error {
  * @throws {SchemaLoaderInvalidJsonError} if the body is not parseable as JSON.
  */
 async function fetchSchema<T extends object>(url: string): Promise<T> {
+  // Lazy import: the resolver stack pulls in undici, which jsdom test
+  // environments cannot evaluate, so it loads at fetch time to keep this
+  // module importable there.
+  const { resolveJsonDocument } = await import('../resolvers/index.js');
   try {
     const { json } = await resolveJsonDocument(url, { accept: SCHEMA_ACCEPT, totalTimeoutMs: FETCH_TIMEOUT_MS });
     return json as T;

@@ -1,4 +1,4 @@
-import { resolveJsonDocument, type ResolveDocumentOptions } from '../resolvers/index.js';
+import type { ResolveDocumentOptions } from '../resolvers/index.js';
 import type { TtlCache } from '../cache/ttl-cache.js';
 
 /**
@@ -51,6 +51,10 @@ export function createJsonLdDocumentLoader(
   const { cache, accept, ...resolverOptions } = options ?? {};
 
   const load = async (url: string): Promise<LoadedRemoteDocument> => {
+    // Lazy import: the resolver stack pulls in undici, which jsdom test
+    // environments cannot evaluate, so it loads at fetch time to keep this
+    // module importable there.
+    const { resolveJsonDocument } = await import('../resolvers/index.js');
     const { json, finalUrl } = await resolveJsonDocument(url, {
       ...resolverOptions,
       accept: accept ?? CONTEXT_ACCEPT_HEADER,

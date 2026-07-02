@@ -85,6 +85,11 @@ describe('createSchemaLoader', () => {
 
       const a = loader.load(SCHEMA_URL);
       const b = loader.load(SCHEMA_URL);
+      // The loader imports the guarded resolver lazily, so the mocked fetch
+      // starts a tick after load(); wait for it before releasing the promise.
+      while (resolveJsonDocument.mock.calls.length === 0) {
+        await new Promise((r) => setImmediate(r));
+      }
       resolve({ json: { $schema: 'foo' }, finalUrl: SCHEMA_URL });
       await expect(a).resolves.toEqual({ $schema: 'foo' });
       await expect(b).resolves.toEqual({ $schema: 'foo' });
