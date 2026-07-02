@@ -1,6 +1,7 @@
 import { Prisma } from '@/lib/prisma/generated';
 import { prisma } from '@/lib/prisma/prisma';
 import { createLogger } from '@uncefact/untp-ri-services/logging';
+import { isUniqueConstraintViolation } from '@/lib/prisma/db-errors';
 
 const logger = createLogger().child({ module: 'service-account-user' });
 
@@ -85,8 +86,4 @@ export async function resolveServiceAccountUser(claims: ServiceAccountClaims): P
     logger.error({ sub: claims.sub, error }, 'Failed to provision service account user');
     return null;
   }
-}
-
-function isUniqueConstraintViolation(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && (error as { code: string }).code === 'P2002';
 }

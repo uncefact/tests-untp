@@ -1,6 +1,7 @@
 import { Prisma } from '@/lib/prisma/generated';
 import { prisma } from '@/lib/prisma/prisma';
 import { createLogger } from '@uncefact/untp-ri-services/logging';
+import { isUniqueConstraintViolation } from '@/lib/prisma/db-errors';
 
 const logger = createLogger().child({ module: 'resolve-closed-mode-tenant' });
 
@@ -112,8 +113,4 @@ async function retryResolution(
     logger.error({ groupClaimValue, sub, error }, 'Retry resolution also failed');
     return null;
   }
-}
-
-function isUniqueConstraintViolation(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && (error as { code: string }).code === 'P2002';
 }

@@ -8,6 +8,7 @@ import {
   ServiceRegistryError,
 } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
+import { isDatabaseError } from '@/lib/prisma/db-errors';
 import { ServiceError } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
 
@@ -53,6 +54,14 @@ export function handleRouteError(e: unknown): Response {
   if (e instanceof ServiceError) {
     logger.error({ err: e, code: e.code, status: e.statusCode }, 'Service error');
     return NextResponse.json({ error: e.message, code: e.code }, { status: e.statusCode });
+  }
+  if (isDatabaseError(e)) {
+    // Database errors carry ORM internals (engine text, table and column names) in
+    // their message; log the detail, return only a generic body. Unlike the final
+    // fallback below, this branch never echoes error text. The distinct log message
+    // is the signal that a repository is missing a mapping.
+    logger.error({ err: e }, 'Unhandled database error');
+    return NextResponse.json({ error: 'An unexpected error has occurred.' }, { status: 500 });
   }
   logger.error({ err: e }, 'Unexpected error');
   return NextResponse.json({ error: errorMessage(e) }, { status: 500 });
