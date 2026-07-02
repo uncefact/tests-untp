@@ -90,3 +90,16 @@ export class ResolverRedirectMissingLocationError extends ResolverError {
     });
   }
 }
+
+/** The response body was fetched but could not be parsed as JSON. */
+export class ResolverInvalidJsonError extends ResolverError {
+  constructor(url: string, cause: unknown) {
+    super({
+      code: 'resolver.invalid-json',
+      message: `Response body for ${url} is not valid JSON.`,
+      received: cause instanceof Error ? cause.message : String(cause),
+      expected: 'a JSON document',
+      cause,
+    });
+  }
+}
